@@ -2127,26 +2127,40 @@ void runNaturalNumberGameProofs() {
 
     Environment env = buildArithmeticEnvironment();
 
-    // Convenience helpers — closures that build the boilerplate
-    // applications of Equality and reflexivity at Type 0.
-    auto equality = [](ExpressionPointer a, ExpressionPointer x,
-                        ExpressionPointer y) {
-        return makeApplication(
-            makeApplication(
-                makeApplication(
-                    makeConstant("Equality", {makeLevelConst(0)}),
-                    a),
-                x),
-            y);
-    };
-    auto reflexivity = [](ExpressionPointer a, ExpressionPointer x) {
-        return makeApplication(
-            makeApplication(
-                makeConstant("reflexivity", {makeLevelConst(0)}),
-                a),
-            x);
-    };
-    auto Natural = []() { return makeConstant("Natural"); };
+    // ------------------------------------------------------------------
+    // The equality we'll use throughout these proofs is an INDUCTIVE
+    // equality — no longer an axiom. Its recursor (the J principle)
+    // gives us substitution / Leibniz reasoning for free, so we won't
+    // need a separate successorCongruence axiom.
+    //
+    //   inductive Equality₁.{u} (A : Type u) (x : A) : A → Prop
+    //     | refl₁ : Equality₁ A x x
+    //
+    // We use the name Equality₁ (and refl₁) inside this function to
+    // avoid clashing with the axiomatic Equality / reflexivity in
+    // buildArithmeticEnvironment(), which other tests depend on.
+    // ------------------------------------------------------------------
+    addInductive(env, "Equality1", {"u"},
+        makePi("A", makeType(makeLevelParam("u")),
+            makePi("x", makeBoundVariable(0),
+                makePi("y", makeBoundVariable(1), makeProp()))),
+        /*numParameters=*/ 2,
+        {{
+            "refl1",
+            makePi("A", makeType(makeLevelParam("u")),
+                makePi("x", makeBoundVariable(0),
+                    makeApplication(
+                        makeApplication(
+                            makeApplication(
+                                makeConstant("Equality1",
+                                              {makeLevelParam("u")}),
+                                makeBoundVariable(1)),
+                            makeBoundVariable(0)),
+                        makeBoundVariable(0))))
+        }});
+
+    // Convenience helpers. All proofs below use the inductive equality.
+    auto Nat = []() { return makeConstant("Natural"); };
     auto zero = []() { return makeConstant("zero"); };
     auto succ = [](ExpressionPointer n) {
         return makeApplication(makeConstant("successor"), n);
@@ -2154,264 +2168,130 @@ void runNaturalNumberGameProofs() {
     auto plus = [](ExpressionPointer n, ExpressionPointer m) {
         return makeApplication(makeApplication(makeConstant("add"), n), m);
     };
-
-    // ------------------------------------------------------------------
-    // Theorem 1: zero_add :  Π(a : Natural). 0 + a = a.
-    //
-    // Definitional: add zero a reduces under ι to (λm. m) a, then β to a.
-    // So  Equality Natural (add zero a) a   is definitionally equal to
-    // Equality Natural a a,  and reflexivity Natural a inhabits both.
-    //
-    //   zero_add := λ(a : Natural). reflexivity Natural a
-    // ------------------------------------------------------------------
-    {
-        auto theoremType =
-            makePi("a", Natural(),
-                equality(Natural(),
-                          plus(zero(), makeBoundVariable(0)),
-                          makeBoundVariable(0)));
-        auto proof = makeLambda("a", Natural(),
-                                 reflexivity(Natural(), makeBoundVariable(0)));
-        addDefinition(env, "zero_add", theoremType, proof);
-        EXPECT_TRUE(env.lookup("zero_add") != nullptr);
-        std::cout << "  zero_add  ⊨  Π(a : Natural). add zero a = a   "
-                     "(definitional)\n";
-    }
-
-    // ------------------------------------------------------------------
-    // Now that the kernel supports inductive families, we can replace the
-    // axiomatic Equality with an inductive declaration. The recursor is
-    // auto-generated; this gives us the J / transport / Leibniz-
-    // substitution principle, from which we derive successorCongruence
-    // and any other equality reasoning we need.
-    //
-    // The arithmetic environment already declares Equality as an axiom.
-    // We can't redeclare it, so we add a parallel inductive equality.
-    // Use a different name (InductiveEquality) to avoid clashing with the
-    // existing axiom. Same for the constructor — reflInductive.
-    //
-    //   inductive InductiveEquality.{u} (A : Type u) (x : A) : A → Prop
-    //     | reflInductive : InductiveEquality A x x
-    // ------------------------------------------------------------------
-    addInductive(env, "InductiveEquality", {"u"},
-        // kind: Π(A : Type u). Π(x : A). Π(y : A). Prop
-        makePi("A", makeType(makeLevelParam("u")),
-            makePi("x", makeBoundVariable(0),
-                makePi("y", makeBoundVariable(1), makeProp()))),
-        /*numParameters=*/ 2,
-        {{
-            "reflInductive",
-            // refl's type: Π(A : Type u). Π(x : A). InductiveEquality A x x
-            makePi("A", makeType(makeLevelParam("u")),
-                makePi("x", makeBoundVariable(0),
-                    makeApplication(
-                        makeApplication(
-                            makeApplication(
-                                makeConstant("InductiveEquality",
-                                              {makeLevelParam("u")}),
-                                makeBoundVariable(1) /* A */),
-                            makeBoundVariable(0) /* x */),
-                        makeBoundVariable(0) /* x */)))
-        }});
-
-    // Helper closures for the inductive version.
-    auto inductiveEquality = [](ExpressionPointer a, ExpressionPointer x,
-                                 ExpressionPointer y) {
+    auto eq = [](ExpressionPointer a, ExpressionPointer x,
+                 ExpressionPointer y) {
         return makeApplication(
             makeApplication(
                 makeApplication(
-                    makeConstant("InductiveEquality", {makeLevelConst(0)}),
+                    makeConstant("Equality1", {makeLevelConst(0)}),
                     a),
                 x),
             y);
     };
-    auto reflInductive = [](ExpressionPointer a, ExpressionPointer x) {
+    auto refl = [](ExpressionPointer a, ExpressionPointer x) {
         return makeApplication(
             makeApplication(
-                makeConstant("reflInductive", {makeLevelConst(0)}),
+                makeConstant("refl1", {makeLevelConst(0)}),
                 a),
             x);
     };
 
     // ------------------------------------------------------------------
-    // successorCongruence — DERIVED from InductiveEquality's recursor
-    // (no longer an axiom!). The recursor's type is:
+    // Derived: succCong : Π(x y : Natural). x = y → succ x = succ y.
     //
-    //   InductiveEquality_recursor.{u, m}
-    //     : Π(A : Type u). Π(x : A).
-    //       Π(motive : Π(y : A). Π(_ : InductiveEquality A x y). Sort m).
-    //       Π(case_refl : motive x (reflInductive A x)).
-    //       Π(y : A). Π(eq : InductiveEquality A x y).
-    //       motive y eq
-    //
-    // To prove  Π(x y : Natural). InductiveEquality x y → succ x = succ y
-    // we recurse on the equality:
-    //   motive := λ y' _eq'. InductiveEquality Natural (succ x) (succ y')
-    //   case_refl := reflInductive Natural (succ x)
-    //                              -- since y'=x and _eq'=refl, we need
-    //                              -- IE Nat (succ x) (succ x).
-    //
-    //   inductiveSuccessorCongruence :=
-    //     λ x y eq.
-    //       InductiveEquality_recursor.{0,0}
-    //         Natural x
-    //         (λ y' _eq'. InductiveEquality Natural (succ x) (succ y'))
-    //         (reflInductive Natural (succ x))
-    //         y eq
+    // Eliminate the equality using Equality1's recursor. The motive
+    //   λ y' _eq'. Equality1 Natural (succ x) (succ y')
+    // turns the goal "succ x = succ y" into the special case where
+    // y' = x (so we need succ x = succ x, immediate from refl).
     // ------------------------------------------------------------------
     {
-        // Motive: λ(y' : Natural). λ(_eq' : InductiveEquality Natural x y').
-        //           InductiveEquality Natural (succ x) (succ y')
-        // Inside this double lambda, x is captured from the outer scope.
-        // Indices when used inside the recursor body:
-        //   - the outer body has x, y, eq bound (de Bruijn indices 2, 1, 0).
-        //   - inside motive's lambdas: y'=0, _eq'=... wait motive has 2 lambdas
-        //     so depths add up. Let me be careful.
-        //
-        // The successorCongruence proof body lives inside three lambdas:
-        //   λ x. λ y. λ eq. [body]
-        // From [body]'s perspective: eq=0, y=1, x=2.
-        //
-        // The motive lambda is constructed INSIDE [body]; its references
-        // to x must reach further out. Motive is:
-        //   λ y'. λ _eq'. InductiveEquality Natural (succ x) (succ y')
-        // Indices INSIDE motive's body:
-        //   y' = 0 (innermost), _eq' = ... actually wait, motive has 2
-        //   lambdas (y' and _eq'). Inside the innermost body:
-        //     _eq' = 0, y' = 1, then jumping out to the outer scope:
-        //     eq = 2, y = 3, x = 4.
-        //   So x is at index 4, y' is at index 1.
-        // Inside motive's _eq' body, binders going outward are:
-        //   _eq'=0, y'=1, eq=2, y=3, x=4
-        // The _eq's TYPE is constructed inside y' but outside _eq', so
-        // binders there are: y'=0, eq=1, y=2, x=3.
-        auto motive = makeLambda("y'", makeConstant("Natural"),
+        // Proof body lives inside  λ x. λ y. λ eq. [body]. From body:
+        //   eq=0, y=1, x=2.
+        // Motive constructed inside body — inside its inner _eq' body the
+        // binders are _eq'=0, y'=1, eq=2, y=3, x=4. The _eq's TYPE is
+        // built inside y' but outside _eq', so binders are y'=0, eq=1,
+        // y=2, x=3.
+        auto motive = makeLambda("y'", Nat(),
             makeLambda("_eq'",
-                inductiveEquality(makeConstant("Natural"),
-                                    makeBoundVariable(3) /* x */,
-                                    makeBoundVariable(0) /* y' */),
-                inductiveEquality(makeConstant("Natural"),
-                                    succ(makeBoundVariable(4) /* x */),
-                                    succ(makeBoundVariable(1) /* y' */))));
-
-        // case_refl: from inside the outer three-lambda body, we need
-        //   reflInductive Natural (succ x)
-        // x is at index 2 (eq=0, y=1, x=2).
-        auto caseRefl =
-            reflInductive(makeConstant("Natural"),
-                          succ(makeBoundVariable(2) /* x */));
-
-        // The full proof: λ x. λ y. λ eq. recursor Nat x motive caseRefl y eq
-        auto proof = makeLambda("x", makeConstant("Natural"),
-            makeLambda("y", makeConstant("Natural"),
+                eq(Nat(),
+                   makeBoundVariable(3) /* x */,
+                   makeBoundVariable(0) /* y' */),
+                eq(Nat(),
+                   succ(makeBoundVariable(4) /* x */),
+                   succ(makeBoundVariable(1) /* y' */))));
+        auto caseRefl = refl(Nat(), succ(makeBoundVariable(2) /* x */));
+        auto proof = makeLambda("x", Nat(),
+            makeLambda("y", Nat(),
                 makeLambda("eq",
-                    inductiveEquality(makeConstant("Natural"),
-                                       makeBoundVariable(1) /* x */,
-                                       makeBoundVariable(0) /* y */),
+                    eq(Nat(),
+                       makeBoundVariable(1) /* x */,
+                       makeBoundVariable(0) /* y */),
                     makeApplication(
                         makeApplication(
                             makeApplication(
                                 makeApplication(
                                     makeApplication(
                                         makeApplication(
-                                            makeConstant(
-                                                "InductiveEquality_recursor",
-                                                {makeLevelConst(0),
-                                                 makeLevelConst(0)}),
-                                            makeConstant("Natural")),
+                                            makeConstant("Equality1_recursor",
+                                                          {makeLevelConst(0),
+                                                           makeLevelConst(0)}),
+                                            Nat()),
                                         makeBoundVariable(2) /* x */),
                                     motive),
                                 caseRefl),
                             makeBoundVariable(1) /* y */),
                         makeBoundVariable(0) /* eq */))));
-
-        auto theoremType = makePi("x", makeConstant("Natural"),
-            makePi("y", makeConstant("Natural"),
+        auto theoremType = makePi("x", Nat(),
+            makePi("y", Nat(),
                 makePi("_eq",
-                    inductiveEquality(makeConstant("Natural"),
-                                       makeBoundVariable(1),
-                                       makeBoundVariable(0)),
-                    inductiveEquality(makeConstant("Natural"),
-                                       succ(makeBoundVariable(2)),
-                                       succ(makeBoundVariable(1))))));
-
-        addDefinition(env, "inductiveSuccessorCongruence", theoremType, proof);
-        EXPECT_TRUE(env.lookup("inductiveSuccessorCongruence") != nullptr);
-        std::cout << "  inductiveSuccessorCongruence  ⊨  (derived from "
-                     "InductiveEquality recursor)\n";
+                    eq(Nat(), makeBoundVariable(1), makeBoundVariable(0)),
+                    eq(Nat(),
+                       succ(makeBoundVariable(2)),
+                       succ(makeBoundVariable(1))))));
+        addDefinition(env, "succCong", theoremType, proof);
+        std::cout << "  succCong   ⊨  Π(x y : Natural). x = y → "
+                     "succ x = succ y   (J)\n";
     }
 
-    // Keep the axiom-based version available too (the old proofs depend
-    // on it).
-    addAxiom(env, "successorCongruence",
-        makePi("x", Natural(),
-            makePi("y", Natural(),
-                makePi("_eq",
-                       equality(Natural(),
-                                 makeBoundVariable(1) /* x */,
-                                 makeBoundVariable(0) /* y */),
-                    equality(Natural(),
-                              succ(makeBoundVariable(2) /* x */),
-                              succ(makeBoundVariable(1) /* y */))))));
+    // ------------------------------------------------------------------
+    // Theorem 1: zero_add :  Π(a : Natural). 0 + a = a.
+    //
+    // Definitional: add zero a ι-reduces to a, so the proof is just
+    // refl Natural a.
+    // ------------------------------------------------------------------
+    {
+        auto theoremType =
+            makePi("a", Nat(),
+                eq(Nat(), plus(zero(), makeBoundVariable(0)),
+                   makeBoundVariable(0)));
+        auto proof = makeLambda("a", Nat(),
+            refl(Nat(), makeBoundVariable(0)));
+        addDefinition(env, "zero_add", theoremType, proof);
+        std::cout << "  zero_add   ⊨  Π(a : Natural). 0 + a = a   "
+                     "(definitional)\n";
+    }
 
     // ------------------------------------------------------------------
     // Theorem 2: add_zero :  Π(a : Natural). a + 0 = a.
     //
-    // Not definitional — add a zero doesn't reduce when a is a free
-    // variable, because add recurses on its first argument. Proof by
-    // induction on a, using Natural_recursor.{0} (motive returns Prop).
-    //
-    //   motive          := λ(a : Natural). Equality Natural (a + 0) a
-    //   case_zero       : Equality Natural (zero + 0) zero
-    //                  =  Equality Natural zero zero          (by ι)
-    //                  ↤  reflexivity Natural zero
-    //   case_succ k IH  : Equality Natural ((succ k) + 0) (succ k)
-    //                  =  Equality Natural (succ (k + 0)) (succ k)
-    //                  ↤  successorCongruence (k + 0) k IH
-    //
-    //   add_zero := λ(a : Natural). Natural_recursor.{0} motive
-    //                  case_zero case_succ a
+    // Not definitional. Proof by induction on a using Natural_recursor
+    // with a Prop-valued motive, and succCong (derived above, not an
+    // axiom) for the successor case.
     // ------------------------------------------------------------------
     {
-        // motive : Π(_ : Natural). Prop.
-        auto motive = makeLambda("a", Natural(),
-            equality(Natural(),
-                      plus(makeBoundVariable(0) /* a */, zero()),
-                      makeBoundVariable(0) /* a */));
-
-        // case_zero : Equality Natural (zero + zero) zero.
-        // After ι-reduction, this is  Equality Natural zero zero,
-        // which reflexivity Natural zero inhabits.
-        auto caseZero = reflexivity(Natural(), zero());
-
-        // case_succ : Π(k : Natural). Π(IH : Equality (k + 0) k).
-        //               Equality Natural ((succ k) + 0) (succ k)
-        //
-        // The body successorCongruence is applied to:
-        //   x = k + 0  ↦  makeBoundVariable(1) is k (inside the IH binder)
-        //                 plus(k, zero) needs k = bound var 1.
-        //   y = k      ↦  makeBoundVariable(1)
-        //   eq = IH    ↦  makeBoundVariable(0)
-        auto caseSucc = makeLambda("k", Natural(),
+        auto motive = makeLambda("a", Nat(),
+            eq(Nat(),
+               plus(makeBoundVariable(0), zero()),
+               makeBoundVariable(0)));
+        auto caseZero = refl(Nat(), zero());
+        auto caseSucc = makeLambda("k", Nat(),
             makeLambda("IH",
-                equality(Natural(),
-                          plus(makeBoundVariable(0) /* k inside k-binder */,
-                                zero()),
-                          makeBoundVariable(0) /* k */),
+                eq(Nat(),
+                   plus(makeBoundVariable(0), zero()),
+                   makeBoundVariable(0)),
                 makeApplication(
                     makeApplication(
-                        makeApplication(makeConstant("successorCongruence"),
+                        makeApplication(makeConstant("succCong"),
                                         plus(makeBoundVariable(1) /* k */,
                                               zero())),
                         makeBoundVariable(1) /* k */),
                     makeBoundVariable(0) /* IH */)));
 
         auto theoremType =
-            makePi("a", Natural(),
-                equality(Natural(),
-                          plus(makeBoundVariable(0) /* a */, zero()),
-                          makeBoundVariable(0) /* a */));
-        auto proof = makeLambda("a", Natural(),
+            makePi("a", Nat(),
+                eq(Nat(), plus(makeBoundVariable(0), zero()),
+                   makeBoundVariable(0)));
+        auto proof = makeLambda("a", Nat(),
             makeApplication(
                 makeApplication(
                     makeApplication(
@@ -2420,35 +2300,28 @@ void runNaturalNumberGameProofs() {
                             motive),
                         caseZero),
                     caseSucc),
-                makeBoundVariable(0) /* a */));
+                makeBoundVariable(0)));
 
         addDefinition(env, "add_zero", theoremType, proof);
-        EXPECT_TRUE(env.lookup("add_zero") != nullptr);
-        std::cout << "  add_zero  ⊨  Π(a : Natural). add a zero = a   "
-                     "(by induction)\n";
+        std::cout << "  add_zero   ⊨  Π(a : Natural). a + 0 = a   "
+                     "(induction + succCong)\n";
     }
 
     // ------------------------------------------------------------------
-    // Theorem 3: add_one_right :  Π(a : Natural). a + 1 = succ a.
+    // Theorem 3: one_add :  Π(a : Natural). 1 + a = succ a.
     //
-    // Definitional once we substitute! add a (succ zero) recurses on a,
-    // so for a free variable a it doesn't reduce. But succ a = add a 1
-    // *does* reduce in one direction:  add (succ zero) a  reduces to
-    // succ a (via ι on the outer successor and ι on zero inside). So
-    // the symmetric form  Equality Natural (add (succ zero) a) (succ a)
-    // *is* definitional. Let's prove that.
+    // Definitional once you observe that add (succ zero) a ι-reduces
+    // to succ a directly.
     // ------------------------------------------------------------------
     {
         auto theoremType =
-            makePi("a", Natural(),
-                equality(Natural(),
-                          plus(succ(zero()), makeBoundVariable(0) /* a */),
-                          succ(makeBoundVariable(0) /* a */)));
-        auto proof = makeLambda("a", Natural(),
-            reflexivity(Natural(), succ(makeBoundVariable(0))));
+            makePi("a", Nat(),
+                eq(Nat(), plus(succ(zero()), makeBoundVariable(0)),
+                   succ(makeBoundVariable(0))));
+        auto proof = makeLambda("a", Nat(),
+            refl(Nat(), succ(makeBoundVariable(0))));
         addDefinition(env, "one_add", theoremType, proof);
-        EXPECT_TRUE(env.lookup("one_add") != nullptr);
-        std::cout << "  one_add   ⊨  Π(a : Natural). 1 + a = succ a   "
+        std::cout << "  one_add    ⊨  Π(a : Natural). 1 + a = succ a   "
                      "(definitional)\n";
     }
 }
