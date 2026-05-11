@@ -2187,6 +2187,206 @@ void runNaturalNumberGameProofs() {
     };
 
     // ------------------------------------------------------------------
+    // Eq.symm — universe-polymorphic.
+    //   Π(A : Type u). Π(x y : A). Equality1 A x y → Equality1 A y x.
+    // Derived from the recursor. Recurses on the input equality with
+    // motive  λ y' _. Equality1 A y' x.  Base case y'=x needs x = x,
+    // i.e. refl1 A x.
+    // ------------------------------------------------------------------
+    {
+        // Proof body lives inside  λ A. λ x. λ y. λ eq. [body].
+        // From body's perspective: eq=0, y=1, x=2, A=3.
+        // Motive is  λ y'. λ _eq'. Equality1.{u} A y' x.
+        //   At motive's _eq' body level: _eq'=0, y'=1, eq=2, y=3, x=4, A=5.
+        //   At _eq' TYPE position (inside y' but outside _eq'):
+        //                          y'=0, eq=1, y=2, x=3, A=4.
+        auto motive = makeLambda("y'", makeBoundVariable(3) /* A */,
+            makeLambda("_eq'",
+                makeApplication(makeApplication(makeApplication(
+                    makeConstant("Equality1", {makeLevelParam("u")}),
+                    makeBoundVariable(4) /* A */),
+                    makeBoundVariable(3) /* x */),
+                    makeBoundVariable(0) /* y' */),
+                makeApplication(makeApplication(makeApplication(
+                    makeConstant("Equality1", {makeLevelParam("u")}),
+                    makeBoundVariable(5) /* A */),
+                    makeBoundVariable(1) /* y' */),
+                    makeBoundVariable(4) /* x */)));
+
+        auto caseRefl = makeApplication(
+            makeApplication(
+                makeConstant("refl1", {makeLevelParam("u")}),
+                makeBoundVariable(3) /* A */),
+            makeBoundVariable(2) /* x */);
+
+        auto proof = makeLambda("A", makeType(makeLevelParam("u")),
+            makeLambda("x", makeBoundVariable(0) /* A */,
+                makeLambda("y", makeBoundVariable(1) /* A */,
+                    makeLambda("_eq",
+                        makeApplication(makeApplication(makeApplication(
+                            makeConstant("Equality1", {makeLevelParam("u")}),
+                            makeBoundVariable(2)),
+                            makeBoundVariable(1)),
+                            makeBoundVariable(0)),
+                        makeApplication(
+                            makeApplication(
+                                makeApplication(
+                                    makeApplication(
+                                        makeApplication(
+                                            makeApplication(
+                                                makeConstant(
+                                                    "Equality1_recursor",
+                                                    {makeLevelParam("u"),
+                                                     makeLevelConst(0)}),
+                                                makeBoundVariable(3) /* A */),
+                                            makeBoundVariable(2) /* x */),
+                                        motive),
+                                    caseRefl),
+                                makeBoundVariable(1) /* y */),
+                            makeBoundVariable(0) /* eq */)))));
+
+        auto theoremType =
+            makePi("A", makeType(makeLevelParam("u")),
+                makePi("x", makeBoundVariable(0),
+                    makePi("y", makeBoundVariable(1),
+                        makePi("_eq",
+                            makeApplication(makeApplication(makeApplication(
+                                makeConstant("Equality1",
+                                              {makeLevelParam("u")}),
+                                makeBoundVariable(2)),
+                                makeBoundVariable(1)),
+                                makeBoundVariable(0)),
+                            makeApplication(makeApplication(makeApplication(
+                                makeConstant("Equality1",
+                                              {makeLevelParam("u")}),
+                                makeBoundVariable(3)),
+                                makeBoundVariable(1)),
+                                makeBoundVariable(2))))));
+
+        addDefinition(env, "Eq.symm", {"u"}, theoremType, proof);
+        std::cout << "  Eq.symm    ⊨  Π(A : Type u). Π(x y : A). x = y → "
+                     "y = x   (J, universe-polymorphic)\n";
+    }
+
+    // ------------------------------------------------------------------
+    // Eq.trans — universe-polymorphic.
+    //   Π(A : Type u). Π(x y z : A). x = y → y = z → x = z.
+    // Recurse on the SECOND equality with motive  λ z' _. Equality1 A x z'.
+    // Base case z'=y needs x = y, supplied directly by the first equality.
+    // ------------------------------------------------------------------
+    {
+        // Proof body lives inside  λ A x y z eq_xy eq_yz. From body:
+        //   eq_yz=0, eq_xy=1, z=2, y=3, x=4, A=5.
+        // Motive  λ z'. λ _eq'. Equality1.{u} A x z'.
+        //   _eq' body: _eq'=0, z'=1, eq_yz=2, eq_xy=3, z=4, y=5, x=6, A=7.
+        //   _eq' TYPE (inside z' but outside _eq'): z'=0, eq_yz=1, eq_xy=2,
+        //     z=3, y=4, x=5, A=6.
+        auto motive = makeLambda("z'", makeBoundVariable(5) /* A */,
+            makeLambda("_eq'",
+                makeApplication(makeApplication(makeApplication(
+                    makeConstant("Equality1", {makeLevelParam("u")}),
+                    makeBoundVariable(6) /* A */),
+                    makeBoundVariable(4) /* y */),
+                    makeBoundVariable(0) /* z' */),
+                makeApplication(makeApplication(makeApplication(
+                    makeConstant("Equality1", {makeLevelParam("u")}),
+                    makeBoundVariable(7) /* A */),
+                    makeBoundVariable(6) /* x */),
+                    makeBoundVariable(1) /* z' */)));
+
+        // caseRefl at body level (eq_yz=0, eq_xy=1, z=2, y=3, x=4, A=5):
+        // we need Equality1.{u} A x y, which is eq_xy = Bound 1.
+        auto caseRefl = makeBoundVariable(1) /* eq_xy */;
+
+        auto proof = makeLambda("A", makeType(makeLevelParam("u")),
+            makeLambda("x", makeBoundVariable(0),
+                makeLambda("y", makeBoundVariable(1),
+                    makeLambda("z", makeBoundVariable(2),
+                        makeLambda("eq_xy",
+                            makeApplication(makeApplication(makeApplication(
+                                makeConstant("Equality1",
+                                              {makeLevelParam("u")}),
+                                makeBoundVariable(3) /* A */),
+                                makeBoundVariable(2) /* x */),
+                                makeBoundVariable(1) /* y */),
+                            makeLambda("eq_yz",
+                                // At this position (inside A,x,y,z,eq_xy
+                                // outside eq_yz): eq_xy=0, z=1, y=2, x=3,
+                                // A=4. So y is Bound(2), not Bound(3).
+                                makeApplication(makeApplication(makeApplication(
+                                    makeConstant("Equality1",
+                                                  {makeLevelParam("u")}),
+                                    makeBoundVariable(4) /* A */),
+                                    makeBoundVariable(2) /* y */),
+                                    makeBoundVariable(1) /* z */),
+                                makeApplication(
+                                    makeApplication(
+                                        makeApplication(
+                                            makeApplication(
+                                                makeApplication(
+                                                    makeApplication(
+                                                        makeConstant(
+                                                            "Equality1_recursor",
+                                                            {makeLevelParam("u"),
+                                                             makeLevelConst(0)}),
+                                                        makeBoundVariable(5) /* A */),
+                                                    makeBoundVariable(3) /* y */),
+                                                motive),
+                                            caseRefl),
+                                        makeBoundVariable(2) /* z */),
+                                    makeBoundVariable(0) /* eq_yz */)))))));
+
+        auto theoremType =
+            makePi("A", makeType(makeLevelParam("u")),
+                makePi("x", makeBoundVariable(0),
+                    makePi("y", makeBoundVariable(1),
+                        makePi("z", makeBoundVariable(2),
+                            makePi("eq_xy",
+                                makeApplication(makeApplication(makeApplication(
+                                    makeConstant("Equality1",
+                                                  {makeLevelParam("u")}),
+                                    makeBoundVariable(3)),
+                                    makeBoundVariable(2)),
+                                    makeBoundVariable(1)),
+                                makePi("eq_yz",
+                                    makeApplication(makeApplication(makeApplication(
+                                        makeConstant("Equality1",
+                                                      {makeLevelParam("u")}),
+                                        makeBoundVariable(4) /* A */),
+                                        makeBoundVariable(2) /* y */),
+                                        makeBoundVariable(1) /* z */),
+                                    makeApplication(makeApplication(makeApplication(
+                                        makeConstant("Equality1",
+                                                      {makeLevelParam("u")}),
+                                        makeBoundVariable(5) /* A */),
+                                        makeBoundVariable(4) /* x */),
+                                        makeBoundVariable(2) /* z */)))))));
+
+        addDefinition(env, "Eq.trans", {"u"}, theoremType, proof);
+        std::cout << "  Eq.trans   ⊨  Π(A : Type u). Π(x y z : A). "
+                     "x = y → y = z → x = z   (J, universe-polymorphic)\n";
+    }
+
+    // ------------------------------------------------------------------
+    // Polymorphic demo: Equality1 instantiated at universe 1 (Type 0 as
+    // the value-level type). naturalEqualsItself : Equality1.{1} (Type 0)
+    // Natural Natural. Proof: refl1.{1} (Type 0) Natural. The same
+    // declarations work at higher universes.
+    // ------------------------------------------------------------------
+    addDefinition(env, "naturalEqualsItself",
+        makeApplication(makeApplication(makeApplication(
+            makeConstant("Equality1", {makeLevelConst(1)}),
+            makeType(0)),
+            makeConstant("Natural")),
+            makeConstant("Natural")),
+        makeApplication(
+            makeApplication(makeConstant("refl1", {makeLevelConst(1)}),
+                            makeType(0)),
+            makeConstant("Natural")));
+    std::cout << "  naturalEqualsItself  ⊨  Equality1.{1} (Type 0) "
+                 "Natural Natural\n";
+
+    // ------------------------------------------------------------------
     // Derived: succCong : Π(x y : Natural). x = y → succ x = succ y.
     //
     // Eliminate the equality using Equality1's recursor. The motive
