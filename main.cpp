@@ -2527,6 +2527,435 @@ void runNaturalNumberGameProofs() {
 }
 
 // ----------------------------------------------------------------------------
+// A small library of inductive types and derived functions. Demonstrates
+// that the kernel now handles a variety of inductive shapes:
+//   And      — Prop, 1 ctor with 2 non-param Prop args (restricted elim)
+//   Or       — Prop, 2 ctors                            (restricted elim)
+//   Sum      — Type, 2 ctors                            (large elim)
+//   Prod     — Type, 1 ctor with 2 non-param Type args  (large elim)
+//   Option   — Type, 2 ctors                            (large elim)
+//   List     — Type, 2 ctors, one recursive             (large elim)
+// Each comes with at least one derived function or theorem.
+// ----------------------------------------------------------------------------
+
+void runInductiveLibraryProofs() {
+    std::cout << "--- inductive library proofs ---\n";
+
+    Environment env = buildArithmeticEnvironment();
+
+    auto Nat = []() { return makeConstant("Natural"); };
+    auto zero = []() { return makeConstant("zero"); };
+    auto succ = [](ExpressionPointer n) {
+        return makeApplication(makeConstant("successor"), n);
+    };
+
+    // ---------------- And (Prop) -----------------
+    // And.swap : Π(A B : Prop). And A B → And B A.
+    {
+        addInductive(env, "And",
+            makePi("A", makeProp(),
+                makePi("B", makeProp(), makeProp())),
+            /*numParameters=*/ 2,
+            {{
+                "mkAnd",
+                makePi("A", makeProp(),
+                    makePi("B", makeProp(),
+                        makePi("_a", makeBoundVariable(1) /* A */,
+                            makePi("_b", makeBoundVariable(1) /* B */,
+                                makeApplication(makeApplication(
+                                    makeConstant("And"),
+                                    makeBoundVariable(3) /* A */),
+                                    makeBoundVariable(2) /* B */)))))
+            }});
+
+        // And.swap : Π(A B : Prop). And A B → And B A.
+        // Proof: λ A B p. And_recursor A B (λ _. And B A) (λ a b. mkAnd B A b a) p.
+        // And is multi-arg Prop ctor → restricted elim. Recursor has 0
+        // motive-universe args (motive forced to Prop).
+        //
+        // Inside the 3 outer lambdas (A, B, p): p=0, B=1, A=2.
+        // Inside motive's `_` body (one more binder): _=0, p=1, B=2, A=3.
+        // Inside case_mkAnd's `b` body (3 lambdas in: a, b inside, p, B, A outside):
+        //   b=0, a=1, p=2, B=3, A=4.
+        auto motiveAndSwap = makeLambda("_",
+            makeApplication(makeApplication(
+                makeConstant("And"),
+                makeBoundVariable(2) /* A */),
+                makeBoundVariable(1) /* B */),
+            // body: And B A.  At this position B=2, A=3.
+            makeApplication(makeApplication(
+                makeConstant("And"),
+                makeBoundVariable(2) /* B */),
+                makeBoundVariable(3) /* A */));
+        auto caseMkAnd = makeLambda("a", makeBoundVariable(2) /* A */,
+            makeLambda("b", makeBoundVariable(2) /* B */,
+                // body: mkAnd B A b a.  At this position b=0, a=1, p=2, B=3, A=4.
+                makeApplication(makeApplication(makeApplication(makeApplication(
+                    makeConstant("mkAnd"),
+                    makeBoundVariable(3) /* B */),
+                    makeBoundVariable(4) /* A */),
+                    makeBoundVariable(0) /* b */),
+                    makeBoundVariable(1) /* a */)));
+        auto swapBody = makeLambda("A", makeProp(),
+            makeLambda("B", makeProp(),
+                makeLambda("p",
+                    makeApplication(makeApplication(
+                        makeConstant("And"),
+                        makeBoundVariable(1) /* A */),
+                        makeBoundVariable(0) /* B */),
+                    // body: And_recursor A B motive case p.
+                    // At this position: p=0, B=1, A=2.
+                    makeApplication(makeApplication(makeApplication(
+                            makeApplication(makeApplication(
+                                makeConstant("And_recursor"),
+                                makeBoundVariable(2) /* A */),
+                                makeBoundVariable(1) /* B */),
+                            motiveAndSwap),
+                        caseMkAnd),
+                        makeBoundVariable(0) /* p */))));
+        auto swapType = makePi("A", makeProp(),
+            makePi("B", makeProp(),
+                makePi("_",
+                    makeApplication(makeApplication(
+                        makeConstant("And"),
+                        makeBoundVariable(1)),
+                        makeBoundVariable(0)),
+                    // body: And B A.  At position _=0, B=1, A=2.
+                    makeApplication(makeApplication(
+                        makeConstant("And"),
+                        makeBoundVariable(1) /* B */),
+                        makeBoundVariable(2) /* A */))));
+        addDefinition(env, "And.swap", swapType, swapBody);
+        std::cout << "  And.swap   ⊨  Π(A B : Prop). And A B → And B A\n";
+    }
+
+    // ---------------- Or (Prop) -----------------
+    {
+        addInductive(env, "Or",
+            makePi("A", makeProp(),
+                makePi("B", makeProp(), makeProp())),
+            /*numParameters=*/ 2,
+            {
+                {"orInl",
+                    makePi("A", makeProp(),
+                        makePi("B", makeProp(),
+                            makePi("_a", makeBoundVariable(1) /* A */,
+                                makeApplication(makeApplication(
+                                    makeConstant("Or"),
+                                    makeBoundVariable(2)),
+                                    makeBoundVariable(1)))))},
+                {"orInr",
+                    makePi("A", makeProp(),
+                        makePi("B", makeProp(),
+                            makePi("_b", makeBoundVariable(0) /* B */,
+                                makeApplication(makeApplication(
+                                    makeConstant("Or"),
+                                    makeBoundVariable(2)),
+                                    makeBoundVariable(1)))))},
+            });
+
+        // Or.swap : Π(A B : Prop). Or A B → Or B A.
+        // Or has multiple constructors → restricted elim.
+        //
+        // motive at body level (p=0, B=1, A=2): λ _ : Or A B. Or B A.
+        //   In _ body (one more binder): _=0, p=1, B=2, A=3. Or B A means
+        //   B=2, A=3.
+        // case_orInl: λ (a : A). orInr B A a. At a body: a=0, p=1, B=2, A=3.
+        //   orInr B A a = orInr (Bound 2) (Bound 3) (Bound 0).
+        // case_orInr: λ (b : B). orInl B A b. At b body: same indices.
+        auto motiveOrSwap = makeLambda("_",
+            makeApplication(makeApplication(
+                makeConstant("Or"),
+                makeBoundVariable(2) /* A */),
+                makeBoundVariable(1) /* B */),
+            makeApplication(makeApplication(
+                makeConstant("Or"),
+                makeBoundVariable(2) /* B */),
+                makeBoundVariable(3) /* A */));
+        auto caseOrInl = makeLambda("a", makeBoundVariable(2) /* A */,
+            makeApplication(makeApplication(makeApplication(
+                makeConstant("orInr"),
+                makeBoundVariable(2) /* B */),
+                makeBoundVariable(3) /* A */),
+                makeBoundVariable(0) /* a */));
+        auto caseOrInr = makeLambda("b", makeBoundVariable(1) /* B */,
+            makeApplication(makeApplication(makeApplication(
+                makeConstant("orInl"),
+                makeBoundVariable(2) /* B */),
+                makeBoundVariable(3) /* A */),
+                makeBoundVariable(0) /* b */));
+        auto swapBody = makeLambda("A", makeProp(),
+            makeLambda("B", makeProp(),
+                makeLambda("p",
+                    makeApplication(makeApplication(
+                        makeConstant("Or"),
+                        makeBoundVariable(1)),
+                        makeBoundVariable(0)),
+                    makeApplication(makeApplication(makeApplication(makeApplication(
+                            makeApplication(makeApplication(
+                                makeConstant("Or_recursor"),
+                                makeBoundVariable(2) /* A */),
+                                makeBoundVariable(1) /* B */),
+                            motiveOrSwap),
+                        caseOrInl),
+                        caseOrInr),
+                        makeBoundVariable(0) /* p */))));
+        auto swapType = makePi("A", makeProp(),
+            makePi("B", makeProp(),
+                makePi("_",
+                    makeApplication(makeApplication(
+                        makeConstant("Or"),
+                        makeBoundVariable(1)),
+                        makeBoundVariable(0)),
+                    makeApplication(makeApplication(
+                        makeConstant("Or"),
+                        makeBoundVariable(1) /* B */),
+                        makeBoundVariable(2) /* A */))));
+        addDefinition(env, "Or.swap", swapType, swapBody);
+        std::cout << "  Or.swap    ⊨  Π(A B : Prop). Or A B → Or B A\n";
+    }
+
+    // ---------------- Prod (Type) -----------------
+    {
+        addInductive(env, "Prod",
+            makePi("A", makeType(0),
+                makePi("B", makeType(0), makeType(0))),
+            /*numParameters=*/ 2,
+            {{
+                "mkProd",
+                makePi("A", makeType(0),
+                    makePi("B", makeType(0),
+                        makePi("_a", makeBoundVariable(1),
+                            makePi("_b", makeBoundVariable(1),
+                                makeApplication(makeApplication(
+                                    makeConstant("Prod"),
+                                    makeBoundVariable(3) /* A */),
+                                    makeBoundVariable(2) /* B */)))))
+            }});
+
+        // Prod.swap : Π(A B : Type 0). Prod A B → Prod B A.
+        // Prod is in Type, so large elim is allowed; recursor takes a
+        // motive-level universe arg. We use {1} so the motive returns
+        // Type 0 (a Type-valued recursor).
+        auto motiveProdSwap = makeLambda("_",
+            makeApplication(makeApplication(
+                makeConstant("Prod"),
+                makeBoundVariable(2)),
+                makeBoundVariable(1)),
+            makeApplication(makeApplication(
+                makeConstant("Prod"),
+                makeBoundVariable(2) /* B */),
+                makeBoundVariable(3) /* A */));
+        auto caseMkProd = makeLambda("a", makeBoundVariable(2),
+            makeLambda("b", makeBoundVariable(2),
+                makeApplication(makeApplication(makeApplication(makeApplication(
+                    makeConstant("mkProd"),
+                    makeBoundVariable(3) /* B */),
+                    makeBoundVariable(4) /* A */),
+                    makeBoundVariable(0) /* b */),
+                    makeBoundVariable(1) /* a */)));
+        auto swapBody = makeLambda("A", makeType(0),
+            makeLambda("B", makeType(0),
+                makeLambda("p",
+                    makeApplication(makeApplication(
+                        makeConstant("Prod"),
+                        makeBoundVariable(1)),
+                        makeBoundVariable(0)),
+                    makeApplication(makeApplication(makeApplication(
+                            makeApplication(makeApplication(
+                                makeConstant("Prod_recursor", {makeLevelConst(1)}),
+                                makeBoundVariable(2)),
+                                makeBoundVariable(1)),
+                            motiveProdSwap),
+                        caseMkProd),
+                        makeBoundVariable(0)))));
+        auto swapType = makePi("A", makeType(0),
+            makePi("B", makeType(0),
+                makePi("_",
+                    makeApplication(makeApplication(
+                        makeConstant("Prod"),
+                        makeBoundVariable(1)),
+                        makeBoundVariable(0)),
+                    makeApplication(makeApplication(
+                        makeConstant("Prod"),
+                        makeBoundVariable(1) /* B */),
+                        makeBoundVariable(2) /* A */))));
+        addDefinition(env, "Prod.swap", swapType, swapBody);
+        std::cout << "  Prod.swap  ⊨  Π(A B : Type 0). Prod A B → Prod B A\n";
+    }
+
+    // ---------------- Option (Type) -----------------
+    {
+        addInductive(env, "Option",
+            makePi("A", makeType(0), makeType(0)),
+            /*numParameters=*/ 1,
+            {
+                {"optNone",
+                    makePi("A", makeType(0),
+                        makeApplication(makeConstant("Option"),
+                                          makeBoundVariable(0)))},
+                {"optSome",
+                    makePi("A", makeType(0),
+                        makePi("_a", makeBoundVariable(0),
+                            makeApplication(makeConstant("Option"),
+                                              makeBoundVariable(1))))},
+            });
+
+        // defaultTo : Π(A : Type 0). A → Option A → A.
+        // At body level (3 outer lambdas A, dflt, opt): opt=0, dflt=1, A=2.
+        // motive : λ _ : Option A. A.  Inside _: _=0, opt=1, dflt=2, A=3.
+        //   The motive's body is A = Bound 3.
+        // case_optNone : motive (optNone A) = A. At body level we need the
+        //   default value, which is dflt = Bound 1.
+        // case_optSome : λ a : A. motive (optSome A a) = A.
+        //   Just return a. Inside a: a=0, opt=1, dflt=2, A=3. So a = Bound 0.
+        auto motiveDefaultTo = makeLambda("_",
+            makeApplication(makeConstant("Option"),
+                              makeBoundVariable(2) /* A */),
+            makeBoundVariable(3) /* A */);
+        auto caseOptNone = makeBoundVariable(1) /* dflt */;
+        auto caseOptSome = makeLambda("a", makeBoundVariable(2) /* A */,
+            makeBoundVariable(0) /* a */);
+        // defaultTo : Π(A : Type 0). A → Option A → A.
+        // Body: Option_recursor.{1} A (λ _. A) dflt (λ a. a) opt.
+        auto defaultToBody = makeLambda("A", makeType(0),
+            makeLambda("dflt", makeBoundVariable(0) /* A */,
+                makeLambda("opt",
+                    makeApplication(makeConstant("Option"),
+                                      makeBoundVariable(1) /* A */),
+                    makeApplication(
+                        makeApplication(
+                            makeApplication(
+                                makeApplication(
+                                    makeApplication(
+                                        makeConstant("Option_recursor",
+                                                      {makeLevelConst(1)}),
+                                        makeBoundVariable(2) /* A */),
+                                    motiveDefaultTo),
+                                caseOptNone),
+                            caseOptSome),
+                        makeBoundVariable(0) /* opt */))));
+        auto defaultToType = makePi("A", makeType(0),
+            makePi("_dflt", makeBoundVariable(0) /* A */,
+                makePi("_opt",
+                    makeApplication(makeConstant("Option"),
+                                      makeBoundVariable(1)),
+                    makeBoundVariable(2) /* A */)));
+        addDefinition(env, "defaultTo", defaultToType, defaultToBody);
+        std::cout << "  defaultTo  ⊨  Π(A : Type 0). A → Option A → A\n";
+
+        // Test: defaultTo Natural zero (optSome Natural (succ zero)) ≡ succ zero.
+        // And: defaultTo Natural zero (optNone Natural) ≡ zero.
+        auto someOne = makeApplication(
+            makeApplication(makeConstant("optSome"), Nat()),
+            succ(zero()));
+        auto noneNat = makeApplication(makeConstant("optNone"), Nat());
+        auto callSome =
+            makeApplication(
+                makeApplication(
+                    makeApplication(makeConstant("defaultTo"), Nat()),
+                    zero()),
+                someOne);
+        auto callNone =
+            makeApplication(
+                makeApplication(
+                    makeApplication(makeConstant("defaultTo"), Nat()),
+                    zero()),
+                noneNat);
+        EXPECT_TRUE(isDefinitionallyEqual(env, {}, callSome, succ(zero())));
+        EXPECT_TRUE(isDefinitionallyEqual(env, {}, callNone, zero()));
+    }
+
+    // ---------------- List (Type) -----------------
+    {
+        addInductive(env, "List",
+            makePi("A", makeType(0), makeType(0)),
+            /*numParameters=*/ 1,
+            {
+                {"listNil",
+                    makePi("A", makeType(0),
+                        makeApplication(makeConstant("List"),
+                                          makeBoundVariable(0)))},
+                {"listCons",
+                    makePi("A", makeType(0),
+                        makePi("_head", makeBoundVariable(0),
+                            makePi("_tail",
+                                makeApplication(makeConstant("List"),
+                                                  makeBoundVariable(1)),
+                                makeApplication(makeConstant("List"),
+                                                  makeBoundVariable(2)))))},
+            });
+
+        // length : Π(A : Type 0). List A → Natural.
+        // Recurses on the list. case_listNil = zero. case_listCons takes
+        // head, tail, IH (the length of the tail), returns successor IH.
+        //
+        // motive = λ _ : List A. Natural.  (No A dependence in the
+        // codomain, so no Bound refs to A needed.)
+        //
+        // At the body level (2 outer lambdas A, list): list=0, A=1.
+        // case_listCons : λ head tail IH. successor IH.
+        //   Inside IH body (5 binders deep: IH=0, tail=1, head=2, list=3, A=4):
+        //   IH = Bound 0.
+        auto motiveLength = makeLambda("_",
+            makeApplication(makeConstant("List"),
+                              makeBoundVariable(1) /* A */),
+            Nat());
+        auto caseListNil = zero();
+        auto caseListCons =
+            makeLambda("head", makeBoundVariable(1) /* A */,
+                makeLambda("tail",
+                    makeApplication(makeConstant("List"),
+                                      makeBoundVariable(2) /* A */),
+                    makeLambda("IH", Nat(),
+                        succ(makeBoundVariable(0) /* IH */))));
+        auto lengthBody = makeLambda("A", makeType(0),
+            makeLambda("list",
+                makeApplication(makeConstant("List"),
+                                  makeBoundVariable(0) /* A */),
+                makeApplication(  // apply to list
+                    makeApplication(  // apply to caseListCons
+                        makeApplication(  // apply to caseListNil
+                            makeApplication(  // apply to motive
+                                makeApplication(  // apply to A
+                                    makeConstant("List_recursor", {makeLevelConst(1)}),
+                                    makeBoundVariable(1) /* A */),
+                                motiveLength),
+                            caseListNil),
+                        caseListCons),
+                    makeBoundVariable(0) /* list */)));
+        auto lengthType = makePi("A", makeType(0),
+            makePi("_list",
+                makeApplication(makeConstant("List"),
+                                  makeBoundVariable(0)),
+                Nat()));
+        addDefinition(env, "length", lengthType, lengthBody);
+        std::cout << "  length     ⊨  Π(A : Type 0). List A → Natural\n";
+
+        // Test: length Natural (cons 0 nil) ≡ successor zero.
+        // And: length Natural nil ≡ zero.
+        auto listNilNat =
+            makeApplication(makeConstant("listNil"), Nat());
+        auto singletonZero =
+            makeApplication(
+                makeApplication(
+                    makeApplication(makeConstant("listCons"), Nat()),
+                    zero()),
+                listNilNat);
+        auto lengthEmpty =
+            makeApplication(
+                makeApplication(makeConstant("length"), Nat()),
+                listNilNat);
+        auto lengthOne =
+            makeApplication(
+                makeApplication(makeConstant("length"), Nat()),
+                singletonZero);
+        EXPECT_TRUE(isDefinitionallyEqual(env, {}, lengthEmpty, zero()));
+        EXPECT_TRUE(isDefinitionallyEqual(env, {}, lengthOne,   succ(zero())));
+    }
+}
+
+// ----------------------------------------------------------------------------
 // Integration test: a second inductive (Boolean) and a function defined via
 // its recursor, exercised alongside the existing Natural / add.
 // ----------------------------------------------------------------------------
@@ -2764,6 +3193,7 @@ int main() {
     runInvariantCheckedTests(arithmetic);
     runPropertyTests(arithmetic);
     runNaturalNumberGameProofs();
+    runInductiveLibraryProofs();
     runIntegrationTests();
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";

@@ -1019,28 +1019,42 @@ bool mentionsConstant(ExpressionPointer expression,
 // Strict positivity: the inductive type's name may appear in constructor
 // argument types only in "strictly positive" positions. Concretely:
 //   - it may appear nowhere (a non-recursive argument), OR
-//   - it may be the entire type (a direct recursive argument), OR
-//   - the type may be Π(_ : A). B where A doesn't mention it and B is
-//     strictly positive in it (a higher-order recursive argument, like
+//   - the type may be `T params indices` — an Application chain whose
+//     head is the inductive's Constant — provided T doesn't appear in
+//     any of those arguments (no nested inductives). This catches
+//     direct recursive args like (List A) for List.cons.
+//   - the type may be Π(_ : A). B where A doesn't mention T and B is
+//     strictly positive in T (higher-order recursive arg, like
 //     mkInfTree : (Nat → Tree) → Tree).
 // The rule rejects pathological declarations like
-//   Bad : Type 0 := mkBad : (Bad → Bool) → Bad,
-// which would otherwise let the user derive False.
+//   Bad : Type 0 := mkBad : (Bad → Bool) → Bad.
 bool isStrictlyPositive(ExpressionPointer expression,
                         const std::string& inductiveName) {
-    // Case 1: doesn't mention the inductive at all.
     if (!mentionsConstant(expression, inductiveName)) return true;
-    // Case 2: is exactly the inductive (a direct recursive argument).
-    if (auto* c = std::get_if<Constant>(&expression->node)) {
-        return c->name == inductiveName;
+    // Peel an Application chain to find the head.
+    auto head = expression;
+    while (auto* application = std::get_if<Application>(&head->node)) {
+        head = application->function;
     }
-    // Case 3: Π(_ : A). B with A not mentioning T and B strictly positive.
+    if (auto* c = std::get_if<Constant>(&head->node);
+        c && c->name == inductiveName) {
+        // Direct (or parameterised) recursive use. Require that the
+        // arguments themselves don't mention the inductive — we don't
+        // yet support nested inductive recursion (e.g. List (List A)
+        // as a constructor argument would need a more refined check).
+        auto walker = expression;
+        while (auto* application = std::get_if<Application>(&walker->node)) {
+            if (mentionsConstant(application->argument, inductiveName)) {
+                return false;
+            }
+            walker = application->function;
+        }
+        return true;
+    }
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
         return !mentionsConstant(pi->domain, inductiveName)
             && isStrictlyPositive(pi->codomain, inductiveName);
     }
-    // All other shapes (Application, Lambda, Let, ...) that mention T:
-    // not strictly positive.
     return false;
 }
 
