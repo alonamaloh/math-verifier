@@ -50,9 +50,26 @@ void expectThrow(Thunk thunk, const char* description, int line) {
     }
 }
 
+void expectEqualStrings(const std::string& actual, const std::string& expected,
+                        const char* description, int line) {
+    if (actual == expected) {
+        ++passed;
+    } else {
+        ++failed;
+        std::cerr << "FAIL (line " << line << "): " << description << "\n"
+                  << "  expected: \"" << expected << "\"\n"
+                  << "  actual:   \"" << actual   << "\"\n";
+    }
+}
+
 #define EXPECT_TRUE(condition)   expectTrue((condition), #condition, __LINE__)
+#define EXPECT_FALSE(condition)  expectTrue(!(condition), "not " #condition, __LINE__)
 #define EXPECT_THROW(expression) expectThrow([&]{ (void)(expression); }, \
                                              #expression, __LINE__)
+#define EXPECT_PRINTS(expression, expected) \
+    expectEqualStrings(prettyPrint(expression), (expected), #expression, __LINE__)
+#define EXPECT_LEVEL_PRINTS(level, expected) \
+    expectEqualStrings(prettyPrintLevel(level), (expected), #level, __LINE__)
 
 void runCoreTests() {
     std::cout << "--- core tests ---\n";
@@ -589,6 +606,854 @@ void runEnvironmentTests(const Environment& environment) {
     }
 }
 
+// ----------------------------------------------------------------------------
+// Level arithmetic: the universe-level expression layer in level.{hpp,cpp}.
+// ----------------------------------------------------------------------------
+
+void runLevelArithmeticTests() {
+    std::cout << "--- level arithmetic tests ---\n";
+
+    // makeLevelSucc folds over concrete levels.
+    EXPECT_TRUE(*levelAsConstant(makeLevelSucc(makeLevelConst(0))) == 1);
+    EXPECT_TRUE(*levelAsConstant(makeLevelSucc(makeLevelConst(7))) == 8);
+
+    // makeLevelSucc stays symbolic for parameters.
+    {
+        auto succU = makeLevelSucc(makeLevelParam("u"));
+        EXPECT_FALSE(levelAsConstant(succU).has_value());
+        EXPECT_LEVEL_PRINTS(succU, "u+1");
+    }
+
+    // makeLevelMax: concrete vs concrete is folded.
+    EXPECT_TRUE(*levelAsConstant(
+        makeLevelMax(makeLevelConst(2), makeLevelConst(3))) == 3);
+    EXPECT_TRUE(*levelAsConstant(
+        makeLevelMax(makeLevelConst(5), makeLevelConst(5))) == 5);
+
+    // makeLevelMax: 0 is the identity on either side.
+    {
+        auto u = makeLevelParam("u");
+        EXPECT_TRUE(levelsDefinitionallyEqual(
+            makeLevelMax(makeLevelConst(0), u), u));
+        EXPECT_TRUE(levelsDefinitionallyEqual(
+            makeLevelMax(u, makeLevelConst(0)), u));
+    }
+
+    // makeLevelMax: same level on both sides collapses.
+    {
+        auto u = makeLevelParam("u");
+        EXPECT_TRUE(levelsDefinitionallyEqual(makeLevelMax(u, u), u));
+    }
+
+    // makeLevelIMax: codomain 0 collapses the whole thing to 0.
+    EXPECT_TRUE(*levelAsConstant(
+        makeLevelIMax(makeLevelParam("u"), makeLevelConst(0))) == 0);
+
+    // makeLevelIMax: codomain succ(_) is never 0, so becomes max.
+    {
+        auto u = makeLevelParam("u");
+        auto imaxResult = makeLevelIMax(u, makeLevelSucc(makeLevelParam("v")));
+        // Should be max(u, succ(v)) — folded.
+        EXPECT_LEVEL_PRINTS(imaxResult, "max(u, v+1)");
+    }
+
+    // makeLevelIMax stays symbolic when codomain is an unknown parameter.
+    {
+        auto u = makeLevelParam("u");
+        auto v = makeLevelParam("v");
+        auto imaxResult = makeLevelIMax(u, v);
+        EXPECT_LEVEL_PRINTS(imaxResult, "imax(u, v)");
+    }
+
+    // Equality of levels — concrete and symbolic.
+    EXPECT_TRUE(levelsDefinitionallyEqual(
+        makeLevelConst(3), makeLevelConst(3)));
+    EXPECT_FALSE(levelsDefinitionallyEqual(
+        makeLevelConst(3), makeLevelConst(4)));
+    EXPECT_TRUE(levelsDefinitionallyEqual(
+        makeLevelParam("u"), makeLevelParam("u")));
+    EXPECT_FALSE(levelsDefinitionallyEqual(
+        makeLevelParam("u"), makeLevelParam("v")));
+    EXPECT_FALSE(levelsDefinitionallyEqual(
+        makeLevelParam("u"), makeLevelConst(0)));
+
+    // levelLessOrEqual on concrete pairs.
+    EXPECT_TRUE(levelLessOrEqual(makeLevelConst(0), makeLevelConst(0)));
+    EXPECT_TRUE(levelLessOrEqual(makeLevelConst(0), makeLevelConst(3)));
+    EXPECT_TRUE(levelLessOrEqual(makeLevelConst(2), makeLevelConst(2)));
+    EXPECT_FALSE(levelLessOrEqual(makeLevelConst(4), makeLevelConst(3)));
+
+    // levelLessOrEqual: same parameter is reflexive.
+    EXPECT_TRUE(levelLessOrEqual(
+        makeLevelParam("u"), makeLevelParam("u")));
+    // Different parameters: conservatively false.
+    EXPECT_FALSE(levelLessOrEqual(
+        makeLevelParam("u"), makeLevelParam("v")));
+
+    // levelLessOrEqual: x <= max(x, y).
+    {
+        auto u = makeLevelParam("u");
+        auto v = makeLevelParam("v");
+        EXPECT_TRUE(levelLessOrEqual(u, makeLevelMax(u, v)));
+        EXPECT_TRUE(levelLessOrEqual(v, makeLevelMax(u, v)));
+    }
+
+    // levelLessOrEqual: succ(a) <= succ(b) iff a <= b.
+    EXPECT_TRUE(levelLessOrEqual(
+        makeLevelSucc(makeLevelConst(2)), makeLevelSucc(makeLevelConst(3))));
+    EXPECT_FALSE(levelLessOrEqual(
+        makeLevelSucc(makeLevelConst(3)), makeLevelSucc(makeLevelConst(2))));
+
+    // Substitution: replacing the param appears throughout, others are
+    // untouched.
+    {
+        auto level = makeLevelMax(
+            makeLevelParam("u"),
+            makeLevelSucc(makeLevelParam("v")));
+        auto substituted = substituteLevelParameter(
+            level, "u", makeLevelConst(5));
+        EXPECT_LEVEL_PRINTS(substituted, "max(5, v+1)");
+    }
+
+    // Substitution on a non-matching name is a no-op.
+    {
+        auto level = makeLevelParam("v");
+        auto substituted = substituteLevelParameter(
+            level, "u", makeLevelConst(7));
+        EXPECT_TRUE(levelsDefinitionallyEqual(substituted, level));
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Low-level expression operations: shift, substitute, openBinder, closeBinder.
+// ----------------------------------------------------------------------------
+
+void runDeBruijnOperationTests() {
+    std::cout << "--- shift / substitute / open / close tests ---\n";
+
+    // shift on a bare BoundVariable.
+    {
+        auto result = shift(makeBoundVariable(0), 1, 0);
+        auto* bv = std::get_if<BoundVariable>(&result->node);
+        EXPECT_TRUE(bv && bv->deBruijnIndex == 1);
+    }
+    {
+        auto result = shift(makeBoundVariable(5), 2, 0);
+        auto* bv = std::get_if<BoundVariable>(&result->node);
+        EXPECT_TRUE(bv && bv->deBruijnIndex == 7);
+    }
+
+    // shift respects the cutoff: indices below cutoff don't move.
+    {
+        auto result = shift(makeBoundVariable(0), 5, 1);
+        auto* bv = std::get_if<BoundVariable>(&result->node);
+        EXPECT_TRUE(bv && bv->deBruijnIndex == 0);
+    }
+    {
+        auto result = shift(makeBoundVariable(2), 5, 1);
+        auto* bv = std::get_if<BoundVariable>(&result->node);
+        EXPECT_TRUE(bv && bv->deBruijnIndex == 7);
+    }
+
+    // shift leaves FreeVariable, Sort, Constant unchanged.
+    {
+        auto fv = makeFreeVariable("x");
+        EXPECT_TRUE(shift(fv, 3).get() == fv.get());
+        auto sort = makeType(0);
+        EXPECT_TRUE(shift(sort, 3).get() == sort.get());
+        auto c = makeConstant("Foo");
+        EXPECT_TRUE(shift(c, 3).get() == c.get());
+    }
+
+    // shift under a Pi increments the cutoff in the codomain.
+    //   shift(Π(_ : Nat). Bound(1), 1, 0)
+    //   The Bound(1) refers OUTSIDE the Pi. Inside the codomain, cutoff is 1.
+    //   Bound(1) >= 1, so it shifts to Bound(2).
+    {
+        auto term = makePi("_", makeConstant("Nat"), makeBoundVariable(1));
+        auto shifted = shift(term, 1, 0);
+        auto* pi = std::get_if<Pi>(&shifted->node);
+        EXPECT_TRUE(pi);
+        auto* inner = std::get_if<BoundVariable>(&pi->codomain->node);
+        EXPECT_TRUE(inner && inner->deBruijnIndex == 2);
+    }
+
+    // shift under a Pi: Bound(0) inside the codomain references the binder
+    // itself (inside cutoff after descent), so it stays Bound(0).
+    {
+        auto term = makePi("_", makeConstant("Nat"), makeBoundVariable(0));
+        auto shifted = shift(term, 1, 0);
+        auto* pi = std::get_if<Pi>(&shifted->node);
+        EXPECT_TRUE(pi);
+        auto* inner = std::get_if<BoundVariable>(&pi->codomain->node);
+        EXPECT_TRUE(inner && inner->deBruijnIndex == 0);
+    }
+
+    // substitute: Bound(0) gets replaced.
+    {
+        auto result = substitute(makeBoundVariable(0), 0,
+                                 makeConstant("zero"));
+        auto* c = std::get_if<Constant>(&result->node);
+        EXPECT_TRUE(c && c->name == "zero");
+    }
+
+    // substitute: higher indices are decremented (binder going away).
+    {
+        auto result = substitute(makeBoundVariable(3), 0,
+                                 makeConstant("zero"));
+        auto* bv = std::get_if<BoundVariable>(&result->node);
+        EXPECT_TRUE(bv && bv->deBruijnIndex == 2);
+    }
+
+    // substitute: indices below the target are unchanged.
+    {
+        auto result = substitute(makeBoundVariable(0), 2,
+                                 makeConstant("zero"));
+        auto* bv = std::get_if<BoundVariable>(&result->node);
+        EXPECT_TRUE(bv && bv->deBruijnIndex == 0);
+    }
+
+    // substitute shifts the replacement when crossing a binder. Substitute
+    // FreeVariable("v") for index 0 inside Π(_:T). Bound(0). The codomain's
+    // Bound(0) refers to its own Pi binder (not target 0 at depth 0); after
+    // descent, target becomes 1 and replacement is shift(FreeVar("v"), 1)
+    // which is still FreeVar("v"). Inside, Bound(0) != 1, so it's not
+    // substituted; it stays Bound(0).
+    {
+        auto term = makePi("_", makeConstant("T"), makeBoundVariable(0));
+        auto result = substitute(term, 0, makeFreeVariable("v"));
+        auto* pi = std::get_if<Pi>(&result->node);
+        EXPECT_TRUE(pi);
+        auto* inner = std::get_if<BoundVariable>(&pi->codomain->node);
+        EXPECT_TRUE(inner && inner->deBruijnIndex == 0);
+    }
+
+    // substitute does shift the replacement properly. Substitute Bound(0)
+    // (an outer reference) into Π(_:T). Bound(1) (which references that
+    // outer thing): at depth 1, target=1; Bound(1) matches; replacement is
+    // shift(Bound(0), 1) = Bound(1). So we should get Π(_:T). Bound(1).
+    {
+        auto term = makePi("_", makeConstant("T"), makeBoundVariable(1));
+        auto result = substitute(term, 0, makeBoundVariable(0));
+        auto* pi = std::get_if<Pi>(&result->node);
+        EXPECT_TRUE(pi);
+        auto* inner = std::get_if<BoundVariable>(&pi->codomain->node);
+        EXPECT_TRUE(inner && inner->deBruijnIndex == 1);
+    }
+
+    // openBinder: substitutes BoundVariable(0) with a free variable, leaves
+    // higher indices decremented (the binder is conceptually opened).
+    {
+        auto term = makeBoundVariable(0);
+        auto opened = openBinder(term, "x");
+        auto* fv = std::get_if<FreeVariable>(&opened->node);
+        EXPECT_TRUE(fv && fv->name == "x");
+    }
+
+    // closeBinder is the (left) inverse of openBinder for the simple case.
+    {
+        auto original = makeBoundVariable(0);
+        auto opened   = openBinder(original, "x");
+        auto closed   = closeBinder(opened,  "x");
+        auto* bv = std::get_if<BoundVariable>(&closed->node);
+        EXPECT_TRUE(bv && bv->deBruijnIndex == 0);
+    }
+
+    // closeBinder also shifts existing bound vars up by 1 (room for the new
+    // outer binder).
+    {
+        auto original = makeBoundVariable(2);
+        auto closed   = closeBinder(original, "nonexistent");
+        auto* bv = std::get_if<BoundVariable>(&closed->node);
+        EXPECT_TRUE(bv && bv->deBruijnIndex == 3);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Direct tests of each reduction rule that weakHeadNormalForm implements.
+// ----------------------------------------------------------------------------
+
+void runReductionTests(const Environment& arithmetic) {
+    std::cout << "--- reduction (β / δ / ζ / ι / idempotence) tests ---\n";
+
+    // β-reduction: (λ(x : T). x) y ↦ y.
+    {
+        auto applied = makeApplication(
+            makeLambda("x", makeConstant("T"), makeBoundVariable(0)),
+            makeFreeVariable("y"));
+        auto reduced = weakHeadNormalForm({}, applied);
+        auto* fv = std::get_if<FreeVariable>(&reduced->node);
+        EXPECT_TRUE(fv && fv->name == "y");
+    }
+
+    // β-reduction respects substitution under nested binders.
+    //   (λ(x : T). λ(y : T). x) a  ↦  λ(y : T). a
+    {
+        auto applied = makeApplication(
+            makeLambda("x", makeConstant("T"),
+              makeLambda("y", makeConstant("T"), makeBoundVariable(1))),
+            makeFreeVariable("a"));
+        auto reduced = weakHeadNormalForm({}, applied);
+        auto* lambda = std::get_if<Lambda>(&reduced->node);
+        EXPECT_TRUE(lambda);
+        if (lambda) {
+            auto* body = std::get_if<FreeVariable>(&lambda->body->node);
+            EXPECT_TRUE(body && body->name == "a");
+        }
+    }
+
+    // δ-reduction: a Definition unfolds to its body.
+    {
+        auto reduced = weakHeadNormalForm(arithmetic, makeConstant("one"));
+        // one unfolds to (successor zero). After whnf, head is "successor"
+        // (a Constructor, stuck), with one argument "zero".
+        auto* app = std::get_if<Application>(&reduced->node);
+        EXPECT_TRUE(app);
+        if (app) {
+            auto* head = std::get_if<Constant>(&app->function->node);
+            EXPECT_TRUE(head && head->name == "successor");
+        }
+    }
+
+    // δ-reduction chains: two Definitions unfold transitively.
+    //   oneAlias  ↦  one  ↦  successor zero.
+    {
+        auto reduced = weakHeadNormalForm(
+            arithmetic, makeConstant("oneAlias"));
+        auto* app = std::get_if<Application>(&reduced->node);
+        EXPECT_TRUE(app);
+        if (app) {
+            auto* head = std::get_if<Constant>(&app->function->node);
+            EXPECT_TRUE(head && head->name == "successor");
+            auto* arg = std::get_if<Constant>(&app->argument->node);
+            EXPECT_TRUE(arg && arg->name == "zero");
+        }
+    }
+
+    // ζ-reduction: let x : T := v in body  ↦  body[x := v].
+    {
+        auto term = makeLet("x", makeConstant("Natural"),
+                            makeConstant("zero"),
+                            makeBoundVariable(0));
+        auto reduced = weakHeadNormalForm(arithmetic, term);
+        auto* c = std::get_if<Constant>(&reduced->node);
+        EXPECT_TRUE(c && c->name == "zero");
+    }
+
+    // ι-reduction: Natural_recursor on zero collapses to case_zero.
+    {
+        // Natural_recursor (λ_. Nat) case_zero case_succ zero ↦ case_zero
+        auto motive = makeLambda("_", makeConstant("Natural"),
+                                  makeConstant("Natural"));
+        auto caseZero    = makeConstant("zero");
+        auto caseSuccessor = makeLambda("k", makeConstant("Natural"),
+            makeLambda("_recK", makeConstant("Natural"),
+                makeConstant("zero")));
+        auto applied = makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeApplication(makeConstant("Natural_recursor"), motive),
+                    caseZero),
+                caseSuccessor),
+            makeConstant("zero"));
+        auto reduced = weakHeadNormalForm(arithmetic, applied);
+        auto* c = std::get_if<Constant>(&reduced->node);
+        EXPECT_TRUE(c && c->name == "zero");
+    }
+
+    // ι-reduction: Natural_recursor on (successor v) inserts a recursive call.
+    //   The fully reduced result has head = case_succ applied to v and to
+    //   a recursive Natural_recursor call.
+    {
+        auto motive = makeLambda("_", makeConstant("Natural"),
+                                  makeConstant("Natural"));
+        auto caseZero    = makeConstant("zero");
+        // case_succ k recK = k  (just returns k, ignoring the recursive call).
+        auto caseSuccessor = makeLambda("k", makeConstant("Natural"),
+            makeLambda("_recK", makeConstant("Natural"),
+                makeBoundVariable(1) /* k */));
+        auto target = makeApplication(makeConstant("successor"),
+                                       makeConstant("zero"));
+        auto applied = makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeApplication(makeConstant("Natural_recursor"), motive),
+                    caseZero),
+                caseSuccessor),
+            target);
+        auto reduced = weakHeadNormalForm(arithmetic, applied);
+        // case_succ k _ = k, applied to zero, gives zero.
+        auto* c = std::get_if<Constant>(&reduced->node);
+        EXPECT_TRUE(c && c->name == "zero");
+    }
+
+    // ι doesn't fire if the target isn't a constructor application.
+    // Here the target is a free variable.
+    {
+        Context context = {{"n", makeConstant("Natural")}};
+        auto motive = makeLambda("_", makeConstant("Natural"),
+                                  makeConstant("Natural"));
+        auto caseZero = makeConstant("zero");
+        auto caseSuccessor = makeLambda("k", makeConstant("Natural"),
+            makeLambda("_recK", makeConstant("Natural"),
+                makeBoundVariable(1)));
+        auto stuck = makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeApplication(makeConstant("Natural_recursor"), motive),
+                    caseZero),
+                caseSuccessor),
+            makeFreeVariable("n"));
+        auto reduced = weakHeadNormalForm(arithmetic, stuck);
+        // No reduction: head is still Natural_recursor (a Constant).
+        auto spineHead = reduced;
+        while (auto* app = std::get_if<Application>(&spineHead->node)) {
+            spineHead = app->function;
+        }
+        auto* c = std::get_if<Constant>(&spineHead->node);
+        EXPECT_TRUE(c && c->name == "Natural_recursor");
+    }
+
+    // Idempotence: whnf'ing twice gives a definitionally-equal result.
+    {
+        auto term = makeApplication(
+            makeApplication(makeConstant("add"), makeConstant("zero")),
+            makeConstant("zero"));
+        auto once  = weakHeadNormalForm(arithmetic, term);
+        auto twice = weakHeadNormalForm(arithmetic, once);
+        EXPECT_TRUE(isDefinitionallyEqual(arithmetic, {}, once, twice));
+    }
+
+    // whnf doesn't reduce inside binders.
+    //   λ(x : Nat). ((λy. y) x)  has a β-redex inside its body, but whnf
+    //   should leave the lambda intact.
+    {
+        auto term = makeLambda("x", makeConstant("Natural"),
+            makeApplication(
+                makeLambda("y", makeConstant("Natural"), makeBoundVariable(0)),
+                makeBoundVariable(0)));
+        auto reduced = weakHeadNormalForm(arithmetic, term);
+        EXPECT_TRUE(std::holds_alternative<Lambda>(reduced->node));
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Comprehensive negative-path coverage for inferType. Each test produces a
+// specific failure mode of the type checker.
+// ----------------------------------------------------------------------------
+
+void runInferTypeErrorTests(const Environment& arithmetic) {
+    std::cout << "--- inferType error tests ---\n";
+
+    // Unbound free variable.
+    EXPECT_THROW(inferType(arithmetic, {}, makeFreeVariable("ghost")));
+
+    // Undefined constant.
+    EXPECT_THROW(inferType(arithmetic, {}, makeConstant("ghost")));
+
+    // Constant with wrong universe-argument arity.
+    EXPECT_THROW(inferType(arithmetic, {},
+        makeConstant("Equality", {makeLevelConst(0), makeLevelConst(1)})));
+    EXPECT_THROW(inferType(arithmetic, {},
+        makeConstant("Natural", {makeLevelConst(0)})));  // Natural has no params.
+
+    // Pi: domain isn't a type. Pass a Natural value (`zero`) as a domain.
+    EXPECT_THROW(inferType(arithmetic, {},
+        makePi("_", makeConstant("zero"), makeType(0))));
+
+    // Pi: codomain isn't a type. In a context where `n : Natural` is in
+    // scope, `Π(_ : Natural). n` has codomain `n`, which is a value, not
+    // a type.
+    {
+        Context context = {{"n", makeConstant("Natural")}};
+        EXPECT_THROW(inferType(arithmetic, context,
+            makePi("_", makeConstant("Natural"), makeFreeVariable("n"))));
+    }
+
+    // Lambda: domain isn't a type.
+    EXPECT_THROW(inferType(arithmetic, {},
+        makeLambda("_", makeConstant("zero"), makeConstant("zero"))));
+
+    // Application: function isn't a Pi.
+    EXPECT_THROW(inferType(arithmetic, {},
+        makeApplication(makeConstant("zero"), makeConstant("zero"))));
+
+    // Application: argument type doesn't match Pi domain. successor expects
+    // Natural; passing it a Type 0 is wrong.
+    EXPECT_THROW(inferType(arithmetic, {},
+        makeApplication(makeConstant("successor"), makeType(0))));
+
+    // Let: declared type isn't a type.
+    EXPECT_THROW(inferType(arithmetic, {},
+        makeLet("x", makeConstant("zero"),
+                makeConstant("zero"),
+                makeConstant("zero"))));
+
+    // Let: value's type doesn't match declared.
+    EXPECT_THROW(inferType(arithmetic, {},
+        makeLet("x", makeConstant("Natural"),
+                makeType(0),  // value has type Type 1, doesn't match Natural.
+                makeConstant("zero"))));
+
+    // A bare BoundVariable at the top level is a kernel-internal error
+    // (binders should be opened before recursing into inferType).
+    EXPECT_THROW(inferType(arithmetic, {}, makeBoundVariable(0)));
+}
+
+// ----------------------------------------------------------------------------
+// Negative-path coverage for declarations: addAxiom / addDefinition /
+// addInductive should reject malformed inputs without corrupting the env.
+// ----------------------------------------------------------------------------
+
+void runDeclarationErrorTests(const Environment& arithmetic) {
+    std::cout << "--- declaration error tests ---\n";
+
+    // addAxiom: duplicate name.
+    {
+        Environment local = arithmetic;
+        EXPECT_THROW(addAxiom(local, "Natural", makeType(0)));
+    }
+
+    // addAxiom: declared "type" isn't a type.
+    {
+        Environment local;
+        EXPECT_THROW(addAxiom(local, "bad", makeConstant("nope")));
+    }
+
+    // addDefinition: duplicate name.
+    {
+        Environment local = arithmetic;
+        EXPECT_THROW(addDefinition(local, "one",
+                                   makeConstant("Natural"),
+                                   makeConstant("zero")));
+    }
+
+    // addDefinition: body's type does not match declared type.
+    {
+        Environment local = arithmetic;
+        EXPECT_THROW(addDefinition(
+            local, "bogus",
+            makeConstant("Natural"), makeType(0)));
+    }
+
+    // addDefinition leaves the environment unchanged after a failed
+    // declaration (size stays the same).
+    {
+        Environment local = arithmetic;
+        std::size_t sizeBefore = local.declarations.size();
+        try {
+            addDefinition(local, "bogus",
+                          makeConstant("Natural"), makeType(0));
+        } catch (const TypeError&) {}
+        EXPECT_TRUE(local.declarations.size() == sizeBefore);
+    }
+
+    // addInductive: duplicate name.
+    {
+        Environment local = arithmetic;
+        EXPECT_THROW(addInductive(local, "Natural", makeType(0),
+                                  {{"someCtor", makeConstant("Natural")}}));
+    }
+
+    // addInductive: constructor name conflicts with an existing declaration.
+    {
+        Environment local = arithmetic;
+        // "zero" is already declared (as the Constructor of Natural).
+        EXPECT_THROW(addInductive(local, "AnotherNat", makeType(0),
+                                  {{"zero", makeConstant("AnotherNat")}}));
+    }
+
+    // addInductive: kind is not itself a type (passing a value).
+    {
+        Environment local = arithmetic;
+        EXPECT_THROW(addInductive(local, "Bad", makeConstant("zero"),
+                                  {{"someCtor", makeConstant("Bad")}}));
+    }
+
+    // addInductive: kind must be a plain Sort. Passing a Pi (no parameters
+    // or indices supported yet) is rejected.
+    {
+        Environment local;
+        EXPECT_THROW(addInductive(
+            local, "List",
+            makePi("_", makeType(0), makeType(0)),
+            {}));
+    }
+
+    // addInductive on failure leaves the env unchanged (rollback).
+    {
+        Environment local = arithmetic;
+        std::size_t sizeBefore = local.declarations.size();
+        try {
+            // Constructor type with a Constant that doesn't exist.
+            addInductive(local, "Stranger", makeType(0),
+                         {{"strangerCtor",
+                           makeApplication(makeConstant("Stranger"),
+                                           makeConstant("not_a_thing"))}});
+        } catch (const TypeError&) {}
+        EXPECT_TRUE(local.declarations.size() == sizeBefore);
+        // The inductive's name and constructor name shouldn't be in the env
+        // after the failed addInductive.
+        EXPECT_TRUE(local.lookup("Stranger") == nullptr);
+        EXPECT_TRUE(local.lookup("strangerCtor") == nullptr);
+        EXPECT_TRUE(local.lookup("Stranger_recursor") == nullptr);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Universe polymorphism tests: polymorphic definitions, level substitution
+// across reductions, and end-to-end uses with different universe args.
+// ----------------------------------------------------------------------------
+
+void runUniversePolymorphismTests(const Environment& arithmetic) {
+    std::cout << "--- universe polymorphism tests ---\n";
+
+    // The polymorphic identity at the kernel level. We define
+    //   identity.{u} : Π(A : Type u). Π(x : A). A := λA. λx. x
+    // and check that it instantiates at multiple universes.
+    Environment env = arithmetic;
+    addDefinition(env, "identity", {"u"},
+        makePi("A", makeType(makeLevelParam("u")),
+          makePi("x", makeBoundVariable(0), makeBoundVariable(1))),
+        makeLambda("A", makeType(makeLevelParam("u")),
+          makeLambda("x", makeBoundVariable(0), makeBoundVariable(0))));
+
+    // identity.{0} Natural zero  ≡  zero  (after β reductions).
+    {
+        auto applied = makeApplication(
+            makeApplication(makeConstant("identity", {makeLevelConst(0)}),
+                            makeConstant("Natural")),
+            makeConstant("zero"));
+        EXPECT_TRUE(isDefinitionallyEqual(env, {}, applied,
+                                          makeConstant("zero")));
+    }
+
+    // identity.{1} (Type 0) Natural  has type Type 0 and reduces to Natural.
+    {
+        auto applied = makeApplication(
+            makeApplication(makeConstant("identity", {makeLevelConst(1)}),
+                            makeType(0)),
+            makeConstant("Natural"));
+        auto inferredType = inferType(env, {}, applied);
+        EXPECT_TRUE(isDefinitionallyEqual(env, {}, inferredType,
+                                          makeType(0)));
+        EXPECT_TRUE(isDefinitionallyEqual(env, {}, applied,
+                                          makeConstant("Natural")));
+    }
+
+    // The recorded universe arguments survive printing.
+    EXPECT_PRINTS(makeConstant("Equality", {makeLevelConst(0)}),
+                  "Equality.{0}");
+    EXPECT_PRINTS(makeConstant("Equality", {makeLevelParam("u")}),
+                  "Equality.{u}");
+
+    // The same polymorphic constant at different levels has the same NAME
+    // when compared as Constants — but the kernel doesn't consider them
+    // definitionally equal unless universe args also agree.
+    EXPECT_FALSE(isDefinitionallyEqual(env, {},
+        makeConstant("Equality", {makeLevelConst(0)}),
+        makeConstant("Equality", {makeLevelConst(1)})));
+
+    // Polymorphic δ-reduction: when a polymorphic definition is unfolded,
+    // universe arguments get substituted into the body. typeIdAt.{u} is a
+    // function that returns the type it is given.
+    //   typeIdAt.{u} : Π(A : Type u). Type u
+    //   typeIdAt.{u} := λA. A
+    addDefinition(env, "typeIdAt", {"u"},
+        makePi("A", makeType(makeLevelParam("u")),
+               makeType(makeLevelParam("u"))),
+        makeLambda("A", makeType(makeLevelParam("u")), makeBoundVariable(0)));
+    // typeIdAt.{0} Natural reduces under δ + β to Natural.
+    {
+        auto applied = makeApplication(
+            makeConstant("typeIdAt", {makeLevelConst(0)}),
+            makeConstant("Natural"));
+        auto reduced = weakHeadNormalForm(env, applied);
+        auto* c = std::get_if<Constant>(&reduced->node);
+        EXPECT_TRUE(c && c->name == "Natural");
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Pretty-printer output tests. These pin down the exact rendering so any
+// future change is detected.
+// ----------------------------------------------------------------------------
+
+void runPrintingTests(const Environment& arithmetic) {
+    std::cout << "--- pretty-printer tests ---\n";
+
+    EXPECT_PRINTS(makeProp(), "Prop");
+    EXPECT_PRINTS(makeType(0), "Type 0");
+    EXPECT_PRINTS(makeType(1), "Type 1");
+    EXPECT_PRINTS(makeType(makeLevelParam("u")), "Type u");
+    EXPECT_PRINTS(makeSort(makeLevelMax(makeLevelParam("u"),
+                                        makeLevelParam("v"))),
+                  "Sort max(u, v)");
+
+    EXPECT_PRINTS(makeConstant("zero"), "zero");
+    EXPECT_PRINTS(makeConstant("Equality", {makeLevelConst(0)}),
+                  "Equality.{0}");
+    EXPECT_PRINTS(makeConstant("foo",
+                               {makeLevelParam("u"), makeLevelParam("v")}),
+                  "foo.{u, v}");
+
+    EXPECT_PRINTS(makeFreeVariable("x"), "x");
+
+    // Application is left-associative: f g h prints flat.
+    EXPECT_PRINTS(makeApplication(
+                      makeApplication(makeConstant("f"), makeConstant("g")),
+                      makeConstant("h")),
+                  "f g h");
+
+    // Application: argument that is itself an Application gets parens.
+    EXPECT_PRINTS(makeApplication(
+                      makeConstant("f"),
+                      makeApplication(makeConstant("g"), makeConstant("h"))),
+                  "f (g h)");
+
+    // Pi prints with Π and a colon-typed binder.
+    EXPECT_PRINTS(
+        makePi("x", makeConstant("Natural"), makeConstant("Natural")),
+        "Π(x : Natural). Natural");
+
+    // Lambda prints with λ.
+    EXPECT_PRINTS(
+        makeLambda("x", makeConstant("Natural"), makeBoundVariable(0)),
+        "λ(x : Natural). x");
+
+    // Binder hint collision: inner binder is freshened.
+    EXPECT_PRINTS(
+        makeLambda("x", makeConstant("T"),
+          makeLambda("x", makeConstant("T"), makeBoundVariable(1))),
+        "λ(x : T). λ(x_1 : T). x");
+
+    // Let prints with "let ... := ... in ...".
+    EXPECT_PRINTS(
+        makeLet("n", makeConstant("Natural"), makeConstant("zero"),
+                makeBoundVariable(0)),
+        "let n : Natural := zero in n");
+
+    // Suppress the arithmetic-environment warning by referencing it.
+    (void)arithmetic;
+}
+
+// ----------------------------------------------------------------------------
+// Integration test: a second inductive (Boolean) and a function defined via
+// its recursor, exercised alongside the existing Natural / add.
+// ----------------------------------------------------------------------------
+
+void runIntegrationTests() {
+    std::cout << "--- integration tests ---\n";
+
+    Environment env = buildArithmeticEnvironment();
+
+    // Boolean as a second inductive type.
+    addInductive(env, "Boolean", makeType(0), {
+        {"true",  makeConstant("Boolean")},
+        {"false", makeConstant("Boolean")},
+    });
+
+    // Negation defined via the Boolean recursor.
+    //   not b = Boolean_recursor (λ_. Boolean) false true b
+    addDefinition(env, "not",
+        makePi("_", makeConstant("Boolean"), makeConstant("Boolean")),
+        makeLambda("b", makeConstant("Boolean"),
+            makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeApplication(
+                            makeConstant("Boolean_recursor"),
+                            makeLambda("_", makeConstant("Boolean"),
+                                        makeConstant("Boolean"))),
+                        makeConstant("false")),
+                    makeConstant("true")),
+                makeBoundVariable(0))));
+
+    // not true ≡ false; not false ≡ true; not (not b) is η-equal to b after
+    // we further substitute, but it doesn't reduce without knowing b — so we
+    // only check the concrete cases.
+    EXPECT_TRUE(isDefinitionallyEqual(env, {},
+        makeApplication(makeConstant("not"), makeConstant("true")),
+        makeConstant("false")));
+    EXPECT_TRUE(isDefinitionallyEqual(env, {},
+        makeApplication(makeConstant("not"), makeConstant("false")),
+        makeConstant("true")));
+    EXPECT_TRUE(isDefinitionallyEqual(env, {},
+        makeApplication(makeConstant("not"),
+                        makeApplication(makeConstant("not"),
+                                        makeConstant("true"))),
+        makeConstant("true")));
+
+    // Multiplication on Natural, defined via the recursor and add. The
+    // motive is a constant function — we use a Natural → Natural to keep
+    // things in Type 0.
+    //   multiply n m = Natural_recursor (λ_. Natural → Natural)
+    //                                    (λ_. zero)
+    //                                    (λk recK m. add m (recK m))
+    //                                    n m
+    {
+        auto naturalToNatural = makePi(
+            "_", makeConstant("Natural"), makeConstant("Natural"));
+        auto motive = makeLambda("_", makeConstant("Natural"),
+                                  naturalToNatural);
+        // case_zero: multiply zero m = zero — a constant zero function.
+        auto caseZero = makeLambda("_m", makeConstant("Natural"),
+                                    makeConstant("zero"));
+        // case_succ k recK m = add m (recK m)
+        auto caseSuccessor = makeLambda("k", makeConstant("Natural"),
+            makeLambda("recK", naturalToNatural,
+              makeLambda("m", makeConstant("Natural"),
+                makeApplication(
+                    makeApplication(makeConstant("add"),
+                                    makeBoundVariable(0) /* m */),
+                    makeApplication(makeBoundVariable(1) /* recK */,
+                                    makeBoundVariable(0) /* m */)))));
+
+        auto multiplyBody = makeLambda("n", makeConstant("Natural"),
+            makeLambda("m", makeConstant("Natural"),
+              makeApplication(
+                makeApplication(
+                  makeApplication(
+                    makeApplication(
+                      makeApplication(makeConstant("Natural_recursor"),
+                                      motive),
+                      caseZero),
+                    caseSuccessor),
+                  makeBoundVariable(1) /* n */),
+                makeBoundVariable(0) /* m */)));
+
+        auto multiplyType = makePi("n", makeConstant("Natural"),
+                                makePi("m", makeConstant("Natural"),
+                                  makeConstant("Natural")));
+        addDefinition(env, "multiply", multiplyType, multiplyBody);
+
+        // multiply two three  ≡  six.
+        auto buildN = [](int n) {
+            ExpressionPointer result = makeConstant("zero");
+            for (int i = 0; i < n; ++i) {
+                result = makeApplication(makeConstant("successor"), result);
+            }
+            return result;
+        };
+        auto two   = buildN(2);
+        auto three = buildN(3);
+        auto six   = buildN(6);
+        auto product = makeApplication(
+            makeApplication(makeConstant("multiply"), two),
+            three);
+        EXPECT_TRUE(isDefinitionallyEqual(env, {}, product, six));
+
+        // multiply zero n ≡ zero for any concrete n. Whatever n is, the
+        // motive's zero case takes over.
+        auto fiveTimesZero = makeApplication(
+            makeApplication(makeConstant("multiply"),
+                            makeConstant("zero")),
+            buildN(5));
+        EXPECT_TRUE(isDefinitionallyEqual(env, {},
+            fiveTimesZero, makeConstant("zero")));
+    }
+}
+
 } // namespace
 
 int main() {
@@ -694,6 +1559,14 @@ int main() {
 
     runCoreTests();
     runEnvironmentTests(arithmetic);
+    runLevelArithmeticTests();
+    runDeBruijnOperationTests();
+    runReductionTests(arithmetic);
+    runInferTypeErrorTests(arithmetic);
+    runDeclarationErrorTests(arithmetic);
+    runUniversePolymorphismTests(arithmetic);
+    runPrintingTests(arithmetic);
+    runIntegrationTests();
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";
     return failed == 0 ? 0 : 1;

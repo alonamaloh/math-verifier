@@ -424,11 +424,25 @@ bool isDefinitionallyEqual(const Environment& environment,
         }
     } else if (auto* leftConstant = std::get_if<Constant>(&leftReduced->node)) {
         // After weakHeadNormalForm, a Constant at the head can only be an
-        // Axiom (Definitions were unfolded). Equality reduces to name
-        // comparison.
-        auto* rightConstant = std::get_if<Constant>(&rightReduced->node);
-        if (rightConstant && leftConstant->name == rightConstant->name) {
-            return true;
+        // Axiom / Inductive / Constructor / Recursor (Definitions were
+        // unfolded). Two such constants are equal iff they have the same
+        // name AND the same universe arguments — distinct universe
+        // instantiations of a polymorphic constant are NOT interchangeable.
+        if (auto* rightConstant = std::get_if<Constant>(&rightReduced->node);
+            rightConstant && leftConstant->name == rightConstant->name &&
+            leftConstant->universeArguments.size()
+                == rightConstant->universeArguments.size()) {
+            bool allLevelsAgree = true;
+            for (std::size_t i = 0;
+                 i < leftConstant->universeArguments.size(); ++i) {
+                if (!levelsDefinitionallyEqual(
+                        leftConstant->universeArguments[i],
+                        rightConstant->universeArguments[i])) {
+                    allLevelsAgree = false;
+                    break;
+                }
+            }
+            if (allLevelsAgree) return true;
         }
     } else if (auto* leftPi = std::get_if<Pi>(&leftReduced->node)) {
         if (auto* rightPi = std::get_if<Pi>(&rightReduced->node)) {
