@@ -212,7 +212,7 @@ Environment buildArithmeticEnvironment() {
                 makeApplication(
                   makeApplication(
                     makeApplication(
-                      makeApplication(makeConstant("Natural_recursor"),
+                      makeApplication(makeConstant("Natural_recursor", {makeLevelConst(1)}),
                                       motive),
                       caseZero),
                     caseSuccessor),
@@ -492,7 +492,7 @@ void runEnvironmentTests(const Environment& environment) {
     // structure (a Π beginning with the motive).
     {
         auto recursorType =
-            inferType(environment, {}, makeConstant("Natural_recursor"));
+            inferType(environment, {}, makeConstant("Natural_recursor", {makeLevelConst(1)}));
         auto recursorTypeReduced =
             weakHeadNormalForm(environment, recursorType);
         EXPECT_TRUE(std::holds_alternative<Pi>(recursorTypeReduced->node));
@@ -987,7 +987,7 @@ void runReductionTests(const Environment& arithmetic) {
         auto applied = makeApplication(
             makeApplication(
                 makeApplication(
-                    makeApplication(makeConstant("Natural_recursor"), motive),
+                    makeApplication(makeConstant("Natural_recursor", {makeLevelConst(1)}), motive),
                     caseZero),
                 caseSuccessor),
             makeConstant("zero"));
@@ -1012,7 +1012,7 @@ void runReductionTests(const Environment& arithmetic) {
         auto applied = makeApplication(
             makeApplication(
                 makeApplication(
-                    makeApplication(makeConstant("Natural_recursor"), motive),
+                    makeApplication(makeConstant("Natural_recursor", {makeLevelConst(1)}), motive),
                     caseZero),
                 caseSuccessor),
             target);
@@ -1035,7 +1035,7 @@ void runReductionTests(const Environment& arithmetic) {
         auto stuck = makeApplication(
             makeApplication(
                 makeApplication(
-                    makeApplication(makeConstant("Natural_recursor"), motive),
+                    makeApplication(makeConstant("Natural_recursor", {makeLevelConst(1)}), motive),
                     caseZero),
                 caseSuccessor),
             makeFreeVariable("n"));
@@ -1378,6 +1378,121 @@ void runPrintingTests(const Environment& arithmetic) {
 // position. Without this check, a malicious user can derive False.
 // ----------------------------------------------------------------------------
 
+// ----------------------------------------------------------------------------
+// Universe-polymorphic recursor tests. With a polymorphic motive, the same
+// Natural_recursor can be instantiated at any motive universe — Type 0 for
+// the typical case (computing Naturals from Naturals), or Prop to prove
+// propositions by induction.
+// ----------------------------------------------------------------------------
+
+void runPolymorphicRecursorTests(const Environment& arithmetic) {
+    std::cout << "--- polymorphic recursor tests ---\n";
+
+    // The recursor takes a motive-level universe argument.
+    {
+        auto type = inferType(arithmetic, {},
+            makeConstant("Natural_recursor", {makeLevelConst(1)}));
+        // Motive is Π(_ : Natural). Type 0 in this case. Type of the
+        // recursor lives in Sort imax(of motive type, ...) = Type 1.
+        EXPECT_TRUE(std::holds_alternative<Pi>(type->node));
+    }
+
+    // Instantiate at motive level 0 (Prop motive). The recursor's motive
+    // type becomes Π(_ : Natural). Prop. Calls to it eliminate Natural
+    // into propositions — i.e. proofs by induction.
+    {
+        auto recursorPropMotive =
+            makeConstant("Natural_recursor", {makeLevelConst(0)});
+        auto inferredType = inferType(arithmetic, {}, recursorPropMotive);
+        // Pretty-print to confirm motive is Π(_ : Natural). Prop.
+        // (Concretely: the type starts with Π(motive : Π(_ : Natural). Prop).)
+        auto whnfType = weakHeadNormalForm(arithmetic, inferredType);
+        auto* pi = std::get_if<Pi>(&whnfType->node);
+        EXPECT_TRUE(pi);
+        if (pi) {
+            // pi->domain is the motive's TYPE, which should be
+            // Π(_ : Natural). Prop.
+            auto* motivePi = std::get_if<Pi>(&pi->domain->node);
+            EXPECT_TRUE(motivePi);
+            if (motivePi) {
+                auto* codomainSort =
+                    std::get_if<Sort>(&motivePi->codomain->node);
+                EXPECT_TRUE(
+                    codomainSort &&
+                    levelAsConstant(codomainSort->level) &&
+                    *levelAsConstant(codomainSort->level) == 0);  // Prop
+            }
+        }
+    }
+
+    // Prove a proposition by induction: ∀(n : Natural). Equality.{0}
+    //                                      Natural n n.
+    // The proof is reflexivity applied to each constructor case, and
+    // Natural_recursor at motive level 0 (Prop) ties them together.
+    //
+    //   inductionProof : Π(n : Natural). Equality Natural n n
+    //   inductionProof =
+    //     Natural_recursor.{0}
+    //       (λn. Equality Natural n n)              -- motive : Natural → Prop
+    //       (reflexivity Natural zero)              -- case_zero
+    //       (λk recK. reflexivity Natural (successor k))  -- case_succ
+    {
+        Environment env = arithmetic;
+        auto motive = makeLambda("n", makeConstant("Natural"),
+            makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeConstant("Equality", {makeLevelConst(0)}),
+                        makeConstant("Natural")),
+                    makeBoundVariable(0) /* n */),
+                makeBoundVariable(0) /* n */));
+        auto caseZero = makeApplication(
+            makeApplication(makeConstant("reflexivity",
+                                          {makeLevelConst(0)}),
+                            makeConstant("Natural")),
+            makeConstant("zero"));
+        auto caseSuccessor = makeLambda("k", makeConstant("Natural"),
+            // recK is the IH; we ignore it because reflexivity gives us
+            // what we want directly. Bound 0 = recK, bound 1 = k.
+            makeLambda("recK",
+                makeApplication(
+                    makeApplication(
+                        makeApplication(
+                            makeConstant("Equality", {makeLevelConst(0)}),
+                            makeConstant("Natural")),
+                        makeBoundVariable(0) /* k */),
+                    makeBoundVariable(0) /* k */),
+                makeApplication(
+                    makeApplication(makeConstant("reflexivity",
+                                                  {makeLevelConst(0)}),
+                                    makeConstant("Natural")),
+                    makeApplication(makeConstant("successor"),
+                                    makeBoundVariable(1) /* k */))));
+        auto inductionProof = makeLambda("n", makeConstant("Natural"),
+            makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeApplication(
+                            makeConstant("Natural_recursor",
+                                          {makeLevelConst(0)}),
+                            motive),
+                        caseZero),
+                    caseSuccessor),
+                makeBoundVariable(0) /* n */));
+        auto proofType = makePi("n", makeConstant("Natural"),
+            makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeConstant("Equality", {makeLevelConst(0)}),
+                        makeConstant("Natural")),
+                    makeBoundVariable(0)),
+                makeBoundVariable(0)));
+        addDefinition(env, "inductionProof", proofType, inductionProof);
+        // The definition typechecks: kernel-verified proof by induction.
+        EXPECT_TRUE(env.lookup("inductionProof") != nullptr);
+    }
+}
+
 void runStrictPositivityTests() {
     std::cout << "--- strict positivity tests ---\n";
 
@@ -1505,17 +1620,15 @@ void runHardeningTests(const Environment& arithmetic) {
         EXPECT_TRUE(std::holds_alternative<Sort>(reduced->node));
     }
 
-    // ι-reduction's universe-prefix check: when the recursor and the target
-    // constructor disagree on universe arguments, ι doesn't fire and the
-    // expression stays stuck. (We can only exercise this minimally given
-    // that Natural isn't universe-polymorphic — the prefix is empty and
-    // trivially matches; this test is here as a regression baseline so
-    // the polymorphic case has a place to land tests later.)
+    // The recursor has one universe parameter — the motive's universe.
+    // Zero args is wrong arity.
     {
-        // Natural_recursor expects no universe args (Natural has none).
-        // Passing one is wrong arity; inferType should throw.
         EXPECT_THROW(inferType(arithmetic, {},
-            makeConstant("Natural_recursor", {makeLevelConst(0)})));
+            makeConstant("Natural_recursor")));
+        // Two args is also wrong.
+        EXPECT_THROW(inferType(arithmetic, {},
+            makeConstant("Natural_recursor",
+                         {makeLevelConst(0), makeLevelConst(1)})));
     }
 
     // Fuel limit: an explicit fuel budget of 0 causes weakHeadNormalForm
@@ -1574,7 +1687,7 @@ void runIntegrationTests() {
                 makeApplication(
                     makeApplication(
                         makeApplication(
-                            makeConstant("Boolean_recursor"),
+                            makeConstant("Boolean_recursor", {makeLevelConst(1)}),
                             makeLambda("_", makeConstant("Boolean"),
                                         makeConstant("Boolean"))),
                         makeConstant("false")),
@@ -1627,7 +1740,7 @@ void runIntegrationTests() {
                 makeApplication(
                   makeApplication(
                     makeApplication(
-                      makeApplication(makeConstant("Natural_recursor"),
+                      makeApplication(makeConstant("Natural_recursor", {makeLevelConst(1)}),
                                       motive),
                       caseZero),
                     caseSuccessor),
@@ -1742,7 +1855,7 @@ int main() {
                makePi("P", makeProp(), makeBoundVariable(0)));
 
     runExample(arithmetic, "Natural_recursor  (auto-generated)",
-               makeConstant("Natural_recursor"));
+               makeConstant("Natural_recursor", {makeLevelConst(1)}));
 
     runExample(arithmetic, "add  (defined via Natural_recursor)",
                makeConstant("add"));
@@ -1780,6 +1893,7 @@ int main() {
     runPrintingTests(arithmetic);
     runHardeningTests(arithmetic);
     runStrictPositivityTests();
+    runPolymorphicRecursorTests(arithmetic);
     runIntegrationTests();
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";

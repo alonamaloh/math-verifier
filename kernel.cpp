@@ -992,10 +992,12 @@ ExpressionPointer buildCaseType(const std::string& motivePlaceholder,
 }
 
 // Builds the full type of the recursor for an inductive declaration. The
-// motive is hardcoded to map into Type 0 — extending to other motive
-// universes requires universe polymorphism, which is a later chunk.
+// motive's codomain is `Sort motiveLevelName` — a level parameter, so the
+// generated recursor is universe-polymorphic in the motive. Callers supply
+// the level at the use site (e.g. recursor.{u_inductive..., motiveLevel}).
 ExpressionPointer buildRecursorType(
     const std::string& inductiveName,
+    const std::string& motiveLevelName,
     const std::vector<ConstructorSpec>& constructors) {
     // Internal-origin placeholders for the motive and target. They are
     // closed by closeBinder below before the recursor type is returned;
@@ -1005,7 +1007,8 @@ ExpressionPointer buildRecursorType(
     const std::string targetPlaceholder = "target";
 
     auto motiveType =
-        makePi("_", makeConstant(inductiveName), makeType(0));
+        makePi("_", makeConstant(inductiveName),
+               makeSort(makeLevelParam(motiveLevelName)));
 
     std::vector<ExpressionPointer> caseTypes;
     caseTypes.reserve(constructors.size());
@@ -1116,14 +1119,32 @@ void addInductive(Environment& environment, std::string inductiveName,
             Constructor{universeParameters, inductiveName, i, constructor.type});
     }
 
-    // Generate and register the recursor.
+    // Generate and register the recursor. The recursor is universe-
+    // polymorphic in the motive's codomain: it gains one extra universe
+    // parameter (call it motiveLevel) beyond what the inductive has.
+    // We pick a name that doesn't collide with the inductive's existing
+    // universe parameters; this is purely a naming convenience since user
+    // code refers to it positionally.
     std::string recursorName = inductiveName + "_recursor";
     if (environment.declarations.count(recursorName)) {
         rollback();
         throw TypeError(
             "addInductive: recursor name already taken: " + recursorName);
     }
-    auto recursorType = buildRecursorType(inductiveName, constructors);
+    std::string motiveLevelName = "motiveLevel";
+    {
+        auto inUse = [&](const std::string& candidate) {
+            for (const auto& p : universeParameters) {
+                if (p == candidate) return true;
+            }
+            return false;
+        };
+        for (int suffix = 1; inUse(motiveLevelName); ++suffix) {
+            motiveLevelName = "motiveLevel_" + std::to_string(suffix);
+        }
+    }
+    auto recursorType = buildRecursorType(
+        inductiveName, motiveLevelName, constructors);
     try {
         auto kindOfRecursorType = weakHeadNormalForm(
             environment, inferType(environment, {}, recursorType));
@@ -1136,8 +1157,10 @@ void addInductive(Environment& environment, std::string inductiveName,
         rollback();
         throw;
     }
+    std::vector<std::string> recursorUniverseParameters = universeParameters;
+    recursorUniverseParameters.push_back(motiveLevelName);
     environment.declarations.emplace(
         recursorName,
-        Recursor{std::move(universeParameters), inductiveName, recursorType,
-                 (int)constructors.size()});
+        Recursor{std::move(recursorUniverseParameters), inductiveName,
+                 recursorType, (int)constructors.size()});
 }
