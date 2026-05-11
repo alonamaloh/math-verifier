@@ -15,6 +15,7 @@ struct TypeError : std::runtime_error {
 struct ContextEntry {
     std::string name;
     ExpressionPointer type;
+    FreeVariableOrigin origin = FreeVariableOrigin::User;
 };
 using Context = std::vector<ContextEntry>;
 
@@ -127,16 +128,24 @@ ExpressionPointer substitute(ExpressionPointer expression,
                          int targetIndex,
                          ExpressionPointer replacement);
 
-// Replaces BoundVariable{0} with FreeVariable{freshName} and decrements
+// Replaces BoundVariable{0} with the supplied free variable and decrements
 // higher indices. Used to descend under a binder while exposing the bound
-// variable as a free variable for type-checking and equality.
+// variable as a free variable for type-checking and equality. The `origin`
+// argument distinguishes user-supplied fresh names (the default) from
+// kernel-internal ones used by isDefinitionallyEqual and the recursor
+// builders.
 ExpressionPointer openBinder(ExpressionPointer expression,
-                         const std::string& freshName);
+                             const std::string& freshName,
+                             FreeVariableOrigin origin
+                                 = FreeVariableOrigin::User);
 
-// Replaces FreeVariable{name} with a BoundVariable referring to a binder
-// added one level above `expression`, and shifts other bound variables up
-// by one. Used by inferType on Lambda to rebuild the Pi.
-ExpressionPointer closeBinder(ExpressionPointer expression, const std::string& name);
+// Replaces every FreeVariable matching (name, origin) with a BoundVariable
+// referring to a binder added one level above `expression`, and shifts
+// other bound variables up by one. The inverse of openBinder.
+ExpressionPointer closeBinder(ExpressionPointer expression,
+                              const std::string& name,
+                              FreeVariableOrigin origin
+                                  = FreeVariableOrigin::User);
 
 // Reduces only the head: enough to see whether the outermost form is a
 // Sort, Pi, Lambda, etc. Unfolds definitions in head position

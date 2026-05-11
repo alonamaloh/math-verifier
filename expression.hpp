@@ -11,8 +11,19 @@
 struct Expression;
 using ExpressionPointer = std::shared_ptr<Expression>;
 
+// Distinguishes free variables introduced by the user (via makeFreeVariable
+// and ContextEntry) from those introduced by the kernel internally — for
+// example, the placeholder names used by isDefinitionallyEqual when it
+// opens a Pi/Lambda binder for structural comparison, or the placeholders
+// used by buildCaseType / buildRecursorType during recursor construction.
+// Two FreeVariables are identified by *both* their name and their origin,
+// so the kernel's internal names cannot collide with anything the user can
+// construct.
+enum class FreeVariableOrigin { User, Internal };
+
 struct BoundVariable { int deBruijnIndex; };
-struct FreeVariable  { std::string name; };
+struct FreeVariable  { std::string name;
+                       FreeVariableOrigin origin = FreeVariableOrigin::User; };
 struct Sort          { LevelPointer level; };
 struct Pi            { std::string displayHint; ExpressionPointer domain; ExpressionPointer codomain; };
 struct Lambda        { std::string displayHint; ExpressionPointer domain; ExpressionPointer body; };
@@ -42,6 +53,10 @@ inline ExpressionPointer makeBoundVariable(int index) {
 inline ExpressionPointer makeFreeVariable(std::string name) {
     return std::make_shared<Expression>(FreeVariable{std::move(name)});
 }
+// Note: no public builder exists for Internal-origin FreeVariables — they
+// are an implementation detail of the kernel (isDefinitionallyEqual binder
+// opening, buildCaseType/buildRecursorType placeholders) and the User
+// origin is the only one client code should construct.
 // Sort taking a level expression. Universe-polymorphic code passes a Level
 // containing a LevelParam; concrete code uses LevelConst (via the int
 // overload below). Level 0 is Prop; level n+1 is "Type n".

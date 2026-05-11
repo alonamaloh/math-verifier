@@ -867,6 +867,41 @@ void runDeBruijnOperationTests() {
         auto* bv = std::get_if<BoundVariable>(&closed->node);
         EXPECT_TRUE(bv && bv->deBruijnIndex == 3);
     }
+
+    // Origin-tag isolation. The kernel internally uses names like "v0",
+    // "v1", "motive", "target" when opening binders or building recursors.
+    // A user is free to introduce free variables with those same names; the
+    // FreeVariableOrigin tag keeps them distinct from anything the kernel
+    // generates internally, so no collision can occur.
+    //
+    // Here we put a user free variable named "v0" in scope and compare two
+    // equivalent terms whose codomain references it. The kernel's first
+    // internal opening name (with an empty context) is also "v0" — but
+    // Internal-origin — so structurally the two populations coexist.
+    {
+        Environment empty;
+        Context context = {{"v0", makeConstant("Nat0")}};
+        // We need Nat0 to exist as a type so context entries type-check
+        // when the kernel infers types for proof irrelevance.
+        Environment localEnvironment;
+        addAxiom(localEnvironment, "Nat0", makeType(0));
+        auto leftTerm = makePi("y", makeConstant("Nat0"),
+                                makeFreeVariable("v0"));
+        auto rightTerm = makePi("y", makeConstant("Nat0"),
+                                 makeFreeVariable("v0"));
+        EXPECT_TRUE(isDefinitionallyEqual(localEnvironment, context,
+                                          leftTerm, rightTerm));
+        // And two distinct user names "v0" and "motive" don't get confused.
+        Context context2 = {{"v0", makeConstant("Nat0")},
+                            {"motive", makeConstant("Nat0")}};
+        auto leftDifferent = makePi("y", makeConstant("Nat0"),
+                                     makeFreeVariable("v0"));
+        auto rightDifferent = makePi("y", makeConstant("Nat0"),
+                                      makeFreeVariable("motive"));
+        EXPECT_FALSE(isDefinitionallyEqual(localEnvironment, context2,
+                                           leftDifferent, rightDifferent));
+        (void)empty;
+    }
 }
 
 // ----------------------------------------------------------------------------

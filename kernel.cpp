@@ -5,6 +5,14 @@
 
 namespace {
 
+// Kernel-private builder for Internal-origin free variables. Lives here
+// (not in expression.hpp) so clients of the kernel cannot construct them
+// through the public API.
+ExpressionPointer makeInternalFreeVariable(std::string name) {
+    return std::make_shared<Expression>(
+        FreeVariable{std::move(name), FreeVariableOrigin::Internal});
+}
+
 // Lean's imax rule on level expressions: makeLevelIMax already encodes the
 // Prop-collapsing behaviour for concrete codomains and falls back to a
 // symbolic LevelIMax otherwise.
@@ -162,8 +170,12 @@ ExpressionPointer substitute(ExpressionPointer expression,
     throw TypeError("internal: unhandled Expression variant in substitute");
 }
 
-ExpressionPointer openBinder(ExpressionPointer expression, const std::string& freshName) {
-    return substitute(std::move(expression), 0, makeFreeVariable(freshName));
+ExpressionPointer openBinder(ExpressionPointer expression,
+                             const std::string& freshName,
+                             FreeVariableOrigin origin) {
+    auto freeVar = std::make_shared<Expression>(
+        FreeVariable{freshName, origin});
+    return substitute(std::move(expression), 0, std::move(freeVar));
 }
 
 namespace {
@@ -173,6 +185,7 @@ namespace {
 // since the close started).
 ExpressionPointer closeAtDepth(ExpressionPointer expression,
                            const std::string& name,
+                           FreeVariableOrigin origin,
                            int depth) {
     if (auto* boundVariable = std::get_if<BoundVariable>(&expression->node)) {
         // Any bound index referring to something outside `expression`
@@ -185,39 +198,43 @@ ExpressionPointer closeAtDepth(ExpressionPointer expression,
         return expression;
     }
     if (auto* freeVariable = std::get_if<FreeVariable>(&expression->node)) {
-        if (freeVariable->name == name) return makeBoundVariable(depth);
+        if (freeVariable->name == name && freeVariable->origin == origin) {
+            return makeBoundVariable(depth);
+        }
         return expression;
     }
     if (std::holds_alternative<Sort>(expression->node))     return expression;
     if (std::holds_alternative<Constant>(expression->node)) return expression;
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
         return makePi(pi->displayHint,
-                      closeAtDepth(pi->domain,   name, depth),
-                      closeAtDepth(pi->codomain, name, depth + 1));
+                      closeAtDepth(pi->domain,   name, origin, depth),
+                      closeAtDepth(pi->codomain, name, origin, depth + 1));
     }
     if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
         return makeLambda(lambda->displayHint,
-                          closeAtDepth(lambda->domain, name, depth),
-                          closeAtDepth(lambda->body,   name, depth + 1));
+                          closeAtDepth(lambda->domain, name, origin, depth),
+                          closeAtDepth(lambda->body,   name, origin, depth + 1));
     }
     if (auto* application = std::get_if<Application>(&expression->node)) {
         return makeApplication(
-            closeAtDepth(application->function, name, depth),
-            closeAtDepth(application->argument, name, depth));
+            closeAtDepth(application->function, name, origin, depth),
+            closeAtDepth(application->argument, name, origin, depth));
     }
     if (auto* let = std::get_if<Let>(&expression->node)) {
         return makeLet(let->displayHint,
-                       closeAtDepth(let->type,  name, depth),
-                       closeAtDepth(let->value, name, depth),
-                       closeAtDepth(let->body,  name, depth + 1));
+                       closeAtDepth(let->type,  name, origin, depth),
+                       closeAtDepth(let->value, name, origin, depth),
+                       closeAtDepth(let->body,  name, origin, depth + 1));
     }
     throw TypeError("internal: unhandled Expression variant in closeBinder");
 }
 
 } // namespace
 
-ExpressionPointer closeBinder(ExpressionPointer expression, const std::string& name) {
-    return closeAtDepth(std::move(expression), name, 0);
+ExpressionPointer closeBinder(ExpressionPointer expression,
+                              const std::string& name,
+                              FreeVariableOrigin origin) {
+    return closeAtDepth(std::move(expression), name, origin, 0);
 }
 
 namespace {
@@ -384,13 +401,14 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
 
 namespace {
 
-// Generates a name guaranteed not to collide with any user-provided name,
-// because user names don't contain the SOH (\x01) control character. Each
-// fresh name is unique within a single isDefinitionallyEqual call tree:
-// every recursion under a binder grows the context by one, so the count
-// strictly increases.
+// Generates a name for an Internal-origin free variable, used by
+// isDefinitionallyEqual / isSubtype to open a Pi or Lambda binder for
+// recursion. Uniqueness within the call tree comes from the context size,
+// which strictly increases with each opening. The name itself is plain
+// text — collision with user-supplied names is impossible because user
+// names live in the User origin and these in the Internal origin.
 std::string makeOpeningName(const Context& context) {
-    return std::string("\x01") + std::to_string(context.size());
+    return "v" + std::to_string(context.size());
 }
 
 } // namespace
@@ -415,7 +433,10 @@ bool isDefinitionallyEqual(const Environment& environment,
         }
     } else if (auto* leftFree = std::get_if<FreeVariable>(&leftReduced->node)) {
         auto* rightFree = std::get_if<FreeVariable>(&rightReduced->node);
-        if (rightFree && leftFree->name == rightFree->name) return true;
+        if (rightFree && leftFree->name == rightFree->name
+                      && leftFree->origin == rightFree->origin) {
+            return true;
+        }
     } else if (auto* leftSort = std::get_if<Sort>(&leftReduced->node)) {
         auto* rightSort = std::get_if<Sort>(&rightReduced->node);
         if (rightSort && levelsDefinitionallyEqual(leftSort->level,
@@ -452,11 +473,12 @@ bool isDefinitionallyEqual(const Environment& environment,
             }
             auto fresh = makeOpeningName(context);
             Context extendedContext = context;
-            extendedContext.push_back({fresh, leftPi->domain});
+            extendedContext.push_back(
+                {fresh, leftPi->domain, FreeVariableOrigin::Internal});
             return isDefinitionallyEqual(
                 environment, extendedContext,
-                openBinder(leftPi->codomain,  fresh),
-                openBinder(rightPi->codomain, fresh));
+                openBinder(leftPi->codomain,  fresh, FreeVariableOrigin::Internal),
+                openBinder(rightPi->codomain, fresh, FreeVariableOrigin::Internal));
         }
     } else if (auto* leftLambda = std::get_if<Lambda>(&leftReduced->node)) {
         if (auto* rightLambda = std::get_if<Lambda>(&rightReduced->node)) {
@@ -467,11 +489,12 @@ bool isDefinitionallyEqual(const Environment& environment,
             }
             auto fresh = makeOpeningName(context);
             Context extendedContext = context;
-            extendedContext.push_back({fresh, leftLambda->domain});
+            extendedContext.push_back(
+                {fresh, leftLambda->domain, FreeVariableOrigin::Internal});
             return isDefinitionallyEqual(
                 environment, extendedContext,
-                openBinder(leftLambda->body,  fresh),
-                openBinder(rightLambda->body, fresh));
+                openBinder(leftLambda->body,  fresh, FreeVariableOrigin::Internal),
+                openBinder(rightLambda->body, fresh, FreeVariableOrigin::Internal));
         }
     } else if (auto* leftApplication = std::get_if<Application>(&leftReduced->node)) {
         if (auto* rightApplication = std::get_if<Application>(&rightReduced->node)) {
@@ -497,11 +520,12 @@ bool isDefinitionallyEqual(const Environment& environment,
                 shift(rightReduced, 1), makeBoundVariable(0));
             auto fresh = makeOpeningName(context);
             Context extendedContext = context;
-            extendedContext.push_back({fresh, leftLambda->domain});
+            extendedContext.push_back(
+                {fresh, leftLambda->domain, FreeVariableOrigin::Internal});
             if (isDefinitionallyEqual(
                     environment, extendedContext,
-                    openBinder(leftLambda->body, fresh),
-                    openBinder(etaExpandedRight, fresh))) {
+                    openBinder(leftLambda->body, fresh, FreeVariableOrigin::Internal),
+                    openBinder(etaExpandedRight, fresh, FreeVariableOrigin::Internal))) {
                 return true;
             }
         }
@@ -510,11 +534,12 @@ bool isDefinitionallyEqual(const Environment& environment,
                 shift(leftReduced, 1), makeBoundVariable(0));
             auto fresh = makeOpeningName(context);
             Context extendedContext = context;
-            extendedContext.push_back({fresh, rightLambda->domain});
+            extendedContext.push_back(
+                {fresh, rightLambda->domain, FreeVariableOrigin::Internal});
             if (isDefinitionallyEqual(
                     environment, extendedContext,
-                    openBinder(etaExpandedLeft, fresh),
-                    openBinder(rightLambda->body, fresh))) {
+                    openBinder(etaExpandedLeft, fresh, FreeVariableOrigin::Internal),
+                    openBinder(rightLambda->body, fresh, FreeVariableOrigin::Internal))) {
                 return true;
             }
         }
@@ -568,10 +593,11 @@ bool isSubtype(const Environment& environment,
             }
             auto fresh = makeOpeningName(context);
             Context extendedContext = context;
-            extendedContext.push_back({fresh, subPi->domain});
+            extendedContext.push_back(
+                {fresh, subPi->domain, FreeVariableOrigin::Internal});
             return isSubtype(environment, extendedContext,
-                             openBinder(subPi->codomain,   fresh),
-                             openBinder(superPi->codomain, fresh));
+                             openBinder(subPi->codomain,   fresh, FreeVariableOrigin::Internal),
+                             openBinder(superPi->codomain, fresh, FreeVariableOrigin::Internal));
         }
     }
 
@@ -605,9 +631,16 @@ ExpressionPointer inferType(const Environment& environment,
     }
     if (auto* freeVariable = std::get_if<FreeVariable>(&expression->node)) {
         for (auto entry = context.rbegin(); entry != context.rend(); ++entry) {
-            if (entry->name == freeVariable->name) return entry->type;
+            if (entry->name == freeVariable->name &&
+                entry->origin == freeVariable->origin) {
+                return entry->type;
+            }
         }
-        throw TypeError("unbound free variable: " + freeVariable->name);
+        throw TypeError(
+            std::string(freeVariable->origin == FreeVariableOrigin::User
+                            ? "unbound free variable: "
+                            : "unbound internal variable: ")
+            + freeVariable->name);
     }
     if (auto* constant = std::get_if<Constant>(&expression->node)) {
         auto* declaration = environment.lookup(constant->name);
@@ -751,17 +784,13 @@ namespace {
 // hypothesis binder is inserted that gives access to the recursive result.
 // The result of the case is `motive (constructor arg_1 ... arg_n)`.
 //
-// We build the term using a free variable for `motive` (and one fresh free
-// variable per binder during construction), then close them in the right
-// order. The caller is responsible for closing the free `motive` reference
-// once the whole recursor type has been assembled.
+// During construction, every binder is represented by an Internal-origin
+// free variable. closeBinder converts those back to BoundVariables in the
+// right order. The motive placeholder stays free in the result; the caller
+// closes it after assembling the whole recursor type.
 ExpressionPointer buildCaseType(const std::string& motivePlaceholder,
                                 const std::string& inductiveName,
                                 const ConstructorSpec& constructor) {
-    // Walk the constructor's type to extract its arguments. For each Pi the
-    // codomain may reference earlier arguments via BoundVariable(0); we
-    // substitute a fresh free variable as we descend so subsequent argument
-    // types are expressed with names rather than indices.
     struct ArgumentInfo {
         std::string freeName;
         std::string displayHint;
@@ -772,14 +801,14 @@ ExpressionPointer buildCaseType(const std::string& motivePlaceholder,
     auto walker = constructor.type;
     int argumentIndex = 0;
     while (auto* pi = std::get_if<Pi>(&walker->node)) {
-        std::string freeName = "\x02arg" + std::to_string(argumentIndex)
-                             + "_" + constructor.name;
+        std::string freeName = "arg_" + std::to_string(argumentIndex);
         bool recursive = false;
         if (auto* c = std::get_if<Constant>(&pi->domain->node)) {
             if (c->name == inductiveName) recursive = true;
         }
         arguments.push_back({freeName, pi->displayHint, pi->domain, recursive});
-        walker = substitute(pi->codomain, 0, makeFreeVariable(freeName));
+        walker = substitute(pi->codomain, 0,
+                            makeInternalFreeVariable(freeName));
         argumentIndex++;
     }
 
@@ -787,10 +816,10 @@ ExpressionPointer buildCaseType(const std::string& motivePlaceholder,
     auto constructorApplied = makeConstant(constructor.name);
     for (const auto& argument : arguments) {
         constructorApplied = makeApplication(
-            constructorApplied, makeFreeVariable(argument.freeName));
+            constructorApplied, makeInternalFreeVariable(argument.freeName));
     }
     auto result = makeApplication(
-        makeFreeVariable(motivePlaceholder), constructorApplied);
+        makeInternalFreeVariable(motivePlaceholder), constructorApplied);
 
     // Wrap from innermost to outermost. For each argument in reverse order:
     //   - if the argument is recursive, first wrap with the hypothesis Pi
@@ -800,14 +829,15 @@ ExpressionPointer buildCaseType(const std::string& motivePlaceholder,
         const auto& argument = arguments[j];
         if (argument.isRecursive) {
             auto hypothesisType = makeApplication(
-                makeFreeVariable(motivePlaceholder),
-                makeFreeVariable(argument.freeName));
+                makeInternalFreeVariable(motivePlaceholder),
+                makeInternalFreeVariable(argument.freeName));
             // Hypothesis binder is not referenced by name in the rest of the
             // case type, so no closeBinder is needed for its name.
             result = makePi("hypothesis_" + argument.displayHint,
                             hypothesisType, result);
         }
-        result = closeBinder(result, argument.freeName);
+        result = closeBinder(result, argument.freeName,
+                             FreeVariableOrigin::Internal);
         result = makePi(argument.displayHint, argument.domain, result);
     }
     return result;
@@ -819,8 +849,12 @@ ExpressionPointer buildCaseType(const std::string& motivePlaceholder,
 ExpressionPointer buildRecursorType(
     const std::string& inductiveName,
     const std::vector<ConstructorSpec>& constructors) {
-    const std::string motivePlaceholder = "\x02recursorMotive";
-    const std::string targetPlaceholder = "\x02recursorTarget";
+    // Internal-origin placeholders for the motive and target. They are
+    // closed by closeBinder below before the recursor type is returned;
+    // because they live in the Internal origin they cannot collide with
+    // anything the user can construct.
+    const std::string motivePlaceholder = "motive";
+    const std::string targetPlaceholder = "target";
 
     auto motiveType =
         makePi("_", makeConstant(inductiveName), makeType(0));
@@ -833,9 +867,10 @@ ExpressionPointer buildRecursorType(
     }
 
     // Innermost return type: motive target.
-    auto core = makeApplication(makeFreeVariable(motivePlaceholder),
-                                makeFreeVariable(targetPlaceholder));
-    auto recursorType = closeBinder(core, targetPlaceholder);
+    auto core = makeApplication(makeInternalFreeVariable(motivePlaceholder),
+                                makeInternalFreeVariable(targetPlaceholder));
+    auto recursorType = closeBinder(core, targetPlaceholder,
+                                    FreeVariableOrigin::Internal);
     recursorType = makePi("target", makeConstant(inductiveName), recursorType);
 
     // Wrap each case binder (innermost to outermost). The cases are unused
@@ -848,7 +883,8 @@ ExpressionPointer buildRecursorType(
 
     // Wrap with the motive binder, closing the free motive placeholder
     // throughout.
-    recursorType = closeBinder(recursorType, motivePlaceholder);
+    recursorType = closeBinder(recursorType, motivePlaceholder,
+                               FreeVariableOrigin::Internal);
     recursorType = makePi("motive", motiveType, recursorType);
     return recursorType;
 }

@@ -45,6 +45,11 @@ void writeAtomic(std::ostringstream& output,
         return;
     }
     if (auto* freeVariable = std::get_if<FreeVariable>(&expression->node)) {
+        // Kernel-internal free variables are prefixed with '@' on display
+        // so that any accidental leak into user-facing output is obvious.
+        if (freeVariable->origin == FreeVariableOrigin::Internal) {
+            output << "@";
+        }
         output << freeVariable->name;
         return;
     }
