@@ -844,6 +844,88 @@ void addDefinition(Environment& environment,
 
 namespace {
 
+// True if `expression` syntactically contains a Constant with the given
+// name anywhere. Used by the strict-positivity check below — and only by
+// it; it's a cheap structural walk, not a semantic test.
+bool mentionsConstant(ExpressionPointer expression,
+                      const std::string& constantName) {
+    if (auto* c = std::get_if<Constant>(&expression->node)) {
+        return c->name == constantName;
+    }
+    if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        return mentionsConstant(pi->domain,   constantName)
+            || mentionsConstant(pi->codomain, constantName);
+    }
+    if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        return mentionsConstant(lambda->domain, constantName)
+            || mentionsConstant(lambda->body,   constantName);
+    }
+    if (auto* application = std::get_if<Application>(&expression->node)) {
+        return mentionsConstant(application->function, constantName)
+            || mentionsConstant(application->argument, constantName);
+    }
+    if (auto* let = std::get_if<Let>(&expression->node)) {
+        return mentionsConstant(let->type,  constantName)
+            || mentionsConstant(let->value, constantName)
+            || mentionsConstant(let->body,  constantName);
+    }
+    return false;  // BoundVariable, FreeVariable, Sort: no Constant inside.
+}
+
+// Strict positivity: the inductive type's name may appear in constructor
+// argument types only in "strictly positive" positions. Concretely:
+//   - it may appear nowhere (a non-recursive argument), OR
+//   - it may be the entire type (a direct recursive argument), OR
+//   - the type may be Π(_ : A). B where A doesn't mention it and B is
+//     strictly positive in it (a higher-order recursive argument, like
+//     mkInfTree : (Nat → Tree) → Tree).
+// The rule rejects pathological declarations like
+//   Bad : Type 0 := mkBad : (Bad → Bool) → Bad,
+// which would otherwise let the user derive False.
+bool isStrictlyPositive(ExpressionPointer expression,
+                        const std::string& inductiveName) {
+    // Case 1: doesn't mention the inductive at all.
+    if (!mentionsConstant(expression, inductiveName)) return true;
+    // Case 2: is exactly the inductive (a direct recursive argument).
+    if (auto* c = std::get_if<Constant>(&expression->node)) {
+        return c->name == inductiveName;
+    }
+    // Case 3: Π(_ : A). B with A not mentioning T and B strictly positive.
+    if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        return !mentionsConstant(pi->domain, inductiveName)
+            && isStrictlyPositive(pi->codomain, inductiveName);
+    }
+    // All other shapes (Application, Lambda, Let, ...) that mention T:
+    // not strictly positive.
+    return false;
+}
+
+// Verifies that every argument of `constructor` is strictly positive in
+// `inductiveName`. Walks the constructor's type as a Pi-chain. Returns the
+// codomain-after-stripping (the conclusion of the constructor) so the
+// caller can also check it ends in the inductive.
+ExpressionPointer checkConstructorStrictlyPositive(
+    const std::string& inductiveName,
+    const ConstructorSpec& constructor) {
+    auto walker = constructor.type;
+    int argumentIndex = 0;
+    while (auto* pi = std::get_if<Pi>(&walker->node)) {
+        if (!isStrictlyPositive(pi->domain, inductiveName)) {
+            throw TypeError(
+                "addInductive: constructor " + constructor.name +
+                " argument " + std::to_string(argumentIndex) +
+                " has non-strictly-positive occurrence of " + inductiveName);
+        }
+        // Walk into the codomain. The codomain may reference the bound
+        // variable via BoundVariable(0); we don't need to track it for
+        // the positivity check (we only inspect each Pi's domain), but
+        // we must advance through the binder structure.
+        walker = pi->codomain;
+        argumentIndex++;
+    }
+    return walker;
+}
+
 // Builds the type of the case for a single constructor in the recursor's
 // signature. The case binds each constructor argument; for arguments whose
 // type is the inductive itself (direct recursive arguments), an extra
@@ -996,7 +1078,10 @@ void addInductive(Environment& environment, std::string inductiveName,
         environment.declarations.erase(inductiveName + "_recursor");
     };
 
-    // Type-check and register each constructor.
+    // Type-check and register each constructor. Each constructor type
+    // must (a) itself be a well-formed type, (b) have only strictly-
+    // positive occurrences of the inductive being declared, and (c) end
+    // in the inductive (its conclusion is a Constant referring to it).
     for (int i = 0; i < (int)constructors.size(); ++i) {
         const auto& constructor = constructors[i];
         if (environment.declarations.count(constructor.name)) {
@@ -1012,6 +1097,15 @@ void addInductive(Environment& environment, std::string inductiveName,
                 throw TypeError(
                     "addInductive: constructor type is not a type: " +
                     constructor.name);
+            }
+            auto conclusion =
+                checkConstructorStrictlyPositive(inductiveName, constructor);
+            if (auto* c = std::get_if<Constant>(&conclusion->node);
+                !c || c->name != inductiveName) {
+                rollback();
+                throw TypeError(
+                    "addInductive: constructor " + constructor.name +
+                    " does not end in " + inductiveName);
             }
         } catch (const TypeError&) {
             rollback();

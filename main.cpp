@@ -1373,6 +1373,108 @@ void runPrintingTests(const Environment& arithmetic) {
 }
 
 // ----------------------------------------------------------------------------
+// Strict-positivity tests: addInductive must reject constructor types in
+// which the inductive being declared appears in a non-strictly-positive
+// position. Without this check, a malicious user can derive False.
+// ----------------------------------------------------------------------------
+
+void runStrictPositivityTests() {
+    std::cout << "--- strict positivity tests ---\n";
+
+    // The canonical bad inductive:
+    //   Bad : Type 0 := mkBad : (Bad → Bool) → Bad
+    // The constructor mkBad has an argument of type (Bad → Bool), which
+    // places Bad in the domain of a Pi inside an argument — a non-strictly-
+    // positive occurrence. This is rejected.
+    {
+        Environment local;
+        addInductive(local, "Boolean", makeType(0), {
+            {"true",  makeConstant("Boolean")},
+            {"false", makeConstant("Boolean")},
+        });
+        EXPECT_THROW(addInductive(local, "Bad", makeType(0), {
+            {"mkBad",
+                makePi("_",
+                    makePi("_",
+                        makeConstant("Bad"),
+                        makeConstant("Boolean")),
+                    makeConstant("Bad"))},
+        }));
+        // The whole declaration was rolled back.
+        EXPECT_TRUE(local.lookup("Bad") == nullptr);
+        EXPECT_TRUE(local.lookup("mkBad") == nullptr);
+        EXPECT_TRUE(local.lookup("Bad_recursor") == nullptr);
+    }
+
+    // A worse case: Bad appears under multiple Pis on the way down.
+    //   Worse : Type 0 := mkWorse : ((Worse → Worse) → Bool) → Worse
+    {
+        Environment local;
+        addInductive(local, "Boolean", makeType(0), {
+            {"true",  makeConstant("Boolean")},
+            {"false", makeConstant("Boolean")},
+        });
+        EXPECT_THROW(addInductive(local, "Worse", makeType(0), {
+            {"mkWorse",
+                makePi("_",
+                    makePi("_",
+                        makePi("_",
+                            makeConstant("Worse"),
+                            makeConstant("Worse")),
+                        makeConstant("Boolean")),
+                    makeConstant("Worse"))},
+        }));
+    }
+
+    // A constructor whose conclusion isn't the inductive must be rejected.
+    {
+        Environment local;
+        addInductive(local, "Boolean", makeType(0), {
+            {"true",  makeConstant("Boolean")},
+            {"false", makeConstant("Boolean")},
+        });
+        EXPECT_THROW(addInductive(local, "Nope", makeType(0), {
+            // Conclusion is Boolean, not Nope.
+            {"mkNope", makeConstant("Boolean")},
+        }));
+    }
+
+    // Good inductives are still accepted.
+    {
+        Environment local;
+        // Natural: zero, successor.
+        EXPECT_TRUE([&]() {
+            try {
+                addInductive(local, "Natural", makeType(0), {
+                    {"zero", makeConstant("Natural")},
+                    {"successor", makePi("_", makeConstant("Natural"),
+                                          makeConstant("Natural"))},
+                });
+                return true;
+            } catch (...) { return false; }
+        }());
+
+        // Higher-order recursive arguments are allowed when the inductive
+        // appears only as the codomain of the parameter type.
+        //   InfTree : Type 0 := mkLeaf : InfTree
+        //                     | mkBranch : (Natural → InfTree) → InfTree
+        EXPECT_TRUE([&]() {
+            try {
+                addInductive(local, "InfTree", makeType(0), {
+                    {"mkLeaf", makeConstant("InfTree")},
+                    {"mkBranch",
+                        makePi("_",
+                            makePi("_", makeConstant("Natural"),
+                                   makeConstant("InfTree")),
+                            makeConstant("InfTree"))},
+                });
+                return true;
+            } catch (...) { return false; }
+        }());
+    }
+}
+
+// ----------------------------------------------------------------------------
 // Defensive-hardening tests: explicit universe-arity checks in the kernel's
 // internal reductions, and the fuel-limit safety net.
 // ----------------------------------------------------------------------------
@@ -1677,6 +1779,7 @@ int main() {
     runUniversePolymorphismTests(arithmetic);
     runPrintingTests(arithmetic);
     runHardeningTests(arithmetic);
+    runStrictPositivityTests();
     runIntegrationTests();
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";
