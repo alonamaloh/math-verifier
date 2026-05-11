@@ -9,7 +9,7 @@ column as items land.
 |---|---|---|---|
 | 1.1 | Arity checks in internal reductions | **done** (a6847ba) | `substituteUniverseLevels`, δ-step, ι-step. Throw / refuse-to-reduce on mismatch. |
 | 1.2 | Fuel parameter on reducers / equality | **done** (a6847ba) | `int fuel = defaultFuel (10000)` default. `weakHeadNormalForm` throws on exhaustion; `isDefinitionallyEqual` / `isSubtype` return false. |
-| 1.3 | Input validation at API boundary | deferred (low priority) | Origin-tag fix already closes the load-bearing case. |
+| 1.3 | Input validation at API boundary + invariant-check flag | **done** | `validateName` checks every name supplied through `addAxiom` / `addDefinition` / `addInductive` (non-empty, no control chars, no leading '@'). `kernelCheckInvariants` flag toggles a kind-soundness postcondition on every successful `inferType`. Off by default; tests flip it on for a representative pass over the kernel's main behaviours. |
 
 ## Tier 2 — Strict positivity
 
@@ -30,8 +30,8 @@ column as items land.
 | # | Item | Status | Notes |
 |---|---|---|---|
 | 4.1 | Property-based testing | **done** (f703fd1) | Random-expression generator over the arithmetic environment. Four invariants: `whnf` idempotence, `isDefEq` reflexivity, `isDefEq` symmetry, type preservation under reduction. ~250 well-typed cases per run (of 400 trials); deterministic seed for reproducibility. All four properties hold across all sampled cases. |
-| 4.2 | Independent re-checker | not started — single biggest confidence multiplier remaining | Separate file (e.g. `verifier.cpp`) with a deliberately different implementation: naive named binders, exhaustive normalisation, structural alpha-equivalence. Wire it up so every successful `inferType` is cross-checked. Estimated ~400-600 LOC. |
-| 4.3 | Export to external checker | not started | Serialise proof terms in a portable format readable by MetaCoq / Dedukti / equivalent. Cross-verify our claims against a system we didn't write. |
+| 4.2 | Independent re-checker | postponed pending real-use experience | A separate-codepath verifier would be the biggest confidence multiplier, but pre-investing while the kernel is still evolving risks invalidating duplicated work in the alternative implementation. Revisit after the kernel sees non-test use. |
+| 4.3 | Export to external checker | postponed (likely too hard right now) | Locks us into someone else's encoding before we know what we want to encode. Revisit if/when we want a billion-dollar guarantee. |
 
 ## Items deliberately deferred
 

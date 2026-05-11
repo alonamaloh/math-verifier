@@ -3,6 +3,38 @@
 #include <algorithm>
 #include <string>
 
+bool kernelCheckInvariants = false;
+
+namespace {
+
+// Thread-local guard so that the postcondition checks (which themselves
+// call back into inferType) don't recursively re-check their own work.
+// We only run the invariant check at the outermost public-API call.
+thread_local bool isCurrentlyCheckingInvariants = false;
+
+// Rejects names that are empty, contain control characters, or begin with
+// `@` (reserved by the printer for kernel-internal free variables). Used
+// to validate every name a client passes through the public API. Cheap
+// enough to leave always on.
+void validateName(const std::string& name, const std::string& description) {
+    if (name.empty()) {
+        throw TypeError(description + ": empty name");
+    }
+    if (name[0] == '@') {
+        throw TypeError(description + ": name '" + name +
+                        "' must not begin with '@' (reserved)");
+    }
+    for (unsigned char c : name) {
+        if (c < 0x20) {
+            throw TypeError(description + ": name contains a control "
+                            "character (byte value " +
+                            std::to_string((int)c) + ")");
+        }
+    }
+}
+
+} // namespace
+
 namespace {
 
 // Kernel-private builder for Internal-origin free variables. Lives here
@@ -686,9 +718,47 @@ std::string freshName(const std::string& displayHint, const Context& context) {
     }
 }
 
+namespace {
+ExpressionPointer inferTypeWork(const Environment& environment,
+                                const Context& context,
+                                ExpressionPointer expression);
+}
+
 ExpressionPointer inferType(const Environment& environment,
-                        const Context& context,
-                        ExpressionPointer expression) {
+                            const Context& context,
+                            ExpressionPointer expression) {
+    if (!kernelCheckInvariants || isCurrentlyCheckingInvariants) {
+        // Fast path: either invariant checking is off, or we're already
+        // inside a check (recursive call inside the postcondition itself).
+        return inferTypeWork(environment, context, expression);
+    }
+    isCurrentlyCheckingInvariants = true;
+    ExpressionPointer result;
+    try {
+        result = inferTypeWork(environment, context, expression);
+        // Kind soundness: re-infer the result type and require it to be a
+        // Sort. The recursive call sees isCurrentlyCheckingInvariants set
+        // and takes the fast path, so the check itself doesn't recurse.
+        auto kind = weakHeadNormalForm(
+            environment, inferType(environment, context, result));
+        if (!std::holds_alternative<Sort>(kind->node)) {
+            isCurrentlyCheckingInvariants = false;
+            throw TypeError(
+                "invariant violation: inferType returned an internally "
+                "ill-formed type (its own kind did not reduce to a Sort)");
+        }
+    } catch (...) {
+        isCurrentlyCheckingInvariants = false;
+        throw;
+    }
+    isCurrentlyCheckingInvariants = false;
+    return result;
+}
+
+namespace {
+ExpressionPointer inferTypeWork(const Environment& environment,
+                                const Context& context,
+                                ExpressionPointer expression) {
     if (auto* boundVariable = std::get_if<BoundVariable>(&expression->node)) {
         throw TypeError(
             "internal: bare BoundVariable reached inferType (index " +
@@ -799,11 +869,16 @@ ExpressionPointer inferType(const Environment& environment,
     }
     throw TypeError("internal: unhandled Expression variant in inferType");
 }
+} // namespace
 
 void addAxiom(Environment& environment,
               std::string name,
               std::vector<std::string> universeParameters,
               ExpressionPointer declaredType) {
+    validateName(name, "addAxiom: axiom name");
+    for (const auto& parameterName : universeParameters) {
+        validateName(parameterName, "addAxiom: universe parameter name");
+    }
     if (environment.declarations.count(name)) {
         throw TypeError("addAxiom: name already declared: " + name);
     }
@@ -822,6 +897,10 @@ void addDefinition(Environment& environment,
                    std::vector<std::string> universeParameters,
                    ExpressionPointer declaredType,
                    ExpressionPointer body) {
+    validateName(name, "addDefinition: definition name");
+    for (const auto& parameterName : universeParameters) {
+        validateName(parameterName, "addDefinition: universe parameter name");
+    }
     if (environment.declarations.count(name)) {
         throw TypeError("addDefinition: name already declared: " + name);
     }
@@ -1046,6 +1125,13 @@ void addInductive(Environment& environment, std::string inductiveName,
                   std::vector<std::string> universeParameters,
                   ExpressionPointer kind,
                   std::vector<ConstructorSpec> constructors) {
+    validateName(inductiveName, "addInductive: inductive name");
+    for (const auto& parameterName : universeParameters) {
+        validateName(parameterName, "addInductive: universe parameter name");
+    }
+    for (const auto& constructor : constructors) {
+        validateName(constructor.name, "addInductive: constructor name");
+    }
     if (environment.declarations.count(inductiveName)) {
         throw TypeError("addInductive: name already declared: " + inductiveName);
     }

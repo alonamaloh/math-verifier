@@ -1861,6 +1861,104 @@ void runHardeningTests(const Environment& arithmetic) {
 }
 
 // ----------------------------------------------------------------------------
+// Public-API input validation. Names supplied through addAxiom /
+// addDefinition / addInductive must be non-empty, must not begin with '@'
+// (reserved by the printer for internal free variables), and must not
+// contain control characters. The validation runs unconditionally — these
+// are cheap checks that catch obvious abuse at the boundary.
+// ----------------------------------------------------------------------------
+
+void runInputValidationTests() {
+    std::cout << "--- input validation tests ---\n";
+
+    {
+        Environment env;
+        // Empty name.
+        EXPECT_THROW(addAxiom(env, "", makeType(0)));
+        // Names beginning with '@' are reserved.
+        EXPECT_THROW(addAxiom(env, "@bad", makeType(0)));
+        // Control characters.
+        EXPECT_THROW(addAxiom(env, std::string("bad\x01here"), makeType(0)));
+        // Bad universe-parameter name.
+        EXPECT_THROW(addAxiom(env, "good", {""}, makeType(0)));
+        EXPECT_THROW(addAxiom(env, "good", {"@u"}, makeType(0)));
+        // A clean axiom name works.
+        addAxiom(env, "Good", makeType(0));
+        EXPECT_TRUE(env.lookup("Good") != nullptr);
+    }
+    {
+        Environment env;
+        EXPECT_THROW(addDefinition(env, "@bad",
+                                   makeType(0), makeType(0)));
+    }
+    {
+        Environment env;
+        EXPECT_THROW(addInductive(env, "@bad", makeType(0), {}));
+        EXPECT_THROW(addInductive(env, "good", makeType(0),
+                                   {{"@badCtor", makeConstant("good")}}));
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Optional invariant checking: flip on kernelCheckInvariants and re-run a
+// representative subset of the existing tests. Every successful inferType
+// runs a kind-soundness postcondition; the cost roughly doubles but every
+// internal inconsistency would surface here.
+// ----------------------------------------------------------------------------
+
+void runInvariantCheckedTests(const Environment& arithmetic) {
+    std::cout << "--- invariant-checked tests (postcondition enabled) ---\n";
+    kernelCheckInvariants = true;
+    try {
+        // Re-run a sample of representative kernel work with the
+        // postcondition enabled. If the kernel ever produced an internally
+        // ill-formed type, the postcondition would throw — these calls
+        // would not succeed.
+        EXPECT_TRUE(isDefinitionallyEqual(arithmetic, {},
+            makeApplication(
+                makeApplication(makeConstant("add"), makeConstant("zero")),
+                makeConstant("zero")),
+            makeConstant("zero")));
+
+        auto twoTimesOne = makeApplication(
+            makeApplication(makeConstant("add"),
+                            makeApplication(makeConstant("successor"),
+                                            makeConstant("zero"))),
+            makeApplication(makeConstant("successor"),
+                            makeConstant("zero")));
+        auto two = makeApplication(makeConstant("successor"),
+            makeApplication(makeConstant("successor"), makeConstant("zero")));
+        EXPECT_TRUE(isDefinitionallyEqual(arithmetic, {},
+                                          twoTimesOne, two));
+
+        // Inference round-trips through the postcondition.
+        auto recursorType = inferType(arithmetic, {},
+            makeConstant("Natural_recursor", {makeLevelConst(1)}));
+        EXPECT_TRUE(std::holds_alternative<Pi>(recursorType->node));
+
+        // Polymorphic reflexivity at multiple universes.
+        auto proofZero = inferType(arithmetic, {},
+            makeApplication(
+                makeApplication(makeConstant("reflexivity",
+                                              {makeLevelConst(0)}),
+                                makeConstant("Natural")),
+                makeConstant("zero")));
+        auto expectedZero = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
+                                makeConstant("Natural")),
+                makeConstant("zero")),
+            makeConstant("zero"));
+        EXPECT_TRUE(isDefinitionallyEqual(arithmetic, {},
+                                          proofZero, expectedZero));
+    } catch (...) {
+        kernelCheckInvariants = false;
+        throw;
+    }
+    kernelCheckInvariants = false;
+}
+
+// ----------------------------------------------------------------------------
 // Property-based testing. Generates random closed expressions over the
 // arithmetic environment, filters those that successfully type-check, and
 // runs four invariants over each:
@@ -2245,6 +2343,8 @@ int main() {
     runPolymorphicRecursorTests(arithmetic);
     runRestrictedEliminationTests();
     runProofIrrelevanceAuditTests(arithmetic);
+    runInputValidationTests();
+    runInvariantCheckedTests(arithmetic);
     runPropertyTests(arithmetic);
     runIntegrationTests();
 

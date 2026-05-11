@@ -154,6 +154,13 @@ ExpressionPointer closeBinder(ExpressionPointer expression,
 // fragment never approaches this bound for any realistic input.
 constexpr int defaultFuel = 10000;
 
+// Optional runtime invariant checks. When true, inferType performs a
+// kind-soundness postcondition on every successful inference (it re-infers
+// the result type and requires it to be a Sort). This roughly doubles the
+// cost of type-checking but catches the entire class of "kernel produced
+// internally-inconsistent output" bugs. Off by default; tests enable it.
+extern bool kernelCheckInvariants;
+
 // Reduces only the head: enough to see whether the outermost form is a
 // Sort, Pi, Lambda, etc. Unfolds definitions in head position
 // (delta-reduction). Throws TypeError on fuel exhaustion.
