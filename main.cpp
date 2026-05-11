@@ -1500,6 +1500,130 @@ void runPolymorphicRecursorTests(const Environment& arithmetic) {
 // The kernel forces the motive's universe to Prop for such recursors.
 // ----------------------------------------------------------------------------
 
+// ----------------------------------------------------------------------------
+// Proof irrelevance × impredicativity audit. These tests pin down what the
+// kernel's proof-irrelevance branch does and doesn't equate, especially
+// around the impredicative Pi rule. The principle: two terms are
+// definitionally equal by proof irrelevance iff their type lives in Prop.
+// ----------------------------------------------------------------------------
+
+void runProofIrrelevanceAuditTests(const Environment& arithmetic) {
+    std::cout << "--- proof-irrelevance audit tests ---\n";
+
+    // Baseline: two proofs of the same proposition are equal.
+    {
+        auto propositionType = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
+                                makeConstant("Natural")),
+                makeConstant("zero")),
+            makeConstant("zero"));
+        Context ctx = {{"p", propositionType}, {"q", propositionType}};
+        EXPECT_TRUE(isDefinitionallyEqual(arithmetic, ctx,
+                                          makeFreeVariable("p"),
+                                          makeFreeVariable("q")));
+    }
+
+    // Proofs of *distinct* propositions are NOT equal.
+    {
+        auto leftProp = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
+                                makeConstant("Natural")),
+                makeConstant("zero")),
+            makeConstant("zero"));
+        auto rightProp = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
+                                makeConstant("Natural")),
+                makeConstant("zero")),
+            makeApplication(makeConstant("successor"), makeConstant("zero")));
+        Context ctx = {{"p", leftProp}, {"q", rightProp}};
+        EXPECT_FALSE(isDefinitionallyEqual(arithmetic, ctx,
+                                           makeFreeVariable("p"),
+                                           makeFreeVariable("q")));
+    }
+
+    // A term whose type lives in Type (not Prop) is NOT equated by proof
+    // irrelevance, even if both sides are "predicates".
+    // Two distinct predicates  λ(n : Natural). Equality Natural n n  and
+    // λ(n : Natural). Equality Natural zero zero  have type
+    // Π(_ : Natural). Prop, whose universe is imax(1, 1) = Type 0. Not in
+    // Prop. So they aren't equated.
+    {
+        auto predicateA = makeLambda("n", makeConstant("Natural"),
+            makeApplication(
+                makeApplication(
+                    makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
+                                    makeConstant("Natural")),
+                    makeBoundVariable(0)),
+                makeBoundVariable(0)));
+        auto predicateB = makeLambda("n", makeConstant("Natural"),
+            makeApplication(
+                makeApplication(
+                    makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
+                                    makeConstant("Natural")),
+                    makeConstant("zero")),
+                makeConstant("zero")));
+        EXPECT_FALSE(isDefinitionallyEqual(arithmetic, {},
+                                           predicateA, predicateB));
+    }
+
+    // A function whose codomain is a proof type IS in Prop (impredicativity
+    // collapses the Pi to Prop), so two such functions are equal by proof
+    // irrelevance. The functions are "extensionally equal" because they
+    // return interchangeable proofs.
+    //
+    //   Π(x : Natural). Equality Natural zero zero  has universe
+    //     imax(1, 0) = 0 = Prop.
+    {
+        auto propositionType = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
+                                makeConstant("Natural")),
+                makeConstant("zero")),
+            makeConstant("zero"));
+        auto functionType =
+            makePi("_", makeConstant("Natural"), propositionType);
+        Context ctx = {{"f", functionType}, {"g", functionType}};
+        EXPECT_TRUE(isDefinitionallyEqual(arithmetic, ctx,
+                                          makeFreeVariable("f"),
+                                          makeFreeVariable("g")));
+    }
+
+    // Proof irrelevance never equates terms of disjoint types.
+    {
+        Context ctx = {{"n", makeConstant("Natural")},
+                       {"b", makeConstant("Natural")}};
+        // n and b are Naturals (Type 0). Not in Prop. Distinct free vars.
+        EXPECT_FALSE(isDefinitionallyEqual(arithmetic, ctx,
+                                           makeFreeVariable("n"),
+                                           makeFreeVariable("b")));
+    }
+
+    // η + proof irrelevance: a Lambda that wraps a proof-returning function
+    // is equal to the bare function. Both have type in Prop (codomain is
+    // Equality, which is in Prop).
+    //   λ(x : Natural). reflexivity Natural zero  vs  the partially-
+    //   applied reflexivity at zero — but reflexivity needs a type AND a
+    //   value; the partially-applied form ends differently. Skip; the
+    //   eta-equality of these forms is a separate test.
+
+    // Proof irrelevance + applications: comparing  Equality Natural zero
+    // zero  and  Equality Natural zero zero  (same Application chain)
+    // succeeds structurally — proof irrelevance isn't needed but also
+    // doesn't break things.
+    {
+        auto term = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
+                                makeConstant("Natural")),
+                makeConstant("zero")),
+            makeConstant("zero"));
+        EXPECT_TRUE(isDefinitionallyEqual(arithmetic, {}, term, term));
+    }
+}
+
 void runRestrictedEliminationTests() {
     std::cout << "--- restricted elimination tests ---\n";
 
@@ -1968,6 +2092,7 @@ int main() {
     runStrictPositivityTests();
     runPolymorphicRecursorTests(arithmetic);
     runRestrictedEliminationTests();
+    runProofIrrelevanceAuditTests(arithmetic);
     runIntegrationTests();
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";

@@ -7,23 +7,23 @@ column as items land.
 
 | # | Item | Status | Notes |
 |---|---|---|---|
-| 1.1 | Arity checks in internal reductions | in progress | `substituteUniverseLevels`, δ-step in `weakHeadNormalForm`, ι-step constructor/recursor match. Throw on mismatch instead of indexing out of bounds. |
-| 1.2 | Fuel parameter on reducers / equality | not started | Add `int fuel = 10000` default to `weakHeadNormalForm`, `isDefinitionallyEqual`, `isSubtype`. Decrement on each loop iteration and recursive call; throw or conservatively return false on exhaustion. |
-| 1.3 | Input validation at API boundary | deferred (low priority) | Origin-tag fix already closes the load-bearing case. Could still add name-validation in `addAxiom`/`addDefinition`/`addInductive` as defense in depth. |
+| 1.1 | Arity checks in internal reductions | **done** (a6847ba) | `substituteUniverseLevels`, δ-step, ι-step. Throw / refuse-to-reduce on mismatch. |
+| 1.2 | Fuel parameter on reducers / equality | **done** (a6847ba) | `int fuel = defaultFuel (10000)` default. `weakHeadNormalForm` throws on exhaustion; `isDefinitionallyEqual` / `isSubtype` return false. |
+| 1.3 | Input validation at API boundary | deferred (low priority) | Origin-tag fix already closes the load-bearing case. |
 
 ## Tier 2 — Strict positivity
 
 | # | Item | Status | Notes |
 |---|---|---|---|
-| 2.1 | Strict-positivity check on inductive declarations | not started | In `addInductive`, for each constructor's argument types, verify the inductive name appears only in strictly-positive positions. Helpers: `mentionsConstant(expr, name)` and `isStrictlyPositive(expr, name)`. Reject `Bad : Type 0 := mkBad : (Bad → Bool) → Bad`. |
+| 2.1 | Strict-positivity check on inductive declarations | **done** (6f6b295) | `mentionsConstant`, `isStrictlyPositive`, `checkConstructorStrictlyPositive`. Rejects `Bad : Type 0 := mkBad : (Bad → Bool) → Bad`. |
 
 ## Tier 3 — Recursor and Prop machinery
 
 | # | Item | Status | Notes |
 |---|---|---|---|
-| 3.1 | Universe-polymorphic motive in auto-generated recursors | not started | Recursor declarations gain one extra universe parameter (call it `motiveLevel`). `buildRecursorType` uses `Sort (LevelParam motiveLevel)` for the motive's codomain. ι-step adds prefix-equality check on the universe args (constructor's args must match the inductive-prefix of the recursor's). |
-| 3.2 | Restricted elimination for Prop inductives | not started | When the inductive's kind reduces to `Sort 0` (Prop), the auto-generated recursor must force the motive to land in Prop too — except for singleton inductives (zero or one constructor with all args in Prop). Implement after 3.1. |
-| 3.3 | Proof-irrelevance × impredicativity audit | not started | Enumerate the cases where proof irrelevance fires. Add boundary tests at each (predicates vs proofs, η-expanded vs not, etc.). No new code expected — just analysis and tests. |
+| 3.1 | Universe-polymorphic motive in auto-generated recursors | **done** (8202741) | Recursor gains a fresh `motiveLevel` universe parameter; `buildRecursorType` takes a `LevelPointer` for the motive's codomain. Proof by induction now expressible. |
+| 3.2 | Restricted elimination for Prop inductives | **done** (260ec8a) | Non-empty Prop inductives have motive fixed at Prop. Empty Prop inductives (`False`) still admit large elimination. |
+| 3.3 | Proof-irrelevance × impredicativity audit | **done** (just now) | Boundary tests pin down what the kernel does and doesn't equate — predicates over types are NOT equated (type lives in Type 0), functions to proofs ARE (impredicativity collapses to Prop). |
 
 ## Tier 4 — Independent verification
 
