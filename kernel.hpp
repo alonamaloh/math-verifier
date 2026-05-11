@@ -40,9 +40,15 @@ struct Axiom       { std::vector<std::string> universeParameters;
                      ExpressionPointer type; };
 struct Definition  { std::vector<std::string> universeParameters;
                      ExpressionPointer type; ExpressionPointer body; };
+// An Inductive's `kind` is a Pi-chain ending in a Sort. The first
+// `numParameters` Pis bind parameters (uniform across constructors); the
+// remaining Pis bind indices (allowed to vary per constructor). For
+// non-parameterised, non-indexed inductives like Natural, the kind is a
+// plain Sort and numParameters is 0.
 struct Inductive   { std::vector<std::string> universeParameters;
                      ExpressionPointer kind;
-                     std::vector<std::string> constructorNames; };
+                     std::vector<std::string> constructorNames;
+                     int numParameters; };
 struct Constructor { std::vector<std::string> universeParameters;
                      std::string inductiveName;
                      int constructorIndex;
@@ -50,7 +56,9 @@ struct Constructor { std::vector<std::string> universeParameters;
 struct Recursor    { std::vector<std::string> universeParameters;
                      std::string inductiveName;
                      ExpressionPointer type;
-                     int numConstructors; };
+                     int numConstructors;
+                     int numParameters;
+                     int numIndices; };
 
 using Declaration = std::variant<Axiom, Definition,
                                  Inductive, Constructor, Recursor>;
@@ -105,16 +113,40 @@ struct ConstructorSpec {
 // prefix whose recursive arguments are direct references to the inductive
 // (no nested or higher-order recursion). Strict positivity is the user's
 // responsibility; the kernel does not check it yet.
+// Canonical signature: inductive with explicit numParameters. The kind is
+// a Pi-chain Π(p_1) ... Π(p_n). Π(i_1) ... Π(i_m). Sort u, where the first
+// `numParameters` Pis bind parameters and the remaining Pis bind indices.
+// Each constructor's type must begin with those same parameter Pis and
+// end in `inductiveName` applied to the parameters and to some specific
+// indices.
 void addInductive(Environment& environment, std::string inductiveName,
                   std::vector<std::string> universeParameters,
                   ExpressionPointer kind,
+                  int numParameters,
                   std::vector<ConstructorSpec> constructors);
 
+// Convenience overloads for the most common cases. Without numParameters,
+// the inductive has zero parameters and the kind must be a plain Sort.
+inline void addInductive(Environment& environment, std::string inductiveName,
+                         std::vector<std::string> universeParameters,
+                         ExpressionPointer kind,
+                         std::vector<ConstructorSpec> constructors) {
+    addInductive(environment, std::move(inductiveName),
+                 std::move(universeParameters),
+                 std::move(kind), 0, std::move(constructors));
+}
 inline void addInductive(Environment& environment, std::string inductiveName,
                          ExpressionPointer kind,
                          std::vector<ConstructorSpec> constructors) {
     addInductive(environment, std::move(inductiveName), {},
-                 std::move(kind), std::move(constructors));
+                 std::move(kind), 0, std::move(constructors));
+}
+inline void addInductive(Environment& environment, std::string inductiveName,
+                         ExpressionPointer kind,
+                         int numParameters,
+                         std::vector<ConstructorSpec> constructors) {
+    addInductive(environment, std::move(inductiveName), {},
+                 std::move(kind), numParameters, std::move(constructors));
 }
 
 // Adds `amount` to every BoundVariable whose index is at least `cutoff`.

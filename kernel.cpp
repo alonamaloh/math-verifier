@@ -1124,6 +1124,7 @@ ExpressionPointer buildRecursorType(
 void addInductive(Environment& environment, std::string inductiveName,
                   std::vector<std::string> universeParameters,
                   ExpressionPointer kind,
+                  int numParameters,
                   std::vector<ConstructorSpec> constructors) {
     validateName(inductiveName, "addInductive: inductive name");
     for (const auto& parameterName : universeParameters) {
@@ -1135,17 +1136,35 @@ void addInductive(Environment& environment, std::string inductiveName,
     if (environment.declarations.count(inductiveName)) {
         throw TypeError("addInductive: name already declared: " + inductiveName);
     }
-    // The kind must itself be a well-formed type, and for v1 it must be a
-    // Sort (no parameters or indices).
+    // The kind must itself be a well-formed type. Walk the Pi-chain to
+    // count Pis and find the terminal Sort.
     auto kindOfKind = weakHeadNormalForm(
         environment, inferType(environment, {}, kind));
     if (!std::holds_alternative<Sort>(kindOfKind->node)) {
         throw TypeError("addInductive: kind is not a type: " + inductiveName);
     }
-    if (!std::holds_alternative<Sort>(kind->node)) {
+    int totalPiCount = 0;
+    auto kindWalker = kind;
+    while (auto* pi = std::get_if<Pi>(&kindWalker->node)) {
+        kindWalker = pi->codomain;
+        totalPiCount++;
+    }
+    if (!std::holds_alternative<Sort>(kindWalker->node)) {
         throw TypeError(
-            "addInductive: kind must be a Sort (parameters and indices "
-            "are not yet supported): " + inductiveName);
+            "addInductive: kind must end in a Sort: " + inductiveName);
+    }
+    if (numParameters < 0 || numParameters > totalPiCount) {
+        throw TypeError(
+            "addInductive: numParameters out of range for kind: " + inductiveName);
+    }
+    int numIndices = totalPiCount - numParameters;
+    if (numParameters != 0 || numIndices != 0) {
+        // TODO: generalised parameter / index support is being added; the
+        // recursor builder and ι-reduction must be extended first.
+        throw TypeError(
+            "addInductive: parameters and indices not yet supported in "
+            "generalised form (numParameters=" + std::to_string(numParameters) +
+            ", numIndices=" + std::to_string(numIndices) + ")");
     }
 
     // Pre-register the inductive so that constructor types can reference it.
@@ -1156,7 +1175,7 @@ void addInductive(Environment& environment, std::string inductiveName,
     }
     environment.declarations.emplace(
         inductiveName,
-        Inductive{universeParameters, kind, constructorNames});
+        Inductive{universeParameters, kind, constructorNames, numParameters});
 
     // A small lambda that rolls back partial registration on error.
     auto rollback = [&]() {
@@ -1267,5 +1286,6 @@ void addInductive(Environment& environment, std::string inductiveName,
     environment.declarations.emplace(
         recursorName,
         Recursor{std::move(recursorUniverseParameters), inductiveName,
-                 recursorType, (int)constructors.size()});
+                 recursorType, (int)constructors.size(),
+                 numParameters, numIndices});
 }
