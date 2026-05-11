@@ -2110,6 +2110,192 @@ void runPropertyTests(const Environment& arithmetic) {
 }
 
 // ----------------------------------------------------------------------------
+// Natural-Number-Game-style proofs. Demonstrates kernel-verified theorems
+// about Natural and addition. Some go through by pure β/δ/ι/ζ reduction;
+// others need induction via Natural_recursor.{0} (a Prop-valued motive).
+// Where our axiomatic Equality lacks an elimination principle, we add a
+// congruence-of-successor axiom — what an inductive Equality with refl as
+// its constructor would give us for free if we had parameters/indices on
+// inductives.
+// ----------------------------------------------------------------------------
+
+void runNaturalNumberGameProofs() {
+    std::cout << "--- natural number game proofs ---\n";
+
+    Environment env = buildArithmeticEnvironment();
+
+    // Convenience helpers — closures that build the boilerplate
+    // applications of Equality and reflexivity at Type 0.
+    auto equality = [](ExpressionPointer a, ExpressionPointer x,
+                        ExpressionPointer y) {
+        return makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeConstant("Equality", {makeLevelConst(0)}),
+                    a),
+                x),
+            y);
+    };
+    auto reflexivity = [](ExpressionPointer a, ExpressionPointer x) {
+        return makeApplication(
+            makeApplication(
+                makeConstant("reflexivity", {makeLevelConst(0)}),
+                a),
+            x);
+    };
+    auto Natural = []() { return makeConstant("Natural"); };
+    auto zero = []() { return makeConstant("zero"); };
+    auto succ = [](ExpressionPointer n) {
+        return makeApplication(makeConstant("successor"), n);
+    };
+    auto plus = [](ExpressionPointer n, ExpressionPointer m) {
+        return makeApplication(makeApplication(makeConstant("add"), n), m);
+    };
+
+    // ------------------------------------------------------------------
+    // Theorem 1: zero_add :  Π(a : Natural). 0 + a = a.
+    //
+    // Definitional: add zero a reduces under ι to (λm. m) a, then β to a.
+    // So  Equality Natural (add zero a) a   is definitionally equal to
+    // Equality Natural a a,  and reflexivity Natural a inhabits both.
+    //
+    //   zero_add := λ(a : Natural). reflexivity Natural a
+    // ------------------------------------------------------------------
+    {
+        auto theoremType =
+            makePi("a", Natural(),
+                equality(Natural(),
+                          plus(zero(), makeBoundVariable(0)),
+                          makeBoundVariable(0)));
+        auto proof = makeLambda("a", Natural(),
+                                 reflexivity(Natural(), makeBoundVariable(0)));
+        addDefinition(env, "zero_add", theoremType, proof);
+        EXPECT_TRUE(env.lookup("zero_add") != nullptr);
+        std::cout << "  zero_add  ⊨  Π(a : Natural). add zero a = a   "
+                     "(definitional)\n";
+    }
+
+    // ------------------------------------------------------------------
+    // To go further we need to act on equalities. Our Equality is an
+    // axiom, so it has no built-in elimination principle. Add the one
+    // case we actually need — congruence of successor — as an axiom.
+    // (An inductive Equality with refl as its constructor would derive
+    // this from its recursor; but we don't have inductive families yet.)
+    //
+    //   successorCongruence : Π(x y : Natural). Equality Natural x y →
+    //                                            Equality Natural (succ x) (succ y)
+    // ------------------------------------------------------------------
+    addAxiom(env, "successorCongruence",
+        makePi("x", Natural(),
+            makePi("y", Natural(),
+                makePi("_eq",
+                       equality(Natural(),
+                                 makeBoundVariable(1) /* x */,
+                                 makeBoundVariable(0) /* y */),
+                    equality(Natural(),
+                              succ(makeBoundVariable(2) /* x */),
+                              succ(makeBoundVariable(1) /* y */))))));
+
+    // ------------------------------------------------------------------
+    // Theorem 2: add_zero :  Π(a : Natural). a + 0 = a.
+    //
+    // Not definitional — add a zero doesn't reduce when a is a free
+    // variable, because add recurses on its first argument. Proof by
+    // induction on a, using Natural_recursor.{0} (motive returns Prop).
+    //
+    //   motive          := λ(a : Natural). Equality Natural (a + 0) a
+    //   case_zero       : Equality Natural (zero + 0) zero
+    //                  =  Equality Natural zero zero          (by ι)
+    //                  ↤  reflexivity Natural zero
+    //   case_succ k IH  : Equality Natural ((succ k) + 0) (succ k)
+    //                  =  Equality Natural (succ (k + 0)) (succ k)
+    //                  ↤  successorCongruence (k + 0) k IH
+    //
+    //   add_zero := λ(a : Natural). Natural_recursor.{0} motive
+    //                  case_zero case_succ a
+    // ------------------------------------------------------------------
+    {
+        // motive : Π(_ : Natural). Prop.
+        auto motive = makeLambda("a", Natural(),
+            equality(Natural(),
+                      plus(makeBoundVariable(0) /* a */, zero()),
+                      makeBoundVariable(0) /* a */));
+
+        // case_zero : Equality Natural (zero + zero) zero.
+        // After ι-reduction, this is  Equality Natural zero zero,
+        // which reflexivity Natural zero inhabits.
+        auto caseZero = reflexivity(Natural(), zero());
+
+        // case_succ : Π(k : Natural). Π(IH : Equality (k + 0) k).
+        //               Equality Natural ((succ k) + 0) (succ k)
+        //
+        // The body successorCongruence is applied to:
+        //   x = k + 0  ↦  makeBoundVariable(1) is k (inside the IH binder)
+        //                 plus(k, zero) needs k = bound var 1.
+        //   y = k      ↦  makeBoundVariable(1)
+        //   eq = IH    ↦  makeBoundVariable(0)
+        auto caseSucc = makeLambda("k", Natural(),
+            makeLambda("IH",
+                equality(Natural(),
+                          plus(makeBoundVariable(0) /* k inside k-binder */,
+                                zero()),
+                          makeBoundVariable(0) /* k */),
+                makeApplication(
+                    makeApplication(
+                        makeApplication(makeConstant("successorCongruence"),
+                                        plus(makeBoundVariable(1) /* k */,
+                                              zero())),
+                        makeBoundVariable(1) /* k */),
+                    makeBoundVariable(0) /* IH */)));
+
+        auto theoremType =
+            makePi("a", Natural(),
+                equality(Natural(),
+                          plus(makeBoundVariable(0) /* a */, zero()),
+                          makeBoundVariable(0) /* a */));
+        auto proof = makeLambda("a", Natural(),
+            makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeApplication(
+                            makeConstant("Natural_recursor", {makeLevelConst(0)}),
+                            motive),
+                        caseZero),
+                    caseSucc),
+                makeBoundVariable(0) /* a */));
+
+        addDefinition(env, "add_zero", theoremType, proof);
+        EXPECT_TRUE(env.lookup("add_zero") != nullptr);
+        std::cout << "  add_zero  ⊨  Π(a : Natural). add a zero = a   "
+                     "(by induction)\n";
+    }
+
+    // ------------------------------------------------------------------
+    // Theorem 3: add_one_right :  Π(a : Natural). a + 1 = succ a.
+    //
+    // Definitional once we substitute! add a (succ zero) recurses on a,
+    // so for a free variable a it doesn't reduce. But succ a = add a 1
+    // *does* reduce in one direction:  add (succ zero) a  reduces to
+    // succ a (via ι on the outer successor and ι on zero inside). So
+    // the symmetric form  Equality Natural (add (succ zero) a) (succ a)
+    // *is* definitional. Let's prove that.
+    // ------------------------------------------------------------------
+    {
+        auto theoremType =
+            makePi("a", Natural(),
+                equality(Natural(),
+                          plus(succ(zero()), makeBoundVariable(0) /* a */),
+                          succ(makeBoundVariable(0) /* a */)));
+        auto proof = makeLambda("a", Natural(),
+            reflexivity(Natural(), succ(makeBoundVariable(0))));
+        addDefinition(env, "one_add", theoremType, proof);
+        EXPECT_TRUE(env.lookup("one_add") != nullptr);
+        std::cout << "  one_add   ⊨  Π(a : Natural). 1 + a = succ a   "
+                     "(definitional)\n";
+    }
+}
+
+// ----------------------------------------------------------------------------
 // Integration test: a second inductive (Boolean) and a function defined via
 // its recursor, exercised alongside the existing Natural / add.
 // ----------------------------------------------------------------------------
@@ -2346,6 +2532,7 @@ int main() {
     runInputValidationTests();
     runInvariantCheckedTests(arithmetic);
     runPropertyTests(arithmetic);
+    runNaturalNumberGameProofs();
     runIntegrationTests();
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";
