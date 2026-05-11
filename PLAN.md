@@ -29,8 +29,8 @@ column as items land.
 
 | # | Item | Status | Notes |
 |---|---|---|---|
-| 4.1 | Property-based testing | **done** | Random-expression generator over the arithmetic environment. Four invariants: `whnf` idempotence, `isDefEq` reflexivity, `isDefEq` symmetry, type preservation under reduction. ~250 well-typed cases per run (of 400 trials); deterministic seed for reproducibility. All four properties hold across all sampled cases. |
-| 4.2 | Independent re-checker | not started | Separate file (`verifier.cpp`) with a deliberately different implementation: naive named binders, exhaustive substitution. Run after every successful `inferType` and assert agreement. Single biggest confidence multiplier remaining. |
+| 4.1 | Property-based testing | **done** (f703fd1) | Random-expression generator over the arithmetic environment. Four invariants: `whnf` idempotence, `isDefEq` reflexivity, `isDefEq` symmetry, type preservation under reduction. ~250 well-typed cases per run (of 400 trials); deterministic seed for reproducibility. All four properties hold across all sampled cases. |
+| 4.2 | Independent re-checker | not started — single biggest confidence multiplier remaining | Separate file (e.g. `verifier.cpp`) with a deliberately different implementation: naive named binders, exhaustive normalisation, structural alpha-equivalence. Wire it up so every successful `inferType` is cross-checked. Estimated ~400-600 LOC. |
 | 4.3 | Export to external checker | not started | Serialise proof terms in a portable format readable by MetaCoq / Dedukti / equivalent. Cross-verify our claims against a system we didn't write. |
 
 ## Items deliberately deferred

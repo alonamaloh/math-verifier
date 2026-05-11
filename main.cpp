@@ -1923,6 +1923,7 @@ void runPropertyTests(const Environment& arithmetic) {
     int reflexiveFailures = 0;
     int symmetricFailures = 0;
     int typePreservationFailures = 0;
+    int kindSoundnessFailures = 0;
 
     auto sample = [&]() {
         std::uniform_int_distribution<int> d(1, maxDepth);
@@ -1984,15 +1985,30 @@ void runPropertyTests(const Environment& arithmetic) {
         } catch (const TypeError&) {
             ++typePreservationFailures;
         }
+
+        // Kind soundness: the inferred type must itself be a well-formed
+        // type — i.e. inferType(type) must succeed and reduce to a Sort.
+        // This catches cases where inferType returns something internally
+        // ill-formed (for instance, a term with dangling bound indices).
+        try {
+            auto kindOfType = weakHeadNormalForm(
+                arithmetic, inferType(arithmetic, {}, type));
+            if (!std::holds_alternative<Sort>(kindOfType->node)) {
+                ++kindSoundnessFailures;
+            }
+        } catch (const TypeError&) {
+            ++kindSoundnessFailures;
+        }
     }
 
     std::cout << "  " << wellTyped << " well-typed expressions sampled (of "
               << trialCount << " trials)\n";
     EXPECT_TRUE(wellTyped >= trialCount / 4);  // expect a reasonable hit rate.
-    EXPECT_TRUE(idempotentFailures      == 0);
-    EXPECT_TRUE(reflexiveFailures       == 0);
-    EXPECT_TRUE(symmetricFailures       == 0);
+    EXPECT_TRUE(idempotentFailures       == 0);
+    EXPECT_TRUE(reflexiveFailures        == 0);
+    EXPECT_TRUE(symmetricFailures        == 0);
     EXPECT_TRUE(typePreservationFailures == 0);
+    EXPECT_TRUE(kindSoundnessFailures    == 0);
 }
 
 // ----------------------------------------------------------------------------
