@@ -3,6 +3,7 @@
 #include "printer.hpp"
 
 #include <iostream>
+#include <random>
 #include <string>
 
 namespace {
@@ -1860,6 +1861,141 @@ void runHardeningTests(const Environment& arithmetic) {
 }
 
 // ----------------------------------------------------------------------------
+// Property-based testing. Generates random closed expressions over the
+// arithmetic environment, filters those that successfully type-check, and
+// runs four invariants over each:
+//   - whnf is idempotent  (whnf (whnf e)  is def-equal to  whnf e).
+//   - isDefEq is reflexive  (every term is def-equal to itself).
+//   - isDefEq is symmetric  (a ≡ b implies b ≡ a, on a sampled pair).
+//   - Type preservation  (inferType (whnf e)  is def-equal to  inferType e).
+// Failures are catalogued and reported; the test count includes the number
+// of typechecking cases, not the number generated.
+// ----------------------------------------------------------------------------
+
+namespace {
+
+ExpressionPointer randomExpression(std::mt19937& rng, int depth) {
+    static const std::vector<std::string> constantPool = {
+        "zero", "one", "two", "successor", "add", "Natural"
+    };
+    auto pickFrom = [&](const std::vector<std::string>& xs) {
+        std::uniform_int_distribution<int> d(0, (int)xs.size() - 1);
+        return xs[d(rng)];
+    };
+    auto pickConstant = [&]() { return makeConstant(pickFrom(constantPool)); };
+
+    if (depth <= 0) {
+        return pickConstant();
+    }
+    // Pick a shape weighted toward leaves so the term doesn't blow up.
+    std::uniform_int_distribution<int> shape(0, 9);
+    int choice = shape(rng);
+    if (choice < 4) {
+        return pickConstant();
+    } else if (choice < 7) {
+        auto function = randomExpression(rng, depth - 1);
+        auto argument = randomExpression(rng, depth - 1);
+        return makeApplication(function, argument);
+    } else if (choice < 8) {
+        auto body = randomExpression(rng, depth - 1);
+        return makeLambda("x", makeConstant("Natural"), body);
+    } else if (choice < 9) {
+        // Let
+        auto value = randomExpression(rng, depth - 1);
+        auto body  = randomExpression(rng, depth - 1);
+        return makeLet("x", makeConstant("Natural"), value, body);
+    } else {
+        return makeType(0);
+    }
+}
+
+} // namespace
+
+void runPropertyTests(const Environment& arithmetic) {
+    std::cout << "--- property tests ---\n";
+
+    const int trialCount = 400;
+    const int maxDepth   = 5;
+    std::mt19937 rng(0xCAFE);  // deterministic seed for reproducibility.
+
+    int wellTyped = 0;
+    int idempotentFailures = 0;
+    int reflexiveFailures = 0;
+    int symmetricFailures = 0;
+    int typePreservationFailures = 0;
+
+    auto sample = [&]() {
+        std::uniform_int_distribution<int> d(1, maxDepth);
+        return randomExpression(rng, d(rng));
+    };
+
+    for (int trial = 0; trial < trialCount; ++trial) {
+        auto expression = sample();
+        ExpressionPointer type;
+        try {
+            type = inferType(arithmetic, {}, expression);
+        } catch (const TypeError&) {
+            continue;  // Untypable — skip.
+        }
+        ++wellTyped;
+
+        // Idempotence of whnf.
+        try {
+            auto once  = weakHeadNormalForm(arithmetic, expression);
+            auto twice = weakHeadNormalForm(arithmetic, once);
+            if (!isDefinitionallyEqual(arithmetic, {}, once, twice)) {
+                ++idempotentFailures;
+            }
+        } catch (const TypeError&) {
+            ++idempotentFailures;
+        }
+
+        // Reflexivity of isDefinitionallyEqual.
+        try {
+            if (!isDefinitionallyEqual(arithmetic, {}, expression, expression)) {
+                ++reflexiveFailures;
+            }
+        } catch (const TypeError&) {
+            ++reflexiveFailures;
+        }
+
+        // Symmetry: pair against a second random well-typed term.
+        try {
+            auto other = sample();
+            try {
+                (void)inferType(arithmetic, {}, other);  // require well-typed.
+                bool ab = isDefinitionallyEqual(arithmetic, {}, expression, other);
+                bool ba = isDefinitionallyEqual(arithmetic, {}, other, expression);
+                if (ab != ba) ++symmetricFailures;
+            } catch (const TypeError&) {
+                // Other side untypable — skip the symmetry check for this trial.
+            }
+        } catch (const TypeError&) {
+            ++symmetricFailures;
+        }
+
+        // Type preservation under reduction.
+        try {
+            auto reduced = weakHeadNormalForm(arithmetic, expression);
+            auto reducedType = inferType(arithmetic, {}, reduced);
+            if (!isDefinitionallyEqual(arithmetic, {}, type, reducedType)) {
+                ++typePreservationFailures;
+            }
+        } catch (const TypeError&) {
+            ++typePreservationFailures;
+        }
+    }
+
+    std::cout << "  " << wellTyped << " well-typed expressions sampled (of "
+              << trialCount << " trials)\n";
+    EXPECT_TRUE(wellTyped >= trialCount / 4);  // expect a reasonable hit rate.
+    EXPECT_TRUE(idempotentFailures      == 0);
+    EXPECT_TRUE(reflexiveFailures       == 0);
+    EXPECT_TRUE(symmetricFailures       == 0);
+    EXPECT_TRUE(typePreservationFailures == 0);
+}
+
+// ----------------------------------------------------------------------------
 // Integration test: a second inductive (Boolean) and a function defined via
 // its recursor, exercised alongside the existing Natural / add.
 // ----------------------------------------------------------------------------
@@ -2093,6 +2229,7 @@ int main() {
     runPolymorphicRecursorTests(arithmetic);
     runRestrictedEliminationTests();
     runProofIrrelevanceAuditTests(arithmetic);
+    runPropertyTests(arithmetic);
     runIntegrationTests();
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";
