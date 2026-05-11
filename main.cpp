@@ -1493,6 +1493,79 @@ void runPolymorphicRecursorTests(const Environment& arithmetic) {
     }
 }
 
+// ----------------------------------------------------------------------------
+// Restricted-elimination tests for Prop inductives. A non-empty Prop
+// inductive must not allow its proofs to be eliminated into Type — that
+// would let users extract data from a proof and break proof irrelevance.
+// The kernel forces the motive's universe to Prop for such recursors.
+// ----------------------------------------------------------------------------
+
+void runRestrictedEliminationTests() {
+    std::cout << "--- restricted elimination tests ---\n";
+
+    // A Prop inductive with two constructors: a disjunction over a fixed
+    // pair of propositions. Its recursor must NOT take a motive-universe
+    // parameter (motive is forced to Prop).
+    {
+        Environment env;
+        addAxiom(env, "P", makeProp());
+        addAxiom(env, "Q", makeProp());
+        addInductive(env, "Or_PQ", makeProp(), {
+            {"inl", makePi("_", makeConstant("P"), makeConstant("Or_PQ"))},
+            {"inr", makePi("_", makeConstant("Q"), makeConstant("Or_PQ"))},
+        });
+        // The recursor takes no universe arguments.
+        auto recursor = makeConstant("Or_PQ_recursor");
+        auto type = inferType(env, {}, recursor);
+        EXPECT_TRUE(std::holds_alternative<Pi>(type->node));
+        // Supplying a universe argument is rejected as wrong arity.
+        EXPECT_THROW(inferType(env, {},
+            makeConstant("Or_PQ_recursor", {makeLevelConst(1)})));
+        // The motive's codomain in the recursor type is Prop, not a
+        // universe parameter. We inspect by walking into the Pi:
+        auto* pi = std::get_if<Pi>(&type->node);
+        EXPECT_TRUE(pi);
+        if (pi) {
+            auto* motivePi = std::get_if<Pi>(&pi->domain->node);
+            EXPECT_TRUE(motivePi);
+            if (motivePi) {
+                auto* codomainSort =
+                    std::get_if<Sort>(&motivePi->codomain->node);
+                EXPECT_TRUE(codomainSort &&
+                            levelAsConstant(codomainSort->level) &&
+                            *levelAsConstant(codomainSort->level) == 0);
+            }
+        }
+    }
+
+    // An empty Prop inductive (zero constructors, like False) DOES allow
+    // large elimination — there's no proof to extract from, so any motive
+    // universe is sound. The recursor takes a motive-level universe arg.
+    {
+        Environment env;
+        addInductive(env, "False", makeProp(), {});
+        auto recursor =
+            makeConstant("False_recursor", {makeLevelConst(1)});
+        auto type = inferType(env, {}, recursor);
+        EXPECT_TRUE(std::holds_alternative<Pi>(type->node));
+        // Without a universe arg it's wrong arity.
+        EXPECT_THROW(inferType(env, {}, makeConstant("False_recursor")));
+    }
+
+    // For a Type-valued inductive, large elimination is allowed normally
+    // — the recursor takes a motive-level universe arg as before.
+    {
+        Environment env;
+        addInductive(env, "Boolean", makeType(0), {
+            {"true",  makeConstant("Boolean")},
+            {"false", makeConstant("Boolean")},
+        });
+        auto type = inferType(env, {},
+            makeConstant("Boolean_recursor", {makeLevelConst(1)}));
+        EXPECT_TRUE(std::holds_alternative<Pi>(type->node));
+    }
+}
+
 void runStrictPositivityTests() {
     std::cout << "--- strict positivity tests ---\n";
 
@@ -1894,6 +1967,7 @@ int main() {
     runHardeningTests(arithmetic);
     runStrictPositivityTests();
     runPolymorphicRecursorTests(arithmetic);
+    runRestrictedEliminationTests();
     runIntegrationTests();
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";

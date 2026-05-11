@@ -992,12 +992,13 @@ ExpressionPointer buildCaseType(const std::string& motivePlaceholder,
 }
 
 // Builds the full type of the recursor for an inductive declaration. The
-// motive's codomain is `Sort motiveLevelName` — a level parameter, so the
-// generated recursor is universe-polymorphic in the motive. Callers supply
-// the level at the use site (e.g. recursor.{u_inductive..., motiveLevel}).
+// motive's codomain is `Sort motiveLevel` where motiveLevel is either a
+// LevelParam (giving a universe-polymorphic recursor) or a LevelConst
+// (fixing the motive's universe — used for restricted elimination of
+// Prop-valued inductives).
 ExpressionPointer buildRecursorType(
     const std::string& inductiveName,
-    const std::string& motiveLevelName,
+    LevelPointer motiveLevel,
     const std::vector<ConstructorSpec>& constructors) {
     // Internal-origin placeholders for the motive and target. They are
     // closed by closeBinder below before the recursor type is returned;
@@ -1007,8 +1008,7 @@ ExpressionPointer buildRecursorType(
     const std::string targetPlaceholder = "target";
 
     auto motiveType =
-        makePi("_", makeConstant(inductiveName),
-               makeSort(makeLevelParam(motiveLevelName)));
+        makePi("_", makeConstant(inductiveName), makeSort(motiveLevel));
 
     std::vector<ExpressionPointer> caseTypes;
     caseTypes.reserve(constructors.size());
@@ -1119,20 +1119,34 @@ void addInductive(Environment& environment, std::string inductiveName,
             Constructor{universeParameters, inductiveName, i, constructor.type});
     }
 
-    // Generate and register the recursor. The recursor is universe-
-    // polymorphic in the motive's codomain: it gains one extra universe
-    // parameter (call it motiveLevel) beyond what the inductive has.
-    // We pick a name that doesn't collide with the inductive's existing
-    // universe parameters; this is purely a naming convenience since user
-    // code refers to it positionally.
+    // Generate and register the recursor. For inductives that live in
+    // Type, the motive's codomain is a fresh universe parameter — the
+    // recursor is universe-polymorphic in the motive. For inductives that
+    // live in Prop, we restrict elimination: the motive's codomain is
+    // forced to Prop, so a proof can only eliminate to another proof
+    // (preserving proof irrelevance). The empty Prop inductive (zero
+    // constructors, like False) is a singleton case where large elimination
+    // is sound: there's no proof to extract data from in the first place.
     std::string recursorName = inductiveName + "_recursor";
     if (environment.declarations.count(recursorName)) {
         rollback();
         throw TypeError(
             "addInductive: recursor name already taken: " + recursorName);
     }
-    std::string motiveLevelName = "motiveLevel";
-    {
+    bool inductiveLivesInProp = false;
+    if (auto* kindSort = std::get_if<Sort>(&kind->node)) {
+        auto kindLevel = levelAsConstant(kindSort->level);
+        if (kindLevel && *kindLevel == 0) {
+            inductiveLivesInProp = true;
+        }
+    }
+    bool allowLargeElimination =
+        !inductiveLivesInProp || constructors.empty();
+
+    LevelPointer motiveLevel;
+    std::string motiveLevelName;  // empty if motive level is fixed at Prop.
+    if (allowLargeElimination) {
+        motiveLevelName = "motiveLevel";
         auto inUse = [&](const std::string& candidate) {
             for (const auto& p : universeParameters) {
                 if (p == candidate) return true;
@@ -1142,9 +1156,12 @@ void addInductive(Environment& environment, std::string inductiveName,
         for (int suffix = 1; inUse(motiveLevelName); ++suffix) {
             motiveLevelName = "motiveLevel_" + std::to_string(suffix);
         }
+        motiveLevel = makeLevelParam(motiveLevelName);
+    } else {
+        motiveLevel = makeLevelConst(0);  // Prop motive only.
     }
     auto recursorType = buildRecursorType(
-        inductiveName, motiveLevelName, constructors);
+        inductiveName, motiveLevel, constructors);
     try {
         auto kindOfRecursorType = weakHeadNormalForm(
             environment, inferType(environment, {}, recursorType));
@@ -1158,7 +1175,9 @@ void addInductive(Environment& environment, std::string inductiveName,
         throw;
     }
     std::vector<std::string> recursorUniverseParameters = universeParameters;
-    recursorUniverseParameters.push_back(motiveLevelName);
+    if (!motiveLevelName.empty()) {
+        recursorUniverseParameters.push_back(motiveLevelName);
+    }
     environment.declarations.emplace(
         recursorName,
         Recursor{std::move(recursorUniverseParameters), inductiveName,
