@@ -305,47 +305,87 @@ ExpressionPointer applyArguments(ExpressionPointer head,
     return head;
 }
 
-// Builds the ι-reduction result for `recursor motive case_1 ... case_k target`
-// where target is `constructor v_1 ... v_n` for the given Constructor.
-// For each constructor arg v_j whose declared type is the inductive itself
-// (recursive arg), we apply the case to v_j AND to a recursive call of the
-// recursor on v_j.
-ExpressionPointer buildIotaReduction(const std::string& recursorName,
-                                     const std::vector<LevelPointer>& recursorUniverseArguments,
-                                     const Recursor& recursor,
-                                     const Constructor& constructor,
-                                     const std::vector<ExpressionPointer>& recursorArgs,
-                                     const std::vector<ExpressionPointer>& constructorArgs) {
-    // The case for this constructor sits at index (1 + constructorIndex) in
-    // recursorArgs (after motive at index 0). The target sits at the next
-    // position (1 + numConstructors). Any args beyond that are extras the
-    // caller will re-apply.
-    auto result = recursorArgs[1 + constructor.constructorIndex];
+// Builds the ι-reduction result. The recursor application is
+//   recursor.{us} params... motive cases... indices... target
+// where target reduces to a constructor application
+//   constructor.{us'} params'... nonParamArgs...
+// The result is the case for that constructor, applied to the non-param
+// args (plus an inductive-hypothesis recursive call for each recursive
+// non-param arg).
+ExpressionPointer buildIotaReduction(
+    const std::string& recursorName,
+    const std::vector<LevelPointer>& recursorUniverseArguments,
+    const Recursor& recursor,
+    const Constructor& constructor,
+    const std::vector<ExpressionPointer>& recursorArgs,
+    const std::vector<ExpressionPointer>& constructorArgs) {
+    int numParameters   = recursor.numParameters;
+    int numConstructors = recursor.numConstructors;
 
-    // Walk the constructor's declared type to know which args are recursive.
+    // The case for this constructor.
+    auto result =
+        recursorArgs[numParameters + 1 + constructor.constructorIndex];
+
+    // Walk the constructor's declared type. The first numParameters Pis
+    // are the parameter binders; skip them, substituting the matching
+    // recursor parameter value into the codomain at each step.
     auto walker = constructor.type;
     int argIndex = 0;
+    for (int p = 0; p < numParameters; ++p) {
+        auto* pi = std::get_if<Pi>(&walker->node);
+        if (!pi) {
+            throw TypeError(
+                "ι-reduction: constructor of inductive " +
+                constructor.inductiveName +
+                " has fewer Pi binders than the inductive has parameters");
+        }
+        walker = substitute(pi->codomain, 0, constructorArgs[argIndex]);
+        argIndex++;
+    }
+
+    // Remaining Pis are non-param arguments. Apply the case to each one,
+    // inserting an inductive-hypothesis recursive call for each recursive
+    // argument.
     while (auto* pi = std::get_if<Pi>(&walker->node)) {
         auto argValue = constructorArgs[argIndex];
         result = makeApplication(result, argValue);
 
+        // Detect recursive argument by peeling the type's Application chain.
         bool isRecursive = false;
-        if (auto* c = std::get_if<Constant>(&pi->domain->node)) {
-            if (c->name == recursor.inductiveName) isRecursive = true;
+        std::vector<ExpressionPointer> recursiveIndices;
+        auto typeHead = pi->domain;
+        std::vector<ExpressionPointer> typeArgs;
+        while (auto* app = std::get_if<Application>(&typeHead->node)) {
+            typeArgs.push_back(app->argument);
+            typeHead = app->function;
         }
+        std::reverse(typeArgs.begin(), typeArgs.end());
+        if (auto* c = std::get_if<Constant>(&typeHead->node);
+            c && c->name == recursor.inductiveName) {
+            isRecursive = true;
+            // Indices for the recursive call: the typeArgs past the params.
+            for (std::size_t i = numParameters; i < typeArgs.size(); ++i) {
+                recursiveIndices.push_back(typeArgs[i]);
+            }
+        }
+
         if (isRecursive) {
-            // Build the recursive call, preserving universe arguments on the
-            // recursor head:  recursor.{us} motive case_1 ... case_k argValue.
-            auto recursiveCall = makeConstant(recursorName, recursorUniverseArguments);
-            // recursorArgs[0..numConstructors] are motive + cases.
-            for (int i = 0; i <= recursor.numConstructors; ++i) {
+            // Build recursor.{us} params motive cases recursiveIndices argValue.
+            auto recursiveCall =
+                makeConstant(recursorName, recursorUniverseArguments);
+            // Params + motive + cases (indices 0..numParameters + numConstructors).
+            for (int i = 0; i <= numParameters + numConstructors; ++i) {
                 recursiveCall = makeApplication(recursiveCall, recursorArgs[i]);
+            }
+            for (const auto& idx : recursiveIndices) {
+                recursiveCall = makeApplication(recursiveCall, idx);
             }
             recursiveCall = makeApplication(recursiveCall, argValue);
             result = makeApplication(result, recursiveCall);
         }
-        // The codomain may reference earlier args via BoundVariable(0);
-        // substitute to keep indices coherent.
+
+        // Advance through the binder; substitute the arg value to keep
+        // de Bruijn indices coherent in the remaining codomain.
         walker = substitute(pi->codomain, 0, argValue);
         argIndex++;
     }
@@ -419,7 +459,9 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
                 auto* declaration = environment.lookup(headConstant->name);
                 if (auto* recursor = (declaration ? std::get_if<Recursor>(declaration)
                                                   : nullptr)) {
-                    int needed = 1 + recursor->numConstructors + 1;
+                    int needed = recursor->numParameters + 1
+                               + recursor->numConstructors
+                               + recursor->numIndices + 1;
                     if ((int)spine.args.size() >= needed) {
                         // Reduce the target to whnf and inspect.
                         auto reducedTarget =
@@ -459,6 +501,29 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
                                     }
                                 }
                                 if (!prefixMatches) {
+                                    return applyArguments(spine.head, spine.args);
+                                }
+                                // Also verify the parameter values match.
+                                // The recursor's first numParameters value
+                                // args are the inductive's parameters; the
+                                // constructor's first numParameters value
+                                // args must agree definitionally.
+                                bool parameterValuesMatch = true;
+                                int paramCount = recursor->numParameters;
+                                if ((int)targetSpine.args.size() < paramCount) {
+                                    parameterValuesMatch = false;
+                                }
+                                for (int i = 0;
+                                     parameterValuesMatch && i < paramCount;
+                                     ++i) {
+                                    if (!isDefinitionallyEqual(
+                                            environment, {},
+                                            spine.args[i],
+                                            targetSpine.args[i], fuel)) {
+                                        parameterValuesMatch = false;
+                                    }
+                                }
+                                if (!parameterValuesMatch) {
                                     return applyArguments(spine.head, spine.args);
                                 }
                                 // ι-reduce.
@@ -1005,117 +1070,276 @@ ExpressionPointer checkConstructorStrictlyPositive(
     return walker;
 }
 
-// Builds the type of the case for a single constructor in the recursor's
-// signature. The case binds each constructor argument; for arguments whose
-// type is the inductive itself (direct recursive arguments), an extra
-// hypothesis binder is inserted that gives access to the recursive result.
-// The result of the case is `motive (constructor arg_1 ... arg_n)`.
-//
-// During construction, every binder is represented by an Internal-origin
-// free variable. closeBinder converts those back to BoundVariables in the
-// right order. The motive placeholder stays free in the result; the caller
-// closes it after assembling the whole recursor type.
-ExpressionPointer buildCaseType(const std::string& motivePlaceholder,
-                                const std::string& inductiveName,
-                                const ConstructorSpec& constructor) {
-    struct ArgumentInfo {
-        std::string freeName;
-        std::string displayHint;
-        ExpressionPointer domain;
-        bool isRecursive;
-    };
-    std::vector<ArgumentInfo> arguments;
-    auto walker = constructor.type;
-    int argumentIndex = 0;
+// Generalised recursor builder, with parameter and index support. Every
+// binder in the recursor's type is named with an Internal-origin free
+// variable during construction; closeBinder turns those back into bound
+// variables in the right order.
+
+// Information about one binder appearing in the inductive's kind: its
+// fresh free-variable name (used during construction), its display hint,
+// its domain (in the context of preceding binders, with FreeVariables for
+// each), and whether it is a parameter or an index.
+struct KindBinderInfo {
+    std::string freshName;
+    std::string displayHint;
+    ExpressionPointer type;
+    bool isParameter;
+};
+
+// Walks the inductive's kind, returning a binder for each Pi and the
+// terminal Sort (which lives in the context of all binders, with
+// FreeVariables substituted for each Pi-bound variable).
+struct SplitKind {
+    std::vector<KindBinderInfo> binders;
+    ExpressionPointer terminalSort;
+};
+SplitKind splitInductiveKind(ExpressionPointer kind, int numParameters) {
+    SplitKind result;
+    auto walker = kind;
+    int piIndex = 0;
     while (auto* pi = std::get_if<Pi>(&walker->node)) {
-        std::string freeName = "arg_" + std::to_string(argumentIndex);
-        bool recursive = false;
-        if (auto* c = std::get_if<Constant>(&pi->domain->node)) {
-            if (c->name == inductiveName) recursive = true;
-        }
-        arguments.push_back({freeName, pi->displayHint, pi->domain, recursive});
-        walker = substitute(pi->codomain, 0,
-                            makeInternalFreeVariable(freeName));
-        argumentIndex++;
+        std::string freshName = "indBinder_" + std::to_string(piIndex);
+        result.binders.push_back({
+            freshName, pi->displayHint, pi->domain,
+            piIndex < numParameters});
+        walker = openBinder(pi->codomain, freshName,
+                            FreeVariableOrigin::Internal);
+        piIndex++;
     }
-
-    // Innermost result: motive (constructor arg_1 ... arg_n).
-    auto constructorApplied = makeConstant(constructor.name);
-    for (const auto& argument : arguments) {
-        constructorApplied = makeApplication(
-            constructorApplied, makeInternalFreeVariable(argument.freeName));
-    }
-    auto result = makeApplication(
-        makeInternalFreeVariable(motivePlaceholder), constructorApplied);
-
-    // Wrap from innermost to outermost. For each argument in reverse order:
-    //   - if the argument is recursive, first wrap with the hypothesis Pi
-    //     (whose type is `motive arg_j`),
-    //   - then wrap with the argument Pi itself, closing the free name.
-    for (int j = (int)arguments.size() - 1; j >= 0; --j) {
-        const auto& argument = arguments[j];
-        if (argument.isRecursive) {
-            auto hypothesisType = makeApplication(
-                makeInternalFreeVariable(motivePlaceholder),
-                makeInternalFreeVariable(argument.freeName));
-            // Hypothesis binder is not referenced by name in the rest of the
-            // case type, so no closeBinder is needed for its name.
-            result = makePi("hypothesis_" + argument.displayHint,
-                            hypothesisType, result);
-        }
-        result = closeBinder(result, argument.freeName,
-                             FreeVariableOrigin::Internal);
-        result = makePi(argument.displayHint, argument.domain, result);
-    }
+    result.terminalSort = walker;
     return result;
 }
 
-// Builds the full type of the recursor for an inductive declaration. The
-// motive's codomain is `Sort motiveLevel` where motiveLevel is either a
-// LevelParam (giving a universe-polymorphic recursor) or a LevelConst
-// (fixing the motive's universe — used for restricted elimination of
-// Prop-valued inductives).
+// Builds the case type for one constructor in the recursor's signature.
+// The case binds each non-parameter argument of the constructor; for each
+// recursive argument (one whose type is the inductive applied to params
+// and some indices), an extra hypothesis binder is inserted that gives
+// access to the inductive hypothesis. The case's conclusion is
+// `motive constructorIndices (constructor params nonParamArgs)` where
+// constructorIndices are the specific indices the constructor produces.
+//
+// The constructor's first numParameters Pis are opened with the SAME
+// fresh names that the recursor builder uses for the inductive's
+// parameters, so references to the parameters inside the case type live
+// in the same name space as the rest of the recursor.
+ExpressionPointer buildCaseType(
+    const std::string& inductiveName,
+    const std::vector<LevelPointer>& inductiveUniverseArgs,
+    const std::vector<KindBinderInfo>& inductiveBinders,
+    int numParameters,
+    const std::string& motivePlaceholder,
+    const ConstructorSpec& constructor) {
+    auto walker = constructor.type;
+
+    // Open the constructor's parameter prefix with the inductive's
+    // parameter fresh names.
+    for (int p = 0; p < numParameters; ++p) {
+        auto* pi = std::get_if<Pi>(&walker->node);
+        if (!pi) {
+            throw TypeError(
+                "buildCaseType: constructor " + constructor.name +
+                " has fewer Pi binders than the inductive's "
+                "parameter count");
+        }
+        walker = openBinder(pi->codomain, inductiveBinders[p].freshName,
+                            FreeVariableOrigin::Internal);
+    }
+
+    struct NonParamArg {
+        std::string freshName;
+        std::string displayHint;
+        ExpressionPointer type;
+        bool isRecursive;
+        std::vector<ExpressionPointer> indicesForRecursiveCall;
+    };
+    std::vector<NonParamArg> nonParamArgs;
+    int nonParamIndex = 0;
+    while (auto* pi = std::get_if<Pi>(&walker->node)) {
+        std::string freshName = "ctorArg_" + std::to_string(nonParamIndex);
+
+        // Determine if this argument is a (direct) recursive argument by
+        // peeling its type's Application chain. A recursive argument's
+        // type is `T params indices` for some indices.
+        bool isRecursive = false;
+        std::vector<ExpressionPointer> recursiveIndices;
+        auto typeHead = pi->domain;
+        std::vector<ExpressionPointer> typeArgs;
+        while (auto* app = std::get_if<Application>(&typeHead->node)) {
+            typeArgs.push_back(app->argument);
+            typeHead = app->function;
+        }
+        std::reverse(typeArgs.begin(), typeArgs.end());
+        if (auto* c = std::get_if<Constant>(&typeHead->node);
+            c && c->name == inductiveName &&
+            (int)typeArgs.size() == (int)inductiveBinders.size()) {
+            isRecursive = true;
+            for (std::size_t i = numParameters; i < typeArgs.size(); ++i) {
+                recursiveIndices.push_back(typeArgs[i]);
+            }
+        }
+
+        nonParamArgs.push_back({
+            freshName, pi->displayHint, pi->domain,
+            isRecursive, recursiveIndices});
+        walker = openBinder(pi->codomain, freshName,
+                            FreeVariableOrigin::Internal);
+        nonParamIndex++;
+    }
+
+    // The walker is now the conclusion `T params constructorIndices`.
+    // Peel its Application chain to extract the index values.
+    std::vector<ExpressionPointer> conclusionArgs;
+    auto conclusionHead = walker;
+    while (auto* app = std::get_if<Application>(&conclusionHead->node)) {
+        conclusionArgs.push_back(app->argument);
+        conclusionHead = app->function;
+    }
+    std::reverse(conclusionArgs.begin(), conclusionArgs.end());
+    std::vector<ExpressionPointer> constructorIndices;
+    for (std::size_t i = numParameters; i < conclusionArgs.size(); ++i) {
+        constructorIndices.push_back(conclusionArgs[i]);
+    }
+
+    // Innermost body: motive constructorIndices (constructor params args).
+    auto constructorApplied =
+        makeConstant(constructor.name, inductiveUniverseArgs);
+    for (int p = 0; p < numParameters; ++p) {
+        constructorApplied = makeApplication(
+            constructorApplied,
+            makeInternalFreeVariable(inductiveBinders[p].freshName));
+    }
+    for (const auto& argument : nonParamArgs) {
+        constructorApplied = makeApplication(
+            constructorApplied,
+            makeInternalFreeVariable(argument.freshName));
+    }
+    auto body = makeInternalFreeVariable(motivePlaceholder);
+    for (const auto& idx : constructorIndices) {
+        body = makeApplication(body, idx);
+    }
+    body = makeApplication(body, constructorApplied);
+
+    // Wrap each non-param arg's Pi (and its hypothesis Pi if recursive),
+    // innermost first.
+    for (int j = (int)nonParamArgs.size() - 1; j >= 0; --j) {
+        const auto& argument = nonParamArgs[j];
+        if (argument.isRecursive) {
+            auto hypothesisType =
+                makeInternalFreeVariable(motivePlaceholder);
+            for (const auto& idx : argument.indicesForRecursiveCall) {
+                hypothesisType = makeApplication(hypothesisType, idx);
+            }
+            hypothesisType = makeApplication(
+                hypothesisType,
+                makeInternalFreeVariable(argument.freshName));
+            body = makePi("hypothesis_" + argument.displayHint,
+                          hypothesisType, body);
+        }
+        body = closeBinder(body, argument.freshName,
+                           FreeVariableOrigin::Internal);
+        body = makePi(argument.displayHint, argument.type, body);
+    }
+
+    return body;
+}
+
+// Builds the full type of the recursor for an inductive declaration that
+// may have parameters and indices.
 ExpressionPointer buildRecursorType(
     const std::string& inductiveName,
+    const std::vector<std::string>& inductiveUniverseParameters,
     LevelPointer motiveLevel,
+    ExpressionPointer kind,
+    int numParameters,
     const std::vector<ConstructorSpec>& constructors) {
-    // Internal-origin placeholders for the motive and target. They are
-    // closed by closeBinder below before the recursor type is returned;
-    // because they live in the Internal origin they cannot collide with
-    // anything the user can construct.
     const std::string motivePlaceholder = "motive";
     const std::string targetPlaceholder = "target";
 
-    auto motiveType =
-        makePi("_", makeConstant(inductiveName), makeSort(motiveLevel));
+    std::vector<LevelPointer> inductiveUniverseArgs;
+    for (const auto& name : inductiveUniverseParameters) {
+        inductiveUniverseArgs.push_back(makeLevelParam(name));
+    }
 
+    auto split = splitInductiveKind(kind, numParameters);
+
+    // Build "T applied to all params and all indices" as a helper.
+    auto buildInductiveApplied = [&]() {
+        auto result =
+            makeConstant(inductiveName, inductiveUniverseArgs);
+        for (const auto& binder : split.binders) {
+            result = makeApplication(
+                result, makeInternalFreeVariable(binder.freshName));
+        }
+        return result;
+    };
+
+    // Build the motive's type:
+    //   Π(i_1) ... Π(i_m). Π(_ : T params indices). Sort motiveLevel
+    auto motiveType = makeSort(motiveLevel);
+    motiveType = makePi("_", buildInductiveApplied(), motiveType);
+    for (int i = (int)split.binders.size() - 1; i >= 0; --i) {
+        if (split.binders[i].isParameter) continue;
+        const auto& b = split.binders[i];
+        motiveType = closeBinder(motiveType, b.freshName,
+                                  FreeVariableOrigin::Internal);
+        motiveType = makePi(b.displayHint, b.type, motiveType);
+    }
+
+    // Build case types for each constructor.
     std::vector<ExpressionPointer> caseTypes;
     caseTypes.reserve(constructors.size());
     for (const auto& constructor : constructors) {
-        caseTypes.push_back(
-            buildCaseType(motivePlaceholder, inductiveName, constructor));
+        caseTypes.push_back(buildCaseType(
+            inductiveName, inductiveUniverseArgs, split.binders,
+            numParameters, motivePlaceholder, constructor));
     }
 
-    // Innermost return type: motive target.
-    auto core = makeApplication(makeInternalFreeVariable(motivePlaceholder),
-                                makeInternalFreeVariable(targetPlaceholder));
-    auto recursorType = closeBinder(core, targetPlaceholder,
-                                    FreeVariableOrigin::Internal);
-    recursorType = makePi("target", makeConstant(inductiveName), recursorType);
+    // Innermost body: motive indices target.
+    auto body = makeInternalFreeVariable(motivePlaceholder);
+    for (const auto& b : split.binders) {
+        if (!b.isParameter) {
+            body = makeApplication(
+                body, makeInternalFreeVariable(b.freshName));
+        }
+    }
+    body = makeApplication(
+        body, makeInternalFreeVariable(targetPlaceholder));
 
-    // Wrap each case binder (innermost to outermost). The cases are unused
-    // in the rest of the type's body, so no name-closing is needed; we just
-    // wrap.
+    // Wrap with target Pi.
+    auto recursorType = closeBinder(body, targetPlaceholder,
+                                     FreeVariableOrigin::Internal);
+    recursorType = makePi("target", buildInductiveApplied(), recursorType);
+
+    // Wrap with index Pis (innermost = last index).
+    for (int i = (int)split.binders.size() - 1; i >= 0; --i) {
+        if (split.binders[i].isParameter) continue;
+        const auto& b = split.binders[i];
+        recursorType = closeBinder(recursorType, b.freshName,
+                                    FreeVariableOrigin::Internal);
+        recursorType = makePi(b.displayHint, b.type, recursorType);
+    }
+
+    // Wrap with case Pis (innermost = last case). Cases aren't referenced
+    // elsewhere in the type, so no name to close.
     for (int i = (int)constructors.size() - 1; i >= 0; --i) {
         recursorType = makePi("case_" + constructors[i].name,
                               caseTypes[i], recursorType);
     }
 
-    // Wrap with the motive binder, closing the free motive placeholder
-    // throughout.
+    // Wrap with motive Pi.
     recursorType = closeBinder(recursorType, motivePlaceholder,
-                               FreeVariableOrigin::Internal);
+                                FreeVariableOrigin::Internal);
     recursorType = makePi("motive", motiveType, recursorType);
+
+    // Wrap with parameter Pis (innermost = last parameter).
+    for (int i = (int)split.binders.size() - 1; i >= 0; --i) {
+        if (!split.binders[i].isParameter) continue;
+        const auto& b = split.binders[i];
+        recursorType = closeBinder(recursorType, b.freshName,
+                                    FreeVariableOrigin::Internal);
+        recursorType = makePi(b.displayHint, b.type, recursorType);
+    }
+
     return recursorType;
 }
 
@@ -1158,14 +1382,6 @@ void addInductive(Environment& environment, std::string inductiveName,
             "addInductive: numParameters out of range for kind: " + inductiveName);
     }
     int numIndices = totalPiCount - numParameters;
-    if (numParameters != 0 || numIndices != 0) {
-        // TODO: generalised parameter / index support is being added; the
-        // recursor builder and ι-reduction must be extended first.
-        throw TypeError(
-            "addInductive: parameters and indices not yet supported in "
-            "generalised form (numParameters=" + std::to_string(numParameters) +
-            ", numIndices=" + std::to_string(numIndices) + ")");
-    }
 
     // Pre-register the inductive so that constructor types can reference it.
     std::vector<std::string> constructorNames;
@@ -1208,7 +1424,14 @@ void addInductive(Environment& environment, std::string inductiveName,
             }
             auto conclusion =
                 checkConstructorStrictlyPositive(inductiveName, constructor);
-            if (auto* c = std::get_if<Constant>(&conclusion->node);
+            // The conclusion may be `T params indices` (an Application chain
+            // ending in the inductive's Constant). Peel the chain.
+            auto conclusionHead = conclusion;
+            while (auto* application =
+                       std::get_if<Application>(&conclusionHead->node)) {
+                conclusionHead = application->function;
+            }
+            if (auto* c = std::get_if<Constant>(&conclusionHead->node);
                 !c || c->name != inductiveName) {
                 rollback();
                 throw TypeError(
@@ -1239,14 +1462,40 @@ void addInductive(Environment& environment, std::string inductiveName,
             "addInductive: recursor name already taken: " + recursorName);
     }
     bool inductiveLivesInProp = false;
-    if (auto* kindSort = std::get_if<Sort>(&kind->node)) {
-        auto kindLevel = levelAsConstant(kindSort->level);
-        if (kindLevel && *kindLevel == 0) {
-            inductiveLivesInProp = true;
+    {
+        auto terminal = kind;
+        while (auto* pi = std::get_if<Pi>(&terminal->node)) {
+            terminal = pi->codomain;
+        }
+        if (auto* sort = std::get_if<Sort>(&terminal->node)) {
+            auto level = levelAsConstant(sort->level);
+            if (level && *level == 0) {
+                inductiveLivesInProp = true;
+            }
+        }
+    }
+    // Large elimination from Prop is sound when there's nothing to extract:
+    //   - empty inductives (zero constructors): no proof to extract from,
+    //   - singleton inductives (exactly one constructor with zero non-
+    //     parameter arguments): the constructor carries only what's already
+    //     fixed by the parameters, so eliminating doesn't reveal anything
+    //     that wasn't already determined. The canonical example is
+    //     Equality / Eq: refl's only "data" is the proof itself, which is
+    //     the J principle's purpose to exploit.
+    bool isSingleton = false;
+    if (inductiveLivesInProp && constructors.size() == 1) {
+        auto walker = constructors[0].type;
+        int totalCtorPiCount = 0;
+        while (auto* pi = std::get_if<Pi>(&walker->node)) {
+            walker = pi->codomain;
+            totalCtorPiCount++;
+        }
+        if (totalCtorPiCount - numParameters == 0) {
+            isSingleton = true;
         }
     }
     bool allowLargeElimination =
-        !inductiveLivesInProp || constructors.empty();
+        !inductiveLivesInProp || constructors.empty() || isSingleton;
 
     LevelPointer motiveLevel;
     std::string motiveLevelName;  // empty if motive level is fixed at Prop.
@@ -1266,7 +1515,8 @@ void addInductive(Environment& environment, std::string inductiveName,
         motiveLevel = makeLevelConst(0);  // Prop motive only.
     }
     auto recursorType = buildRecursorType(
-        inductiveName, motiveLevel, constructors);
+        inductiveName, universeParameters, motiveLevel, kind, numParameters,
+        constructors);
     try {
         auto kindOfRecursorType = weakHeadNormalForm(
             environment, inferType(environment, {}, recursorType));

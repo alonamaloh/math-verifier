@@ -1206,13 +1206,16 @@ void runDeclarationErrorTests(const Environment& arithmetic) {
                                   {{"someCtor", makeConstant("Bad")}}));
     }
 
-    // addInductive: kind must be a plain Sort. Passing a Pi (no parameters
-    // or indices supported yet) is rejected.
+    // addInductive: a Pi-kind is now accepted (it describes parameters or
+    // indices). But numParameters out of range relative to the Pi-chain
+    // length is still rejected.
     {
         Environment local;
+        // Kind has one Pi; numParameters = 5 is out of range.
         EXPECT_THROW(addInductive(
-            local, "List",
+            local, "Bogus",
             makePi("_", makeType(0), makeType(0)),
+            /*numParameters=*/ 5,
             {}));
     }
 
@@ -2176,15 +2179,170 @@ void runNaturalNumberGameProofs() {
     }
 
     // ------------------------------------------------------------------
-    // To go further we need to act on equalities. Our Equality is an
-    // axiom, so it has no built-in elimination principle. Add the one
-    // case we actually need — congruence of successor — as an axiom.
-    // (An inductive Equality with refl as its constructor would derive
-    // this from its recursor; but we don't have inductive families yet.)
+    // Now that the kernel supports inductive families, we can replace the
+    // axiomatic Equality with an inductive declaration. The recursor is
+    // auto-generated; this gives us the J / transport / Leibniz-
+    // substitution principle, from which we derive successorCongruence
+    // and any other equality reasoning we need.
     //
-    //   successorCongruence : Π(x y : Natural). Equality Natural x y →
-    //                                            Equality Natural (succ x) (succ y)
+    // The arithmetic environment already declares Equality as an axiom.
+    // We can't redeclare it, so we add a parallel inductive equality.
+    // Use a different name (InductiveEquality) to avoid clashing with the
+    // existing axiom. Same for the constructor — reflInductive.
+    //
+    //   inductive InductiveEquality.{u} (A : Type u) (x : A) : A → Prop
+    //     | reflInductive : InductiveEquality A x x
     // ------------------------------------------------------------------
+    addInductive(env, "InductiveEquality", {"u"},
+        // kind: Π(A : Type u). Π(x : A). Π(y : A). Prop
+        makePi("A", makeType(makeLevelParam("u")),
+            makePi("x", makeBoundVariable(0),
+                makePi("y", makeBoundVariable(1), makeProp()))),
+        /*numParameters=*/ 2,
+        {{
+            "reflInductive",
+            // refl's type: Π(A : Type u). Π(x : A). InductiveEquality A x x
+            makePi("A", makeType(makeLevelParam("u")),
+                makePi("x", makeBoundVariable(0),
+                    makeApplication(
+                        makeApplication(
+                            makeApplication(
+                                makeConstant("InductiveEquality",
+                                              {makeLevelParam("u")}),
+                                makeBoundVariable(1) /* A */),
+                            makeBoundVariable(0) /* x */),
+                        makeBoundVariable(0) /* x */)))
+        }});
+
+    // Helper closures for the inductive version.
+    auto inductiveEquality = [](ExpressionPointer a, ExpressionPointer x,
+                                 ExpressionPointer y) {
+        return makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeConstant("InductiveEquality", {makeLevelConst(0)}),
+                    a),
+                x),
+            y);
+    };
+    auto reflInductive = [](ExpressionPointer a, ExpressionPointer x) {
+        return makeApplication(
+            makeApplication(
+                makeConstant("reflInductive", {makeLevelConst(0)}),
+                a),
+            x);
+    };
+
+    // ------------------------------------------------------------------
+    // successorCongruence — DERIVED from InductiveEquality's recursor
+    // (no longer an axiom!). The recursor's type is:
+    //
+    //   InductiveEquality_recursor.{u, m}
+    //     : Π(A : Type u). Π(x : A).
+    //       Π(motive : Π(y : A). Π(_ : InductiveEquality A x y). Sort m).
+    //       Π(case_refl : motive x (reflInductive A x)).
+    //       Π(y : A). Π(eq : InductiveEquality A x y).
+    //       motive y eq
+    //
+    // To prove  Π(x y : Natural). InductiveEquality x y → succ x = succ y
+    // we recurse on the equality:
+    //   motive := λ y' _eq'. InductiveEquality Natural (succ x) (succ y')
+    //   case_refl := reflInductive Natural (succ x)
+    //                              -- since y'=x and _eq'=refl, we need
+    //                              -- IE Nat (succ x) (succ x).
+    //
+    //   inductiveSuccessorCongruence :=
+    //     λ x y eq.
+    //       InductiveEquality_recursor.{0,0}
+    //         Natural x
+    //         (λ y' _eq'. InductiveEquality Natural (succ x) (succ y'))
+    //         (reflInductive Natural (succ x))
+    //         y eq
+    // ------------------------------------------------------------------
+    {
+        // Motive: λ(y' : Natural). λ(_eq' : InductiveEquality Natural x y').
+        //           InductiveEquality Natural (succ x) (succ y')
+        // Inside this double lambda, x is captured from the outer scope.
+        // Indices when used inside the recursor body:
+        //   - the outer body has x, y, eq bound (de Bruijn indices 2, 1, 0).
+        //   - inside motive's lambdas: y'=0, _eq'=... wait motive has 2 lambdas
+        //     so depths add up. Let me be careful.
+        //
+        // The successorCongruence proof body lives inside three lambdas:
+        //   λ x. λ y. λ eq. [body]
+        // From [body]'s perspective: eq=0, y=1, x=2.
+        //
+        // The motive lambda is constructed INSIDE [body]; its references
+        // to x must reach further out. Motive is:
+        //   λ y'. λ _eq'. InductiveEquality Natural (succ x) (succ y')
+        // Indices INSIDE motive's body:
+        //   y' = 0 (innermost), _eq' = ... actually wait, motive has 2
+        //   lambdas (y' and _eq'). Inside the innermost body:
+        //     _eq' = 0, y' = 1, then jumping out to the outer scope:
+        //     eq = 2, y = 3, x = 4.
+        //   So x is at index 4, y' is at index 1.
+        // Inside motive's _eq' body, binders going outward are:
+        //   _eq'=0, y'=1, eq=2, y=3, x=4
+        // The _eq's TYPE is constructed inside y' but outside _eq', so
+        // binders there are: y'=0, eq=1, y=2, x=3.
+        auto motive = makeLambda("y'", makeConstant("Natural"),
+            makeLambda("_eq'",
+                inductiveEquality(makeConstant("Natural"),
+                                    makeBoundVariable(3) /* x */,
+                                    makeBoundVariable(0) /* y' */),
+                inductiveEquality(makeConstant("Natural"),
+                                    succ(makeBoundVariable(4) /* x */),
+                                    succ(makeBoundVariable(1) /* y' */))));
+
+        // case_refl: from inside the outer three-lambda body, we need
+        //   reflInductive Natural (succ x)
+        // x is at index 2 (eq=0, y=1, x=2).
+        auto caseRefl =
+            reflInductive(makeConstant("Natural"),
+                          succ(makeBoundVariable(2) /* x */));
+
+        // The full proof: λ x. λ y. λ eq. recursor Nat x motive caseRefl y eq
+        auto proof = makeLambda("x", makeConstant("Natural"),
+            makeLambda("y", makeConstant("Natural"),
+                makeLambda("eq",
+                    inductiveEquality(makeConstant("Natural"),
+                                       makeBoundVariable(1) /* x */,
+                                       makeBoundVariable(0) /* y */),
+                    makeApplication(
+                        makeApplication(
+                            makeApplication(
+                                makeApplication(
+                                    makeApplication(
+                                        makeApplication(
+                                            makeConstant(
+                                                "InductiveEquality_recursor",
+                                                {makeLevelConst(0),
+                                                 makeLevelConst(0)}),
+                                            makeConstant("Natural")),
+                                        makeBoundVariable(2) /* x */),
+                                    motive),
+                                caseRefl),
+                            makeBoundVariable(1) /* y */),
+                        makeBoundVariable(0) /* eq */))));
+
+        auto theoremType = makePi("x", makeConstant("Natural"),
+            makePi("y", makeConstant("Natural"),
+                makePi("_eq",
+                    inductiveEquality(makeConstant("Natural"),
+                                       makeBoundVariable(1),
+                                       makeBoundVariable(0)),
+                    inductiveEquality(makeConstant("Natural"),
+                                       succ(makeBoundVariable(2)),
+                                       succ(makeBoundVariable(1))))));
+
+        addDefinition(env, "inductiveSuccessorCongruence", theoremType, proof);
+        EXPECT_TRUE(env.lookup("inductiveSuccessorCongruence") != nullptr);
+        std::cout << "  inductiveSuccessorCongruence  ⊨  (derived from "
+                     "InductiveEquality recursor)\n";
+    }
+
+    // Keep the axiom-based version available too (the old proofs depend
+    // on it).
     addAxiom(env, "successorCongruence",
         makePi("x", Natural(),
             makePi("y", Natural(),
