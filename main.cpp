@@ -1373,6 +1373,81 @@ void runPrintingTests(const Environment& arithmetic) {
 }
 
 // ----------------------------------------------------------------------------
+// Defensive-hardening tests: explicit universe-arity checks in the kernel's
+// internal reductions, and the fuel-limit safety net.
+// ----------------------------------------------------------------------------
+
+void runHardeningTests(const Environment& arithmetic) {
+    std::cout << "--- defensive hardening tests ---\n";
+
+    // The internal universe-arity check catches a malformed Definition
+    // reference reaching weakHeadNormalForm directly. We construct a
+    // Constant referring to a definition but with the wrong universe-arg
+    // count, then hand it straight to weakHeadNormalForm (bypassing the
+    // arity check in inferType).
+    {
+        Environment local = arithmetic;
+        // polyDef.{u} : Type (u+1) := Type u
+        addDefinition(local, "polyDef", {"u"},
+                      makeType(makeLevelSucc(makeLevelParam("u"))),
+                      makeType(makeLevelParam("u")));
+        // Construct polyDef with zero universe args (instead of one).
+        EXPECT_THROW(weakHeadNormalForm(local, makeConstant("polyDef")));
+        // Two universe args is also wrong.
+        EXPECT_THROW(weakHeadNormalForm(
+            local, makeConstant("polyDef",
+                                {makeLevelConst(0), makeLevelConst(1)})));
+        // The correct arity reduces fine — body Type 0 unfolds.
+        auto reduced = weakHeadNormalForm(
+            local, makeConstant("polyDef", {makeLevelConst(0)}));
+        EXPECT_TRUE(std::holds_alternative<Sort>(reduced->node));
+    }
+
+    // ι-reduction's universe-prefix check: when the recursor and the target
+    // constructor disagree on universe arguments, ι doesn't fire and the
+    // expression stays stuck. (We can only exercise this minimally given
+    // that Natural isn't universe-polymorphic — the prefix is empty and
+    // trivially matches; this test is here as a regression baseline so
+    // the polymorphic case has a place to land tests later.)
+    {
+        // Natural_recursor expects no universe args (Natural has none).
+        // Passing one is wrong arity; inferType should throw.
+        EXPECT_THROW(inferType(arithmetic, {},
+            makeConstant("Natural_recursor", {makeLevelConst(0)})));
+    }
+
+    // Fuel limit: an explicit fuel budget of 0 causes weakHeadNormalForm
+    // to throw on any non-atomic term.
+    {
+        auto applied = makeApplication(
+            makeLambda("x", makeConstant("Natural"), makeBoundVariable(0)),
+            makeConstant("zero"));
+        // With ample fuel, this reduces to "zero".
+        auto reduced = weakHeadNormalForm(arithmetic, applied, 1000);
+        EXPECT_TRUE(isDefinitionallyEqual(
+            arithmetic, {}, reduced, makeConstant("zero")));
+        // With no fuel, throws.
+        EXPECT_THROW(weakHeadNormalForm(arithmetic, applied, 1));
+    }
+
+    // Fuel limit: isDefinitionallyEqual conservatively returns false on
+    // exhaustion rather than throwing — equality is undecidable in this
+    // window, but we must not falsely claim equality.
+    {
+        auto applied = makeApplication(
+            makeLambda("x", makeConstant("Natural"), makeBoundVariable(0)),
+            makeConstant("zero"));
+        // With fuel 1, the function reduces the LHS to "zero" but can't
+        // also reduce the RHS. The result is conservatively false.
+        EXPECT_FALSE(isDefinitionallyEqual(
+            arithmetic, {}, applied, makeConstant("zero"), 1));
+        // With ample fuel they're equal.
+        EXPECT_TRUE(isDefinitionallyEqual(
+            arithmetic, {}, applied, makeConstant("zero"), 1000));
+    }
+}
+
+// ----------------------------------------------------------------------------
 // Integration test: a second inductive (Boolean) and a function defined via
 // its recursor, exercised alongside the existing Natural / add.
 // ----------------------------------------------------------------------------
@@ -1601,6 +1676,7 @@ int main() {
     runDeclarationErrorTests(arithmetic);
     runUniversePolymorphismTests(arithmetic);
     runPrintingTests(arithmetic);
+    runHardeningTests(arithmetic);
     runIntegrationTests();
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";

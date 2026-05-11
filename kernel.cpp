@@ -30,6 +30,13 @@ ExpressionPointer substituteUniverseLevels(
     ExpressionPointer expression,
     const std::vector<std::string>& parameterNames,
     const std::vector<LevelPointer>& replacements) {
+    if (parameterNames.size() != replacements.size()) {
+        throw TypeError(
+            "internal: substituteUniverseLevels called with mismatched "
+            "parameter/replacement counts (" +
+            std::to_string(parameterNames.size()) + " vs " +
+            std::to_string(replacements.size()) + ")");
+    }
     auto substituteOneLevel = [&](LevelPointer level) {
         for (std::size_t i = 0; i < parameterNames.size(); ++i) {
             level = substituteLevelParameter(level, parameterNames[i],
@@ -316,14 +323,32 @@ ExpressionPointer buildIotaReduction(const std::string& recursorName,
 } // namespace
 
 ExpressionPointer weakHeadNormalForm(const Environment& environment,
-                                     ExpressionPointer expression) {
+                                     ExpressionPointer expression,
+                                     int fuel) {
     while (true) {
+        if (--fuel <= 0) {
+            throw TypeError(
+                "weakHeadNormalForm: reduction did not terminate within "
+                "fuel limit; expression may be ill-typed");
+        }
         // δ-reduction on a bare Constant referring to a Definition. If the
         // definition is universe-polymorphic, instantiate its body with the
-        // supplied universe arguments before unfolding.
+        // supplied universe arguments before unfolding. Refuses to reduce
+        // (and throws) if the Constant's universe arity disagrees with the
+        // Definition's — this can only happen on malformed input, since
+        // inferType would have caught it; the check is defensive.
         if (auto* constant = std::get_if<Constant>(&expression->node)) {
             if (auto* declaration = environment.lookup(constant->name)) {
                 if (auto* definition = std::get_if<Definition>(declaration)) {
+                    if (definition->universeParameters.size()
+                            != constant->universeArguments.size()) {
+                        throw TypeError(
+                            "weakHeadNormalForm: constant " + constant->name +
+                            " referenced with " +
+                            std::to_string(constant->universeArguments.size()) +
+                            " universe argument(s); definition declares " +
+                            std::to_string(definition->universeParameters.size()));
+                    }
                     auto body = definition->body;
                     if (!definition->universeParameters.empty()) {
                         body = substituteUniverseLevels(
@@ -345,7 +370,7 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
         // Application: peel the spine, reduce the head, then try β or ι.
         if (std::holds_alternative<Application>(expression->node)) {
             auto spine = peelApplicationSpine(expression);
-            spine.head = weakHeadNormalForm(environment, spine.head);
+            spine.head = weakHeadNormalForm(environment, spine.head, fuel);
 
             // β-reduction: if the head is a Lambda and we have at least one arg.
             if (auto* lambda = std::get_if<Lambda>(&spine.head->node);
@@ -366,7 +391,7 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
                     if ((int)spine.args.size() >= needed) {
                         // Reduce the target to whnf and inspect.
                         auto reducedTarget =
-                            weakHeadNormalForm(environment, spine.args[needed - 1]);
+                            weakHeadNormalForm(environment, spine.args[needed - 1], fuel);
                         auto targetSpine = peelApplicationSpine(reducedTarget);
                         if (auto* ctorConstant =
                                 std::get_if<Constant>(&targetSpine.head->node)) {
@@ -377,6 +402,33 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
                                                 : nullptr);
                                 constructor &&
                                 constructor->inductiveName == recursor->inductiveName) {
+                                // Defensive universe-argument compatibility
+                                // check: the constructor's universe args
+                                // must match the prefix of the recursor's.
+                                // (Currently the two sets are the same size;
+                                // when universe-polymorphic motives land,
+                                // the recursor will have one extra trailing
+                                // universe arg for the motive level.) On
+                                // mismatch, refuse to ι-reduce; the
+                                // expression is stuck.
+                                const auto& recursorArgs =
+                                    headConstant->universeArguments;
+                                const auto& constructorArgs =
+                                    ctorConstant->universeArguments;
+                                bool prefixMatches =
+                                    constructorArgs.size() <= recursorArgs.size();
+                                for (std::size_t i = 0;
+                                     prefixMatches && i < constructorArgs.size();
+                                     ++i) {
+                                    if (!levelsDefinitionallyEqual(
+                                            recursorArgs[i],
+                                            constructorArgs[i])) {
+                                        prefixMatches = false;
+                                    }
+                                }
+                                if (!prefixMatches) {
+                                    return applyArguments(spine.head, spine.args);
+                                }
                                 // ι-reduce.
                                 auto reduced = buildIotaReduction(
                                     headConstant->name,
@@ -416,9 +468,14 @@ std::string makeOpeningName(const Context& context) {
 bool isDefinitionallyEqual(const Environment& environment,
                            const Context& context,
                            ExpressionPointer left,
-                           ExpressionPointer right) {
-    auto leftReduced  = weakHeadNormalForm(environment, std::move(left));
-    auto rightReduced = weakHeadNormalForm(environment, std::move(right));
+                           ExpressionPointer right,
+                           int fuel) {
+    if (--fuel <= 0) {
+        // Conservative on exhaustion: don't claim equality we can't prove.
+        return false;
+    }
+    auto leftReduced  = weakHeadNormalForm(environment, std::move(left),  fuel);
+    auto rightReduced = weakHeadNormalForm(environment, std::move(right), fuel);
 
     // Structural cases. When recursing into a Pi or Lambda body/codomain,
     // we *open* the binder with a fresh free variable and extend the
@@ -468,7 +525,7 @@ bool isDefinitionallyEqual(const Environment& environment,
     } else if (auto* leftPi = std::get_if<Pi>(&leftReduced->node)) {
         if (auto* rightPi = std::get_if<Pi>(&rightReduced->node)) {
             if (!isDefinitionallyEqual(environment, context,
-                                       leftPi->domain, rightPi->domain)) {
+                                       leftPi->domain, rightPi->domain, fuel)) {
                 return false;
             }
             auto fresh = makeOpeningName(context);
@@ -478,13 +535,14 @@ bool isDefinitionallyEqual(const Environment& environment,
             return isDefinitionallyEqual(
                 environment, extendedContext,
                 openBinder(leftPi->codomain,  fresh, FreeVariableOrigin::Internal),
-                openBinder(rightPi->codomain, fresh, FreeVariableOrigin::Internal));
+                openBinder(rightPi->codomain, fresh, FreeVariableOrigin::Internal),
+                fuel);
         }
     } else if (auto* leftLambda = std::get_if<Lambda>(&leftReduced->node)) {
         if (auto* rightLambda = std::get_if<Lambda>(&rightReduced->node)) {
             if (!isDefinitionallyEqual(environment, context,
                                        leftLambda->domain,
-                                       rightLambda->domain)) {
+                                       rightLambda->domain, fuel)) {
                 return false;
             }
             auto fresh = makeOpeningName(context);
@@ -494,16 +552,17 @@ bool isDefinitionallyEqual(const Environment& environment,
             return isDefinitionallyEqual(
                 environment, extendedContext,
                 openBinder(leftLambda->body,  fresh, FreeVariableOrigin::Internal),
-                openBinder(rightLambda->body, fresh, FreeVariableOrigin::Internal));
+                openBinder(rightLambda->body, fresh, FreeVariableOrigin::Internal),
+                fuel);
         }
     } else if (auto* leftApplication = std::get_if<Application>(&leftReduced->node)) {
         if (auto* rightApplication = std::get_if<Application>(&rightReduced->node)) {
             if (isDefinitionallyEqual(environment, context,
                                       leftApplication->function,
-                                      rightApplication->function)
+                                      rightApplication->function, fuel)
              && isDefinitionallyEqual(environment, context,
                                       leftApplication->argument,
-                                      rightApplication->argument)) {
+                                      rightApplication->argument, fuel)) {
                 return true;
             }
             // Otherwise fall through — proof irrelevance might still apply.
@@ -525,7 +584,8 @@ bool isDefinitionallyEqual(const Environment& environment,
             if (isDefinitionallyEqual(
                     environment, extendedContext,
                     openBinder(leftLambda->body, fresh, FreeVariableOrigin::Internal),
-                    openBinder(etaExpandedRight, fresh, FreeVariableOrigin::Internal))) {
+                    openBinder(etaExpandedRight, fresh, FreeVariableOrigin::Internal),
+                    fuel)) {
                 return true;
             }
         }
@@ -539,7 +599,8 @@ bool isDefinitionallyEqual(const Environment& environment,
             if (isDefinitionallyEqual(
                     environment, extendedContext,
                     openBinder(etaExpandedLeft, fresh, FreeVariableOrigin::Internal),
-                    openBinder(rightLambda->body, fresh, FreeVariableOrigin::Internal))) {
+                    openBinder(rightLambda->body, fresh, FreeVariableOrigin::Internal),
+                    fuel)) {
                 return true;
             }
         }
@@ -551,14 +612,14 @@ bool isDefinitionallyEqual(const Environment& environment,
     try {
         auto leftType = inferType(environment, context, leftReduced);
         auto leftKind = weakHeadNormalForm(
-            environment, inferType(environment, context, leftType));
+            environment, inferType(environment, context, leftType), fuel);
         if (auto* sort = std::get_if<Sort>(&leftKind->node)) {
             auto concreteLevel = levelAsConstant(sort->level);
             if (concreteLevel && *concreteLevel == 0) {
                 // leftReduced is a proof of leftType, a proposition.
                 auto rightType = inferType(environment, context, rightReduced);
                 if (isDefinitionallyEqual(environment, context,
-                                          leftType, rightType)) {
+                                          leftType, rightType, fuel)) {
                     return true;
                 }
             }
@@ -573,9 +634,13 @@ bool isDefinitionallyEqual(const Environment& environment,
 bool isSubtype(const Environment& environment,
                const Context& context,
                ExpressionPointer subType,
-               ExpressionPointer superType) {
-    auto subReduced   = weakHeadNormalForm(environment, std::move(subType));
-    auto superReduced = weakHeadNormalForm(environment, std::move(superType));
+               ExpressionPointer superType,
+               int fuel) {
+    if (--fuel <= 0) {
+        return false;
+    }
+    auto subReduced   = weakHeadNormalForm(environment, std::move(subType),   fuel);
+    auto superReduced = weakHeadNormalForm(environment, std::move(superType), fuel);
 
     // Sort cumulativity: Sort m <: Sort n iff m <= n.
     if (auto* subSort = std::get_if<Sort>(&subReduced->node)) {
@@ -588,7 +653,7 @@ bool isSubtype(const Environment& environment,
     if (auto* subPi = std::get_if<Pi>(&subReduced->node)) {
         if (auto* superPi = std::get_if<Pi>(&superReduced->node)) {
             if (!isDefinitionallyEqual(environment, context,
-                                       subPi->domain, superPi->domain)) {
+                                       subPi->domain, superPi->domain, fuel)) {
                 return false;
             }
             auto fresh = makeOpeningName(context);
@@ -597,12 +662,13 @@ bool isSubtype(const Environment& environment,
                 {fresh, subPi->domain, FreeVariableOrigin::Internal});
             return isSubtype(environment, extendedContext,
                              openBinder(subPi->codomain,   fresh, FreeVariableOrigin::Internal),
-                             openBinder(superPi->codomain, fresh, FreeVariableOrigin::Internal));
+                             openBinder(superPi->codomain, fresh, FreeVariableOrigin::Internal),
+                             fuel);
         }
     }
 
     // Everything else: definitional equality is sufficient.
-    return isDefinitionallyEqual(environment, context, subReduced, superReduced);
+    return isDefinitionallyEqual(environment, context, subReduced, superReduced, fuel);
 }
 
 std::string freshName(const std::string& displayHint, const Context& context) {

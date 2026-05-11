@@ -147,30 +147,42 @@ ExpressionPointer closeBinder(ExpressionPointer expression,
                               FreeVariableOrigin origin
                                   = FreeVariableOrigin::User);
 
+// Default fuel for kernel functions that recursively reduce. The fuel is
+// decremented at every reduction step and recursive call; functions throw
+// (or return false conservatively) when it runs out. This guards against
+// non-termination for malformed input — a well-typed expression in our
+// fragment never approaches this bound for any realistic input.
+constexpr int defaultFuel = 10000;
+
 // Reduces only the head: enough to see whether the outermost form is a
 // Sort, Pi, Lambda, etc. Unfolds definitions in head position
-// (delta-reduction).
+// (delta-reduction). Throws TypeError on fuel exhaustion.
 ExpressionPointer weakHeadNormalForm(const Environment& environment,
-                                 ExpressionPointer expression);
+                                 ExpressionPointer expression,
+                                 int fuel = defaultFuel);
 
 // Definitional equality: same up to reduction, alpha-renaming, η, and
 // proof irrelevance. The `context` is consulted when proof irrelevance
-// needs to infer the types of the two sides.
+// needs to infer the types of the two sides. Returns false conservatively
+// when fuel runs out.
 bool isDefinitionallyEqual(const Environment& environment,
                            const Context& context,
                            ExpressionPointer left,
-                           ExpressionPointer right);
+                           ExpressionPointer right,
+                           int fuel = defaultFuel);
 
 // Universe cumulativity: returns true if `subType` can be used wherever
 // `superType` is expected. Equivalent to isDefinitionallyEqual except at
 // the Sort head, where Sort m <: Sort n whenever m <= n; and at the Pi
 // head, where the domains must be equal but the codomains may be related
 // by subtyping (covariant codomain). Used in Application argument checks,
-// addDefinition body checks, and Let value checks.
+// addDefinition body checks, and Let value checks. Returns false on
+// fuel exhaustion.
 bool isSubtype(const Environment& environment,
                const Context& context,
                ExpressionPointer subType,
-               ExpressionPointer superType);
+               ExpressionPointer superType,
+               int fuel = defaultFuel);
 
 // Returns the type of `expression` in `environment` and `context`,
 // or throws TypeError.
