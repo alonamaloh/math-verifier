@@ -49,15 +49,30 @@ void writeAtomic(std::ostringstream& output,
         return;
     }
     if (auto* sort = std::get_if<Sort>(&expression->node)) {
-        if (sort->universeLevel == 0) {
-            output << "Prop";
+        if (auto concreteLevel = levelAsConstant(sort->level)) {
+            if (*concreteLevel == 0) {
+                output << "Prop";
+            } else {
+                output << "Type " << (*concreteLevel - 1);
+            }
+        } else if (auto* succ = std::get_if<LevelSucc>(&sort->level->node)) {
+            // Sort (succ x) is Type x — render symbolic Type for non-const u.
+            output << "Type " << prettyPrintLevel(succ->base);
         } else {
-            output << "Type " << (sort->universeLevel - 1);
+            output << "Sort " << prettyPrintLevel(sort->level);
         }
         return;
     }
     if (auto* constant = std::get_if<Constant>(&expression->node)) {
         output << constant->name;
+        if (!constant->universeArguments.empty()) {
+            output << ".{";
+            for (std::size_t i = 0; i < constant->universeArguments.size(); ++i) {
+                if (i > 0) output << ", ";
+                output << prettyPrintLevel(constant->universeArguments[i]);
+            }
+            output << "}";
+        }
         return;
     }
     output << "(";

@@ -5,12 +5,89 @@
 
 namespace {
 
-// Lean's imax rule: if the codomain lives in Prop, the Pi type lives in
-// Prop too (this is impredicativity for Prop); otherwise it lives in the
-// max of the two universes.
-int impredicativeMax(int domainLevel, int codomainLevel) {
-    if (codomainLevel == 0) return 0;
-    return std::max(domainLevel, codomainLevel);
+// Lean's imax rule on level expressions: makeLevelIMax already encodes the
+// Prop-collapsing behaviour for concrete codomains and falls back to a
+// symbolic LevelIMax otherwise.
+LevelPointer impredicativeMaxLevel(LevelPointer domainLevel,
+                                   LevelPointer codomainLevel) {
+    return makeLevelIMax(std::move(domainLevel), std::move(codomainLevel));
+}
+
+// Walks `expression`, replacing each universe parameter that appears in any
+// Sort or in a Constant's universe arguments with the supplied substitution.
+// Used by inferType when a polymorphic constant is referenced with explicit
+// level arguments — every internal Sort and Constant in the declared type
+// needs its level parameters instantiated.
+ExpressionPointer substituteUniverseLevels(
+    ExpressionPointer expression,
+    const std::vector<std::string>& parameterNames,
+    const std::vector<LevelPointer>& replacements) {
+    auto substituteOneLevel = [&](LevelPointer level) {
+        for (std::size_t i = 0; i < parameterNames.size(); ++i) {
+            level = substituteLevelParameter(level, parameterNames[i],
+                                             replacements[i]);
+        }
+        return level;
+    };
+
+    if (auto* sort = std::get_if<Sort>(&expression->node)) {
+        return makeSort(substituteOneLevel(sort->level));
+    }
+    if (auto* constant = std::get_if<Constant>(&expression->node)) {
+        std::vector<LevelPointer> newArguments;
+        newArguments.reserve(constant->universeArguments.size());
+        for (auto& argument : constant->universeArguments) {
+            newArguments.push_back(substituteOneLevel(argument));
+        }
+        return makeConstant(constant->name, std::move(newArguments));
+    }
+    if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        return makePi(pi->displayHint,
+                      substituteUniverseLevels(pi->domain,   parameterNames, replacements),
+                      substituteUniverseLevels(pi->codomain, parameterNames, replacements));
+    }
+    if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        return makeLambda(lambda->displayHint,
+                          substituteUniverseLevels(lambda->domain, parameterNames, replacements),
+                          substituteUniverseLevels(lambda->body,   parameterNames, replacements));
+    }
+    if (auto* application = std::get_if<Application>(&expression->node)) {
+        return makeApplication(
+            substituteUniverseLevels(application->function, parameterNames, replacements),
+            substituteUniverseLevels(application->argument, parameterNames, replacements));
+    }
+    if (auto* let = std::get_if<Let>(&expression->node)) {
+        return makeLet(let->displayHint,
+                       substituteUniverseLevels(let->type,  parameterNames, replacements),
+                       substituteUniverseLevels(let->value, parameterNames, replacements),
+                       substituteUniverseLevels(let->body,  parameterNames, replacements));
+    }
+    // BoundVariable, FreeVariable: no levels inside, return as-is.
+    return expression;
+}
+
+// Helper accessor: every Declaration variant carries a list of universe
+// parameter names. Returns it.
+const std::vector<std::string>& declarationUniverseParameters(
+    const Declaration& declaration) {
+    if (auto* axiom       = std::get_if<Axiom>(&declaration))       return axiom->universeParameters;
+    if (auto* definition  = std::get_if<Definition>(&declaration))  return definition->universeParameters;
+    if (auto* inductive   = std::get_if<Inductive>(&declaration))   return inductive->universeParameters;
+    if (auto* constructor = std::get_if<Constructor>(&declaration)) return constructor->universeParameters;
+    if (auto* recursor    = std::get_if<Recursor>(&declaration))    return recursor->universeParameters;
+    static const std::vector<std::string> empty;
+    return empty;
+}
+
+// Returns the declared type of any Declaration. (For Inductive this is the
+// `kind` field; for everything else it's `type`.)
+ExpressionPointer declarationType(const Declaration& declaration) {
+    if (auto* axiom       = std::get_if<Axiom>(&declaration))       return axiom->type;
+    if (auto* definition  = std::get_if<Definition>(&declaration))  return definition->type;
+    if (auto* inductive   = std::get_if<Inductive>(&declaration))   return inductive->kind;
+    if (auto* constructor = std::get_if<Constructor>(&declaration)) return constructor->type;
+    if (auto* recursor    = std::get_if<Recursor>(&declaration))    return recursor->type;
+    throw TypeError("internal: unhandled Declaration variant");
 }
 
 } // namespace
@@ -178,6 +255,7 @@ ExpressionPointer applyArguments(ExpressionPointer head,
 // (recursive arg), we apply the case to v_j AND to a recursive call of the
 // recursor on v_j.
 ExpressionPointer buildIotaReduction(const std::string& recursorName,
+                                     const std::vector<LevelPointer>& recursorUniverseArguments,
                                      const Recursor& recursor,
                                      const Constructor& constructor,
                                      const std::vector<ExpressionPointer>& recursorArgs,
@@ -200,8 +278,9 @@ ExpressionPointer buildIotaReduction(const std::string& recursorName,
             if (c->name == recursor.inductiveName) isRecursive = true;
         }
         if (isRecursive) {
-            // Build the recursive call: recursor motive case_1 ... case_k argValue.
-            auto recursiveCall = makeConstant(recursorName);
+            // Build the recursive call, preserving universe arguments on the
+            // recursor head:  recursor.{us} motive case_1 ... case_k argValue.
+            auto recursiveCall = makeConstant(recursorName, recursorUniverseArguments);
             // recursorArgs[0..numConstructors] are motive + cases.
             for (int i = 0; i <= recursor.numConstructors; ++i) {
                 recursiveCall = makeApplication(recursiveCall, recursorArgs[i]);
@@ -222,11 +301,20 @@ ExpressionPointer buildIotaReduction(const std::string& recursorName,
 ExpressionPointer weakHeadNormalForm(const Environment& environment,
                                      ExpressionPointer expression) {
     while (true) {
-        // δ-reduction on a bare Constant referring to a Definition.
+        // δ-reduction on a bare Constant referring to a Definition. If the
+        // definition is universe-polymorphic, instantiate its body with the
+        // supplied universe arguments before unfolding.
         if (auto* constant = std::get_if<Constant>(&expression->node)) {
             if (auto* declaration = environment.lookup(constant->name)) {
                 if (auto* definition = std::get_if<Definition>(declaration)) {
-                    expression = definition->body;
+                    auto body = definition->body;
+                    if (!definition->universeParameters.empty()) {
+                        body = substituteUniverseLevels(
+                            body,
+                            definition->universeParameters,
+                            constant->universeArguments);
+                    }
+                    expression = body;
                     continue;
                 }
             }
@@ -274,7 +362,9 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
                                 constructor->inductiveName == recursor->inductiveName) {
                                 // ι-reduce.
                                 auto reduced = buildIotaReduction(
-                                    headConstant->name, *recursor, *constructor,
+                                    headConstant->name,
+                                    headConstant->universeArguments,
+                                    *recursor, *constructor,
                                     spine.args, targetSpine.args);
                                 // Re-apply any extra arguments past `needed`.
                                 expression = applyArguments(reduced, spine.args, needed);
@@ -328,7 +418,8 @@ bool isDefinitionallyEqual(const Environment& environment,
         if (rightFree && leftFree->name == rightFree->name) return true;
     } else if (auto* leftSort = std::get_if<Sort>(&leftReduced->node)) {
         auto* rightSort = std::get_if<Sort>(&rightReduced->node);
-        if (rightSort && leftSort->universeLevel == rightSort->universeLevel) {
+        if (rightSort && levelsDefinitionallyEqual(leftSort->level,
+                                                   rightSort->level)) {
             return true;
         }
     } else if (auto* leftConstant = std::get_if<Constant>(&leftReduced->node)) {
@@ -423,7 +514,8 @@ bool isDefinitionallyEqual(const Environment& environment,
         auto leftKind = weakHeadNormalForm(
             environment, inferType(environment, context, leftType));
         if (auto* sort = std::get_if<Sort>(&leftKind->node)) {
-            if (sort->universeLevel == 0) {
+            auto concreteLevel = levelAsConstant(sort->level);
+            if (concreteLevel && *concreteLevel == 0) {
                 // leftReduced is a proof of leftType, a proposition.
                 auto rightType = inferType(environment, context, rightReduced);
                 if (isDefinitionallyEqual(environment, context,
@@ -449,7 +541,7 @@ bool isSubtype(const Environment& environment,
     // Sort cumulativity: Sort m <: Sort n iff m <= n.
     if (auto* subSort = std::get_if<Sort>(&subReduced->node)) {
         if (auto* superSort = std::get_if<Sort>(&superReduced->node)) {
-            return subSort->universeLevel <= superSort->universeLevel;
+            return levelLessOrEqual(subSort->level, superSort->level);
         }
     }
 
@@ -508,20 +600,23 @@ ExpressionPointer inferType(const Environment& environment,
         if (!declaration) {
             throw TypeError("undefined constant: " + constant->name);
         }
-        if (auto* axiom       = std::get_if<Axiom>(declaration))
-            return axiom->type;
-        if (auto* definition  = std::get_if<Definition>(declaration))
-            return definition->type;
-        if (auto* inductive   = std::get_if<Inductive>(declaration))
-            return inductive->kind;
-        if (auto* constructorDecl = std::get_if<Constructor>(declaration))
-            return constructorDecl->type;
-        if (auto* recursorDecl    = std::get_if<Recursor>(declaration))
-            return recursorDecl->type;
-        throw TypeError("internal: unhandled Declaration variant in inferType");
+        const auto& parameters = declarationUniverseParameters(*declaration);
+        if (parameters.size() != constant->universeArguments.size()) {
+            throw TypeError(
+                "constant " + constant->name + ": expected " +
+                std::to_string(parameters.size()) +
+                " universe argument(s), got " +
+                std::to_string(constant->universeArguments.size()));
+        }
+        auto type = declarationType(*declaration);
+        if (!parameters.empty()) {
+            type = substituteUniverseLevels(type, parameters,
+                                            constant->universeArguments);
+        }
+        return type;
     }
     if (auto* sort = std::get_if<Sort>(&expression->node)) {
-        return makeSort(sort->universeLevel + 1);
+        return makeSort(makeLevelSucc(sort->level));
     }
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
         auto domainKind = weakHeadNormalForm(
@@ -541,8 +636,8 @@ ExpressionPointer inferType(const Environment& environment,
         if (!codomainSort) {
             throw TypeError("Pi: codomain is not a type");
         }
-        return makeSort(impredicativeMax(domainSort->universeLevel,
-                                         codomainSort->universeLevel));
+        return makeSort(
+            impredicativeMaxLevel(domainSort->level, codomainSort->level));
     }
     if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
         auto domainKind = weakHeadNormalForm(
@@ -594,6 +689,7 @@ ExpressionPointer inferType(const Environment& environment,
 
 void addAxiom(Environment& environment,
               std::string name,
+              std::vector<std::string> universeParameters,
               ExpressionPointer declaredType) {
     if (environment.declarations.count(name)) {
         throw TypeError("addAxiom: name already declared: " + name);
@@ -603,12 +699,14 @@ void addAxiom(Environment& environment,
     if (!std::holds_alternative<Sort>(kindOfType->node)) {
         throw TypeError("addAxiom: declared type is not a type for " + name);
     }
-    environment.declarations.emplace(std::move(name),
-                                     Axiom{std::move(declaredType)});
+    environment.declarations.emplace(
+        std::move(name),
+        Axiom{std::move(universeParameters), std::move(declaredType)});
 }
 
 void addDefinition(Environment& environment,
                    std::string name,
+                   std::vector<std::string> universeParameters,
                    ExpressionPointer declaredType,
                    ExpressionPointer body) {
     if (environment.declarations.count(name)) {
@@ -627,7 +725,8 @@ void addDefinition(Environment& environment,
     }
     environment.declarations.emplace(
         std::move(name),
-        Definition{std::move(declaredType), std::move(body)});
+        Definition{std::move(universeParameters),
+                   std::move(declaredType), std::move(body)});
 }
 
 namespace {
@@ -743,6 +842,7 @@ ExpressionPointer buildRecursorType(
 } // namespace
 
 void addInductive(Environment& environment, std::string inductiveName,
+                  std::vector<std::string> universeParameters,
                   ExpressionPointer kind,
                   std::vector<ConstructorSpec> constructors) {
     if (environment.declarations.count(inductiveName)) {
@@ -768,7 +868,8 @@ void addInductive(Environment& environment, std::string inductiveName,
         constructorNames.push_back(constructor.name);
     }
     environment.declarations.emplace(
-        inductiveName, Inductive{kind, constructorNames});
+        inductiveName,
+        Inductive{universeParameters, kind, constructorNames});
 
     // A small lambda that rolls back partial registration on error.
     auto rollback = [&]() {
@@ -802,7 +903,7 @@ void addInductive(Environment& environment, std::string inductiveName,
         }
         environment.declarations.emplace(
             constructor.name,
-            Constructor{inductiveName, i, constructor.type});
+            Constructor{universeParameters, inductiveName, i, constructor.type});
     }
 
     // Generate and register the recursor.
@@ -827,5 +928,6 @@ void addInductive(Environment& environment, std::string inductiveName,
     }
     environment.declarations.emplace(
         recursorName,
-        Recursor{inductiveName, recursorType, (int)constructors.size()});
+        Recursor{std::move(universeParameters), inductiveName, recursorType,
+                 (int)constructors.size()});
 }

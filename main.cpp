@@ -63,7 +63,9 @@ void runCoreTests() {
     for (int level = 0; level < 3; ++level) {
         auto inferredType = inferType(environment, {}, makeSort(level));
         auto* sort = std::get_if<Sort>(&inferredType->node);
-        EXPECT_TRUE(sort != nullptr && sort->universeLevel == level + 1);
+        EXPECT_TRUE(sort != nullptr &&
+                    levelAsConstant(sort->level) &&
+                    *levelAsConstant(sort->level) == level + 1);
     }
 
     EXPECT_THROW(inferType(environment, {}, makeFreeVariable("nope")));
@@ -125,22 +127,24 @@ Environment buildArithmeticEnvironment() {
             makePi("n", makeConstant("Natural"), makeConstant("Natural"))},
     });
 
-    // Equality : Π(A : Type 0). Π(x : A). Π(y : A). Prop
-    // de Bruijn:  Π(Type 0). Π(@0). Π(@1). Prop
-    addAxiom(environment, "Equality",
-        makePi("A", makeType(0),
+    // Equality.{u} : Π(A : Type u). Π(x : A). Π(y : A). Prop
+    // Universe-polymorphic in u, so the same Equality works at any
+    // universe level.
+    addAxiom(environment, "Equality", {"u"},
+        makePi("A", makeType(makeLevelParam("u")),
           makePi("x", makeBoundVariable(0),
             makePi("y", makeBoundVariable(1),
               makeProp()))));
 
-    // reflexivity : Π(A : Type 0). Π(x : A). Equality A x x
-    // de Bruijn:    Π(Type 0). Π(@0). Equality @1 @0 @0
-    addAxiom(environment, "reflexivity",
-        makePi("A", makeType(0),
+    // reflexivity.{u} : Π(A : Type u). Π(x : A). Equality.{u} A x x
+    addAxiom(environment, "reflexivity", {"u"},
+        makePi("A", makeType(makeLevelParam("u")),
           makePi("x", makeBoundVariable(0),
             makeApplication(
               makeApplication(
-                makeApplication(makeConstant("Equality"), makeBoundVariable(1)),
+                makeApplication(
+                    makeConstant("Equality", {makeLevelParam("u")}),
+                    makeBoundVariable(1)),
                 makeBoundVariable(0)),
               makeBoundVariable(0)))));
 
@@ -239,12 +243,12 @@ void runEnvironmentTests(const Environment& environment) {
     // reflexivity Natural zero : Equality Natural zero zero  — a real proof.
     {
         auto proof = makeApplication(
-            makeApplication(makeConstant("reflexivity"), makeConstant("Natural")),
+            makeApplication(makeConstant("reflexivity", {makeLevelConst(0)}), makeConstant("Natural")),
             makeConstant("zero"));
         auto inferredType = inferType(environment, {}, proof);
         auto expected = makeApplication(
             makeApplication(
-                makeApplication(makeConstant("Equality"), makeConstant("Natural")),
+                makeApplication(makeConstant("Equality", {makeLevelConst(0)}), makeConstant("Natural")),
                 makeConstant("zero")),
             makeConstant("zero"));
         EXPECT_TRUE(isDefinitionallyEqual(environment, {}, inferredType, expected));
@@ -273,7 +277,7 @@ void runEnvironmentTests(const Environment& environment) {
     {
         auto overApplied = makeApplication(
             makeApplication(
-                makeApplication(makeConstant("reflexivity"), makeConstant("Natural")),
+                makeApplication(makeConstant("reflexivity", {makeLevelConst(0)}), makeConstant("Natural")),
                 makeConstant("zero")),
             makeConstant("one"));
         EXPECT_THROW(inferType(environment, {}, overApplied));
@@ -293,7 +297,7 @@ void runEnvironmentTests(const Environment& environment) {
         EXPECT_THROW(addDefinition(
             localEnvironment, "bad", makeConstant("Natural"),
             makeApplication(
-                makeApplication(makeConstant("reflexivity"),
+                makeApplication(makeConstant("reflexivity", {makeLevelConst(0)}),
                                 makeConstant("Natural")),
                 makeConstant("zero"))));
     }
@@ -323,7 +327,7 @@ void runEnvironmentTests(const Environment& environment) {
         auto bogusLet = makeLet(
             "n", makeConstant("Natural"),
             makeApplication(
-                makeApplication(makeConstant("reflexivity"),
+                makeApplication(makeConstant("reflexivity", {makeLevelConst(0)}),
                                 makeConstant("Natural")),
                 makeConstant("zero")),
             makeConstant("zero"));
@@ -354,12 +358,14 @@ void runEnvironmentTests(const Environment& environment) {
     //   reflexivity : ∀(A : Type 0). ∀(x : A). Equality A x x   : Prop
     {
         auto reflexivityType =
-            inferType(environment, {}, makeConstant("reflexivity"));
+            inferType(environment, {}, makeConstant("reflexivity", {makeLevelConst(0)}));
         auto reflexivityKind =
             weakHeadNormalForm(environment,
                                inferType(environment, {}, reflexivityType));
         auto* sort = std::get_if<Sort>(&reflexivityKind->node);
-        EXPECT_TRUE(sort != nullptr && sort->universeLevel == 0);
+        EXPECT_TRUE(sort != nullptr &&
+                    levelAsConstant(sort->level) &&
+                    *levelAsConstant(sort->level) == 0);
     }
 
     // Π(P : Prop). P — quantifying over all propositions, itself a Prop.
@@ -371,7 +377,9 @@ void runEnvironmentTests(const Environment& environment) {
         auto kind = weakHeadNormalForm(environment,
                                        inferType(environment, {}, term));
         auto* sort = std::get_if<Sort>(&kind->node);
-        EXPECT_TRUE(sort != nullptr && sort->universeLevel == 0);  // Prop
+        EXPECT_TRUE(sort != nullptr &&
+                    levelAsConstant(sort->level) &&
+                    *levelAsConstant(sort->level) == 0);  // Prop
     }
 
     // Π(_ : Prop). Prop is NOT in Prop — its codomain is the *type* Prop
@@ -381,7 +389,9 @@ void runEnvironmentTests(const Environment& environment) {
         auto kind = weakHeadNormalForm(environment,
                                        inferType(environment, {}, term));
         auto* sort = std::get_if<Sort>(&kind->node);
-        EXPECT_TRUE(sort != nullptr && sort->universeLevel == 1);  // Type 0
+        EXPECT_TRUE(sort != nullptr &&
+                    levelAsConstant(sort->level) &&
+                    *levelAsConstant(sort->level) == 1);  // Type 0
     }
 
     // Π(_ : Type 0). Type 0 lives in Type 1.
@@ -390,7 +400,9 @@ void runEnvironmentTests(const Environment& environment) {
         auto kind = weakHeadNormalForm(environment,
                                        inferType(environment, {}, term));
         auto* sort = std::get_if<Sort>(&kind->node);
-        EXPECT_TRUE(sort != nullptr && sort->universeLevel == 2);  // Type 1
+        EXPECT_TRUE(sort != nullptr &&
+                    levelAsConstant(sort->level) &&
+                    *levelAsConstant(sort->level) == 2);  // Type 1
     }
 
     // Universe cumulativity: a function expecting Type 1 accepts a Type 0
@@ -434,7 +446,7 @@ void runEnvironmentTests(const Environment& environment) {
     {
         auto propositionType = makeApplication(
             makeApplication(
-                makeApplication(makeConstant("Equality"),
+                makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
                                 makeConstant("Natural")),
                 makeConstant("zero")),
             makeConstant("zero"));
@@ -517,6 +529,64 @@ void runEnvironmentTests(const Environment& environment) {
         EXPECT_TRUE(isDefinitionallyEqual(environment, {},
                                           addZero, identity));
     }
+
+    // Universe polymorphism. Equality.{u} can be instantiated at any
+    // universe; at Type 0 it asserts equality of small values, at Type 1
+    // it asserts equality of Types. Reflexivity proves both.
+    {
+        // Equality.{0} Natural zero zero  : Prop
+        auto small = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
+                                makeConstant("Natural")),
+                makeConstant("zero")),
+            makeConstant("zero"));
+        auto smallKind = weakHeadNormalForm(
+            environment, inferType(environment, {}, small));
+        auto* smallSort = std::get_if<Sort>(&smallKind->node);
+        EXPECT_TRUE(smallSort && levelAsConstant(smallSort->level) &&
+                    *levelAsConstant(smallSort->level) == 0);
+
+        // Equality.{1} (Type 0) Natural Natural  : Prop
+        // (Natural : Type 0, so we're stating that the type Natural equals
+        // itself.) Lives in Prop just like Equality.{0} — propositions are
+        // always in Prop regardless of u.
+        auto big = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant("Equality", {makeLevelConst(1)}),
+                                makeType(0)),
+                makeConstant("Natural")),
+            makeConstant("Natural"));
+        auto bigKind = weakHeadNormalForm(
+            environment, inferType(environment, {}, big));
+        auto* bigSort = std::get_if<Sort>(&bigKind->node);
+        EXPECT_TRUE(bigSort && levelAsConstant(bigSort->level) &&
+                    *levelAsConstant(bigSort->level) == 0);
+    }
+
+    // reflexivity.{1} (Type 0) Natural  :  Equality.{1} (Type 0) Natural Natural
+    {
+        auto proof = makeApplication(
+            makeApplication(makeConstant("reflexivity", {makeLevelConst(1)}),
+                            makeType(0)),
+            makeConstant("Natural"));
+        auto inferredType = inferType(environment, {}, proof);
+        auto expected = makeApplication(
+            makeApplication(
+                makeApplication(makeConstant("Equality", {makeLevelConst(1)}),
+                                makeType(0)),
+                makeConstant("Natural")),
+            makeConstant("Natural"));
+        EXPECT_TRUE(isDefinitionallyEqual(environment, {},
+                                          inferredType, expected));
+    }
+
+    // Mismatched universe arity is rejected: Equality declares one universe
+    // parameter, so supplying zero arguments must throw.
+    {
+        EXPECT_THROW(
+            inferType(environment, {}, makeConstant("Equality")));
+    }
 }
 
 } // namespace
@@ -566,13 +636,13 @@ int main() {
     runExample(arithmetic,
                "reflexivity Natural zero  -- a proof that zero = zero",
                makeApplication(
-                   makeApplication(makeConstant("reflexivity"),
+                   makeApplication(makeConstant("reflexivity", {makeLevelConst(0)}),
                                    makeConstant("Natural")),
                    makeConstant("zero")));
 
     runExample(arithmetic,
                "reflexivity Natural  -- partially applied; codomain depends on A",
-               makeApplication(makeConstant("reflexivity"),
+               makeApplication(makeConstant("reflexivity", {makeLevelConst(0)}),
                                makeConstant("Natural")));
 
     runExample(arithmetic,
@@ -589,7 +659,7 @@ int main() {
 
     runExample(arithmetic, "Prop", makeProp());
     runExample(arithmetic, "Equality (now lands in Prop)",
-               makeConstant("Equality"));
+               makeConstant("Equality", {makeLevelConst(0)}));
     runExample(arithmetic,
                "Π(P : Prop). P   (impredicative quantifier; lives in Prop)",
                makePi("P", makeProp(), makeBoundVariable(0)));
@@ -609,6 +679,18 @@ int main() {
                                        makeConstant("zero"))),
                    makeApplication(makeConstant("successor"),
                                    makeConstant("zero"))));
+
+    runExample(arithmetic,
+               "Equality (universe-polymorphic)",
+               makeConstant("Equality", {makeLevelParam("u")}));
+
+    runExample(arithmetic,
+               "reflexivity.{1} (Type 0) Natural  -- proof at a higher universe",
+               makeApplication(
+                   makeApplication(
+                       makeConstant("reflexivity", {makeLevelConst(1)}),
+                       makeType(0)),
+                   makeConstant("Natural")));
 
     runCoreTests();
     runEnvironmentTests(arithmetic);

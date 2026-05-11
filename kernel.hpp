@@ -31,14 +31,23 @@ using Context = std::vector<ContextEntry>;
 //   Recursor    — the auto-generated eliminator for an inductive. Stuck on
 //                 its own, but iota-reduces when fully applied with the
 //                 final argument being a constructor application.
-struct Axiom       { ExpressionPointer type; };
-struct Definition  { ExpressionPointer type; ExpressionPointer body; };
-struct Inductive   { ExpressionPointer kind;
+// Each declaration carries the universe parameter names it abstracts over.
+// At a Constant use site, the caller supplies a matching list of Level
+// arguments; inferType substitutes those into the declaration's type.
+// Most declarations in everyday use have no parameters (empty vector).
+struct Axiom       { std::vector<std::string> universeParameters;
+                     ExpressionPointer type; };
+struct Definition  { std::vector<std::string> universeParameters;
+                     ExpressionPointer type; ExpressionPointer body; };
+struct Inductive   { std::vector<std::string> universeParameters;
+                     ExpressionPointer kind;
                      std::vector<std::string> constructorNames; };
-struct Constructor { std::string inductiveName;
+struct Constructor { std::vector<std::string> universeParameters;
+                     std::string inductiveName;
                      int constructorIndex;
                      ExpressionPointer type; };
-struct Recursor    { std::string inductiveName;
+struct Recursor    { std::vector<std::string> universeParameters;
+                     std::string inductiveName;
                      ExpressionPointer type;
                      int numConstructors; };
 
@@ -56,13 +65,29 @@ struct Environment {
 
 // Type-checks `declaredType` (it must itself be a type) and adds an axiom
 // to `environment`. Throws TypeError on name collision or ill-formed type.
+// `universeParameters` are the names of the level parameters this axiom
+// abstracts over; pass {} for a non-polymorphic axiom.
 void addAxiom(Environment& environment, std::string name,
+              std::vector<std::string> universeParameters,
               ExpressionPointer declaredType);
+
+inline void addAxiom(Environment& environment, std::string name,
+                     ExpressionPointer declaredType) {
+    addAxiom(environment, std::move(name), {}, std::move(declaredType));
+}
 
 // Type-checks both `declaredType` and `body`, requires they agree
 // definitionally, and adds the definition to `environment`.
 void addDefinition(Environment& environment, std::string name,
+                   std::vector<std::string> universeParameters,
                    ExpressionPointer declaredType, ExpressionPointer body);
+
+inline void addDefinition(Environment& environment, std::string name,
+                          ExpressionPointer declaredType,
+                          ExpressionPointer body) {
+    addDefinition(environment, std::move(name), {},
+                  std::move(declaredType), std::move(body));
+}
 
 // A constructor specification supplied to addInductive: the constructor's
 // name and its declared type (a Pi-prefix ending in the inductive being
@@ -80,8 +105,16 @@ struct ConstructorSpec {
 // (no nested or higher-order recursion). Strict positivity is the user's
 // responsibility; the kernel does not check it yet.
 void addInductive(Environment& environment, std::string inductiveName,
+                  std::vector<std::string> universeParameters,
                   ExpressionPointer kind,
                   std::vector<ConstructorSpec> constructors);
+
+inline void addInductive(Environment& environment, std::string inductiveName,
+                         ExpressionPointer kind,
+                         std::vector<ConstructorSpec> constructors) {
+    addInductive(environment, std::move(inductiveName), {},
+                 std::move(kind), std::move(constructors));
+}
 
 // Adds `amount` to every BoundVariable whose index is at least `cutoff`.
 // Used to keep indices coherent when a term crosses additional binders.
