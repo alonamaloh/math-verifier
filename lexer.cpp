@@ -286,7 +286,6 @@ bool isKeyword(TokenKind kind) {
         case TokenKind::KeywordHypothesis:
         case TokenKind::KeywordApply:
         case TokenKind::KeywordReduction:
-        case TokenKind::KeywordCongruenceOf:
         case TokenKind::KeywordMotive:
         case TokenKind::KeywordTarget:
             return true;
@@ -328,7 +327,6 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::KeywordHypothesis:    return "'hypothesis'";
         case TokenKind::KeywordApply:         return "'apply'";
         case TokenKind::KeywordReduction:     return "'reduction'";
-        case TokenKind::KeywordCongruenceOf:  return "'congruenceOf'";
         case TokenKind::KeywordMotive:        return "'motive'";
         case TokenKind::KeywordTarget:        return "'target'";
         case TokenKind::LeftParen:            return "'('";

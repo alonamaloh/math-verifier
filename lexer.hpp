@@ -27,7 +27,7 @@ enum class TokenKind {
     KeywordHave, KeywordShow, KeywordCalc, KeywordBy,
     KeywordInduction, KeywordOn,
     KeywordCase, KeywordOf, KeywordWith, KeywordHypothesis,
-    KeywordApply, KeywordReduction, KeywordCongruenceOf,
+    KeywordApply, KeywordReduction,
     KeywordMotive, KeywordTarget,
 
     // Punctuation
