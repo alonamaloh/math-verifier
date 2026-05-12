@@ -1276,6 +1276,97 @@ private:
                         }
                     }
                 }
+                // Leading-argument inference for under-applied calls to
+                // an Axiom or Definition (Theorem). When the user
+                // supplies STRICTLY FEWER value arguments than the
+                // declaration's total Pi count and an expectedType is
+                // available, try to fill in the missing leading args
+                // by backward-forward unification — the same machinery
+                // constructor parameter inference uses.
+                //
+                // Engages only when:
+                //   * argumentCount is between 1 and totalPiCount-1,
+                //   * expectedType is non-null,
+                //   * the declaration has no universe parameters OR
+                //     the user supplied an explicit `.{...}` list of
+                //     the right arity.
+                // If inference cannot resolve every leading metavariable
+                // we fall through to the partial-application path so the
+                // user can still partially apply explicitly.
+                if (!isCurrentDeclaration
+                    && environmentDeclaration
+                    && expectedType
+                    && argumentCount > 0) {
+                    ExpressionPointer declarationKernelType;
+                    const std::vector<std::string>* declarationUniverseParams
+                        = nullptr;
+                    if (auto* axiom =
+                            std::get_if<Axiom>(environmentDeclaration)) {
+                        declarationKernelType = axiom->type;
+                        declarationUniverseParams = &axiom->universeParameters;
+                    } else if (auto* definition =
+                                   std::get_if<Definition>(
+                                       environmentDeclaration)) {
+                        declarationKernelType = definition->type;
+                        declarationUniverseParams =
+                            &definition->universeParameters;
+                    }
+                    if (declarationKernelType) {
+                        int totalPiCount =
+                            countLeadingPis(declarationKernelType);
+                        int numLeadingToInfer =
+                            totalPiCount - static_cast<int>(argumentCount);
+                        bool universesOk =
+                            declarationUniverseParams->empty()
+                            || (headIdentifier->universeArgs.size()
+                                == declarationUniverseParams->size());
+                        if (numLeadingToInfer > 0 && universesOk) {
+                            try {
+                                std::vector<LevelPointer> universeArguments;
+                                if (!headIdentifier->universeArgs.empty()) {
+                                    for (const auto& level :
+                                         headIdentifier->universeArgs) {
+                                        universeArguments.push_back(
+                                            elaborateLevel(*level));
+                                    }
+                                }
+                                ExpressionPointer instantiated =
+                                    substituteUniverseLevels(
+                                        declarationKernelType,
+                                        *declarationUniverseParams,
+                                        universeArguments);
+                                CallInferenceResult inferred =
+                                    inferLeadingArguments(
+                                        name, instantiated,
+                                        numLeadingToInfer,
+                                        application->arguments,
+                                        localBinders, expectedType,
+                                        "_callLeadingArgument_",
+                                        expression.line);
+                                ExpressionPointer head = makeConstant(
+                                    name, universeArguments);
+                                for (auto& leadingValue :
+                                     inferred.leadingValues) {
+                                    head = makeApplication(
+                                        std::move(head),
+                                        std::move(leadingValue));
+                                }
+                                for (auto& trailingValue :
+                                     inferred.trailingValues) {
+                                    head = makeApplication(
+                                        std::move(head),
+                                        std::move(trailingValue));
+                                }
+                                return head;
+                            } catch (const ElaborateError&) {
+                                // Inference failed — fall through to the
+                                // partial-application path. Users can
+                                // still partially apply explicitly when
+                                // they want to.
+                            }
+                        }
+                    }
+                }
                 // Stage 2 universe inference: if the head is a polymorphic
                 // constant called without explicit `.{...}`, infer the
                 // universe arguments by unifying the value arguments'
@@ -1922,121 +2013,160 @@ private:
     // (b) if any parameters remain unassigned and an expectedType is
     // provided, unifying the constructor's result type against
     // expectedType.
-    ExpressionPointer elaborateConstructorCallInferringParameters(
-        const Constructor& constructor,
-        const Inductive& inductive,
-        const std::vector<SurfaceExpressionPointer>& valueArgumentsSurface,
-        const std::vector<LevelPointer>& universeArguments,
+    // Generalised leading-argument inference. Takes a declaration's
+    // (universe-substituted) type, the count of leading Pis to treat as
+    // inferable metavariables, and the user-supplied trailing arguments.
+    // Returns a vector of inferred kernel terms for the leading positions
+    // (in declaration order) plus a vector of elaborated trailing args.
+    //
+    // The unification machinery is shared with constructor parameter
+    // inference: open the leading Pis as Internal-origin FreeVariables,
+    // backward-unify the result type against `expectedType` if available,
+    // then elaborate each trailing arg in order and unify its inferred
+    // type against the Pi domain (with previously-resolved metavariables
+    // substituted).
+    struct CallInferenceResult {
+        std::vector<ExpressionPointer> leadingValues;     // inferred
+        std::vector<ExpressionPointer> trailingValues;    // user args
+    };
+    CallInferenceResult inferLeadingArguments(
+        const std::string& diagnosticName,
+        ExpressionPointer instantiatedDeclarationType,
+        int numLeadingToInfer,
+        const std::vector<SurfaceExpressionPointer>& trailingArgumentsSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
+        const std::string& metavariablePrefix,
         int line) {
 
-        int parameterCount = inductive.numParameters;
-
-        // Instantiate universe parameters in the constructor's type.
-        ExpressionPointer constructorType = substituteUniverseLevels(
-            constructor.type, constructor.universeParameters,
-            universeArguments);
-
-        // Open each parameter Pi with an Internal-origin FreeVariable
+        // Open each leading Pi with an Internal-origin FreeVariable
         // serving as a metavariable.
-        std::vector<std::string> parameterFreshNames;
+        std::vector<std::string> leadingFreshNames;
         std::set<std::string> metavariableNames;
-        ExpressionPointer cursor = constructorType;
-        for (int i = 0; i < parameterCount; ++i) {
+        ExpressionPointer cursor = instantiatedDeclarationType;
+        for (int i = 0; i < numLeadingToInfer; ++i) {
             auto* pi = std::get_if<Pi>(&cursor->node);
             if (!pi) {
                 throw ElaborateError(
-                    "internal: constructor '" + constructor.inductiveName
-                    + "' has fewer parameter Pis than expected (line "
+                    "internal: declaration '" + diagnosticName
+                    + "' has fewer leading Pis than expected (line "
                     + std::to_string(line) + ")");
             }
             std::string fresh =
-                "_constructorParameter_" + std::to_string(i) + "_"
-                + constructor.inductiveName;
-            parameterFreshNames.push_back(fresh);
+                metavariablePrefix + std::to_string(i) + "_"
+                + diagnosticName;
+            leadingFreshNames.push_back(fresh);
             metavariableNames.insert(fresh);
             cursor = openBinder(pi->codomain, fresh,
                                  FreeVariableOrigin::Internal);
         }
 
-        // Backward inference FIRST, before elaborating value args. We
-        // compute the constructor's result type by opening every
-        // value-arg Pi as well (with Internal FreeVars distinct from
-        // the parameter metavariables), then unify against
-        // `expectedType` if it was supplied. This lets the value-arg
-        // elaborations below see fully-resolved expected domain types,
-        // which is essential for under-applied nested constructor
-        // calls (e.g. `Or.introduceRight(Exists.introduce(...))` —
-        // without backward-first, the inner Exists.introduce would
-        // try and fail to infer A and P from a higher-order context).
+        // Backward inference FIRST, before elaborating trailing args.
+        // Open every trailing-arg Pi as well (with Internal FreeVars
+        // distinct from the leading metavariables), then unify the
+        // result against `expectedType` if it was supplied. This lets
+        // the trailing-arg elaborations below see fully-resolved
+        // expected domain types, which is essential for nested
+        // under-applied calls.
         std::map<std::string, ExpressionPointer> assignment;
         if (expectedType) {
             ExpressionPointer resultProbe = cursor;
-            for (size_t j = 0; j < valueArgumentsSurface.size(); ++j) {
+            for (size_t j = 0;
+                 j < trailingArgumentsSurface.size(); ++j) {
                 auto* pi = std::get_if<Pi>(&resultProbe->node);
                 if (!pi) break;
-                std::string valueArgumentFresh =
-                    "_constructorValueArgument_" + std::to_string(j);
+                std::string trailingArgumentFresh =
+                    "_callTrailingArgument_" + std::to_string(j);
                 resultProbe = openBinder(pi->codomain,
-                                          valueArgumentFresh,
+                                          trailingArgumentFresh,
                                           FreeVariableOrigin::Internal);
             }
-            ExpressionPointer expectedTypeNormalised =
-                weakHeadNormalForm(environment_, expectedType);
-            unifyConstructorParameters(resultProbe,
-                                          expectedTypeNormalised,
+            // Structural match first, without unfolding. Works when
+            // both sides share the same head.
+            unifyConstructorParameters(resultProbe, expectedType,
                                           metavariableNames, assignment);
+            // If anything's still unassigned, WHNF both sides and try
+            // again. This handles Definition-headed types (e.g.
+            // `Natural.divides(_, _)`) by unfolding them to their
+            // underlying structure (`Exists(...)`) — metavariables
+            // pushed under Lambda binders are now safe to assign,
+            // because the unifier shifts them back to the outer scope.
+            bool anyLeftUnassigned = false;
+            for (const auto& name : leadingFreshNames) {
+                if (!assignment.count(name)) {
+                    anyLeftUnassigned = true; break;
+                }
+            }
+            if (anyLeftUnassigned) {
+                ExpressionPointer expectedTypeNormalised =
+                    weakHeadNormalForm(environment_, expectedType);
+                ExpressionPointer resultProbeNormalised =
+                    weakHeadNormalForm(environment_, resultProbe);
+                unifyConstructorParameters(resultProbeNormalised,
+                                              expectedTypeNormalised,
+                                              metavariableNames, assignment);
+            }
         }
 
-        // Walk value-arg Pis. For each, elaborate the corresponding
+        // Walk trailing-arg Pis. For each, elaborate the corresponding
         // surface argument, infer its kernel type, and unify the
-        // (parameter-substituted) Pi domain against the inferred type
-        // to fill in any parameters that backward inference didn't
-        // resolve. Then move on to the next Pi by opening it with an
-        // Internal-origin FreeVariable.
-        std::vector<ExpressionPointer> elaboratedValueArguments;
-        for (size_t j = 0; j < valueArgumentsSurface.size(); ++j) {
+        // (metavariable-substituted) Pi domain against the inferred
+        // type to fill in any leading values that backward inference
+        // didn't resolve. Then descend through the Pi.
+        std::vector<ExpressionPointer> elaboratedTrailingArguments;
+        for (size_t j = 0; j < trailingArgumentsSurface.size(); ++j) {
             auto* pi = std::get_if<Pi>(&cursor->node);
             if (!pi) {
                 throw ElaborateError(
-                    "constructor '" + constructor.inductiveName
-                    + "': too many value arguments at line "
+                    "call to '" + diagnosticName
+                    + "': too many arguments at line "
                     + std::to_string(line));
             }
             ExpressionPointer expectedDomain =
                 substituteFreeVariables(pi->domain, assignment);
-            // Pass expectedDomain as the expected type for the value
-            // argument's own elaboration (so nested under-applied
-            // constructors there can do their own parameter inference).
-            ExpressionPointer kernelValueArgument = elaborateExpression(
-                *valueArgumentsSurface[j], localBinders, expectedDomain);
-            // inferTypeInLocalContext opens local binders into
-            // Internal-origin FreeVariables; close them back so the
-            // captured assignment lives in the original local-binder
-            // context (with BoundVariable references).
+            ExpressionPointer kernelTrailingArgument = elaborateExpression(
+                *trailingArgumentsSurface[j], localBinders,
+                expectedDomain);
             ExpressionPointer inferredArgumentType =
                 weakHeadNormalForm(environment_,
                     inferTypeInLocalContext(
-                        localBinders, kernelValueArgument));
+                        localBinders, kernelTrailingArgument));
             inferredArgumentType = closeOverLocalBinders(
                 inferredArgumentType, localBinders,
                 localBinders.size());
+            // Structural attempt first; WHNF both sides as fallback
+            // for Definition-headed mismatches.
             unifyConstructorParameters(expectedDomain,
                                           inferredArgumentType,
                                           metavariableNames, assignment);
-            elaboratedValueArguments.push_back(kernelValueArgument);
-            std::string valueArgumentFresh =
-                "_constructorValueArgument_" + std::to_string(j);
-            cursor = openBinder(pi->codomain, valueArgumentFresh,
+            bool anyLeftUnassigned = false;
+            for (const auto& name : leadingFreshNames) {
+                if (!assignment.count(name)) {
+                    anyLeftUnassigned = true; break;
+                }
+            }
+            if (anyLeftUnassigned) {
+                ExpressionPointer expectedDomainNormalised =
+                    weakHeadNormalForm(environment_, expectedDomain);
+                ExpressionPointer inferredArgumentTypeRenormalised =
+                    weakHeadNormalForm(environment_,
+                                        inferredArgumentType);
+                unifyConstructorParameters(expectedDomainNormalised,
+                                              inferredArgumentTypeRenormalised,
+                                              metavariableNames, assignment);
+            }
+            elaboratedTrailingArguments.push_back(kernelTrailingArgument);
+            std::string trailingArgumentFresh =
+                "_callTrailingArgument_" + std::to_string(j);
+            cursor = openBinder(pi->codomain, trailingArgumentFresh,
                                  FreeVariableOrigin::Internal);
         }
 
-        // If any parameter still remains unassigned after forward
-        // inference, try one more backward unification (now using
-        // forward-derived value-arg info if relevant).
+        // If any leading value still remains unassigned after forward
+        // inference, retry the backward unification (now potentially
+        // using newly-derived information).
         bool anyUnassigned = false;
-        for (const auto& name : parameterFreshNames) {
+        for (const auto& name : leadingFreshNames) {
             if (!assignment.count(name)) { anyUnassigned = true; break; }
         }
         if (anyUnassigned && expectedType) {
@@ -2049,33 +2179,56 @@ private:
                                           metavariableNames, assignment);
         }
 
-        // Assemble the inferred parameter values in declaration order.
-        std::vector<ExpressionPointer> parameterValues;
-        for (const auto& name : parameterFreshNames) {
+        CallInferenceResult result;
+        for (const auto& name : leadingFreshNames) {
             auto iterator = assignment.find(name);
             if (iterator == assignment.end()) {
                 throw ElaborateError(
-                    "cannot infer constructor parameter for '"
-                    + constructor.inductiveName
+                    "cannot infer leading argument for '"
+                    + diagnosticName
                     + "' at line " + std::to_string(line)
-                    + "; supply parameters explicitly");
+                    + "; supply it explicitly");
             }
-            parameterValues.push_back(iterator->second);
+            result.leadingValues.push_back(iterator->second);
         }
+        result.trailingValues = std::move(elaboratedTrailingArguments);
+        return result;
+    }
 
-        // Build the constructor application:
-        // <Constructor>.{universeArgs}(<paramValues>, <valueArgs>).
-        // Constructor's name is obtained via its index into the
-        // inductive's constructorNames.
+    // Constructor-specific wrapper around `inferLeadingArguments`. Handles
+    // the universe-argument plumbing and assembles the final constructor
+    // application.
+    ExpressionPointer elaborateConstructorCallInferringParameters(
+        const Constructor& constructor,
+        const Inductive& inductive,
+        const std::vector<SurfaceExpressionPointer>& valueArgumentsSurface,
+        const std::vector<LevelPointer>& universeArguments,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line) {
+
+        ExpressionPointer constructorType = substituteUniverseLevels(
+            constructor.type, constructor.universeParameters,
+            universeArguments);
+        CallInferenceResult inferred = inferLeadingArguments(
+            constructor.inductiveName,
+            constructorType,
+            inductive.numParameters,
+            valueArgumentsSurface,
+            localBinders,
+            expectedType,
+            "_constructorParameter_",
+            line);
+
         const std::string& constructorName =
             inductive.constructorNames[constructor.constructorIndex];
         ExpressionPointer head = makeConstant(constructorName,
                                                universeArguments);
-        for (auto& parameterValue : parameterValues) {
+        for (auto& parameterValue : inferred.leadingValues) {
             head = makeApplication(std::move(head),
                                     std::move(parameterValue));
         }
-        for (auto& valueArgument : elaboratedValueArguments) {
+        for (auto& valueArgument : inferred.trailingValues) {
             head = makeApplication(std::move(head),
                                     std::move(valueArgument));
         }
@@ -2643,20 +2796,29 @@ private:
     }
 
     // Returns true if `expression` contains an Internal-origin
-    // FreeVariable whose name starts with `_constructorValueArgument_`.
-    // Used to filter out backward-inference candidates whose target
-    // refers to a value-arg placeholder we opened during the result-
-    // type probe — those placeholders aren't substituted away later,
-    // so they'd leak into the assembled kernel term.
+    // FreeVariable whose name starts with `_constructorValueArgument_`
+    // or `_callTrailingArgument_` — both are trailing-arg placeholders
+    // opened during the backward-inference result-type probe. Targets
+    // that mention any such placeholder aren't substituted away later
+    // and would leak into the assembled kernel term, so the unifier
+    // rejects them.
     bool containsValueArgumentFreeVar(ExpressionPointer expression) {
         if (auto* freeVariable =
                 std::get_if<FreeVariable>(&expression->node)) {
             const std::string& name = freeVariable->name;
-            const std::string prefix = "_constructorValueArgument_";
-            if (freeVariable->origin == FreeVariableOrigin::Internal
-                && name.size() >= prefix.size()
-                && name.compare(0, prefix.size(), prefix) == 0) {
-                return true;
+            if (freeVariable->origin != FreeVariableOrigin::Internal) {
+                return false;
+            }
+            static const char* placeholderPrefixes[] = {
+                "_constructorValueArgument_",
+                "_callTrailingArgument_",
+            };
+            for (const char* prefix : placeholderPrefixes) {
+                size_t length = std::char_traits<char>::length(prefix);
+                if (name.size() >= length
+                    && name.compare(0, length, prefix) == 0) {
+                    return true;
+                }
             }
             return false;
         }
@@ -2690,6 +2852,42 @@ private:
     // For the common cases (parameters appearing at the top level of
     // value-arg domains or as direct args of the result type's
     // applications), this is sufficient.
+    // Walks a term and returns true if it references any BoundVariable
+    // whose index is < threshold (i.e. it captures a binder we
+    // descended into). Used to gate metavariable assignment under
+    // binders: we can lift target up to the outer scope only when no
+    // such "captured" references are present.
+    bool referencesBoundBelowThreshold(ExpressionPointer expression,
+                                        int threshold,
+                                        int currentDepth = 0) {
+        if (auto* boundVariable =
+                std::get_if<BoundVariable>(&expression->node)) {
+            int effectiveIndex =
+                boundVariable->deBruijnIndex - currentDepth;
+            return effectiveIndex >= 0 && effectiveIndex < threshold;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return referencesBoundBelowThreshold(pi->domain, threshold,
+                                                  currentDepth)
+                || referencesBoundBelowThreshold(pi->codomain, threshold,
+                                                  currentDepth + 1);
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return referencesBoundBelowThreshold(lambda->domain, threshold,
+                                                  currentDepth)
+                || referencesBoundBelowThreshold(lambda->body, threshold,
+                                                  currentDepth + 1);
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return referencesBoundBelowThreshold(
+                       application->function, threshold, currentDepth)
+                || referencesBoundBelowThreshold(
+                       application->argument, threshold, currentDepth);
+        }
+        return false;
+    }
+
     void unifyConstructorParameters(
         ExpressionPointer pattern,
         ExpressionPointer target,
@@ -2698,11 +2896,17 @@ private:
         int binderDepth = 0) {
         if (auto* freeVariable =
                 std::get_if<FreeVariable>(&pattern->node)) {
-            if (binderDepth == 0
-                && metavariableNames.count(freeVariable->name)
+            if (metavariableNames.count(freeVariable->name)
                 && !assignment.count(freeVariable->name)
-                && !containsValueArgumentFreeVar(target)) {
-                assignment[freeVariable->name] = target;
+                && !containsValueArgumentFreeVar(target)
+                && !referencesBoundBelowThreshold(target, binderDepth)) {
+                // Lift the target up to the outer scope by shifting it
+                // down by `binderDepth`. Safe because we just verified
+                // the target has no references that would be captured.
+                ExpressionPointer lifted = binderDepth == 0
+                    ? target
+                    : shift(target, -binderDepth);
+                assignment[freeVariable->name] = lifted;
             }
             return;
         }
@@ -2733,24 +2937,35 @@ private:
         if (auto* patternApplication =
                 std::get_if<Application>(&pattern->node)) {
             // Skip unification when the function head is a metavariable:
-            // that's a higher-order unification problem (the metavariable
-            // could match many target functions/args), and our simple
-            // structural matcher can't pick the right answer. Backward
-            // inference via expectedType handles these cases more
-            // reliably.
-            ExpressionPointer functionHead = patternApplication->function;
+            // higher-order unification, our structural matcher can't
+            // pick the right answer.
+            ExpressionPointer patternHead = patternApplication->function;
             while (auto* nestedApp =
-                       std::get_if<Application>(&functionHead->node)) {
-                functionHead = nestedApp->function;
+                       std::get_if<Application>(&patternHead->node)) {
+                patternHead = nestedApp->function;
             }
             if (auto* headFreeVariable =
-                    std::get_if<FreeVariable>(&functionHead->node)) {
+                    std::get_if<FreeVariable>(&patternHead->node)) {
                 if (metavariableNames.count(headFreeVariable->name)) {
                     return;
                 }
             }
             if (auto* targetApplication =
                     std::get_if<Application>(&target->node)) {
+                // Require the heads (after walking the function chain)
+                // to be structurally equivalent. Without this check,
+                // pointwise recursion of two same-arity but
+                // semantically-different applications (e.g.
+                // `Natural.divides(_, _)` vs `Exists(Natural, _)`)
+                // would assign metavariables to wrong-typed targets.
+                ExpressionPointer targetHead = targetApplication->function;
+                while (auto* nestedApp =
+                           std::get_if<Application>(&targetHead->node)) {
+                    targetHead = nestedApp->function;
+                }
+                if (!headsMatch(patternHead, targetHead)) {
+                    return;
+                }
                 unifyConstructorParameters(
                     patternApplication->function,
                     targetApplication->function,
@@ -2762,6 +2977,39 @@ private:
             }
             return;
         }
+    }
+
+    // Heads match when both are the same Constant (same name + universe
+    // arguments), the same BoundVariable index, or the same Sort. A
+    // FreeVariable head means a metavariable case — handled separately.
+    bool headsMatch(ExpressionPointer left, ExpressionPointer right) {
+        if (auto* leftConstant = std::get_if<Constant>(&left->node)) {
+            if (auto* rightConstant =
+                    std::get_if<Constant>(&right->node)) {
+                return leftConstant->name == rightConstant->name;
+            }
+            return false;
+        }
+        if (auto* leftBound = std::get_if<BoundVariable>(&left->node)) {
+            if (auto* rightBound =
+                    std::get_if<BoundVariable>(&right->node)) {
+                return leftBound->deBruijnIndex
+                    == rightBound->deBruijnIndex;
+            }
+            return false;
+        }
+        if (std::get_if<Sort>(&left->node)) {
+            return std::get_if<Sort>(&right->node) != nullptr;
+        }
+        if (auto* leftFree = std::get_if<FreeVariable>(&left->node)) {
+            if (auto* rightFree =
+                    std::get_if<FreeVariable>(&right->node)) {
+                return leftFree->name == rightFree->name
+                    && leftFree->origin == rightFree->origin;
+            }
+            return false;
+        }
+        return false;
     }
 
     // Calls the kernel's inferType on `term` interpreted under the given
