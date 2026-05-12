@@ -794,20 +794,41 @@ private:
         }
         if (auto* application =
                 std::get_if<SurfaceApplication>(&expression.node)) {
-            // congruenceOf(f, h) is special-cased: it desugars to a call
-            // of Equality.congruence with type / universe / endpoint
-            // arguments inferred from the types of f and h. Two positional
-            // args; further arguments would be applied to the resulting
-            // proof, but that's unusual.
+            // A small family of identifier names is special-cased to
+            // infer their typically-explicit arguments from the user-
+            // supplied positional args.
             auto* headIdentifier = std::get_if<SurfaceIdentifier>(
                 &application->function->node);
-            if (headIdentifier
-                && headIdentifier->qualifiedName == "congruenceOf"
-                && headIdentifier->universeArgs.empty()
-                && application->arguments.size() == 2) {
-                return desugarCongruenceOf(
-                    application->arguments[0], application->arguments[1],
-                    localBinders, expression.line, expression.column);
+            if (headIdentifier && headIdentifier->universeArgs.empty()) {
+                const std::string& name = headIdentifier->qualifiedName;
+                size_t argumentCount = application->arguments.size();
+                if (name == "congruenceOf" && argumentCount == 2) {
+                    return desugarCongruenceOf(
+                        application->arguments[0],
+                        application->arguments[1],
+                        localBinders,
+                        expression.line, expression.column);
+                }
+                if (name == "reflexivity" && argumentCount == 1) {
+                    return desugarReflexivity(
+                        application->arguments[0],
+                        localBinders,
+                        expression.line, expression.column);
+                }
+                if (name == "Equality.symmetry" && argumentCount == 1) {
+                    return desugarEqualitySymmetry(
+                        application->arguments[0],
+                        localBinders,
+                        expression.line, expression.column);
+                }
+                if (name == "Equality.transitivity"
+                    && argumentCount == 2) {
+                    return desugarEqualityTransitivity(
+                        application->arguments[0],
+                        application->arguments[1],
+                        localBinders,
+                        expression.line, expression.column);
+                }
             }
             ExpressionPointer head =
                 elaborateExpression(*application->function, localBinders);
@@ -880,10 +901,9 @@ private:
                                            std::move(rightKernel));
                 return applied;
             }
-            throw ElaborateError(
-                "operator '" + binary->opSymbol + "' is not yet supported "
-                "by the elaborator; use the explicit function call form "
-                "(e.g. Natural.add(a, b) instead of a + b)");
+            return desugarArithmeticOperator(
+                binary->opSymbol, *binary->left, *binary->right,
+                localBinders, expression.line);
         }
         if (auto* unary =
                 std::get_if<SurfaceUnaryOperation>(&expression.node)) {
@@ -1066,6 +1086,193 @@ private:
             return base;
         }
         throw ElaborateError("unhandled level variant");
+    }
+
+    // Resolves a binary arithmetic operator (`+`, `*`, ...) to a kernel
+    // function call. For v1 the resolution table is hardcoded to the
+    // Natural namespace: if both operands have type Natural, use
+    // Natural.add / Natural.multiply. Otherwise an ElaborateError is
+    // raised. A proper using-declaration-driven mechanism is the next
+    // iteration.
+    ExpressionPointer desugarArithmeticOperator(
+        const std::string& operatorSymbol,
+        const SurfaceExpression& leftSurface,
+        const SurfaceExpression& rightSurface,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        ExpressionPointer leftKernel =
+            elaborateExpression(leftSurface, localBinders);
+        ExpressionPointer rightKernel =
+            elaborateExpression(rightSurface, localBinders);
+        // Determine the operand type by inferring the type of the left
+        // operand. We peel any FreeVars from opening because we only
+        // need to peek at the head.
+        ExpressionPointer leftType = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, leftKernel));
+        auto* leftTypeConstant = std::get_if<Constant>(&leftType->node);
+        std::string operandTypeName =
+            leftTypeConstant ? leftTypeConstant->name : "<unknown>";
+        std::string targetFunction;
+        if (operandTypeName == "Natural") {
+            if (operatorSymbol == "+") targetFunction = "Natural.add";
+            else if (operatorSymbol == "*") targetFunction = "Natural.multiply";
+        }
+        if (targetFunction.empty()) {
+            throw ElaborateError(
+                "operator '" + operatorSymbol + "' is not supported for "
+                "operand type '" + operandTypeName + "' (line "
+                + std::to_string(line)
+                + "); v1 supports + and * on Natural only");
+        }
+        if (environment_.lookup(targetFunction) == nullptr) {
+            throw ElaborateError(
+                "operator '" + operatorSymbol + "' resolves to '"
+                + targetFunction + "' but that function is not in scope "
+                "(line " + std::to_string(line) + ")");
+        }
+        ExpressionPointer call = makeConstant(targetFunction);
+        call = makeApplication(std::move(call), std::move(leftKernel));
+        call = makeApplication(std::move(call), std::move(rightKernel));
+        return call;
+    }
+
+    // Desugars `reflexivity(x)` into `reflexivity.{u}(typeOfX, x)` where
+    // u is x's type universe. Mirrors how the constructor's signature
+    // makes A and u inferable from x.
+    ExpressionPointer desugarReflexivity(
+        SurfaceExpressionPointer xSurface,
+        const std::vector<LocalBinder>& localBinders,
+        int line, int column) {
+        ExpressionPointer xKernel =
+            elaborateExpression(*xSurface, localBinders);
+        ExpressionPointer xTypeOpen =
+            inferTypeInLocalContext(localBinders, xKernel);
+        ExpressionPointer xType = closeOverLocalBinders(
+            xTypeOpen, localBinders, localBinders.size());
+        LevelPointer levelU = typeUniverseOf(localBinders, xKernel);
+        ExpressionPointer call = makeConstant("reflexivity", {levelU});
+        call = makeApplication(std::move(call), std::move(xType));
+        call = makeApplication(std::move(call), std::move(xKernel));
+        (void)line; (void)column;
+        return call;
+    }
+
+    // Helper: given a kernel term whose type (already weak-head-normalised)
+    // is `Equality.{u}(A, x, y)`, extracts the four components. Throws
+    // ElaborateError if the type doesn't have that shape.
+    struct EqualityComponents {
+        ExpressionPointer typeA;
+        ExpressionPointer x;
+        ExpressionPointer y;
+        LevelPointer levelU;
+    };
+    EqualityComponents extractEqualityComponents(
+        ExpressionPointer equalityType, const char* contextLabel,
+        int line) {
+        auto* outerApp = std::get_if<Application>(&equalityType->node);
+        if (!outerApp) {
+            throw ElaborateError(
+                std::string(contextLabel)
+                + ": argument's type is not a fully applied Equality "
+                "(line " + std::to_string(line) + ")");
+        }
+        ExpressionPointer y = outerApp->argument;
+        auto* middleApp =
+            std::get_if<Application>(&outerApp->function->node);
+        if (!middleApp) {
+            throw ElaborateError(
+                std::string(contextLabel)
+                + ": argument's type is not a fully applied Equality "
+                "(line " + std::to_string(line) + ")");
+        }
+        ExpressionPointer x = middleApp->argument;
+        auto* innerApp =
+            std::get_if<Application>(&middleApp->function->node);
+        if (!innerApp) {
+            throw ElaborateError(
+                std::string(contextLabel)
+                + ": argument's type is not a fully applied Equality "
+                "(line " + std::to_string(line) + ")");
+        }
+        ExpressionPointer typeA = innerApp->argument;
+        auto* equalityConstant =
+            std::get_if<Constant>(&innerApp->function->node);
+        if (!equalityConstant
+            || equalityConstant->name != "Equality"
+            || equalityConstant->universeArguments.size() != 1) {
+            throw ElaborateError(
+                std::string(contextLabel)
+                + ": argument's type isn't an Equality.{u} (line "
+                + std::to_string(line) + ")");
+        }
+        return {typeA, x, y, equalityConstant->universeArguments[0]};
+    }
+
+    // Desugars `Equality.symmetry(h)` to the full call with A, x, y
+    // inferred from h's type.
+    ExpressionPointer desugarEqualitySymmetry(
+        SurfaceExpressionPointer hSurface,
+        const std::vector<LocalBinder>& localBinders,
+        int line, int column) {
+        ExpressionPointer hKernel =
+            elaborateExpression(*hSurface, localBinders);
+        ExpressionPointer hType = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, hKernel));
+        EqualityComponents components = extractEqualityComponents(
+            hType, "Equality.symmetry", line);
+        ExpressionPointer typeA = closeOverLocalBinders(
+            components.typeA, localBinders, localBinders.size());
+        ExpressionPointer x = closeOverLocalBinders(
+            components.x, localBinders, localBinders.size());
+        ExpressionPointer y = closeOverLocalBinders(
+            components.y, localBinders, localBinders.size());
+        ExpressionPointer call =
+            makeConstant("Equality.symmetry", {components.levelU});
+        call = makeApplication(std::move(call), std::move(typeA));
+        call = makeApplication(std::move(call), std::move(x));
+        call = makeApplication(std::move(call), std::move(y));
+        call = makeApplication(std::move(call), std::move(hKernel));
+        (void)column;
+        return call;
+    }
+
+    // Desugars `Equality.transitivity(h1, h2)` to the full call with A,
+    // x, y, z inferred from the two arguments' types.
+    ExpressionPointer desugarEqualityTransitivity(
+        SurfaceExpressionPointer h1Surface,
+        SurfaceExpressionPointer h2Surface,
+        const std::vector<LocalBinder>& localBinders,
+        int line, int column) {
+        ExpressionPointer h1Kernel =
+            elaborateExpression(*h1Surface, localBinders);
+        ExpressionPointer h2Kernel =
+            elaborateExpression(*h2Surface, localBinders);
+        ExpressionPointer h1Type = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, h1Kernel));
+        ExpressionPointer h2Type = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, h2Kernel));
+        EqualityComponents firstComponents = extractEqualityComponents(
+            h1Type, "Equality.transitivity (first arg)", line);
+        EqualityComponents secondComponents = extractEqualityComponents(
+            h2Type, "Equality.transitivity (second arg)", line);
+        ExpressionPointer typeA = closeOverLocalBinders(
+            firstComponents.typeA, localBinders, localBinders.size());
+        ExpressionPointer x = closeOverLocalBinders(
+            firstComponents.x, localBinders, localBinders.size());
+        ExpressionPointer y = closeOverLocalBinders(
+            firstComponents.y, localBinders, localBinders.size());
+        ExpressionPointer z = closeOverLocalBinders(
+            secondComponents.y, localBinders, localBinders.size());
+        ExpressionPointer call = makeConstant(
+            "Equality.transitivity", {firstComponents.levelU});
+        call = makeApplication(std::move(call), std::move(typeA));
+        call = makeApplication(std::move(call), std::move(x));
+        call = makeApplication(std::move(call), std::move(y));
+        call = makeApplication(std::move(call), std::move(z));
+        call = makeApplication(std::move(call), std::move(h1Kernel));
+        call = makeApplication(std::move(call), std::move(h2Kernel));
+        (void)column;
+        return call;
     }
 
     // Desugars `congruenceOf(f, h)` into a full call to

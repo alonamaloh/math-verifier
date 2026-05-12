@@ -1,106 +1,83 @@
 -- Natural/arithmetic.math
 --
 -- Identities about Natural arithmetic. Builds toward the
--- "Natural is a commutative semiring" claim. The `=` operator desugars
--- to Equality.{u}(...) and congruenceOf(f, h) to Equality.congruence
--- with inferred type / universe arguments; both are elaborator sugar.
+-- "Natural is a commutative semiring" claim.
+--
+-- Surface sugar in play:
+--   a + b                                desugars to  Natural.add(a, b)
+--   a * b                                desugars to  Natural.multiply(a, b)
+--   a = b                                desugars to  Equality.{u}(typeOfA, a, b)
+--   reflexivity(x)                       desugars to  reflexivity.{u}(typeOfX, x)
+--   congruenceOf(f, h)                   desugars to  Equality.congruence
+--   Equality.symmetry(h)                 desugars to  Equality.symmetry.{u}(A, x, y, h)
+--   Equality.transitivity(h1, h2)        desugars to  Equality.transitivity.{u}(A, x, y, z, h1, h2)
 
 module Natural.arithmetic
 
 import Natural.basics
 import Equality.basics
 
--- Theorem: 0 + a = a. Definitional (add reduces immediately).
-theorem Natural.zero_add(a : Natural)
-        : Natural.add(zero, a) = a :=
-  reflexivity.{0}(Natural, a)
+-- Theorem: 0 + a = a. Definitional.
+theorem Natural.zero_add(a : Natural) : zero + a = a :=
+  reflexivity(a)
 
 -- Theorem: a + 0 = a. Induction on a.
-theorem Natural.add_zero
-        : (a : Natural) → Natural.add(a, zero) = a
-  | zero         => reflexivity.{0}(Natural, zero)
+theorem Natural.add_zero : (a : Natural) → a + zero = a
+  | zero         => reflexivity(zero)
   | successor(k) => congruenceOf(successor, Natural.add_zero(k))
 
 -- Theorem: 1 + a = successor(a). Definitional.
-theorem Natural.one_add(a : Natural)
-        : Natural.add(one, a) = successor(a) :=
-  reflexivity.{0}(Natural, successor(a))
+theorem Natural.one_add(a : Natural) : one + a = successor(a) :=
+  reflexivity(successor(a))
 
 -- Theorem: a + successor(b) = successor(a + b). Mirror of the definitional
 -- rule for add on the first argument.
 theorem Natural.add_successor
-        : (a b : Natural)
-          → Natural.add(a, successor(b)) = successor(Natural.add(a, b))
-  | zero,         b => reflexivity.{0}(Natural, successor(b))
+        : (a b : Natural) → a + successor(b) = successor(a + b)
+  | zero,         b => reflexivity(successor(b))
   | successor(k), b => congruenceOf(successor, Natural.add_successor(k, b))
 
 -- Theorem: a + b = b + a. Induction on a.
-theorem Natural.add_commutative
-        : (a b : Natural) → Natural.add(a, b) = Natural.add(b, a)
+theorem Natural.add_commutative : (a b : Natural) → a + b = b + a
   | zero, b =>
-      Equality.symmetry.{0}(Natural, Natural.add(b, zero), b,
-                             Natural.add_zero(b))
+      Equality.symmetry(Natural.add_zero(b))
   | successor(k), b =>
-      Equality.transitivity.{0}(
-          Natural,
-          successor(Natural.add(k, b)),
-          successor(Natural.add(b, k)),
-          Natural.add(b, successor(k)),
+      Equality.transitivity(
           congruenceOf(successor, Natural.add_commutative(k, b)),
-          Equality.symmetry.{0}(
-              Natural,
-              Natural.add(b, successor(k)),
-              successor(Natural.add(b, k)),
-              Natural.add_successor(b, k)))
+          Equality.symmetry(Natural.add_successor(b, k)))
 
 -- Theorem: 0 * a = 0. Definitional.
-theorem Natural.zero_multiply(a : Natural)
-        : Natural.multiply(zero, a) = zero :=
-  reflexivity.{0}(Natural, zero)
+theorem Natural.zero_multiply(a : Natural) : zero * a = zero :=
+  reflexivity(zero)
 
 -- Theorem: a * 0 = 0. By induction on a.
-theorem Natural.multiply_zero
-        : (a : Natural) → Natural.multiply(a, zero) = zero
-  | zero         => reflexivity.{0}(Natural, zero)
+theorem Natural.multiply_zero : (a : Natural) → a * zero = zero
+  | zero         => reflexivity(zero)
   | successor(k) => Natural.multiply_zero(k)
 
 -- Theorem: 1 * a = a. Reduces to add_zero on a.
-theorem Natural.one_multiply(a : Natural)
-        : Natural.multiply(one, a) = a :=
+theorem Natural.one_multiply(a : Natural) : one * a = a :=
   Natural.add_zero(a)
 
 -- Theorem: a * successor(b) = a + (a * b).
 -- Axiomatised — its proof requires arithmetic chains not yet at hand.
 axiom Natural.multiply_successor
-        : (a b : Natural)
-          → Natural.multiply(a, successor(b))
-            = Natural.add(a, Natural.multiply(a, b))
+        : (a b : Natural) → a * successor(b) = a + a * b
 
 -- Theorem: a * b = b * a. Induction on a.
 theorem Natural.multiply_commutative
-        : (a b : Natural) → Natural.multiply(a, b) = Natural.multiply(b, a)
+        : (a b : Natural) → a * b = b * a
   | zero, b =>
-      Equality.symmetry.{0}(Natural, Natural.multiply(b, zero), zero,
-                             Natural.multiply_zero(b))
+      Equality.symmetry(Natural.multiply_zero(b))
   | successor(k), b =>
-      Equality.transitivity.{0}(
-          Natural,
-          Natural.add(b, Natural.multiply(k, b)),
-          Natural.add(b, Natural.multiply(b, k)),
-          Natural.multiply(b, successor(k)),
-          congruenceOf(fun (x : Natural) => Natural.add(b, x),
+      Equality.transitivity(
+          congruenceOf(fun (x : Natural) => b + x,
                        Natural.multiply_commutative(k, b)),
-          Equality.symmetry.{0}(
-              Natural,
-              Natural.multiply(b, successor(k)),
-              Natural.add(b, Natural.multiply(b, k)),
-              Natural.multiply_successor(b, k)))
+          Equality.symmetry(Natural.multiply_successor(b, k)))
 
 -- Theorem: (a + b) + c = a + (b + c). Induction on a.
 theorem Natural.add_associative
-        : (a b c : Natural)
-          → Natural.add(Natural.add(a, b), c)
-            = Natural.add(a, Natural.add(b, c))
-  | zero,         b, c => reflexivity.{0}(Natural, Natural.add(b, c))
+        : (a b c : Natural) → (a + b) + c = a + (b + c)
+  | zero,         b, c => reflexivity(b + c)
   | successor(k), b, c =>
       congruenceOf(successor, Natural.add_associative(k, b, c))
