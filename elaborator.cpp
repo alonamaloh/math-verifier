@@ -1537,12 +1537,41 @@ private:
                                  FreeVariableOrigin::Internal);
         }
 
+        // Backward inference FIRST, before elaborating value args. We
+        // compute the constructor's result type by opening every
+        // value-arg Pi as well (with Internal FreeVars distinct from
+        // the parameter metavariables), then unify against
+        // `expectedType` if it was supplied. This lets the value-arg
+        // elaborations below see fully-resolved expected domain types,
+        // which is essential for under-applied nested constructor
+        // calls (e.g. `Or.introduceRight(Exists.introduce(...))` —
+        // without backward-first, the inner Exists.introduce would
+        // try and fail to infer A and P from a higher-order context).
+        std::map<std::string, ExpressionPointer> assignment;
+        if (expectedType) {
+            ExpressionPointer resultProbe = cursor;
+            for (size_t j = 0; j < valueArgumentsSurface.size(); ++j) {
+                auto* pi = std::get_if<Pi>(&resultProbe->node);
+                if (!pi) break;
+                std::string valueArgumentFresh =
+                    "_constructorValueArgument_" + std::to_string(j);
+                resultProbe = openBinder(pi->codomain,
+                                          valueArgumentFresh,
+                                          FreeVariableOrigin::Internal);
+            }
+            ExpressionPointer expectedTypeNormalised =
+                weakHeadNormalForm(environment_, expectedType);
+            unifyConstructorParameters(resultProbe,
+                                          expectedTypeNormalised,
+                                          metavariableNames, assignment);
+        }
+
         // Walk value-arg Pis. For each, elaborate the corresponding
         // surface argument, infer its kernel type, and unify the
         // (parameter-substituted) Pi domain against the inferred type
-        // to extract parameter assignments. Then move on to the next
-        // Pi by opening it with an Internal-origin FreeVariable.
-        std::map<std::string, ExpressionPointer> assignment;
+        // to fill in any parameters that backward inference didn't
+        // resolve. Then move on to the next Pi by opening it with an
+        // Internal-origin FreeVariable.
         std::vector<ExpressionPointer> elaboratedValueArguments;
         for (size_t j = 0; j < valueArgumentsSurface.size(); ++j) {
             auto* pi = std::get_if<Pi>(&cursor->node);
@@ -1554,8 +1583,11 @@ private:
             }
             ExpressionPointer expectedDomain =
                 substituteFreeVariables(pi->domain, assignment);
+            // Pass expectedDomain as the expected type for the value
+            // argument's own elaboration (so nested under-applied
+            // constructors there can do their own parameter inference).
             ExpressionPointer kernelValueArgument = elaborateExpression(
-                *valueArgumentsSurface[j], localBinders);
+                *valueArgumentsSurface[j], localBinders, expectedDomain);
             // inferTypeInLocalContext opens local binders into
             // Internal-origin FreeVariables; close them back so the
             // captured assignment lives in the original local-binder
@@ -1577,8 +1609,9 @@ private:
                                  FreeVariableOrigin::Internal);
         }
 
-        // If any parameter remains unassigned, try unifying the
-        // constructor's result type against the expected type (if any).
+        // If any parameter still remains unassigned after forward
+        // inference, try one more backward unification (now using
+        // forward-derived value-arg info if relevant).
         bool anyUnassigned = false;
         for (const auto& name : parameterFreshNames) {
             if (!assignment.count(name)) { anyUnassigned = true; break; }
@@ -2186,6 +2219,40 @@ private:
         return expression;
     }
 
+    // Returns true if `expression` contains an Internal-origin
+    // FreeVariable whose name starts with `_constructorValueArgument_`.
+    // Used to filter out backward-inference candidates whose target
+    // refers to a value-arg placeholder we opened during the result-
+    // type probe — those placeholders aren't substituted away later,
+    // so they'd leak into the assembled kernel term.
+    bool containsValueArgumentFreeVar(ExpressionPointer expression) {
+        if (auto* freeVariable =
+                std::get_if<FreeVariable>(&expression->node)) {
+            const std::string& name = freeVariable->name;
+            const std::string prefix = "_constructorValueArgument_";
+            if (freeVariable->origin == FreeVariableOrigin::Internal
+                && name.size() >= prefix.size()
+                && name.compare(0, prefix.size(), prefix) == 0) {
+                return true;
+            }
+            return false;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return containsValueArgumentFreeVar(pi->domain)
+                || containsValueArgumentFreeVar(pi->codomain);
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return containsValueArgumentFreeVar(lambda->domain)
+                || containsValueArgumentFreeVar(lambda->body);
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return containsValueArgumentFreeVar(application->function)
+                || containsValueArgumentFreeVar(application->argument);
+        }
+        return false;
+    }
+
     // Walks `pattern` and `target` in parallel. Whenever pattern is a
     // FreeVariable whose name is in `metavariableNames` (and isn't yet
     // assigned), records `assignment[name] = target`. For Pi/Lambda/
@@ -2210,7 +2277,8 @@ private:
                 std::get_if<FreeVariable>(&pattern->node)) {
             if (binderDepth == 0
                 && metavariableNames.count(freeVariable->name)
-                && !assignment.count(freeVariable->name)) {
+                && !assignment.count(freeVariable->name)
+                && !containsValueArgumentFreeVar(target)) {
                 assignment[freeVariable->name] = target;
             }
             return;
