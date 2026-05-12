@@ -8,7 +8,9 @@ module Natural.divisibility
 
 import Natural.basics
 import Natural.arithmetic
+import Natural.order
 import Equality.basics
+import Logic.basics
 import Logic.exists
 
 -- The divisor divides the dividend exactly when some quotient witnesses
@@ -80,3 +82,39 @@ theorem Natural.divides_transitive (a b c : Natural)
   | Exists.introduce(firstQuotient, firstEquality), secondDivides =>
       Natural.divides_transitive_helper(
           a, b, c, firstQuotient, firstEquality, secondDivides)
+
+-- If d divides n, then either n is zero (with witness quotient also
+-- zero) or d ≤ n (because n = d * q ≥ d when q ≥ 1). Helper that
+-- pattern-matches the witness quotient.
+theorem Natural.divides_le_or_zero_helper (d n : Natural)
+        : (quotient : Natural)
+          → Equality(Natural, n, Natural.multiply(d, quotient))
+          → Or(n = zero, LessOrEqual(d, n))
+  | zero, equalityProof =>
+      Or.introduceLeft(
+          Equality.transitivity(equalityProof,
+              Natural.multiply_zero(d)))
+  | successor(quotientPredecessor), equalityProof =>
+      Or.introduceRight(
+          -- LessOrEqual(d, d + d*qP) by le_add_right.
+          -- d + d*qP = d * succ(qP) = n via multiply_successor and the
+          -- given equality (reversed).
+          Equality.transport_proposition(
+              Natural,
+              fun (transportPoint : Natural) =>
+                  LessOrEqual(d, transportPoint),
+              Natural.add(d, Natural.multiply(d, quotientPredecessor)),
+              n,
+              Equality.symmetry(
+                  Equality.transitivity(equalityProof,
+                      Natural.multiply_successor(d, quotientPredecessor))),
+              Natural.le_add_right(
+                  d, Natural.multiply(d, quotientPredecessor))))
+
+-- And the main statement: if d divides n, either n is zero or d ≤ n.
+theorem Natural.divides_le_or_zero (d n : Natural)
+        : Natural.divides(d, n)
+          → Or(n = zero, LessOrEqual(d, n))
+  | Exists.introduce(quotient, equalityProof) =>
+      Natural.divides_le_or_zero_helper(
+          d, n, quotient, equalityProof)

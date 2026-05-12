@@ -41,3 +41,34 @@ theorem LessOrEqual.transitive (a b c : Natural)
           LessOrEqual.transitive(
               a, b, cPredecessor,
               secondProofSubdivided, firstProof))
+
+-- Successor preserves ≤: a ≤ b implies succ(a) ≤ succ(b). By induction
+-- on the proof.
+--
+-- In the case bodies we use the DESTRUCTURED names (commonValue,
+-- smallerD, etc.) rather than the outer binder names a and b. The
+-- motive substitutes the constructor's specific index values into
+-- the case's expected type, but the case body's local context still
+-- resolves `a` and `b` to the OUTER binders (which kernel-level
+-- aren't equal to the destructured values, even though they are
+-- propositionally so in each case).
+theorem Natural.succ_le_succ (a b : Natural)
+        : LessOrEqual(a, b)
+          → LessOrEqual(successor(a), successor(b))
+  | LessOrEqual.reflexivity(commonValue) =>
+      LessOrEqual.reflexivity(successor(commonValue))
+  | LessOrEqual.step(smallerD, largerPredecessor, subproof) =>
+      LessOrEqual.step(
+          successor(smallerD), successor(largerPredecessor),
+          Natural.succ_le_succ(smallerD, largerPredecessor, subproof))
+
+-- a ≤ a + b. Induction on a, using that successor(_) + m and zero + m
+-- reduce definitionally on the first argument.
+theorem Natural.le_add_right
+        : (a b : Natural) → LessOrEqual(a, Natural.add(a, b))
+  | zero, b =>
+      Natural.zero_least(b)
+  | successor(predecessor), b =>
+      Natural.succ_le_succ(
+          predecessor, Natural.add(predecessor, b),
+          Natural.le_add_right(predecessor, b))

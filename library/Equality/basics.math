@@ -31,3 +31,19 @@ theorem Equality.transitivity (A : Type) (x y z : A)
 theorem Equality.congruence (A : Type) (B : Type) (f : A → B) (x y : A)
         : Equality(A, x, y) → Equality(B, f(x), f(y))
   | reflexivity => reflexivity(f(x))
+
+-- Transport along an equality, for Proposition-valued predicates:
+-- given `x = y` and `P(x)`, conclude `P(y)`. Useful for rewriting
+-- the goal of a proof along a previously-established equality.
+theorem Equality.transport_proposition
+        (A : Type) (P : A → Proposition)
+        (x y : A)
+        (equalityProof : Equality(A, x, y))
+        (proofAtX : P(x))
+        : P(y) :=
+  Equality_recursor(
+    A, x,
+    fun (rightEnd : A) (_ : Equality(A, x, rightEnd)) => P(rightEnd),
+    proofAtX,
+    y,
+    equalityProof)
