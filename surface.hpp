@@ -18,6 +18,19 @@ using SurfaceExpressionPointer = std::shared_ptr<const SurfaceExpression>;
 struct SurfaceLevel;
 using SurfaceLevelPointer = std::shared_ptr<const SurfaceLevel>;
 
+struct SurfacePattern;
+using SurfacePatternPointer = std::shared_ptr<const SurfacePattern>;
+
+// One clause of a `cases` expression. Defined up-front (before
+// SurfaceExpression) so SurfaceExpression's std::variant can hold a
+// SurfaceCases that owns a std::vector<SurfaceCasesClause>.
+struct SurfaceCasesClause {
+    SurfacePatternPointer pattern;
+    SurfaceExpressionPointer body;
+    int line = 0;
+    int column = 0;
+};
+
 // -------- universe levels --------
 
 struct SurfaceLevelNumeric { int value; };
@@ -126,12 +139,32 @@ struct SurfaceUnaryOperation {
     SurfaceExpressionPointer operand;
 };
 
+// Anonymous tuple expression `⟨a, b, ...⟩`. The elaborator picks the
+// constructor based on the expected type — `And.introduction(a, b)` when
+// the goal is `And(_, _)`, `Exists.introduce(a, b)` for `Exists(_, _)`,
+// and the unique constructor for any other single-constructor inductive.
+// N-ary tuples right-associate: `⟨a, b, c⟩` ≡ `⟨a, ⟨b, c⟩⟩`.
+struct SurfaceAnonymousTuple {
+    std::vector<SurfaceExpressionPointer> components;
+};
+
+// `cases scrutinee { | pattern => body  | pattern => body  ... }`. The
+// elaborator picks the inductive's recursor and builds the motive from
+// the surrounding expected type. Patterns may be constructor patterns,
+// tuple patterns, or bare names (variable binding for a one-constructor
+// inductive).
+struct SurfaceCases {
+    SurfaceExpressionPointer scrutinee;
+    std::vector<SurfaceCasesClause> clauses;
+};
+
 struct SurfaceExpression {
     std::variant<
         SurfaceIdentifier, SurfaceNumericLiteral,
         SurfaceApplication, SurfacePiType, SurfaceLambda,
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
-        SurfaceBinaryOperation, SurfaceUnaryOperation
+        SurfaceBinaryOperation, SurfaceUnaryOperation,
+        SurfaceAnonymousTuple, SurfaceCases
     > node;
     int line = 0;
     int column = 0;
@@ -212,6 +245,15 @@ inline SurfaceExpressionPointer makeSurfaceUnaryOperation(
         SurfaceUnaryOperation{std::move(opSymbol), std::move(operand)},
         line, column});
 }
+inline SurfaceExpressionPointer makeSurfaceAnonymousTuple(
+    std::vector<SurfaceExpressionPointer> components,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceAnonymousTuple{std::move(components)}, line, column});
+}
+// Forward-declared above; full SurfaceCasesClause type lives later in
+// this header (it depends on SurfacePattern). The builder is defined
+// alongside the type.
 
 // -------- patterns --------
 
@@ -219,8 +261,8 @@ inline SurfaceExpressionPointer makeSurfaceUnaryOperation(
 // binding, or a nullary constructor — resolved by the elaborator) or a
 // constructor application like `successor(k)` (always a constructor
 // pattern). A name of just "_" is a wildcard.
-struct SurfacePattern;
-using SurfacePatternPointer = std::shared_ptr<const SurfacePattern>;
+// (SurfacePattern is forward-declared up top so SurfaceCasesClause can
+// reference it.)
 
 struct SurfacePatternBareName {
     std::string name;  // "_" for wildcard
@@ -229,8 +271,15 @@ struct SurfacePatternConstructor {
     std::string constructorName;
     std::vector<SurfacePatternPointer> arguments;
 };
+// Tuple pattern `⟨pat, pat, ...⟩`. The elaborator picks the destructuring
+// constructor (e.g. And.introduction, Exists.introduce) based on the
+// scrutinee's type, matching the same logic as SurfaceAnonymousTuple.
+struct SurfacePatternTuple {
+    std::vector<SurfacePatternPointer> components;
+};
 struct SurfacePattern {
-    std::variant<SurfacePatternBareName, SurfacePatternConstructor> node;
+    std::variant<SurfacePatternBareName, SurfacePatternConstructor,
+                 SurfacePatternTuple> node;
     int line = 0;
     int column = 0;
 };
@@ -247,6 +296,25 @@ inline SurfacePatternPointer makeSurfacePatternConstructor(
     return std::make_shared<const SurfacePattern>(SurfacePattern{
         SurfacePatternConstructor{std::move(constructorName),
                                   std::move(arguments)},
+        line, column});
+}
+inline SurfacePatternPointer makeSurfacePatternTuple(
+    std::vector<SurfacePatternPointer> components,
+    int line, int column) {
+    return std::make_shared<const SurfacePattern>(
+        SurfacePattern{SurfacePatternTuple{std::move(components)},
+                       line, column});
+}
+
+// SurfaceCasesClause is defined near the top of the file (before
+// SurfaceExpression) so SurfaceCases can store a vector of clauses.
+
+inline SurfaceExpressionPointer makeSurfaceCases(
+    SurfaceExpressionPointer scrutinee,
+    std::vector<SurfaceCasesClause> clauses,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceCases{std::move(scrutinee), std::move(clauses)},
         line, column});
 }
 

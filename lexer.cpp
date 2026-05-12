@@ -33,6 +33,7 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"induction",     TokenKind::KeywordInduction},
         {"on",            TokenKind::KeywordOn},
         {"case",          TokenKind::KeywordCase},
+        {"cases",         TokenKind::KeywordCases},
         {"of",            TokenKind::KeywordOf},
         {"with",          TokenKind::KeywordWith},
         {"hypothesis",    TokenKind::KeywordHypothesis},
@@ -214,6 +215,8 @@ private:
             {"∧", TokenKind::LogicalAnd},
             {"∨", TokenKind::LogicalOr},
             {"¬", TokenKind::LogicalNot},
+            {"⟨", TokenKind::LeftAngle},
+            {"⟩", TokenKind::RightAngle},
         };
         for (const auto& entry : table) {
             if (matchPrefix(entry.text)) {
@@ -281,6 +284,7 @@ bool isKeyword(TokenKind kind) {
         case TokenKind::KeywordInduction:
         case TokenKind::KeywordOn:
         case TokenKind::KeywordCase:
+        case TokenKind::KeywordCases:
         case TokenKind::KeywordOf:
         case TokenKind::KeywordWith:
         case TokenKind::KeywordHypothesis:
@@ -322,6 +326,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::KeywordInduction:     return "'induction'";
         case TokenKind::KeywordOn:            return "'on'";
         case TokenKind::KeywordCase:          return "'case'";
+        case TokenKind::KeywordCases:         return "'cases'";
         case TokenKind::KeywordOf:            return "'of'";
         case TokenKind::KeywordWith:          return "'with'";
         case TokenKind::KeywordHypothesis:    return "'hypothesis'";
@@ -333,6 +338,8 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::RightParen:           return "')'";
         case TokenKind::LeftBrace:            return "'{'";
         case TokenKind::RightBrace:           return "'}'";
+        case TokenKind::LeftAngle:            return "'⟨'";
+        case TokenKind::RightAngle:           return "'⟩'";
         case TokenKind::Comma:                return "','";
         case TokenKind::Colon:                return "':'";
         case TokenKind::Pipe:                 return "'|'";

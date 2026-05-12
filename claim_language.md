@@ -1,0 +1,201 @@
+# Claim language: design plan
+
+A higher-level surface language for proofs, compiling to the existing CIC kernel via the existing elaborator. Drafted 2026-05-13.
+
+## Goal
+
+A surface language in which mathematicians and LLMs can write proofs that read roughly like textbook proofs at the chosen granularity, with the option to drill into any step and see more detail in the same language.
+
+## Why not just sugar on top of Lean
+
+Lean's surface syntax is already reasonably close to what a human can comfortably type. The remaining gap between a Lean tactic script and a textbook proof is not syntactic — it's that mathematicians' proofs are information-dense because the reader fills in routine bookkeeping: witness destructuring, bound discharging, transport spelling, transitivity invocations. A genuinely higher-level language has to push that bookkeeping onto the *elaborator*, not just shorten the syntax for it.
+
+## Core ideas
+
+### Claim-based proofs
+
+Each line is a CLAIM. The elaborator's job is to verify the claim from prior claims, the local context, and the library. Verification may invoke automation (the "hammer"). When the hammer succeeds, the line stands as written. When it fails, the user (or LLM) attaches detail.
+
+### Footnotes
+
+A claim that the hammer cannot close on its own may be paired with a footnote: a sequence of smaller claims and lemma applications that justifies it. The footnote is written in the **same language** as the main proof, just at finer granularity. Footnotes nest: a claim inside a footnote may itself have a footnote.
+
+This makes proofs **fractal**: the same artifact reads as a one-page textbook proof at the top level and as a fully spelled-out formal proof at the leaves. The author picks the granularity; the reader picks the zoom.
+
+### Rigid syntax
+
+One form per concept. No English synonyms (no `hence` vs `thus` vs `therefore`). C-shape: braces, semicolons, named keywords. The language is small — probably 20-30 primitives total: `claim`, `witness`, `destructure`, `by_cases`, `by induction`, `apply`, `suffices`, `contradiction`, `unfold`, `rewrite`, `calc`, and a handful more. Errors are local and specific.
+
+### Hammer + footnote separation
+
+The hammer may search expensively. The footnote, once written, is a deterministic record of how the search closes the claim: a list of intermediate claims and lemma applications. Re-verification is fast — no search. Footnotes are kernel-verified, so a buggy hammer cannot smuggle in unsoundness.
+
+## Worked example
+
+```
+theorem has_prime_divisor(n: Nat, h: 2 ≤ n): ∃ p. prime(p) ∧ p ∣ n {
+    by strong_induction on n with ih;
+    by_cases on prime(n) {
+        case yes as p_n:
+            witness n with ⟨p_n, divides_reflexive(n)⟩;
+        case no as np_n: {
+            claim ∃ d. 2 ≤ d ∧ d < n ∧ d ∣ n;
+                -- footnote:
+                apply prime_or_proper_divisor(n, h);
+                case prime: contradiction with np_n;
+                case composite as ⟨d, h_lo, h_hi, h_div⟩: witness d;
+            destructure as ⟨d, h_lo, h_hi, h_div⟩;
+            claim ∃ p. prime(p) ∧ p ∣ d by ih(d, h_hi, h_lo);
+            destructure as ⟨p, h_p, h_pd⟩;
+            witness p with ⟨h_p, divides_transitive(h_pd, h_div)⟩;
+        }
+    }
+}
+```
+
+Compare with the current ~50-line `Natural/prime_divisor.math`. The shape of the proof is visible at a glance, and every line is a recognizable mathematical move.
+
+## Build phases
+
+### Phase 1 — Surface syntax, zero hammer
+
+Parser for the new language. Desugaring to the existing CIC kernel via the existing elaborator. Every claim must come with enough detail (named lemmas, explicit witnesses) for the elaborator to construct the kernel term directly — no automated search yet.
+
+What Phase 1 delivers:
+
+- Implicit arguments at theorem call sites.
+- Anonymous constructor notation (`⟨…⟩` for `Exists`, `And`, etc.).
+- `destructure as ⟨…⟩` and `let ⟨…⟩ := …` for eliminator chains.
+- `by_cases` and `by induction` as structural primitives.
+- `witness <expr> with <proof>` for `Exists.introduce`.
+- `apply lemma(args)` for direct lemma invocation.
+- `claim X by <proof>` as the basic unit.
+
+Test target: rewrite `Natural/prime_divisor.math` and a few smaller files in the new syntax. Measure compression and readability. Estimate: 3-5x shorter from syntax alone, with no automation.
+
+### Phase 2 — Trivial hammer
+
+A claim without a footnote tries, in order:
+
+1. Reflexivity (`rfl`).
+2. Match against an in-scope hypothesis.
+3. Apply each imported lemma whose conclusion type unifies with the goal.
+
+Closes roughly 30-50% of one-step claims. Errors say "couldn't close from {context}; tried: lemma X, lemma Y, ...".
+
+### Phase 3 — Structured hammer
+
+Definitional unfolding, one-step equality rewriting, depth-2 lemma chaining, narrow decision procedures (e.g. linear arithmetic on `Natural`). At this point most arithmetic and order claims close without footnotes.
+
+### Phase 4 — LLM in the loop
+
+Failed claims invoke an LLM with `(context, goal, available_lemmas, why_it_failed)`. The LLM proposes intermediate claims as a footnote. Each suggestion is kernel-verified — no trust in the LLM for soundness, only for usefulness. The user can accept, edit, or request another proposal.
+
+### Phase 5 — Auto-collapse
+
+As the hammer improves, previously-detailed footnotes may become closable by the hammer directly. The system can suggest "this footnote is now redundant — fold it?". Proofs monotonically shrink toward the highest-level form the current hammer supports.
+
+Every phase produces a usable system. Each phase makes the average proof shorter; none invalidates earlier proofs.
+
+## Design decisions still open
+
+- **File extension.** Probably `.proof`, so the new language can coexist with `.math` during the transition.
+- **Trace format for footnotes.** Plain proof text is the source of truth. Whether to cache a context+lemma hash for change detection is a later question.
+- **Stability under library refactor.** Frozen-with-rename-tracking vs. regenerate-on-miss. Probable default: frozen, with a lint pass that re-runs the hammer when context hashes change.
+- **Notation.** ASCII vs. Unicode. Probably both, with ASCII forms for everything.
+- **Universe handling.** Fully implicit at the surface; the elaborator infers and reports.
+- **Module system.** Reuse the existing `import` mechanism from `.math`.
+
+## Phase 1 starting moves
+
+1. Pick the file extension and tokens.
+2. Sketch the grammar (BNF or similar).
+3. Build the parser.
+4. Build the desugaring layer mapping each surface construct to a kernel term via the existing elaborator.
+5. Transcribe one short `.math` file (e.g. `Equality/basics.math` or `Logic/basics.math`) to validate the design.
+6. Transcribe `Natural/prime_divisor.math` as the main proof-of-concept.
+
+## Phase 1 grammar (concrete starting subset)
+
+Implementation strategy: extend `.math` additively rather than introduce a new file extension. The new constructs are extra forms alongside the existing ones; old files keep working. A `.proof` extension may follow once the new forms have displaced the old.
+
+New syntactic forms, MVP slice:
+
+```
+// New theorem body form: a block of statements ending in a final expression.
+theorem_decl_block
+        := "theorem" qualified_name universe_params?
+           "(" binder ")" * ":" expression
+           "{" statement* expression "}"
+
+statement
+        := let_stmt | cases_stmt
+
+let_stmt
+        := "let" pattern (":" expression)? ":=" expression ";"
+
+cases_stmt
+        := "cases" expression "{" case_clause+ "}"
+
+case_clause
+        := "case" pattern "=>" (expression | block_expression)
+
+block_expression
+        := "{" statement* expression "}"
+
+// Patterns extend the existing pattern grammar with anonymous tuples.
+pattern
+        := bare_name | constructor_pattern | tuple_pattern
+tuple_pattern
+        := "⟨" pattern ("," pattern)* "⟩"
+
+// New atomic expression: anonymous tuple. Desugars per expected type.
+tuple_expression
+        := "⟨" expression ("," expression)* "⟩"
+```
+
+Desugarings:
+
+- `⟨a, b⟩` at expected type `And(A, B)` desugars to `And.introduction(a, b)`. At `Exists(A, P)` desugars to `Exists.introduce(a, b)`. At any other single-constructor inductive, applies that constructor (with parameters inferred). N-ary tuples right-associate: `⟨a, b, c⟩` is `⟨a, ⟨b, c⟩⟩`.
+- `let ⟨x, y⟩ := h; rest` where `h : And(A, B)` desugars to `And.eliminate(A, B, GoalType, fun x y => rest, h)`. For `Exists`, to `Exists.eliminate(...)`. The goal type is the type of the surrounding block.
+- `cases h { case Ctor(args) => body; ... }` where `h : I(...)` desugars to `I.eliminate` (the convention-named eliminator) or to the kernel recursor with appropriate motive. The motive's return type is the expected type of the surrounding block. Case bodies see the destructured names.
+
+Out of MVP scope (will follow in subsequent slices):
+
+- `claim` / `apply` / `witness` / `suffices` / `contradiction` / `by induction` block forms.
+- Implicit arguments at theorem call sites.
+- Footnotes.
+- Any hammer.
+
+## Phase 1 implementation status (landed 2026-05-13)
+
+The MVP slice above is implemented end-to-end. The surface forms shipped:
+
+- Anonymous tuple expression `⟨a, b, ..., n⟩` desugaring per expected
+  type to the unique constructor (right-associating for K=2 constructors
+  when N > 2 — handles nested Exists/And uniformly).
+- Anonymous tuple pattern `⟨a, b, ..., n⟩` with the same right-associate
+  rule for destructuring.
+- `cases scrutinee { | pattern => body  | pattern => body ... }` as an
+  expression. Non-indexed inductives only. Goal-type from the
+  surrounding expected type.
+- `let ⟨pat, pat, ...⟩ := value in body` — single-clause `cases` sugar.
+
+Test: `library/Natural/prime_divisor_v2.math` proves the same
+`has_prime_divisor` theorem as the original `prime_divisor.math` in
+67 lines vs 170 — 2.5× compression, with the proof's structure
+(strong induction, prime/composite split, destructure-and-recurse)
+visible at a glance.
+
+A related bug in the elaborator's `buildCaseLambda` was uncovered and
+fixed in the same change: the per-arg "is recursive" detection was
+running after parameter substitution, which false-positived when a
+parameter value happened to share its head with the inductive (e.g.
+matching on `And(A, And(B, C))` made And.introduction's second arg
+appear recursive). The detection now uses the original constructor
+type.
+
+Next slice candidates: implicit arguments at theorem call sites
+(removes the motive/IH boilerplate still visible in `prime_divisor_v2`),
+plus a statement-level proof block to introduce `claim`/`apply`/
+`witness`.

@@ -173,6 +173,26 @@ private:
         //   name                       (variable binding, or nullary constructor)
         //   Foo.bar(pat, pat, ...)     (constructor application; qualified name allowed)
         //   _                          (wildcard)
+        //   ⟨pat, pat, ...⟩            (anonymous tuple — destructures a
+        //                                single-constructor inductive whose
+        //                                identity the elaborator picks from
+        //                                the scrutinee's type)
+        if (peek().kind == TokenKind::LeftAngle) {
+            Token openAngle = consumeAny();
+            std::vector<SurfacePatternPointer> components;
+            if (peek().kind == TokenKind::RightAngle) {
+                throwHere("anonymous tuple pattern needs at least one "
+                          "component");
+            }
+            components.push_back(parsePattern());
+            while (peek().kind == TokenKind::Comma) {
+                consumeAny();
+                components.push_back(parsePattern());
+            }
+            expect(TokenKind::RightAngle, "ending anonymous tuple pattern");
+            return makeSurfacePatternTuple(std::move(components),
+                                            openAngle.line, openAngle.column);
+        }
         if (peek().kind != TokenKind::Identifier) {
             throwHere("expected pattern");
         }
@@ -293,8 +313,29 @@ private:
 
     SurfaceExpressionPointer parseLet() {
         const Token& start = consumeAny();  // 'let'
+        if (peek().kind == TokenKind::LeftAngle) {
+            // Pattern-form destructuring let: `let ⟨a, b⟩ := value in body`.
+            // Desugars to a single-clause `cases value { | ⟨a, b⟩ => body }`
+            // — the elaborator picks the destructuring constructor from
+            // the value's type.
+            auto pattern = parsePattern();
+            expect(TokenKind::Assign, "after let pattern");
+            auto value = parseExpression();
+            expect(TokenKind::KeywordIn, "after let value");
+            auto body = parseExpression();
+            SurfaceCasesClause clause;
+            clause.pattern = std::move(pattern);
+            clause.body = std::move(body);
+            clause.line = start.line;
+            clause.column = start.column;
+            std::vector<SurfaceCasesClause> clauses;
+            clauses.push_back(std::move(clause));
+            return makeSurfaceCases(std::move(value), std::move(clauses),
+                                     start.line, start.column);
+        }
         if (peek().kind != TokenKind::Identifier) {
-            throwHere("expected identifier after 'let'");
+            throwHere("expected identifier or anonymous tuple pattern "
+                      "after 'let'");
         }
         std::string name = consumeAny().lexeme;
         expect(TokenKind::Colon, "after let name");
@@ -552,6 +593,12 @@ private:
             return makeSurfaceNumericLiteral(token.lexeme,
                                               token.line, token.column);
         }
+        if (current.kind == TokenKind::LeftAngle) {
+            return parseAnonymousTuple();
+        }
+        if (current.kind == TokenKind::KeywordCases) {
+            return parseCasesExpression();
+        }
         if (current.kind == TokenKind::KeywordType) {
             Token token = consumeAny();
             if (peek().kind == TokenKind::LeftParen) {
@@ -586,6 +633,49 @@ private:
             return inner;
         }
         throwHere("expected expression");
+    }
+
+    // `⟨a, b, ...⟩` — anonymous tuple expression. At least one component.
+    SurfaceExpressionPointer parseAnonymousTuple() {
+        Token openAngle = consumeAny();  // '⟨'
+        if (peek().kind == TokenKind::RightAngle) {
+            throwHere("anonymous tuple needs at least one component");
+        }
+        std::vector<SurfaceExpressionPointer> components;
+        components.push_back(parseExpression());
+        while (peek().kind == TokenKind::Comma) {
+            consumeAny();
+            components.push_back(parseExpression());
+        }
+        expect(TokenKind::RightAngle, "ending anonymous tuple");
+        return makeSurfaceAnonymousTuple(std::move(components),
+                                          openAngle.line, openAngle.column);
+    }
+
+    // `cases scrutinee { | pattern => body  | pattern => body  ... }`.
+    // Builds an inductive eliminator at elaboration time; the motive is
+    // derived from the enclosing expected type.
+    SurfaceExpressionPointer parseCasesExpression() {
+        Token casesToken = consumeAny();  // 'cases'
+        auto scrutinee = parseExpression();
+        expect(TokenKind::LeftBrace, "after cases scrutinee");
+        std::vector<SurfaceCasesClause> clauses;
+        while (peek().kind == TokenKind::Pipe) {
+            Token pipeToken = consumeAny();
+            SurfaceCasesClause clause;
+            clause.line = pipeToken.line;
+            clause.column = pipeToken.column;
+            clause.pattern = parsePattern();
+            expect(TokenKind::FatArrow, "between cases pattern and body");
+            clause.body = parseExpression();
+            clauses.push_back(std::move(clause));
+        }
+        if (clauses.empty()) {
+            throwHere("cases expression needs at least one '|' clause");
+        }
+        expect(TokenKind::RightBrace, "ending cases expression");
+        return makeSurfaceCases(std::move(scrutinee), std::move(clauses),
+                                 casesToken.line, casesToken.column);
     }
 
     // A qualified name like Natural.add_zero with an optional universe

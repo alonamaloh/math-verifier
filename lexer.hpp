@@ -26,13 +26,14 @@ enum class TokenKind {
     KeywordProof, KeywordQed,
     KeywordHave, KeywordShow, KeywordCalc, KeywordBy,
     KeywordInduction, KeywordOn,
-    KeywordCase, KeywordOf, KeywordWith, KeywordHypothesis,
+    KeywordCase, KeywordCases, KeywordOf, KeywordWith, KeywordHypothesis,
     KeywordApply, KeywordReduction,
     KeywordMotive, KeywordTarget,
 
     // Punctuation
     LeftParen, RightParen,
     LeftBrace, RightBrace,
+    LeftAngle, RightAngle,    // "⟨" / "⟩" — anonymous tuples
     Comma, Colon, Pipe,
     Dot,
     DotLeftBrace,    // ".{"  introduces universe-argument list

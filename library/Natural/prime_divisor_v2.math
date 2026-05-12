@@ -1,0 +1,67 @@
+-- Natural/prime_divisor_v2.math
+--
+-- Every natural number ≥ 2 has a prime divisor — Phase 1 surface
+-- syntax. Compare with Natural/prime_divisor.math for the equivalent
+-- proof in the original eliminator-chain form. The structural shape
+-- of the proof is now visible at a glance:
+--
+--   strong-induction on subject; cases on prime-or-proper-divisor.
+--     prime case  → witness subject.
+--     composite   → unpack divisor, recurse, witness prime.
+--
+-- Surface affordances exercised here:
+--   * `cases` for case-split on Or.
+--   * `let ⟨…⟩ := …` (one-level destructuring let) for And and Exists.
+--   * Anonymous tuple `⟨…⟩` for Exists.introduce / And.introduction
+--     with right-associate flattening into nested And.
+
+module Natural.prime_divisor_v2
+
+import Natural.basics
+import Natural.order
+import Natural.divisibility
+import Natural.prime
+import Natural.strong_recursion
+import Natural.prime_split
+import Logic.basics
+import Logic.exists
+
+theorem Natural.has_prime_divisor_v2 (n : Natural)
+        (atLeastTwo : LessOrEqual(two, n))
+        : Exists(Natural, fun (prime : Natural) =>
+            And(Natural.is_prime(prime),
+                Natural.divides(prime, n))) :=
+  Natural.strong_induction(
+    fun (subject : Natural) =>
+        LessOrEqual(two, subject)
+        → Exists(Natural, fun (prime : Natural) =>
+              And(Natural.is_prime(prime),
+                   Natural.divides(prime, subject))),
+    fun (subject : Natural)
+        (inductionHypothesis :
+            (smaller : Natural)
+            → LessOrEqual(successor(smaller), subject)
+            → LessOrEqual(two, smaller)
+            → Exists(Natural, fun (prime : Natural) =>
+                  And(Natural.is_prime(prime),
+                       Natural.divides(prime, smaller))))
+        (subjectAtLeastTwo : LessOrEqual(two, subject)) =>
+      cases Natural.prime_or_proper_divisor(subject, subjectAtLeastTwo) {
+        | Or.introduceLeft(subjectIsPrime) =>
+            ⟨subject, subjectIsPrime, Natural.divides_reflexive(subject)⟩
+        | Or.introduceRight(properDivisorWitness) =>
+            let ⟨divisor, divisorAtLeastTwo,
+                  divisorBelowSubject, divisorDividesSubject⟩
+                := properDivisorWitness
+            in
+            let ⟨prime, primeIsPrime, primeDividesDivisor⟩
+                := inductionHypothesis(
+                       divisor, divisorBelowSubject, divisorAtLeastTwo)
+            in
+            ⟨prime, primeIsPrime,
+              Natural.divides_transitive(
+                  prime, divisor, subject,
+                  primeDividesDivisor, divisorDividesSubject)⟩
+      },
+    n,
+    atLeastTwo)

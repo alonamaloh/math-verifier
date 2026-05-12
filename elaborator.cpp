@@ -661,6 +661,38 @@ private:
             bool isRecursive;
         };
         std::vector<ConstructorArgument> constructorArguments;
+        // Pre-compute the per-arg `isRecursive` flag from the ORIGINAL
+        // (un-substituted) constructor type. Doing this after parameter
+        // substitution gives false positives when a parameter value
+        // happens to have the inductive's name as its head — e.g.
+        // matching on a scrutinee of type `And(A, And(B, C))` would
+        // make And.introduction's second arg appear recursive purely
+        // because the substituted second parameter is itself an `And`.
+        // In the original type, that arg's head is the parameter
+        // variable (a BoundVariable), which is unambiguous.
+        std::vector<bool> argumentIsRecursiveOriginal;
+        {
+            ExpressionPointer originalCursor = constructor->type;
+            for (size_t p = 0; p < parameterValues.size(); ++p) {
+                auto* pi =
+                    std::get_if<Pi>(&originalCursor->node);
+                if (!pi) break;
+                originalCursor = pi->codomain;
+            }
+            while (auto* pi =
+                       std::get_if<Pi>(&originalCursor->node)) {
+                ExpressionPointer typeHead = pi->domain;
+                while (auto* application =
+                           std::get_if<Application>(&typeHead->node)) {
+                    typeHead = application->function;
+                }
+                auto* constant =
+                    std::get_if<Constant>(&typeHead->node);
+                argumentIsRecursiveOriginal.push_back(
+                    constant && constant->name == inductiveName);
+                originalCursor = pi->codomain;
+            }
+        }
         // The constructor's specific index values (one per index of the
         // inductive). Extracted from the result type after stripping
         // all parameter and value-arg Pis. References here may be to:
@@ -691,17 +723,16 @@ private:
                 ConstructorArgument constructorArgument;
                 constructorArgument.defaultName = pi->displayHint;
                 constructorArgument.type = pi->domain;
-                // Recursive argument: type's head (after peeling
-                // Applications) is the inductive constant.
-                ExpressionPointer typeHead = pi->domain;
-                while (auto* application =
-                           std::get_if<Application>(&typeHead->node)) {
-                    typeHead = application->function;
-                }
-                auto* constant =
-                    std::get_if<Constant>(&typeHead->node);
+                // Use the recursive-flag computed from the ORIGINAL
+                // constructor type (above). Falling back to checking
+                // the post-substitution head would mistake parameter
+                // values whose head is the inductive (e.g. `And(B, C)`
+                // substituted into And.introduction's `b : B` slot)
+                // for genuine recursive arguments.
+                size_t index = constructorArguments.size();
                 constructorArgument.isRecursive =
-                    constant && constant->name == inductiveName;
+                    (index < argumentIsRecursiveOriginal.size())
+                    && argumentIsRecursiveOriginal[index];
                 constructorArguments.push_back(constructorArgument);
                 cursor = pi->codomain;
             }
@@ -1381,7 +1412,398 @@ private:
                 "unary operator '" + unary->opSymbol + "' is not yet "
                 "supported by the elaborator");
         }
+        if (auto* tuple =
+                std::get_if<SurfaceAnonymousTuple>(&expression.node)) {
+            return elaborateAnonymousTuple(*tuple, localBinders, expectedType,
+                                            expression.line, expression.column);
+        }
+        if (auto* cases =
+                std::get_if<SurfaceCases>(&expression.node)) {
+            return elaborateCasesExpression(*cases, localBinders, expectedType,
+                                             expression.line, expression.column);
+        }
         throw ElaborateError("unhandled surface expression variant");
+    }
+
+    // `⟨a, b, ..., n⟩` at expected type `I(...)`: desugars to a call of
+    // I's unique constructor. When the constructor takes more value-args
+    // than there are tuple components, the user's tuple is under-sized
+    // and we error. When the constructor takes exactly N value-args, we
+    // emit a direct constructor application. When the constructor takes
+    // K < N value-args and K == 2, we right-associate: `⟨a, b, c⟩` at
+    // `Exists(_, _)` becomes `Exists.introduce(a, ⟨b, c⟩)` and the inner
+    // `⟨b, c⟩` is elaborated against the second-argument's expected
+    // type. (This is the conventional shape for nested Exists/And.)
+    ExpressionPointer elaborateAnonymousTuple(
+        const SurfaceAnonymousTuple& tuple,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+
+        if (!expectedType) {
+            throw ElaborateError(
+                "anonymous tuple '⟨...⟩' needs an expected type from "
+                "context (line " + std::to_string(line) + ")");
+        }
+        ExpressionPointer head =
+            weakHeadNormalForm(environment_, expectedType);
+        ExpressionPointer headFunction = head;
+        while (auto* application =
+                   std::get_if<Application>(&headFunction->node)) {
+            headFunction = application->function;
+        }
+        auto* constant = std::get_if<Constant>(&headFunction->node);
+        if (!constant) {
+            throw ElaborateError(
+                "anonymous tuple '⟨...⟩' at line "
+                + std::to_string(line)
+                + ": expected type does not have an inductive head");
+        }
+        const Declaration* inductiveDecl =
+            environment_.lookup(constant->name);
+        auto* inductive = inductiveDecl
+            ? std::get_if<Inductive>(inductiveDecl) : nullptr;
+        if (!inductive) {
+            throw ElaborateError(
+                "anonymous tuple '⟨...⟩' at line "
+                + std::to_string(line)
+                + ": expected type's head '" + constant->name
+                + "' is not an inductive");
+        }
+        if (inductive->constructorNames.size() != 1) {
+            throw ElaborateError(
+                "anonymous tuple '⟨...⟩' at line "
+                + std::to_string(line)
+                + ": expected single-constructor inductive, but '"
+                + constant->name + "' has "
+                + std::to_string(inductive->constructorNames.size())
+                + " constructors");
+        }
+        const std::string& constructorName =
+            inductive->constructorNames[0];
+        const Declaration* constructorDecl =
+            environment_.lookup(constructorName);
+        auto* constructor = constructorDecl
+            ? std::get_if<Constructor>(constructorDecl) : nullptr;
+        if (!constructor) {
+            throw ElaborateError(
+                "anonymous tuple '⟨...⟩' at line "
+                + std::to_string(line)
+                + ": constructor '" + constructorName
+                + "' missing from environment");
+        }
+        int totalPiCount = countLeadingPis(constructor->type);
+        int valueArgumentCount =
+            totalPiCount - inductive->numParameters;
+        size_t componentCount = tuple.components.size();
+        if (componentCount == 0) {
+            throw ElaborateError(
+                "anonymous tuple '⟨...⟩' is empty at line "
+                + std::to_string(line));
+        }
+        // Build a SurfaceApplication and re-elaborate it so that the
+        // existing constructor parameter inference path handles it.
+        std::vector<SurfaceExpressionPointer> components;
+        if (static_cast<int>(componentCount) == valueArgumentCount) {
+            components = tuple.components;
+        } else if (valueArgumentCount == 2 && componentCount > 2) {
+            components.push_back(tuple.components[0]);
+            std::vector<SurfaceExpressionPointer> tail(
+                tuple.components.begin() + 1, tuple.components.end());
+            components.push_back(makeSurfaceAnonymousTuple(
+                std::move(tail), line, column));
+        } else {
+            throw ElaborateError(
+                "anonymous tuple '⟨...⟩' at line "
+                + std::to_string(line) + ": constructor '"
+                + constructorName + "' takes "
+                + std::to_string(valueArgumentCount)
+                + " value argument(s), got "
+                + std::to_string(componentCount)
+                + " tuple component(s)");
+        }
+        SurfaceExpressionPointer constructorReference =
+            makeSurfaceIdentifier(constructorName, {}, line, column);
+        SurfaceExpressionPointer surfaceCall = makeSurfaceApplication(
+            std::move(constructorReference), std::move(components),
+            line, column);
+        return elaborateExpression(*surfaceCall, localBinders,
+                                    expectedType);
+    }
+
+    // `cases scrutinee { | pattern => body | ... }`. Phase 1 covers
+    // non-indexed inductives only. Re-uses the existing
+    // `buildCaseLambda` helper by synthesizing a minimal pattern-match
+    // declaration whose cases mirror the user's clauses.
+    ExpressionPointer elaborateCasesExpression(
+        const SurfaceCases& cases,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+
+        if (!expectedType) {
+            throw ElaborateError(
+                "cases expression needs an expected type from context "
+                "(line " + std::to_string(line) + ")");
+        }
+
+        // Elaborate scrutinee + infer + normalise type. The inferred type
+        // comes back in "opened" form — local-binder references are
+        // Internal-origin FreeVariables. Decompose the opened form to
+        // find the inductive head, then close every piece we plan to
+        // embed in the motive or pass to buildCaseLambda so they're back
+        // in BoundVariable form.
+        ExpressionPointer scrutinee =
+            elaborateExpression(*cases.scrutinee, localBinders);
+        ExpressionPointer scrutineeTypeOpened = weakHeadNormalForm(
+            environment_, inferTypeInLocalContext(localBinders, scrutinee));
+
+        std::vector<ExpressionPointer> inductiveArguments;
+        ExpressionPointer cursor = scrutineeTypeOpened;
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            inductiveArguments.insert(inductiveArguments.begin(),
+                                       application->argument);
+            cursor = weakHeadNormalForm(environment_, application->function);
+        }
+        auto* constant = std::get_if<Constant>(&cursor->node);
+        if (!constant) {
+            throw ElaborateError(
+                "cases scrutinee at line " + std::to_string(line)
+                + ": type's head is not an inductive constant after "
+                "normalisation");
+        }
+        const Declaration* inductiveDecl =
+            environment_.lookup(constant->name);
+        auto* inductive = inductiveDecl
+            ? std::get_if<Inductive>(inductiveDecl) : nullptr;
+        if (!inductive) {
+            throw ElaborateError(
+                "cases scrutinee at line " + std::to_string(line)
+                + ": type '" + constant->name + "' is not an inductive");
+        }
+        if (static_cast<int>(inductiveArguments.size())
+            < inductive->numParameters) {
+            throw ElaborateError(
+                "cases at line " + std::to_string(line)
+                + ": inductive '" + constant->name + "' applied to fewer "
+                  "than its parameter count");
+        }
+        // Close every piece coming out of opened-form inference back to
+        // local-binder BoundVariables. The motive and parameterValues
+        // passed to buildCaseLambda must live in the same scope as
+        // localBinders (BoundVariables, not Internal FreeVariables).
+        ExpressionPointer scrutineeType = closeOverLocalBinders(
+            scrutineeTypeOpened, localBinders, localBinders.size());
+        std::vector<ExpressionPointer> parameterValues;
+        for (int p = 0; p < inductive->numParameters; ++p) {
+            parameterValues.push_back(closeOverLocalBinders(
+                inductiveArguments[p], localBinders,
+                localBinders.size()));
+        }
+        std::vector<ExpressionPointer> indexValues(
+            inductiveArguments.begin() + inductive->numParameters,
+            inductiveArguments.end());
+        if (!indexValues.empty()) {
+            throw ElaborateError(
+                "cases at line " + std::to_string(line)
+                + ": pattern matching on indexed inductive '"
+                + constant->name + "' is not supported in Phase 1");
+        }
+        const std::vector<LevelPointer>& inductiveUniverseArguments =
+            constant->universeArguments;
+
+        // Look up the recursor.
+        std::string recursorName = constant->name + "_recursor";
+        const Declaration* recursorDecl =
+            environment_.lookup(recursorName);
+        if (!recursorDecl) {
+            throw ElaborateError(
+                "cases at line " + std::to_string(line)
+                + ": no recursor for inductive '" + constant->name + "'");
+        }
+        auto* recursor = std::get_if<Recursor>(recursorDecl);
+        if (!recursor) {
+            throw ElaborateError(
+                "cases at line " + std::to_string(line)
+                + ": '" + recursorName + "' is not a recursor");
+        }
+
+        // Build the motive: fun (target : scrutineeType) => expectedType.
+        // The expected type lives in the outer scope; shift by 1 to make
+        // it valid under the motive's target binder. (BoundVariable
+        // references to local binders need to skip past the new binder.)
+        ExpressionPointer motive = makeLambda(
+            "_cases_target", scrutineeType, shift(expectedType, 1));
+
+        // Infer the motive's universe level by asking the kernel for
+        // its type (a Pi ending in a Sort). Local binders' types may
+        // reference earlier locals, so open them via openOverLocalBinders.
+        LevelPointer motiveLevel;
+        {
+            Context openedContext;
+            for (size_t i = 0; i < localBinders.size(); ++i) {
+                ExpressionPointer openedType = openOverLocalBinders(
+                    localBinders[i].type, localBinders, i);
+                openedContext.push_back(
+                    {localBinders[i].name, openedType,
+                     FreeVariableOrigin::Internal});
+            }
+            ExpressionPointer motiveType =
+                inferType(environment_, openedContext,
+                           openOverLocalBinders(
+                               motive, localBinders,
+                               localBinders.size()));
+            ExpressionPointer motiveCursor = motiveType;
+            while (auto* pi = std::get_if<Pi>(&motiveCursor->node)) {
+                motiveCursor = pi->codomain;
+            }
+            auto* sortNode = std::get_if<Sort>(&motiveCursor->node);
+            if (!sortNode) {
+                throw ElaborateError(
+                    "internal: cases motive type doesn't end in a Sort "
+                    "(line " + std::to_string(line) + ")");
+            }
+            motiveLevel = sortNode->level;
+        }
+
+        // Build a synthetic pattern-match declaration so we can reuse
+        // buildCaseLambda. Each user clause becomes a SurfacePatternCase
+        // with a single pattern. Tuple patterns are first translated to
+        // constructor patterns (only meaningful for single-constructor
+        // inductives — checked here).
+        SurfaceDefinitionDeclaration syntheticDeclaration;
+        // The synthetic name is used only by rewriteRecursiveCalls,
+        // which looks for calls of this name in the case body. We pick
+        // a name no user would write so it can never match.
+        syntheticDeclaration.name =
+            "_cases_at_line_" + std::to_string(line)
+            + "_column_" + std::to_string(column);
+        syntheticDeclaration.isTheorem = false;
+        for (const auto& clause : cases.clauses) {
+            SurfacePatternPointer pattern = clause.pattern;
+            SurfaceExpressionPointer body = clause.body;
+            if (auto* tupleNode = std::get_if<SurfacePatternTuple>(
+                    &pattern->node)) {
+                if (inductive->constructorNames.size() != 1) {
+                    throw ElaborateError(
+                        "cases at line " + std::to_string(clause.line)
+                        + ": anonymous tuple pattern '⟨...⟩' only works "
+                          "for single-constructor inductives, but '"
+                        + constant->name + "' has "
+                        + std::to_string(
+                            inductive->constructorNames.size())
+                        + " constructors");
+                }
+                const std::string& ctorName =
+                    inductive->constructorNames[0];
+                const Declaration* ctorDecl =
+                    environment_.lookup(ctorName);
+                auto* ctorDeclaration = ctorDecl
+                    ? std::get_if<Constructor>(ctorDecl) : nullptr;
+                if (!ctorDeclaration) {
+                    throw ElaborateError(
+                        "cases at line " + std::to_string(clause.line)
+                        + ": constructor '" + ctorName
+                        + "' missing from environment");
+                }
+                int totalPi = countLeadingPis(ctorDeclaration->type);
+                int valueArgCount =
+                    totalPi - inductive->numParameters;
+                size_t componentCount = tupleNode->components.size();
+                if (static_cast<int>(componentCount) == valueArgCount) {
+                    pattern = makeSurfacePatternConstructor(
+                        ctorName, tupleNode->components,
+                        clause.line, clause.column);
+                } else if (valueArgCount == 2 && componentCount > 2) {
+                    // Right-associate: outer pattern binds first
+                    // component directly and a fresh name for the rest;
+                    // body is wrapped in an inner cases that
+                    // destructures the rest via a tuple pattern with
+                    // one fewer component.
+                    std::string freshName =
+                        "_tupleRest_" + std::to_string(line) + "_"
+                        + std::to_string(clause.line) + "_"
+                        + std::to_string(clause.column);
+                    std::vector<SurfacePatternPointer> outerArgs;
+                    outerArgs.push_back(tupleNode->components[0]);
+                    outerArgs.push_back(makeSurfacePatternBareName(
+                        freshName, clause.line, clause.column));
+                    pattern = makeSurfacePatternConstructor(
+                        ctorName, std::move(outerArgs),
+                        clause.line, clause.column);
+                    std::vector<SurfacePatternPointer> restComponents(
+                        tupleNode->components.begin() + 1,
+                        tupleNode->components.end());
+                    SurfacePatternPointer restPattern =
+                        makeSurfacePatternTuple(
+                            std::move(restComponents),
+                            clause.line, clause.column);
+                    SurfaceExpressionPointer freshReference =
+                        makeSurfaceIdentifier(freshName, {},
+                                               clause.line, clause.column);
+                    SurfaceCasesClause innerClause;
+                    innerClause.pattern = std::move(restPattern);
+                    innerClause.body = body;
+                    innerClause.line = clause.line;
+                    innerClause.column = clause.column;
+                    std::vector<SurfaceCasesClause> innerClauses;
+                    innerClauses.push_back(std::move(innerClause));
+                    body = makeSurfaceCases(
+                        std::move(freshReference),
+                        std::move(innerClauses),
+                        clause.line, clause.column);
+                } else {
+                    throw ElaborateError(
+                        "cases at line " + std::to_string(clause.line)
+                        + ": anonymous tuple pattern has "
+                        + std::to_string(componentCount)
+                        + " component(s) but constructor '" + ctorName
+                        + "' takes " + std::to_string(valueArgCount));
+                }
+            }
+            SurfacePatternCase patternCase;
+            patternCase.patterns.push_back(std::move(pattern));
+            patternCase.body = std::move(body);
+            patternCase.line = clause.line;
+            patternCase.column = clause.column;
+            syntheticDeclaration.cases.push_back(std::move(patternCase));
+        }
+
+        // Build a case lambda for each constructor (in declared order).
+        std::vector<ExpressionPointer> caseLambdas;
+        for (const auto& constructorName : inductive->constructorNames) {
+            caseLambdas.push_back(buildCaseLambda(
+                syntheticDeclaration, constructorName, constant->name,
+                inductiveUniverseArguments, motive, parameterValues,
+                localBinders));
+        }
+
+        // Assemble the recursor call. For large-eliminating recursors
+        // the motive's universe level is an additional universe arg
+        // appended after the inductive's own universe args.
+        bool recursorHasMotiveLevel =
+            recursor->universeParameters.size()
+            > inductive->universeParameters.size();
+        std::vector<LevelPointer> recursorUniverseArguments =
+            inductiveUniverseArguments;
+        if (recursorHasMotiveLevel) {
+            recursorUniverseArguments.push_back(motiveLevel);
+        }
+        ExpressionPointer applied =
+            makeConstant(recursorName,
+                          std::move(recursorUniverseArguments));
+        for (const auto& parameterValue : parameterValues) {
+            applied = makeApplication(applied, parameterValue);
+        }
+        applied = makeApplication(applied, motive);
+        for (auto& caseLambda : caseLambdas) {
+            applied =
+                makeApplication(applied, std::move(caseLambda));
+        }
+        // No indices to apply (Phase 1 forbids indexed inductives).
+        applied = makeApplication(applied, scrutinee);
+        return applied;
     }
 
     ExpressionPointer elaborateIdentifier(
