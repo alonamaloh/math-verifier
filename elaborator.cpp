@@ -776,12 +776,39 @@ private:
             lambdaBinders.push_back({destructuredName, constructorArgumentType});
             binderDepth++;
             if (constructorArgument.isRecursive) {
-                // Recursive hypothesis: type = motive(<this destructured>).
-                // Motive lives at the outer (empty) context, so we shift
-                // by binderDepth to bring it under all current binders.
+                // Recursive hypothesis: type = motive(<indices>,
+                // <this destructured>). For non-indexed inductives the
+                // index list is empty and the motive takes a single
+                // argument (the scrutinee). For indexed ones (e.g.
+                // LessOrEqual.step's recursive proof argument has type
+                // LessOrEqual(smaller, larger)), we must extract those
+                // indices from the value-arg's type and feed them to
+                // the motive in order.
                 ExpressionPointer shiftedMotive = shift(motive, binderDepth);
-                ExpressionPointer recursionHypothesisType =
-                    makeApplication(shiftedMotive,
+                ExpressionPointer recursionHypothesisType = shiftedMotive;
+                // Peel the constructor-argument type (now in our
+                // lambdaBinder scope, since constructorArgumentType is
+                // shifted) to extract its arguments. The first
+                // `numParameters` are parameter values; the rest are
+                // index values.
+                ExpressionPointer typeCursor =
+                    shift(constructorArgumentType, 1);
+                std::vector<ExpressionPointer> recursiveTypeArguments;
+                while (auto* application =
+                           std::get_if<Application>(&typeCursor->node)) {
+                    recursiveTypeArguments.insert(
+                        recursiveTypeArguments.begin(),
+                        application->argument);
+                    typeCursor = application->function;
+                }
+                for (size_t k = parameterValues.size();
+                     k < recursiveTypeArguments.size(); ++k) {
+                    recursionHypothesisType = makeApplication(
+                        recursionHypothesisType,
+                        recursiveTypeArguments[k]);
+                }
+                recursionHypothesisType =
+                    makeApplication(recursionHypothesisType,
                                     makeBoundVariable(0));
                 // ^ Bound(0) is the most-recently-bound name, which is
                 // the constructor argument we just added

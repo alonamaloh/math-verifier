@@ -24,3 +24,20 @@ definition Natural.zero_least
   | successor(predecessor) =>
       LessOrEqual.step(zero, predecessor,
                         Natural.zero_least(predecessor))
+
+-- ≤ is transitive. Pattern-match on the second proof (LessOrEqual(b, c));
+-- the first proof is threaded as a function argument that comes after
+-- the scrutinee so the motive abstracts over its type. That way the
+-- reflexivity case (which forces b = c) automatically specialises the
+-- first proof's type to LessOrEqual(a, c).
+theorem LessOrEqual.transitive (a b c : Natural)
+        : LessOrEqual(b, c)
+          → LessOrEqual(a, b)
+          → LessOrEqual(a, c)
+  | LessOrEqual.reflexivity(_), firstProof =>
+      firstProof
+  | LessOrEqual.step(_, cPredecessor, secondProofSubdivided), firstProof =>
+      LessOrEqual.step(a, cPredecessor,
+          LessOrEqual.transitive(
+              a, b, cPredecessor,
+              secondProofSubdivided, firstProof))
