@@ -33,32 +33,19 @@ definition False.eliminate(GoalType : Type) (proofOfFalse : False)
   False_recursor(fun (_ : False) => GoalType, proofOfFalse)
 
 -- Project the left component of a conjunction.
-definition And.left(A B : Proposition) (conjunction : And(A, B)) : A :=
-  And_recursor(A, B,
-                fun (_ : And(A, B)) => A,
-                fun (leftProof : A) (_ : B) => leftProof,
-                conjunction)
+definition And.left (A B : Proposition) : And(A, B) → A
+  | And.introduction(leftProof, _) => leftProof
 
 -- Project the right component of a conjunction.
-definition And.right(A B : Proposition) (conjunction : And(A, B)) : B :=
-  And_recursor(A, B,
-                fun (_ : And(A, B)) => B,
-                fun (_ : A) (rightProof : B) => rightProof,
-                conjunction)
+definition And.right (A B : Proposition) : And(A, B) → B
+  | And.introduction(_, rightProof) => rightProof
 
 -- And.swap: And(A, B) → And(B, A).
-definition And.swap(A B : Proposition) (conjunction : And(A, B))
-        : And(B, A) :=
-  And_recursor(A, B,
-                fun (_ : And(A, B)) => And(B, A),
-                fun (leftProof : A) (rightProof : B)
-                    => And.introduction(B, A, rightProof, leftProof),
-                conjunction)
+definition And.swap (A B : Proposition) : And(A, B) → And(B, A)
+  | And.introduction(leftProof, rightProof) =>
+      And.introduction(rightProof, leftProof)
 
 -- Or.swap: Or(A, B) → Or(B, A).
-definition Or.swap(A B : Proposition) (disjunction : Or(A, B)) : Or(B, A) :=
-  Or_recursor(A, B,
-               fun (_ : Or(A, B)) => Or(B, A),
-               fun (leftProof : A) => Or.introduceRight(B, A, leftProof),
-               fun (rightProof : B) => Or.introduceLeft(B, A, rightProof),
-               disjunction)
+definition Or.swap (A B : Proposition) : Or(A, B) → Or(B, A)
+  | Or.introduceLeft(leftProof)   => Or.introduceRight(leftProof)
+  | Or.introduceRight(rightProof) => Or.introduceLeft(rightProof)

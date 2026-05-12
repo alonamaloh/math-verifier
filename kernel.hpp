@@ -153,6 +153,15 @@ inline void addInductive(Environment& environment, std::string inductiveName,
 // Used to keep indices coherent when a term crosses additional binders.
 ExpressionPointer shift(ExpressionPointer expression, int amount, int cutoff = 0);
 
+// Walks `expression` and replaces every LevelParam appearing in any Sort
+// or Constant universe-argument list, mapping each name in `parameterNames`
+// to the corresponding entry in `replacements`. Used to instantiate a
+// polymorphic constant when its universe arguments are known.
+ExpressionPointer substituteUniverseLevels(
+    ExpressionPointer expression,
+    const std::vector<std::string>& parameterNames,
+    const std::vector<LevelPointer>& replacements);
+
 // Replaces BoundVariable{targetIndex} with `replacement` and decrements
 // higher indices (the binder being removed). Recurses under binders with
 // targetIndex+1 and a shifted replacement. Used by beta reduction.

@@ -53,6 +53,8 @@ LevelPointer impredicativeMaxLevel(LevelPointer domainLevel,
     return makeLevelIMax(std::move(domainLevel), std::move(codomainLevel));
 }
 
+}  // namespace
+
 // Walks `expression`, replacing each universe parameter that appears in any
 // Sort or in a Constant's universe arguments with the supplied substitution.
 // Used by inferType when a polymorphic constant is referenced with explicit
@@ -112,6 +114,8 @@ ExpressionPointer substituteUniverseLevels(
     // BoundVariable, FreeVariable: no levels inside, return as-is.
     return expression;
 }
+
+namespace {
 
 // Helper accessor: every Declaration variant carries a list of universe
 // parameter names. Returns it.
