@@ -1,0 +1,43 @@
+-- Natural/divisibility.math
+--
+-- The divides relation `a | b` on Natural, defined as ∃ k. b = a * k.
+-- Plus a few basic facts. Proofs go through the Exists recursor since
+-- pattern matching on parameterised inductives isn't yet supported.
+
+module Natural.divisibility
+
+import Natural.basics
+import Natural.arithmetic
+import Equality.basics
+import Logic.exists
+
+-- a divides b : there is a natural k such that b = a * k.
+definition Natural.divides(a b : Natural) : Prop :=
+  Exists(Natural, fun (k : Natural) => b = a * k)
+
+-- Every natural divides itself: a | a, with witness k = 1 and the
+-- proof a = a * 1 from multiply_one (reversed).
+theorem Natural.divides_reflexive(a : Natural) : Natural.divides(a, a) :=
+  Exists.introduce(
+    Natural,
+    fun (k : Natural) => a = a * k,
+    one,
+    Equality.symmetry(Natural.multiply_one(a)))
+
+-- One divides everything: 1 | a, with witness k = a and the
+-- proof a = 1 * a from one_multiply (reversed).
+theorem Natural.one_divides(a : Natural) : Natural.divides(one, a) :=
+  Exists.introduce(
+    Natural,
+    fun (k : Natural) => a = one * k,
+    a,
+    Equality.symmetry(Natural.one_multiply(a)))
+
+-- Every natural divides zero: a | 0, with witness k = 0 and the
+-- proof 0 = a * 0 from multiply_zero (reversed).
+theorem Natural.divides_zero(a : Natural) : Natural.divides(a, zero) :=
+  Exists.introduce(
+    Natural,
+    fun (k : Natural) => zero = a * k,
+    zero,
+    Equality.symmetry(Natural.multiply_zero(a)))
