@@ -864,7 +864,7 @@ ExpressionPointer inferTypeWork(const Environment& environment,
         return type;
     }
     if (auto* sort = std::get_if<Sort>(&expression->node)) {
-        return makeSort(makeLevelSucc(sort->level));
+        return makeSort(makeLevelSuccessor(sort->level));
     }
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
         auto domainKind = weakHeadNormalForm(

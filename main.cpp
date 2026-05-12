@@ -630,15 +630,15 @@ void runEnvironmentTests(const Environment& environment) {
 void runLevelArithmeticTests() {
     std::cout << "--- level arithmetic tests ---\n";
 
-    // makeLevelSucc folds over concrete levels.
-    EXPECT_TRUE(*levelAsConstant(makeLevelSucc(makeLevelConst(0))) == 1);
-    EXPECT_TRUE(*levelAsConstant(makeLevelSucc(makeLevelConst(7))) == 8);
+    // makeLevelSuccessor folds over concrete levels.
+    EXPECT_TRUE(*levelAsConstant(makeLevelSuccessor(makeLevelConst(0))) == 1);
+    EXPECT_TRUE(*levelAsConstant(makeLevelSuccessor(makeLevelConst(7))) == 8);
 
-    // makeLevelSucc stays symbolic for parameters.
+    // makeLevelSuccessor stays symbolic for parameters.
     {
-        auto succU = makeLevelSucc(makeLevelParam("u"));
-        EXPECT_FALSE(levelAsConstant(succU).has_value());
-        EXPECT_LEVEL_PRINTS(succU, "u+1");
+        auto successorOfU = makeLevelSuccessor(makeLevelParam("u"));
+        EXPECT_FALSE(levelAsConstant(successorOfU).has_value());
+        EXPECT_LEVEL_PRINTS(successorOfU, "u+1");
     }
 
     // makeLevelMax: concrete vs concrete is folded.
@@ -669,7 +669,7 @@ void runLevelArithmeticTests() {
     // makeLevelIMax: codomain successor(_) is never 0, so becomes max.
     {
         auto u = makeLevelParam("u");
-        auto imaxResult = makeLevelIMax(u, makeLevelSucc(makeLevelParam("v")));
+        auto imaxResult = makeLevelIMax(u, makeLevelSuccessor(makeLevelParam("v")));
         // Should be max(u, successor(v)) — folded.
         EXPECT_LEVEL_PRINTS(imaxResult, "max(u, v+1)");
     }
@@ -717,16 +717,16 @@ void runLevelArithmeticTests() {
 
     // levelLessOrEqual: successor(a) <= successor(b) iff a <= b.
     EXPECT_TRUE(levelLessOrEqual(
-        makeLevelSucc(makeLevelConst(2)), makeLevelSucc(makeLevelConst(3))));
+        makeLevelSuccessor(makeLevelConst(2)), makeLevelSuccessor(makeLevelConst(3))));
     EXPECT_FALSE(levelLessOrEqual(
-        makeLevelSucc(makeLevelConst(3)), makeLevelSucc(makeLevelConst(2))));
+        makeLevelSuccessor(makeLevelConst(3)), makeLevelSuccessor(makeLevelConst(2))));
 
     // Substitution: replacing the param appears throughout, others are
     // untouched.
     {
         auto level = makeLevelMax(
             makeLevelParam("u"),
-            makeLevelSucc(makeLevelParam("v")));
+            makeLevelSuccessor(makeLevelParam("v")));
         auto substituted = substituteLevelParameter(
             level, "u", makeLevelConst(5));
         EXPECT_LEVEL_PRINTS(substituted, "max(5, v+1)");
@@ -1824,7 +1824,7 @@ void runHardeningTests(const Environment& arithmetic) {
         Environment local = arithmetic;
         // polyDef.{u} : Type (u+1) := Type u
         addDefinition(local, "polyDef", {"u"},
-                      makeType(makeLevelSucc(makeLevelParam("u"))),
+                      makeType(makeLevelSuccessor(makeLevelParam("u"))),
                       makeType(makeLevelParam("u")));
         // Construct polyDef with zero universe args (instead of one).
         EXPECT_THROW(weakHeadNormalForm(local, makeConstant("polyDef")));

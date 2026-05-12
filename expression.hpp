@@ -74,7 +74,7 @@ inline ExpressionPointer makeType(int index) {
 }
 // Polymorphic Type universe: `Type u` lives at Sort (u+1).
 inline ExpressionPointer makeType(LevelPointer level) {
-    return makeSort(makeLevelSucc(std::move(level)));
+    return makeSort(makeLevelSuccessor(std::move(level)));
 }
 inline ExpressionPointer makePi(std::string displayHint,
                             ExpressionPointer domain,

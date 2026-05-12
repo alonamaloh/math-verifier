@@ -148,15 +148,16 @@ private:
     //
     // is translated into a recursor call. For v1 the supported shape is:
     //   - All function arguments are listed in the type signature
-    //     (Pi-chain). No `(args)` allowed before the colon.
+    //     (Pi-chain). No `(arguments)` allowed before the colon.
     //   - The first argument is the scrutinee. Its type must be a bare
     //     inductive identifier with zero parameters (Natural, Boolean,
     //     enum-like types).
     //   - Other positions in each pattern row must be bare variable
     //     patterns (or `_`).
     //   - Every constructor must have exactly one matching case.
-    //   - Recursive calls in case bodies must use the destructured arg
-    //     of the case as their first argument (structural recursion).
+    //   - Recursive calls in case bodies must use the destructured
+    //     argument of the case as their first argument (structural
+    //     recursion).
 
     void elaboratePatternMatchDefinition(
         const SurfaceDefinitionDecl& declaration) {
@@ -189,7 +190,8 @@ private:
                    std::get_if<SurfacePiType>(&returnType->node)) {
             if (piType->binder.names.empty()) {
                 SurfaceArgument argument;
-                argument.name = "_arg" + std::to_string(syntheticIndex++);
+                argument.name =
+                    "_argument" + std::to_string(syntheticIndex++);
                 argument.type = piType->binder.type;
                 functionArguments.push_back(argument);
             } else {
@@ -293,7 +295,7 @@ private:
                 "pattern matching on indexed inductives is not yet "
                 "supported (inductive '" + inductiveName
                 + "' applied with " + std::to_string(numIndexArgs)
-                + " index arg(s) — use a direct recursor call)");
+                + " index argument(s) — use a direct recursor call)");
         }
 
         // Build the full type as a Pi chain.
@@ -306,31 +308,33 @@ private:
         }
 
         // Build the motive in the kernel. The motive is a lambda over
-        // the scrutinee, with body = Pi over the remaining args ending
+        // the scrutinee, with body = Pi over the remaining arguments
+        // ending
         // in the return type. The return type may reference any of the
         // function's arguments, so we elaborate it with the full binder
         // stack [scrutinee, otherArg1, ..., otherArgN] in scope and
-        // then wrap with Pis for the non-scrutinee args.
+        // then wrap with Pis for the non-scrutinee arguments.
         ExpressionPointer motive;
         {
             std::vector<LocalBinder> motiveStack;
             motiveStack.push_back({scrutineeArgument.name,
                                    argumentKernelTypes[0]});
-            std::vector<ExpressionPointer> otherArgKernelTypes;
+            std::vector<ExpressionPointer> otherArgumentKernelTypes;
             for (size_t i = 1; i < functionArguments.size(); ++i) {
-                ExpressionPointer argType =
+                ExpressionPointer argumentType =
                     elaborateExpression(*functionArguments[i].type,
                                          motiveStack);
-                otherArgKernelTypes.push_back(argType);
-                motiveStack.push_back({functionArguments[i].name, argType});
+                otherArgumentKernelTypes.push_back(argumentType);
+                motiveStack.push_back(
+                    {functionArguments[i].name, argumentType});
             }
             ExpressionPointer motiveCodomain =
                 elaborateExpression(*returnType, motiveStack);
             for (int i =
-                     static_cast<int>(otherArgKernelTypes.size()) - 1;
+                     static_cast<int>(otherArgumentKernelTypes.size()) - 1;
                  i >= 0; --i) {
                 motiveCodomain = makePi(functionArguments[i + 1].name,
-                                         otherArgKernelTypes[i],
+                                         otherArgumentKernelTypes[i],
                                          std::move(motiveCodomain));
             }
             motive = makeLambda(scrutineeArgument.name,
@@ -415,15 +419,17 @@ private:
             applied = makeApplication(std::move(applied),
                                        std::move(caseLambda));
         }
-        // The scrutinee. The function's args are bound (from innermost
-        // outermost) at depths n-1, n-2, ..., 0 inside the body lambda.
-        // The scrutinee is the FIRST function arg, so its de Bruijn
-        // index when we're inside ALL function arg binders is
-        // (n - 1) — counting from innermost outward.
+        // The scrutinee. The function's arguments are bound (from
+        // innermost outermost) at depths n-1, n-2, ..., 0 inside the
+        // body lambda. The scrutinee is the FIRST function argument,
+        // so its de Bruijn index when we're inside ALL function
+        // argument binders is (n - 1) — counting from innermost
+        // outward.
         int argumentCount = static_cast<int>(functionArguments.size());
         applied = makeApplication(std::move(applied),
                                    makeBoundVariable(argumentCount - 1));
-        // Then apply to all the other args (in declaration order, from
+        // Then apply to all the other arguments (in declaration order,
+        // from
         // the second onward). At the point we apply argument i, its de
         // Bruijn index inside the body lambda is (argumentCount - 1 - i).
         for (int i = 1; i < argumentCount; ++i) {
@@ -520,7 +526,7 @@ private:
             throw ElaborateError(
                 "constructor lookup failed for '" + constructorName + "'");
         }
-        // Decompose constructor type into per-arg Pis. For a non-
+        // Decompose constructor type into per-argument Pis. For a non-
         // parameterised inductive, the constructor's type is exactly
         // a Pi chain over its arguments ending in the inductive type.
         struct ConstructorArgument {
@@ -555,8 +561,8 @@ private:
                 ConstructorArgument constructorArgument;
                 constructorArgument.defaultName = pi->displayHint;
                 constructorArgument.type = pi->domain;
-                // Recursive arg: type's head (after peeling Applications)
-                // is the inductive constant.
+                // Recursive argument: type's head (after peeling
+                // Applications) is the inductive constant.
                 ExpressionPointer typeHead = pi->domain;
                 while (auto* application =
                            std::get_if<Application>(&typeHead->node)) {
@@ -579,11 +585,14 @@ private:
         }
 
         // The case lambda's binders, in order:
-        //   For each constructor arg i:
+        //   For each constructor argument i:
         //     - destructuredNames[i] : constructorArguments[i].type
-        //     - if recursive, a hypothesis  "_rec_<name>"  of type motive(arg_i)
-        //   Then the remaining function args (in order), using names
-        //   from matchedCase->patterns[1..n-1] (must be bare-name patterns).
+        //     - if recursive, an induction hypothesis
+        //       "_inductionHypothesisFor_<name>" of type
+        //       motive(argument_i)
+        //   Then the remaining function arguments (in order), using
+        //   names from matchedCase->patterns[1..n-1] (must be
+        //   bare-name patterns).
         struct LambdaBinder {
             std::string name;
             ExpressionPointer type;
@@ -599,18 +608,22 @@ private:
             const auto& constructorArgument = constructorArguments[i];
             const std::string& destructuredName = destructuredNames[i];
             // The constructor's type Pis use BoundVariables that reference
-            // previously-bound constructor args. We must shift the type
+            // previously-bound constructor arguments. We must shift
+            // the type
             // by (binderDepth - i) to account for our current binder count
-            // — i is the number of OTHER ctor args already in the lambda
-            // binder list (each ctor arg adds 1, each rec hyp adds 1).
-            // For a non-recursive ctor like zero, this loop runs zero
-            // times. For successor, just one ctor arg (and its rec hyp).
+            // — i is the number of OTHER constructor arguments already
+            // in the lambda binder list (each constructor argument adds
+            // 1, each induction hypothesis adds 1). For a non-recursive
+            // constructor like zero, this loop runs zero times. For
+            // successor, just one constructor argument (and its
+            // induction hypothesis).
             // Within one constructor, the kernel-emitted types reference
-            // earlier ctor args via Bound(i - 1 - j). After shifting by
+            // earlier constructor arguments via Bound(i - 1 - j).
+            // After shifting by
             // (binderDepth - i), the types match our actual lambda depth.
-            ExpressionPointer ctorArgType =
+            ExpressionPointer constructorArgumentType =
                 shift(constructorArgument.type, binderDepth - static_cast<int>(i));
-            lambdaBinders.push_back({destructuredName, ctorArgType});
+            lambdaBinders.push_back({destructuredName, constructorArgumentType});
             binderDepth++;
             if (constructorArgument.isRecursive) {
                 // Recursive hypothesis: type = motive(<this destructured>).
@@ -621,8 +634,10 @@ private:
                     makeApplication(shiftedMotive,
                                     makeBoundVariable(0));
                 // ^ Bound(0) is the most-recently-bound name, which is
-                // the constructor arg we just added (destructuredName).
-                std::string hypothesisName = "_rec_" + destructuredName;
+                // the constructor argument we just added
+                // (destructuredName).
+                std::string hypothesisName =
+                    "_inductionHypothesisFor_" + destructuredName;
                 lambdaBinders.push_back({hypothesisName,
                                           recursionHypothesisType});
                 recursiveArgToHypothesis[destructuredName] = hypothesisName;
@@ -630,7 +645,7 @@ private:
             }
         }
 
-        // Add the function's other args (patterns[1..n-1]).
+        // Add the function's other arguments (patterns[1..n-1]).
         for (size_t i = 1; i < matchedCase->patterns.size(); ++i) {
             const SurfacePattern& pattern = *matchedCase->patterns[i];
             auto* bareName = std::get_if<SurfacePatternBareName>(
@@ -657,9 +672,9 @@ private:
             for (const auto& binder : lambdaBinders) {
                 stack.push_back({binder.name, binder.type});
             }
-            ExpressionPointer argType =
+            ExpressionPointer argumentType =
                 elaborateExpression(*surfaceArgType, stack);
-            lambdaBinders.push_back({bareName->name, argType});
+            lambdaBinders.push_back({bareName->name, argumentType});
             binderDepth++;
         }
 
@@ -900,7 +915,7 @@ private:
                 std::get_if<SurfaceApplication>(&expression.node)) {
             // A small family of identifier names is special-cased to
             // infer their typically-explicit arguments from the user-
-            // supplied positional args.
+            // supplied positional arguments.
             auto* headIdentifier = std::get_if<SurfaceIdentifier>(
                 &application->function->node);
             if (headIdentifier && headIdentifier->universeArgs.empty()) {
@@ -1215,7 +1230,7 @@ private:
         if (auto* addLevel = std::get_if<SurfaceLevelAdd>(&level.node)) {
             LevelPointer base = elaborateLevel(*addLevel->base);
             for (int i = 0; i < addLevel->amount; ++i) {
-                base = makeLevelSucc(std::move(base));
+                base = makeLevelSuccessor(std::move(base));
             }
             return base;
         }
@@ -1275,23 +1290,26 @@ private:
         return call;
     }
 
-    // Desugars `reflexivity(x)` into `reflexivity.{u}(typeOfX, x)` where
-    // u is x's type universe. Mirrors how the constructor's signature
-    // makes A and u inferable from x.
+    // Desugars `reflexivity(subject)` into
+    // `reflexivity.{u}(typeOfSubject, subject)` where u is the subject's
+    // type universe. Mirrors how the constructor's signature makes the
+    // carrier type and its universe inferable from the subject.
     ExpressionPointer desugarReflexivity(
-        SurfaceExpressionPointer xSurface,
+        SurfaceExpressionPointer subjectSurface,
         const std::vector<LocalBinder>& localBinders,
         int line, int column) {
-        ExpressionPointer xKernel =
-            elaborateExpression(*xSurface, localBinders);
-        ExpressionPointer xTypeOpen =
-            inferTypeInLocalContext(localBinders, xKernel);
-        ExpressionPointer xType = closeOverLocalBinders(
-            xTypeOpen, localBinders, localBinders.size());
-        LevelPointer levelU = typeUniverseOf(localBinders, xKernel);
-        ExpressionPointer call = makeConstant("reflexivity", {levelU});
-        call = makeApplication(std::move(call), std::move(xType));
-        call = makeApplication(std::move(call), std::move(xKernel));
+        ExpressionPointer subjectKernel =
+            elaborateExpression(*subjectSurface, localBinders);
+        ExpressionPointer subjectTypeOpened =
+            inferTypeInLocalContext(localBinders, subjectKernel);
+        ExpressionPointer subjectType = closeOverLocalBinders(
+            subjectTypeOpened, localBinders, localBinders.size());
+        LevelPointer carrierUniverseLevel =
+            typeUniverseOf(localBinders, subjectKernel);
+        ExpressionPointer call =
+            makeConstant("reflexivity", {carrierUniverseLevel});
+        call = makeApplication(std::move(call), std::move(subjectType));
+        call = makeApplication(std::move(call), std::move(subjectKernel));
         (void)line; (void)column;
         return call;
     }
@@ -1300,10 +1318,10 @@ private:
     // is `Equality.{u}(A, x, y)`, extracts the four components. Throws
     // ElaborateError if the type doesn't have that shape.
     struct EqualityComponents {
-        ExpressionPointer typeA;
-        ExpressionPointer x;
-        ExpressionPointer y;
-        LevelPointer levelU;
+        ExpressionPointer carrierType;
+        ExpressionPointer leftEndpoint;
+        ExpressionPointer rightEndpoint;
+        LevelPointer carrierUniverseLevel;
     };
     EqualityComponents extractEqualityComponents(
         ExpressionPointer equalityType, const char* contextLabel,
@@ -1315,7 +1333,7 @@ private:
                 + ": argument's type is not a fully applied Equality "
                 "(line " + std::to_string(line) + ")");
         }
-        ExpressionPointer y = outerApp->argument;
+        ExpressionPointer rightEndpoint = outerApp->argument;
         auto* middleApp =
             std::get_if<Application>(&outerApp->function->node);
         if (!middleApp) {
@@ -1324,7 +1342,7 @@ private:
                 + ": argument's type is not a fully applied Equality "
                 "(line " + std::to_string(line) + ")");
         }
-        ExpressionPointer x = middleApp->argument;
+        ExpressionPointer leftEndpoint = middleApp->argument;
         auto* innerApp =
             std::get_if<Application>(&middleApp->function->node);
         if (!innerApp) {
@@ -1333,7 +1351,7 @@ private:
                 + ": argument's type is not a fully applied Equality "
                 "(line " + std::to_string(line) + ")");
         }
-        ExpressionPointer typeA = innerApp->argument;
+        ExpressionPointer carrierType = innerApp->argument;
         auto* equalityConstant =
             std::get_if<Constant>(&innerApp->function->node);
         if (!equalityConstant
@@ -1344,72 +1362,93 @@ private:
                 + ": argument's type isn't an Equality.{u} (line "
                 + std::to_string(line) + ")");
         }
-        return {typeA, x, y, equalityConstant->universeArguments[0]};
+        return {carrierType, leftEndpoint, rightEndpoint,
+                equalityConstant->universeArguments[0]};
     }
 
-    // Desugars `Equality.symmetry(h)` to the full call with A, x, y
-    // inferred from h's type.
+    // Desugars `Equality.symmetry(equalityProof)` to the full call with
+    // the carrier type and endpoint values inferred from the proof's
+    // type.
     ExpressionPointer desugarEqualitySymmetry(
-        SurfaceExpressionPointer hSurface,
+        SurfaceExpressionPointer equalityProofSurface,
         const std::vector<LocalBinder>& localBinders,
         int line, int column) {
-        ExpressionPointer hKernel =
-            elaborateExpression(*hSurface, localBinders);
-        ExpressionPointer hType = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, hKernel));
+        ExpressionPointer equalityProofKernel =
+            elaborateExpression(*equalityProofSurface, localBinders);
+        ExpressionPointer equalityProofType =
+            weakHeadNormalForm(environment_,
+                inferTypeInLocalContext(localBinders,
+                                          equalityProofKernel));
         EqualityComponents components = extractEqualityComponents(
-            hType, "Equality.symmetry", line);
-        ExpressionPointer typeA = closeOverLocalBinders(
-            components.typeA, localBinders, localBinders.size());
-        ExpressionPointer x = closeOverLocalBinders(
-            components.x, localBinders, localBinders.size());
-        ExpressionPointer y = closeOverLocalBinders(
-            components.y, localBinders, localBinders.size());
+            equalityProofType, "Equality.symmetry", line);
+        ExpressionPointer carrierType = closeOverLocalBinders(
+            components.carrierType, localBinders, localBinders.size());
+        ExpressionPointer leftEndpoint = closeOverLocalBinders(
+            components.leftEndpoint, localBinders, localBinders.size());
+        ExpressionPointer rightEndpoint = closeOverLocalBinders(
+            components.rightEndpoint, localBinders, localBinders.size());
         ExpressionPointer call =
-            makeConstant("Equality.symmetry", {components.levelU});
-        call = makeApplication(std::move(call), std::move(typeA));
-        call = makeApplication(std::move(call), std::move(x));
-        call = makeApplication(std::move(call), std::move(y));
-        call = makeApplication(std::move(call), std::move(hKernel));
+            makeConstant("Equality.symmetry",
+                          {components.carrierUniverseLevel});
+        call = makeApplication(std::move(call), std::move(carrierType));
+        call = makeApplication(std::move(call), std::move(leftEndpoint));
+        call = makeApplication(std::move(call), std::move(rightEndpoint));
+        call = makeApplication(std::move(call),
+                                std::move(equalityProofKernel));
         (void)column;
         return call;
     }
 
-    // Desugars `Equality.transitivity(h1, h2)` to the full call with A,
-    // x, y, z inferred from the two arguments' types.
+    // Desugars `Equality.transitivity(firstEquality, secondEquality)`
+    // to the full call, with the carrier type and the three endpoints
+    // inferred from the two argument equalities' types.
     ExpressionPointer desugarEqualityTransitivity(
-        SurfaceExpressionPointer h1Surface,
-        SurfaceExpressionPointer h2Surface,
+        SurfaceExpressionPointer firstEqualitySurface,
+        SurfaceExpressionPointer secondEqualitySurface,
         const std::vector<LocalBinder>& localBinders,
         int line, int column) {
-        ExpressionPointer h1Kernel =
-            elaborateExpression(*h1Surface, localBinders);
-        ExpressionPointer h2Kernel =
-            elaborateExpression(*h2Surface, localBinders);
-        ExpressionPointer h1Type = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, h1Kernel));
-        ExpressionPointer h2Type = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, h2Kernel));
+        ExpressionPointer firstEqualityKernel =
+            elaborateExpression(*firstEqualitySurface, localBinders);
+        ExpressionPointer secondEqualityKernel =
+            elaborateExpression(*secondEqualitySurface, localBinders);
+        ExpressionPointer firstEqualityType =
+            weakHeadNormalForm(environment_,
+                inferTypeInLocalContext(localBinders,
+                                          firstEqualityKernel));
+        ExpressionPointer secondEqualityType =
+            weakHeadNormalForm(environment_,
+                inferTypeInLocalContext(localBinders,
+                                          secondEqualityKernel));
         EqualityComponents firstComponents = extractEqualityComponents(
-            h1Type, "Equality.transitivity (first arg)", line);
+            firstEqualityType,
+            "Equality.transitivity (first argument)", line);
         EqualityComponents secondComponents = extractEqualityComponents(
-            h2Type, "Equality.transitivity (second arg)", line);
-        ExpressionPointer typeA = closeOverLocalBinders(
-            firstComponents.typeA, localBinders, localBinders.size());
-        ExpressionPointer x = closeOverLocalBinders(
-            firstComponents.x, localBinders, localBinders.size());
-        ExpressionPointer y = closeOverLocalBinders(
-            firstComponents.y, localBinders, localBinders.size());
-        ExpressionPointer z = closeOverLocalBinders(
-            secondComponents.y, localBinders, localBinders.size());
+            secondEqualityType,
+            "Equality.transitivity (second argument)", line);
+        ExpressionPointer carrierType = closeOverLocalBinders(
+            firstComponents.carrierType,
+            localBinders, localBinders.size());
+        ExpressionPointer leftEndpoint = closeOverLocalBinders(
+            firstComponents.leftEndpoint,
+            localBinders, localBinders.size());
+        ExpressionPointer middleEndpoint = closeOverLocalBinders(
+            firstComponents.rightEndpoint,
+            localBinders, localBinders.size());
+        ExpressionPointer rightEndpoint = closeOverLocalBinders(
+            secondComponents.rightEndpoint,
+            localBinders, localBinders.size());
         ExpressionPointer call = makeConstant(
-            "Equality.transitivity", {firstComponents.levelU});
-        call = makeApplication(std::move(call), std::move(typeA));
-        call = makeApplication(std::move(call), std::move(x));
-        call = makeApplication(std::move(call), std::move(y));
-        call = makeApplication(std::move(call), std::move(z));
-        call = makeApplication(std::move(call), std::move(h1Kernel));
-        call = makeApplication(std::move(call), std::move(h2Kernel));
+            "Equality.transitivity",
+            {firstComponents.carrierUniverseLevel});
+        call = makeApplication(std::move(call), std::move(carrierType));
+        call = makeApplication(std::move(call), std::move(leftEndpoint));
+        call = makeApplication(std::move(call),
+                                std::move(middleEndpoint));
+        call = makeApplication(std::move(call), std::move(rightEndpoint));
+        call = makeApplication(std::move(call),
+                                std::move(firstEqualityKernel));
+        call = makeApplication(std::move(call),
+                                std::move(secondEqualityKernel));
         (void)column;
         return call;
     }
@@ -1419,99 +1458,101 @@ private:
     // type arguments and universes from the kernel types of f and h.
     // Requires `Equality.congruence` to be in the environment.
     ExpressionPointer desugarCongruenceOf(
-        SurfaceExpressionPointer fSurface,
-        SurfaceExpressionPointer hSurface,
+        SurfaceExpressionPointer functionSurface,
+        SurfaceExpressionPointer equalityProofSurface,
         const std::vector<LocalBinder>& localBinders,
         int line, int column) {
 
-        // Elaborate h first so we know the domain type (from its
-        // Equality structure); that lets us accept an untyped lambda
-        // for f (bidirectional elaboration of `fun x => body`).
-        ExpressionPointer hKernel =
-            elaborateExpression(*hSurface, localBinders);
-        ExpressionPointer hType = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, hKernel));
+        // Elaborate the equality proof first so we know the domain
+        // type (from its Equality structure); that lets us accept an
+        // untyped lambda for the function argument (bidirectional
+        // elaboration of `fun x => body`).
+        ExpressionPointer equalityProofKernel =
+            elaborateExpression(*equalityProofSurface, localBinders);
+        ExpressionPointer equalityProofType =
+            weakHeadNormalForm(environment_,
+                inferTypeInLocalContext(localBinders,
+                                          equalityProofKernel));
 
-        // Pre-extract typeA from h's Equality type so we can hand it
-        // to an untyped lambda's elaboration. We use the closed form
-        // (BoundVariables for our local binders) so the lambda we
-        // construct slots into the surrounding context correctly.
-        EqualityComponents hComponents = extractEqualityComponents(
-            hType, "congruenceOf", line);
-        ExpressionPointer typeAForLambda = closeOverLocalBinders(
-            hComponents.typeA, localBinders, localBinders.size());
+        // Pre-extract the domain type from the proof's Equality type
+        // so we can hand it to an untyped lambda's elaboration. We use
+        // the closed form (BoundVariables for our local binders) so
+        // the lambda we construct slots into the surrounding context
+        // correctly.
+        EqualityComponents proofComponents = extractEqualityComponents(
+            equalityProofType, "congruenceOf", line);
+        ExpressionPointer domainTypeForLambda = closeOverLocalBinders(
+            proofComponents.carrierType,
+            localBinders, localBinders.size());
 
-        // Elaborate f. If it's an untyped single-binder lambda, fill
-        // the domain from typeAForLambda; otherwise elaborate normally.
-        ExpressionPointer fKernel;
-        auto* fSurfaceLambda =
-            std::get_if<SurfaceLambda>(&fSurface->node);
-        if (fSurfaceLambda
-            && !fSurfaceLambda->binder.type
-            && fSurfaceLambda->binder.names.size() == 1) {
+        // Elaborate the function. If it's an untyped single-binder
+        // lambda, fill the domain from domainTypeForLambda; otherwise
+        // elaborate normally.
+        ExpressionPointer functionKernel;
+        auto* functionSurfaceLambda =
+            std::get_if<SurfaceLambda>(&functionSurface->node);
+        if (functionSurfaceLambda
+            && !functionSurfaceLambda->binder.type
+            && functionSurfaceLambda->binder.names.size() == 1) {
             std::vector<LocalBinder> extended = localBinders;
             extended.push_back(
-                {fSurfaceLambda->binder.names[0], typeAForLambda});
-            ExpressionPointer lambdaBody =
-                elaborateExpression(*fSurfaceLambda->body, extended);
-            fKernel = makeLambda(fSurfaceLambda->binder.names[0],
-                                  typeAForLambda,
-                                  std::move(lambdaBody));
+                {functionSurfaceLambda->binder.names[0],
+                 domainTypeForLambda});
+            ExpressionPointer lambdaBody = elaborateExpression(
+                *functionSurfaceLambda->body, extended);
+            functionKernel =
+                makeLambda(functionSurfaceLambda->binder.names[0],
+                            domainTypeForLambda,
+                            std::move(lambdaBody));
         } else {
-            fKernel = elaborateExpression(*fSurface, localBinders);
+            functionKernel =
+                elaborateExpression(*functionSurface, localBinders);
         }
 
-        // f's type should be a Pi (A → B). Extract A and B.
-        ExpressionPointer fType = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, fKernel));
-        auto* fPi = std::get_if<Pi>(&fType->node);
-        if (!fPi) {
+        // The function's type should be a Pi (A → B). Extract A (the
+        // domain) and B (the codomain).
+        ExpressionPointer functionType =
+            weakHeadNormalForm(environment_,
+                inferTypeInLocalContext(localBinders, functionKernel));
+        auto* functionPi = std::get_if<Pi>(&functionType->node);
+        if (!functionPi) {
             throw ElaborateError(
                 "congruenceOf: first argument must be a function "
                 "(line " + std::to_string(line) + ")");
         }
-        ExpressionPointer typeA = fPi->domain;
-        ExpressionPointer typeB = fPi->codomain;
-        ExpressionPointer x = hComponents.x;
-        ExpressionPointer y = hComponents.y;
+        ExpressionPointer domainType = functionPi->domain;
+        ExpressionPointer codomainType = functionPi->codomain;
+        ExpressionPointer leftEndpoint = proofComponents.leftEndpoint;
+        ExpressionPointer rightEndpoint = proofComponents.rightEndpoint;
 
-        // Compute universe levels u (for A) and v (for B).
-        LevelPointer levelU = typeUniverseOf(localBinders, x);
-        // For levelV, we need the universe of typeB. But typeB lives in
-        // a context with one extra binder (the Pi's binder). We re-infer
-        // by elaborating in extended context.
+        // Compute universe levels for the domain and codomain types.
+        LevelPointer domainUniverseLevel =
+            typeUniverseOf(localBinders, leftEndpoint);
+        // For the codomain universe level, we need the universe of
+        // codomainType. But codomainType lives in a context with one
+        // extra binder (the Pi's binder). We re-infer by elaborating
+        // in extended context. For non-dependent codomains, the level
+        // result has no BoundVariables so it's safe to return as-is.
         std::vector<LocalBinder> piExtended = localBinders;
-        piExtended.push_back({fPi->displayHint, fPi->domain});
-        // Hmm — for non-dependent functions, typeB doesn't reference
-        // the binder. For dependent functions, congruenceOf doesn't
-        // straightforwardly apply (the proof would be more complex).
-        // For v1, require f to be non-dependent (codomain doesn't
-        // reference its binder).
-        // To detect: typeB shouldn't have Bound(0) free. We approximate
-        // by computing levelV in the extended context; if it succeeds,
-        // we lift it back.
-        // For the simple case (non-dependent), typeB is fine to use
-        // directly with one shift if we don't add a binder. Let's just
-        // try: compute the universe of typeB by inferType in the binder-
-        // extended context, then we'll close back over the binder.
-        // For non-dependent codomains, the level result has no Bound vars
-        // so it's safe to return as-is.
-        LevelPointer levelV;
+        piExtended.push_back({functionPi->displayHint, functionPi->domain});
+        LevelPointer codomainUniverseLevel;
         {
-            ExpressionPointer typeOfTypeB =
-                inferTypeInLocalContext(piExtended, typeB);
-            auto* sortNode = std::get_if<Sort>(&typeOfTypeB->node);
+            ExpressionPointer typeOfCodomain =
+                inferTypeInLocalContext(piExtended, codomainType);
+            auto* sortNode = std::get_if<Sort>(&typeOfCodomain->node);
             if (!sortNode) {
                 throw ElaborateError(
                     "congruenceOf: cannot determine codomain universe");
             }
             LevelPointer sortLevel = sortNode->level;
-            if (auto* succ = std::get_if<LevelSucc>(&sortLevel->node)) {
-                levelV = succ->base;
+            if (auto* successorLevel =
+                    std::get_if<LevelSuccessor>(&sortLevel->node)) {
+                codomainUniverseLevel = successorLevel->base;
             } else if (auto* constant =
                             std::get_if<LevelConst>(&sortLevel->node)) {
                 if (constant->value >= 1) {
-                    levelV = makeLevelConst(constant->value - 1);
+                    codomainUniverseLevel =
+                        makeLevelConst(constant->value - 1);
                 } else {
                     throw ElaborateError(
                         "congruenceOf: cannot derive universe predecessor");
@@ -1522,23 +1563,28 @@ private:
             }
         }
 
-        // x and y came out of the inferred type, which lives in the opened
-        // form with FreeVariables for our local binders. Close them back
-        // to BoundVariables so they make sense in the calling context.
-        ExpressionPointer closedX = closeOverLocalBinders(
-            x, localBinders, localBinders.size());
-        ExpressionPointer closedY = closeOverLocalBinders(
-            y, localBinders, localBinders.size());
+        // The endpoints came out of the inferred type, which lives in
+        // the opened form with FreeVariables for our local binders.
+        // Close them back to BoundVariables so they make sense in the
+        // calling context.
+        ExpressionPointer closedLeftEndpoint = closeOverLocalBinders(
+            leftEndpoint, localBinders, localBinders.size());
+        ExpressionPointer closedRightEndpoint = closeOverLocalBinders(
+            rightEndpoint, localBinders, localBinders.size());
 
-        // Build Equality.congruence.{u, v}(A, B, f, x, y, h).
+        // Build Equality.congruence.{u, v}(A, B, f, x, y, proof).
         ExpressionPointer call = makeConstant(
-            "Equality.congruence", {levelU, levelV});
-        call = makeApplication(std::move(call), std::move(typeA));
-        call = makeApplication(std::move(call), std::move(typeB));
-        call = makeApplication(std::move(call), std::move(fKernel));
-        call = makeApplication(std::move(call), std::move(closedX));
-        call = makeApplication(std::move(call), std::move(closedY));
-        call = makeApplication(std::move(call), std::move(hKernel));
+            "Equality.congruence",
+            {domainUniverseLevel, codomainUniverseLevel});
+        call = makeApplication(std::move(call), std::move(domainType));
+        call = makeApplication(std::move(call), std::move(codomainType));
+        call = makeApplication(std::move(call), std::move(functionKernel));
+        call = makeApplication(std::move(call),
+                                std::move(closedLeftEndpoint));
+        call = makeApplication(std::move(call),
+                                std::move(closedRightEndpoint));
+        call = makeApplication(std::move(call),
+                                std::move(equalityProofKernel));
         (void)column;
         return call;
     }
@@ -1595,8 +1641,8 @@ private:
     // For a term whose type is in some universe — i.e. the type's type is
     // a Sort N — returns the level u such that the term has type Type(u)
     // (i.e. u = N - 1). Throws if the predecessor cannot be computed
-    // syntactically (e.g. a polymorphic Sort whose level is not a Succ
-    // or concrete constant).
+    // syntactically (e.g. a polymorphic Sort whose level is not a
+    // LevelSuccessor or a concrete LevelConst).
     LevelPointer typeUniverseOf(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer term) {
@@ -1610,8 +1656,9 @@ private:
                 "internal: expected a Sort when computing universe level");
         }
         LevelPointer sortLevel = sortNode->level;
-        if (auto* succ = std::get_if<LevelSucc>(&sortLevel->node)) {
-            return succ->base;
+        if (auto* successorLevel =
+                std::get_if<LevelSuccessor>(&sortLevel->node)) {
+            return successorLevel->base;
         }
         if (auto* constant = std::get_if<LevelConst>(&sortLevel->node)) {
             if (constant->value >= 1) {
@@ -1660,7 +1707,8 @@ private:
     // from the signature being instantiated (may contain LevelParams that
     // are unsolved); the "actual" side is the level inferred from the
     // user's argument. Only handles cases we encounter in practice
-    // (LevelParam, LevelSucc, LevelConst, LevelMax of constant-or-param).
+    // (LevelParam, LevelSuccessor, LevelConst, LevelMax of constant-or-
+    // parameter).
     void unifyLevels(
         LevelPointer expected, LevelPointer actual,
         std::map<std::string, LevelPointer>& assignment) {
@@ -1671,18 +1719,19 @@ private:
             }
             return;
         }
-        if (auto* expectedSucc =
-                std::get_if<LevelSucc>(&expected->node)) {
-            if (auto* actualSucc =
-                    std::get_if<LevelSucc>(&actual->node)) {
-                unifyLevels(expectedSucc->base, actualSucc->base,
+        if (auto* expectedSuccessor =
+                std::get_if<LevelSuccessor>(&expected->node)) {
+            if (auto* actualSuccessor =
+                    std::get_if<LevelSuccessor>(&actual->node)) {
+                unifyLevels(expectedSuccessor->base,
+                             actualSuccessor->base,
                              assignment);
                 return;
             }
             if (auto* actualConstant =
                     std::get_if<LevelConst>(&actual->node)) {
                 if (actualConstant->value >= 1) {
-                    unifyLevels(expectedSucc->base,
+                    unifyLevels(expectedSuccessor->base,
                                  makeLevelConst(actualConstant->value - 1),
                                  assignment);
                     return;
@@ -1713,7 +1762,8 @@ private:
                          assignment);
             return;
         }
-        // Constant heads with universe-args lined up (e.g., Equality.{u}
+        // Constant heads with universe-arguments lined up (e.g.,
+        // Equality.{u}
         // applied to a value vs Equality.{0} applied to the same).
         if (auto* expectedConstant =
                 std::get_if<Constant>(&expected->node)) {

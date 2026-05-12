@@ -60,9 +60,11 @@ void writeAtomic(std::ostringstream& output,
             } else {
                 output << "Type " << (*concreteLevel - 1);
             }
-        } else if (auto* succ = std::get_if<LevelSucc>(&sort->level->node)) {
-            // Sort (succ x) is Type x — render symbolic Type for non-const u.
-            output << "Type " << prettyPrintLevel(succ->base);
+        } else if (auto* successor =
+                        std::get_if<LevelSuccessor>(&sort->level->node)) {
+            // Sort (LevelSuccessor x) is Type x — render symbolic
+            // Type for non-constant levels.
+            output << "Type " << prettyPrintLevel(successor->base);
         } else {
             output << "Sort " << prettyPrintLevel(sort->level);
         }

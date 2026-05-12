@@ -1,8 +1,8 @@
 -- Natural/divisibility.math
 --
--- The divides relation `a | b` on Natural, defined as ∃ k. b = a * k.
--- Plus a few basic facts. Proofs go through the Exists recursor since
--- pattern matching on parameterised inductives isn't yet supported.
+-- The divides relation on natural numbers: `divides(divisor, dividend)`
+-- holds when there is some `quotient` such that
+-- `dividend = divisor * quotient`. Plus a few basic facts.
 
 module Natural.divisibility
 
@@ -11,33 +11,41 @@ import Natural.arithmetic
 import Equality.basics
 import Logic.exists
 
--- a divides b : there is a natural k such that b = a * k.
-definition Natural.divides(a b : Natural) : Prop :=
-  Exists(Natural, fun (k : Natural) => b = a * k)
+-- The divisor divides the dividend exactly when some quotient witnesses
+-- their product relation.
+definition Natural.divides(divisor dividend : Natural) : Prop :=
+  Exists(Natural,
+          fun (quotient : Natural)
+              => dividend = divisor * quotient)
 
--- Every natural divides itself: a | a, with witness k = 1 and the
--- proof a = a * 1 from multiply_one (reversed).
-theorem Natural.divides_reflexive(a : Natural) : Natural.divides(a, a) :=
+-- Every natural divides itself: the quotient is one, and the proof
+-- that `naturalNumber = naturalNumber * 1` comes from multiply_one
+-- (reversed).
+theorem Natural.divides_reflexive(naturalNumber : Natural)
+        : Natural.divides(naturalNumber, naturalNumber) :=
   Exists.introduce(
     Natural,
-    fun (k : Natural) => a = a * k,
+    fun (quotient : Natural) => naturalNumber = naturalNumber * quotient,
     one,
-    Equality.symmetry(Natural.multiply_one(a)))
+    Equality.symmetry(Natural.multiply_one(naturalNumber)))
 
--- One divides everything: 1 | a, with witness k = a and the
--- proof a = 1 * a from one_multiply (reversed).
-theorem Natural.one_divides(a : Natural) : Natural.divides(one, a) :=
+-- One divides every natural: the quotient is the natural itself, and
+-- the proof that `naturalNumber = 1 * naturalNumber` comes from
+-- one_multiply (reversed).
+theorem Natural.one_divides(naturalNumber : Natural)
+        : Natural.divides(one, naturalNumber) :=
   Exists.introduce(
     Natural,
-    fun (k : Natural) => a = one * k,
-    a,
-    Equality.symmetry(Natural.one_multiply(a)))
+    fun (quotient : Natural) => naturalNumber = one * quotient,
+    naturalNumber,
+    Equality.symmetry(Natural.one_multiply(naturalNumber)))
 
--- Every natural divides zero: a | 0, with witness k = 0 and the
--- proof 0 = a * 0 from multiply_zero (reversed).
-theorem Natural.divides_zero(a : Natural) : Natural.divides(a, zero) :=
+-- Every natural divides zero: the quotient is zero, and the proof
+-- that `0 = candidate * 0` comes from multiply_zero (reversed).
+theorem Natural.divides_zero(candidate : Natural)
+        : Natural.divides(candidate, zero) :=
   Exists.introduce(
     Natural,
-    fun (k : Natural) => zero = a * k,
+    fun (quotient : Natural) => zero = candidate * quotient,
     zero,
-    Equality.symmetry(Natural.multiply_zero(a)))
+    Equality.symmetry(Natural.multiply_zero(candidate)))

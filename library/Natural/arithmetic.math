@@ -8,9 +8,15 @@
 --   a * b                                desugars to  Natural.multiply(a, b)
 --   a = b                                desugars to  Equality.{u}(typeOfA, a, b)
 --   reflexivity(x)                       desugars to  reflexivity.{u}(typeOfX, x)
---   congruenceOf(f, h)                   desugars to  Equality.congruence
---   Equality.symmetry(h)                 desugars to  Equality.symmetry.{u}(A, x, y, h)
---   Equality.transitivity(h1, h2)        desugars to  Equality.transitivity.{u}(A, x, y, z, h1, h2)
+--   congruenceOf(f, equalityProof)       desugars to  Equality.congruence
+--   Equality.symmetry(equalityProof)     desugars to  Equality.symmetry.{u}(A, x, y, h)
+--   Equality.transitivity(firstEquality, secondEquality)
+--                                        desugars to  Equality.transitivity.{u}(A, x, y, z, h1, h2)
+--
+-- We use single-letter `a`, `b`, `c` for generic operand parameters of
+-- arithmetic theorems (math convention, no specific role beyond "a
+-- natural number"). In pattern destructuring of `successor(...)` the
+-- bound argument is named `predecessor` since that IS its role.
 
 module Natural.arithmetic
 
@@ -23,8 +29,9 @@ theorem Natural.zero_add(a : Natural) : zero + a = a :=
 
 -- Theorem: a + 0 = a. Induction on a.
 theorem Natural.add_zero : (a : Natural) → a + zero = a
-  | zero         => reflexivity(zero)
-  | successor(k) => congruenceOf(successor, Natural.add_zero(k))
+  | zero                   => reflexivity(zero)
+  | successor(predecessor) =>
+      congruenceOf(successor, Natural.add_zero(predecessor))
 
 -- Theorem: 1 + a = successor(a). Definitional.
 theorem Natural.one_add(a : Natural) : one + a = successor(a) :=
@@ -34,17 +41,20 @@ theorem Natural.one_add(a : Natural) : one + a = successor(a) :=
 -- rule for add on the first argument.
 theorem Natural.add_successor
         : (a b : Natural) → a + successor(b) = successor(a + b)
-  | zero,         b => reflexivity(successor(b))
-  | successor(k), b => congruenceOf(successor, Natural.add_successor(k, b))
+  | zero,                   b => reflexivity(successor(b))
+  | successor(predecessor), b =>
+      congruenceOf(successor,
+                    Natural.add_successor(predecessor, b))
 
 -- Theorem: a + b = b + a. Induction on a.
 theorem Natural.add_commutative : (a b : Natural) → a + b = b + a
   | zero, b =>
       Equality.symmetry(Natural.add_zero(b))
-  | successor(k), b =>
+  | successor(predecessor), b =>
       Equality.transitivity(
-          congruenceOf(successor, Natural.add_commutative(k, b)),
-          Equality.symmetry(Natural.add_successor(b, k)))
+          congruenceOf(successor,
+                        Natural.add_commutative(predecessor, b)),
+          Equality.symmetry(Natural.add_successor(b, predecessor)))
 
 -- Theorem: 0 * a = 0. Definitional.
 theorem Natural.zero_multiply(a : Natural) : zero * a = zero :=
@@ -52,8 +62,8 @@ theorem Natural.zero_multiply(a : Natural) : zero * a = zero :=
 
 -- Theorem: a * 0 = 0. By induction on a.
 theorem Natural.multiply_zero : (a : Natural) → a * zero = zero
-  | zero         => reflexivity(zero)
-  | successor(k) => Natural.multiply_zero(k)
+  | zero                   => reflexivity(zero)
+  | successor(predecessor) => Natural.multiply_zero(predecessor)
 
 -- Theorem: 1 * a = a. Reduces to add_zero on a.
 theorem Natural.one_multiply(a : Natural) : one * a = a :=
@@ -69,11 +79,11 @@ theorem Natural.multiply_commutative
         : (a b : Natural) → a * b = b * a
   | zero, b =>
       Equality.symmetry(Natural.multiply_zero(b))
-  | successor(k), b =>
+  | successor(predecessor), b =>
       Equality.transitivity(
-          congruenceOf(fun x => b + x,
-                       Natural.multiply_commutative(k, b)),
-          Equality.symmetry(Natural.multiply_successor(b, k)))
+          congruenceOf(fun summand => b + summand,
+                        Natural.multiply_commutative(predecessor, b)),
+          Equality.symmetry(Natural.multiply_successor(b, predecessor)))
 
 -- Theorem: a * 1 = a. From commutativity + one_multiply.
 theorem Natural.multiply_one(a : Natural) : a * one = a :=
@@ -84,6 +94,7 @@ theorem Natural.multiply_one(a : Natural) : a * one = a :=
 -- Theorem: (a + b) + c = a + (b + c). Induction on a.
 theorem Natural.add_associative
         : (a b c : Natural) → (a + b) + c = a + (b + c)
-  | zero,         b, c => reflexivity(b + c)
-  | successor(k), b, c =>
-      congruenceOf(successor, Natural.add_associative(k, b, c))
+  | zero,                   b, c => reflexivity(b + c)
+  | successor(predecessor), b, c =>
+      congruenceOf(successor,
+                    Natural.add_associative(predecessor, b, c))

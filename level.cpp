@@ -11,12 +11,12 @@ LevelPointer makeLevelParam(std::string name) {
     return std::make_shared<Level>(LevelParam{std::move(name)});
 }
 
-LevelPointer makeLevelSucc(LevelPointer base) {
-    // succ(const n) = const (n+1)
-    if (auto* c = std::get_if<LevelConst>(&base->node)) {
-        return makeLevelConst(c->value + 1);
+LevelPointer makeLevelSuccessor(LevelPointer base) {
+    // successor(LevelConst n) = LevelConst (n+1)
+    if (auto* concrete = std::get_if<LevelConst>(&base->node)) {
+        return makeLevelConst(concrete->value + 1);
     }
-    return std::make_shared<Level>(LevelSucc{std::move(base)});
+    return std::make_shared<Level>(LevelSuccessor{std::move(base)});
 }
 
 LevelPointer makeLevelMax(LevelPointer left, LevelPointer right) {
@@ -37,8 +37,9 @@ LevelPointer makeLevelIMax(LevelPointer left, LevelPointer right) {
         if (rightConst->value == 0) return makeLevelConst(0);
         return makeLevelMax(std::move(left), std::move(right));
     }
-    // succ(_) is never 0, so imax(_, succ(_)) = max(_, succ(_)).
-    if (std::holds_alternative<LevelSucc>(right->node)) {
+    // successor(_) is never 0, so imax(_, successor(_)) =
+    // max(_, successor(_)).
+    if (std::holds_alternative<LevelSuccessor>(right->node)) {
         return makeLevelMax(std::move(left), std::move(right));
     }
     return std::make_shared<Level>(LevelIMax{std::move(left), std::move(right)});
@@ -58,9 +59,10 @@ LevelPointer substituteLevelParameter(LevelPointer level,
     if (auto* p = std::get_if<LevelParam>(&level->node)) {
         return p->name == parameterName ? replacement : level;
     }
-    if (auto* s = std::get_if<LevelSucc>(&level->node)) {
-        auto newBase = substituteLevelParameter(s->base, parameterName, replacement);
-        return makeLevelSucc(newBase);
+    if (auto* successor = std::get_if<LevelSuccessor>(&level->node)) {
+        auto newBase = substituteLevelParameter(
+            successor->base, parameterName, replacement);
+        return makeLevelSuccessor(newBase);
     }
     if (auto* m = std::get_if<LevelMax>(&level->node)) {
         auto newLeft  = substituteLevelParameter(m->left,  parameterName, replacement);
@@ -90,9 +92,12 @@ bool levelsDefinitionallyEqual(LevelPointer left, LevelPointer right) {
         }
         return false;
     }
-    if (auto* leftSucc = std::get_if<LevelSucc>(&left->node)) {
-        if (auto* rightSucc = std::get_if<LevelSucc>(&right->node)) {
-            return levelsDefinitionallyEqual(leftSucc->base, rightSucc->base);
+    if (auto* leftSuccessor =
+            std::get_if<LevelSuccessor>(&left->node)) {
+        if (auto* rightSuccessor =
+                std::get_if<LevelSuccessor>(&right->node)) {
+            return levelsDefinitionallyEqual(
+                leftSuccessor->base, rightSuccessor->base);
         }
         return false;
     }
@@ -116,9 +121,11 @@ bool levelsDefinitionallyEqual(LevelPointer left, LevelPointer right) {
 bool levelLessOrEqual(LevelPointer subLevel, LevelPointer superLevel) {
     if (levelsDefinitionallyEqual(subLevel, superLevel)) return true;
     // Concrete vs concrete.
-    auto sub   = levelAsConstant(subLevel);
-    auto super_ = levelAsConstant(superLevel);
-    if (sub && super_) return *sub <= *super_;
+    auto subConcrete   = levelAsConstant(subLevel);
+    auto superConcrete = levelAsConstant(superLevel);
+    if (subConcrete && superConcrete) {
+        return *subConcrete <= *superConcrete;
+    }
     // sub <= max(a, b) if sub <= a OR sub <= b.
     if (auto* superMax = std::get_if<LevelMax>(&superLevel->node)) {
         return levelLessOrEqual(subLevel, superMax->left)
@@ -129,14 +136,19 @@ bool levelLessOrEqual(LevelPointer subLevel, LevelPointer superLevel) {
         return levelLessOrEqual(subMax->left,  superLevel)
             && levelLessOrEqual(subMax->right, superLevel);
     }
-    // succ(a) <= succ(b) iff a <= b.
-    if (auto* subSucc = std::get_if<LevelSucc>(&subLevel->node)) {
-        if (auto* superSucc = std::get_if<LevelSucc>(&superLevel->node)) {
-            return levelLessOrEqual(subSucc->base, superSucc->base);
+    // successor(a) <= successor(b) iff a <= b.
+    if (auto* subSuccessor =
+            std::get_if<LevelSuccessor>(&subLevel->node)) {
+        if (auto* superSuccessor =
+                std::get_if<LevelSuccessor>(&superLevel->node)) {
+            return levelLessOrEqual(
+                subSuccessor->base, superSuccessor->base);
         }
-        // succ(a) <= const n  iff  a <= const (n-1)  when n >= 1.
-        if (super_ && *super_ >= 1) {
-            return levelLessOrEqual(subSucc->base, makeLevelConst(*super_ - 1));
+        // successor(a) <= LevelConst n  iff  a <= LevelConst (n-1)
+        // when n >= 1.
+        if (superConcrete && *superConcrete >= 1) {
+            return levelLessOrEqual(
+                subSuccessor->base, makeLevelConst(*superConcrete - 1));
         }
     }
     return false;
@@ -161,12 +173,12 @@ void writeLevelAtomic(std::ostringstream& out, LevelPointer level) {
 }
 
 void writeLevel(std::ostringstream& out, LevelPointer level, int precedence) {
-    if (auto* s = std::get_if<LevelSucc>(&level->node)) {
-        // succ over a const should have been folded by makeLevelSucc, but
-        // print symbolically if not.
+    if (auto* successor = std::get_if<LevelSuccessor>(&level->node)) {
+        // successor over a LevelConst should have been folded by
+        // makeLevelSuccessor, but print symbolically if not.
         bool parens = precedence > 0;
         if (parens) out << "(";
-        writeLevelAtomic(out, s->base);
+        writeLevelAtomic(out, successor->base);
         out << "+1";
         if (parens) out << ")";
         return;

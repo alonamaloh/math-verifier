@@ -11,7 +11,7 @@
 //   LevelConst n  — a concrete integer level. 0 is Prop, 1 is Type 0, ...
 //   LevelParam n  — a named universe parameter; substituted when a
 //                   polymorphic constant is applied.
-//   LevelSucc l   — l + 1.
+//   LevelSuccessor l   — l + 1.
 //   LevelMax a b  — max(a, b).
 //   LevelIMax a b — Lean's imax: 0 if b normalises to 0 (impredicative
 //                   Prop behaviour), otherwise max(a, b).
@@ -20,12 +20,12 @@ using LevelPointer = std::shared_ptr<Level>;
 
 struct LevelConst { int value; };
 struct LevelParam { std::string name; };
-struct LevelSucc  { LevelPointer base; };
+struct LevelSuccessor  { LevelPointer base; };
 struct LevelMax   { LevelPointer left; LevelPointer right; };
 struct LevelIMax  { LevelPointer left; LevelPointer right; };
 
 struct Level {
-    std::variant<LevelConst, LevelParam, LevelSucc, LevelMax, LevelIMax> node;
+    std::variant<LevelConst, LevelParam, LevelSuccessor, LevelMax, LevelIMax> node;
 
     Level() = default;
 
@@ -37,11 +37,12 @@ struct Level {
 };
 
 // Construction helpers. These perform a small amount of normalisation at
-// construction time (e.g. max(0, l) = l, succ(const n) = const (n+1)) so
-// that simple structural equality is enough at most call sites.
+// construction time (e.g. max(0, l) = l, successor(LevelConst n) =
+// LevelConst (n+1)) so that simple structural equality is enough at
+// most call sites.
 LevelPointer makeLevelConst(int value);
 LevelPointer makeLevelParam(std::string name);
-LevelPointer makeLevelSucc(LevelPointer base);
+LevelPointer makeLevelSuccessor(LevelPointer base);
 LevelPointer makeLevelMax(LevelPointer left, LevelPointer right);
 LevelPointer makeLevelIMax(LevelPointer left, LevelPointer right);
 

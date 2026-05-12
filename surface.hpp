@@ -286,7 +286,7 @@ struct SurfaceAxiomDecl {
     SurfaceExpressionPointer type;
 };
 
-// `definition Name.{u} (args) : Type := body`  OR
+// `definition Name.{u} (arguments) : Type := body`  OR
 // `definition Name.{u} : T1 → ... → Tn  | p1, ..., pn => body | ...`.
 // One of `body` / `cases` is populated; the other is empty.
 // `isTheorem` is true if the source used the `theorem` keyword.

@@ -52,15 +52,15 @@ private:
 
     SurfaceImportDecl parseImportDecl() {
         consumeAny();  // 'import'
-        SurfaceImportDecl decl;
-        decl.moduleName = consumeQualifiedNameString();
-        return decl;
+        SurfaceImportDecl declaration;
+        declaration.moduleName = consumeQualifiedNameString();
+        return declaration;
     }
 
     SurfaceUsingDecl parseUsingDecl() {
         consumeAny();  // 'using'
-        SurfaceUsingDecl decl;
-        decl.namespacePath = consumeQualifiedNameString();
+        SurfaceUsingDecl declaration;
+        declaration.namespacePath = consumeQualifiedNameString();
         expect(TokenKind::Dot, "in using directive");
         if (peek().kind == TokenKind::Identifier) {
             // either "operators" or "literals" — we accept them by spelling
@@ -69,21 +69,21 @@ private:
                 throwHere("expected 'operators', 'literals', or a name "
                           "list in using directive");
             }
-            decl.target = target;
+            declaration.target = target;
         } else if (peek().kind == TokenKind::LeftBrace) {
             consumeAny();
-            decl.target = "names";
+            declaration.target = "names";
             if (peek().kind != TokenKind::RightBrace) {
                 if (peek().kind != TokenKind::Identifier) {
                     throwHere("expected name in using list");
                 }
-                decl.names.push_back(consumeAny().lexeme);
+                declaration.names.push_back(consumeAny().lexeme);
                 while (peek().kind == TokenKind::Comma) {
                     consumeAny();
                     if (peek().kind != TokenKind::Identifier) {
                         throwHere("expected name in using list");
                     }
-                    decl.names.push_back(consumeAny().lexeme);
+                    declaration.names.push_back(consumeAny().lexeme);
                 }
             }
             expect(TokenKind::RightBrace, "ending using name list");
@@ -91,66 +91,66 @@ private:
             throwHere("expected 'operators', 'literals', or '{' after '.'"
                       " in using directive");
         }
-        return decl;
+        return declaration;
     }
 
     SurfaceInductiveDecl parseInductiveDecl() {
         consumeAny();  // 'inductive'
-        SurfaceInductiveDecl decl;
-        decl.name = consumeQualifiedNameString();
-        decl.universeParameters = parseUniverseParameterList();
+        SurfaceInductiveDecl declaration;
+        declaration.name = consumeQualifiedNameString();
+        declaration.universeParameters = parseUniverseParameterList();
         while (peek().kind == TokenKind::LeftParen) {
-            decl.parameters.push_back(parseExplicitBinder());
+            declaration.parameters.push_back(parseExplicitBinder());
         }
         expect(TokenKind::Colon, "before inductive kind");
-        decl.kind = parseExpression();
+        declaration.kind = parseExpression();
         expect(TokenKind::KeywordWhere, "before inductive constructors");
         while (peek().kind == TokenKind::Pipe) {
             consumeAny();  // '|'
-            SurfaceConstructorSpec spec;
+            SurfaceConstructorSpec constructorSpec;
             if (peek().kind != TokenKind::Identifier) {
                 throwHere("expected constructor name after '|'");
             }
-            spec.name = consumeQualifiedNameString();
+            constructorSpec.name = consumeQualifiedNameString();
             expect(TokenKind::Colon, "before constructor type");
-            spec.type = parseExpression();
-            decl.constructors.push_back(std::move(spec));
+            constructorSpec.type = parseExpression();
+            declaration.constructors.push_back(std::move(constructorSpec));
         }
-        return decl;
+        return declaration;
     }
 
     SurfaceAxiomDecl parseAxiomDecl() {
         consumeAny();  // 'axiom'
-        SurfaceAxiomDecl decl;
-        decl.name = consumeQualifiedNameString();
-        decl.universeParameters = parseUniverseParameterList();
+        SurfaceAxiomDecl declaration;
+        declaration.name = consumeQualifiedNameString();
+        declaration.universeParameters = parseUniverseParameterList();
         expect(TokenKind::Colon, "before axiom type");
-        decl.type = parseExpression();
-        return decl;
+        declaration.type = parseExpression();
+        return declaration;
     }
 
     SurfaceDefinitionDecl parseDefinitionDecl(bool isTheorem) {
         consumeAny();  // 'definition' / 'theorem'
-        SurfaceDefinitionDecl decl;
-        decl.isTheorem = isTheorem;
-        decl.name = consumeQualifiedNameString();
-        decl.universeParameters = parseUniverseParameterList();
+        SurfaceDefinitionDecl declaration;
+        declaration.isTheorem = isTheorem;
+        declaration.name = consumeQualifiedNameString();
+        declaration.universeParameters = parseUniverseParameterList();
         while (peek().kind == TokenKind::LeftParen) {
-            decl.arguments.push_back(parseExplicitBinder());
+            declaration.arguments.push_back(parseExplicitBinder());
         }
         expect(TokenKind::Colon, "before declaration type");
-        decl.type = parseExpression();
+        declaration.type = parseExpression();
         if (peek().kind == TokenKind::Assign) {
             consumeAny();  // ':='
-            decl.body = parseExpression();
+            declaration.body = parseExpression();
         } else if (peek().kind == TokenKind::Pipe) {
             while (peek().kind == TokenKind::Pipe) {
-                decl.cases.push_back(parsePatternCase());
+                declaration.cases.push_back(parsePatternCase());
             }
         } else {
             throwHere("expected ':=' or '|' after declaration type");
         }
-        return decl;
+        return declaration;
     }
 
     SurfacePatternCase parsePatternCase() {
