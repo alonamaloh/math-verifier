@@ -117,7 +117,8 @@ private:
         ExpressionPointer returnType =
             elaborateExpression(*declaration.type, localBinders);
         ExpressionPointer bodyExpression =
-            elaborateExpression(*declaration.body, localBinders);
+            elaborateExpression(*declaration.body, localBinders,
+                                 returnType);
 
         // Build the full declared type and body by wrapping in reverse.
         ExpressionPointer fullType = returnType;

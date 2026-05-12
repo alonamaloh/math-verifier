@@ -1,0 +1,125 @@
+-- Natural/decide.math
+--
+-- Decision procedures on Natural: decidable equality, decidable
+-- ordering, decidable divisibility. Each procedure returns an
+-- `Or(positive proof, negative proof)`, giving the constructive
+-- analogue of a Boolean test along with a proof of the result.
+--
+-- The proofs go through one-level pattern matches and explicit helper
+-- definitions because our pattern matching can only destructure one
+-- scrutinee at a time. Helpers that "remember" the predecessor of an
+-- earlier pattern take the inductive hypothesis explicitly so that
+-- recursion on the predecessor is structural.
+
+module Natural.decide
+
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.strong_recursion
+import Equality.basics
+import Logic.basics
+
+-- decidable equality, with zero as the left operand.
+theorem Natural.decides_equality_zero_against
+        : (other : Natural) → Or(zero = other, Not(zero = other))
+  | zero =>
+      Or.introduceLeft(reflexivity(zero))
+  | successor(predecessor) =>
+      Or.introduceRight(Natural.zero_not_successor(predecessor))
+
+-- decidable equality, with successor(predecessor) as the left operand,
+-- given a decision procedure for predecessor.
+theorem Natural.decides_equality_successor_against
+        (predecessor : Natural)
+        (decidePredecessor :
+            (other : Natural)
+            → Or(predecessor = other, Not(predecessor = other)))
+        : (other : Natural)
+          → Or(successor(predecessor) = other,
+                Not(successor(predecessor) = other))
+  | zero =>
+      Or.introduceRight(
+          fun (impossible : successor(predecessor) = zero) =>
+              Natural.successor_not_zero(predecessor, impossible))
+  | successor(otherPredecessor) =>
+      Or.eliminate(
+          predecessor = otherPredecessor,
+          Not(predecessor = otherPredecessor),
+          Or(successor(predecessor) = successor(otherPredecessor),
+              Not(successor(predecessor) = successor(otherPredecessor))),
+          fun (predEqOther : predecessor = otherPredecessor) =>
+              Or.introduceLeft(
+                  congruenceOf(successor, predEqOther)),
+          fun (predNeqOther : Not(predecessor = otherPredecessor)) =>
+              Or.introduceRight(
+                  fun (succEq : successor(predecessor) = successor(otherPredecessor)) =>
+                      predNeqOther(
+                          Natural.successor_injective(
+                              predecessor, otherPredecessor,
+                              succEq))),
+          decidePredecessor(otherPredecessor))
+
+-- Decidable equality on Natural.
+theorem Natural.decides_equality
+        : (a b : Natural) → Or(a = b, Not(a = b))
+  | zero, b =>
+      Natural.decides_equality_zero_against(b)
+  | successor(predecessor), b =>
+      Natural.decides_equality_successor_against(
+          predecessor,
+          Natural.decides_equality(predecessor),
+          b)
+
+-- decidable ≤, with zero as the left operand: always true.
+theorem Natural.decides_le_zero_against (other : Natural)
+        : Or(LessOrEqual(zero, other), Not(LessOrEqual(zero, other))) :=
+  Or.introduceLeft(Natural.zero_least(other))
+
+-- decidable ≤, successor case.
+theorem Natural.decides_le_successor_against
+        (predecessor : Natural)
+        (decidePredecessor :
+            (other : Natural)
+            → Or(LessOrEqual(predecessor, other),
+                  Not(LessOrEqual(predecessor, other))))
+        : (other : Natural)
+          → Or(LessOrEqual(successor(predecessor), other),
+                Not(LessOrEqual(successor(predecessor), other)))
+  | zero =>
+      Or.introduceRight(Natural.not_le_succ_zero(predecessor))
+  | successor(otherPredecessor) =>
+      Or.eliminate(
+          LessOrEqual(predecessor, otherPredecessor),
+          Not(LessOrEqual(predecessor, otherPredecessor)),
+          Or(LessOrEqual(successor(predecessor),
+                          successor(otherPredecessor)),
+              Not(LessOrEqual(successor(predecessor),
+                               successor(otherPredecessor)))),
+          fun (predLe : LessOrEqual(predecessor, otherPredecessor)) =>
+              Or.introduceLeft(
+                  Natural.succ_le_succ(
+                      predecessor, otherPredecessor, predLe)),
+          fun (predNotLe :
+                  Not(LessOrEqual(predecessor, otherPredecessor))) =>
+              Or.introduceRight(
+                  fun (succLe :
+                          LessOrEqual(successor(predecessor),
+                                       successor(otherPredecessor))) =>
+                      predNotLe(
+                          Natural.le_succ_succ_descend(
+                              predecessor, otherPredecessor, succLe))),
+          decidePredecessor(otherPredecessor))
+
+-- Decidable ≤ on Natural.
+theorem Natural.decides_le
+        : (a b : Natural)
+          → Or(LessOrEqual(a, b), Not(LessOrEqual(a, b)))
+  | zero, b =>
+      Natural.decides_le_zero_against(b)
+  | successor(predecessor), b =>
+      Natural.decides_le_successor_against(
+          predecessor,
+          Natural.decides_le(predecessor),
+          b)
+

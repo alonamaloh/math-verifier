@@ -183,6 +183,26 @@ theorem Natural.for_all_below
             Natural.le_succ_succ_inversion(
                 k, predecessor, succKLeSuccM))
 
+-- Inversion of `succ(p) ≤ succ(oP)`: yields `p ≤ oP`. Combines
+-- le_succ_succ_inversion with le_predecessor_le.
+theorem Natural.le_succ_succ_descend (p oP : Natural)
+        : LessOrEqual(successor(p), successor(oP))
+          → LessOrEqual(p, oP) :=
+  fun (succLe : LessOrEqual(successor(p), successor(oP))) =>
+    Or.eliminate(
+        p = oP,
+        LessOrEqual(successor(p), oP),
+        LessOrEqual(p, oP),
+        fun (eq : p = oP) =>
+            Equality.transport_proposition(
+                Natural,
+                fun (rightEnd : Natural) => LessOrEqual(p, rightEnd),
+                p, oP, eq,
+                LessOrEqual.reflexivity(p)),
+        fun (succPLeOP : LessOrEqual(successor(p), oP)) =>
+            Natural.le_predecessor_le(p, oP, succPLeOP),
+        Natural.le_succ_succ_inversion(p, oP, succLe))
+
 -- Strong induction: combine for_all_below with the step at level n.
 theorem Natural.strong_induction
         (P : Natural → Proposition)
