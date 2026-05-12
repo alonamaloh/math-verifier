@@ -1,0 +1,39 @@
+-- Natural/peano.math
+--
+-- Peano-style facts about Natural that go beyond what the inductive
+-- type itself encodes: in particular, that `successor` is never `zero`,
+-- which we use to extract False from `2 = 0` and similar absurd
+-- equalities. The standard trick is to define a discriminator
+-- (`is_successor`) and transport `True.trivial` along the false
+-- equality via the Equality recursor.
+
+module Natural.peano
+
+import Natural.basics
+import Equality.basics
+import Logic.basics
+
+-- Discriminator: True for `successor(_)`, False for `zero`. Reduces
+-- definitionally for either constructor, which is what lets us turn
+-- a hypothetical equality between them into False.
+definition Natural.is_successor : Natural → Proposition
+  | zero         => False
+  | successor(_) => True
+
+-- successor(n) ≠ zero.
+theorem Natural.successor_not_zero (n : Natural)
+        : Not(successor(n) = zero) :=
+  fun (equalityProof : successor(n) = zero) =>
+    Equality_recursor(
+      Natural, successor(n),
+      fun (other : Natural) (_ : Equality(Natural, successor(n), other))
+          => Natural.is_successor(other),
+      True.trivial,
+      zero,
+      equalityProof)
+
+-- And the symmetric form.
+theorem Natural.zero_not_successor (n : Natural)
+        : Not(zero = successor(n)) :=
+  fun (equalityProof : zero = successor(n)) =>
+    Natural.successor_not_zero(n, Equality.symmetry(equalityProof))
