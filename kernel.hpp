@@ -65,10 +65,23 @@ using Declaration = std::variant<Axiom, Definition,
 
 struct Environment {
     std::map<std::string, Declaration> declarations;
+    // Elaborator-side metadata: number of leading implicit binders for
+    // each declaration. The kernel itself ignores this — it's used by
+    // the surface elaborator to decide which leading arguments at a
+    // call site to fill in via unification. A declaration not present
+    // in this map has zero implicit binders. Phase 2.1 restricts
+    // implicit binders to leading consecutive positions.
+    std::map<std::string, int> implicitArgumentCounts;
 
     const Declaration* lookup(const std::string& name) const {
         auto iterator = declarations.find(name);
         return iterator == declarations.end() ? nullptr : &iterator->second;
+    }
+
+    int implicitArgumentCount(const std::string& name) const {
+        auto iterator = implicitArgumentCounts.find(name);
+        return iterator == implicitArgumentCounts.end()
+            ? 0 : iterator->second;
     }
 };
 

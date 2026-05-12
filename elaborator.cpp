@@ -81,6 +81,31 @@ private:
         resetAutoBoundState();
     }
 
+    // Counts leading implicit binder names in a declaration's argument
+    // list. Throws if `{x:T}` and `(y:U)` are interleaved (Phase 2.1
+    // restricts implicit binders to a leading consecutive prefix). The
+    // result is the total number of NAMES across the leading implicit
+    // binders (so `{A B : Type}` counts as 2).
+    int countLeadingImplicitArgumentNames(
+        const SurfaceDefinitionDeclaration& declaration) {
+        int count = 0;
+        bool seenExplicit = false;
+        for (const auto& binder : declaration.arguments) {
+            if (binder.isImplicit) {
+                if (seenExplicit) {
+                    throw ElaborateError(
+                        "declaration '" + declaration.name
+                        + "': implicit binders '{x : T}' must precede "
+                          "all explicit binders");
+                }
+                count += static_cast<int>(binder.names.size());
+            } else {
+                seenExplicit = true;
+            }
+        }
+        return count;
+    }
+
     void elaborateDefinition(const SurfaceDefinitionDeclaration& declaration) {
         if (!declaration.cases.empty()) {
             elaboratePatternMatchDefinition(declaration);
@@ -133,6 +158,12 @@ private:
         addDefinition(environment_, declaration.name,
                       finalUniverseParameters(declaration.universeParameters),
                       std::move(fullType), std::move(fullBody));
+        int implicitCount =
+            countLeadingImplicitArgumentNames(declaration);
+        if (implicitCount > 0) {
+            environment_.implicitArgumentCounts[declaration.name] =
+                implicitCount;
+        }
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
@@ -571,6 +602,12 @@ private:
         addDefinition(environment_, declaration.name,
                       finalUniverseParameters(declaration.universeParameters),
                       std::move(fullType), std::move(fullBody));
+        int implicitCount =
+            countLeadingImplicitArgumentNames(declaration);
+        if (implicitCount > 0) {
+            environment_.implicitArgumentCounts[declaration.name] =
+                implicitCount;
+        }
 
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
@@ -1314,8 +1351,28 @@ private:
                     if (declarationKernelType) {
                         int totalPiCount =
                             countLeadingPis(declarationKernelType);
-                        int numLeadingToInfer =
-                            totalPiCount - static_cast<int>(argumentCount);
+                        int declaredImplicitCount =
+                            environment_.implicitArgumentCount(name);
+                        // Two engagement modes:
+                        //   (a) Declaration uses `{x : T}` implicit
+                        //       binders. The user provides exactly the
+                        //       explicit-arg count and we infer the
+                        //       declared implicit prefix.
+                        //   (b) Declaration has no implicit binders.
+                        //       Fall back to arity-based inference:
+                        //       under-applied calls infer the missing
+                        //       leading args.
+                        int numLeadingToInfer = 0;
+                        if (declaredImplicitCount > 0) {
+                            if (static_cast<int>(argumentCount)
+                                == totalPiCount - declaredImplicitCount) {
+                                numLeadingToInfer = declaredImplicitCount;
+                            }
+                        } else {
+                            numLeadingToInfer =
+                                totalPiCount
+                                - static_cast<int>(argumentCount);
+                        }
                         bool universesOk =
                             declarationUniverseParams->empty()
                             || (headIdentifier->universeArgs.size()

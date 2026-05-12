@@ -23,7 +23,7 @@ parser.o: parser.cpp parser.hpp surface.hpp lexer.hpp
 elaborator.o: elaborator.cpp elaborator.hpp surface.hpp kernel.hpp expression.hpp level.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-main.o: main.cpp expression.hpp kernel.hpp printer.hpp level.hpp lexer.hpp
+main.o: main.cpp expression.hpp kernel.hpp printer.hpp level.hpp lexer.hpp surface.hpp parser.hpp elaborator.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:

@@ -93,9 +93,14 @@ inline SurfaceLevelPointer makeSurfaceLevelMeta(int line, int column) {
 // A binder appearing in a Pi type or a lambda. Multiple names share one
 // type: `(x y z : T)` is one binder with three names. An anonymous
 // binder (the `T → U` form of Pi) has an empty `names` vector.
+// `isImplicit` is true for `{x : T}` form binders — the elaborator
+// infers them at call sites rather than expecting the caller to spell
+// them out. For Phase 2.1, implicit binders must appear consecutively
+// at the leading positions of a declaration's parameter list.
 struct SurfaceBinder {
     std::vector<std::string> names;
     SurfaceExpressionPointer type;
+    bool isImplicit = false;
 };
 
 struct SurfaceIdentifier {

@@ -99,7 +99,8 @@ private:
         SurfaceInductiveDeclaration declaration;
         declaration.name = consumeQualifiedNameString();
         declaration.universeParameters = parseUniverseParameterList();
-        while (peek().kind == TokenKind::LeftParen) {
+        while (peek().kind == TokenKind::LeftParen
+               || peek().kind == TokenKind::LeftBrace) {
             declaration.parameters.push_back(parseExplicitBinder());
         }
         expect(TokenKind::Colon, "before inductive kind");
@@ -135,7 +136,8 @@ private:
         declaration.isTheorem = isTheorem;
         declaration.name = consumeQualifiedNameString();
         declaration.universeParameters = parseUniverseParameterList();
-        while (peek().kind == TokenKind::LeftParen) {
+        while (peek().kind == TokenKind::LeftParen
+               || peek().kind == TokenKind::LeftBrace) {
             declaration.arguments.push_back(parseExplicitBinder());
         }
         expect(TokenKind::Colon, "before declaration type");
@@ -285,8 +287,10 @@ private:
         const Token& start = consumeAny();  // 'fun'
         std::vector<SurfaceBinder> binders;
         while (peek().kind == TokenKind::LeftParen
+               || peek().kind == TokenKind::LeftBrace
                || peek().kind == TokenKind::Identifier) {
-            if (peek().kind == TokenKind::LeftParen) {
+            if (peek().kind == TokenKind::LeftParen
+                || peek().kind == TokenKind::LeftBrace) {
                 binders.push_back(parseExplicitBinder());
             } else {
                 // Untyped binder: a bare name. The elaborator must be
@@ -294,7 +298,7 @@ private:
                 // (currently supported only for select special-cased
                 // call sites like congruenceOf's first argument).
                 Token nameToken = consumeAny();
-                binders.push_back({{nameToken.lexeme}, nullptr});
+                binders.push_back({{nameToken.lexeme}, nullptr, false});
             }
         }
         if (binders.empty()) {
@@ -349,10 +353,19 @@ private:
                               start.line, start.column);
     }
 
-    // Helper used by lambda parsing. Requires an explicit `(name+ : type)`
-    // form; throws on malformed binders.
+    // Helper used by lambda parsing. Accepts `(name+ : type)` for an
+    // explicit binder and `{name+ : type}` for an implicit binder.
+    // Throws on malformed binders.
     SurfaceBinder parseExplicitBinder() {
-        expect(TokenKind::LeftParen, "starting binder");
+        bool isImplicit = false;
+        TokenKind closing = TokenKind::RightParen;
+        if (peek().kind == TokenKind::LeftBrace) {
+            isImplicit = true;
+            closing = TokenKind::RightBrace;
+            consumeAny();  // '{'
+        } else {
+            expect(TokenKind::LeftParen, "starting binder");
+        }
         std::vector<std::string> names;
         while (peek().kind == TokenKind::Identifier) {
             names.push_back(consumeAny().lexeme);
@@ -362,18 +375,30 @@ private:
         }
         expect(TokenKind::Colon, "in binder");
         auto type = parseExpression();
-        expect(TokenKind::RightParen, "ending binder");
-        return SurfaceBinder{std::move(names), std::move(type)};
+        expect(closing,
+               isImplicit ? "ending implicit binder"
+                          : "ending binder");
+        SurfaceBinder binder{std::move(names), std::move(type),
+                              isImplicit};
+        return binder;
     }
 
     // Lookahead-with-restore variant for parseImplication. Returns
-    // nullopt if the input doesn't match `(name+ : type)`, restoring
-    // the parser position so the caller can fall back to expression
-    // parsing.
+    // nullopt if the input doesn't match a binder; restores the parser
+    // position so the caller can fall back to expression parsing.
     std::optional<SurfaceBinder> tryParseExplicitBinder() {
         size_t save = position_;
-        if (peek().kind != TokenKind::LeftParen) return std::nullopt;
-        consumeAny();  // '('
+        bool isImplicit = false;
+        TokenKind closing = TokenKind::RightParen;
+        if (peek().kind == TokenKind::LeftBrace) {
+            isImplicit = true;
+            closing = TokenKind::RightBrace;
+            consumeAny();  // '{'
+        } else if (peek().kind == TokenKind::LeftParen) {
+            consumeAny();  // '('
+        } else {
+            return std::nullopt;
+        }
         std::vector<std::string> names;
         while (peek().kind == TokenKind::Identifier) {
             names.push_back(consumeAny().lexeme);
@@ -390,20 +415,23 @@ private:
             position_ = save;
             return std::nullopt;
         }
-        if (peek().kind != TokenKind::RightParen) {
+        if (peek().kind != closing) {
             position_ = save;
             return std::nullopt;
         }
-        consumeAny();  // ')'
-        return SurfaceBinder{std::move(names), std::move(type)};
+        consumeAny();
+        SurfaceBinder binder{std::move(names), std::move(type),
+                              isImplicit};
+        return binder;
     }
 
     // Pi types and implication. Right-associative. Tries explicit
-    // `(name+ : T) → U` form first; otherwise parses a regular
-    // expression and looks for a following `→`.
+    // `(name+ : T) → U` or implicit `{name+ : T} → U` form first;
+    // otherwise parses a regular expression and looks for a following `→`.
     SurfaceExpressionPointer parseImplication() {
         size_t save = position_;
-        if (peek().kind == TokenKind::LeftParen) {
+        if (peek().kind == TokenKind::LeftParen
+            || peek().kind == TokenKind::LeftBrace) {
             auto binderOpt = tryParseExplicitBinder();
             if (binderOpt) {
                 if (peek().kind == TokenKind::Arrow) {

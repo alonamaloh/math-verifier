@@ -199,3 +199,45 @@ Next slice candidates: implicit arguments at theorem call sites
 (removes the motive/IH boilerplate still visible in `prime_divisor_v2`),
 plus a statement-level proof block to introduce `claim`/`apply`/
 `witness`.
+
+## Phase 2 updates (landed 2026-05-13)
+
+### Phase 2.0 — Arity-based inference at theorem call sites
+
+Generalised the constructor parameter inference to all
+Axiom/Definition (theorem) calls. When the user supplies strictly
+fewer value arguments than the declaration's leading Pi count AND an
+expected type is in scope, the elaborator fills in the missing leading
+arguments via backward-forward unification.
+
+Concretely, `Natural.divides_transitive(p_div_d, d_div_n)` now expands
+to the full 5-arg call with prime/divisor/subject inferred from the
+proof arguments' types and the expected return.
+
+Two unifier bugs surfaced and fixed:
+
+- Application-case head check: the unifier had been pointwise-aligning
+  two Application chains without first verifying their function-chain
+  heads match, which let `Natural.divides(_, _)` "unify" against
+  `Exists(Natural, _)` and assign metavariables to wrong-typed targets.
+- Under-binder assignment: the unifier refused all metavariable
+  assignments when descended into a binder, even when the target's
+  free Bound vars all referenced outside the binder. Now assigns
+  with a shift-back when safe.
+
+### Phase 2.1 — Explicit implicit binders `{x : T}`
+
+Surface syntax for `{x : T}` and `{x y z : T}` binders in lambdas, Pi
+types, definitions, theorems, and inductives. The elaborator tracks
+the leading implicit count per declaration and engages inference
+whenever the user provides exactly `totalPi - implicitCount` arguments
+— independent of whether arity-based inference would have engaged.
+
+Restriction (Phase 2.1): implicit binders must form a leading
+consecutive prefix; interleaved `{...}` and `(...)` is rejected.
+
+Restriction (Phase 2.1): when an implicit binder has type `Type`
+(introducing an auto-bound universe parameter), the user must call
+with explicit `.{u}` universe arguments. Combining leading-arg
+inference with universe-arg inference at the call site is a separate
+slice.
