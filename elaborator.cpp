@@ -162,20 +162,34 @@ private:
     void elaboratePatternMatchDefinition(
         const SurfaceDefinitionDeclaration& declaration) {
 
-        if (!declaration.arguments.empty()) {
-            throw ElaborateError(
-                "pattern-match definition '" + declaration.name
-                + "' must declare its arguments in the type signature, "
-                "not as binders before the colon. (Support for outer "
-                "binders is a future iteration.)");
-        }
-
         currentUniverseParametersOrdered_ = declaration.universeParameters;
         currentUniverseParameters_ = std::set<std::string>(
             declaration.universeParameters.begin(),
             declaration.universeParameters.end());
         currentDeclarationName_ = declaration.name;
         resetAutoBoundState();
+
+        // Outer binders (pre-colon arguments like `(A B : Proposition)`)
+        // become wrapper Pis around the type and wrapper Lambdas around
+        // the body. Everything else — the scrutinee analysis, motive,
+        // case lambdas, recursor application — happens inside that
+        // outer-binder scope.
+        std::vector<LocalBinder> outerBinderStack;
+        std::vector<std::pair<std::string, ExpressionPointer>>
+            outerBinders;
+        for (const auto& binder : declaration.arguments) {
+            ExpressionPointer outerBinderType =
+                elaborateExpression(*binder.type, outerBinderStack);
+            for (const auto& name : binder.names) {
+                outerBinders.push_back({name, outerBinderType});
+                outerBinderStack.push_back({name, outerBinderType});
+                if (&name != &binder.names.back()) {
+                    outerBinderType =
+                        elaborateExpression(*binder.type, outerBinderStack);
+                }
+            }
+        }
+        int outerBinderCount = static_cast<int>(outerBinders.size());
 
         // Decompose the type into a list of (name, surface type) binders
         // plus a final return type. Anonymous Pis get synthesised names.
@@ -249,8 +263,10 @@ private:
 
         // Elaborate the kernel types for each function argument, and
         // the kernel return type. We need these for both type signature
-        // and motive construction.
-        std::vector<LocalBinder> binderStack;
+        // and motive construction. The starting stack is the outer
+        // binder stack, so function-argument types and the return type
+        // can reference outer binders by name.
+        std::vector<LocalBinder> binderStack = outerBinderStack;
         std::vector<ExpressionPointer> argumentKernelTypes;
         for (const auto& argument : functionArguments) {
             ExpressionPointer argumentType =
@@ -298,7 +314,8 @@ private:
                 + " index argument(s) — use a direct recursor call)");
         }
 
-        // Build the full type as a Pi chain.
+        // Build the full type as a Pi chain over function arguments,
+        // then wrap in another Pi chain for the outer binders.
         ExpressionPointer fullType = returnKernelType;
         for (int i = static_cast<int>(functionArguments.size()) - 1;
              i >= 0; --i) {
@@ -306,17 +323,24 @@ private:
                               argumentKernelTypes[i],
                               std::move(fullType));
         }
+        for (int i = outerBinderCount - 1; i >= 0; --i) {
+            fullType = makePi(outerBinders[i].first,
+                              outerBinders[i].second,
+                              std::move(fullType));
+        }
 
         // Build the motive in the kernel. The motive is a lambda over
         // the scrutinee, with body = Pi over the remaining arguments
-        // ending
-        // in the return type. The return type may reference any of the
-        // function's arguments, so we elaborate it with the full binder
-        // stack [scrutinee, otherArg1, ..., otherArgN] in scope and
-        // then wrap with Pis for the non-scrutinee arguments.
+        // ending in the return type. The return type may reference
+        // any of the function's arguments AND any outer binders, so
+        // we elaborate it with the full binder stack
+        // [outerBinders..., scrutinee, otherArg1, ..., otherArgN] in
+        // scope and then wrap with Pis for the non-scrutinee arguments.
+        // The resulting motive expression has free BoundVariable
+        // references to the outer binders (none if outerBinderCount=0).
         ExpressionPointer motive;
         {
-            std::vector<LocalBinder> motiveStack;
+            std::vector<LocalBinder> motiveStack = outerBinderStack;
             motiveStack.push_back({scrutineeArgument.name,
                                    argumentKernelTypes[0]});
             std::vector<ExpressionPointer> otherArgumentKernelTypes;
@@ -342,12 +366,24 @@ private:
                                 std::move(motiveCodomain));
         }
 
-        // Determine the motive's universe level by asking the kernel for
-        // its type (a Pi chain ending in a Sort).
+        // Determine the motive's universe level by asking the kernel
+        // for its type (a Pi chain ending in a Sort). The motive may
+        // reference outer binders, so we open those references into
+        // Internal-origin FreeVariables and pass a matching Context
+        // to inferType.
         LevelPointer motiveLevel;
         {
+            Context outerBinderContext;
+            for (const auto& binder : outerBinderStack) {
+                outerBinderContext.push_back(
+                    {binder.name, binder.type,
+                     FreeVariableOrigin::Internal});
+            }
             ExpressionPointer motiveType =
-                inferType(environment_, {}, motive);
+                inferType(environment_, outerBinderContext,
+                           openOverLocalBinders(
+                               motive, outerBinderStack,
+                               outerBinderStack.size()));
             ExpressionPointer cursor = motiveType;
             while (auto* pi = std::get_if<Pi>(&cursor->node)) {
                 cursor = pi->codomain;
@@ -370,14 +406,16 @@ private:
         // For parameterised inductives, pass the parameter values so the
         // case lambda can strip the constructor's parameter Pis and
         // substitute the values into the remaining argument types.
+        // The outer-binder stack lets the case body and any
+        // non-scrutinee argument types reference outer binders.
         std::vector<ExpressionPointer> caseLambdas;
         for (const auto& constructorName : inductive->constructorNames) {
             caseLambdas.push_back(
                 buildCaseLambda(declaration, constructorName,
                                 inductiveName, motive,
                                 functionArgumentPairs,
-                                inductive->numParameters,
-                                parameterValues));
+                                parameterValues,
+                                outerBinderStack));
         }
 
         // Build the recursor call. The recursor's universe arguments
@@ -411,13 +449,26 @@ private:
             makeConstant(std::move(recursorName),
                           std::move(recursorUniverseArguments));
         ExpressionPointer applied = std::move(recursorReference);
+        // The recursor call lives inside the function-argument lambdas
+        // (which we wrap below), which are themselves inside the
+        // outer-binder lambdas. Parameter values, the motive, and case
+        // lambdas were all built within the outer-binder scope, so any
+        // BoundVariable references to outer binders inside them must
+        // be bumped by `argumentCount` to account for the extra
+        // function-argument lambdas above us. For closed sub-terms
+        // (no outer binders in scope, or no references to them) the
+        // shift is a no-op.
+        int argumentCount = static_cast<int>(functionArguments.size());
         for (const auto& parameterValue : parameterValues) {
-            applied = makeApplication(std::move(applied), parameterValue);
-        }
-        applied = makeApplication(std::move(applied), motive);
-        for (auto& caseLambda : caseLambdas) {
             applied = makeApplication(std::move(applied),
-                                       std::move(caseLambda));
+                                       shift(parameterValue, argumentCount));
+        }
+        applied = makeApplication(std::move(applied),
+                                   shift(motive, argumentCount));
+        for (auto& caseLambda : caseLambdas) {
+            applied = makeApplication(
+                std::move(applied),
+                shift(std::move(caseLambda), argumentCount));
         }
         // The scrutinee. The function's arguments are bound (from
         // innermost outermost) at depths n-1, n-2, ..., 0 inside the
@@ -425,24 +476,29 @@ private:
         // so its de Bruijn index when we're inside ALL function
         // argument binders is (n - 1) — counting from innermost
         // outward.
-        int argumentCount = static_cast<int>(functionArguments.size());
         applied = makeApplication(std::move(applied),
                                    makeBoundVariable(argumentCount - 1));
         // Then apply to all the other arguments (in declaration order,
-        // from
-        // the second onward). At the point we apply argument i, its de
-        // Bruijn index inside the body lambda is (argumentCount - 1 - i).
+        // from the second onward). At the point we apply argument i,
+        // its de Bruijn index inside the body lambda is
+        // (argumentCount - 1 - i).
         for (int i = 1; i < argumentCount; ++i) {
             applied = makeApplication(
                 std::move(applied),
                 makeBoundVariable(argumentCount - 1 - i));
         }
 
-        // Wrap in lambdas over function arguments.
+        // Wrap in lambdas over function arguments, then in lambdas
+        // over the outer binders.
         ExpressionPointer fullBody = applied;
         for (int i = argumentCount - 1; i >= 0; --i) {
             fullBody = makeLambda(functionArguments[i].name,
                                    argumentKernelTypes[i],
+                                   std::move(fullBody));
+        }
+        for (int i = outerBinderCount - 1; i >= 0; --i) {
+            fullBody = makeLambda(outerBinders[i].first,
+                                   outerBinders[i].second,
                                    std::move(fullBody));
         }
 
@@ -467,14 +523,18 @@ private:
     // the constructor's parameter Pis and substitutes the values into
     // the remaining argument types, so the case lambda binds only the
     // non-parameter arguments.
+    // The `outerBinderStack` is the context of outer (pre-colon) binders
+    // around the entire pattern-match definition. Non-scrutinee
+    // argument types and the case body are elaborated with those
+    // outer binders in scope, so they can be referenced by name.
     ExpressionPointer buildCaseLambda(
         const SurfaceDefinitionDeclaration& declaration,
         const std::string& constructorName,
         const std::string& inductiveName,
         ExpressionPointer motive,
         const std::vector<FunctionArgumentPair>& functionArgumentTypes,
-        int numParameters,
-        const std::vector<ExpressionPointer>& parameterValues) {
+        const std::vector<ExpressionPointer>& parameterValues,
+        const std::vector<LocalBinder>& outerBinderStack) {
 
         // Find the case in the declaration matching this constructor.
         const SurfacePatternCase* matchedCase = nullptr;
@@ -536,26 +596,22 @@ private:
         };
         std::vector<ConstructorArgument> constructorArguments;
         {
-            // Skip the constructor's parameter Pis (the first
-            // numParameters of them); they're filled by the recursor
-            // application and aren't bound by the case lambda.
+            // Apply the parameter values to the constructor's type via
+            // beta reduction — peel one parameter Pi, substitute its
+            // value, repeat. (Peeling all Pis first and then substituting
+            // all values in sequence is incorrect when the values
+            // themselves reference outer binders: each later substitute
+            // walks the partially-substituted cursor and collides with
+            // BoundVariables introduced by the earlier substitutes.)
             ExpressionPointer cursor = constructor->type;
-            for (int i = 0; i < numParameters; ++i) {
+            for (size_t i = 0; i < parameterValues.size(); ++i) {
                 auto* pi = std::get_if<Pi>(&cursor->node);
                 if (!pi) {
                     throw ElaborateError(
                         "internal: constructor '" + constructorName
                         + "' has fewer parameter Pis than expected");
                 }
-                cursor = pi->codomain;
-            }
-            // Substitute the parameter values into the remaining type,
-            // innermost-bound (last) parameter first. After all
-            // substitutions, the remaining Pis bind only non-parameter
-            // arguments and reference the parameter values directly.
-            for (auto iterator = parameterValues.rbegin();
-                 iterator != parameterValues.rend(); ++iterator) {
-                cursor = substitute(cursor, 0, *iterator);
+                cursor = substitute(pi->codomain, 0, parameterValues[i]);
             }
             while (auto* pi = std::get_if<Pi>(&cursor->node)) {
                 ConstructorArgument constructorArgument;
@@ -667,8 +723,8 @@ private:
             SurfaceExpressionPointer surfaceArgType =
                 functionArgumentTypes[i].surfaceType;
             // Elaborate this surface type in a binder stack reflecting
-            // our current lambda binders.
-            std::vector<LocalBinder> stack;
+            // the outer binders and our current case-lambda binders.
+            std::vector<LocalBinder> stack = outerBinderStack;
             for (const auto& binder : lambdaBinders) {
                 stack.push_back({binder.name, binder.type});
             }
@@ -678,12 +734,15 @@ private:
             binderDepth++;
         }
 
-        // Translate the body: rewrite recursive calls.
+        // Translate the body: rewrite recursive calls. The user types
+        // out the outer binders in any recursive call, so we tell the
+        // rewriter to skip past them before looking for the scrutinee.
         SurfaceExpressionPointer rewrittenBody = rewriteRecursiveCalls(
-            matchedCase->body, declaration.name, recursiveArgToHypothesis);
+            matchedCase->body, declaration.name, recursiveArgToHypothesis,
+            static_cast<int>(outerBinderStack.size()));
 
-        // Elaborate the body with all binders in scope.
-        std::vector<LocalBinder> bodyStack;
+        // Elaborate the body with all binders in scope (outer + case).
+        std::vector<LocalBinder> bodyStack = outerBinderStack;
         for (const auto& binder : lambdaBinders) {
             bodyStack.push_back({binder.name, binder.type});
         }
@@ -701,17 +760,21 @@ private:
     }
 
     // Walks a surface expression and replaces calls of the form
-    // `thisDeclName(<destructuredName>, ...rest)` with `<recursionHypothesis>(...rest)`,
-    // where the mapping `destructuredName → recursionHypothesis` is
-    // determined by the case currently being translated. Non-recursive
-    // calls (or recursive calls on something other than a destructured
-    // variable) are left alone — the kernel will reject them as ill-
-    // typed if structural recursion was actually required.
+    // `thisDeclName(<outerBinders>..., <destructuredName>, ...rest)`
+    // with `<recursionHypothesis>(...rest)`, where the mapping
+    // `destructuredName → recursionHypothesis` is determined by the
+    // case currently being translated. `outerBinderCount` is the
+    // number of pre-colon arguments the user must repeat in every
+    // recursive call before the scrutinee. Non-recursive calls (or
+    // recursive calls on something other than a destructured variable
+    // at the right position) are left alone — the kernel will reject
+    // them as ill-typed if structural recursion was actually required.
     SurfaceExpressionPointer rewriteRecursiveCalls(
         SurfaceExpressionPointer expression,
         const std::string& thisDeclName,
         const std::map<std::string, std::string>&
-            recursiveArgToHypothesis) {
+            recursiveArgToHypothesis,
+        int outerBinderCount) {
 
         const SurfaceExpression& node = *expression;
         if (auto* application =
@@ -719,36 +782,41 @@ private:
             // Recurse into function and arguments first.
             auto rewrittenFunction = rewriteRecursiveCalls(
                 application->function, thisDeclName,
-                recursiveArgToHypothesis);
+                recursiveArgToHypothesis, outerBinderCount);
             std::vector<SurfaceExpressionPointer> rewrittenArguments;
             for (const auto& argument : application->arguments) {
                 rewrittenArguments.push_back(rewriteRecursiveCalls(
-                    argument, thisDeclName, recursiveArgToHypothesis));
+                    argument, thisDeclName, recursiveArgToHypothesis,
+                    outerBinderCount));
             }
             // Check if this is a recursive call we should rewrite.
+            // The scrutinee sits at index `outerBinderCount` (after
+            // the user has typed out the outer binders).
             auto* functionIdentifier = std::get_if<SurfaceIdentifier>(
                 &application->function->node);
             if (functionIdentifier
                 && functionIdentifier->qualifiedName == thisDeclName
                 && functionIdentifier->universeArgs.empty()
-                && !rewrittenArguments.empty()) {
-                auto* firstArgumentIdentifier =
+                && static_cast<int>(rewrittenArguments.size())
+                       > outerBinderCount) {
+                auto* scrutineeArgumentIdentifier =
                     std::get_if<SurfaceIdentifier>(
-                        &rewrittenArguments[0]->node);
-                if (firstArgumentIdentifier
-                    && firstArgumentIdentifier->universeArgs.empty()) {
+                        &rewrittenArguments[outerBinderCount]->node);
+                if (scrutineeArgumentIdentifier
+                    && scrutineeArgumentIdentifier->universeArgs.empty()) {
                     auto iterator = recursiveArgToHypothesis.find(
-                        firstArgumentIdentifier->qualifiedName);
+                        scrutineeArgumentIdentifier->qualifiedName);
                     if (iterator != recursiveArgToHypothesis.end()) {
                         // Replace head with the recursion hypothesis,
-                        // dropping the first argument (which the kernel
-                        // handles implicitly via the recursor).
+                        // dropping the outer-binder arguments and the
+                        // scrutinee (the recursor handles them implicitly).
                         auto hypothesisIdentifier =
                             makeSurfaceIdentifier(iterator->second, {},
                                                    node.line, node.column);
                         std::vector<SurfaceExpressionPointer>
                             remainingArguments(
-                                rewrittenArguments.begin() + 1,
+                                rewrittenArguments.begin()
+                                    + outerBinderCount + 1,
                                 rewrittenArguments.end());
                         if (remainingArguments.empty()) {
                             return hypothesisIdentifier;
@@ -768,38 +836,47 @@ private:
             return makeSurfacePiType(
                 {piType->binder.names,
                  rewriteRecursiveCalls(piType->binder.type, thisDeclName,
-                                        recursiveArgToHypothesis)},
+                                        recursiveArgToHypothesis,
+                                        outerBinderCount)},
                 rewriteRecursiveCalls(piType->codomain, thisDeclName,
-                                       recursiveArgToHypothesis),
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
                 node.line, node.column);
         }
         if (auto* lambda = std::get_if<SurfaceLambda>(&node.node)) {
             return makeSurfaceLambda(
                 {lambda->binder.names,
                  rewriteRecursiveCalls(lambda->binder.type, thisDeclName,
-                                        recursiveArgToHypothesis)},
+                                        recursiveArgToHypothesis,
+                                        outerBinderCount)},
                 rewriteRecursiveCalls(lambda->body, thisDeclName,
-                                       recursiveArgToHypothesis),
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
                 node.line, node.column);
         }
         if (auto* let = std::get_if<SurfaceLet>(&node.node)) {
             return makeSurfaceLet(
                 let->name,
                 rewriteRecursiveCalls(let->type, thisDeclName,
-                                       recursiveArgToHypothesis),
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
                 rewriteRecursiveCalls(let->value, thisDeclName,
-                                       recursiveArgToHypothesis),
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
                 rewriteRecursiveCalls(let->body, thisDeclName,
-                                       recursiveArgToHypothesis),
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
                 node.line, node.column);
         }
         if (auto* ascription = std::get_if<SurfaceAscription>(&node.node)) {
             return makeSurfaceAscription(
                 rewriteRecursiveCalls(ascription->expression,
                                        thisDeclName,
-                                       recursiveArgToHypothesis),
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
                 rewriteRecursiveCalls(ascription->type, thisDeclName,
-                                       recursiveArgToHypothesis),
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
                 node.line, node.column);
         }
         if (auto* binary =
@@ -807,16 +884,19 @@ private:
             return makeSurfaceBinaryOperation(
                 binary->opSymbol,
                 rewriteRecursiveCalls(binary->left, thisDeclName,
-                                       recursiveArgToHypothesis),
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
                 rewriteRecursiveCalls(binary->right, thisDeclName,
-                                       recursiveArgToHypothesis),
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
                 node.line, node.column);
         }
         if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node.node)) {
             return makeSurfaceUnaryOperation(
                 unary->opSymbol,
                 rewriteRecursiveCalls(unary->operand, thisDeclName,
-                                       recursiveArgToHypothesis),
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
                 node.line, node.column);
         }
         // Atomic forms (identifier, numeric literal, Type, Proposition) are
