@@ -1,0 +1,56 @@
+-- Equality/basics.math
+--
+-- Propositional equality. Universe-polymorphic so the same Equality
+-- can talk about values, types, types-of-types, etc.
+
+module Equality.basics
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Prop where
+  | reflexivity : Equality(A, x, x)
+
+-- Symmetry: if x = y, then y = x.
+--
+-- Proof by induction on the equality proof itself (the "J principle").
+-- The motive  λ y' _. Equality(A, y', x)  turns the goal into the
+-- reflexive case where y' = x, which is proved by reflexivity(A, x).
+theorem Equality.symmetry.{u}
+        (A : Type(u)) (x y : A) (h : Equality.{u}(A, x, y))
+        : Equality.{u}(A, y, x) :=
+  Equality_recursor.{u, 0}(
+    A, x,
+    fun (y' : A) (_ : Equality.{u}(A, x, y')) => Equality.{u}(A, y', x),
+    reflexivity.{u}(A, x),
+    y,
+    h)
+
+-- Transitivity: if x = y and y = z, then x = z.
+--
+-- Recurse on the *second* equality with motive λ z' _. Equality(A, x, z').
+-- The reflexive case (z' = y) needs Equality(A, x, y), which is the
+-- first equality hxy.
+theorem Equality.transitivity.{u}
+        (A : Type(u)) (x y z : A)
+        (hxy : Equality.{u}(A, x, y)) (hyz : Equality.{u}(A, y, z))
+        : Equality.{u}(A, x, z) :=
+  Equality_recursor.{u, 0}(
+    A, y,
+    fun (z' : A) (_ : Equality.{u}(A, y, z')) => Equality.{u}(A, x, z'),
+    hxy,
+    z,
+    hyz)
+
+-- Congruence: if x = y, then f(x) = f(y).
+--
+-- Universe-polymorphic in both the source and target type universes
+-- (u for A, v for B). Recurses on the equality with motive
+-- λ y' _. Equality(B, f(x), f(y')).
+theorem Equality.congruence.{u, v}
+        (A : Type(u)) (B : Type(v)) (f : A → B)
+        (x y : A) (h : Equality.{u}(A, x, y))
+        : Equality.{v}(B, f(x), f(y)) :=
+  Equality_recursor.{u, 0}(
+    A, x,
+    fun (y' : A) (_ : Equality.{u}(A, x, y')) => Equality.{v}(B, f(x), f(y')),
+    reflexivity.{v}(B, f(x)),
+    y,
+    h)

@@ -1,0 +1,34 @@
+-- Natural/basics.math
+--
+-- Natural numbers with constructors zero and successor, and the
+-- core arithmetic operations defined by structural recursion.
+
+module Natural.basics
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+-- Small constants used throughout the library.
+definition one   : Natural := successor(zero)
+definition two   : Natural := successor(one)
+definition three : Natural := successor(two)
+definition four  : Natural := successor(three)
+
+-- Addition. Pattern-matches on the first argument.
+--
+-- Definitional reduction rules (visible to the kernel after elaboration):
+--   add(zero, m)         ≡ m
+--   add(successor(k), m) ≡ successor(add(k, m))
+definition Natural.add : Natural → Natural → Natural
+  | zero,         m  =>  m
+  | successor(k), m  =>  successor(Natural.add(k, m))
+
+-- Multiplication.
+--
+-- Definitional reduction rules:
+--   multiply(zero, m)         ≡ zero
+--   multiply(successor(k), m) ≡ add(m, multiply(k, m))
+definition Natural.multiply : Natural → Natural → Natural
+  | zero,         _  =>  zero
+  | successor(k), m  =>  Natural.add(m, Natural.multiply(k, m))

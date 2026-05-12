@@ -1,0 +1,311 @@
+#pragma once
+
+// Surface AST for the .math language. Produced by the parser, consumed
+// by the elaborator. Distinct from the kernel's Expression because the
+// surface form carries source positions, qualified names with unresolved
+// universe arguments, operator nodes (resolved by the elaborator), and
+// other surface-only features. Conversion to a kernel Expression is the
+// elaborator's job.
+
+#include <memory>
+#include <string>
+#include <variant>
+#include <vector>
+
+struct SurfaceExpression;
+using SurfaceExpressionPointer = std::shared_ptr<const SurfaceExpression>;
+
+struct SurfaceLevel;
+using SurfaceLevelPointer = std::shared_ptr<const SurfaceLevel>;
+
+// -------- universe levels --------
+
+struct SurfaceLevelNumeric { int value; };
+struct SurfaceLevelName    { std::string name; };
+struct SurfaceLevelMax     { SurfaceLevelPointer left, right; };
+struct SurfaceLevelImax    { SurfaceLevelPointer left, right; };
+struct SurfaceLevelAdd     { SurfaceLevelPointer base; int amount; };
+
+struct SurfaceLevel {
+    std::variant<SurfaceLevelNumeric, SurfaceLevelName,
+                 SurfaceLevelMax, SurfaceLevelImax,
+                 SurfaceLevelAdd> node;
+    int line = 0;
+    int column = 0;
+};
+
+inline SurfaceLevelPointer makeSurfaceLevelNumeric(int value,
+                                                   int line, int column) {
+    return std::make_shared<const SurfaceLevel>(
+        SurfaceLevel{SurfaceLevelNumeric{value}, line, column});
+}
+inline SurfaceLevelPointer makeSurfaceLevelName(std::string name,
+                                                 int line, int column) {
+    return std::make_shared<const SurfaceLevel>(
+        SurfaceLevel{SurfaceLevelName{std::move(name)}, line, column});
+}
+inline SurfaceLevelPointer makeSurfaceLevelMax(SurfaceLevelPointer left,
+                                                SurfaceLevelPointer right,
+                                                int line, int column) {
+    return std::make_shared<const SurfaceLevel>(
+        SurfaceLevel{SurfaceLevelMax{std::move(left), std::move(right)},
+                     line, column});
+}
+inline SurfaceLevelPointer makeSurfaceLevelImax(SurfaceLevelPointer left,
+                                                 SurfaceLevelPointer right,
+                                                 int line, int column) {
+    return std::make_shared<const SurfaceLevel>(
+        SurfaceLevel{SurfaceLevelImax{std::move(left), std::move(right)},
+                     line, column});
+}
+inline SurfaceLevelPointer makeSurfaceLevelAdd(SurfaceLevelPointer base,
+                                                int amount,
+                                                int line, int column) {
+    return std::make_shared<const SurfaceLevel>(
+        SurfaceLevel{SurfaceLevelAdd{std::move(base), amount},
+                     line, column});
+}
+
+// -------- expressions --------
+
+// A binder appearing in a Pi type or a lambda. Multiple names share one
+// type: `(x y z : T)` is one binder with three names. An anonymous
+// binder (the `T → U` form of Pi) has an empty `names` vector.
+struct SurfaceBinder {
+    std::vector<std::string> names;
+    SurfaceExpressionPointer type;
+};
+
+struct SurfaceIdentifier {
+    std::string qualifiedName;                       // dotted, e.g. "Natural.add"
+    std::vector<SurfaceLevelPointer> universeArgs;   // empty if no .{...}
+};
+struct SurfaceNumericLiteral { std::string digits; };
+struct SurfaceApplication {
+    SurfaceExpressionPointer function;
+    std::vector<SurfaceExpressionPointer> arguments;
+};
+struct SurfacePiType {
+    SurfaceBinder binder;
+    SurfaceExpressionPointer codomain;
+};
+struct SurfaceLambda {
+    SurfaceBinder binder;
+    SurfaceExpressionPointer body;
+};
+struct SurfaceLet {
+    std::string name;
+    SurfaceExpressionPointer type;
+    SurfaceExpressionPointer value;
+    SurfaceExpressionPointer body;
+};
+struct SurfaceAscription {
+    SurfaceExpressionPointer expression;
+    SurfaceExpressionPointer type;
+};
+struct SurfaceType { SurfaceLevelPointer level; };
+struct SurfaceProp { };
+// Binary operator node. The elaborator resolves `opSymbol` against the
+// active `using` declarations to a concrete kernel function.
+struct SurfaceBinaryOperation {
+    std::string opSymbol;
+    SurfaceExpressionPointer left;
+    SurfaceExpressionPointer right;
+};
+struct SurfaceUnaryOperation {
+    std::string opSymbol;
+    SurfaceExpressionPointer operand;
+};
+
+struct SurfaceExpression {
+    std::variant<
+        SurfaceIdentifier, SurfaceNumericLiteral,
+        SurfaceApplication, SurfacePiType, SurfaceLambda,
+        SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProp,
+        SurfaceBinaryOperation, SurfaceUnaryOperation
+    > node;
+    int line = 0;
+    int column = 0;
+};
+
+// -------- builders --------
+
+inline SurfaceExpressionPointer makeSurfaceIdentifier(
+    std::string qualifiedName,
+    std::vector<SurfaceLevelPointer> universeArgs,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceIdentifier{std::move(qualifiedName), std::move(universeArgs)},
+        line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceNumericLiteral(
+    std::string digits, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceNumericLiteral{std::move(digits)}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceApplication(
+    SurfaceExpressionPointer function,
+    std::vector<SurfaceExpressionPointer> arguments,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceApplication{std::move(function), std::move(arguments)},
+        line, column});
+}
+inline SurfaceExpressionPointer makeSurfacePiType(
+    SurfaceBinder binder, SurfaceExpressionPointer codomain,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfacePiType{std::move(binder), std::move(codomain)}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceLambda(
+    SurfaceBinder binder, SurfaceExpressionPointer body,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceLambda{std::move(binder), std::move(body)}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceLet(
+    std::string name, SurfaceExpressionPointer type,
+    SurfaceExpressionPointer value, SurfaceExpressionPointer body,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceLet{std::move(name), std::move(type),
+                   std::move(value), std::move(body)},
+        line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceAscription(
+    SurfaceExpressionPointer expression, SurfaceExpressionPointer type,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceAscription{std::move(expression), std::move(type)},
+        line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceType(
+    SurfaceLevelPointer level, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceType{std::move(level)}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceProp(int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceProp{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceBinaryOperation(
+    std::string opSymbol, SurfaceExpressionPointer left,
+    SurfaceExpressionPointer right, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceBinaryOperation{std::move(opSymbol),
+                                std::move(left), std::move(right)},
+        line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceUnaryOperation(
+    std::string opSymbol, SurfaceExpressionPointer operand,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceUnaryOperation{std::move(opSymbol), std::move(operand)},
+        line, column});
+}
+
+// -------- patterns --------
+
+// A pattern in a pattern-match definition case. Either a name (variable
+// binding, or a nullary constructor — resolved by the elaborator) or a
+// constructor application like `successor(k)` (always a constructor
+// pattern). A name of just "_" is a wildcard.
+struct SurfacePattern;
+using SurfacePatternPointer = std::shared_ptr<const SurfacePattern>;
+
+struct SurfacePatternBareName {
+    std::string name;  // "_" for wildcard
+};
+struct SurfacePatternConstructor {
+    std::string constructorName;
+    std::vector<SurfacePatternPointer> arguments;
+};
+struct SurfacePattern {
+    std::variant<SurfacePatternBareName, SurfacePatternConstructor> node;
+    int line = 0;
+    int column = 0;
+};
+
+inline SurfacePatternPointer makeSurfacePatternBareName(
+    std::string name, int line, int column) {
+    return std::make_shared<const SurfacePattern>(
+        SurfacePattern{SurfacePatternBareName{std::move(name)}, line, column});
+}
+inline SurfacePatternPointer makeSurfacePatternConstructor(
+    std::string constructorName,
+    std::vector<SurfacePatternPointer> arguments,
+    int line, int column) {
+    return std::make_shared<const SurfacePattern>(SurfacePattern{
+        SurfacePatternConstructor{std::move(constructorName),
+                                  std::move(arguments)},
+        line, column});
+}
+
+// One case of a pattern-match definition: a list of patterns (one per
+// function argument) and the body expression.
+struct SurfacePatternCase {
+    std::vector<SurfacePatternPointer> patterns;
+    SurfaceExpressionPointer body;
+    int line = 0;
+    int column = 0;
+};
+
+// -------- declarations --------
+
+// One constructor of an inductive type. Its `type` is the constructor's
+// declared type starting AFTER the inductive's parameter binders — the
+// elaborator wraps the parameters back in when constructing the kernel
+// declaration.
+struct SurfaceConstructorSpec {
+    std::string name;
+    SurfaceExpressionPointer type;
+};
+
+// `inductive Name.{u, v} (p1 : T1) (p2 : T2) : Kind where | ctor : ...`.
+struct SurfaceInductiveDecl {
+    std::string name;
+    std::vector<std::string> universeParameters;
+    std::vector<SurfaceBinder> parameters;
+    SurfaceExpressionPointer kind;
+    std::vector<SurfaceConstructorSpec> constructors;
+};
+
+// `axiom Name.{u} : Type`.
+struct SurfaceAxiomDecl {
+    std::string name;
+    std::vector<std::string> universeParameters;
+    SurfaceExpressionPointer type;
+};
+
+// `definition Name.{u} (args) : Type := body`  OR
+// `definition Name.{u} : T1 → ... → Tn  | p1, ..., pn => body | ...`.
+// One of `body` / `cases` is populated; the other is empty.
+// `isTheorem` is true if the source used the `theorem` keyword.
+struct SurfaceDefinitionDecl {
+    std::string name;
+    std::vector<std::string> universeParameters;
+    std::vector<SurfaceBinder> arguments;
+    SurfaceExpressionPointer type;
+    SurfaceExpressionPointer body;   // null if pattern form
+    std::vector<SurfacePatternCase> cases;
+    bool isTheorem = false;
+};
+
+struct SurfaceImportDecl  { std::string moduleName; };
+// using <namespace>.operators / .literals / .{name, name, ...}
+struct SurfaceUsingDecl {
+    std::string namespacePath;       // e.g. "Natural"
+    std::string target;              // "operators" / "literals" / "names"
+    std::vector<std::string> names;  // populated when target == "names"
+};
+
+using SurfaceTopStatement = std::variant<
+    SurfaceImportDecl, SurfaceUsingDecl,
+    SurfaceInductiveDecl, SurfaceAxiomDecl, SurfaceDefinitionDecl
+>;
+
+struct SurfaceModule {
+    std::string moduleName;
+    std::vector<SurfaceTopStatement> statements;
+};
+
