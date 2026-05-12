@@ -39,31 +39,31 @@ private:
     // -------- top-level statements --------
 
     void elaborateTopStatement(const SurfaceTopStatement& statement) {
-        if (auto* import = std::get_if<SurfaceImportDecl>(&statement)) {
+        if (auto* import = std::get_if<SurfaceImportDeclaration>(&statement)) {
             importedModules_.push_back(import->moduleName);
             return;
         }
-        if (std::get_if<SurfaceUsingDecl>(&statement)) {
+        if (std::get_if<SurfaceUsingDeclaration>(&statement)) {
             // No-op for v0: notation resolution not implemented yet. Modules
             // must use explicit qualified function calls.
             return;
         }
-        if (auto* inductive = std::get_if<SurfaceInductiveDecl>(&statement)) {
+        if (auto* inductive = std::get_if<SurfaceInductiveDeclaration>(&statement)) {
             elaborateInductive(*inductive);
             return;
         }
-        if (auto* axiom = std::get_if<SurfaceAxiomDecl>(&statement)) {
+        if (auto* axiom = std::get_if<SurfaceAxiomDeclaration>(&statement)) {
             elaborateAxiom(*axiom);
             return;
         }
-        if (auto* definition = std::get_if<SurfaceDefinitionDecl>(&statement)) {
+        if (auto* definition = std::get_if<SurfaceDefinitionDeclaration>(&statement)) {
             elaborateDefinition(*definition);
             return;
         }
         throw ElaborateError("unhandled top-level statement variant");
     }
 
-    void elaborateAxiom(const SurfaceAxiomDecl& declaration) {
+    void elaborateAxiom(const SurfaceAxiomDeclaration& declaration) {
         currentUniverseParametersOrdered_ = declaration.universeParameters;
         currentUniverseParameters_ = std::set<std::string>(
             declaration.universeParameters.begin(),
@@ -81,7 +81,7 @@ private:
         resetAutoBoundState();
     }
 
-    void elaborateDefinition(const SurfaceDefinitionDecl& declaration) {
+    void elaborateDefinition(const SurfaceDefinitionDeclaration& declaration) {
         if (!declaration.cases.empty()) {
             elaboratePatternMatchDefinition(declaration);
             return;
@@ -160,7 +160,7 @@ private:
     //     recursion).
 
     void elaboratePatternMatchDefinition(
-        const SurfaceDefinitionDecl& declaration) {
+        const SurfaceDefinitionDeclaration& declaration) {
 
         if (!declaration.arguments.empty()) {
             throw ElaborateError(
@@ -468,7 +468,7 @@ private:
     // the remaining argument types, so the case lambda binds only the
     // non-parameter arguments.
     ExpressionPointer buildCaseLambda(
-        const SurfaceDefinitionDecl& declaration,
+        const SurfaceDefinitionDeclaration& declaration,
         const std::string& constructorName,
         const std::string& inductiveName,
         ExpressionPointer motive,
@@ -478,8 +478,8 @@ private:
 
         // Find the case in the declaration matching this constructor.
         const SurfacePatternCase* matchedCase = nullptr;
-        for (const auto& caseDecl : declaration.cases) {
-            const SurfacePattern& firstPattern = *caseDecl.patterns.front();
+        for (const auto& caseDeclaration : declaration.cases) {
+            const SurfacePattern& firstPattern = *caseDeclaration.patterns.front();
             std::string seenName;
             if (auto* constructorPattern =
                     std::get_if<SurfacePatternConstructor>(
@@ -491,7 +491,7 @@ private:
                 seenName = bareName->name;
             }
             if (seenName == constructorName) {
-                matchedCase = &caseDecl;
+                matchedCase = &caseDeclaration;
                 break;
             }
         }
@@ -824,7 +824,7 @@ private:
         return expression;
     }
 
-    void elaborateInductive(const SurfaceInductiveDecl& declaration) {
+    void elaborateInductive(const SurfaceInductiveDeclaration& declaration) {
         currentUniverseParametersOrdered_ = declaration.universeParameters;
         currentUniverseParameters_ = std::set<std::string>(
             declaration.universeParameters.begin(),

@@ -37,12 +37,12 @@ public:
 private:
     SurfaceTopStatement parseTopStatement() {
         switch (peek().kind) {
-            case TokenKind::KeywordImport:     return parseImportDecl();
-            case TokenKind::KeywordUsing:      return parseUsingDecl();
-            case TokenKind::KeywordInductive:  return parseInductiveDecl();
-            case TokenKind::KeywordAxiom:      return parseAxiomDecl();
-            case TokenKind::KeywordDefinition: return parseDefinitionDecl(false);
-            case TokenKind::KeywordTheorem:    return parseDefinitionDecl(true);
+            case TokenKind::KeywordImport:     return parseImportDeclaration();
+            case TokenKind::KeywordUsing:      return parseUsingDeclaration();
+            case TokenKind::KeywordInductive:  return parseInductiveDeclaration();
+            case TokenKind::KeywordAxiom:      return parseAxiomDeclaration();
+            case TokenKind::KeywordDefinition: return parseDefinitionDeclaration(false);
+            case TokenKind::KeywordTheorem:    return parseDefinitionDeclaration(true);
             default:
                 throwHere("expected top-level statement keyword "
                           "(import / using / inductive / axiom / "
@@ -50,16 +50,16 @@ private:
         }
     }
 
-    SurfaceImportDecl parseImportDecl() {
+    SurfaceImportDeclaration parseImportDeclaration() {
         consumeAny();  // 'import'
-        SurfaceImportDecl declaration;
+        SurfaceImportDeclaration declaration;
         declaration.moduleName = consumeQualifiedNameString();
         return declaration;
     }
 
-    SurfaceUsingDecl parseUsingDecl() {
+    SurfaceUsingDeclaration parseUsingDeclaration() {
         consumeAny();  // 'using'
-        SurfaceUsingDecl declaration;
+        SurfaceUsingDeclaration declaration;
         declaration.namespacePath = consumeQualifiedNameString();
         expect(TokenKind::Dot, "in using directive");
         if (peek().kind == TokenKind::Identifier) {
@@ -94,9 +94,9 @@ private:
         return declaration;
     }
 
-    SurfaceInductiveDecl parseInductiveDecl() {
+    SurfaceInductiveDeclaration parseInductiveDeclaration() {
         consumeAny();  // 'inductive'
-        SurfaceInductiveDecl declaration;
+        SurfaceInductiveDeclaration declaration;
         declaration.name = consumeQualifiedNameString();
         declaration.universeParameters = parseUniverseParameterList();
         while (peek().kind == TokenKind::LeftParen) {
@@ -119,9 +119,9 @@ private:
         return declaration;
     }
 
-    SurfaceAxiomDecl parseAxiomDecl() {
+    SurfaceAxiomDeclaration parseAxiomDeclaration() {
         consumeAny();  // 'axiom'
-        SurfaceAxiomDecl declaration;
+        SurfaceAxiomDeclaration declaration;
         declaration.name = consumeQualifiedNameString();
         declaration.universeParameters = parseUniverseParameterList();
         expect(TokenKind::Colon, "before axiom type");
@@ -129,9 +129,9 @@ private:
         return declaration;
     }
 
-    SurfaceDefinitionDecl parseDefinitionDecl(bool isTheorem) {
+    SurfaceDefinitionDeclaration parseDefinitionDeclaration(bool isTheorem) {
         consumeAny();  // 'definition' / 'theorem'
-        SurfaceDefinitionDecl declaration;
+        SurfaceDefinitionDeclaration declaration;
         declaration.isTheorem = isTheorem;
         declaration.name = consumeQualifiedNameString();
         declaration.universeParameters = parseUniverseParameterList();

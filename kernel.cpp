@@ -469,10 +469,10 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
                         auto targetSpine = peelApplicationSpine(reducedTarget);
                         if (auto* ctorConstant =
                                 std::get_if<Constant>(&targetSpine.head->node)) {
-                            auto* targetDecl =
+                            auto* targetDeclaration =
                                 environment.lookup(ctorConstant->name);
                             if (auto* constructor =
-                                    (targetDecl ? std::get_if<Constructor>(targetDecl)
+                                    (targetDeclaration ? std::get_if<Constructor>(targetDeclaration)
                                                 : nullptr);
                                 constructor &&
                                 constructor->inductiveName == recursor->inductiveName) {

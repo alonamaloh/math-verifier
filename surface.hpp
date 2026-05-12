@@ -271,7 +271,7 @@ struct SurfaceConstructorSpec {
 };
 
 // `inductive Name.{u, v} (p1 : T1) (p2 : T2) : Kind where | ctor : ...`.
-struct SurfaceInductiveDecl {
+struct SurfaceInductiveDeclaration {
     std::string name;
     std::vector<std::string> universeParameters;
     std::vector<SurfaceBinder> parameters;
@@ -280,7 +280,7 @@ struct SurfaceInductiveDecl {
 };
 
 // `axiom Name.{u} : Type`.
-struct SurfaceAxiomDecl {
+struct SurfaceAxiomDeclaration {
     std::string name;
     std::vector<std::string> universeParameters;
     SurfaceExpressionPointer type;
@@ -290,7 +290,7 @@ struct SurfaceAxiomDecl {
 // `definition Name.{u} : T1 → ... → Tn  | p1, ..., pn => body | ...`.
 // One of `body` / `cases` is populated; the other is empty.
 // `isTheorem` is true if the source used the `theorem` keyword.
-struct SurfaceDefinitionDecl {
+struct SurfaceDefinitionDeclaration {
     std::string name;
     std::vector<std::string> universeParameters;
     std::vector<SurfaceBinder> arguments;
@@ -300,17 +300,17 @@ struct SurfaceDefinitionDecl {
     bool isTheorem = false;
 };
 
-struct SurfaceImportDecl  { std::string moduleName; };
+struct SurfaceImportDeclaration  { std::string moduleName; };
 // using <namespace>.operators / .literals / .{name, name, ...}
-struct SurfaceUsingDecl {
+struct SurfaceUsingDeclaration {
     std::string namespacePath;       // e.g. "Natural"
     std::string target;              // "operators" / "literals" / "names"
     std::vector<std::string> names;  // populated when target == "names"
 };
 
 using SurfaceTopStatement = std::variant<
-    SurfaceImportDecl, SurfaceUsingDecl,
-    SurfaceInductiveDecl, SurfaceAxiomDecl, SurfaceDefinitionDecl
+    SurfaceImportDeclaration, SurfaceUsingDeclaration,
+    SurfaceInductiveDeclaration, SurfaceAxiomDeclaration, SurfaceDefinitionDeclaration
 >;
 
 struct SurfaceModule {
