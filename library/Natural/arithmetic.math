@@ -46,6 +46,14 @@ theorem Natural.add_successor
       congruenceOf(successor,
                     Natural.add_successor(predecessor, b))
 
+-- Theorem: (a + b) + c = a + (b + c). Induction on a.
+theorem Natural.add_associative
+        : (a b c : Natural) → (a + b) + c = a + (b + c)
+  | zero,                   b, c => reflexivity(b + c)
+  | successor(predecessor), b, c =>
+      congruenceOf(successor,
+                    Natural.add_associative(predecessor, b, c))
+
 -- Theorem: a + b = b + a. Induction on a.
 theorem Natural.add_commutative : (a b : Natural) → a + b = b + a
   | zero, b =>
@@ -69,10 +77,48 @@ theorem Natural.multiply_zero : (a : Natural) → a * zero = zero
 theorem Natural.one_multiply(a : Natural) : one * a = a :=
   Natural.add_zero(a)
 
--- Theorem: a * successor(b) = a + (a * b).
--- Axiomatised — its proof requires arithmetic chains not yet at hand.
-axiom Natural.multiply_successor
+-- Theorem: a * successor(b) = a + a * b. Induction on a.
+--
+-- Base case (a = 0): both sides reduce definitionally to 0
+-- (multiply on a zero first argument).
+--
+-- Inductive step (a = succ(predecessor)): after multiply's first-arg
+-- reduction and add's first-arg reduction, the goal becomes
+--   succ(b + predecessor * succ(b))
+--     = succ(predecessor + (b + predecessor * b)).
+-- Strip the outer successor with congruenceOf; rewrite
+-- `predecessor * succ(b)` using the inductive hypothesis to
+-- `predecessor + predecessor * b`; then rearrange via
+-- add_associative (twice) and add_commutative.
+theorem Natural.multiply_successor
         : (a b : Natural) → a * successor(b) = a + a * b
+  | zero, b =>
+      reflexivity(zero)
+  | successor(predecessor), b =>
+      Equality.transitivity(
+          congruenceOf(
+              fun (rest : Natural) =>
+                  successor(Natural.add(b, rest)),
+              Natural.multiply_successor(predecessor, b)),
+          Equality.transitivity(
+              congruenceOf(
+                  successor,
+                  Equality.symmetry(
+                      Natural.add_associative(
+                          b, predecessor,
+                          Natural.multiply(predecessor, b)))),
+              Equality.transitivity(
+                  congruenceOf(
+                      fun (rest : Natural) =>
+                          successor(
+                              Natural.add(rest,
+                                  Natural.multiply(predecessor, b))),
+                      Natural.add_commutative(b, predecessor)),
+                  congruenceOf(
+                      successor,
+                      Natural.add_associative(
+                          predecessor, b,
+                          Natural.multiply(predecessor, b))))))
 
 -- Theorem: a * b = b * a. Induction on a.
 theorem Natural.multiply_commutative
@@ -90,14 +136,6 @@ theorem Natural.multiply_one(a : Natural) : a * one = a :=
   Equality.transitivity(
     Natural.multiply_commutative(a, one),
     Natural.one_multiply(a))
-
--- Theorem: (a + b) + c = a + (b + c). Induction on a.
-theorem Natural.add_associative
-        : (a b c : Natural) → (a + b) + c = a + (b + c)
-  | zero,                   b, c => reflexivity(b + c)
-  | successor(predecessor), b, c =>
-      congruenceOf(successor,
-                    Natural.add_associative(predecessor, b, c))
 
 -- Distributivity (right): (a + b) * c = a * c + b * c. Induction on a.
 -- Leverages that successor(_) * m and zero * m reduce definitionally
