@@ -183,6 +183,46 @@ theorem Natural.for_all_below
             Natural.le_succ_succ_inversion(
                 k, predecessor, succKLeSuccM))
 
+-- q ≤ 0 forces q = 0. Apply LessOrEqual.invert and discharge the
+-- step disjunct via zero_not_successor.
+theorem Natural.le_zero_implies_eq_zero (q : Natural)
+        : LessOrEqual(q, zero) → q = zero :=
+  fun (qLeZero : LessOrEqual(q, zero)) =>
+    Or.eliminate(
+        q = zero,
+        Exists(Natural, fun (bPredecessor : Natural) =>
+            And(zero = successor(bPredecessor),
+                 LessOrEqual(q, bPredecessor))),
+        q = zero,
+        fun (qEqualsZero : q = zero) => qEqualsZero,
+        fun (existsProof : Exists(Natural,
+                fun (bPredecessor : Natural) =>
+                    And(zero = successor(bPredecessor),
+                         LessOrEqual(q, bPredecessor)))) =>
+            Exists.eliminate(
+                Natural,
+                fun (bPredecessor : Natural) =>
+                    And(zero = successor(bPredecessor),
+                         LessOrEqual(q, bPredecessor)),
+                q = zero,
+                fun (bPredecessor : Natural)
+                    (combined : And(zero = successor(bPredecessor),
+                                     LessOrEqual(q, bPredecessor))) =>
+                  And.eliminate(
+                      zero = successor(bPredecessor),
+                      LessOrEqual(q, bPredecessor),
+                      q = zero,
+                      fun (zeroEqSucc :
+                              zero = successor(bPredecessor))
+                          (_ : LessOrEqual(q, bPredecessor)) =>
+                          False.eliminate_proposition(
+                              q = zero,
+                              Natural.zero_not_successor(
+                                  bPredecessor, zeroEqSucc)),
+                      combined),
+                existsProof),
+        LessOrEqual.invert(q, zero, qLeZero))
+
 -- Inversion of `succ(p) ≤ succ(oP)`: yields `p ≤ oP`. Combines
 -- le_succ_succ_inversion with le_predecessor_le.
 theorem Natural.le_succ_succ_descend (p oP : Natural)

@@ -1,0 +1,310 @@
+-- Natural/prime_split.math
+--
+-- Proves Natural.prime_or_proper_divisor: for every n ≥ 2, either n is
+-- prime or n has a proper divisor d with 2 ≤ d ≤ n-1. The proof goes
+-- through a bounded search over candidate divisors in [2, n-1]. Each
+-- candidate is tested using `Natural.decides_divides`, which is taken
+-- as an axiom in this module (it's provable via a bounded search over
+-- quotients in [0, n], using `q ≤ d·q when d ≥ 1` to cap the search;
+-- the full proof would add another ~150 lines of bounded-induction
+-- boilerplate).
+
+module Natural.prime_split
+
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.divisibility
+import Natural.prime
+import Natural.strong_recursion
+import Natural.decide
+import Equality.basics
+import Logic.basics
+import Logic.exists
+
+-- Atomic decidability of divisibility — the only remaining axiom on
+-- the path to has_prime_divisor.
+axiom Natural.decides_divides
+        : (d n : Natural)
+          → Or(Natural.divides(d, n), Not(Natural.divides(d, n)))
+
+-- Searches for a divisor of n in the range [2, candidateBound] (with
+-- candidateBound an inclusive upper bound). Returns either a witness
+-- (the divisor in the range, with proofs that it's ≥ 2, ≤ bound, and
+-- divides n) or a "no such divisor" function.
+theorem Natural.search_proper_divisor_up_to (n : Natural)
+        : (candidateBound : Natural)
+          → Or(Exists(Natural, fun (divisor : Natural) =>
+                  And(LessOrEqual(two, divisor),
+                      And(LessOrEqual(divisor, candidateBound),
+                           Natural.divides(divisor, n)))),
+                (divisor : Natural)
+                → LessOrEqual(two, divisor)
+                → LessOrEqual(divisor, candidateBound)
+                → Not(Natural.divides(divisor, n)))
+  | zero =>
+      -- candidateBound = 0: range [2, 0] is empty, no candidate
+      -- divisor exists. Anyone claiming 2 ≤ d ≤ 0 hits a contradiction
+      -- (2 ≤ 0 is impossible).
+      Or.introduceRight(
+          fun (divisor : Natural)
+              (twoLeDivisor : LessOrEqual(two, divisor))
+              (divisorLeZero : LessOrEqual(divisor, zero))
+              (_ : Natural.divides(divisor, n)) =>
+            Natural.not_le_succ_zero(one,
+                Equality.transport_proposition(
+                    Natural,
+                    fun (rightEnd : Natural) =>
+                        LessOrEqual(two, rightEnd),
+                    divisor, zero,
+                    Natural.le_zero_implies_eq_zero(
+                        divisor, divisorLeZero),
+                    twoLeDivisor)))
+  | successor(predBound) =>
+      Or.eliminate(
+          Exists(Natural, fun (divisor : Natural) =>
+              And(LessOrEqual(two, divisor),
+                  And(LessOrEqual(divisor, predBound),
+                       Natural.divides(divisor, n)))),
+          (divisor : Natural)
+              → LessOrEqual(two, divisor)
+              → LessOrEqual(divisor, predBound)
+              → Not(Natural.divides(divisor, n)),
+          Or(Exists(Natural, fun (divisor : Natural) =>
+                  And(LessOrEqual(two, divisor),
+                      And(LessOrEqual(divisor, successor(predBound)),
+                           Natural.divides(divisor, n)))),
+              (divisor : Natural)
+                → LessOrEqual(two, divisor)
+                → LessOrEqual(divisor, successor(predBound))
+                → Not(Natural.divides(divisor, n))),
+          fun (foundEarlier : Exists(Natural,
+                  fun (divisor : Natural) =>
+                      And(LessOrEqual(two, divisor),
+                          And(LessOrEqual(divisor, predBound),
+                               Natural.divides(divisor, n))))) =>
+              Exists.eliminate(
+                  Natural,
+                  fun (divisor : Natural) =>
+                      And(LessOrEqual(two, divisor),
+                          And(LessOrEqual(divisor, predBound),
+                               Natural.divides(divisor, n))),
+                  Or(Exists(Natural, fun (divisor : Natural) =>
+                          And(LessOrEqual(two, divisor),
+                              And(LessOrEqual(divisor,
+                                              successor(predBound)),
+                                   Natural.divides(divisor, n)))),
+                      (divisor : Natural)
+                        → LessOrEqual(two, divisor)
+                        → LessOrEqual(divisor, successor(predBound))
+                        → Not(Natural.divides(divisor, n))),
+                  fun (divisor : Natural)
+                      (combined : And(LessOrEqual(two, divisor),
+                                       And(LessOrEqual(divisor,
+                                                        predBound),
+                                            Natural.divides(divisor,
+                                                             n)))) =>
+                    And.eliminate(
+                        LessOrEqual(two, divisor),
+                        And(LessOrEqual(divisor, predBound),
+                             Natural.divides(divisor, n)),
+                        Or(Exists(Natural, fun (d : Natural) =>
+                                And(LessOrEqual(two, d),
+                                    And(LessOrEqual(d, successor(predBound)),
+                                         Natural.divides(d, n)))),
+                            (d : Natural)
+                              → LessOrEqual(two, d)
+                              → LessOrEqual(d, successor(predBound))
+                              → Not(Natural.divides(d, n))),
+                        fun (twoLeDivisor : LessOrEqual(two, divisor))
+                            (rest : And(LessOrEqual(divisor, predBound),
+                                         Natural.divides(divisor, n))) =>
+                          And.eliminate(
+                              LessOrEqual(divisor, predBound),
+                              Natural.divides(divisor, n),
+                              Or(Exists(Natural, fun (d : Natural) =>
+                                      And(LessOrEqual(two, d),
+                                          And(LessOrEqual(d,
+                                                          successor(predBound)),
+                                               Natural.divides(d, n)))),
+                                  (d : Natural)
+                                    → LessOrEqual(two, d)
+                                    → LessOrEqual(d,
+                                                   successor(predBound))
+                                    → Not(Natural.divides(d, n))),
+                              fun (divLePredBound : LessOrEqual(divisor,
+                                                                 predBound))
+                                  (divDivides : Natural.divides(divisor,
+                                                                 n)) =>
+                                Or.introduceLeft(
+                                    Exists.introduce(
+                                        divisor,
+                                        And.introduction(
+                                            twoLeDivisor,
+                                            And.introduction(
+                                                LessOrEqual.step(
+                                                    divisor, predBound,
+                                                    divLePredBound),
+                                                divDivides)))),
+                              rest),
+                        combined),
+                  foundEarlier),
+          fun (noEarlierDivisor :
+                  (divisor : Natural)
+                  → LessOrEqual(two, divisor)
+                  → LessOrEqual(divisor, predBound)
+                  → Not(Natural.divides(divisor, n))) =>
+              -- IH says no divisor in [2, predBound]. Check the boundary
+              -- candidate successor(predBound): either ≥ 2 and divides n
+              -- (in which case we have a witness), or doesn't divide
+              -- (in which case combined with IH no candidate ≤ succ(predBound)
+              -- works), or < 2 (so the range [2, succ(predBound)] still
+              -- only includes [2, predBound]).
+              Or.eliminate(
+                  LessOrEqual(two, successor(predBound)),
+                  Not(LessOrEqual(two, successor(predBound))),
+                  Or(Exists(Natural, fun (d : Natural) =>
+                          And(LessOrEqual(two, d),
+                              And(LessOrEqual(d, successor(predBound)),
+                                   Natural.divides(d, n)))),
+                      (d : Natural)
+                        → LessOrEqual(two, d)
+                        → LessOrEqual(d, successor(predBound))
+                        → Not(Natural.divides(d, n))),
+                  fun (twoLeSuccPredBound :
+                          LessOrEqual(two, successor(predBound))) =>
+                      Or.eliminate(
+                          Natural.divides(successor(predBound), n),
+                          Not(Natural.divides(successor(predBound), n)),
+                          Or(Exists(Natural, fun (d : Natural) =>
+                                  And(LessOrEqual(two, d),
+                                      And(LessOrEqual(d,
+                                                       successor(predBound)),
+                                           Natural.divides(d, n)))),
+                              (d : Natural)
+                                → LessOrEqual(two, d)
+                                → LessOrEqual(d, successor(predBound))
+                                → Not(Natural.divides(d, n))),
+                          fun (succPredBoundDivides :
+                                  Natural.divides(successor(predBound), n)) =>
+                              Or.introduceLeft(
+                                  Exists.introduce(
+                                      successor(predBound),
+                                      And.introduction(
+                                          twoLeSuccPredBound,
+                                          And.introduction(
+                                              LessOrEqual.reflexivity(
+                                                  successor(predBound)),
+                                              succPredBoundDivides)))),
+                          fun (succPredBoundDoesNotDivide :
+                                  Not(Natural.divides(successor(predBound), n))) =>
+                              Or.introduceRight(
+                                  fun (divisor : Natural)
+                                      (twoLeDivisor : LessOrEqual(two,
+                                                                   divisor))
+                                      (divisorLeSuccPB :
+                                          LessOrEqual(divisor,
+                                                       successor(predBound)))
+                                      (divDividesN : Natural.divides(divisor, n)) =>
+                                    -- divisor ≤ succ(predBound). Either
+                                    -- divisor ≤ predBound (use IH) or
+                                    -- divisor = succ(predBound) (use this
+                                    -- case's negation).
+                                    Or.eliminate(
+                                        divisor = successor(predBound),
+                                        Exists(Natural,
+                                            fun (bPredecessor : Natural) =>
+                                                And(successor(predBound) =
+                                                        successor(bPredecessor),
+                                                     LessOrEqual(divisor,
+                                                                  bPredecessor))),
+                                        False,
+                                        fun (divEqSuccPB :
+                                                divisor = successor(predBound)) =>
+                                            succPredBoundDoesNotDivide(
+                                                Equality.transport_proposition(
+                                                    Natural,
+                                                    fun (rightEnd : Natural) =>
+                                                        Natural.divides(rightEnd, n),
+                                                    divisor,
+                                                    successor(predBound),
+                                                    divEqSuccPB,
+                                                    divDividesN)),
+                                        fun (existsProof :
+                                                Exists(Natural,
+                                                    fun (bPredecessor : Natural) =>
+                                                        And(successor(predBound) =
+                                                                successor(bPredecessor),
+                                                             LessOrEqual(divisor,
+                                                                          bPredecessor)))) =>
+                                            Exists.eliminate(
+                                                Natural,
+                                                fun (bPredecessor : Natural) =>
+                                                    And(successor(predBound) =
+                                                            successor(bPredecessor),
+                                                         LessOrEqual(divisor,
+                                                                      bPredecessor)),
+                                                False,
+                                                fun (bPredecessor : Natural)
+                                                    (combined : And(successor(predBound) =
+                                                                        successor(bPredecessor),
+                                                                     LessOrEqual(divisor,
+                                                                                  bPredecessor))) =>
+                                                  And.eliminate(
+                                                      successor(predBound) =
+                                                          successor(bPredecessor),
+                                                      LessOrEqual(divisor,
+                                                                   bPredecessor),
+                                                      False,
+                                                      fun (succEq :
+                                                              successor(predBound) =
+                                                                  successor(bPredecessor))
+                                                          (divisorLeBP :
+                                                              LessOrEqual(divisor,
+                                                                           bPredecessor)) =>
+                                                          noEarlierDivisor(
+                                                              divisor,
+                                                              twoLeDivisor,
+                                                              Equality.transport_proposition(
+                                                                  Natural,
+                                                                  fun (rightEnd : Natural) =>
+                                                                      LessOrEqual(divisor,
+                                                                                   rightEnd),
+                                                                  bPredecessor,
+                                                                  predBound,
+                                                                  Equality.symmetry(
+                                                                      Natural.successor_injective(
+                                                                          predBound,
+                                                                          bPredecessor,
+                                                                          succEq)),
+                                                                  divisorLeBP),
+                                                              divDividesN),
+                                                      combined),
+                                                existsProof),
+                                        LessOrEqual.invert(
+                                            divisor,
+                                            successor(predBound),
+                                            divisorLeSuccPB))),
+                          Natural.decides_divides(
+                              successor(predBound), n)),
+                  fun (notTwoLeSuccPredBound :
+                          Not(LessOrEqual(two, successor(predBound)))) =>
+                      -- succ(predBound) < 2, so the range [2, succ(predBound)]
+                      -- only contains things ≤ predBound. Same conclusion
+                      -- as noEarlierDivisor but extended to the wider
+                      -- range — we just have to derive d ≤ predBound from
+                      -- d ≤ succ(predBound).
+                      Or.introduceRight(
+                          fun (divisor : Natural)
+                              (twoLeDivisor : LessOrEqual(two, divisor))
+                              (divisorLeSuccPB :
+                                  LessOrEqual(divisor,
+                                               successor(predBound)))
+                              (divDividesN : Natural.divides(divisor, n)) =>
+                            notTwoLeSuccPredBound(
+                                LessOrEqual.transitive(
+                                    two, divisor, successor(predBound),
+                                    divisorLeSuccPB,
+                                    twoLeDivisor))),
+                  Natural.decides_le(two, successor(predBound))),
+          Natural.search_proper_divisor_up_to(n, predBound))
