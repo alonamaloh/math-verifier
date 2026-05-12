@@ -1317,10 +1317,42 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line, int column) {
 
-        ExpressionPointer fKernel =
-            elaborateExpression(*fSurface, localBinders);
+        // Elaborate h first so we know the domain type (from its
+        // Equality structure); that lets us accept an untyped lambda
+        // for f (bidirectional elaboration of `fun x => body`).
         ExpressionPointer hKernel =
             elaborateExpression(*hSurface, localBinders);
+        ExpressionPointer hType = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, hKernel));
+
+        // Pre-extract typeA from h's Equality type so we can hand it
+        // to an untyped lambda's elaboration. We use the closed form
+        // (BoundVariables for our local binders) so the lambda we
+        // construct slots into the surrounding context correctly.
+        EqualityComponents hComponents = extractEqualityComponents(
+            hType, "congruenceOf", line);
+        ExpressionPointer typeAForLambda = closeOverLocalBinders(
+            hComponents.typeA, localBinders, localBinders.size());
+
+        // Elaborate f. If it's an untyped single-binder lambda, fill
+        // the domain from typeAForLambda; otherwise elaborate normally.
+        ExpressionPointer fKernel;
+        auto* fSurfaceLambda =
+            std::get_if<SurfaceLambda>(&fSurface->node);
+        if (fSurfaceLambda
+            && !fSurfaceLambda->binder.type
+            && fSurfaceLambda->binder.names.size() == 1) {
+            std::vector<LocalBinder> extended = localBinders;
+            extended.push_back(
+                {fSurfaceLambda->binder.names[0], typeAForLambda});
+            ExpressionPointer lambdaBody =
+                elaborateExpression(*fSurfaceLambda->body, extended);
+            fKernel = makeLambda(fSurfaceLambda->binder.names[0],
+                                  typeAForLambda,
+                                  std::move(lambdaBody));
+        } else {
+            fKernel = elaborateExpression(*fSurface, localBinders);
+        }
 
         // f's type should be a Pi (A → B). Extract A and B.
         ExpressionPointer fType = weakHeadNormalForm(environment_,
@@ -1333,29 +1365,8 @@ private:
         }
         ExpressionPointer typeA = fPi->domain;
         ExpressionPointer typeB = fPi->codomain;
-
-        // h's type should be Equality.{u}(A, x, y). Walk the Application
-        // chain to extract x and y. Normalise first since the inferred
-        // type may be a motive application that hasn't β-reduced yet.
-        ExpressionPointer hType = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, hKernel));
-        // The Equality type expression is Application(Application(
-        //   Application(Constant("Equality", {u}), A), x), y).
-        auto* outerApp = std::get_if<Application>(&hType->node);
-        if (!outerApp) {
-            throw ElaborateError(
-                "congruenceOf: second argument must be a proof of "
-                "equality (line " + std::to_string(line) + ")");
-        }
-        ExpressionPointer y = outerApp->argument;
-        auto* middleApp =
-            std::get_if<Application>(&outerApp->function->node);
-        if (!middleApp) {
-            throw ElaborateError(
-                "congruenceOf: second argument's type is not a fully "
-                "applied Equality (line " + std::to_string(line) + ")");
-        }
-        ExpressionPointer x = middleApp->argument;
+        ExpressionPointer x = hComponents.x;
+        ExpressionPointer y = hComponents.y;
 
         // Compute universe levels u (for A) and v (for B).
         LevelPointer levelU = typeUniverseOf(localBinders, x);

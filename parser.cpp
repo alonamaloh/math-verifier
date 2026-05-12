@@ -255,11 +255,21 @@ private:
     SurfaceExpressionPointer parseLambda() {
         const Token& start = consumeAny();  // 'fun'
         std::vector<SurfaceBinder> binders;
-        while (peek().kind == TokenKind::LeftParen) {
-            binders.push_back(parseExplicitBinder());
+        while (peek().kind == TokenKind::LeftParen
+               || peek().kind == TokenKind::Identifier) {
+            if (peek().kind == TokenKind::LeftParen) {
+                binders.push_back(parseExplicitBinder());
+            } else {
+                // Untyped binder: a bare name. The elaborator must be
+                // able to recover the binder's type from context
+                // (currently supported only for select special-cased
+                // call sites like congruenceOf's first argument).
+                Token nameToken = consumeAny();
+                binders.push_back({{nameToken.lexeme}, nullptr});
+            }
         }
         if (binders.empty()) {
-            throwHere("expected at least one parenthesised binder after 'fun'");
+            throwHere("expected at least one binder after 'fun'");
         }
         expect(TokenKind::FatArrow, "after binders in 'fun'");
         auto body = parseExpression();
