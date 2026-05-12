@@ -69,14 +69,16 @@ private:
             declaration.universeParameters.begin(),
             declaration.universeParameters.end());
         currentDeclarationName_ = declaration.name;
+        resetAutoBoundState();
         ExpressionPointer type =
             elaborateExpression(*declaration.type, {});
         addAxiom(environment_, declaration.name,
-                 declaration.universeParameters,
+                 finalUniverseParameters(declaration.universeParameters),
                  std::move(type));
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
+        resetAutoBoundState();
     }
 
     void elaborateDefinition(const SurfaceDefinitionDecl& declaration) {
@@ -89,6 +91,7 @@ private:
             declaration.universeParameters.begin(),
             declaration.universeParameters.end());
         currentDeclarationName_ = declaration.name;
+        resetAutoBoundState();
 
         // Surface form has explicit (a : T) binders before the colon, plus
         // a return type after, plus a body. To register with the kernel:
@@ -127,11 +130,12 @@ private:
         }
 
         addDefinition(environment_, declaration.name,
-                      declaration.universeParameters,
+                      finalUniverseParameters(declaration.universeParameters),
                       std::move(fullType), std::move(fullBody));
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
+        resetAutoBoundState();
     }
 
     // -------- pattern-matching definitions --------
@@ -169,6 +173,7 @@ private:
             declaration.universeParameters.begin(),
             declaration.universeParameters.end());
         currentDeclarationName_ = declaration.name;
+        resetAutoBoundState();
 
         // Decompose the type into a list of (name, surface type) binders
         // plus a final return type. Anonymous Pis get synthesised names.
@@ -364,12 +369,13 @@ private:
         }
 
         addDefinition(environment_, declaration.name,
-                      declaration.universeParameters,
+                      finalUniverseParameters(declaration.universeParameters),
                       std::move(fullType), std::move(fullBody));
 
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
+        resetAutoBoundState();
     }
 
     struct FunctionArgumentPair {
@@ -702,6 +708,7 @@ private:
             declaration.universeParameters.begin(),
             declaration.universeParameters.end());
         currentDeclarationName_ = declaration.name;
+        resetAutoBoundState();
 
         // Build the kind: parameter Pis wrapped around the surface kind.
         std::vector<LocalBinder> localBinders;
@@ -729,31 +736,20 @@ private:
         }
 
         // Constructors. Each constructor's type may reference the
-        // inductive being declared and the parameters. We elaborate in
-        // the parameter-extended context, then wrap with parameter Pis.
+        // inductive being declared and the parameters; we elaborate in
+        // the parameter-extended context already built for the kind,
+        // then wrap with parameter Pis using the same kernel types we
+        // computed for the kind. Reusing the kind's localBinders /
+        // parameterBinders avoids re-elaborating parameter types (which
+        // would create fresh universe metavariables and decouple the
+        // constructors' references to the parameters from the kind's).
         std::vector<ConstructorSpec> kernelConstructors;
         for (const auto& constructorSpec : declaration.constructors) {
-            // Re-establish localBinders for parameters.
-            std::vector<LocalBinder> ctorLocalBinders;
-            std::vector<std::pair<std::string, ExpressionPointer>>
-                ctorParameterBinders;
-            for (const auto& binder : declaration.parameters) {
-                ExpressionPointer parameterType =
-                    elaborateExpression(*binder.type, ctorLocalBinders);
-                for (const auto& name : binder.names) {
-                    ctorParameterBinders.push_back({name, parameterType});
-                    ctorLocalBinders.push_back({name, parameterType});
-                    if (&name != &binder.names.back()) {
-                        parameterType = elaborateExpression(
-                            *binder.type, ctorLocalBinders);
-                    }
-                }
-            }
             ExpressionPointer constructorBody =
-                elaborateExpression(*constructorSpec.type, ctorLocalBinders);
+                elaborateExpression(*constructorSpec.type, localBinders);
             ExpressionPointer fullConstructorType = constructorBody;
-            for (auto iterator = ctorParameterBinders.rbegin();
-                 iterator != ctorParameterBinders.rend(); ++iterator) {
+            for (auto iterator = parameterBinders.rbegin();
+                 iterator != parameterBinders.rend(); ++iterator) {
                 fullConstructorType = makePi(iterator->first,
                                               iterator->second,
                                               fullConstructorType);
@@ -767,13 +763,14 @@ private:
             numParameters += static_cast<int>(binder.names.size());
         }
         addInductive(environment_, declaration.name,
-                     declaration.universeParameters,
+                     finalUniverseParameters(declaration.universeParameters),
                      fullKind, numParameters,
                      std::move(kernelConstructors));
 
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
+        resetAutoBoundState();
     }
 
     // -------- expression elaboration --------
@@ -828,6 +825,36 @@ private:
                         application->arguments[1],
                         localBinders,
                         expression.line, expression.column);
+                }
+                // Stage 2 universe inference: if the head is a polymorphic
+                // constant called without explicit `.{...}`, infer the
+                // universe arguments by unifying the value arguments'
+                // types against the declaration's parameter types.
+                bool isCurrentDeclaration =
+                    !currentDeclarationName_.empty()
+                    && currentDeclarationName_ == name;
+                const Declaration* environmentDeclaration =
+                    environment_.lookup(name);
+                if (!isCurrentDeclaration
+                    && environmentDeclaration
+                    && universeParameterCount(*environmentDeclaration) > 0) {
+                    std::vector<ExpressionPointer> valueArguments;
+                    for (const auto& argumentSurface :
+                         application->arguments) {
+                        valueArguments.push_back(elaborateExpression(
+                            *argumentSurface, localBinders));
+                    }
+                    std::vector<LevelPointer> inferredUniverseArguments =
+                        inferUniverseArguments(*environmentDeclaration,
+                                                 valueArguments,
+                                                 localBinders);
+                    ExpressionPointer head = makeConstant(
+                        name, inferredUniverseArguments);
+                    for (auto& valueArgument : valueArguments) {
+                        head = makeApplication(std::move(head),
+                                                std::move(valueArgument));
+                    }
+                    return head;
                 }
             }
             ExpressionPointer head =
@@ -1084,6 +1111,11 @@ private:
                 base = makeLevelSucc(std::move(base));
             }
             return base;
+        }
+        if (std::get_if<SurfaceLevelMeta>(&level.node)) {
+            // Bare `Type` in source: generate a fresh universe parameter
+            // name and let it be auto-bound to the enclosing declaration.
+            return makeLevelParam(freshAutoBoundUniverseName());
         }
         throw ElaborateError("unhandled level variant");
     }
@@ -1474,6 +1506,175 @@ private:
             "Equality.{u}(...) form");
     }
 
+    static const std::vector<std::string>& declarationUniverseParameters(
+        const Declaration& declaration) {
+        static const std::vector<std::string> empty;
+        if (auto* axiom = std::get_if<Axiom>(&declaration))
+            return axiom->universeParameters;
+        if (auto* definition = std::get_if<Definition>(&declaration))
+            return definition->universeParameters;
+        if (auto* inductive = std::get_if<Inductive>(&declaration))
+            return inductive->universeParameters;
+        if (auto* constructor = std::get_if<Constructor>(&declaration))
+            return constructor->universeParameters;
+        if (auto* recursor = std::get_if<Recursor>(&declaration))
+            return recursor->universeParameters;
+        return empty;
+    }
+
+    static ExpressionPointer declarationType(
+        const Declaration& declaration) {
+        if (auto* axiom = std::get_if<Axiom>(&declaration))
+            return axiom->type;
+        if (auto* definition = std::get_if<Definition>(&declaration))
+            return definition->type;
+        if (auto* inductive = std::get_if<Inductive>(&declaration))
+            return inductive->kind;
+        if (auto* constructor = std::get_if<Constructor>(&declaration))
+            return constructor->type;
+        if (auto* recursor = std::get_if<Recursor>(&declaration))
+            return recursor->type;
+        return nullptr;
+    }
+
+    // Unifies a single level expression with a concrete level, collecting
+    // assignments for universe-parameter names. The "expected" side comes
+    // from the signature being instantiated (may contain LevelParams that
+    // are unsolved); the "actual" side is the level inferred from the
+    // user's argument. Only handles cases we encounter in practice
+    // (LevelParam, LevelSucc, LevelConst, LevelMax of constant-or-param).
+    void unifyLevels(
+        LevelPointer expected, LevelPointer actual,
+        std::map<std::string, LevelPointer>& assignment) {
+        if (auto* parameter = std::get_if<LevelParam>(&expected->node)) {
+            auto iterator = assignment.find(parameter->name);
+            if (iterator == assignment.end()) {
+                assignment[parameter->name] = actual;
+            }
+            return;
+        }
+        if (auto* expectedSucc =
+                std::get_if<LevelSucc>(&expected->node)) {
+            if (auto* actualSucc =
+                    std::get_if<LevelSucc>(&actual->node)) {
+                unifyLevels(expectedSucc->base, actualSucc->base,
+                             assignment);
+                return;
+            }
+            if (auto* actualConstant =
+                    std::get_if<LevelConst>(&actual->node)) {
+                if (actualConstant->value >= 1) {
+                    unifyLevels(expectedSucc->base,
+                                 makeLevelConst(actualConstant->value - 1),
+                                 assignment);
+                    return;
+                }
+            }
+        }
+        // Other cases (max, imax, mismatched constants): no assignment.
+    }
+
+    void unifyTypes(
+        ExpressionPointer expected, ExpressionPointer actual,
+        std::map<std::string, LevelPointer>& assignment) {
+        // Walk Pi chains in parallel. We don't try to match Pi domains
+        // (they may contain BoundVariables in the expected side that
+        // don't substitute trivially); the codomain typically carries
+        // the universe info we care about.
+        if (auto* expectedPi = std::get_if<Pi>(&expected->node)) {
+            if (auto* actualPi = std::get_if<Pi>(&actual->node)) {
+                unifyTypes(expectedPi->codomain, actualPi->codomain,
+                            assignment);
+                return;
+            }
+        }
+        auto* expectedSort = std::get_if<Sort>(&expected->node);
+        auto* actualSort = std::get_if<Sort>(&actual->node);
+        if (expectedSort && actualSort) {
+            unifyLevels(expectedSort->level, actualSort->level,
+                         assignment);
+            return;
+        }
+        // Constant heads with universe-args lined up (e.g., Equality.{u}
+        // applied to a value vs Equality.{0} applied to the same).
+        if (auto* expectedConstant =
+                std::get_if<Constant>(&expected->node)) {
+            if (auto* actualConstant =
+                    std::get_if<Constant>(&actual->node)) {
+                if (expectedConstant->name == actualConstant->name) {
+                    size_t commonCount = std::min(
+                        expectedConstant->universeArguments.size(),
+                        actualConstant->universeArguments.size());
+                    for (size_t i = 0; i < commonCount; ++i) {
+                        unifyLevels(
+                            expectedConstant->universeArguments[i],
+                            actualConstant->universeArguments[i],
+                            assignment);
+                    }
+                }
+            }
+        }
+        if (auto* expectedApplication =
+                std::get_if<Application>(&expected->node)) {
+            if (auto* actualApplication =
+                    std::get_if<Application>(&actual->node)) {
+                unifyTypes(expectedApplication->function,
+                            actualApplication->function, assignment);
+            }
+        }
+    }
+
+    // Stage 2 universe inference: when the user writes `Equality(A, x, y)`
+    // without `.{u}`, look at the declaration's universe parameters and
+    // value-argument types to derive the universe instantiation. Returns
+    // the inferred universe arguments in declaration order. Universe
+    // parameters that cannot be derived are defaulted to LevelConst(0).
+    std::vector<LevelPointer> inferUniverseArguments(
+        const Declaration& declaration,
+        const std::vector<ExpressionPointer>& valueArguments,
+        const std::vector<LocalBinder>& localBinders) {
+
+        const std::vector<std::string>& universeParameters =
+            declarationUniverseParameters(declaration);
+        if (universeParameters.empty()) return {};
+
+        std::map<std::string, LevelPointer> assignment;
+        ExpressionPointer cursor = declarationType(declaration);
+        for (size_t i = 0;
+             i < valueArguments.size() && cursor != nullptr; ++i) {
+            cursor = weakHeadNormalForm(environment_, cursor);
+            auto* pi = std::get_if<Pi>(&cursor->node);
+            if (!pi) break;
+            ExpressionPointer expectedDomain =
+                weakHeadNormalForm(environment_, pi->domain);
+            ExpressionPointer actualType;
+            try {
+                actualType = weakHeadNormalForm(environment_,
+                    inferTypeInLocalContext(localBinders,
+                                              valueArguments[i]));
+            } catch (const TypeError&) {
+                cursor = pi->codomain;
+                continue;
+            } catch (const ElaborateError&) {
+                cursor = pi->codomain;
+                continue;
+            }
+            unifyTypes(expectedDomain, actualType, assignment);
+            cursor = pi->codomain;
+        }
+
+        std::vector<LevelPointer> result;
+        for (const auto& name : universeParameters) {
+            auto iterator = assignment.find(name);
+            if (iterator != assignment.end()) {
+                result.push_back(iterator->second);
+            } else {
+                result.push_back(makeLevelConst(0));
+            }
+        }
+        return result;
+    }
+
     static size_t universeParameterCount(const Declaration& declaration) {
         if (auto* axiom = std::get_if<Axiom>(&declaration))
             return axiom->universeParameters.size();
@@ -1488,6 +1689,35 @@ private:
         return 0;
     }
 
+    // ---- universe metavariable state ----
+    // Each call to a declaration handler resets these. As elaboration
+    // proceeds, each bare `Type` in the source generates a fresh
+    // universe parameter name; the name is appended both to the
+    // ordered/set views of "available universe parameters" (so internal
+    // self-references can use it) and to autoBoundUniverseParameters_,
+    // which is folded into the kernel declaration's universe parameter
+    // list at the end of the handler.
+    std::string freshAutoBoundUniverseName() {
+        std::string name =
+            "_auto_u_" + std::to_string(metavarCounter_++);
+        autoBoundUniverseParameters_.push_back(name);
+        currentUniverseParametersOrdered_.push_back(name);
+        currentUniverseParameters_.insert(name);
+        return name;
+    }
+    void resetAutoBoundState() {
+        autoBoundUniverseParameters_.clear();
+        metavarCounter_ = 0;
+    }
+    std::vector<std::string> finalUniverseParameters(
+        const std::vector<std::string>& userDeclared) {
+        std::vector<std::string> result = userDeclared;
+        for (const auto& name : autoBoundUniverseParameters_) {
+            result.push_back(name);
+        }
+        return result;
+    }
+
     Environment& environment_;
     std::vector<std::string>& importedModules_;
     std::string moduleName_;
@@ -1496,8 +1726,11 @@ private:
     // ordered so we can auto-fill universe arguments at self-reference
     // sites (the user writes `Equality(A, x, x)` inside reflexivity's
     // constructor type; we elaborate it as `Equality.{u}(A, x, x)`).
+    // Auto-bound names are appended as bare `Type` is encountered.
     std::vector<std::string> currentUniverseParametersOrdered_;
     std::set<std::string> currentUniverseParameters_;
+    std::vector<std::string> autoBoundUniverseParameters_;
+    int metavarCounter_ = 0;
 };
 
 }  // namespace

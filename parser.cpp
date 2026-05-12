@@ -535,10 +535,19 @@ private:
         }
         if (current.kind == TokenKind::KeywordType) {
             Token token = consumeAny();
-            expect(TokenKind::LeftParen, "after 'Type'");
-            auto level = parseLevel();
-            expect(TokenKind::RightParen, "after level expression");
-            return makeSurfaceType(std::move(level), token.line, token.column);
+            if (peek().kind == TokenKind::LeftParen) {
+                consumeAny();
+                auto level = parseLevel();
+                expect(TokenKind::RightParen, "after level expression");
+                return makeSurfaceType(std::move(level),
+                                        token.line, token.column);
+            }
+            // Bare `Type` — universe is a metavariable that the elaborator
+            // resolves (Stage 3 auto-binds unresolved ones as universe
+            // parameters of the enclosing declaration).
+            return makeSurfaceType(
+                makeSurfaceLevelMeta(token.line, token.column),
+                token.line, token.column);
         }
         if (current.kind == TokenKind::KeywordProp) {
             Token token = consumeAny();

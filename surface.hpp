@@ -25,11 +25,16 @@ struct SurfaceLevelName    { std::string name; };
 struct SurfaceLevelMax     { SurfaceLevelPointer left, right; };
 struct SurfaceLevelImax    { SurfaceLevelPointer left, right; };
 struct SurfaceLevelAdd     { SurfaceLevelPointer base; int amount; };
+// A level that the surface author has left unspecified — `Type` without
+// `(level)`. The elaborator generates a fresh universe metavariable for
+// each occurrence; unresolved metavariables become auto-bound universe
+// parameters of the enclosing declaration (Stage 3).
+struct SurfaceLevelMeta    { };
 
 struct SurfaceLevel {
     std::variant<SurfaceLevelNumeric, SurfaceLevelName,
                  SurfaceLevelMax, SurfaceLevelImax,
-                 SurfaceLevelAdd> node;
+                 SurfaceLevelAdd, SurfaceLevelMeta> node;
     int line = 0;
     int column = 0;
 };
@@ -64,6 +69,10 @@ inline SurfaceLevelPointer makeSurfaceLevelAdd(SurfaceLevelPointer base,
     return std::make_shared<const SurfaceLevel>(
         SurfaceLevel{SurfaceLevelAdd{std::move(base), amount},
                      line, column});
+}
+inline SurfaceLevelPointer makeSurfaceLevelMeta(int line, int column) {
+    return std::make_shared<const SurfaceLevel>(
+        SurfaceLevel{SurfaceLevelMeta{}, line, column});
 }
 
 // -------- expressions --------
