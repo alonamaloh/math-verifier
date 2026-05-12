@@ -10,3 +10,17 @@ module Logic.exists
 
 inductive Exists (A : Type) (P : A → Proposition) : Proposition where
   | Exists.introduce : (witness : A) → P(witness) → Exists(A, P)
+
+-- Exists.eliminate: case-analyse a witnessed proof to a Proposition
+-- goal. Lets the proof body access the witness and the predicate
+-- proof together.
+definition Exists.eliminate
+        (A : Type) (P : A → Proposition)
+        (GoalProposition : Proposition)
+        (handler : (witness : A) → P(witness) → GoalProposition)
+        (existsProof : Exists(A, P))
+        : GoalProposition :=
+  Exists_recursor(
+    A, P,
+    fun (_ : Exists(A, P)) => GoalProposition,
+    handler, existsProof)

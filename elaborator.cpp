@@ -1272,9 +1272,38 @@ private:
             }
             ExpressionPointer head =
                 elaborateExpression(*application->function, localBinders);
+            // Propagate the expected argument type to each argument
+            // elaboration by walking the head's type. Lets constructor
+            // parameter inference inside lambda-shaped arguments see
+            // the right expected type (e.g. for the handler functions
+            // passed to Or.eliminate / Exists.eliminate).
+            ExpressionPointer headType;
+            try {
+                headType = weakHeadNormalForm(environment_,
+                    inferTypeInLocalContext(localBinders, head));
+            } catch (...) {
+                headType = nullptr;
+            }
             for (const auto& argument : application->arguments) {
+                ExpressionPointer argumentExpectedType;
+                if (headType) {
+                    if (auto* pi =
+                            std::get_if<Pi>(&headType->node)) {
+                        argumentExpectedType = pi->domain;
+                    }
+                }
                 ExpressionPointer argumentTerm =
-                    elaborateExpression(*argument, localBinders);
+                    elaborateExpression(*argument, localBinders,
+                                         argumentExpectedType);
+                if (headType) {
+                    if (auto* pi =
+                            std::get_if<Pi>(&headType->node)) {
+                        headType = weakHeadNormalForm(environment_,
+                            substitute(pi->codomain, 0, argumentTerm));
+                    } else {
+                        headType = nullptr;
+                    }
+                }
                 head = makeApplication(std::move(head),
                                         std::move(argumentTerm));
             }
@@ -1284,7 +1313,7 @@ private:
             return elaboratePiType(*piType, localBinders);
         }
         if (auto* lambda = std::get_if<SurfaceLambda>(&expression.node)) {
-            return elaborateLambda(*lambda, localBinders);
+            return elaborateLambda(*lambda, localBinders, expectedType);
         }
         if (auto* let = std::get_if<SurfaceLet>(&expression.node)) {
             ExpressionPointer letType =
@@ -1656,7 +1685,8 @@ private:
 
     ExpressionPointer elaborateLambda(
         const SurfaceLambda& lambda,
-        const std::vector<LocalBinder>& localBinders) {
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType = nullptr) {
         if (lambda.binder.names.empty()) {
             throw ElaborateError("lambda binder must have at least one name");
         }
@@ -1668,8 +1698,26 @@ private:
             domainsPerName.push_back(domainHere);
             extended.push_back({name, domainHere});
         }
+        // If we have an expected Pi type, peel off as many Pi binders
+        // as the lambda has names so we can pass the codomain down to
+        // the body's elaboration. This lets constructor parameter
+        // inference inside the body see the expected return type.
+        ExpressionPointer expectedBody = nullptr;
+        if (expectedType) {
+            ExpressionPointer cursor =
+                weakHeadNormalForm(environment_, expectedType);
+            bool ok = true;
+            for (size_t k = 0; k < lambda.binder.names.size(); ++k) {
+                auto* pi = std::get_if<Pi>(&cursor->node);
+                if (!pi) { ok = false; break; }
+                cursor = pi->codomain;
+            }
+            if (ok) {
+                expectedBody = cursor;
+            }
+        }
         ExpressionPointer body =
-            elaborateExpression(*lambda.body, extended);
+            elaborateExpression(*lambda.body, extended, expectedBody);
         ExpressionPointer result = body;
         for (int i = static_cast<int>(lambda.binder.names.size()) - 1;
              i >= 0; --i) {

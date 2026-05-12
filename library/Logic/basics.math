@@ -61,3 +61,27 @@ definition And.swap (A B : Proposition) : And(A, B) → And(B, A)
 definition Or.swap (A B : Proposition) : Or(A, B) → Or(B, A)
   | Or.introduceLeft(leftProof)   => Or.introduceRight(leftProof)
   | Or.introduceRight(rightProof) => Or.introduceLeft(rightProof)
+
+-- Or.eliminate (case analysis to a Proposition goal). Lets us
+-- handle the left and right alternatives separately.
+definition Or.eliminate
+        (A B GoalProposition : Proposition)
+        (handleLeft : A → GoalProposition)
+        (handleRight : B → GoalProposition)
+        (disjunction : Or(A, B))
+        : GoalProposition :=
+  Or_recursor(
+    A, B,
+    fun (_ : Or(A, B)) => GoalProposition,
+    handleLeft, handleRight, disjunction)
+
+-- And.eliminate (analogous, for conjunctions).
+definition And.eliminate
+        (A B GoalProposition : Proposition)
+        (handler : A → B → GoalProposition)
+        (conjunction : And(A, B))
+        : GoalProposition :=
+  And_recursor(
+    A, B,
+    fun (_ : And(A, B)) => GoalProposition,
+    handler, conjunction)
