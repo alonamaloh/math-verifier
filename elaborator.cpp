@@ -8,6 +8,15 @@
 
 namespace {
 
+// One local binder in the elaborator's context. Tracks the user-visible
+// name and the kernel type. Used both to compute de Bruijn indices for
+// name lookup and to construct a kernel Context for inferType calls
+// during `=` desugaring and `congruenceOf(...)` elaboration.
+struct LocalBinder {
+    std::string name;
+    ExpressionPointer type;
+};
+
 class Elaborator {
 public:
     Elaborator(Environment& environment,
@@ -87,7 +96,7 @@ private:
         //   body          = fun (a1 : T1) (a2 : T2) ... => bodyExpression
         // We thread a local-binder list as we elaborate the type and body
         // in parallel, then wrap both with the appropriate Pi / Lambda.
-        std::vector<std::string> localBinders;
+        std::vector<LocalBinder> localBinders;
         std::vector<std::pair<std::string, ExpressionPointer>>
             argumentBinders;
         for (const auto& binder : declaration.arguments) {
@@ -95,12 +104,7 @@ private:
                 elaborateExpression(*binder.type, localBinders);
             for (const auto& name : binder.names) {
                 argumentBinders.push_back({name, argumentType});
-                localBinders.push_back(name);
-                // Re-elaborate type if multiple names share one binder
-                // — but we share the same kernel term across names; the
-                // kernel handles de Bruijn lifting correctly only if we
-                // re-elaborate in the extended context for each name.
-                // We re-elaborate below if there's another name to bind.
+                localBinders.push_back({name, argumentType});
                 if (&name != &binder.names.back()) {
                     argumentType = elaborateExpression(*binder.type,
                                                         localBinders);
@@ -234,12 +238,13 @@ private:
         // Elaborate the kernel types for each function argument, and
         // the kernel return type. We need these for both type signature
         // and motive construction.
-        std::vector<std::string> binderStack;
+        std::vector<LocalBinder> binderStack;
         std::vector<ExpressionPointer> argumentKernelTypes;
         for (const auto& argument : functionArguments) {
-            argumentKernelTypes.push_back(
-                elaborateExpression(*argument.type, binderStack));
-            binderStack.push_back(argument.name);
+            ExpressionPointer argumentType =
+                elaborateExpression(*argument.type, binderStack);
+            argumentKernelTypes.push_back(argumentType);
+            binderStack.push_back({argument.name, argumentType});
         }
         ExpressionPointer returnKernelType =
             elaborateExpression(*returnType, binderStack);
@@ -261,14 +266,16 @@ private:
         // then wrap with Pis for the non-scrutinee args.
         ExpressionPointer motive;
         {
-            std::vector<std::string> motiveStack;
-            motiveStack.push_back(scrutineeArgument.name);
+            std::vector<LocalBinder> motiveStack;
+            motiveStack.push_back({scrutineeArgument.name,
+                                   argumentKernelTypes[0]});
             std::vector<ExpressionPointer> otherArgKernelTypes;
             for (size_t i = 1; i < functionArguments.size(); ++i) {
-                otherArgKernelTypes.push_back(
+                ExpressionPointer argType =
                     elaborateExpression(*functionArguments[i].type,
-                                         motiveStack));
-                motiveStack.push_back(functionArguments[i].name);
+                                         motiveStack);
+                otherArgKernelTypes.push_back(argType);
+                motiveStack.push_back({functionArguments[i].name, argType});
             }
             ExpressionPointer motiveCodomain =
                 elaborateExpression(*returnType, motiveStack);
@@ -533,8 +540,10 @@ private:
                 functionArgumentTypes[i].surfaceType;
             // Elaborate this surface type in a binder stack reflecting
             // our current lambda binders.
-            std::vector<std::string> stack;
-            for (const auto& binder : lambdaBinders) stack.push_back(binder.name);
+            std::vector<LocalBinder> stack;
+            for (const auto& binder : lambdaBinders) {
+                stack.push_back({binder.name, binder.type});
+            }
             ExpressionPointer argType =
                 elaborateExpression(*surfaceArgType, stack);
             lambdaBinders.push_back({bareName->name, argType});
@@ -546,9 +555,9 @@ private:
             matchedCase->body, declaration.name, recursiveArgToHypothesis);
 
         // Elaborate the body with all binders in scope.
-        std::vector<std::string> bodyStack;
+        std::vector<LocalBinder> bodyStack;
         for (const auto& binder : lambdaBinders) {
-            bodyStack.push_back(binder.name);
+            bodyStack.push_back({binder.name, binder.type});
         }
         ExpressionPointer bodyKernel =
             elaborateExpression(*rewrittenBody, bodyStack);
@@ -695,7 +704,7 @@ private:
         currentDeclarationName_ = declaration.name;
 
         // Build the kind: parameter Pis wrapped around the surface kind.
-        std::vector<std::string> localBinders;
+        std::vector<LocalBinder> localBinders;
         std::vector<std::pair<std::string, ExpressionPointer>>
             parameterBinders;
         for (const auto& binder : declaration.parameters) {
@@ -703,7 +712,7 @@ private:
                 elaborateExpression(*binder.type, localBinders);
             for (const auto& name : binder.names) {
                 parameterBinders.push_back({name, parameterType});
-                localBinders.push_back(name);
+                localBinders.push_back({name, parameterType});
                 if (&name != &binder.names.back()) {
                     parameterType = elaborateExpression(*binder.type,
                                                          localBinders);
@@ -725,7 +734,7 @@ private:
         std::vector<ConstructorSpec> kernelConstructors;
         for (const auto& constructorSpec : declaration.constructors) {
             // Re-establish localBinders for parameters.
-            std::vector<std::string> ctorLocalBinders;
+            std::vector<LocalBinder> ctorLocalBinders;
             std::vector<std::pair<std::string, ExpressionPointer>>
                 ctorParameterBinders;
             for (const auto& binder : declaration.parameters) {
@@ -733,7 +742,7 @@ private:
                     elaborateExpression(*binder.type, ctorLocalBinders);
                 for (const auto& name : binder.names) {
                     ctorParameterBinders.push_back({name, parameterType});
-                    ctorLocalBinders.push_back(name);
+                    ctorLocalBinders.push_back({name, parameterType});
                     if (&name != &binder.names.back()) {
                         parameterType = elaborateExpression(
                             *binder.type, ctorLocalBinders);
@@ -771,7 +780,7 @@ private:
 
     ExpressionPointer elaborateExpression(
         const SurfaceExpression& expression,
-        const std::vector<std::string>& localBinders) {
+        const std::vector<LocalBinder>& localBinders) {
 
         if (auto* identifier =
                 std::get_if<SurfaceIdentifier>(&expression.node)) {
@@ -785,6 +794,21 @@ private:
         }
         if (auto* application =
                 std::get_if<SurfaceApplication>(&expression.node)) {
+            // congruenceOf(f, h) is special-cased: it desugars to a call
+            // of Equality.congruence with type / universe / endpoint
+            // arguments inferred from the types of f and h. Two positional
+            // args; further arguments would be applied to the resulting
+            // proof, but that's unusual.
+            auto* headIdentifier = std::get_if<SurfaceIdentifier>(
+                &application->function->node);
+            if (headIdentifier
+                && headIdentifier->qualifiedName == "congruenceOf"
+                && headIdentifier->universeArgs.empty()
+                && application->arguments.size() == 2) {
+                return desugarCongruenceOf(
+                    application->arguments[0], application->arguments[1],
+                    localBinders, expression.line, expression.column);
+            }
             ExpressionPointer head =
                 elaborateExpression(*application->function, localBinders);
             for (const auto& argument : application->arguments) {
@@ -806,8 +830,8 @@ private:
                 elaborateExpression(*let->type, localBinders);
             ExpressionPointer letValue =
                 elaborateExpression(*let->value, localBinders);
-            std::vector<std::string> extended = localBinders;
-            extended.push_back(let->name);
+            std::vector<LocalBinder> extended = localBinders;
+            extended.push_back({let->name, letType});
             ExpressionPointer letBody =
                 elaborateExpression(*let->body, extended);
             return makeLet(let->name, std::move(letType),
@@ -831,6 +855,31 @@ private:
         }
         if (auto* binary =
                 std::get_if<SurfaceBinaryOperation>(&expression.node)) {
+            if (binary->opSymbol == "=") {
+                // Desugar `a = b` to `Equality.{u}(typeOfA, a, b)`.
+                // The inferred type may contain Internal-origin FreeVars
+                // introduced by our opening; close them back so the
+                // resulting term is valid in the original context.
+                ExpressionPointer leftKernel =
+                    elaborateExpression(*binary->left, localBinders);
+                ExpressionPointer rightKernel =
+                    elaborateExpression(*binary->right, localBinders);
+                ExpressionPointer leftTypeOpen =
+                    inferTypeInLocalContext(localBinders, leftKernel);
+                ExpressionPointer leftType = closeOverLocalBinders(
+                    leftTypeOpen, localBinders, localBinders.size());
+                LevelPointer universeLevel =
+                    typeUniverseOf(localBinders, leftKernel);
+                ExpressionPointer equalityReference =
+                    makeConstant("Equality", {universeLevel});
+                ExpressionPointer applied = makeApplication(
+                    std::move(equalityReference), std::move(leftType));
+                applied = makeApplication(std::move(applied),
+                                           std::move(leftKernel));
+                applied = makeApplication(std::move(applied),
+                                           std::move(rightKernel));
+                return applied;
+            }
             throw ElaborateError(
                 "operator '" + binary->opSymbol + "' is not yet supported "
                 "by the elaborator; use the explicit function call form "
@@ -847,11 +896,11 @@ private:
 
     ExpressionPointer elaborateIdentifier(
         const SurfaceIdentifier& identifier,
-        const std::vector<std::string>& localBinders,
+        const std::vector<LocalBinder>& localBinders,
         int line, int column) {
 
         for (int i = static_cast<int>(localBinders.size()) - 1; i >= 0; --i) {
-            if (localBinders[i] == identifier.qualifiedName) {
+            if (localBinders[i].name == identifier.qualifiedName) {
                 int deBruijnIndex =
                     static_cast<int>(localBinders.size()) - 1 - i;
                 if (!identifier.universeArgs.empty()) {
@@ -928,24 +977,25 @@ private:
 
     ExpressionPointer elaboratePiType(
         const SurfacePiType& piType,
-        const std::vector<std::string>& localBinders) {
+        const std::vector<LocalBinder>& localBinders) {
         if (piType.binder.names.empty()) {
             // Anonymous: T → U.
             ExpressionPointer domain =
                 elaborateExpression(*piType.binder.type, localBinders);
-            std::vector<std::string> extended = localBinders;
-            extended.push_back("_");
+            std::vector<LocalBinder> extended = localBinders;
+            extended.push_back({"_", domain});
             ExpressionPointer codomain =
                 elaborateExpression(*piType.codomain, extended);
             return makePi("_", std::move(domain), std::move(codomain));
         }
         // Multi-name binder: (x y z : T) → U becomes a chain of Pis.
-        std::vector<std::string> extended = localBinders;
+        std::vector<LocalBinder> extended = localBinders;
         std::vector<ExpressionPointer> domainsPerName;
         for (const auto& name : piType.binder.names) {
-            domainsPerName.push_back(
-                elaborateExpression(*piType.binder.type, extended));
-            extended.push_back(name);
+            ExpressionPointer domainHere =
+                elaborateExpression(*piType.binder.type, extended);
+            domainsPerName.push_back(domainHere);
+            extended.push_back({name, domainHere});
         }
         ExpressionPointer codomain =
             elaborateExpression(*piType.codomain, extended);
@@ -961,16 +1011,17 @@ private:
 
     ExpressionPointer elaborateLambda(
         const SurfaceLambda& lambda,
-        const std::vector<std::string>& localBinders) {
+        const std::vector<LocalBinder>& localBinders) {
         if (lambda.binder.names.empty()) {
             throw ElaborateError("lambda binder must have at least one name");
         }
-        std::vector<std::string> extended = localBinders;
+        std::vector<LocalBinder> extended = localBinders;
         std::vector<ExpressionPointer> domainsPerName;
         for (const auto& name : lambda.binder.names) {
-            domainsPerName.push_back(
-                elaborateExpression(*lambda.binder.type, extended));
-            extended.push_back(name);
+            ExpressionPointer domainHere =
+                elaborateExpression(*lambda.binder.type, extended);
+            domainsPerName.push_back(domainHere);
+            extended.push_back({name, domainHere});
         }
         ExpressionPointer body =
             elaborateExpression(*lambda.body, extended);
@@ -1015,6 +1066,205 @@ private:
             return base;
         }
         throw ElaborateError("unhandled level variant");
+    }
+
+    // Desugars `congruenceOf(f, h)` into a full call to
+    // `Equality.congruence.{u, v}(A, B, f, x, y, h)` by inferring the
+    // type arguments and universes from the kernel types of f and h.
+    // Requires `Equality.congruence` to be in the environment.
+    ExpressionPointer desugarCongruenceOf(
+        SurfaceExpressionPointer fSurface,
+        SurfaceExpressionPointer hSurface,
+        const std::vector<LocalBinder>& localBinders,
+        int line, int column) {
+
+        ExpressionPointer fKernel =
+            elaborateExpression(*fSurface, localBinders);
+        ExpressionPointer hKernel =
+            elaborateExpression(*hSurface, localBinders);
+
+        // f's type should be a Pi (A → B). Extract A and B.
+        ExpressionPointer fType = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, fKernel));
+        auto* fPi = std::get_if<Pi>(&fType->node);
+        if (!fPi) {
+            throw ElaborateError(
+                "congruenceOf: first argument must be a function "
+                "(line " + std::to_string(line) + ")");
+        }
+        ExpressionPointer typeA = fPi->domain;
+        ExpressionPointer typeB = fPi->codomain;
+
+        // h's type should be Equality.{u}(A, x, y). Walk the Application
+        // chain to extract x and y. Normalise first since the inferred
+        // type may be a motive application that hasn't β-reduced yet.
+        ExpressionPointer hType = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, hKernel));
+        // The Equality type expression is Application(Application(
+        //   Application(Constant("Equality", {u}), A), x), y).
+        auto* outerApp = std::get_if<Application>(&hType->node);
+        if (!outerApp) {
+            throw ElaborateError(
+                "congruenceOf: second argument must be a proof of "
+                "equality (line " + std::to_string(line) + ")");
+        }
+        ExpressionPointer y = outerApp->argument;
+        auto* middleApp =
+            std::get_if<Application>(&outerApp->function->node);
+        if (!middleApp) {
+            throw ElaborateError(
+                "congruenceOf: second argument's type is not a fully "
+                "applied Equality (line " + std::to_string(line) + ")");
+        }
+        ExpressionPointer x = middleApp->argument;
+
+        // Compute universe levels u (for A) and v (for B).
+        LevelPointer levelU = typeUniverseOf(localBinders, x);
+        // For levelV, we need the universe of typeB. But typeB lives in
+        // a context with one extra binder (the Pi's binder). We re-infer
+        // by elaborating in extended context.
+        std::vector<LocalBinder> piExtended = localBinders;
+        piExtended.push_back({fPi->displayHint, fPi->domain});
+        // Hmm — for non-dependent functions, typeB doesn't reference
+        // the binder. For dependent functions, congruenceOf doesn't
+        // straightforwardly apply (the proof would be more complex).
+        // For v1, require f to be non-dependent (codomain doesn't
+        // reference its binder).
+        // To detect: typeB shouldn't have Bound(0) free. We approximate
+        // by computing levelV in the extended context; if it succeeds,
+        // we lift it back.
+        // For the simple case (non-dependent), typeB is fine to use
+        // directly with one shift if we don't add a binder. Let's just
+        // try: compute the universe of typeB by inferType in the binder-
+        // extended context, then we'll close back over the binder.
+        // For non-dependent codomains, the level result has no Bound vars
+        // so it's safe to return as-is.
+        LevelPointer levelV;
+        {
+            ExpressionPointer typeOfTypeB =
+                inferTypeInLocalContext(piExtended, typeB);
+            auto* sortNode = std::get_if<Sort>(&typeOfTypeB->node);
+            if (!sortNode) {
+                throw ElaborateError(
+                    "congruenceOf: cannot determine codomain universe");
+            }
+            LevelPointer sortLevel = sortNode->level;
+            if (auto* succ = std::get_if<LevelSucc>(&sortLevel->node)) {
+                levelV = succ->base;
+            } else if (auto* constant =
+                            std::get_if<LevelConst>(&sortLevel->node)) {
+                if (constant->value >= 1) {
+                    levelV = makeLevelConst(constant->value - 1);
+                } else {
+                    throw ElaborateError(
+                        "congruenceOf: cannot derive universe predecessor");
+                }
+            } else {
+                throw ElaborateError(
+                    "congruenceOf: cannot derive universe predecessor");
+            }
+        }
+
+        // x and y came out of the inferred type, which lives in the opened
+        // form with FreeVariables for our local binders. Close them back
+        // to BoundVariables so they make sense in the calling context.
+        ExpressionPointer closedX = closeOverLocalBinders(
+            x, localBinders, localBinders.size());
+        ExpressionPointer closedY = closeOverLocalBinders(
+            y, localBinders, localBinders.size());
+
+        // Build Equality.congruence.{u, v}(A, B, f, x, y, h).
+        ExpressionPointer call = makeConstant(
+            "Equality.congruence", {levelU, levelV});
+        call = makeApplication(std::move(call), std::move(typeA));
+        call = makeApplication(std::move(call), std::move(typeB));
+        call = makeApplication(std::move(call), std::move(fKernel));
+        call = makeApplication(std::move(call), std::move(closedX));
+        call = makeApplication(std::move(call), std::move(closedY));
+        call = makeApplication(std::move(call), std::move(hKernel));
+        (void)column;
+        return call;
+    }
+
+    // Open the innermost `count` local binders of `term` into FreeVariables
+    // (one per binder, by name, with Internal origin so they don't collide
+    // with user names). Returns the opened term suitable for inferType when
+    // paired with a matching Context built from the same binders.
+    ExpressionPointer openOverLocalBinders(
+        ExpressionPointer term,
+        const std::vector<LocalBinder>& localBinders,
+        size_t count) {
+        for (size_t i = count; i > 0; --i) {
+            term = openBinder(term, localBinders[i - 1].name,
+                              FreeVariableOrigin::Internal);
+        }
+        return term;
+    }
+
+    // Inverse of openOverLocalBinders: converts the Internal-origin
+    // FreeVariables introduced by opening back into BoundVariables so the
+    // term can be embedded in a context with the same binders. Closes
+    // outermost-first (the reverse order of opening), so the resulting
+    // BoundVariable indices line up.
+    ExpressionPointer closeOverLocalBinders(
+        ExpressionPointer term,
+        const std::vector<LocalBinder>& localBinders,
+        size_t count) {
+        for (size_t i = 0; i < count; ++i) {
+            term = closeBinder(term, localBinders[i].name,
+                                FreeVariableOrigin::Internal);
+        }
+        return term;
+    }
+
+    // Calls the kernel's inferType on `term` interpreted under the given
+    // local binder stack. Builds a kernel Context with FreeVariables for
+    // each binder and opens the term to refer to them.
+    ExpressionPointer inferTypeInLocalContext(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term) {
+        ExpressionPointer openedTerm = openOverLocalBinders(
+            term, localBinders, localBinders.size());
+        Context context;
+        for (size_t i = 0; i < localBinders.size(); ++i) {
+            ExpressionPointer openedType = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            context.push_back({localBinders[i].name, openedType,
+                                FreeVariableOrigin::Internal});
+        }
+        return inferType(environment_, context, openedTerm);
+    }
+
+    // For a term whose type is in some universe — i.e. the type's type is
+    // a Sort N — returns the level u such that the term has type Type(u)
+    // (i.e. u = N - 1). Throws if the predecessor cannot be computed
+    // syntactically (e.g. a polymorphic Sort whose level is not a Succ
+    // or concrete constant).
+    LevelPointer typeUniverseOf(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term) {
+        ExpressionPointer typeOfTerm =
+            inferTypeInLocalContext(localBinders, term);
+        ExpressionPointer typeOfType =
+            inferTypeInLocalContext(localBinders, typeOfTerm);
+        auto* sortNode = std::get_if<Sort>(&typeOfType->node);
+        if (!sortNode) {
+            throw ElaborateError(
+                "internal: expected a Sort when computing universe level");
+        }
+        LevelPointer sortLevel = sortNode->level;
+        if (auto* succ = std::get_if<LevelSucc>(&sortLevel->node)) {
+            return succ->base;
+        }
+        if (auto* constant = std::get_if<LevelConst>(&sortLevel->node)) {
+            if (constant->value >= 1) {
+                return makeLevelConst(constant->value - 1);
+            }
+        }
+        throw ElaborateError(
+            "cannot determine universe level for desugaring; the type's "
+            "Sort isn't a syntactic successor — use the explicit "
+            "Equality.{u}(...) form");
     }
 
     static size_t universeParameterCount(const Declaration& declaration) {

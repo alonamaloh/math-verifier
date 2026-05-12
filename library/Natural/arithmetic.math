@@ -1,9 +1,9 @@
 -- Natural/arithmetic.math
 --
 -- Identities about Natural arithmetic. Builds toward the
--- "Natural is a commutative semiring" claim. Operators (+ and =) are
--- not yet supported by the elaborator, so we use the explicit forms
--- Natural.add(...) and Equality.{0}(Natural, ..., ...).
+-- "Natural is a commutative semiring" claim. The `=` operator desugars
+-- to Equality.{u}(...) and congruenceOf(f, h) to Equality.congruence
+-- with inferred type / universe arguments; both are elaborator sugar.
 
 module Natural.arithmetic
 
@@ -12,142 +12,84 @@ import Equality.basics
 
 -- Theorem: 0 + a = a. Definitional (add reduces immediately).
 theorem Natural.zero_add(a : Natural)
-        : Equality.{0}(Natural, Natural.add(zero, a), a) :=
+        : Natural.add(zero, a) = a :=
   reflexivity.{0}(Natural, a)
 
 -- Theorem: a + 0 = a. Induction on a.
 theorem Natural.add_zero
-        : (a : Natural)
-          → Equality.{0}(Natural, Natural.add(a, zero), a)
+        : (a : Natural) → Natural.add(a, zero) = a
   | zero         => reflexivity.{0}(Natural, zero)
-  | successor(k) => Equality.congruence.{0, 0}(
-                       Natural, Natural, successor,
-                       Natural.add(k, zero), k,
-                       Natural.add_zero(k))
+  | successor(k) => congruenceOf(successor, Natural.add_zero(k))
 
 -- Theorem: 1 + a = successor(a). Definitional.
 theorem Natural.one_add(a : Natural)
-        : Equality.{0}(Natural, Natural.add(one, a), successor(a)) :=
+        : Natural.add(one, a) = successor(a) :=
   reflexivity.{0}(Natural, successor(a))
 
--- Theorem: a + successor(b) = successor(a + b). The mirror of the
--- definitional rule for add on the first argument.
+-- Theorem: a + successor(b) = successor(a + b). Mirror of the definitional
+-- rule for add on the first argument.
 theorem Natural.add_successor
         : (a b : Natural)
-          → Equality.{0}(Natural, Natural.add(a, successor(b)),
-                          successor(Natural.add(a, b)))
+          → Natural.add(a, successor(b)) = successor(Natural.add(a, b))
   | zero,         b => reflexivity.{0}(Natural, successor(b))
-  | successor(k), b => Equality.congruence.{0, 0}(
-                          Natural, Natural, successor,
-                          Natural.add(k, successor(b)),
-                          successor(Natural.add(k, b)),
-                          Natural.add_successor(k, b))
+  | successor(k), b => congruenceOf(successor, Natural.add_successor(k, b))
 
 -- Theorem: a + b = b + a. Induction on a.
---
--- Base case (a = zero):       zero + b = b   (zero_add)
---                             b = b + zero   (symmetry of add_zero)
--- Inductive case (a = succ k): succ(k) + b = succ(k + b)   (definitional)
---                              succ(k + b) = succ(b + k)    (IH + congruence)
---                              succ(b + k) = b + succ(k)    (symmetry of add_successor)
 theorem Natural.add_commutative
-        : (a b : Natural)
-          → Equality.{0}(Natural, Natural.add(a, b), Natural.add(b, a))
-  | zero,         b => Equality.symmetry.{0}(
-                          Natural,
-                          Natural.add(b, zero), b,
-                          Natural.add_zero(b))
-  | successor(k), b => Equality.transitivity.{0}(
-                          Natural,
-                          successor(Natural.add(k, b)),
-                          successor(Natural.add(b, k)),
-                          Natural.add(b, successor(k)),
-                          Equality.congruence.{0, 0}(
-                              Natural, Natural, successor,
-                              Natural.add(k, b), Natural.add(b, k),
-                              Natural.add_commutative(k, b)),
-                          Equality.symmetry.{0}(
-                              Natural,
-                              Natural.add(b, successor(k)),
-                              successor(Natural.add(b, k)),
-                              Natural.add_successor(b, k)))
+        : (a b : Natural) → Natural.add(a, b) = Natural.add(b, a)
+  | zero, b =>
+      Equality.symmetry.{0}(Natural, Natural.add(b, zero), b,
+                             Natural.add_zero(b))
+  | successor(k), b =>
+      Equality.transitivity.{0}(
+          Natural,
+          successor(Natural.add(k, b)),
+          successor(Natural.add(b, k)),
+          Natural.add(b, successor(k)),
+          congruenceOf(successor, Natural.add_commutative(k, b)),
+          Equality.symmetry.{0}(
+              Natural,
+              Natural.add(b, successor(k)),
+              successor(Natural.add(b, k)),
+              Natural.add_successor(b, k)))
 
--- Theorem: 0 * a = 0. Definitional (multiply(zero, _) reduces to zero).
+-- Theorem: 0 * a = 0. Definitional.
 theorem Natural.zero_multiply(a : Natural)
-        : Equality.{0}(Natural, Natural.multiply(zero, a), zero) :=
+        : Natural.multiply(zero, a) = zero :=
   reflexivity.{0}(Natural, zero)
 
 -- Theorem: a * 0 = 0. By induction on a.
 theorem Natural.multiply_zero
-        : (a : Natural)
-          → Equality.{0}(Natural, Natural.multiply(a, zero), zero)
+        : (a : Natural) → Natural.multiply(a, zero) = zero
   | zero         => reflexivity.{0}(Natural, zero)
-  -- Inductive case: multiply(successor(k), zero)
-  --   = add(zero, multiply(k, zero))    (definitional)
-  --   = multiply(k, zero)               (definitional, add(zero, _) = _)
-  --   = zero                            (IH)
   | successor(k) => Natural.multiply_zero(k)
 
--- Theorem: 1 * a = a. Definitional once we follow the reductions.
--- multiply(one, a) = multiply(successor(zero), a)
---   = add(a, multiply(zero, a))   (definitional)
---   = add(a, zero)                (definitional)
---   = a                           (add_zero — NOT definitional)
+-- Theorem: 1 * a = a. Reduces to add_zero on a.
 theorem Natural.one_multiply(a : Natural)
-        : Equality.{0}(Natural, Natural.multiply(one, a), a) :=
+        : Natural.multiply(one, a) = a :=
   Natural.add_zero(a)
 
--- Theorem: a * successor(b) = add(a, multiply(a, b)). Induction on a.
---
--- multiply(zero, successor(b)) = zero
--- add(zero, multiply(zero, b)) = add(zero, zero) = zero.  Definitionally equal.
---
--- multiply(successor(k), successor(b))
---   = add(successor(b), multiply(k, successor(b)))               (definitional)
---   IH: multiply(k, successor(b)) = add(k, multiply(k, b))
---   So we want to show
---      add(successor(b), multiply(k, successor(b)))
---      = add(successor(k), multiply(successor(k), b))
---      = add(successor(k), add(b, multiply(k, b)))               (definitional)
--- Both sides are successor of (b + multiply(k, successor(b))) and
--- successor of (k + add(b, multiply(k, b))) respectively. This needs
--- commutativity/associativity work — substantial. Deferred.
+-- Theorem: a * successor(b) = a + (a * b).
+-- Axiomatised — its proof requires arithmetic chains not yet at hand.
 axiom Natural.multiply_successor
         : (a b : Natural)
-          → Equality.{0}(Natural,
-                          Natural.multiply(a, successor(b)),
-                          Natural.add(a, Natural.multiply(a, b)))
+          → Natural.multiply(a, successor(b))
+            = Natural.add(a, Natural.multiply(a, b))
 
 -- Theorem: a * b = b * a. Induction on a.
---
--- Base case (a = zero):       multiply(zero, b) = zero  (definitional)
---                             multiply(b, zero) = zero  (multiply_zero)
---                             chain via symmetry.
--- Inductive case (a = succ k): multiply(succ k, b) = add(b, multiply(k, b))  (definitional)
---                              multiply(b, succ k) = add(b, multiply(b, k))  (multiply_successor)
---                              IH: multiply(k, b) = multiply(b, k)
---                              add(b, multiply(k, b)) = add(b, multiply(b, k)) by congruence on (add b _).
 theorem Natural.multiply_commutative
-        : (a b : Natural)
-          → Equality.{0}(Natural,
-                          Natural.multiply(a, b),
-                          Natural.multiply(b, a))
+        : (a b : Natural) → Natural.multiply(a, b) = Natural.multiply(b, a)
   | zero, b =>
-      Equality.symmetry.{0}(
-          Natural,
-          Natural.multiply(b, zero), zero,
-          Natural.multiply_zero(b))
+      Equality.symmetry.{0}(Natural, Natural.multiply(b, zero), zero,
+                             Natural.multiply_zero(b))
   | successor(k), b =>
       Equality.transitivity.{0}(
           Natural,
           Natural.add(b, Natural.multiply(k, b)),
           Natural.add(b, Natural.multiply(b, k)),
           Natural.multiply(b, successor(k)),
-          Equality.congruence.{0, 0}(
-              Natural, Natural,
-              fun (x : Natural) => Natural.add(b, x),
-              Natural.multiply(k, b), Natural.multiply(b, k),
-              Natural.multiply_commutative(k, b)),
+          congruenceOf(fun (x : Natural) => Natural.add(b, x),
+                       Natural.multiply_commutative(k, b)),
           Equality.symmetry.{0}(
               Natural,
               Natural.multiply(b, successor(k)),
@@ -155,23 +97,10 @@ theorem Natural.multiply_commutative
               Natural.multiply_successor(b, k)))
 
 -- Theorem: (a + b) + c = a + (b + c). Induction on a.
---
--- Base case (a = zero):        (zero + b) + c = b + c  (definitional)
---                              zero + (b + c) = b + c  (definitional)
---                              both sides definitionally equal.
--- Inductive case (a = succ k): (succ k + b) + c = succ((k + b) + c)  (definitional)
---                              IH: (k + b) + c = k + (b + c)
---                              succ((k + b) + c) = succ(k + (b + c))   (congruence on IH)
---                              succ k + (b + c) = succ(k + (b + c))   (definitional)
 theorem Natural.add_associative
         : (a b c : Natural)
-          → Equality.{0}(Natural,
-                          Natural.add(Natural.add(a, b), c),
-                          Natural.add(a, Natural.add(b, c)))
-  | zero,         b, c => reflexivity.{0}(Natural,
-                                            Natural.add(b, c))
-  | successor(k), b, c => Equality.congruence.{0, 0}(
-                              Natural, Natural, successor,
-                              Natural.add(Natural.add(k, b), c),
-                              Natural.add(k, Natural.add(b, c)),
-                              Natural.add_associative(k, b, c))
+          → Natural.add(Natural.add(a, b), c)
+            = Natural.add(a, Natural.add(b, c))
+  | zero,         b, c => reflexivity.{0}(Natural, Natural.add(b, c))
+  | successor(k), b, c =>
+      congruenceOf(successor, Natural.add_associative(k, b, c))

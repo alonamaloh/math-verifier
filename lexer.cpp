@@ -38,7 +38,6 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"hypothesis",    TokenKind::KeywordHypothesis},
         {"apply",         TokenKind::KeywordApply},
         {"reduction",     TokenKind::KeywordReduction},
-        {"congruenceOf",  TokenKind::KeywordCongruenceOf},
         {"motive",        TokenKind::KeywordMotive},
         {"target",        TokenKind::KeywordTarget},
     };
