@@ -284,14 +284,14 @@ private:
         // Constant("Inductive", {univ_args}), p1), p2) for an
         // inductive applied to two parameters.
         std::vector<LevelPointer> inductiveUniverseArguments;
-        std::vector<ExpressionPointer> parameterValues;
+        std::vector<ExpressionPointer> inductiveArguments;
         {
             ExpressionPointer cursor = weakHeadNormalForm(
                 environment_, argumentKernelTypes[0]);
             while (auto* application =
                        std::get_if<Application>(&cursor->node)) {
-                parameterValues.insert(parameterValues.begin(),
-                                        application->argument);
+                inductiveArguments.insert(inductiveArguments.begin(),
+                                            application->argument);
                 cursor = weakHeadNormalForm(
                     environment_, application->function);
             }
@@ -302,16 +302,52 @@ private:
             }
             inductiveUniverseArguments = headConstant->universeArguments;
         }
-        int numInductiveArgs =
-            static_cast<int>(parameterValues.size());
-        int numIndexArgs =
-            numInductiveArgs - inductive->numParameters;
-        if (numIndexArgs != 0) {
-            throw ElaborateError(
-                "pattern matching on indexed inductives is not yet "
-                "supported (inductive '" + inductiveName
-                + "' applied with " + std::to_string(numIndexArgs)
-                + " index argument(s) — use a direct recursor call)");
+
+        // Split into parameters (first numParameters) and indices (rest).
+        // For indexed inductives, each index value MUST be a
+        // BoundVariable referring to a distinct outer binder. This
+        // restriction lets the motive simply re-bind those outer
+        // names. More general index patterns (e.g. `Equality(A, zero, n)`)
+        // require unification machinery we don't yet have.
+        std::vector<ExpressionPointer> parameterValues(
+            inductiveArguments.begin(),
+            inductiveArguments.begin() + inductive->numParameters);
+        std::vector<ExpressionPointer> indexValues(
+            inductiveArguments.begin() + inductive->numParameters,
+            inductiveArguments.end());
+        std::vector<int> indexToOuterBinderPosition(indexValues.size());
+        std::vector<bool> outerBinderIsIndex(outerBinderCount, false);
+        for (size_t k = 0; k < indexValues.size(); ++k) {
+            auto* boundVariable = std::get_if<BoundVariable>(
+                &indexValues[k]->node);
+            if (!boundVariable) {
+                throw ElaborateError(
+                    "pattern matching on indexed inductive '"
+                    + inductiveName
+                    + "': index " + std::to_string(k)
+                    + " of the scrutinee must be a local variable name "
+                    "(complex index expressions are not supported)");
+            }
+            int outerPosition = outerBinderCount - 1
+                - boundVariable->deBruijnIndex;
+            if (outerPosition < 0
+                || outerPosition >= outerBinderCount) {
+                throw ElaborateError(
+                    "pattern matching on indexed inductive '"
+                    + inductiveName
+                    + "': index " + std::to_string(k)
+                    + " must reference an outer binder of the "
+                    "definition");
+            }
+            if (outerBinderIsIndex[outerPosition]) {
+                throw ElaborateError(
+                    "pattern matching on indexed inductive '"
+                    + inductiveName
+                    + "': the same outer binder is used as more than "
+                    "one index");
+            }
+            outerBinderIsIndex[outerPosition] = true;
+            indexToOuterBinderPosition[k] = outerPosition;
         }
 
         // Build the full type as a Pi chain over function arguments,
@@ -329,20 +365,50 @@ private:
                               std::move(fullType));
         }
 
-        // Build the motive in the kernel. The motive is a lambda over
-        // the scrutinee, with body = Pi over the remaining arguments
-        // ending in the return type. The return type may reference
-        // any of the function's arguments AND any outer binders, so
-        // we elaborate it with the full binder stack
-        // [outerBinders..., scrutinee, otherArg1, ..., otherArgN] in
-        // scope and then wrap with Pis for the non-scrutinee arguments.
-        // The resulting motive expression has free BoundVariable
-        // references to the outer binders (none if outerBinderCount=0).
+        // Build the motive in the kernel. For an inductive without
+        // indices the motive is `Lambda scrutinee. Pi otherArgs.
+        // returnType`. For an indexed inductive it is
+        // `Lambda i_1 ... Lambda i_m. Lambda scrutinee. Pi otherArgs.
+        // returnType`, where the m index lambdas "re-bind" the outer
+        // binders that the scrutinee's index positions reference. The
+        // user's surface returnType references those names directly;
+        // we elaborate it under a binder stack where the motive's
+        // index binders shadow the outer ones, so name resolution
+        // picks the motive-bound copy.
         ExpressionPointer motive;
+        ExpressionPointer scrutineeTypeInMotive;  // used below for type
         {
             std::vector<LocalBinder> motiveStack = outerBinderStack;
+            // Append motive-bound index binders (in scrutinee order).
+            // Each shares its name with the corresponding outer binder,
+            // so user references to that name in the return type
+            // resolve to the motive-bound version (shadowing the
+            // outer one). The type is the outer binder's type, shifted
+            // to account for any new binders that sit between the
+            // outer binder's original position and the motive index
+            // binder's current position.
+            std::vector<ExpressionPointer> motiveIndexBinderTypes;
+            std::vector<std::string> motiveIndexBinderNames;
+            for (size_t k = 0; k < indexValues.size(); ++k) {
+                int outerPosition = indexToOuterBinderPosition[k];
+                int shiftAmount = static_cast<int>(motiveStack.size())
+                    - outerPosition;
+                ExpressionPointer indexBinderType = shift(
+                    outerBinderStack[outerPosition].type, shiftAmount);
+                motiveIndexBinderTypes.push_back(indexBinderType);
+                motiveIndexBinderNames.push_back(
+                    outerBinderStack[outerPosition].name);
+                motiveStack.push_back(
+                    {outerBinderStack[outerPosition].name,
+                     indexBinderType});
+            }
+            // Re-elaborate the scrutinee's surface type in the new
+            // motiveStack so that any references to outer index
+            // binders resolve to the motive's index binders.
+            scrutineeTypeInMotive = elaborateExpression(
+                *functionArguments[0].type, motiveStack);
             motiveStack.push_back({scrutineeArgument.name,
-                                   argumentKernelTypes[0]});
+                                    scrutineeTypeInMotive});
             std::vector<ExpressionPointer> otherArgumentKernelTypes;
             for (size_t i = 1; i < functionArguments.size(); ++i) {
                 ExpressionPointer argumentType =
@@ -354,6 +420,7 @@ private:
             }
             ExpressionPointer motiveCodomain =
                 elaborateExpression(*returnType, motiveStack);
+            // Wrap with Pis for non-scrutinee function arguments.
             for (int i =
                      static_cast<int>(otherArgumentKernelTypes.size()) - 1;
                  i >= 0; --i) {
@@ -361,9 +428,19 @@ private:
                                          otherArgumentKernelTypes[i],
                                          std::move(motiveCodomain));
             }
-            motive = makeLambda(scrutineeArgument.name,
-                                argumentKernelTypes[0],
+            // Wrap with the scrutinee lambda.
+            motiveCodomain = makeLambda(scrutineeArgument.name,
+                                          scrutineeTypeInMotive,
+                                          std::move(motiveCodomain));
+            // Wrap with index lambdas, innermost (last) first.
+            for (int k = static_cast<int>(indexValues.size()) - 1;
+                 k >= 0; --k) {
+                motiveCodomain =
+                    makeLambda(motiveIndexBinderNames[k],
+                                motiveIndexBinderTypes[k],
                                 std::move(motiveCodomain));
+            }
+            motive = std::move(motiveCodomain);
         }
 
         // Determine the motive's universe level by asking the kernel
@@ -373,10 +450,16 @@ private:
         // to inferType.
         LevelPointer motiveLevel;
         {
+            // Context entries' types must themselves be in the opened
+            // form — each binder's type may reference earlier outer
+            // binders via Bound vars, and those need to become FreeVars
+            // with matching Internal-origin names.
             Context outerBinderContext;
-            for (const auto& binder : outerBinderStack) {
+            for (size_t i = 0; i < outerBinderStack.size(); ++i) {
+                ExpressionPointer openedType = openOverLocalBinders(
+                    outerBinderStack[i].type, outerBinderStack, i);
                 outerBinderContext.push_back(
-                    {binder.name, binder.type,
+                    {outerBinderStack[i].name, openedType,
                      FreeVariableOrigin::Internal});
             }
             ExpressionPointer motiveType =
@@ -470,6 +553,15 @@ private:
             applied = makeApplication(
                 std::move(applied),
                 shift(std::move(caseLambda), argumentCount));
+        }
+        // For indexed inductives, apply the recursor to the index
+        // values (in scrutinee order). They were extracted from the
+        // scrutinee type as outer-binder BoundVariables; shift them
+        // by argumentCount to account for the enclosing function-arg
+        // lambdas we'll wrap with below.
+        for (const auto& indexValue : indexValues) {
+            applied = makeApplication(std::move(applied),
+                                       shift(indexValue, argumentCount));
         }
         // The scrutinee. The function's arguments are bound (from
         // innermost outermost) at depths n-1, n-2, ..., 0 inside the
@@ -597,6 +689,14 @@ private:
             bool isRecursive;
         };
         std::vector<ConstructorArgument> constructorArguments;
+        // The constructor's specific index values (one per index of the
+        // inductive). Extracted from the result type after stripping
+        // all parameter and value-arg Pis. References here may be to:
+        //   - Value-arg BoundVariables (Bound(0..nonParamArgs-1)) bound
+        //     by the constructor's own value-arg Pis, OR
+        //   - Outer-binder references coming from the substituted
+        //     parameter values.
+        std::vector<ExpressionPointer> constructorIndexValuesRaw;
         {
             // Apply the parameter values to the constructor's type via
             // beta reduction — peel one parameter Pi, substitute its
@@ -632,6 +732,22 @@ private:
                     constant && constant->name == inductiveName;
                 constructorArguments.push_back(constructorArgument);
                 cursor = pi->codomain;
+            }
+            // Now cursor is the constructor's result type:
+            // Inductive(parameterValues..., constructorIndexValues...).
+            // Peel the application chain and split.
+            std::vector<ExpressionPointer> inductiveArguments;
+            ExpressionPointer resultCursor = cursor;
+            while (auto* application =
+                       std::get_if<Application>(&resultCursor->node)) {
+                inductiveArguments.insert(inductiveArguments.begin(),
+                                            application->argument);
+                resultCursor = application->function;
+            }
+            for (size_t k = parameterValues.size();
+                 k < inductiveArguments.size(); ++k) {
+                constructorIndexValuesRaw.push_back(
+                    inductiveArguments[k]);
             }
         }
         if (destructuredNames.size() != constructorArguments.size()) {
@@ -752,14 +868,36 @@ private:
             matchedCase->body, declaration.name, recursiveArgToHypothesis,
             static_cast<int>(outerBinderStack.size()));
 
-        // Compute the expected body type, which is
-        // `motive(Ctor.{u}(params..., destructured...))` further applied
-        // to the other function arguments — both as Bound vars at their
-        // positions in the case-lambda binder stack — and beta-reduced.
-        // The result lives in the body's full context (outer + lambda).
+        // Compute the expected body type:
+        //   motive applied to (constructorIndexValues..., Ctor app),
+        //   then to other function arguments, beta-reduced at each step.
+        // For non-indexed inductives, there are zero index values and
+        // the motive is applied only to the constructor application.
         ExpressionPointer expectedBodyType;
         {
             int totalBinderDepth = static_cast<int>(lambdaBinders.size());
+            int constructorValueArgCount =
+                static_cast<int>(constructorArguments.size());
+            // Bring `motive` and `parameterValues` from outer-binder
+            // scope into the case-body's binder context.
+            expectedBodyType = shift(motive, totalBinderDepth);
+            // Apply to the constructor's specific index values. These
+            // may reference value-arg BoundVariables (Bound(0..n-1))
+            // and outer binders via parameter-value lifts. Shift by
+            // (totalBinderDepth - constructorValueArgCount) to map
+            // them to body coordinates — relies on the value args
+            // sitting contiguously at the bottom of lambdaBinders
+            // (i.e. no induction hypotheses interspersed between
+            // them). See limitation note in commit message.
+            for (const auto& indexValue : constructorIndexValuesRaw) {
+                expectedBodyType = makeApplication(
+                    expectedBodyType,
+                    shift(indexValue,
+                           totalBinderDepth
+                           - constructorValueArgCount));
+            }
+            // Apply to the constructor application of (params,
+            // destructured-values).
             ExpressionPointer constructorApplication =
                 makeConstant(constructorName,
                               inductiveUniverseArguments);
@@ -778,7 +916,7 @@ private:
                     makeBoundVariable(deBruijnIndex));
             }
             expectedBodyType = makeApplication(
-                shift(motive, totalBinderDepth),
+                std::move(expectedBodyType),
                 std::move(constructorApplication));
             expectedBodyType = weakHeadNormalForm(
                 environment_, expectedBodyType);

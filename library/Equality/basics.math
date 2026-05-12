@@ -10,41 +10,24 @@ module Equality.basics
 inductive Equality (A : Type) (x : A) : A → Proposition where
   | reflexivity : Equality(A, x, x)
 
--- Symmetry: if x = y, then y = x. Proved by the J principle, which is
--- what the kernel-generated Equality_recursor encodes.
-theorem Equality.symmetry
-        (A : Type) (x y : A) (equalityProof : Equality(A, x, y))
-        : Equality(A, y, x) :=
-  Equality_recursor(
-    A, x,
-    fun (someY : A) (_ : Equality(A, x, someY)) => Equality(A, someY, x),
-    reflexivity(x),
-    y,
-    equalityProof)
+-- Symmetry: if x = y, then y = x. By pattern matching on the equality:
+-- the only case is reflexivity, where y is forced to be x, so the
+-- result type collapses to Equality(A, x, x), which reflexivity proves.
+theorem Equality.symmetry (A : Type) (x y : A)
+        : Equality(A, x, y) → Equality(A, y, x)
+  | reflexivity => reflexivity(x)
 
--- Transitivity: if x = y and y = z, then x = z. Recurse on the second
--- equality with motive λ someZ _. Equality(A, x, someZ).
-theorem Equality.transitivity
-        (A : Type) (x y z : A)
+-- Transitivity: if x = y and y = z, then x = z. Pattern-match on the
+-- SECOND equality (yEqualsZ): when it's reflexivity, z is forced to y,
+-- so the result type Equality(A, x, z) becomes Equality(A, x, y) — and
+-- the first equality xEqualsY is a proof of exactly that.
+theorem Equality.transitivity (A : Type) (x y z : A)
         (xEqualsY : Equality(A, x, y))
-        (yEqualsZ : Equality(A, y, z))
-        : Equality(A, x, z) :=
-  Equality_recursor(
-    A, y,
-    fun (someZ : A) (_ : Equality(A, y, someZ)) => Equality(A, x, someZ),
-    xEqualsY,
-    z,
-    yEqualsZ)
+        : Equality(A, y, z) → Equality(A, x, z)
+  | reflexivity => xEqualsY
 
--- Congruence: if x = y, then f(x) = f(y).
-theorem Equality.congruence
-        (A : Type) (B : Type) (f : A → B)
-        (x y : A) (equalityProof : Equality(A, x, y))
-        : Equality(B, f(x), f(y)) :=
-  Equality_recursor(
-    A, x,
-    fun (someY : A) (_ : Equality(A, x, someY))
-        => Equality(B, f(x), f(someY)),
-    reflexivity(f(x)),
-    y,
-    equalityProof)
+-- Congruence: if x = y, then f(x) = f(y). Pattern-match: the only case
+-- is reflexivity, where y is forced to x and so f(y) = f(x).
+theorem Equality.congruence (A : Type) (B : Type) (f : A → B) (x y : A)
+        : Equality(A, x, y) → Equality(B, f(x), f(y))
+  | reflexivity => reflexivity(f(x))
