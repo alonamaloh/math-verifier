@@ -21,7 +21,7 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"let",           TokenKind::KeywordLet},
         {"in",            TokenKind::KeywordIn},
         {"Type",          TokenKind::KeywordType},
-        {"Prop",          TokenKind::KeywordProp},
+        {"Proposition",   TokenKind::KeywordProposition},
         {"max",           TokenKind::KeywordMax},
         {"imax",          TokenKind::KeywordImax},
         {"proof",         TokenKind::KeywordProof},
@@ -269,7 +269,7 @@ bool isKeyword(TokenKind kind) {
         case TokenKind::KeywordLet:
         case TokenKind::KeywordIn:
         case TokenKind::KeywordType:
-        case TokenKind::KeywordProp:
+        case TokenKind::KeywordProposition:
         case TokenKind::KeywordMax:
         case TokenKind::KeywordImax:
         case TokenKind::KeywordProof:
@@ -310,7 +310,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::KeywordLet:           return "'let'";
         case TokenKind::KeywordIn:            return "'in'";
         case TokenKind::KeywordType:          return "'Type'";
-        case TokenKind::KeywordProp:          return "'Prop'";
+        case TokenKind::KeywordProposition:   return "'Proposition'";
         case TokenKind::KeywordMax:           return "'max'";
         case TokenKind::KeywordImax:          return "'imax'";
         case TokenKind::KeywordProof:         return "'proof'";

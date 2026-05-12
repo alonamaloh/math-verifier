@@ -153,7 +153,7 @@ Environment buildArithmeticEnvironment() {
 
     // Equality as an inductive type:
     //
-    //   inductive Equality.{u} (A : Type u) (x : A) : A → Prop
+    //   inductive Equality.{u} (A : Type u) (x : A) : A → Proposition
     //     | reflexivity : Equality A x x
     //
     // This subsumes the older axiomatic Equality + reflexivity pair. Now
@@ -167,7 +167,7 @@ Environment buildArithmeticEnvironment() {
         makePi("A", makeType(makeLevelParam("u")),
           makePi("x", makeBoundVariable(0),
             makePi("y", makeBoundVariable(1),
-              makeProp()))),
+              makeProposition()))),
         /*numParameters=*/ 2,
         {{
             "reflexivity",
@@ -387,9 +387,9 @@ void runEnvironmentTests(const Environment& environment) {
                                            makeConstant("successor")));
     }
 
-    // Prop and impredicativity: Equality lives in Prop. Reflexivity's full
-    // type therefore also lives in Prop:
-    //   reflexivity : ∀(A : Type 0). ∀(x : A). Equality A x x   : Prop
+    // Proposition and impredicativity: Equality lives in Proposition. Reflexivity's full
+    // type therefore also lives in Proposition:
+    //   reflexivity : ∀(A : Type 0). ∀(x : A). Equality A x x   : Proposition
     {
         auto reflexivityType =
             inferType(environment, {}, makeConstant("reflexivity", {makeLevelConst(0)}));
@@ -402,24 +402,24 @@ void runEnvironmentTests(const Environment& environment) {
                     *levelAsConstant(sort->level) == 0);
     }
 
-    // Π(P : Prop). P — quantifying over all propositions, itself a Prop.
+    // Π(P : Proposition). P — quantifying over all propositions, itself a Proposition.
     // This is the impredicative encoding of False (and of any quantifier
-    // that ranges over Prop). Impredicativity fires here because the
-    // codomain P has type Prop (universe 0), so imax(_, 0) = 0.
+    // that ranges over Proposition). Impredicativity fires here because the
+    // codomain P has type Proposition (universe 0), so imax(_, 0) = 0.
     {
-        auto term = makePi("P", makeProp(), makeBoundVariable(0));
+        auto term = makePi("P", makeProposition(), makeBoundVariable(0));
         auto kind = weakHeadNormalForm(environment,
                                        inferType(environment, {}, term));
         auto* sort = std::get_if<Sort>(&kind->node);
         EXPECT_TRUE(sort != nullptr &&
                     levelAsConstant(sort->level) &&
-                    *levelAsConstant(sort->level) == 0);  // Prop
+                    *levelAsConstant(sort->level) == 0);  // Proposition
     }
 
-    // Π(_ : Prop). Prop is NOT in Prop — its codomain is the *type* Prop
+    // Π(_ : Proposition). Proposition is NOT in Proposition — its codomain is the *type* Proposition
     // (which lives in Type 0), not a proposition. Result is Type 0.
     {
-        auto term = makePi("_", makeProp(), makeProp());
+        auto term = makePi("_", makeProposition(), makeProposition());
         auto kind = weakHeadNormalForm(environment,
                                        inferType(environment, {}, term));
         auto* sort = std::get_if<Sort>(&kind->node);
@@ -494,7 +494,7 @@ void runEnvironmentTests(const Environment& environment) {
     }
 
     // Proof irrelevance does NOT equate distinct values whose type is not
-    // in Prop. Two distinct free Naturals are not definitionally equal.
+    // in Proposition. Two distinct free Naturals are not definitionally equal.
     {
         Context contextWithNaturals = {
             {"a", makeConstant("Natural")},
@@ -568,7 +568,7 @@ void runEnvironmentTests(const Environment& environment) {
     // universe; at Type 0 it asserts equality of small values, at Type 1
     // it asserts equality of Types. Reflexivity proves both.
     {
-        // Equality.{0} Natural zero zero  : Prop
+        // Equality.{0} Natural zero zero  : Proposition
         auto small = makeApplication(
             makeApplication(
                 makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
@@ -581,10 +581,10 @@ void runEnvironmentTests(const Environment& environment) {
         EXPECT_TRUE(smallSort && levelAsConstant(smallSort->level) &&
                     *levelAsConstant(smallSort->level) == 0);
 
-        // Equality.{1} (Type 0) Natural Natural  : Prop
+        // Equality.{1} (Type 0) Natural Natural  : Proposition
         // (Natural : Type 0, so we're stating that the type Natural equals
-        // itself.) Lives in Prop just like Equality.{0} — propositions are
-        // always in Prop regardless of u.
+        // itself.) Lives in Proposition just like Equality.{0} — propositions are
+        // always in Proposition regardless of u.
         auto big = makeApplication(
             makeApplication(
                 makeApplication(makeConstant("Equality", {makeLevelConst(1)}),
@@ -1338,7 +1338,7 @@ void runUniversePolymorphismTests(const Environment& arithmetic) {
 void runPrintingTests(const Environment& arithmetic) {
     std::cout << "--- pretty-printer tests ---\n";
 
-    EXPECT_PRINTS(makeProp(), "Prop");
+    EXPECT_PRINTS(makeProposition(), "Proposition");
     EXPECT_PRINTS(makeType(0), "Type 0");
     EXPECT_PRINTS(makeType(1), "Type 1");
     EXPECT_PRINTS(makeType(makeLevelParam("u")), "Type u");
@@ -1402,7 +1402,7 @@ void runPrintingTests(const Environment& arithmetic) {
 // ----------------------------------------------------------------------------
 // Universe-polymorphic recursor tests. With a polymorphic motive, the same
 // Natural_recursor can be instantiated at any motive universe — Type 0 for
-// the typical case (computing Naturals from Naturals), or Prop to prove
+// the typical case (computing Naturals from Naturals), or Proposition to prove
 // propositions by induction.
 // ----------------------------------------------------------------------------
 
@@ -1418,21 +1418,21 @@ void runPolymorphicRecursorTests(const Environment& arithmetic) {
         EXPECT_TRUE(std::holds_alternative<Pi>(type->node));
     }
 
-    // Instantiate at motive level 0 (Prop motive). The recursor's motive
-    // type becomes Π(_ : Natural). Prop. Calls to it eliminate Natural
+    // Instantiate at motive level 0 (Proposition motive). The recursor's motive
+    // type becomes Π(_ : Natural). Proposition. Calls to it eliminate Natural
     // into propositions — i.e. proofs by induction.
     {
-        auto recursorPropMotive =
+        auto recursorPropositionMotive =
             makeConstant("Natural_recursor", {makeLevelConst(0)});
-        auto inferredType = inferType(arithmetic, {}, recursorPropMotive);
-        // Pretty-print to confirm motive is Π(_ : Natural). Prop.
-        // (Concretely: the type starts with Π(motive : Π(_ : Natural). Prop).)
+        auto inferredType = inferType(arithmetic, {}, recursorPropositionMotive);
+        // Pretty-print to confirm motive is Π(_ : Natural). Proposition.
+        // (Concretely: the type starts with Π(motive : Π(_ : Natural). Proposition).)
         auto whnfType = weakHeadNormalForm(arithmetic, inferredType);
         auto* pi = std::get_if<Pi>(&whnfType->node);
         EXPECT_TRUE(pi);
         if (pi) {
             // pi->domain is the motive's TYPE, which should be
-            // Π(_ : Natural). Prop.
+            // Π(_ : Natural). Proposition.
             auto* motivePi = std::get_if<Pi>(&pi->domain->node);
             EXPECT_TRUE(motivePi);
             if (motivePi) {
@@ -1441,7 +1441,7 @@ void runPolymorphicRecursorTests(const Environment& arithmetic) {
                 EXPECT_TRUE(
                     codomainSort &&
                     levelAsConstant(codomainSort->level) &&
-                    *levelAsConstant(codomainSort->level) == 0);  // Prop
+                    *levelAsConstant(codomainSort->level) == 0);  // Proposition
             }
         }
     }
@@ -1449,12 +1449,12 @@ void runPolymorphicRecursorTests(const Environment& arithmetic) {
     // Prove a proposition by induction: ∀(n : Natural). Equality.{0}
     //                                      Natural n n.
     // The proof is reflexivity applied to each constructor case, and
-    // Natural_recursor at motive level 0 (Prop) ties them together.
+    // Natural_recursor at motive level 0 (Proposition) ties them together.
     //
     //   inductionProof : Π(n : Natural). Equality Natural n n
     //   inductionProof =
     //     Natural_recursor.{0}
-    //       (λn. Equality Natural n n)              -- motive : Natural → Prop
+    //       (λn. Equality Natural n n)              -- motive : Natural → Proposition
     //       (reflexivity Natural zero)              -- case_zero
     //       (λk recK. reflexivity Natural (successor k))  -- case_successor
     {
@@ -1515,17 +1515,17 @@ void runPolymorphicRecursorTests(const Environment& arithmetic) {
 }
 
 // ----------------------------------------------------------------------------
-// Restricted-elimination tests for Prop inductives. A non-empty Prop
+// Restricted-elimination tests for Proposition inductives. A non-empty Proposition
 // inductive must not allow its proofs to be eliminated into Type — that
 // would let users extract data from a proof and break proof irrelevance.
-// The kernel forces the motive's universe to Prop for such recursors.
+// The kernel forces the motive's universe to Proposition for such recursors.
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
 // Proof irrelevance × impredicativity audit. These tests pin down what the
 // kernel's proof-irrelevance branch does and doesn't equate, especially
 // around the impredicative Pi rule. The principle: two terms are
-// definitionally equal by proof irrelevance iff their type lives in Prop.
+// definitionally equal by proof irrelevance iff their type lives in Proposition.
 // ----------------------------------------------------------------------------
 
 void runProofIrrelevanceAuditTests(const Environment& arithmetic) {
@@ -1547,30 +1547,30 @@ void runProofIrrelevanceAuditTests(const Environment& arithmetic) {
 
     // Proofs of *distinct* propositions are NOT equal.
     {
-        auto leftProp = makeApplication(
+        auto leftProposition = makeApplication(
             makeApplication(
                 makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
                                 makeConstant("Natural")),
                 makeConstant("zero")),
             makeConstant("zero"));
-        auto rightProp = makeApplication(
+        auto rightProposition = makeApplication(
             makeApplication(
                 makeApplication(makeConstant("Equality", {makeLevelConst(0)}),
                                 makeConstant("Natural")),
                 makeConstant("zero")),
             makeApplication(makeConstant("successor"), makeConstant("zero")));
-        Context ctx = {{"p", leftProp}, {"q", rightProp}};
+        Context ctx = {{"p", leftProposition}, {"q", rightProposition}};
         EXPECT_FALSE(isDefinitionallyEqual(arithmetic, ctx,
                                            makeFreeVariable("p"),
                                            makeFreeVariable("q")));
     }
 
-    // A term whose type lives in Type (not Prop) is NOT equated by proof
+    // A term whose type lives in Type (not Proposition) is NOT equated by proof
     // irrelevance, even if both sides are "predicates".
     // Two distinct predicates  λ(n : Natural). Equality Natural n n  and
     // λ(n : Natural). Equality Natural zero zero  have type
-    // Π(_ : Natural). Prop, whose universe is imax(1, 1) = Type 0. Not in
-    // Prop. So they aren't equated.
+    // Π(_ : Natural). Proposition, whose universe is imax(1, 1) = Type 0. Not in
+    // Proposition. So they aren't equated.
     {
         auto predicateA = makeLambda("n", makeConstant("Natural"),
             makeApplication(
@@ -1590,13 +1590,13 @@ void runProofIrrelevanceAuditTests(const Environment& arithmetic) {
                                            predicateA, predicateB));
     }
 
-    // A function whose codomain is a proof type IS in Prop (impredicativity
-    // collapses the Pi to Prop), so two such functions are equal by proof
+    // A function whose codomain is a proof type IS in Proposition (impredicativity
+    // collapses the Pi to Proposition), so two such functions are equal by proof
     // irrelevance. The functions are "extensionally equal" because they
     // return interchangeable proofs.
     //
     //   Π(x : Natural). Equality Natural zero zero  has universe
-    //     imax(1, 0) = 0 = Prop.
+    //     imax(1, 0) = 0 = Proposition.
     {
         auto propositionType = makeApplication(
             makeApplication(
@@ -1616,15 +1616,15 @@ void runProofIrrelevanceAuditTests(const Environment& arithmetic) {
     {
         Context ctx = {{"n", makeConstant("Natural")},
                        {"b", makeConstant("Natural")}};
-        // n and b are Naturals (Type 0). Not in Prop. Distinct free vars.
+        // n and b are Naturals (Type 0). Not in Proposition. Distinct free vars.
         EXPECT_FALSE(isDefinitionallyEqual(arithmetic, ctx,
                                            makeFreeVariable("n"),
                                            makeFreeVariable("b")));
     }
 
     // η + proof irrelevance: a Lambda that wraps a proof-returning function
-    // is equal to the bare function. Both have type in Prop (codomain is
-    // Equality, which is in Prop).
+    // is equal to the bare function. Both have type in Proposition (codomain is
+    // Equality, which is in Proposition).
     //   λ(x : Natural). reflexivity Natural zero  vs  the partially-
     //   applied reflexivity at zero — but reflexivity needs a type AND a
     //   value; the partially-applied form ends differently. Skip; the
@@ -1648,14 +1648,14 @@ void runProofIrrelevanceAuditTests(const Environment& arithmetic) {
 void runRestrictedEliminationTests() {
     std::cout << "--- restricted elimination tests ---\n";
 
-    // A Prop inductive with two constructors: a disjunction over a fixed
+    // A Proposition inductive with two constructors: a disjunction over a fixed
     // pair of propositions. Its recursor must NOT take a motive-universe
-    // parameter (motive is forced to Prop).
+    // parameter (motive is forced to Proposition).
     {
         Environment env;
-        addAxiom(env, "P", makeProp());
-        addAxiom(env, "Q", makeProp());
-        addInductive(env, "Or_PQ", makeProp(), {
+        addAxiom(env, "P", makeProposition());
+        addAxiom(env, "Q", makeProposition());
+        addInductive(env, "Or_PQ", makeProposition(), {
             {"inl", makePi("_", makeConstant("P"), makeConstant("Or_PQ"))},
             {"inr", makePi("_", makeConstant("Q"), makeConstant("Or_PQ"))},
         });
@@ -1666,7 +1666,7 @@ void runRestrictedEliminationTests() {
         // Supplying a universe argument is rejected as wrong arity.
         EXPECT_THROW(inferType(env, {},
             makeConstant("Or_PQ_recursor", {makeLevelConst(1)})));
-        // The motive's codomain in the recursor type is Prop, not a
+        // The motive's codomain in the recursor type is Proposition, not a
         // universe parameter. We inspect by walking into the Pi:
         auto* pi = std::get_if<Pi>(&type->node);
         EXPECT_TRUE(pi);
@@ -1683,12 +1683,12 @@ void runRestrictedEliminationTests() {
         }
     }
 
-    // An empty Prop inductive (zero constructors, like False) DOES allow
+    // An empty Proposition inductive (zero constructors, like False) DOES allow
     // large elimination — there's no proof to extract from, so any motive
     // universe is sound. The recursor takes a motive-level universe arg.
     {
         Environment env;
-        addInductive(env, "False", makeProp(), {});
+        addInductive(env, "False", makeProposition(), {});
         auto recursor =
             makeConstant("False_recursor", {makeLevelConst(1)});
         auto type = inferType(env, {}, recursor);
@@ -2132,7 +2132,7 @@ void runPropertyTests(const Environment& arithmetic) {
 // ----------------------------------------------------------------------------
 // Natural-Number-Game-style proofs. Demonstrates kernel-verified theorems
 // about Natural and addition. Some go through by pure β/δ/ι/ζ reduction;
-// others need induction via Natural_recursor.{0} (a Prop-valued motive).
+// others need induction via Natural_recursor.{0} (a Proposition-valued motive).
 // Equality (the inductive type provided by buildArithmeticEnvironment)
 // supplies the J principle through its auto-generated recursor; that's
 // what derived lemmas like Equality.symmetry, Equality.transitivity,
@@ -2454,7 +2454,7 @@ void runNaturalNumberGameProofs() {
     // Theorem 2: add_zero :  Π(a : Natural). a + 0 = a.
     //
     // Not definitional. Proof by induction on a using Natural_recursor
-    // with a Prop-valued motive, and Natural.successorCongruence (derived above, not an
+    // with a Proposition-valued motive, and Natural.successorCongruence (derived above, not an
     // axiom) for the successor case.
     // ------------------------------------------------------------------
     {
@@ -2518,8 +2518,8 @@ void runNaturalNumberGameProofs() {
 // ----------------------------------------------------------------------------
 // A small library of inductive types and derived functions. Demonstrates
 // that the kernel now handles a variety of inductive shapes:
-//   And      — Prop, 1 ctor with 2 non-param Prop args (restricted elim)
-//   Or       — Prop, 2 ctors                            (restricted elim)
+//   And      — Proposition, 1 ctor with 2 non-param Proposition args (restricted elim)
+//   Or       — Proposition, 2 ctors                            (restricted elim)
 //   Sum      — Type, 2 ctors                            (large elim)
 //   Prod     — Type, 1 ctor with 2 non-param Type args  (large elim)
 //   Option   — Type, 2 ctors                            (large elim)
@@ -2538,17 +2538,17 @@ void runInductiveLibraryProofs() {
         return makeApplication(makeConstant("successor"), n);
     };
 
-    // ---------------- And (Prop) -----------------
-    // And.swap : Π(A B : Prop). And A B → And B A.
+    // ---------------- And (Proposition) -----------------
+    // And.swap : Π(A B : Proposition). And A B → And B A.
     {
         addInductive(env, "And",
-            makePi("A", makeProp(),
-                makePi("B", makeProp(), makeProp())),
+            makePi("A", makeProposition(),
+                makePi("B", makeProposition(), makeProposition())),
             /*numParameters=*/ 2,
             {{
                 "And.introduction",
-                makePi("A", makeProp(),
-                    makePi("B", makeProp(),
+                makePi("A", makeProposition(),
+                    makePi("B", makeProposition(),
                         makePi("_a", makeBoundVariable(1) /* A */,
                             makePi("_b", makeBoundVariable(1) /* B */,
                                 makeApplication(makeApplication(
@@ -2557,10 +2557,10 @@ void runInductiveLibraryProofs() {
                                     makeBoundVariable(2) /* B */)))))
             }});
 
-        // And.swap : Π(A B : Prop). And A B → And B A.
+        // And.swap : Π(A B : Proposition). And A B → And B A.
         // Proof: λ A B p. And_recursor A B (λ _. And B A) (λ a b. And.introduction B A b a) p.
-        // And is multi-arg Prop ctor → restricted elim. Recursor has 0
-        // motive-universe args (motive forced to Prop).
+        // And is multi-arg Proposition ctor → restricted elim. Recursor has 0
+        // motive-universe args (motive forced to Proposition).
         //
         // Inside the 3 outer lambdas (A, B, p): p=0, B=1, A=2.
         // Inside motive's `_` body (one more binder): _=0, p=1, B=2, A=3.
@@ -2585,8 +2585,8 @@ void runInductiveLibraryProofs() {
                     makeBoundVariable(4) /* A */),
                     makeBoundVariable(0) /* b */),
                     makeBoundVariable(1) /* a */)));
-        auto swapBody = makeLambda("A", makeProp(),
-            makeLambda("B", makeProp(),
+        auto swapBody = makeLambda("A", makeProposition(),
+            makeLambda("B", makeProposition(),
                 makeLambda("p",
                     makeApplication(makeApplication(
                         makeConstant("And"),
@@ -2602,8 +2602,8 @@ void runInductiveLibraryProofs() {
                             motiveAndSwap),
                         caseAndIntroduction),
                         makeBoundVariable(0) /* p */))));
-        auto swapType = makePi("A", makeProp(),
-            makePi("B", makeProp(),
+        auto swapType = makePi("A", makeProposition(),
+            makePi("B", makeProposition(),
                 makePi("_",
                     makeApplication(makeApplication(
                         makeConstant("And"),
@@ -2615,27 +2615,27 @@ void runInductiveLibraryProofs() {
                         makeBoundVariable(1) /* B */),
                         makeBoundVariable(2) /* A */))));
         addDefinition(env, "And.swap", swapType, swapBody);
-        std::cout << "  And.swap   ⊨  Π(A B : Prop). And A B → And B A\n";
+        std::cout << "  And.swap   ⊨  Π(A B : Proposition). And A B → And B A\n";
     }
 
-    // ---------------- Or (Prop) -----------------
+    // ---------------- Or (Proposition) -----------------
     {
         addInductive(env, "Or",
-            makePi("A", makeProp(),
-                makePi("B", makeProp(), makeProp())),
+            makePi("A", makeProposition(),
+                makePi("B", makeProposition(), makeProposition())),
             /*numParameters=*/ 2,
             {
                 {"Or.introduceLeft",
-                    makePi("A", makeProp(),
-                        makePi("B", makeProp(),
+                    makePi("A", makeProposition(),
+                        makePi("B", makeProposition(),
                             makePi("_a", makeBoundVariable(1) /* A */,
                                 makeApplication(makeApplication(
                                     makeConstant("Or"),
                                     makeBoundVariable(2)),
                                     makeBoundVariable(1)))))},
                 {"Or.introduceRight",
-                    makePi("A", makeProp(),
-                        makePi("B", makeProp(),
+                    makePi("A", makeProposition(),
+                        makePi("B", makeProposition(),
                             makePi("_b", makeBoundVariable(0) /* B */,
                                 makeApplication(makeApplication(
                                     makeConstant("Or"),
@@ -2643,7 +2643,7 @@ void runInductiveLibraryProofs() {
                                     makeBoundVariable(1)))))},
             });
 
-        // Or.swap : Π(A B : Prop). Or A B → Or B A.
+        // Or.swap : Π(A B : Proposition). Or A B → Or B A.
         // Or has multiple constructors → restricted elim.
         //
         // motive at body level (p=0, B=1, A=2): λ _ : Or A B. Or B A.
@@ -2673,8 +2673,8 @@ void runInductiveLibraryProofs() {
                 makeBoundVariable(2) /* B */),
                 makeBoundVariable(3) /* A */),
                 makeBoundVariable(0) /* b */));
-        auto swapBody = makeLambda("A", makeProp(),
-            makeLambda("B", makeProp(),
+        auto swapBody = makeLambda("A", makeProposition(),
+            makeLambda("B", makeProposition(),
                 makeLambda("p",
                     makeApplication(makeApplication(
                         makeConstant("Or"),
@@ -2689,8 +2689,8 @@ void runInductiveLibraryProofs() {
                         caseOrIntroduceLeft),
                         caseOrIntroduceRight),
                         makeBoundVariable(0) /* p */))));
-        auto swapType = makePi("A", makeProp(),
-            makePi("B", makeProp(),
+        auto swapType = makePi("A", makeProposition(),
+            makePi("B", makeProposition(),
                 makePi("_",
                     makeApplication(makeApplication(
                         makeConstant("Or"),
@@ -2701,7 +2701,7 @@ void runInductiveLibraryProofs() {
                         makeBoundVariable(1) /* B */),
                         makeBoundVariable(2) /* A */))));
         addDefinition(env, "Or.swap", swapType, swapBody);
-        std::cout << "  Or.swap    ⊨  Π(A B : Prop). Or A B → Or B A\n";
+        std::cout << "  Or.swap    ⊨  Π(A B : Proposition). Or A B → Or B A\n";
     }
 
     // ---------------- Prod (Type) -----------------
@@ -3044,8 +3044,8 @@ std::string surfaceToDebugString(const SurfaceExpression& expression) {
     if (auto* typeExpr = std::get_if<SurfaceType>(&expression.node)) {
         return "Type(" + surfaceLevelToDebugString(*typeExpr->level) + ")";
     }
-    if (std::get_if<SurfaceProp>(&expression.node)) {
-        return "Prop";
+    if (std::get_if<SurfaceProposition>(&expression.node)) {
+        return "Proposition";
     }
     if (auto* binary = std::get_if<SurfaceBinaryOperation>(&expression.node)) {
         return "(" + surfaceToDebugString(*binary->left)
@@ -3324,7 +3324,7 @@ void runParserTests() {
     expectParse("Natural.add",        "Natural.add",                        __LINE__);
     expectParse("Equality.symmetry",  "Equality.symmetry",                  __LINE__);
     expectParse("25",                 "25",                                 __LINE__);
-    expectParse("Prop",               "Prop",                               __LINE__);
+    expectParse("Proposition",        "Proposition",                        __LINE__);
     expectParse("Type(0)",            "Type(0)",                            __LINE__);
     expectParse("Type(u)",            "Type(u)",                            __LINE__);
     expectParse("Type(u + 1)",        "Type((u + 1))",                      __LINE__);
@@ -3558,7 +3558,7 @@ definition identity.{u} (A : Type(u)) (x : A) : A := x
     {
         auto environment = verifyMathSource(R"(
 module Test.equality
-inductive Equality.{u} (A : Type(u)) (x : A) : A -> Prop where
+inductive Equality.{u} (A : Type(u)) (x : A) : A -> Proposition where
   | reflexivity : Equality(A, x, x)
 )");
         EXPECT_TRUE(environment.lookup("Equality") != nullptr);
@@ -3674,7 +3674,7 @@ definition Natural.add : Natural -> Natural -> Natural
   | zero,         m => m
   | successor(k), m => successor(Natural.add(k, m))
 
-inductive Equality.{u} (A : Type(u)) (x : A) : A -> Prop where
+inductive Equality.{u} (A : Type(u)) (x : A) : A -> Proposition where
   | reflexivity : Equality(A, x, x)
 
 axiom Equality.congruence.{u, v}
@@ -3939,12 +3939,13 @@ int main(int argc, char* argv[]) {
                           makeApplication(makeConstant("successor"),
                                           makeBoundVariable(0))));
 
-    runExample(arithmetic, "Prop", makeProp());
-    runExample(arithmetic, "Equality (now lands in Prop)",
+    runExample(arithmetic, "Proposition", makeProposition());
+    runExample(arithmetic, "Equality (now lands in Proposition)",
                makeConstant("Equality", {makeLevelConst(0)}));
     runExample(arithmetic,
-               "Π(P : Prop). P   (impredicative quantifier; lives in Prop)",
-               makePi("P", makeProp(), makeBoundVariable(0)));
+               "Π(P : Proposition). P "
+               "  (impredicative quantifier; lives in Proposition)",
+               makePi("P", makeProposition(), makeBoundVariable(0)));
 
     runExample(arithmetic, "Natural_recursor  (auto-generated)",
                makeConstant("Natural_recursor", {makeLevelConst(1)}));

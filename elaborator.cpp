@@ -383,8 +383,8 @@ private:
         // Build the recursor call. The recursor's universe arguments
         // are the inductive's universe arguments followed (for large-
         // eliminating recursors) by the motive's universe level. For
-        // restricted-elimination recursors (Prop inductives that
-        // aren't singletons), the motive is forced to Prop and the
+        // restricted-elimination recursors (Proposition inductives that
+        // aren't singletons), the motive is forced to Proposition and the
         // recursor takes no extra universe argument.
         std::string recursorName = inductiveName + "_recursor";
         const Declaration* recursorLookup =
@@ -819,7 +819,7 @@ private:
                                        recursiveArgToHypothesis),
                 node.line, node.column);
         }
-        // Atomic forms (identifier, numeric literal, Type, Prop) are
+        // Atomic forms (identifier, numeric literal, Type, Proposition) are
         // unchanged.
         return expression;
     }
@@ -1020,8 +1020,8 @@ private:
             LevelPointer level = elaborateLevel(*typeExpression->level);
             return makeType(std::move(level));
         }
-        if (std::get_if<SurfaceProp>(&expression.node)) {
-            return makeProp();
+        if (std::get_if<SurfaceProposition>(&expression.node)) {
+            return makeProposition();
         }
         if (auto* binary =
                 std::get_if<SurfaceBinaryOperation>(&expression.node)) {

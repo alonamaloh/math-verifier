@@ -568,9 +568,9 @@ private:
                 makeSurfaceLevelMeta(token.line, token.column),
                 token.line, token.column);
         }
-        if (current.kind == TokenKind::KeywordProp) {
+        if (current.kind == TokenKind::KeywordProposition) {
             Token token = consumeAny();
-            return makeSurfaceProp(token.line, token.column);
+            return makeSurfaceProposition(token.line, token.column);
         }
         if (current.kind == TokenKind::LeftParen) {
             Token openParen = consumeAny();

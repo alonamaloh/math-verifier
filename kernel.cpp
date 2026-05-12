@@ -46,7 +46,7 @@ ExpressionPointer makeInternalFreeVariable(std::string name) {
 }
 
 // Lean's imax rule on level expressions: makeLevelIMax already encodes the
-// Prop-collapsing behaviour for concrete codomains and falls back to a
+// Proposition-collapsing behaviour for concrete codomains and falls back to a
 // symbolic LevelIMax otherwise.
 LevelPointer impredicativeMaxLevel(LevelPointer domainLevel,
                                    LevelPointer codomainLevel) {
@@ -703,9 +703,9 @@ bool isDefinitionallyEqual(const Environment& environment,
         }
     }
 
-    // Proof irrelevance: any two terms whose type lives in Prop are
+    // Proof irrelevance: any two terms whose type lives in Proposition are
     // definitionally equal. We infer the types and check whether their
-    // kind (the type of the type) is Sort 0 (= Prop).
+    // kind (the type of the type) is Sort 0 (= Proposition).
     try {
         auto leftType = inferType(environment, context, leftReduced);
         auto leftKind = weakHeadNormalForm(
@@ -1464,9 +1464,9 @@ void addInductive(Environment& environment, std::string inductiveName,
     // Generate and register the recursor. For inductives that live in
     // Type, the motive's codomain is a fresh universe parameter — the
     // recursor is universe-polymorphic in the motive. For inductives that
-    // live in Prop, we restrict elimination: the motive's codomain is
-    // forced to Prop, so a proof can only eliminate to another proof
-    // (preserving proof irrelevance). The empty Prop inductive (zero
+    // live in Proposition, we restrict elimination: the motive's codomain is
+    // forced to Proposition, so a proof can only eliminate to another proof
+    // (preserving proof irrelevance). The empty Proposition inductive (zero
     // constructors, like False) is a singleton case where large elimination
     // is sound: there's no proof to extract data from in the first place.
     std::string recursorName = inductiveName + "_recursor";
@@ -1475,7 +1475,7 @@ void addInductive(Environment& environment, std::string inductiveName,
         throw TypeError(
             "addInductive: recursor name already taken: " + recursorName);
     }
-    bool inductiveLivesInProp = false;
+    bool inductiveLivesInProposition = false;
     {
         auto terminal = kind;
         while (auto* pi = std::get_if<Pi>(&terminal->node)) {
@@ -1484,11 +1484,11 @@ void addInductive(Environment& environment, std::string inductiveName,
         if (auto* sort = std::get_if<Sort>(&terminal->node)) {
             auto level = levelAsConstant(sort->level);
             if (level && *level == 0) {
-                inductiveLivesInProp = true;
+                inductiveLivesInProposition = true;
             }
         }
     }
-    // Large elimination from Prop is sound when there's nothing to extract:
+    // Large elimination from Proposition is sound when there's nothing to extract:
     //   - empty inductives (zero constructors): no proof to extract from,
     //   - singleton inductives (exactly one constructor with zero non-
     //     parameter arguments): the constructor carries only what's already
@@ -1497,7 +1497,7 @@ void addInductive(Environment& environment, std::string inductiveName,
     //     Equality / Eq: refl's only "data" is the proof itself, which is
     //     the J principle's purpose to exploit.
     bool isSingleton = false;
-    if (inductiveLivesInProp && constructors.size() == 1) {
+    if (inductiveLivesInProposition && constructors.size() == 1) {
         auto walker = constructors[0].type;
         int totalCtorPiCount = 0;
         while (auto* pi = std::get_if<Pi>(&walker->node)) {
@@ -1509,10 +1509,10 @@ void addInductive(Environment& environment, std::string inductiveName,
         }
     }
     bool allowLargeElimination =
-        !inductiveLivesInProp || constructors.empty() || isSingleton;
+        !inductiveLivesInProposition || constructors.empty() || isSingleton;
 
     LevelPointer motiveLevel;
-    std::string motiveLevelName;  // empty if motive level is fixed at Prop.
+    std::string motiveLevelName;  // empty if motive level is fixed at Proposition.
     if (allowLargeElimination) {
         motiveLevelName = "motiveLevel";
         auto inUse = [&](const std::string& candidate) {
@@ -1526,7 +1526,7 @@ void addInductive(Environment& environment, std::string inductiveName,
         }
         motiveLevel = makeLevelParam(motiveLevelName);
     } else {
-        motiveLevel = makeLevelConst(0);  // Prop motive only.
+        motiveLevel = makeLevelConst(0);  // Proposition motive only.
     }
     auto recursorType = buildRecursorType(
         inductiveName, universeParameters, motiveLevel, kind, numParameters,

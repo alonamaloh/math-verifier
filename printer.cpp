@@ -56,7 +56,7 @@ void writeAtomic(std::ostringstream& output,
     if (auto* sort = std::get_if<Sort>(&expression->node)) {
         if (auto concreteLevel = levelAsConstant(sort->level)) {
             if (*concreteLevel == 0) {
-                output << "Prop";
+                output << "Proposition";
             } else {
                 output << "Type " << (*concreteLevel - 1);
             }

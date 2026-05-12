@@ -59,14 +59,14 @@ inline ExpressionPointer makeFreeVariable(std::string name) {
 // origin is the only one client code should construct.
 // Sort taking a level expression. Universe-polymorphic code passes a Level
 // containing a LevelParam; concrete code uses LevelConst (via the int
-// overload below). Level 0 is Prop; level n+1 is "Type n".
+// overload below). Level 0 is Proposition; level n+1 is "Type n".
 inline ExpressionPointer makeSort(LevelPointer level) {
     return std::make_shared<Expression>(Sort{std::move(level)});
 }
 inline ExpressionPointer makeSort(int rawLevel) {
     return makeSort(makeLevelConst(rawLevel));
 }
-inline ExpressionPointer makeProp() {
+inline ExpressionPointer makeProposition() {
     return makeSort(0);
 }
 inline ExpressionPointer makeType(int index) {

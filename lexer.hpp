@@ -19,7 +19,7 @@ enum class TokenKind {
 
     // Expression keywords
     KeywordFun, KeywordLet, KeywordIn,
-    KeywordType, KeywordProp,
+    KeywordType, KeywordProposition,
     KeywordMax, KeywordImax,
 
     // Proof keywords

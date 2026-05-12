@@ -8,13 +8,13 @@
 #include <vector>
 
 // Universe levels are recursive expressions. Following Lean's design:
-//   LevelConst n  — a concrete integer level. 0 is Prop, 1 is Type 0, ...
+//   LevelConst n  — a concrete integer level. 0 is Proposition, 1 is Type 0, ...
 //   LevelParam n  — a named universe parameter; substituted when a
 //                   polymorphic constant is applied.
 //   LevelSuccessor l   — l + 1.
 //   LevelMax a b  — max(a, b).
 //   LevelIMax a b — Lean's imax: 0 if b normalises to 0 (impredicative
-//                   Prop behaviour), otherwise max(a, b).
+//                   Proposition behaviour), otherwise max(a, b).
 struct Level;
 using LevelPointer = std::shared_ptr<Level>;
 
@@ -48,7 +48,7 @@ LevelPointer makeLevelIMax(LevelPointer left, LevelPointer right);
 
 // If the (normalised) level is LevelConst{value}, returns the value;
 // otherwise returns std::nullopt. Used by callers that only care about
-// concrete levels (e.g. detecting Prop and the impredicative Pi rule).
+// concrete levels (e.g. detecting Proposition and the impredicative Pi rule).
 std::optional<int> levelAsConstant(LevelPointer level);
 
 // Replaces every LevelParam{name} with the supplied `replacement`. Used by

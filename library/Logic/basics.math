@@ -1,26 +1,26 @@
 -- Logic/basics.math
 --
--- Core propositional connectives. All are Prop-valued inductive types
+-- Core propositional connectives. All are Proposition-valued inductive types
 -- with one or two constructors. Definitions are conventional: True is
 -- inhabited by `trivial`; False is uninhabited; And and Or have the
 -- expected introduction rules; Not(A) is sugar for A → False.
 
 module Logic.basics
 
-inductive True : Prop where
+inductive True : Proposition where
   | True.trivial : True
 
-inductive False : Prop where
+inductive False : Proposition where
   -- no constructors; False is uninhabited
 
-inductive And (A B : Prop) : Prop where
+inductive And (A B : Proposition) : Proposition where
   | And.introduction : A → B → And(A, B)
 
-inductive Or (A B : Prop) : Prop where
+inductive Or (A B : Proposition) : Proposition where
   | Or.introduceLeft  : A → Or(A, B)
   | Or.introduceRight : B → Or(A, B)
 
-definition Not (A : Prop) : Prop := A → False
+definition Not (A : Proposition) : Proposition := A → False
 
 -- From a proof of False, anything follows. Uses the auto-generated
 -- False_recursor, which has the form
@@ -33,21 +33,21 @@ definition False.eliminate(GoalType : Type) (proofOfFalse : False)
   False_recursor(fun (_ : False) => GoalType, proofOfFalse)
 
 -- Project the left component of a conjunction.
-definition And.left(A B : Prop) (conjunction : And(A, B)) : A :=
+definition And.left(A B : Proposition) (conjunction : And(A, B)) : A :=
   And_recursor(A, B,
                 fun (_ : And(A, B)) => A,
                 fun (leftProof : A) (_ : B) => leftProof,
                 conjunction)
 
 -- Project the right component of a conjunction.
-definition And.right(A B : Prop) (conjunction : And(A, B)) : B :=
+definition And.right(A B : Proposition) (conjunction : And(A, B)) : B :=
   And_recursor(A, B,
                 fun (_ : And(A, B)) => B,
                 fun (_ : A) (rightProof : B) => rightProof,
                 conjunction)
 
 -- And.swap: And(A, B) → And(B, A).
-definition And.swap(A B : Prop) (conjunction : And(A, B))
+definition And.swap(A B : Proposition) (conjunction : And(A, B))
         : And(B, A) :=
   And_recursor(A, B,
                 fun (_ : And(A, B)) => And(B, A),
@@ -56,7 +56,7 @@ definition And.swap(A B : Prop) (conjunction : And(A, B))
                 conjunction)
 
 -- Or.swap: Or(A, B) → Or(B, A).
-definition Or.swap(A B : Prop) (disjunction : Or(A, B)) : Or(B, A) :=
+definition Or.swap(A B : Proposition) (disjunction : Or(A, B)) : Or(B, A) :=
   Or_recursor(A, B,
                fun (_ : Or(A, B)) => Or(B, A),
                fun (leftProof : A) => Or.introduceRight(B, A, leftProof),

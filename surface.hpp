@@ -113,7 +113,7 @@ struct SurfaceAscription {
     SurfaceExpressionPointer type;
 };
 struct SurfaceType { SurfaceLevelPointer level; };
-struct SurfaceProp { };
+struct SurfaceProposition { };
 // Binary operator node. The elaborator resolves `opSymbol` against the
 // active `using` declarations to a concrete kernel function.
 struct SurfaceBinaryOperation {
@@ -130,7 +130,7 @@ struct SurfaceExpression {
     std::variant<
         SurfaceIdentifier, SurfaceNumericLiteral,
         SurfaceApplication, SurfacePiType, SurfaceLambda,
-        SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProp,
+        SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation
     > node;
     int line = 0;
@@ -193,9 +193,9 @@ inline SurfaceExpressionPointer makeSurfaceType(
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceType{std::move(level)}, line, column});
 }
-inline SurfaceExpressionPointer makeSurfaceProp(int line, int column) {
+inline SurfaceExpressionPointer makeSurfaceProposition(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
-        SurfaceProp{}, line, column});
+        SurfaceProposition{}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceBinaryOperation(
     std::string opSymbol, SurfaceExpressionPointer left,
