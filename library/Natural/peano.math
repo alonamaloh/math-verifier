@@ -37,3 +37,31 @@ theorem Natural.zero_not_successor (n : Natural)
         : Not(zero = successor(n)) :=
   fun (equalityProof : zero = successor(n)) =>
     Natural.successor_not_zero(n, Equality.symmetry(equalityProof))
+
+-- Predecessor: returns zero for zero (an arbitrary choice — predecessor
+-- isn't really defined there), and the inner argument for successor.
+-- Used by `successor_injective` below.
+definition Natural.predecessor : Natural → Natural
+  | zero         => zero
+  | successor(k) => k
+
+-- successor is injective: if successor(a) = successor(b) then a = b.
+-- Proof by congruence: apply `predecessor` to both sides of the
+-- equality. predecessor(successor(x)) reduces definitionally to x,
+-- so the result is exactly `a = b`.
+theorem Natural.successor_injective (a b : Natural)
+        : successor(a) = successor(b) → a = b :=
+  fun (equalityProof : successor(a) = successor(b)) =>
+    congruenceOf(Natural.predecessor, equalityProof)
+
+-- Useful corollary: `2 = successor(successor(successor(_)))` is absurd.
+-- (Two successor_injective steps plus zero_not_successor.) Reads as
+-- "2 is never of the form 3 + n", which we'll use to rule out the
+-- d ≥ 3 case when classifying divisors of 2.
+theorem Natural.two_not_three_plus (n : Natural)
+        : Not(two = successor(successor(successor(n)))) :=
+  fun (equalityProof : two = successor(successor(successor(n)))) =>
+    Natural.zero_not_successor(n,
+        Natural.successor_injective(zero, successor(n),
+            Natural.successor_injective(one, successor(successor(n)),
+                equalityProof)))

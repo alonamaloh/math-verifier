@@ -224,48 +224,12 @@ private:
                 + "' must have at least one argument");
         }
 
-        // The first argument is the scrutinee. Its type is either a
-        // bare identifier (no parameters) or an application of an
-        // inductive identifier to parameter values (e.g.,
-        // `Exists(Natural, P)`). Indices aren't supported by pattern
-        // matching yet — see Equality / LessOrEqual, which still need
-        // direct recursor calls.
-        const SurfaceArgument& scrutineeArgument = functionArguments[0];
-        std::string inductiveName;
-        {
-            SurfaceExpressionPointer head = scrutineeArgument.type;
-            while (auto* application =
-                       std::get_if<SurfaceApplication>(&head->node)) {
-                head = application->function;
-            }
-            auto* identifier =
-                std::get_if<SurfaceIdentifier>(&head->node);
-            if (!identifier) {
-                throw ElaborateError(
-                    "pattern-match definition '" + declaration.name
-                    + "': scrutinee type must be an inductive name "
-                    "(optionally applied to parameter values)");
-            }
-            inductiveName = identifier->qualifiedName;
-        }
-        const Declaration* inductiveLookup =
-            environment_.lookup(inductiveName);
-        if (!inductiveLookup) {
-            throw ElaborateError("inductive '" + inductiveName
-                                  + "' not found in environment");
-        }
-        const Inductive* inductive =
-            std::get_if<Inductive>(inductiveLookup);
-        if (!inductive) {
-            throw ElaborateError("'" + inductiveName
-                                  + "' is not an inductive type");
-        }
-
         // Elaborate the kernel types for each function argument, and
         // the kernel return type. We need these for both type signature
         // and motive construction. The starting stack is the outer
         // binder stack, so function-argument types and the return type
         // can reference outer binders by name.
+        const SurfaceArgument& scrutineeArgument = functionArguments[0];
         std::vector<LocalBinder> binderStack = outerBinderStack;
         std::vector<ExpressionPointer> argumentKernelTypes;
         for (const auto& argument : functionArguments) {
@@ -277,12 +241,12 @@ private:
         ExpressionPointer returnKernelType =
             elaborateExpression(*returnType, binderStack);
 
-        // Analyse the elaborated scrutinee type to extract the
-        // inductive's universe arguments and (for parameterised
-        // inductives) the parameter values that the scrutinee is
-        // applied to. The form is Application(Application(...
-        // Constant("Inductive", {univ_args}), p1), p2) for an
-        // inductive applied to two parameters.
+        // Analyse the elaborated (and weak-head-normalised) scrutinee
+        // type to extract the inductive name, universe arguments, and
+        // parameter/index values. Normalising lets a definition like
+        // `Natural.divides(d, n)` unfold to its underlying inductive
+        // (here `Exists(...)`) so we can pattern-match through it.
+        std::string inductiveName;
         std::vector<LevelPointer> inductiveUniverseArguments;
         std::vector<ExpressionPointer> inductiveArguments;
         {
@@ -298,9 +262,24 @@ private:
             auto* headConstant = std::get_if<Constant>(&cursor->node);
             if (!headConstant) {
                 throw ElaborateError(
-                    "internal: scrutinee type's head is not an inductive constant");
+                    "pattern-match definition '" + declaration.name
+                    + "': scrutinee type's head is not an inductive "
+                    "constant after normalisation");
             }
+            inductiveName = headConstant->name;
             inductiveUniverseArguments = headConstant->universeArguments;
+        }
+        const Declaration* inductiveLookup =
+            environment_.lookup(inductiveName);
+        if (!inductiveLookup) {
+            throw ElaborateError("inductive '" + inductiveName
+                                  + "' not found in environment");
+        }
+        const Inductive* inductive =
+            std::get_if<Inductive>(inductiveLookup);
+        if (!inductive) {
+            throw ElaborateError("'" + inductiveName
+                                  + "' is not an inductive type");
         }
 
         // Split into parameters (first numParameters) and indices (rest).
@@ -479,12 +458,6 @@ private:
             motiveLevel = sortNode->level;
         }
 
-        // Collect surface types for buildCaseLambda to use when
-        // elaborating non-scrutinee argument types per case.
-        std::vector<FunctionArgumentPair> functionArgumentPairs;
-        for (const auto& argument : functionArguments) {
-            functionArgumentPairs.push_back({argument.name, argument.type});
-        }
         // Build a case lambda for each constructor, in declared order.
         // For parameterised inductives, pass the parameter values so the
         // case lambda can strip the constructor's parameter Pis and
@@ -497,7 +470,6 @@ private:
                 buildCaseLambda(declaration, constructorName,
                                 inductiveName,
                                 inductiveUniverseArguments, motive,
-                                functionArgumentPairs,
                                 parameterValues,
                                 outerBinderStack));
         }
@@ -626,7 +598,6 @@ private:
         const std::string& inductiveName,
         const std::vector<LevelPointer>& inductiveUniverseArguments,
         ExpressionPointer motive,
-        const std::vector<FunctionArgumentPair>& functionArgumentTypes,
         const std::vector<ExpressionPointer>& parameterValues,
         const std::vector<LocalBinder>& outerBinderStack) {
 
@@ -824,63 +795,19 @@ private:
             }
         }
 
-        // Add the function's other arguments (patterns[1..n-1]).
-        // Track each one's position in lambdaBinders so we can refer
-        // to them by Bound index when computing the expected body type.
-        std::vector<size_t> otherFunctionArgumentPositions;
-        for (size_t i = 1; i < matchedCase->patterns.size(); ++i) {
-            const SurfacePattern& pattern = *matchedCase->patterns[i];
-            auto* bareName = std::get_if<SurfacePatternBareName>(
-                &pattern.node);
-            if (!bareName) {
-                throw ElaborateError(
-                    "non-scrutinee pattern positions must be variable "
-                    "patterns (e.g. 'm' or '_')");
-            }
-            // Look up the i-th function argument's surface type. We use
-            // the pre-decomposed `functionArgumentTypes` list rather than
-            // re-walking declaration.type, because surface Pi nodes may
-            // bind multiple names per Pi (e.g. `(a b : Natural)`).
-            if (i >= functionArgumentTypes.size()) {
-                throw ElaborateError(
-                    "pattern case for '" + constructorName + "' has too "
-                    "many positions for the function signature");
-            }
-            SurfaceExpressionPointer surfaceArgType =
-                functionArgumentTypes[i].surfaceType;
-            // Elaborate this surface type in a binder stack reflecting
-            // the outer binders and our current case-lambda binders.
-            std::vector<LocalBinder> stack = outerBinderStack;
-            for (const auto& binder : lambdaBinders) {
-                stack.push_back({binder.name, binder.type});
-            }
-            ExpressionPointer argumentType =
-                elaborateExpression(*surfaceArgType, stack);
-            otherFunctionArgumentPositions.push_back(lambdaBinders.size());
-            lambdaBinders.push_back({bareName->name, argumentType});
-            binderDepth++;
-        }
-
-        // Translate the body: rewrite recursive calls. The user types
-        // out the outer binders in any recursive call, so we tell the
-        // rewriter to skip past them before looking for the scrutinee.
-        SurfaceExpressionPointer rewrittenBody = rewriteRecursiveCalls(
-            matchedCase->body, declaration.name, recursiveArgToHypothesis,
-            static_cast<int>(outerBinderStack.size()));
-
-        // Compute the expected body type:
-        //   motive applied to (constructorIndexValues..., Ctor app),
-        //   then to other function arguments, beta-reduced at each step.
-        // For non-indexed inductives, there are zero index values and
-        // the motive is applied only to the constructor application.
-        ExpressionPointer expectedBodyType;
+        // Compute the motive applied to (constructorIndexValues..., Ctor
+        // app), beta-reduced. The result is a Pi chain over the
+        // non-scrutinee function arguments, ending in the body's
+        // expected type. We then peel one Pi per non-scrutinee pattern
+        // position to obtain each function argument's substituted
+        // binder type — naturally substituted because the motive
+        // abstracted them.
+        ExpressionPointer motiveAtCase;
         {
             int totalBinderDepth = static_cast<int>(lambdaBinders.size());
             int constructorValueArgCount =
                 static_cast<int>(constructorArguments.size());
-            // Bring `motive` and `parameterValues` from outer-binder
-            // scope into the case-body's binder context.
-            expectedBodyType = shift(motive, totalBinderDepth);
+            motiveAtCase = shift(motive, totalBinderDepth);
             // Apply to the constructor's specific index values. These
             // may reference value-arg BoundVariables (Bound(0..n-1))
             // and outer binders via parameter-value lifts. Shift by
@@ -890,8 +817,8 @@ private:
             // (i.e. no induction hypotheses interspersed between
             // them). See limitation note in commit message.
             for (const auto& indexValue : constructorIndexValuesRaw) {
-                expectedBodyType = makeApplication(
-                    expectedBodyType,
+                motiveAtCase = makeApplication(
+                    motiveAtCase,
                     shift(indexValue,
                            totalBinderDepth
                            - constructorValueArgCount));
@@ -915,21 +842,51 @@ private:
                     constructorApplication,
                     makeBoundVariable(deBruijnIndex));
             }
-            expectedBodyType = makeApplication(
-                std::move(expectedBodyType),
+            motiveAtCase = makeApplication(
+                std::move(motiveAtCase),
                 std::move(constructorApplication));
-            expectedBodyType = weakHeadNormalForm(
-                environment_, expectedBodyType);
-            for (size_t position : otherFunctionArgumentPositions) {
-                int deBruijnIndex = totalBinderDepth - 1
-                    - static_cast<int>(position);
-                expectedBodyType = makeApplication(
-                    expectedBodyType,
-                    makeBoundVariable(deBruijnIndex));
-                expectedBodyType = weakHeadNormalForm(
-                    environment_, expectedBodyType);
-            }
+            motiveAtCase = weakHeadNormalForm(
+                environment_, motiveAtCase);
         }
+
+        // Peel one Pi per non-scrutinee pattern position. The Pi's
+        // domain is the case-binder type (already with the scrutinee
+        // replaced and earlier non-scrutinee args properly indexed,
+        // courtesy of the motive's beta reduction). The codomain
+        // descends inside the binder we just bound — so references
+        // to it as `Bound(0)` line up with our growing lambdaBinders.
+        std::vector<size_t> otherFunctionArgumentPositions;
+        for (size_t i = 1; i < matchedCase->patterns.size(); ++i) {
+            const SurfacePattern& pattern = *matchedCase->patterns[i];
+            auto* bareName = std::get_if<SurfacePatternBareName>(
+                &pattern.node);
+            if (!bareName) {
+                throw ElaborateError(
+                    "non-scrutinee pattern positions must be variable "
+                    "patterns (e.g. 'm' or '_')");
+            }
+            auto* pi = std::get_if<Pi>(&motiveAtCase->node);
+            if (!pi) {
+                throw ElaborateError(
+                    "pattern case for '" + constructorName + "' has too "
+                    "many positions for the function signature");
+            }
+            otherFunctionArgumentPositions.push_back(lambdaBinders.size());
+            lambdaBinders.push_back({bareName->name, pi->domain});
+            motiveAtCase = pi->codomain;
+            binderDepth++;
+        }
+
+        // Translate the body: rewrite recursive calls. The user types
+        // out the outer binders in any recursive call, so we tell the
+        // rewriter to skip past them before looking for the scrutinee.
+        SurfaceExpressionPointer rewrittenBody = rewriteRecursiveCalls(
+            matchedCase->body, declaration.name, recursiveArgToHypothesis,
+            static_cast<int>(outerBinderStack.size()));
+
+        // The expected body type is what's left of the motive after
+        // all the non-scrutinee Pi peels.
+        ExpressionPointer expectedBodyType = motiveAtCase;
 
         // Elaborate the body with all binders in scope (outer + case).
         std::vector<LocalBinder> bodyStack = outerBinderStack;

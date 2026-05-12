@@ -1,0 +1,106 @@
+-- Natural/prime_two.math
+--
+-- Proves that 2 is prime: 2 ≥ 2, and the only divisors of 2 are 1
+-- and 2. The bulk of the work is classifying the divisors of 2 —
+-- we case-analyse the candidate d down to depth 3 (zero, one, two,
+-- three-or-more) and rule out the d = 0 and d ≥ 3 cases using
+-- Peano contradictions.
+
+module Natural.prime_two
+
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.divisibility
+import Natural.peano
+import Natural.prime
+import Equality.basics
+import Logic.basics
+import Logic.exists
+
+-- d = 0 does not divide 2: the witness equality `2 = 0 * q` reduces
+-- definitionally to `2 = 0` (multiply pattern-matches on its first
+-- argument), and we already have `successor(_) ≠ zero`.
+theorem Natural.zero_not_divides_two
+        : Natural.divides(zero, two) → False
+  | Exists.introduce(_, equalityProof) =>
+      Natural.successor_not_zero(one, equalityProof)
+
+-- d ≥ 3 does not divide 2. After applying multiply_successor, the RHS
+-- becomes successor(successor(successor(_))), which `two_not_three_plus`
+-- rules out. (We need q ≠ 0 too: when q = 0 the RHS reduces to 0, and
+-- we use multiply_zero + successor_not_zero.)
+theorem Natural.three_plus_not_divides_two_via_quotient (predecessor3 : Natural)
+        : (quotient : Natural)
+          → Equality(Natural, two,
+              Natural.multiply(
+                  successor(successor(successor(predecessor3))),
+                  quotient))
+          → False
+  | zero, equalityProof =>
+      Natural.successor_not_zero(one,
+          Equality.transitivity(equalityProof,
+              Natural.multiply_zero(
+                  successor(successor(successor(predecessor3))))))
+  | successor(quotientPredecessor), equalityProof =>
+      Natural.two_not_three_plus(
+          Natural.add(predecessor3,
+              Natural.multiply(
+                  successor(successor(successor(predecessor3))),
+                  quotientPredecessor)),
+          Equality.transitivity(equalityProof,
+              Natural.multiply_successor(
+                  successor(successor(successor(predecessor3))),
+                  quotientPredecessor)))
+
+theorem Natural.three_plus_not_divides_two (predecessor3 : Natural)
+        : Natural.divides(
+              successor(successor(successor(predecessor3))), two)
+          → False
+  | Exists.introduce(quotient, equalityProof) =>
+      Natural.three_plus_not_divides_two_via_quotient(
+          predecessor3, quotient, equalityProof)
+
+-- The case-analysis chain: for each "depth" of successor we peel off
+-- the candidate, decide between the immediate value being 1, 2, or
+-- "three-or-more" (the impossible case).
+
+theorem Natural.divisor_two_classify_at_two
+        : (predecessor2 : Natural)
+          → Natural.divides(successor(successor(predecessor2)), two)
+          → Or(successor(successor(predecessor2)) = one,
+                successor(successor(predecessor2)) = two)
+  | zero, _ =>
+      Or.introduceRight(reflexivity(two))
+  | successor(predecessor3), divisionProof =>
+      False.eliminate_proposition(
+          Or(successor(successor(successor(predecessor3))) = one,
+             successor(successor(successor(predecessor3))) = two),
+          Natural.three_plus_not_divides_two(
+              predecessor3, divisionProof))
+
+theorem Natural.divisor_two_classify_at_one
+        : (predecessor : Natural)
+          → Natural.divides(successor(predecessor), two)
+          → Or(successor(predecessor) = one, successor(predecessor) = two)
+  | zero, _ =>
+      Or.introduceLeft(reflexivity(one))
+  | successor(predecessor2), divisionProof =>
+      Natural.divisor_two_classify_at_two(predecessor2, divisionProof)
+
+-- The main classification: every divisor of 2 is 1 or 2.
+theorem Natural.divisor_two_is_one_or_two
+        : (divisor : Natural) → Natural.divides(divisor, two)
+          → Or(divisor = one, divisor = two)
+  | zero, divisionProof =>
+      False.eliminate_proposition(
+          Or(zero = one, zero = two),
+          Natural.zero_not_divides_two(divisionProof))
+  | successor(predecessor), divisionProof =>
+      Natural.divisor_two_classify_at_one(predecessor, divisionProof)
+
+-- And finally: 2 is prime.
+theorem Natural.is_prime_two : Natural.is_prime(two) :=
+  And.introduction(
+      LessOrEqual.reflexivity(two),
+      Natural.divisor_two_is_one_or_two)

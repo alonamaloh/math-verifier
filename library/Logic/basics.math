@@ -32,6 +32,18 @@ definition False.eliminate(GoalType : Type) (proofOfFalse : False)
         : GoalType :=
   False_recursor(fun (_ : False) => GoalType, proofOfFalse)
 
+-- Same idea, but for a Proposition-valued goal. Needed because
+-- `False.eliminate`'s `GoalType : Type` parameter binds an auto-bound
+-- universe `u`, instantiating to `Type u = Sort (u+1)` — which is never
+-- `Sort 0`, the home of Propositions. So a Proposition goal can't be
+-- supplied to `False.eliminate` directly.
+definition False.eliminate_proposition
+        (GoalProposition : Proposition) (proofOfFalse : False)
+        : GoalProposition :=
+  False_recursor(
+      fun (_ : False) => GoalProposition,
+      proofOfFalse)
+
 -- Project the left component of a conjunction.
 definition And.left (A B : Proposition) : And(A, B) → A
   | And.introduction(leftProof, _) => leftProof
