@@ -165,7 +165,8 @@ private:
             throw ElaborateError(
                 "pattern-match definition '" + declaration.name
                 + "' must declare its arguments in the type signature, "
-                "not as binders before the colon");
+                "not as binders before the colon. (Support for outer "
+                "binders is a future iteration.)");
         }
 
         currentUniverseParametersOrdered_ = declaration.universeParameters;
@@ -207,19 +208,30 @@ private:
                 + "' must have at least one argument");
         }
 
-        // The first argument is the scrutinee. Require its type to be a
-        // bare identifier referencing an inductive.
+        // The first argument is the scrutinee. Its type is either a
+        // bare identifier (no parameters) or an application of an
+        // inductive identifier to parameter values (e.g.,
+        // `Exists(Natural, P)`). Indices aren't supported by pattern
+        // matching yet — see Equality / LessOrEqual, which still need
+        // direct recursor calls.
         const SurfaceArgument& scrutineeArgument = functionArguments[0];
-        auto* scrutineeTypeIdentifier =
-            std::get_if<SurfaceIdentifier>(&scrutineeArgument.type->node);
-        if (!scrutineeTypeIdentifier
-            || !scrutineeTypeIdentifier->universeArgs.empty()) {
-            throw ElaborateError(
-                "pattern-match definition '" + declaration.name
-                + "': first argument's type must be a bare inductive "
-                "name with no parameters or universe arguments");
+        std::string inductiveName;
+        {
+            SurfaceExpressionPointer head = scrutineeArgument.type;
+            while (auto* application =
+                       std::get_if<SurfaceApplication>(&head->node)) {
+                head = application->function;
+            }
+            auto* identifier =
+                std::get_if<SurfaceIdentifier>(&head->node);
+            if (!identifier) {
+                throw ElaborateError(
+                    "pattern-match definition '" + declaration.name
+                    + "': scrutinee type must be an inductive name "
+                    "(optionally applied to parameter values)");
+            }
+            inductiveName = identifier->qualifiedName;
         }
-        std::string inductiveName = scrutineeTypeIdentifier->qualifiedName;
         const Declaration* inductiveLookup =
             environment_.lookup(inductiveName);
         if (!inductiveLookup) {
@@ -231,13 +243,6 @@ private:
         if (!inductive) {
             throw ElaborateError("'" + inductiveName
                                   + "' is not an inductive type");
-        }
-        if (inductive->numParameters != 0) {
-            throw ElaborateError(
-                "pattern matching on parameterised inductives is not "
-                "supported in v1 (inductive '" + inductiveName
-                + "' has " + std::to_string(inductive->numParameters)
-                + " parameters; use a direct recursor call instead)");
         }
 
         // Elaborate the kernel types for each function argument, and
@@ -253,6 +258,43 @@ private:
         }
         ExpressionPointer returnKernelType =
             elaborateExpression(*returnType, binderStack);
+
+        // Analyse the elaborated scrutinee type to extract the
+        // inductive's universe arguments and (for parameterised
+        // inductives) the parameter values that the scrutinee is
+        // applied to. The form is Application(Application(...
+        // Constant("Inductive", {univ_args}), p1), p2) for an
+        // inductive applied to two parameters.
+        std::vector<LevelPointer> inductiveUniverseArguments;
+        std::vector<ExpressionPointer> parameterValues;
+        {
+            ExpressionPointer cursor = weakHeadNormalForm(
+                environment_, argumentKernelTypes[0]);
+            while (auto* application =
+                       std::get_if<Application>(&cursor->node)) {
+                parameterValues.insert(parameterValues.begin(),
+                                        application->argument);
+                cursor = weakHeadNormalForm(
+                    environment_, application->function);
+            }
+            auto* headConstant = std::get_if<Constant>(&cursor->node);
+            if (!headConstant) {
+                throw ElaborateError(
+                    "internal: scrutinee type's head is not an inductive constant");
+            }
+            inductiveUniverseArguments = headConstant->universeArguments;
+        }
+        int numInductiveArgs =
+            static_cast<int>(parameterValues.size());
+        int numIndexArgs =
+            numInductiveArgs - inductive->numParameters;
+        if (numIndexArgs != 0) {
+            throw ElaborateError(
+                "pattern matching on indexed inductives is not yet "
+                "supported (inductive '" + inductiveName
+                + "' applied with " + std::to_string(numIndexArgs)
+                + " index arg(s) — use a direct recursor call)");
+        }
 
         // Build the full type as a Pi chain.
         ExpressionPointer fullType = returnKernelType;
@@ -321,24 +363,54 @@ private:
             functionArgumentPairs.push_back({argument.name, argument.type});
         }
         // Build a case lambda for each constructor, in declared order.
+        // For parameterised inductives, pass the parameter values so the
+        // case lambda can strip the constructor's parameter Pis and
+        // substitute the values into the remaining argument types.
         std::vector<ExpressionPointer> caseLambdas;
         for (const auto& constructorName : inductive->constructorNames) {
             caseLambdas.push_back(
                 buildCaseLambda(declaration, constructorName,
                                 inductiveName, motive,
-                                functionArgumentPairs));
+                                functionArgumentPairs,
+                                inductive->numParameters,
+                                parameterValues));
         }
 
-        // Build the recursor call.
-        //   Inductive_recursor.{motiveLevel}(motive, case_1, ..., case_n,
-        //                                      scrutinee)(otherArgs...)
-        // The function's body is a lambda over all arguments wrapping
-        // the recursor application.
+        // Build the recursor call. The recursor's universe arguments
+        // are the inductive's universe arguments followed (for large-
+        // eliminating recursors) by the motive's universe level. For
+        // restricted-elimination recursors (Prop inductives that
+        // aren't singletons), the motive is forced to Prop and the
+        // recursor takes no extra universe argument.
+        std::string recursorName = inductiveName + "_recursor";
+        const Declaration* recursorLookup =
+            environment_.lookup(recursorName);
+        if (!recursorLookup) {
+            throw ElaborateError(
+                "recursor '" + recursorName + "' not in environment");
+        }
+        const Recursor* recursorDeclaration =
+            std::get_if<Recursor>(recursorLookup);
+        if (!recursorDeclaration) {
+            throw ElaborateError(
+                "'" + recursorName + "' is not a recursor");
+        }
+        bool recursorHasMotiveLevel =
+            recursorDeclaration->universeParameters.size()
+            > inductive->universeParameters.size();
+        std::vector<LevelPointer> recursorUniverseArguments =
+            inductiveUniverseArguments;
+        if (recursorHasMotiveLevel) {
+            recursorUniverseArguments.push_back(motiveLevel);
+        }
         ExpressionPointer recursorReference =
-            makeConstant(inductiveName + "_recursor",
-                          {motiveLevel});
-        ExpressionPointer applied = makeApplication(
-            std::move(recursorReference), motive);
+            makeConstant(std::move(recursorName),
+                          std::move(recursorUniverseArguments));
+        ExpressionPointer applied = std::move(recursorReference);
+        for (const auto& parameterValue : parameterValues) {
+            applied = makeApplication(std::move(applied), parameterValue);
+        }
+        applied = makeApplication(std::move(applied), motive);
         for (auto& caseLambda : caseLambdas) {
             applied = makeApplication(std::move(applied),
                                        std::move(caseLambda));
@@ -384,12 +456,19 @@ private:
     };
 
     // Builds the kernel Lambda for one case of a pattern-match definition.
+    // For parameterised inductives, the caller supplies the parameter
+    // values that the scrutinee is applied to; the case lambda strips
+    // the constructor's parameter Pis and substitutes the values into
+    // the remaining argument types, so the case lambda binds only the
+    // non-parameter arguments.
     ExpressionPointer buildCaseLambda(
         const SurfaceDefinitionDecl& declaration,
         const std::string& constructorName,
         const std::string& inductiveName,
         ExpressionPointer motive,
-        const std::vector<FunctionArgumentPair>& functionArgumentTypes) {
+        const std::vector<FunctionArgumentPair>& functionArgumentTypes,
+        int numParameters,
+        const std::vector<ExpressionPointer>& parameterValues) {
 
         // Find the case in the declaration matching this constructor.
         const SurfacePatternCase* matchedCase = nullptr;
@@ -451,12 +530,40 @@ private:
         };
         std::vector<ConstructorArgument> constructorArguments;
         {
+            // Skip the constructor's parameter Pis (the first
+            // numParameters of them); they're filled by the recursor
+            // application and aren't bound by the case lambda.
             ExpressionPointer cursor = constructor->type;
+            for (int i = 0; i < numParameters; ++i) {
+                auto* pi = std::get_if<Pi>(&cursor->node);
+                if (!pi) {
+                    throw ElaborateError(
+                        "internal: constructor '" + constructorName
+                        + "' has fewer parameter Pis than expected");
+                }
+                cursor = pi->codomain;
+            }
+            // Substitute the parameter values into the remaining type,
+            // innermost-bound (last) parameter first. After all
+            // substitutions, the remaining Pis bind only non-parameter
+            // arguments and reference the parameter values directly.
+            for (auto iterator = parameterValues.rbegin();
+                 iterator != parameterValues.rend(); ++iterator) {
+                cursor = substitute(cursor, 0, *iterator);
+            }
             while (auto* pi = std::get_if<Pi>(&cursor->node)) {
                 ConstructorArgument constructorArgument;
                 constructorArgument.defaultName = pi->displayHint;
                 constructorArgument.type = pi->domain;
-                auto* constant = std::get_if<Constant>(&pi->domain->node);
+                // Recursive arg: type's head (after peeling Applications)
+                // is the inductive constant.
+                ExpressionPointer typeHead = pi->domain;
+                while (auto* application =
+                           std::get_if<Application>(&typeHead->node)) {
+                    typeHead = application->function;
+                }
+                auto* constant =
+                    std::get_if<Constant>(&typeHead->node);
                 constructorArgument.isRecursive =
                     constant && constant->name == inductiveName;
                 constructorArguments.push_back(constructorArgument);

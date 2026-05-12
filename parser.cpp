@@ -170,19 +170,28 @@ private:
 
     SurfacePatternPointer parsePattern() {
         // A pattern is either:
-        //   name                  (variable binding, or nullary constructor)
-        //   name(pat, pat, ...)   (constructor application)
-        //   _                     (wildcard, treated as variable named "_")
+        //   name                       (variable binding, or nullary constructor)
+        //   Foo.bar(pat, pat, ...)     (constructor application; qualified name allowed)
+        //   _                          (wildcard)
         if (peek().kind != TokenKind::Identifier) {
             throwHere("expected pattern");
         }
         Token nameToken = consumeAny();
+        std::string fullName = nameToken.lexeme;
+        while (peek().kind == TokenKind::Dot) {
+            consumeAny();
+            if (peek().kind != TokenKind::Identifier) {
+                throwHere("expected identifier after '.' in pattern");
+            }
+            fullName += ".";
+            fullName += consumeAny().lexeme;
+        }
         if (peek().kind == TokenKind::LeftParen) {
             consumeAny();
             std::vector<SurfacePatternPointer> arguments;
             if (peek().kind == TokenKind::RightParen) {
                 throwHere("constructor pattern arguments cannot be empty; "
-                          "use bare '" + nameToken.lexeme
+                          "use bare '" + fullName
                           + "' for nullary constructors");
             }
             arguments.push_back(parsePattern());
@@ -191,12 +200,12 @@ private:
                 arguments.push_back(parsePattern());
             }
             expect(TokenKind::RightParen, "ending constructor pattern");
-            return makeSurfacePatternConstructor(nameToken.lexeme,
+            return makeSurfacePatternConstructor(std::move(fullName),
                                                   std::move(arguments),
                                                   nameToken.line,
                                                   nameToken.column);
         }
-        return makeSurfacePatternBareName(nameToken.lexeme,
+        return makeSurfacePatternBareName(std::move(fullName),
                                            nameToken.line,
                                            nameToken.column);
     }
