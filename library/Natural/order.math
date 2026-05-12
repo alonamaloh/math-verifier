@@ -1,0 +1,25 @@
+-- Natural/order.math
+--
+-- LessOrEqual: the inductive ≤ relation on Natural. Two constructors:
+-- reflexivity gives n ≤ n; step lifts n ≤ m to n ≤ successor(m).
+--
+-- Plus a couple of basic lemmas to confirm the type is usable.
+
+module Natural.order
+
+import Natural.basics
+
+inductive LessOrEqual : Natural → Natural → Prop where
+  | LessOrEqual.reflexivity : (n : Natural) → LessOrEqual(n, n)
+  | LessOrEqual.step
+      : (n m : Natural)
+        → LessOrEqual(n, m)
+        → LessOrEqual(n, successor(m))
+
+-- Zero is below every natural.
+-- Proof by induction on m using the auto-generated Natural recursor
+-- with a Prop-valued motive (λ k. zero ≤ k).
+definition Natural.zero_least
+        : (m : Natural) → LessOrEqual(zero, m)
+  | zero         => LessOrEqual.reflexivity(zero)
+  | successor(k) => LessOrEqual.step(zero, k, Natural.zero_least(k))

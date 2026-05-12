@@ -111,7 +111,7 @@ private:
             if (peek().kind != TokenKind::Identifier) {
                 throwHere("expected constructor name after '|'");
             }
-            spec.name = consumeAny().lexeme;
+            spec.name = consumeQualifiedNameString();
             expect(TokenKind::Colon, "before constructor type");
             spec.type = parseExpression();
             decl.constructors.push_back(std::move(spec));
