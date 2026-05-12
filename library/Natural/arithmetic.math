@@ -98,3 +98,31 @@ theorem Natural.add_associative
   | successor(predecessor), b, c =>
       congruenceOf(successor,
                     Natural.add_associative(predecessor, b, c))
+
+-- Distributivity (right): (a + b) * c = a * c + b * c. Induction on a.
+-- Leverages that successor(_) * m and zero * m reduce definitionally
+-- on the first argument; the only non-definitional step is the
+-- inductive hypothesis and a single add_associative rearrangement.
+theorem Natural.distributivity_right
+        : (a b c : Natural) → (a + b) * c = a * c + b * c
+  | zero, b, c =>
+      reflexivity(b * c)
+  | successor(predecessor), b, c =>
+      Equality.transitivity(
+          congruenceOf(fun (rest : Natural) => c + rest,
+                        Natural.distributivity_right(predecessor, b, c)),
+          Equality.symmetry(
+              Natural.add_associative(c, predecessor * c, b * c)))
+
+-- Theorem: (a * b) * c = a * (b * c). Induction on a, using
+-- distributivity_right for the successor case.
+theorem Natural.multiply_associative
+        : (a b c : Natural) → (a * b) * c = a * (b * c)
+  | zero, b, c =>
+      reflexivity(zero)
+  | successor(predecessor), b, c =>
+      Equality.transitivity(
+          Natural.distributivity_right(b, predecessor * b, c),
+          congruenceOf(fun (rest : Natural) => b * c + rest,
+                        Natural.multiply_associative(
+                            predecessor, b, c)))

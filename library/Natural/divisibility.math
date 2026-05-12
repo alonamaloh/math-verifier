@@ -49,3 +49,34 @@ theorem Natural.divides_zero(candidate : Natural)
     fun (quotient : Natural) => zero = candidate * quotient,
     zero,
     Equality.symmetry(Natural.multiply_zero(candidate)))
+
+-- Divisibility is transitive: if a | b and b | c, then a | c. With
+-- witnesses q1 (b = a*q1) and q2 (c = b*q2), the witness for a | c
+-- is q1*q2, by multiply_associative.
+--
+-- The proof goes through a helper because we can only pattern-match
+-- on one scrutinee at a time; we destructure the first divisibility
+-- proof in `divides_transitive` and the second in the helper.
+theorem Natural.divides_transitive_helper
+        (a b c : Natural) (firstQuotient : Natural)
+        (firstEquality : b = a * firstQuotient)
+        : Natural.divides(b, c) → Natural.divides(a, c)
+  | Exists.introduce(secondQuotient, secondEquality) =>
+      Exists.introduce(
+          firstQuotient * secondQuotient,
+          Equality.transitivity(
+              secondEquality,
+              Equality.transitivity(
+                  congruenceOf(
+                      fun (rest : Natural) => rest * secondQuotient,
+                      firstEquality),
+                  Natural.multiply_associative(
+                      a, firstQuotient, secondQuotient))))
+
+theorem Natural.divides_transitive (a b c : Natural)
+        : Natural.divides(a, b)
+          → Natural.divides(b, c)
+          → Natural.divides(a, c)
+  | Exists.introduce(firstQuotient, firstEquality), secondDivides =>
+      Natural.divides_transitive_helper(
+          a, b, c, firstQuotient, firstEquality, secondDivides)

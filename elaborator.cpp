@@ -2166,6 +2166,23 @@ private:
         }
         if (auto* patternApplication =
                 std::get_if<Application>(&pattern->node)) {
+            // Skip unification when the function head is a metavariable:
+            // that's a higher-order unification problem (the metavariable
+            // could match many target functions/args), and our simple
+            // structural matcher can't pick the right answer. Backward
+            // inference via expectedType handles these cases more
+            // reliably.
+            ExpressionPointer functionHead = patternApplication->function;
+            while (auto* nestedApp =
+                       std::get_if<Application>(&functionHead->node)) {
+                functionHead = nestedApp->function;
+            }
+            if (auto* headFreeVariable =
+                    std::get_if<FreeVariable>(&functionHead->node)) {
+                if (metavariableNames.count(headFreeVariable->name)) {
+                    return;
+                }
+            }
             if (auto* targetApplication =
                     std::get_if<Application>(&target->node)) {
                 unifyConstructorParameters(
