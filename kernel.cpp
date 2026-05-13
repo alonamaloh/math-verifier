@@ -875,7 +875,9 @@ ExpressionPointer inferTypeWork(const Environment& environment,
             environment, inferType(environment, context, pi->domain));
         auto* domainSort = std::get_if<Sort>(&domainKind->node);
         if (!domainSort) {
-            throw TypeError("Pi: domain is not a type");
+            TypeError error("Pi: domain is not a type");
+            error.actualType = domainKind;
+            throw error;
         }
         auto introducedName = freshName(pi->displayHint, context);
         Context extendedContext = context;
@@ -886,7 +888,9 @@ ExpressionPointer inferTypeWork(const Environment& environment,
                       openBinder(pi->codomain, introducedName)));
         auto* codomainSort = std::get_if<Sort>(&codomainKind->node);
         if (!codomainSort) {
-            throw TypeError("Pi: codomain is not a type");
+            TypeError error("Pi: codomain is not a type");
+            error.actualType = codomainKind;
+            throw error;
         }
         return makeSort(
             impredicativeMaxLevel(domainSort->level, codomainSort->level));
@@ -895,7 +899,9 @@ ExpressionPointer inferTypeWork(const Environment& environment,
         auto domainKind = weakHeadNormalForm(
             environment, inferType(environment, context, lambda->domain));
         if (!std::holds_alternative<Sort>(domainKind->node)) {
-            throw TypeError("Lambda: domain is not a type");
+            TypeError error("Lambda: domain is not a type");
+            error.actualType = domainKind;
+            throw error;
         }
         auto introducedName = freshName(lambda->displayHint, context);
         Context extendedContext = context;
@@ -930,7 +936,9 @@ ExpressionPointer inferTypeWork(const Environment& environment,
         auto kindOfType = weakHeadNormalForm(
             environment, inferType(environment, context, let->type));
         if (!std::holds_alternative<Sort>(kindOfType->node)) {
-            throw TypeError("Let: declared type is not a type");
+            TypeError error("Let: declared type is not a type");
+            error.actualType = kindOfType;
+            throw error;
         }
         // Check the value's inferred type matches the declared type.
         auto inferredValueType = inferType(environment, context, let->value);
@@ -989,8 +997,11 @@ void addDefinition(Environment& environment,
     }
     auto inferredBodyType = inferType(environment, {}, body);
     if (!isSubtype(environment, {}, inferredBodyType, declaredType)) {
-        throw TypeError(
+        TypeError error(
             "addDefinition: body type does not match declared type for " + name);
+        error.expectedType = declaredType;
+        error.actualType = inferredBodyType;
+        throw error;
     }
     environment.declarations.emplace(
         std::move(name),

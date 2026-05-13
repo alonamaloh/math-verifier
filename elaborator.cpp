@@ -58,6 +58,51 @@ private:
         Frame& operator=(const Frame&) = delete;
     };
 
+    // Recursively beta-normalises an expression for display. Walks
+    // Pi/Lambda/Application bodies applying weakHeadNormalForm at each
+    // level so that the printed form has no remaining
+    // `(λ. body)(arg)` redexes — these crop up in error messages when
+    // we show the recursor's expected case-lambda type (the motive
+    // application hasn't been beta-reduced yet at error time).
+    ExpressionPointer betaNormalizeForDisplay(
+        ExpressionPointer expression) const {
+        ExpressionPointer current = weakHeadNormalForm(
+            environment_, expression);
+        if (auto* pi = std::get_if<Pi>(&current->node)) {
+            return makePi(pi->displayHint,
+                betaNormalizeForDisplay(pi->domain),
+                betaNormalizeForDisplay(pi->codomain));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&current->node)) {
+            return makeLambda(lambda->displayHint,
+                betaNormalizeForDisplay(lambda->domain),
+                betaNormalizeForDisplay(lambda->body));
+        }
+        if (auto* application =
+                std::get_if<Application>(&current->node)) {
+            return makeApplication(
+                betaNormalizeForDisplay(application->function),
+                betaNormalizeForDisplay(application->argument));
+        }
+        return current;
+    }
+
+    std::string prettyPrintForDisplay(
+        ExpressionPointer expression) const {
+        std::string raw =
+            prettyPrint(betaNormalizeForDisplay(expression));
+        // The printer prefixes Internal-origin FreeVariables with '@'
+        // so that any leak into user output is visible. In error
+        // messages we deliberately open binders into named FreeVars,
+        // so the `@` markers are noise; strip them.
+        std::string stripped;
+        stripped.reserve(raw.size());
+        for (char character : raw) {
+            if (character != '@') stripped.push_back(character);
+        }
+        return stripped;
+    }
+
     // Pretty-print an expression that lives in a local-binder scope.
     // Opens each binder as a named FreeVariable so the printer shows
     // the user's name rather than a bare `<bound k>` index. `count`
@@ -128,11 +173,11 @@ private:
         message += error.what();
         if (error.expectedType) {
             message += "\n    expected type: ";
-            message += prettyPrint(error.expectedType);
+            message += prettyPrintForDisplay(error.expectedType);
         }
         if (error.actualType) {
             message += "\n    actual type:   ";
-            message += prettyPrint(error.actualType);
+            message += prettyPrintForDisplay(error.actualType);
         }
         throw ElaborateError(formatErrorWithContext(message));
     }
@@ -880,6 +925,10 @@ private:
         const std::vector<ExpressionPointer>& parameterValues,
         const std::vector<LocalBinder>& outerBinderStack) {
 
+        Frame frame(*this,
+            "case for '" + constructorName + "' of '"
+            + inductiveName + "'");
+
         // Find the case in the declaration matching this constructor.
         const SurfacePatternCase* matchedCase = nullptr;
         for (const auto& caseDeclaration : declaration.cases) {
@@ -1259,6 +1308,44 @@ private:
         ExpressionPointer bodyKernel =
             elaborateExpression(*rewrittenBody, bodyStack,
                                  expectedBodyType);
+
+        // Early type-check: verify the body's inferred type matches
+        // the expected one. This catches a mismatch HERE — with the
+        // case-for-`Constructor` frame still on the stack — rather
+        // than letting it bubble up to the final recursor application
+        // where attribution to the specific case is lost.
+        try {
+            ExpressionPointer bodyTypeOpened = inferTypeInLocalContext(
+                bodyStack, bodyKernel);
+            ExpressionPointer expectedOpened = openOverLocalBinders(
+                expectedBodyType, bodyStack, bodyStack.size());
+            Context bodyContext;
+            for (size_t i = 0; i < bodyStack.size(); ++i) {
+                ExpressionPointer openedType = openOverLocalBinders(
+                    bodyStack[i].type, bodyStack, i);
+                bodyContext.push_back({bodyStack[i].name, openedType,
+                                          FreeVariableOrigin::Internal});
+            }
+            if (!isDefinitionallyEqual(environment_, bodyContext,
+                                        bodyTypeOpened, expectedOpened)) {
+                // Pass the OPENED types so the display path doesn't
+                // emit `<bound N>` indices — the body-stack binders
+                // now exist in the types as named FreeVariables.
+                TypeError error("case body's type does not match the "
+                                 "expected return type for this branch");
+                error.expectedType = expectedOpened;
+                error.actualType = bodyTypeOpened;
+                rethrowKernelError(error);
+            }
+        } catch (const TypeError& kernelError) {
+            // Wrap any other kernel error from inferType above.
+            if (kernelError.expectedType
+                || kernelError.actualType) {
+                rethrowKernelError(kernelError);
+            }
+            TypeError reraised = kernelError;
+            rethrowKernelError(reraised);
+        }
 
         // Wrap in lambdas in reverse order.
         ExpressionPointer caseLambda = bodyKernel;
