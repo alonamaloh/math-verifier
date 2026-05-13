@@ -1744,7 +1744,18 @@ private:
                             || (headIdentifier->universeArgs.size()
                                 == declarationUniverseParams->size());
                         if (numLeadingToInfer > 0 && universesOk) {
-                            try {
+                            // When the declaration uses explicit
+                            // `{x : T}` binders, the user has
+                            // committed to inference — any failure is
+                            // a real error. When inference is engaged
+                            // only via arity-based heuristics (the
+                            // declaration has no implicit markers),
+                            // we fall back to partial application so
+                            // intentional under-application still
+                            // works.
+                            bool explicitImplicitMode =
+                                declaredImplicitCount > 0;
+                            auto runInference = [&]() {
                                 std::vector<LevelPointer> universeArguments;
                                 if (!headIdentifier->universeArgs.empty()) {
                                     for (const auto& level :
@@ -1781,11 +1792,16 @@ private:
                                         std::move(trailingValue));
                                 }
                                 return head;
+                            };
+                            if (explicitImplicitMode) {
+                                return runInference();
+                            }
+                            try {
+                                return runInference();
                             } catch (const ElaborateError&) {
-                                // Inference failed — fall through to the
-                                // partial-application path. Users can
-                                // still partially apply explicitly when
-                                // they want to.
+                                // Inference failed in arity-based
+                                // mode — fall through to partial
+                                // application.
                             }
                         }
                     }

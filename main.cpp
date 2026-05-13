@@ -3421,6 +3421,149 @@ Environment verifyMathSource(const std::string& source) {
     return environment;
 }
 
+// Exercises the elaborator's diagnostic output — checks that intended
+// error categories produce messages containing the expected substrings
+// (frame phrases, type names, hints). We don't pin the FULL message
+// because the formatting may evolve; we just lock in the cues that a
+// user would scan for when fixing the bug.
+void runErrorMessageTests() {
+    std::cout << "--- error message tests ---\n";
+
+    auto expectErrorContains =
+        [](const std::string& source,
+           const std::vector<std::string>& mustContain,
+           const char* description, int testLine) {
+        std::string message;
+        bool threw = false;
+        try { verifyMathSource(source); }
+        catch (const LexError& e)       { threw = true; message = e.what(); }
+        catch (const ParseError& e)     { threw = true; message = e.what(); }
+        catch (const ElaborateError& e) { threw = true; message = e.what(); }
+        catch (const TypeError& e)      { threw = true; message = e.what(); }
+        if (!threw) {
+            ++failed;
+            std::cerr << "FAIL (line " << testLine
+                      << "): expected error from " << description
+                      << " but none was thrown\n";
+            return;
+        }
+        std::vector<std::string> missing;
+        for (const auto& needle : mustContain) {
+            if (message.find(needle) == std::string::npos) {
+                missing.push_back(needle);
+            }
+        }
+        if (missing.empty()) ++passed;
+        else {
+            ++failed;
+            std::cerr << "FAIL (line " << testLine
+                      << "): error for " << description
+                      << " missing substring(s):\n";
+            for (const auto& needle : missing) {
+                std::cerr << "    expected: " << needle << "\n";
+            }
+            std::cerr << "    actual message:\n      " << message << "\n";
+        }
+    };
+
+    // Hammer failure: should name the theorem, the goal type, and
+    // list at least one candidate.
+    expectErrorContains(R"(
+module Test.errors_hammer
+
+theorem cant_find (A B : Proposition) (h : A) : B := ?
+)",
+        {"hammer placeholder '?'",
+         "theorem 'cant_find'",
+         "could not find a proof",
+         "Candidates in scope:",
+         "h : A"},
+        "hammer-failure error",
+        __LINE__);
+
+    // Cases body type mismatch: the case-for-Constructor frame should
+    // appear, along with expected vs actual types.
+    expectErrorContains(R"(
+module Test.errors_cases
+
+inductive And (A B : Proposition) : Proposition where
+  | And.introduction : A → B → And(A, B)
+
+theorem wrong_branch (A B : Proposition) (h : And(A, B)) : A :=
+  cases h {
+    | And.introduction(a, b) => b
+  }
+)",
+        {"case for 'And.introduction'",
+         "cases expression at line",
+         "theorem 'wrong_branch'",
+         "expected type: A",
+         "actual type:   B"},
+        "cases-branch type mismatch",
+        __LINE__);
+
+    // Under-applied inference with explicit `{x : T}` binders: when
+    // the declaration uses implicit markers, the user has committed
+    // to inference, so a failure surfaces directly. `pick_b` has
+    // two propositional parameters but the second's return type only
+    // mentions B — A cannot be determined from the trailing proof.
+    expectErrorContains(R"(
+module Test.errors_under_applied
+
+theorem pick_b {A B : Proposition} (b : B) : B := b
+
+-- Call with only the proof of B; inference cannot pin down A.
+theorem caller (P Q : Proposition) (h : Q) : Q := pick_b(h)
+)",
+        {"could not infer all leading arguments",
+         "pick_b",
+         "Provide the missing argument(s)"},
+        "under-applied implicit inference",
+        __LINE__);
+
+    // Constructor argument type mismatch: kernel error attribution to
+    // the theorem, with expected and actual types pretty-printed.
+    expectErrorContains(R"(
+module Test.errors_constructor
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive And (A B : Proposition) : Proposition where
+  | And.introduction : A → B → And(A, B)
+
+theorem bad_call (A : Proposition) (n : Natural) : And(A, A) :=
+  And.introduction(A, A, n, n)
+)",
+        {"theorem 'bad_call'",
+         "kernel:",
+         "expected type: A",
+         "actual type:   Natural"},
+        "constructor argument type mismatch",
+        __LINE__);
+
+    // Successful hammer: '?' resolves to a hypothesis, no error.
+    {
+        try {
+            verifyMathSource(R"(
+module Test.errors_hammer_ok
+
+inductive Dummy : Proposition where
+  | unit : Dummy
+
+theorem hammer_ok (A : Proposition) (h : A) : A := ?
+)");
+            ++passed;
+        } catch (const std::exception& e) {
+            ++failed;
+            std::cerr << "FAIL (line " << __LINE__
+                      << "): hammer should have resolved hypothesis-match: "
+                      << e.what() << "\n";
+        }
+    }
+}
+
 void runEndToEndPipelineTests() {
     std::cout << "--- end-to-end pipeline tests ---\n";
 
@@ -3997,6 +4140,7 @@ int main(int argc, char* argv[]) {
     runLexerTests();
     runParserTests();
     runEndToEndPipelineTests();
+    runErrorMessageTests();
     runIntegrationTests();
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";
