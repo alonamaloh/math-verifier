@@ -423,9 +423,14 @@ private:
         }
         ExpressionPointer returnType =
             elaborateExpression(*declaration.type, localBinders);
-        ExpressionPointer bodyExpression =
-            elaborateExpression(*declaration.body, localBinders,
-                                 returnType);
+        ExpressionPointer bodyExpression;
+        try {
+            bodyExpression = elaborateExpression(*declaration.body,
+                                                  localBinders,
+                                                  returnType);
+        } catch (const TypeError& kernelError) {
+            rethrowKernelError(kernelError);
+        }
 
         // Build the full declared type and body by wrapping in reverse.
         ExpressionPointer fullType = returnType;
@@ -1884,8 +1889,12 @@ private:
                 elaborateExpression(*let->value, localBinders);
             std::vector<LocalBinder> extended = localBinders;
             extended.push_back({let->name, letType});
+            // Propagate expectedType to body (shifted for new binder).
+            ExpressionPointer bodyExpectedType =
+                expectedType ? shift(expectedType, 1) : nullptr;
             ExpressionPointer letBody =
-                elaborateExpression(*let->body, extended);
+                elaborateExpression(*let->body, extended,
+                                     bodyExpectedType);
             return makeLet(let->name, std::move(letType),
                            std::move(letValue), std::move(letBody));
         }
