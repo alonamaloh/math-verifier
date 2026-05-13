@@ -1,5 +1,5 @@
 CXX = clang++
-CXXFLAGS = -std=c++20 -Wall -Wextra -Werror -g
+CXXFLAGS = -std=c++20 -Wall -Wextra -Werror -O3 -g
 OBJS = level.o kernel.o printer.o lexer.o parser.o elaborator.o main.o
 
 kernel: $(OBJS)
