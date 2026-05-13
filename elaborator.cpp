@@ -3682,22 +3682,39 @@ private:
         std::string operandTypeName =
             leftTypeConstant ? leftTypeConstant->name : "<unknown>";
         std::string targetFunction;
+        // For `<` we wrap the left operand in `successor`, since
+        // `a < b` is defined as `LessOrEqual(successor(a), b)`.
+        bool wrapLeftInSuccessor = false;
         if (operandTypeName == "Natural") {
             if (operatorSymbol == "+") targetFunction = "Natural.add";
             else if (operatorSymbol == "*") targetFunction = "Natural.multiply";
+            else if (operatorSymbol == "≤") targetFunction = "LessOrEqual";
+            else if (operatorSymbol == "<") {
+                targetFunction = "LessOrEqual";
+                wrapLeftInSuccessor = true;
+            }
         }
         if (targetFunction.empty()) {
             throw ElaborateError(
                 "operator '" + operatorSymbol + "' is not supported for "
                 "operand type '" + operandTypeName + "' (line "
                 + std::to_string(line)
-                + "); v1 supports + and * on Natural only");
+                + "); v1 supports +, *, ≤, < on Natural only");
         }
         if (environment_.lookup(targetFunction) == nullptr) {
             throw ElaborateError(
                 "operator '" + operatorSymbol + "' resolves to '"
                 + targetFunction + "' but that function is not in scope "
                 "(line " + std::to_string(line) + ")");
+        }
+        if (wrapLeftInSuccessor) {
+            if (environment_.lookup("successor") == nullptr) {
+                throw ElaborateError(
+                    "operator '<' on Natural requires `successor` in scope "
+                    "(line " + std::to_string(line) + ")");
+            }
+            leftKernel = makeApplication(
+                makeConstant("successor"), std::move(leftKernel));
         }
         ExpressionPointer call = makeConstant(targetFunction);
         call = makeApplication(std::move(call), std::move(leftKernel));

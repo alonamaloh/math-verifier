@@ -3771,6 +3771,66 @@ definition recursive_through_cases : Natural → Natural
         "recursive call inside cases body is rewritten",
         __LINE__);
 
+    // Numeric literal: `2` desugars to `successor(successor(zero))`.
+    expectVerifies(R"(
+module Test.numeric_literal_desugar
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem two_equals_two : Equality.{0}(Natural, 2, successor(successor(zero)))
+  := reflexivity.{0}(Natural, 2)
+)",
+        "numeric literal desugars to successor chain",
+        __LINE__);
+
+    // `≤` on Naturals desugars to `LessOrEqual`.
+    expectVerifies(R"(
+module Test.le_operator
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive LessOrEqual : Natural → Natural → Proposition where
+  | LessOrEqual.reflexivity
+      : (n : Natural) → LessOrEqual(n, n)
+  | LessOrEqual.step
+      : (smaller larger : Natural)
+        → LessOrEqual(smaller, larger)
+        → LessOrEqual(smaller, successor(larger))
+
+theorem two_le_three : 2 ≤ 3 :=
+  LessOrEqual.step(2, 2, LessOrEqual.reflexivity(2))
+)",
+        "≤ operator desugars to LessOrEqual",
+        __LINE__);
+
+    // `<` on Naturals desugars to `LessOrEqual(successor(_), _)`.
+    expectVerifies(R"(
+module Test.lt_operator
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive LessOrEqual : Natural → Natural → Proposition where
+  | LessOrEqual.reflexivity
+      : (n : Natural) → LessOrEqual(n, n)
+  | LessOrEqual.step
+      : (smaller larger : Natural)
+        → LessOrEqual(smaller, larger)
+        → LessOrEqual(smaller, successor(larger))
+
+theorem one_lt_two : 1 < 2 := LessOrEqual.reflexivity(2)
+)",
+        "< operator desugars to LessOrEqual on successor of left",
+        __LINE__);
+
     // Hammer constructor disjointness: `Not(C(...) = D(...))` for
     // distinct constructors of the same inductive elaborates to a
     // synthesized discriminator + Equality_recursor proof.

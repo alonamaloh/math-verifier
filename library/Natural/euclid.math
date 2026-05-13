@@ -37,18 +37,18 @@ import Lists.basics
 -- product reduces to b + p*b, which is ≥ b ≥ 1 by le_add_right.
 theorem Natural.multiply_at_least_one
         : (a b : Natural)
-          → LessOrEqual(one, a)
-          → LessOrEqual(one, b)
-          → LessOrEqual(one, a * b)
+          → 1 ≤ a
+          → 1 ≤ b
+          → 1 ≤ a * b
   | zero, b, oneLessOrEqualZero, _ =>
       False.eliminate_proposition(
-        LessOrEqual(one, zero * b),
+        1 ≤ zero * b,
         Natural.not_less_or_equal_successor_zero(zero, oneLessOrEqualZero))
   | successor(predecessor), b, _, oneLessOrEqualB =>
       LessOrEqual.transitive(
-        one, b,
-        Natural.add(b, Natural.multiply(predecessor, b)),
-        Natural.less_or_equal_add_right(b, Natural.multiply(predecessor, b)),
+        1, b,
+        b + predecessor * b,
+        Natural.less_or_equal_add_right(b, predecessor * b),
         oneLessOrEqualB)
 
 -- The product of a list of primes is at least 1. Empty case is
@@ -58,20 +58,19 @@ theorem NaturalList.productOf_at_least_one
         : (list : NaturalList)
           → ((p : Natural) → NaturalList.member(p, list)
               → Natural.is_prime(p))
-          → LessOrEqual(one, NaturalList.productOf(list))
+          → 1 ≤ NaturalList.productOf(list)
   | NaturalList.empty, _ =>
-      LessOrEqual.reflexivity(one)
+      LessOrEqual.reflexivity(1)
   | NaturalList.prepend(head, tail), allPrime =>
       Natural.multiply_at_least_one(
           head, NaturalList.productOf(tail),
           LessOrEqual.transitive(
-            one, two, head,
+            1, 2, head,
             And.left(
-                LessOrEqual(two, head),
+                2 ≤ head,
                 (k : Natural)
                   → Natural.divides(k, head)
-                  → Or(Equality(Natural, k, one),
-                       Equality(Natural, k, head)),
+                  → Or(k = 1, k = head),
                 allPrime(head,
                   NaturalList.member.here(tail))),
             Natural.one_less_or_equal_two),
@@ -98,34 +97,33 @@ theorem Natural.infinitely_many_primes
       := Natural.has_prime_divisor(
           successor(NaturalList.productOf(primes)),
           Natural.successor_less_or_equal_successor(
-              one, NaturalList.productOf(primes),
+              1, NaturalList.productOf(primes),
               NaturalList.productOf_at_least_one(primes, allPrime)))
   in
   ⟨q, qIsPrime,
     function (qInPrimes : NaturalList.member(q, primes)) =>
       Or.eliminate(
-          Equality(Natural, one, zero),
-          LessOrEqual(q, one),
+          1 = zero,
+          q ≤ 1,
           False,
-          function (oneEqualsZero : Equality(Natural, one, zero)) =>
+          function (oneEqualsZero : 1 = zero) =>
               Natural.successor_not_zero(zero, oneEqualsZero),
-          function (quotientLessOrEqualOne : LessOrEqual(q, one)) =>
+          function (quotientLessOrEqualOne : q ≤ 1) =>
               Natural.not_less_or_equal_successor_zero(
                   zero,
                   Natural.less_or_equal_successor_successor_descend(
-                      one, zero,
+                      1, zero,
                       LessOrEqual.transitive(
-                          two, q, one,
+                          2, q, 1,
                           quotientLessOrEqualOne,
                           And.left(
-                              LessOrEqual(two, q),
+                              2 ≤ q,
                               (k : Natural)
                                 → Natural.divides(k, q)
-                                → Or(Equality(Natural, k, one),
-                                     Equality(Natural, k, q)),
+                                → Or(k = 1, k = q),
                               qIsPrime)))),
           Natural.divides_less_or_equal_or_zero(
-              q, one,
+              q, 1,
               Natural.divides_consecutive_implies_one(
                   q, NaturalList.productOf(primes),
                   NaturalList.member_divides_product(
