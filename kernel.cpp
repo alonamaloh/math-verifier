@@ -543,6 +543,32 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
                         }
                     }
                 }
+
+                // Quotient lift reduction: Quotient.lift(T, R, U, f, h,
+                // Quotient.mk(T, R, x)) reduces to f(x). The axioms in
+                // `library/Logic/quotient.math` give Quotient.lift and
+                // Quotient.mk specific arities (6 and 3 value args); we
+                // recognise them by name. Without this rule, every
+                // computation on a quotient value would need an
+                // explicit `Quotient.compute` transport.
+                if (headConstant->name == "Quotient.lift"
+                    && spine.args.size() >= 6) {
+                    auto reducedQ = weakHeadNormalForm(
+                        environment, spine.args[5], fuel);
+                    auto qSpine = peelApplicationSpine(reducedQ);
+                    if (auto* mkHead = std::get_if<Constant>(
+                            &qSpine.head->node);
+                        mkHead && mkHead->name == "Quotient.mk"
+                        && qSpine.args.size() >= 3) {
+                        ExpressionPointer x = qSpine.args[2];
+                        ExpressionPointer f = spine.args[3];
+                        ExpressionPointer reduced =
+                            makeApplication(f, x);
+                        expression = applyArguments(reduced,
+                                                     spine.args, 6);
+                        continue;
+                    }
+                }
             }
 
             // No reduction possible. Rebuild and return.

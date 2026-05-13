@@ -3777,6 +3777,54 @@ theorem trivial (A : Type(0)) (x : A) : Equality.{0}(A, x, x) :=
         "calc with a single step elaborates to the step proof",
         __LINE__);
 
+    // Quotient kernel reduction: `Quotient.lift(f, _, Quotient.mk(x))`
+    // should reduce to `f(x)` definitionally, so a `reflexivity` proof
+    // closes the resulting equality. Tests the special-cased rule in
+    // `weakHeadNormalForm`.
+    expectVerifies(R"(
+module Test.quotient_reduction
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+inductive True : Proposition where
+  | True.trivial : True
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+axiom Quotient.{u} : (T : Type(u)) → (R : T → T → Proposition) → Type(u)
+axiom Quotient.mk.{u}
+    : (T : Type(u)) → (R : T → T → Proposition) → T → Quotient.{u}(T, R)
+axiom Quotient.lift.{u, v}
+    : (T : Type(u)) → (R : T → T → Proposition) → (U : Type(v))
+      → (f : T → U)
+      → ((x y : T) → R(x, y) → Equality.{v}(U, f(x), f(y)))
+      → Quotient.{u}(T, R) → U
+
+definition trivialRelation (x y : Natural) : Proposition := True
+
+axiom trivialRespect
+    : (x y : Natural) → trivialRelation(x, y)
+      → Equality.{0}(Natural,
+                      (function (n : Natural) => n)(x),
+                      (function (n : Natural) => n)(y))
+
+theorem lift_reduces_to_f_of_x
+        : Equality.{0}(Natural,
+                        Quotient.lift.{0, 0}(
+                            Natural, trivialRelation, Natural,
+                            function (n : Natural) => n,
+                            trivialRespect,
+                            Quotient.mk.{0}(
+                                Natural, trivialRelation, zero)),
+                        zero) :=
+  reflexivity.{0}(Natural, zero)
+)",
+        "Quotient.lift on Quotient.mk reduces to f(x) definitionally",
+        __LINE__);
+
     // calc block, two-step transitivity chain.
     expectVerifies(R"(
 module Test.calc_two_step
