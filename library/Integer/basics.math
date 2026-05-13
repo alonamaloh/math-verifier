@@ -1,0 +1,142 @@
+-- Integer/basics.math
+--
+-- Integers as the quotient of `IntegerRepresentative` (pairs of
+-- naturals) by the equivalence `(a, b) ~ (c, d) iff a + d = b + c`.
+-- The intuition: `IntegerRepresentative.make(a, b)` represents the
+-- difference `a - b`. Two pairs represent the same integer exactly
+-- when their differences agree — an equality that stays inside
+-- Natural and so doesn't depend on integer subtraction at all.
+
+module Integer.basics
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- Representative pair: `make(positivePart, negativePart)` stands for
+-- `positivePart - negativePart`. Multiple pairs represent the same
+-- integer; the quotient below identifies them.
+inductive IntegerRepresentative : Type(0) where
+  | IntegerRepresentative.make
+      : Natural → Natural → IntegerRepresentative
+
+-- Helper for `IntegerEquivalent` that fixes the first pair's
+-- components and pattern-matches the second pair. The two-stage
+-- destructure (here + below) is what the elaborator's "only the
+-- first pattern position may be a constructor" rule forces.
+definition IntegerEquivalent.after_first (a b : Natural)
+        : IntegerRepresentative → Proposition
+  | IntegerRepresentative.make(c, d) =>
+      a + d = b + c
+
+-- (a, b) ~ (c, d) iff a + d = b + c. Algebraic restatement of "a - b
+-- = c - d" that stays inside Natural.
+definition IntegerEquivalent
+        : IntegerRepresentative → IntegerRepresentative → Proposition
+  | IntegerRepresentative.make(a, b), second =>
+      IntegerEquivalent.after_first(a, b, second)
+
+-- The equivalence is reflexive: (a, b) ~ (a, b). Follows from
+-- a + b = b + a (commutativity).
+theorem IntegerEquivalent.reflexive
+        : (representative : IntegerRepresentative)
+          → IntegerEquivalent(representative, representative)
+  | IntegerRepresentative.make(a, b) =>
+      Natural.add_commutative(a, b)
+
+-- Symmetry: (a, b) ~ (c, d) implies (c, d) ~ (a, b). From `a + d = b
+-- + c` derive `c + b = d + a` by reshuffling via commutativity. Need
+-- a chain of two pattern-matches because the elaborator only allows
+-- one constructor pattern per multi-argument case.
+theorem IntegerEquivalent.symmetric_after_first (a b : Natural)
+        : (y : IntegerRepresentative)
+          → IntegerEquivalent(IntegerRepresentative.make(a, b), y)
+          → IntegerEquivalent(y, IntegerRepresentative.make(a, b))
+  | IntegerRepresentative.make(c, d), aPlusDEqualsBPlusC =>
+      Equality.transitivity(
+          Natural.add_commutative(c, b),
+          Equality.transitivity(
+              Equality.symmetry(aPlusDEqualsBPlusC),
+              Natural.add_commutative(a, d)))
+
+theorem IntegerEquivalent.symmetric
+        : (x y : IntegerRepresentative)
+          → IntegerEquivalent(x, y)
+          → IntegerEquivalent(y, x)
+  | IntegerRepresentative.make(a, b), y, eqProof =>
+      IntegerEquivalent.symmetric_after_first(a, b, y, eqProof)
+
+-- Transitivity: the Natural-component arithmetic kernel. From
+-- `a + d = b + c` and `c + f = d + e`, derive `a + f = b + e`.
+-- Sum the two hypotheses, rearrange both sides into
+-- `something + (c + d)`, then cancel the common addend.
+theorem IntegerEquivalent.transitive_natural
+        (a b c d e f : Natural)
+        (aPlusDEqualsBPlusC : a + d = b + c)
+        (cPlusFEqualsDPlusE : c + f = d + e)
+        : a + f = b + e := {
+  claim sumOfHypotheses
+        : (a + d) + (c + f) = (b + c) + (d + e)
+    by Equality.transitivity(
+           congruenceOf(
+               function (lhs : Natural) => lhs + (c + f),
+               aPlusDEqualsBPlusC),
+           congruenceOf(
+               function (rhs : Natural) => (b + c) + rhs,
+               cPlusFEqualsDPlusE));
+  claim leftReshuffled
+        : (a + d) + (c + f) = (a + f) + (c + d)
+    by Natural.add_four_swap(a, d, c, f);
+  claim rightReshuffled
+        : (b + c) + (d + e) = (b + e) + (d + c)
+    by Natural.add_four_swap(b, c, d, e);
+  claim cancellationSetup
+        : (a + f) + (c + d) = (b + e) + (d + c)
+    by Equality.transitivity(
+           Equality.symmetry(leftReshuffled),
+           Equality.transitivity(sumOfHypotheses, rightReshuffled));
+  claim cancellationReady
+        : (a + f) + (c + d) = (b + e) + (c + d)
+    by Equality.transitivity(
+           cancellationSetup,
+           congruenceOf(
+               function (rhs : Natural) => (b + e) + rhs,
+               Natural.add_commutative(d, c)));
+  Natural.add_cancel_right(a + f, b + e, c + d, cancellationReady)
+}
+
+-- Transitivity, pattern-match chain: destructure x first, then y,
+-- then z, threading the components down to `transitive_natural`.
+theorem IntegerEquivalent.transitive_after_xy
+        (a b c d : Natural)
+        : (z : IntegerRepresentative)
+          → IntegerEquivalent(IntegerRepresentative.make(a, b),
+                              IntegerRepresentative.make(c, d))
+          → IntegerEquivalent(IntegerRepresentative.make(c, d), z)
+          → IntegerEquivalent(IntegerRepresentative.make(a, b), z)
+  | IntegerRepresentative.make(e, f), hyp1, hyp2 =>
+      IntegerEquivalent.transitive_natural(a, b, c, d, e, f, hyp1, hyp2)
+
+theorem IntegerEquivalent.transitive_after_x (a b : Natural)
+        : (y z : IntegerRepresentative)
+          → IntegerEquivalent(IntegerRepresentative.make(a, b), y)
+          → IntegerEquivalent(y, z)
+          → IntegerEquivalent(IntegerRepresentative.make(a, b), z)
+  | IntegerRepresentative.make(c, d), z, hyp1, hyp2 =>
+      IntegerEquivalent.transitive_after_xy(a, b, c, d, z, hyp1, hyp2)
+
+theorem IntegerEquivalent.transitive
+        : (x y z : IntegerRepresentative)
+          → IntegerEquivalent(x, y)
+          → IntegerEquivalent(y, z)
+          → IntegerEquivalent(x, z)
+  | IntegerRepresentative.make(a, b), y, z, hyp1, hyp2 =>
+      IntegerEquivalent.transitive_after_x(a, b, y, z, hyp1, hyp2)
+
+-- The Integer type itself: equivalence classes of IntegerRepresentative.
+definition Integer : Type(0) :=
+  Quotient.{0}(IntegerRepresentative, IntegerEquivalent)
