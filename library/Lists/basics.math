@@ -1,0 +1,57 @@
+-- Lists/basics.math
+--
+-- Lists of natural numbers, plus their core operations: membership
+-- and product. Specialised to Natural because Euclid only ever talks
+-- about lists of natural numbers; universe-polymorphic lists can be
+-- a future addition if a use case arises.
+--
+-- This module deliberately stays at the level of plain data and
+-- predicates. Lemmas that need primality, ordering arithmetic, or
+-- divisibility live in higher-up modules.
+
+module Lists.basics
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.divisibility
+
+-- Linked list of natural numbers.
+inductive NaturalList : Type(0) where
+  | NaturalList.empty : NaturalList
+  | NaturalList.cons : Natural → NaturalList → NaturalList
+
+-- Membership predicate: n is in the list. Defined inductively with
+-- two cases: n is the head, or n is in the tail.
+inductive NaturalList.member (n : Natural) : NaturalList → Proposition where
+  | NaturalList.member.here
+      : (rest : NaturalList)
+        → NaturalList.member(n, NaturalList.cons(n, rest))
+  | NaturalList.member.there
+      : (head : Natural)
+        → (rest : NaturalList)
+        → NaturalList.member(n, rest)
+        → NaturalList.member(n, NaturalList.cons(head, rest))
+
+-- Product of a list of naturals. Empty list has product 1; cons takes
+-- the head times the tail's product.
+definition NaturalList.productOf : NaturalList → Natural
+  | NaturalList.empty => one
+  | NaturalList.cons(head, tail) => head * NaturalList.productOf(tail)
+
+-- Any list member divides the product of the list. By induction on
+-- the membership proof: the `here` case is a direct
+-- divides_self_multiple; the `there` case multiplies through with the
+-- head via divides_multiple_left.
+theorem NaturalList.member_divides_product
+        (n : Natural) (list : NaturalList)
+        : NaturalList.member(n, list)
+          → Natural.divides(n, NaturalList.productOf(list))
+  | NaturalList.member.here(rest) =>
+      Natural.divides_self_multiple(n, NaturalList.productOf(rest))
+  | NaturalList.member.there(head, rest, sub_h) =>
+      Natural.divides_multiple_left(
+        n, head, NaturalList.productOf(rest),
+        NaturalList.member_divides_product(n, rest, sub_h))

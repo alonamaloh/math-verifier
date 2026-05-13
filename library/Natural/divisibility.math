@@ -118,3 +118,48 @@ theorem Natural.divides_le_or_zero (d n : Natural)
   | Exists.introduce(quotient, equalityProof) =>
       Natural.divides_le_or_zero_helper(
           d, n, quotient, equalityProof)
+
+-- A number divides any multiple of itself: n ∣ (n * m). Witness is m.
+theorem Natural.divides_self_multiple (n m : Natural)
+        : Natural.divides(n, n * m) :=
+  ⟨m, reflexivity(n * m)⟩
+
+-- If d divides m, then d divides any multiple k * m. Witness is k * q
+-- where q comes from the input proof; the equality is a chain of
+-- congruence + associativity + commutativity moves:
+--   k * m = k * (d * q)           (substituting m)
+--         = (k * d) * q           (assoc, reversed)
+--         = (d * k) * q           (commutativity inside)
+--         = d * (k * q)           (assoc, forward)
+theorem Natural.divides_multiple_left (d k m : Natural)
+        (h : Natural.divides(d, m))
+        : Natural.divides(d, k * m) := {
+  let ⟨q, equation⟩ := h;
+  ⟨k * q,
+    Equality.transitivity(
+      congruenceOf(fun (x : Natural) => k * x, equation),
+      Equality.transitivity(
+        Equality.symmetry(Natural.multiply_associative(k, d, q)),
+        Equality.transitivity(
+          congruenceOf(
+              fun (x : Natural) => x * q,
+              Natural.multiply_commutative(k, d)),
+          Natural.multiply_associative(d, k, q))))⟩
+}
+
+-- If d divides both a and a+1, then d divides 1. Used in Euclid's
+-- proof to derive a contradiction when a prime candidate would have
+-- to divide both N = product + 1 and the product itself.
+--
+-- TODO(arithmetic): prove this from the underlying witnesses. The
+-- proof sketch is: open d ∣ a and d ∣ succ(a) into d*q1 = a and
+-- d*q2 = succ(a); from these d*q2 = d*q1 + 1; case on d. d=0 is
+-- impossible (succ(a) ≠ 0); for d ≥ 1 the relationship q2 = q1 + 1
+-- forces d ≤ 1, so d = 1, and divides(1, 1) is the witness with
+-- quotient 1. The proof is ~100 lines of arithmetic and is
+-- axiomatised here so the Euclid result can land first.
+axiom Natural.divides_consecutive_implies_one
+        : (d a : Natural)
+          → Natural.divides(d, a)
+          → Natural.divides(d, successor(a))
+          → Natural.divides(d, one)

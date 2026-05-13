@@ -1,0 +1,133 @@
+-- Natural/euclid.math
+--
+-- Euclid's theorem: for any list of primes, there exists a prime not
+-- in the list — so the primes are not finitely enumerable.
+--
+-- Construction: take N = successor(productOf(primes)). N ≥ 2 because
+-- the product of a list of primes is ≥ 1. By `has_prime_divisor`, N
+-- has a prime divisor q. Then q is not in the list: if it were, q
+-- would divide the product, and also divides N = product + 1; by
+-- `Natural.divides_consecutive_implies_one`, q would divide 1,
+-- contradicting q ≥ 2 (from primality).
+--
+-- Two helper lemmas that cross the multiplication/ordering boundary
+-- live here too: `Natural.multiply_at_least_one` (positivity of
+-- product) and `NaturalList.productOf_at_least_one` (positivity of
+-- the list product when every element is prime). They depend on
+-- `not_le_succ_zero` from strong_recursion, which is why they can't
+-- live in `Natural/order.math`.
+
+module Natural.euclid
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.divisibility
+import Natural.strong_recursion
+import Natural.prime
+import Natural.prime_divisor
+import Lists.basics
+
+-- Multiplying two positive naturals is positive. By induction on `a`:
+-- the zero case is impossible (1 ≤ 0 is False); for successor(p) the
+-- product reduces to b + p*b, which is ≥ b ≥ 1 by le_add_right.
+theorem Natural.multiply_at_least_one
+        : (a b : Natural)
+          → LessOrEqual(one, a)
+          → LessOrEqual(one, b)
+          → LessOrEqual(one, a * b)
+  | zero, b, oneLeZero, _ =>
+      False.eliminate_proposition(
+        LessOrEqual(one, zero * b),
+        Natural.not_le_succ_zero(zero, oneLeZero))
+  | successor(predecessor), b, _, oneLeB =>
+      LessOrEqual.transitive(
+        one, b,
+        Natural.add(b, Natural.multiply(predecessor, b)),
+        Natural.le_add_right(b, Natural.multiply(predecessor, b)),
+        oneLeB)
+
+-- The product of a list of primes is at least 1. Empty case is
+-- reflexivity on 1; cons case multiplies head (≥ 2 because prime)
+-- with the IH on the tail.
+theorem NaturalList.productOf_at_least_one
+        : (list : NaturalList)
+          → ((p : Natural) → NaturalList.member(p, list)
+              → Natural.is_prime(p))
+          → LessOrEqual(one, NaturalList.productOf(list))
+  | NaturalList.empty, _ =>
+      LessOrEqual.reflexivity(one)
+  | NaturalList.cons(head, tail), allPrime =>
+      Natural.multiply_at_least_one(
+          head, NaturalList.productOf(tail),
+          LessOrEqual.transitive(
+            one, two, head,
+            And.left(
+                LessOrEqual(two, head),
+                (k : Natural)
+                  → Natural.divides(k, head)
+                  → Or(Equality(Natural, k, one),
+                       Equality(Natural, k, head)),
+                allPrime(head,
+                  NaturalList.member.here(tail))),
+            Natural.one_le_two),
+          NaturalList.productOf_at_least_one(tail,
+            fun (p : Natural)
+                (memTail : NaturalList.member(p, tail)) =>
+              allPrime(p,
+                NaturalList.member.there(head, tail, memTail))))
+
+-- Euclid's theorem. Construction is inlined — local `let X := …`
+-- bindings of intermediate values would be opaque to the kernel's
+-- definitional equality (zeta-reduction is only at the head), so
+-- writing `NaturalList.productOf(primes)` everywhere is required
+-- for the type annotations to line up.
+theorem Natural.infinitely_many_primes
+        (primes : NaturalList)
+        (allPrime : (p : Natural)
+                    → NaturalList.member(p, primes)
+                    → Natural.is_prime(p))
+        : Exists(Natural, fun (q : Natural) =>
+            And(Natural.is_prime(q),
+                Not(NaturalList.member(q, primes)))) :=
+  let ⟨q, qIsPrime, qDividesBig⟩
+      := Natural.has_prime_divisor(
+          successor(NaturalList.productOf(primes)),
+          Natural.succ_le_succ(
+              one, NaturalList.productOf(primes),
+              NaturalList.productOf_at_least_one(primes, allPrime)))
+  in
+  ⟨q, qIsPrime,
+    fun (qInPrimes : NaturalList.member(q, primes)) =>
+      Or.eliminate(
+          Equality(Natural, one, zero),
+          LessOrEqual(q, one),
+          False,
+          fun (oneEqZero : Equality(Natural, one, zero)) =>
+              Natural.successor_not_zero(zero, oneEqZero),
+          fun (qLeOne : LessOrEqual(q, one)) =>
+              Natural.not_le_succ_zero(
+                  zero,
+                  Natural.le_succ_succ_descend(
+                      one, zero,
+                      LessOrEqual.transitive(
+                          two, q, one,
+                          qLeOne,
+                          And.left(
+                              LessOrEqual(two, q),
+                              (k : Natural)
+                                → Natural.divides(k, q)
+                                → Or(Equality(Natural, k, one),
+                                     Equality(Natural, k, q)),
+                              qIsPrime)))),
+          Natural.divides_le_or_zero(
+              q, one,
+              Natural.divides_consecutive_implies_one(
+                  q, NaturalList.productOf(primes),
+                  NaturalList.member_divides_product(
+                      q, primes, qInPrimes),
+                  qDividesBig)))⟩
