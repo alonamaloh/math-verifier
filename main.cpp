@@ -3944,6 +3944,44 @@ theorem disjunction_swap (A B : Proposition) (h : Or(A, B)) : Or(B, A) := {
         "by_cases statement is sugar for cases",
         __LINE__);
 
+    // `by_induction on E using L with subject, ih { body }` — the
+    // elaborator builds the motive by abstracting the surrounding
+    // expected type over E, then wraps the body in lambdas for subject
+    // and ih, and calls L(motive, step, E). Tests with a custom
+    // lemma whose shape matches strong_induction.
+    expectVerifies(R"(
+module Test.by_induction_using
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+axiom Equality.congruence.{u, v}
+  : (A : Type(u)) → (B : Type(v)) → (f : A → B) → (x y : A)
+    → Equality.{u}(A, x, y) → Equality.{v}(B, f(x), f(y))
+
+-- A simple structural-recursion lemma in the shape strong_induction has.
+axiom Natural.induct
+  : (P : Natural → Proposition)
+    → ((subject : Natural)
+       → ((predecessor : Natural)
+          → Equality.{0}(Natural, subject, successor(predecessor))
+          → P(predecessor))
+       → P(subject))
+    → (n : Natural) → P(n)
+
+theorem reflexive_via_induct (n : Natural)
+        : Equality.{0}(Natural, n, n) :=
+  by_induction on n using Natural.induct with subject, ih {
+    reflexivity.{0}(Natural, subject)
+  }
+)",
+        "by_induction using a custom lemma",
+        __LINE__);
+
     // `apply Expr;` — terminal block statement; Expr becomes the
     // trailing value. Just keyword sugar.
     expectVerifies(R"(

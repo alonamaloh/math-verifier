@@ -169,6 +169,20 @@ struct SurfaceCases {
 // expected type from context.
 struct SurfaceHammer { };
 
+// `by_induction on scrutinee using inductionLemma with subjectName,
+// ihName { body }`. The elaborator constructs the motive by
+// abstracting the surrounding expected type over the scrutinee
+// variable, extracts the induction-hypothesis type from the lemma's
+// step signature, and applies the lemma with motive, step (the user's
+// body wrapped in lambdas), and scrutinee.
+struct SurfaceByInductionUsing {
+    SurfaceExpressionPointer scrutinee;
+    SurfaceExpressionPointer inductionLemma;
+    std::string subjectName;
+    std::string ihName;
+    SurfaceExpressionPointer body;
+};
+
 // One step of a `calc` block: a target expression that the previous
 // expression should equal, plus the proof of that single step.
 struct SurfaceCalcStep {
@@ -194,7 +208,7 @@ struct SurfaceExpression {
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer,
-        SurfaceCalc
+        SurfaceCalc, SurfaceByInductionUsing
     > node;
     int line = 0;
     int column = 0;
@@ -291,6 +305,21 @@ inline SurfaceExpressionPointer makeSurfaceCalc(
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceCalc{std::move(initialExpression), std::move(steps)},
+        line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceByInductionUsing(
+    SurfaceExpressionPointer scrutinee,
+    SurfaceExpressionPointer inductionLemma,
+    std::string subjectName,
+    std::string ihName,
+    SurfaceExpressionPointer body,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceByInductionUsing{std::move(scrutinee),
+                                 std::move(inductionLemma),
+                                 std::move(subjectName),
+                                 std::move(ihName),
+                                 std::move(body)},
         line, column});
 }
 // Forward-declared above; full SurfaceCasesClause type lives later in

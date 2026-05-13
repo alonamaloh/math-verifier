@@ -296,43 +296,6 @@ private:
             if (peek().kind == TokenKind::Semicolon) consumeAny();
             finalExpression = makeSurfaceHammer(
                 contradictionToken.line, contradictionToken.column);
-        } else if (peek().kind == TokenKind::KeywordByCases
-                   || peek().kind == TokenKind::KeywordByInduction) {
-            // `by_cases on E { case P: body; ... }` is terminal
-            // sugar for `cases E { case P: body; ... }` — and
-            // `by_induction on E with IH { case P: body; ... }`
-            // additionally appends `IH` to each constructor pattern
-            // that has any recursive arguments. Both consume the
-            // rest of the block as their case-clause block.
-            Token byToken = consumeAny();
-            bool isInduction =
-                byToken.kind == TokenKind::KeywordByInduction;
-            expect(TokenKind::KeywordOn,
-                   isInduction ? "after 'by_induction'"
-                               : "after 'by_cases'");
-            auto scrutinee = parseExpression();
-            std::string ihName;
-            if (isInduction) {
-                expect(TokenKind::KeywordWith,
-                       "after 'by_induction on <expr>'");
-                if (peek().kind != TokenKind::Identifier) {
-                    throwHere("expected an identifier (the induction "
-                              "hypothesis name) after 'with'");
-                }
-                ihName = consumeAny().lexeme;
-            }
-            expect(TokenKind::LeftBrace,
-                   isInduction
-                       ? "after 'by_induction on <expr> with <ih>'"
-                       : "after 'by_cases on <expr>'");
-            auto clauses = parseCasesClauseBlock(
-                ihName, TokenKind::Colon);
-            expect(TokenKind::RightBrace,
-                   isInduction ? "ending by_induction block"
-                               : "ending by_cases block");
-            finalExpression = makeSurfaceCases(
-                std::move(scrutinee), std::move(clauses),
-                byToken.line, byToken.column);
         } else {
             finalExpression = parseExpression();
             // Optional trailing semicolon for the final expression.
@@ -860,6 +823,10 @@ private:
         if (current.kind == TokenKind::KeywordWitness) {
             return parseWitnessExpression();
         }
+        if (current.kind == TokenKind::KeywordByCases
+            || current.kind == TokenKind::KeywordByInduction) {
+            return parseByCasesOrInduction();
+        }
         if (current.kind == TokenKind::LeftBrace) {
             // `{ let pat := v; ...; final_expr }` as an expression.
             // Same shape as the theorem-body block form; useful inside
@@ -1056,6 +1023,75 @@ private:
         return makeSurfaceCalc(std::move(initialExpression),
                                 std::move(steps),
                                 calcToken.line, calcToken.column);
+    }
+
+    // `by_cases on E { case P: body; … }`, or
+    // `by_induction on E with ih { case P: body; … }`, or
+    // `by_induction on E using L with subject, ih { body }`. All three
+    // parse as regular expressions so they can sit anywhere a value
+    // belongs (and be applied to further arguments via parseApplication).
+    SurfaceExpressionPointer parseByCasesOrInduction() {
+        Token byToken = consumeAny();
+        bool isInduction =
+            byToken.kind == TokenKind::KeywordByInduction;
+        expect(TokenKind::KeywordOn,
+               isInduction ? "after 'by_induction'"
+                           : "after 'by_cases'");
+        auto scrutinee = parseExpression();
+        if (isInduction
+            && peek().kind == TokenKind::KeywordUsing) {
+            consumeAny();  // 'using'
+            auto inductionLemma = parseExpression();
+            expect(TokenKind::KeywordWith,
+                   "after 'by_induction on <expr> using <lemma>'");
+            if (peek().kind != TokenKind::Identifier) {
+                throwHere("expected an identifier (the subject "
+                          "name) after 'with'");
+            }
+            std::string subjectName = consumeAny().lexeme;
+            expect(TokenKind::Comma,
+                   "between subject name and ih name");
+            if (peek().kind != TokenKind::Identifier) {
+                throwHere("expected an identifier (the ih name) "
+                          "after ','");
+            }
+            std::string ihNameUsing = consumeAny().lexeme;
+            expect(TokenKind::LeftBrace,
+                   "after 'by_induction … using … with <subject>, <ih>'");
+            auto inductionBody = parseBlockContents();
+            expect(TokenKind::RightBrace,
+                   "ending by_induction-using block");
+            return makeSurfaceByInductionUsing(
+                std::move(scrutinee),
+                std::move(inductionLemma),
+                std::move(subjectName),
+                std::move(ihNameUsing),
+                std::move(inductionBody),
+                byToken.line, byToken.column);
+        }
+        std::string ihName;
+        if (isInduction) {
+            expect(TokenKind::KeywordWith,
+                   "after 'by_induction on <expr>'");
+            if (peek().kind != TokenKind::Identifier) {
+                throwHere("expected an identifier (the "
+                          "induction hypothesis name) after "
+                          "'with'");
+            }
+            ihName = consumeAny().lexeme;
+        }
+        expect(TokenKind::LeftBrace,
+               isInduction
+                   ? "after 'by_induction on <expr> with <ih>'"
+                   : "after 'by_cases on <expr>'");
+        auto clauses = parseCasesClauseBlock(
+            ihName, TokenKind::Colon);
+        expect(TokenKind::RightBrace,
+               isInduction ? "ending by_induction block"
+                           : "ending by_cases block");
+        return makeSurfaceCases(
+            std::move(scrutinee), std::move(clauses),
+            byToken.line, byToken.column);
     }
 
     // `witness E with P` — a shorthand for the anonymous tuple

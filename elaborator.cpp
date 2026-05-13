@@ -2061,7 +2061,128 @@ private:
             return elaborateCalc(*calc, localBinders, expectedType,
                                   expression.line, expression.column);
         }
+        if (auto* byInductionUsing =
+                std::get_if<SurfaceByInductionUsing>(&expression.node)) {
+            return elaborateByInductionUsing(
+                *byInductionUsing, localBinders, expectedType,
+                expression.line, expression.column);
+        }
         throw ElaborateError("unhandled surface expression variant");
+    }
+
+    // `by_induction on E using L with subject, ih { body }`:
+    //   E    = local-variable scrutinee
+    //   L    = induction lemma whose type is
+    //              (motive : T → Sort u)
+    //            → ((subject : T) → IH(subject) → motive subject)
+    //            → (target : T) → motive target
+    //   body = proves motive(subject), with subject and ih in scope
+    //
+    // Strategy: build the motive by abstracting expectedType over E,
+    // apply the lemma to the motive (so the kernel substitutes it into
+    // the remainder of the lemma's type), then decompose the
+    // already-substituted type to extract the subject and ih binder
+    // types. Then build the step lambda and finish the application.
+    ExpressionPointer elaborateByInductionUsing(
+        const SurfaceByInductionUsing& form,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "by_induction-using at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "by_induction needs an expected type from context");
+        }
+        ExpressionPointer scrutineeKernel = elaborateExpression(
+            *form.scrutinee, localBinders);
+        auto* boundVariable =
+            std::get_if<BoundVariable>(&scrutineeKernel->node);
+        if (!boundVariable
+            || boundVariable->deBruijnIndex < 0
+            || boundVariable->deBruijnIndex
+                   >= static_cast<int>(localBinders.size())) {
+            throwElaborate(
+                "by_induction's scrutinee must be a local-binder "
+                "variable (a parameter or let-binding name)");
+        }
+        int scrutineeDeBruijn = boundVariable->deBruijnIndex;
+        int scrutineeArrayIndex =
+            static_cast<int>(localBinders.size()) - 1
+            - scrutineeDeBruijn;
+        ExpressionPointer scrutineeType =
+            localBinders[scrutineeArrayIndex].type;
+        ExpressionPointer lemmaKernel = elaborateExpression(
+            *form.inductionLemma, localBinders);
+
+        // Build motive: Lambda(subjectName, T, expectedType[E := Bound 0]).
+        ExpressionPointer motiveBody =
+            abstractOverBoundVariables(expectedType, {scrutineeDeBruijn});
+        ExpressionPointer motive = makeLambda(
+            form.subjectName, scrutineeType, motiveBody);
+
+        // Apply the motive to the lemma. The kernel computes the
+        // remaining-arguments type, with motive already substituted.
+        ExpressionPointer lemmaAppliedToMotive =
+            makeApplication(lemmaKernel, motive);
+        ExpressionPointer remainingType = weakHeadNormalForm(
+            environment_,
+            inferTypeInLocalContext(localBinders, lemmaAppliedToMotive));
+        // remainingType should be:
+        //   (step : (subject : T) → IH(subject) → motive(subject))
+        //   → (target : T) → motive(target)
+        auto* stepPi = std::get_if<Pi>(&remainingType->node);
+        if (!stepPi) {
+            throwElaborate(
+                "induction lemma has no step argument after the motive");
+        }
+        ExpressionPointer stepType = weakHeadNormalForm(
+            environment_, stepPi->domain);
+        // stepType = (subject : T) → IH(subject) → motive(subject) —
+        // all in OUR context now (motive is concrete, not bound).
+        auto* stepSubjectPi = std::get_if<Pi>(&stepType->node);
+        if (!stepSubjectPi) {
+            throwElaborate(
+                "induction lemma's step must begin with a subject "
+                "argument (Pi)");
+        }
+        ExpressionPointer afterSubject = weakHeadNormalForm(
+            environment_, stepSubjectPi->codomain);
+        auto* stepIhPi = std::get_if<Pi>(&afterSubject->node);
+        if (!stepIhPi) {
+            throwElaborate(
+                "induction lemma's step must have an ih argument after "
+                "the subject");
+        }
+        ExpressionPointer ihTypeAfterSubject = stepIhPi->domain;
+        // ihTypeAfterSubject is in a context with subject at Bound(0)
+        // and our outer binders shifted by 1.
+
+        // Build the step lambda. Body's local-binder context:
+        // localBinders ++ [(subject, T), (ih, IH_in_body_context)].
+        // In stepBinders, subject is Bound(1) and ih is Bound(0); the
+        // outer binders are shifted accordingly.
+        std::vector<LocalBinder> stepBinders = localBinders;
+        stepBinders.push_back({form.subjectName, scrutineeType});
+        stepBinders.push_back({form.ihName, ihTypeAfterSubject});
+        // Body's expected type: motive(subject). motiveBody has
+        // Bound(0) for "abstract subject"; we want Bound(1) (subject
+        // in step body's context).
+        ExpressionPointer bodyExpectedType = shift(motiveBody, 1);
+        ExpressionPointer bodyKernel = elaborateExpression(
+            *form.body, stepBinders, bodyExpectedType);
+        ExpressionPointer ihLambda = makeLambda(
+            form.ihName, ihTypeAfterSubject, bodyKernel);
+        ExpressionPointer step = makeLambda(
+            form.subjectName, scrutineeType, ihLambda);
+
+        // Final: lemmaAppliedToMotive(step)(scrutinee).
+        ExpressionPointer application =
+            makeApplication(lemmaAppliedToMotive, std::move(step));
+        application = makeApplication(std::move(application),
+                                       std::move(scrutineeKernel));
+        (void)column;
+        return application;
     }
 
     // Elaborates a calc chain to a fold of Equality.transitivity calls.
