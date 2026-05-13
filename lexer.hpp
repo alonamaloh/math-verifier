@@ -34,6 +34,7 @@ enum class TokenKind {
     KeywordSuffices,
     KeywordByCases,         // `by_cases` — math-style case-split
     KeywordByInduction,     // `by_induction` — case-split with IH
+    KeywordContradiction,   // `contradiction` — close goal from P / ¬P
 
     // Punctuation
     LeftParen, RightParen,

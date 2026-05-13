@@ -46,6 +46,7 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"suffices",      TokenKind::KeywordSuffices},
         {"by_cases",      TokenKind::KeywordByCases},
         {"by_induction",  TokenKind::KeywordByInduction},
+        {"contradiction", TokenKind::KeywordContradiction},
     };
     return table;
 }
@@ -309,6 +310,7 @@ bool isKeyword(TokenKind kind) {
         case TokenKind::KeywordSuffices:
         case TokenKind::KeywordByCases:
         case TokenKind::KeywordByInduction:
+        case TokenKind::KeywordContradiction:
             return true;
         default:
             return false;
@@ -356,6 +358,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::KeywordSuffices:      return "'suffices'";
         case TokenKind::KeywordByCases:       return "'by_cases'";
         case TokenKind::KeywordByInduction:   return "'by_induction'";
+        case TokenKind::KeywordContradiction: return "'contradiction'";
         case TokenKind::LeftParen:            return "'('";
         case TokenKind::RightParen:           return "')'";
         case TokenKind::LeftBrace:            return "'{'";

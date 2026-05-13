@@ -224,9 +224,15 @@ private:
                     if (peek().kind == TokenKind::KeywordBy) {
                         consumeAny();  // 'by'
                         wrapper.value = parseExpression();
+                    } else if (peek().kind == TokenKind::LeftBrace) {
+                        // Footnote form: `claim P : T { proof_block };`
+                        // is sugar for `claim P : T by { proof_block };`.
+                        // The block is a normal expression-position
+                        // block, so parseExpression handles it.
+                        wrapper.value = parseExpression();
                     } else {
-                        // No `by`: the hammer fills the proof. We
-                        // build a `?` placeholder so the standard
+                        // No `by` or `{`: the hammer fills the proof.
+                        // We build a `?` placeholder so the standard
                         // let-binding path sees the same machinery.
                         wrapper.value = makeSurfaceHammer(
                             statementToken.line, statementToken.column);
@@ -270,6 +276,15 @@ private:
                 std::move(reductionLemma),
                 std::move(arguments),
                 sufficesToken.line, sufficesToken.column);
+        } else if (peek().kind == TokenKind::KeywordContradiction) {
+            // `contradiction;` — terminal. The trailing expression is
+            // a `?` hammer placeholder; the elaborator's contradiction
+            // strategy scans the local context for a pair (H : P,
+            // H' : ¬P) and builds `False.eliminate*(goal, H'(H))`.
+            Token contradictionToken = consumeAny();
+            if (peek().kind == TokenKind::Semicolon) consumeAny();
+            finalExpression = makeSurfaceHammer(
+                contradictionToken.line, contradictionToken.column);
         } else if (peek().kind == TokenKind::KeywordByCases
                    || peek().kind == TokenKind::KeywordByInduction) {
             // `by_cases on E { case P: body; ... }` is terminal

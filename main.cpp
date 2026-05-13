@@ -3944,6 +3944,56 @@ theorem disjunction_swap (A B : Proposition) (h : Or(A, B)) : Or(B, A) := {
         "by_cases statement is sugar for cases",
         __LINE__);
 
+    // `contradiction;` — closes the goal from a contradictory pair
+    // (H : P, H' : ¬P) in scope, building False.eliminate(goal, H'(H)).
+    expectVerifies(R"(
+module Test.contradiction_statement
+
+inductive False : Proposition where
+inductive True : Proposition where
+  | True.trivial : True
+
+definition Not (A : Proposition) : Proposition := A → False
+
+definition False.eliminate_proposition
+        (GoalProposition : Proposition) (proofOfFalse : False)
+        : GoalProposition :=
+  False_recursor(
+      function (_ : False) => GoalProposition,
+      proofOfFalse)
+
+theorem ex_falso (P : Proposition) (h : P) (notH : ¬P) : True := {
+  contradiction;
+}
+)",
+        "contradiction discharges any goal from P and ¬P",
+        __LINE__);
+
+    // Footnote form: `claim P : T { block };` — the proof of P is the
+    // block, which can itself contain nested claims, by_cases, etc.
+    // Equivalent to `claim P : T by { block };`.
+    expectVerifies(R"(
+module Test.claim_footnote
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem foo : Equality.{0}(Natural, zero, zero) := {
+  claim h : Equality.{0}(Natural, zero, zero) {
+    claim inner : Equality.{0}(Natural, zero, zero)
+         by reflexivity.{0}(Natural, zero);
+    inner
+  };
+  h
+}
+)",
+        "claim with block body works as a footnote",
+        __LINE__);
+
     // `by_induction on n with ih { case Constructor(args): body; … }` —
     // the `ih` name is appended to constructor patterns with recursive
     // arguments (e.g. `successor(predecessor)` becomes

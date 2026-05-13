@@ -2633,6 +2633,109 @@ private:
                                        localBinders.size());
     }
 
+    // Try to discharge the current goal from a contradictory pair of
+    // hypotheses in scope: H : P and H' : ¬P (= P → False). Build the
+    // False proof H'(H) and lift to the goal via False.eliminate or
+    // False.eliminate_proposition depending on the goal's universe.
+    ExpressionPointer tryContradictionFromHypotheses(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer goalType) {
+        if (!environment_.lookup("False")) return nullptr;
+        Context openedContext;
+        for (size_t i = 0; i < localBinders.size(); ++i) {
+            ExpressionPointer openedType = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            openedContext.push_back({localBinders[i].name, openedType,
+                                       FreeVariableOrigin::Internal});
+        }
+        // Walk binders looking for one whose type is `P → False` for
+        // some P. For each, scan for another binder whose type is
+        // definitionally equal to P.
+        for (int i = static_cast<int>(localBinders.size()) - 1;
+             i >= 0; --i) {
+            ExpressionPointer negationCandidate = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            ExpressionPointer normalised = weakHeadNormalForm(
+                environment_, negationCandidate);
+            auto* pi = std::get_if<Pi>(&normalised->node);
+            if (!pi) continue;
+            // Codomain must be False with no dependence on the bound
+            // variable (Not(P) = P → False).
+            if (referencesBoundBelowThreshold(pi->codomain, 1)) continue;
+            ExpressionPointer codomainNormalised = weakHeadNormalForm(
+                environment_, pi->codomain);
+            auto* codomainConstant =
+                std::get_if<Constant>(&codomainNormalised->node);
+            if (!codomainConstant
+                || codomainConstant->name != "False") continue;
+            ExpressionPointer negatedProposition = pi->domain;
+            for (int j = static_cast<int>(localBinders.size()) - 1;
+                 j >= 0; --j) {
+                if (j == i) continue;
+                ExpressionPointer candidatePropositionType =
+                    openOverLocalBinders(
+                        localBinders[j].type, localBinders, j);
+                if (!isDefinitionallyEqual(environment_, openedContext,
+                                            candidatePropositionType,
+                                            negatedProposition)) {
+                    continue;
+                }
+                int negationDeBruijn =
+                    static_cast<int>(localBinders.size()) - 1 - i;
+                int propositionDeBruijn =
+                    static_cast<int>(localBinders.size()) - 1 - j;
+                ExpressionPointer falseProof = makeApplication(
+                    makeBoundVariable(negationDeBruijn),
+                    makeBoundVariable(propositionDeBruijn));
+                // Lift False to the goal. Determine whether the goal
+                // lives in Proposition (Sort 0) or Type u by inspecting
+                // its inferred universe.
+                LevelPointer goalUniverseLevel;
+                bool goalIsProposition = false;
+                try {
+                    goalUniverseLevel = typeUniverseOf(
+                        localBinders,
+                        // Pass an "expression of type goalType" — we
+                        // can't easily synthesise one; instead infer the
+                        // universe of goalType directly.
+                        goalType);
+                    (void)goalUniverseLevel;
+                } catch (...) {
+                    // Fall back to eliminate_proposition on error.
+                }
+                {
+                    // Inspect goal type's universe via a direct
+                    // inferType on goalType. If it's Sort 0, we use
+                    // eliminate_proposition; otherwise eliminate (Type).
+                    ExpressionPointer goalTypeOpened =
+                        openOverLocalBinders(goalType, localBinders,
+                                              localBinders.size());
+                    ExpressionPointer goalKind = weakHeadNormalForm(
+                        environment_,
+                        inferType(environment_, openedContext,
+                                   goalTypeOpened));
+                    auto* sort = std::get_if<Sort>(&goalKind->node);
+                    if (sort) {
+                        auto level = levelAsConstant(sort->level);
+                        if (level && *level == 0) {
+                            goalIsProposition = true;
+                        }
+                    }
+                }
+                const char* eliminator = goalIsProposition
+                    ? "False.eliminate_proposition"
+                    : "False.eliminate";
+                if (!environment_.lookup(eliminator)) return nullptr;
+                ExpressionPointer call = makeConstant(eliminator);
+                call = makeApplication(std::move(call), goalType);
+                call = makeApplication(std::move(call),
+                                        std::move(falseProof));
+                return call;
+            }
+        }
+        return nullptr;
+    }
+
     ExpressionPointer elaborateHammerPlaceholder(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
@@ -2656,6 +2759,10 @@ private:
         if (auto disjoint =
                 tryConstructorDisjointness(localBinders, expectedType)) {
             return disjoint;
+        }
+        if (auto contradiction =
+                tryContradictionFromHypotheses(localBinders, expectedType)) {
+            return contradiction;
         }
         std::string message =
             "could not find a proof of:\n      "
