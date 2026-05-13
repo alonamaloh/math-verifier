@@ -24,21 +24,13 @@ inductive IntegerRepresentative : Type(0) where
   | IntegerRepresentative.make
       : Natural → Natural → IntegerRepresentative
 
--- Helper for `IntegerEquivalent` that fixes the first pair's
--- components and pattern-matches the second pair. The two-stage
--- destructure (here + below) is what the elaborator's "only the
--- first pattern position may be a constructor" rule forces.
-definition IntegerEquivalent.after_first (a b : Natural)
-        : IntegerRepresentative → Proposition
-  | IntegerRepresentative.make(c, d) =>
-      a + d = b + c
-
 -- (a, b) ~ (c, d) iff a + d = b + c. Algebraic restatement of "a - b
 -- = c - d" that stays inside Natural.
 definition IntegerEquivalent
         : IntegerRepresentative → IntegerRepresentative → Proposition
-  | IntegerRepresentative.make(a, b), second =>
-      IntegerEquivalent.after_first(a, b, second)
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d) =>
+      a + d = b + c
 
 -- The equivalence is reflexive: (a, b) ~ (a, b). Follows from
 -- a + b = b + a (commutativity).
@@ -49,9 +41,10 @@ theorem IntegerEquivalent.reflexive
       Natural.add_commutative(a, b)
 
 -- Symmetry: (a, b) ~ (c, d) implies (c, d) ~ (a, b). From `a + d = b
--- + c` derive `c + b = d + a` by reshuffling via commutativity. Need
--- a chain of two pattern-matches because the elaborator only allows
--- one constructor pattern per multi-argument case.
+-- + c` derive `c + b = d + a` by reshuffling via commutativity. Uses
+-- a thin helper because hypothesis types do not refine across nested
+-- constructor patterns (the elaborator's recursor-style desugaring
+-- doesn't relocate function-argument bindings inside the inner case).
 theorem IntegerEquivalent.symmetric_after_first (a b : Natural)
         : (y : IntegerRepresentative)
           → IntegerEquivalent(IntegerRepresentative.make(a, b), y)
@@ -111,6 +104,7 @@ theorem IntegerEquivalent.transitive_natural
 
 -- Transitivity, pattern-match chain: destructure x first, then y,
 -- then z, threading the components down to `transitive_natural`.
+-- (Same elaborator limitation as IntegerEquivalent.symmetric.)
 theorem IntegerEquivalent.transitive_after_xy
         (a b c d : Natural)
         : (z : IntegerRepresentative)

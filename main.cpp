@@ -3777,6 +3777,37 @@ theorem trivial (A : Type(0)) (x : A) : Equality.{0}(A, x, x) :=
         "calc with a single step elaborates to the step proof",
         __LINE__);
 
+    // Multi-pattern pattern-match: constructor patterns in non-first
+    // positions desugar to nested `cases` in the body. Supports
+    // definition-style bodies whose result doesn't depend on hypothesis
+    // types refined by the destructuring (proofs with such hypotheses
+    // still need the helper-chain pattern).
+    expectVerifies(R"(
+module Test.multi_pattern
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Pair : Type(0) where
+  | Pair.make : Natural → Natural → Pair
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+definition Pair.swap_components : Pair → Pair → Pair
+  | Pair.make(a, _), Pair.make(c, _) => Pair.make(c, a)
+
+theorem swap_test
+        : Equality.{0}(Pair,
+                        Pair.swap_components(Pair.make(zero, zero),
+                                             Pair.make(zero, zero)),
+                        Pair.make(zero, zero)) :=
+  reflexivity.{0}(Pair, Pair.make(zero, zero))
+)",
+        "multi-constructor pattern desugars via nested cases",
+        __LINE__);
+
     // Quotient kernel reduction: `Quotient.lift(f, _, Quotient.mk(x))`
     // should reduce to `f(x)` definitionally, so a `reflexivity` proof
     // closes the resulting equality. Tests the special-cased rule in

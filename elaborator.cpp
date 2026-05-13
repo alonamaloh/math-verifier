@@ -970,6 +970,51 @@ private:
                 + "' in definition '" + declaration.name + "'");
         }
 
+        // Desugar non-bare patterns in non-scrutinee positions: replace
+        // each with a fresh bare name and wrap the body in a `cases
+        // freshName { originalPattern => body }`. This lets users write
+        // `| Foo.make(a, b), Bar.make(c, d) => …` even though the
+        // recursor-style elaboration below only handles a constructor
+        // pattern in the first position. The wrapping order is
+        // last-to-first so the innermost `cases` is the latest pattern
+        // — pattern-bound names in each position remain in scope for
+        // the original body.
+        SurfacePatternCase desugaredCase = *matchedCase;
+        {
+            SurfaceExpressionPointer wrappedBody = desugaredCase.body;
+            for (size_t reverseIndex =
+                     desugaredCase.patterns.size();
+                 reverseIndex > 1; --reverseIndex) {
+                size_t patternIndex = reverseIndex - 1;
+                const SurfacePattern& pattern =
+                    *desugaredCase.patterns[patternIndex];
+                if (std::get_if<SurfacePatternBareName>(&pattern.node)) {
+                    continue;
+                }
+                std::string freshName =
+                    "_patternMatchArg_" + std::to_string(patternIndex);
+                int line = pattern.line;
+                int column = pattern.column;
+                SurfaceCasesClause clause;
+                clause.pattern = desugaredCase.patterns[patternIndex];
+                clause.body = wrappedBody;
+                clause.line = line;
+                clause.column = column;
+                std::vector<SurfaceCasesClause> clauses;
+                clauses.push_back(std::move(clause));
+                SurfaceExpressionPointer scrutinee = makeSurfaceIdentifier(
+                    freshName, {}, line, column);
+                wrappedBody = makeSurfaceCases(
+                    std::move(scrutinee),
+                    std::move(clauses),
+                    line, column);
+                desugaredCase.patterns[patternIndex] =
+                    makeSurfacePatternBareName(freshName, line, column);
+            }
+            desugaredCase.body = std::move(wrappedBody);
+            matchedCase = &desugaredCase;
+        }
+
         // Extract the destructured argument names from the pattern.
         std::vector<std::string> destructuredNames;
         const SurfacePattern& firstPattern = *matchedCase->patterns.front();
