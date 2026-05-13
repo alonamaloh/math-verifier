@@ -3208,40 +3208,52 @@ private:
                                         static_cast<int>(
                                             binderTypeStack->size())
                                         - 1 - k;
-                                    if (stackPosition >= 0) {
+                                    if (stackPosition >= 0
+                                        && !referencesBoundBelowThreshold(
+                                               (*binderTypeStack)
+                                                   [stackPosition],
+                                               stackPosition)) {
                                         ExpressionPointer kType =
                                             (*binderTypeStack)
                                                 [stackPosition];
                                         // The binder type was captured
-                                        // at the depth it was bound;
-                                        // shift to the outer scope by
-                                        // dropping that many binders.
+                                        // in a scope with `stackPosition`
+                                        // earlier descended binders.
+                                        // Shift down so it lives in
+                                        // the outer scope. The guard
+                                        // above rejects types whose
+                                        // Bound vars reference those
+                                        // earlier descended binders —
+                                        // those can't be expressed in
+                                        // the outer scope.
                                         ExpressionPointer kTypeOuter =
-                                            shift(kType,
-                                                   -(stackPosition));
+                                            stackPosition == 0
+                                                ? kType
+                                                : shift(kType,
+                                                         -stackPosition);
                                         ExpressionPointer abstracted =
                                             abstractOverBoundVariable(
                                                 target, k);
-                                        // The abstracted body lives in
-                                        // a scope with binderDepth
-                                        // pattern-internal binders +
-                                        // the new Lambda binder. We
-                                        // need to lift it to the outer
-                                        // scope (just the new Lambda
-                                        // binder). Shift everything
-                                        // not bound by the new Lambda
-                                        // down by binderDepth.
-                                        // abstractOverBoundVariable
-                                        // shifted other outer refs by
-                                        // +1; binderDepth-1 internal
-                                        // refs (other than k) become
-                                        // captured if they appear, but
-                                        // we checked that target has
-                                        // no refs below
-                                        // captureThreshold.
+                                        // `abstracted` is in scope
+                                        // {outer + descended binders +
+                                        //  Lambda binder}. We need it
+                                        // in {outer + Lambda binder},
+                                        // which means shifting indices
+                                        // that reference the outer
+                                        // scope (Bound(>=binderDepth+1)
+                                        // after abstraction) down by
+                                        // `binderDepth`, while leaving
+                                        // Bound(0) (the Lambda binder)
+                                        // alone. References to the
+                                        // descended binders themselves
+                                        // (Bound(1..binderDepth)) have
+                                        // been ruled out by the
+                                        // `referencesOtherBoundsBelow…`
+                                        // check above.
                                         ExpressionPointer body =
                                             shift(abstracted,
-                                                  -binderDepth + 1);
+                                                  -binderDepth,
+                                                  binderDepth + 1);
                                         ExpressionPointer solution =
                                             makeLambda(
                                                 "_motiveBinder",
