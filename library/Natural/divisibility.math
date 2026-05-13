@@ -147,19 +147,88 @@ theorem Natural.divides_multiple_left (d k m : Natural)
           Natural.multiply_associative(d, k, q))))⟩
 }
 
--- If d divides both a and a+1, then d divides 1. Used in Euclid's
--- proof to derive a contradiction when a prime candidate would have
--- to divide both N = product + 1 and the product itself.
+-- Helper: if successor(d * q1) = d * q2, then d divides one. The
+-- structurally decreasing argument is q1. In the q1 = successor case
+-- we use Natural_recursor directly on q2 — the surface `cases`
+-- expression's recursive-call rewriter doesn't yet descend into
+-- cases bodies, so we expand the q2-split into an explicit recursor
+-- application whose case lambdas the rewriter can see through.
 --
--- TODO(arithmetic): prove this from the underlying witnesses. The
--- proof sketch is: open d ∣ a and d ∣ succ(a) into d*q1 = a and
--- d*q2 = succ(a); from these d*q2 = d*q1 + 1; case on d. d=0 is
--- impossible (succ(a) ≠ 0); for d ≥ 1 the relationship q2 = q1 + 1
--- forces d ≤ 1, so d = 1, and divides(1, 1) is the witness with
--- quotient 1. The proof is ~100 lines of arithmetic and is
--- axiomatised here so the Euclid result can land first.
-axiom Natural.divides_consecutive_implies_one
-        : (d a : Natural)
-          → Natural.divides(d, a)
-          → Natural.divides(d, successor(a))
+--   q1 = 0          → succ(d*0) = succ(0) = 1; witness q2.
+--   q1 = succ, q2=0 → succ(_) cannot equal d*0 = 0, contradiction.
+--   q1 = succ, q2=succ → cancel `d` from both sides of
+--                        d + succ(d*q1') = d + d*q2' to reduce to
+--                        succ(d*q1') = d*q2' and recurse.
+theorem Natural.divides_one_of_consecutive_helper
+        (d : Natural)
+        : (q1 q2 : Natural)
+          → Equality(Natural, successor(d * q1), d * q2)
           → Natural.divides(d, one)
+  | zero, q2, equalityProof =>
+      Exists.introduce(
+          Natural,
+          fun (quotient : Natural) => one = d * quotient,
+          q2,
+          Equality.transitivity(
+              congruenceOf(successor,
+                  Equality.symmetry(Natural.multiply_zero(d))),
+              equalityProof))
+  | successor(q1p), q2, equalityProof =>
+      Natural_recursor.{0}(
+          fun (q2_value : Natural) =>
+              Equality(Natural,
+                       successor(d * successor(q1p)),
+                       d * q2_value)
+              → Natural.divides(d, one),
+          fun (zeroEquality : Equality(Natural,
+                                       successor(d * successor(q1p)),
+                                       d * zero)) =>
+              False.eliminate_proposition(
+                  Natural.divides(d, one),
+                  Natural.successor_not_zero(
+                      d * successor(q1p),
+                      Equality.transitivity(zeroEquality,
+                          Natural.multiply_zero(d)))),
+          fun (q2p : Natural)
+              (_inductionHypothesis :
+                  Equality(Natural,
+                           successor(d * successor(q1p)),
+                           d * q2p)
+                  → Natural.divides(d, one))
+              (successorEquality :
+                  Equality(Natural,
+                           successor(d * successor(q1p)),
+                           d * successor(q2p))) =>
+              Natural.divides_one_of_consecutive_helper(d, q1p, q2p,
+                  Natural.add_cancel_left(
+                      d, successor(d * q1p), d * q2p,
+                      Equality.transitivity(
+                          Natural.add_successor(d, d * q1p),
+                          Equality.transitivity(
+                              congruenceOf(successor,
+                                  Equality.symmetry(
+                                      Natural.multiply_successor(d, q1p))),
+                              Equality.transitivity(
+                                  successorEquality,
+                                  Natural.multiply_successor(d, q2p)))))),
+          q2,
+          equalityProof)
+
+-- If d divides both a and a+1, then d divides 1. Destructure both
+-- divisibility witnesses (a = d*q1, succ(a) = d*q2) into the equation
+-- successor(d*q1) = d*q2 and delegate to the helper. We pattern-match
+-- on the successor-side proof and destructure the a-side proof in the
+-- body, because the pattern-match form only allows constructor
+-- patterns in the scrutinee position.
+theorem Natural.divides_consecutive_implies_one
+        (d a : Natural) (firstDivides : Natural.divides(d, a))
+        : Natural.divides(d, successor(a))
+          → Natural.divides(d, one)
+  | Exists.introduce(q2, secondEquality) => {
+      let ⟨q1, firstEquality⟩ := firstDivides;
+      Natural.divides_one_of_consecutive_helper(d, q1, q2,
+          Equality.transitivity(
+              congruenceOf(successor,
+                  Equality.symmetry(firstEquality)),
+              secondEquality))
+  }

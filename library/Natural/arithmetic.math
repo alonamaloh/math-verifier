@@ -21,6 +21,7 @@
 module Natural.arithmetic
 
 import Natural.basics
+import Natural.peano
 import Equality.basics
 
 -- Theorem: 0 + a = a. Definitional.
@@ -164,3 +165,17 @@ theorem Natural.multiply_associative
           congruenceOf(fun (rest : Natural) => b * c + rest,
                         Natural.multiply_associative(
                             predecessor, b, c)))
+
+-- Cancellation on the left of addition. Proof by induction on `a`:
+-- the zero case is definitional (zero + x ≡ x for any x), and the
+-- successor case rewrites both sides of the equation to
+-- successor(predecessor + …) form (also definitional) and peels off
+-- the successor with successor_injective before recursing.
+theorem Natural.add_cancel_left
+        : (a b c : Natural) → a + b = a + c → b = c
+  | zero, _, _, equalityProof =>
+      equalityProof
+  | successor(predecessor), b, c, equalityProof =>
+      Natural.add_cancel_left(predecessor, b, c,
+          Natural.successor_injective(
+              predecessor + b, predecessor + c, equalityProof))
