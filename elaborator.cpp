@@ -847,13 +847,33 @@ private:
                     inductiveArguments[k]);
             }
         }
-        if (destructuredNames.size() != constructorArguments.size()) {
+        // The user may supply N names (value args only — IHs get
+        // auto-generated `_inductionHypothesisFor_<name>` names) or
+        // N + recursiveCount names (value args followed by explicit
+        // IH names, in declaration order of the recursive args).
+        size_t recursiveCount = 0;
+        for (const auto& constructorArgument : constructorArguments) {
+            if (constructorArgument.isRecursive) ++recursiveCount;
+        }
+        size_t minNames = constructorArguments.size();
+        size_t maxNames = constructorArguments.size() + recursiveCount;
+        if (destructuredNames.size() < minNames
+            || destructuredNames.size() > maxNames) {
             throw ElaborateError(
                 "pattern for '" + constructorName + "' binds "
                 + std::to_string(destructuredNames.size())
-                + " arguments but the constructor takes "
-                + std::to_string(constructorArguments.size()));
+                + " name(s) but the constructor takes "
+                + std::to_string(constructorArguments.size())
+                + " value argument(s)"
+                + (recursiveCount > 0
+                       ? " plus an optional "
+                         + std::to_string(recursiveCount)
+                         + " induction-hypothesis name(s)"
+                       : ""));
         }
+        bool userProvidedHypothesisNames =
+            destructuredNames.size() == maxNames;
+        size_t nextHypothesisIndex = constructorArguments.size();
 
         // The case lambda's binders, in order:
         //   For each constructor argument i:
@@ -939,8 +959,14 @@ private:
                 // ^ Bound(0) is the most-recently-bound name, which is
                 // the constructor argument we just added
                 // (destructuredName).
-                std::string hypothesisName =
-                    "_inductionHypothesisFor_" + destructuredName;
+                std::string hypothesisName;
+                if (userProvidedHypothesisNames) {
+                    hypothesisName =
+                        destructuredNames[nextHypothesisIndex++];
+                } else {
+                    hypothesisName =
+                        "_inductionHypothesisFor_" + destructuredName;
+                }
                 lambdaBinders.push_back({hypothesisName,
                                           recursionHypothesisType});
                 recursiveArgToHypothesis[destructuredName] = hypothesisName;
