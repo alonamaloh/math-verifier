@@ -9,6 +9,7 @@ module Natural.divisibility
 import Natural.basics
 import Natural.arithmetic
 import Natural.order
+import Natural.subtraction
 import Equality.basics
 import Logic.basics
 import Logic.exists
@@ -144,6 +145,48 @@ theorem Natural.divides_multiple_left (d k m : Natural)
               Natural.multiply_commutative(k, d)),
           Natural.multiply_associative(d, k, q))))⟩
 }
+
+-- Left distributivity: d * (a + b) = d * a + d * b. Derived from
+-- right distributivity plus commutativity — useful enough on its own
+-- to name. Both Natural.divides_add and any future linear-combination
+-- reasoning reach for this.
+theorem Natural.multiply_distributes_left_over_add
+        (d a b : Natural)
+        : d * (a + b) = d * a + d * b :=
+  Equality.transitivity(
+      Natural.multiply_commutative(d, a + b),
+      Equality.transitivity(
+          Natural.distributivity_right(a, b, d),
+          Equality.transitivity(
+              congruenceOf(
+                  function (z : Natural) => z + b * d,
+                  Natural.multiply_commutative(a, d)),
+              congruenceOf(
+                  function (w : Natural) => d * a + w,
+                  Natural.multiply_commutative(b, d)))))
+
+-- Divisibility is preserved by addition: if d | a and d | b, then
+-- d | a + b. Combining witnesses: a = d * q1 and b = d * q2 give
+-- a + b = d * q1 + d * q2 = d * (q1 + q2) via left distributivity.
+theorem Natural.divides_add (d a b : Natural)
+        (dDividesA : d ∣ a) (dDividesB : d ∣ b)
+        : d ∣ (a + b) := {
+  let ⟨q1, aEqualsDTimesQ1⟩ := dDividesA;
+  let ⟨q2, bEqualsDTimesQ2⟩ := dDividesB;
+  ⟨q1 + q2,
+    -- a + b = d*q1 + d*q2 = d*(q1+q2).
+    Equality.transitivity(
+        congruenceOf(
+            function (x : Natural) => x + b,
+            aEqualsDTimesQ1),
+        Equality.transitivity(
+            congruenceOf(
+                function (y : Natural) => d * q1 + y,
+                bEqualsDTimesQ2),
+            Equality.symmetry(
+                Natural.multiply_distributes_left_over_add(d, q1, q2))))⟩
+}
+
 
 -- Helper: if successor(d * q1) = d * q2, then d divides 1. Structural
 -- recursion on q1. In the q1 = successor case we case-split q2; an

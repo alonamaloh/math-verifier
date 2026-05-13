@@ -1,0 +1,88 @@
+-- Natural/subtraction.math
+--
+-- Subtraction for Natural via existence-of-witness: when b ≤ a, there is
+-- a unique c with a = b + c. We never define a partial `subtract`
+-- function on Natural — that would either leak truncation (monus) or
+-- require Integer to land at. Instead we expose the existential, and
+-- downstream proofs unpack the witness as needed.
+--
+-- We also prove totality of ≤ on Natural here, since both halves of any
+-- algorithm "split on which side is bigger" pair the same structure.
+
+module Natural.subtraction
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+
+-- If b ≤ a then ∃ c. a = b + c. Pattern-match on the ≤ proof:
+-- reflexivity gives c = 0; step recurses on the sub-proof and bumps
+-- the witness through successor + add_successor. The body uses the
+-- destructured constructor names (commonValue, smaller, predA) so
+-- the kernel's motive-substituted expected type lines up directly.
+theorem Natural.subtraction_witness (b a : Natural)
+        : b ≤ a → ∃ (c : Natural). a = b + c
+  | LessOrEqual.reflexivity(commonValue) =>
+      Exists.introduce(
+          Natural,
+          function (c : Natural) => commonValue = commonValue + c,
+          zero,
+          Equality.symmetry(Natural.add_zero(commonValue)))
+  | LessOrEqual.step(smaller, predecessorOfA, subProof) =>
+      Exists.eliminate(
+          Natural,
+          function (cPrime : Natural) => predecessorOfA = smaller + cPrime,
+          ∃ (c : Natural). successor(predecessorOfA) = smaller + c,
+          function (cPrime : Natural)
+                   (predEquality : predecessorOfA = smaller + cPrime) =>
+              Exists.introduce(
+                  Natural,
+                  function (c : Natural) =>
+                      successor(predecessorOfA) = smaller + c,
+                  successor(cPrime),
+                  Equality.transitivity(
+                      congruenceOf(successor, predEquality),
+                      Equality.symmetry(
+                          Natural.add_successor(smaller, cPrime)))),
+          Natural.subtraction_witness(smaller, predecessorOfA, subProof))
+
+-- Totality: for any a, b, either a ≤ b or b ≤ a. The successor case
+-- on a needs a recursive call passed in as a hypothesis (mirroring
+-- the shape used by `decides_less_or_equal` in `Natural.decide`).
+theorem Natural.totality_of_less_or_equal_successor_against
+        (predecessorOfA : Natural)
+        (totalityPredecessorOfA :
+            (b : Natural) → predecessorOfA ≤ b ∨ b ≤ predecessorOfA)
+        : (b : Natural)
+          → successor(predecessorOfA) ≤ b ∨ b ≤ successor(predecessorOfA)
+  | zero =>
+      Or.introduceRight(Natural.zero_least(successor(predecessorOfA)))
+  | successor(predecessorOfB) =>
+      Or.eliminate(
+          predecessorOfA ≤ predecessorOfB,
+          predecessorOfB ≤ predecessorOfA,
+          successor(predecessorOfA) ≤ successor(predecessorOfB)
+              ∨ successor(predecessorOfB) ≤ successor(predecessorOfA),
+          function (leftBranch : predecessorOfA ≤ predecessorOfB) =>
+              Or.introduceLeft(
+                  Natural.successor_less_or_equal_successor(
+                      predecessorOfA, predecessorOfB, leftBranch)),
+          function (rightBranch : predecessorOfB ≤ predecessorOfA) =>
+              Or.introduceRight(
+                  Natural.successor_less_or_equal_successor(
+                      predecessorOfB, predecessorOfA, rightBranch)),
+          totalityPredecessorOfA(predecessorOfB))
+
+theorem Natural.totality_of_less_or_equal
+        : (a b : Natural) → a ≤ b ∨ b ≤ a
+  | zero, b =>
+      Or.introduceLeft(Natural.zero_least(b))
+  | successor(predecessorOfA), b =>
+      Natural.totality_of_less_or_equal_successor_against(
+          predecessorOfA,
+          Natural.totality_of_less_or_equal(predecessorOfA),
+          b)

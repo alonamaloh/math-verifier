@@ -1,0 +1,78 @@
+-- Natural/gcd.math
+--
+-- Greatest common divisor of two naturals, characterised via the
+-- divisibility lattice: `is_gcd(g, a, b)` says g is a common divisor
+-- of a and b that every common divisor of a and b divides. This is
+-- the universal-property style — no need to fix a "canonical
+-- algorithm" up front.
+--
+-- Existence of a gcd for every (a, b) is deferred to the Bezout
+-- chapter (F-4): once we have Integer and the Euclidean algorithm
+-- with integer coefficients, gcd existence falls out alongside
+-- the linear-combination identity.
+
+module Natural.gcd
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.divisibility
+
+-- Common-divisor predicate: g divides both a and b, and any common
+-- divisor of (a, b) divides g.
+definition Natural.is_gcd (g a b : Natural) : Proposition :=
+  g ∣ a
+  ∧ g ∣ b
+  ∧ ((d : Natural) → d ∣ a → d ∣ b → d ∣ g)
+
+-- Symmetry: gcd of (a, b) is also gcd of (b, a). Trivial reshuffle of
+-- the three components.
+theorem Natural.is_gcd_symmetric (g a b : Natural)
+        (gcdProof : Natural.is_gcd(g, a, b))
+        : Natural.is_gcd(g, b, a) := {
+  let ⟨gDividesA, gDividesB, universalProperty⟩ := gcdProof;
+  ⟨gDividesB,
+   gDividesA,
+   function (d : Natural)
+            (dDividesB : d ∣ b)
+            (dDividesA : d ∣ a) =>
+       universalProperty(d, dDividesA, dDividesB)⟩
+}
+
+-- b is the gcd of (zero, b): b divides 0 (every n divides 0), b
+-- divides b, and any common divisor of (0, b) trivially divides
+-- the second argument.
+theorem Natural.is_gcd_zero_left (b : Natural)
+        : Natural.is_gcd(b, zero, b) :=
+  ⟨Natural.divides_zero(b),
+   Natural.divides_reflexive(b),
+   function (d : Natural)
+            (_ : d ∣ zero)
+            (dDividesB : d ∣ b) =>
+       dDividesB⟩
+
+-- a is the gcd of (a, zero). Same shape with roles swapped.
+theorem Natural.is_gcd_zero_right (a : Natural)
+        : Natural.is_gcd(a, a, zero) :=
+  ⟨Natural.divides_reflexive(a),
+   Natural.divides_zero(a),
+   function (d : Natural)
+            (dDividesA : d ∣ a)
+            (_ : d ∣ zero) =>
+       dDividesA⟩
+
+-- Equivalent characterisation: 1 is the gcd of (a, 1). Every natural
+-- divides 1's quotient witness (q = 1), 1 divides everything, and any
+-- divisor of 1 *is* 1, which trivially divides 1.
+theorem Natural.is_gcd_one_right (a : Natural)
+        : Natural.is_gcd(1, a, 1) :=
+  ⟨Natural.one_divides(a),
+   Natural.divides_reflexive(1),
+   function (d : Natural)
+            (_ : d ∣ a)
+            (dDividesOne : d ∣ 1) =>
+       dDividesOne⟩
