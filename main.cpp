@@ -3771,6 +3771,99 @@ definition recursive_through_cases : Natural → Natural
         "recursive call inside cases body is rewritten",
         __LINE__);
 
+    // Hammer constructor disjointness: `Not(C(...) = D(...))` for
+    // distinct constructors of the same inductive elaborates to a
+    // synthesized discriminator + Equality_recursor proof.
+    expectVerifies(R"(
+module Test.hammer_disjointness_successor_zero
+
+inductive True : Proposition where
+  | True.trivial : True
+
+inductive False : Proposition where
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+theorem successor_disjoint_from_zero (n : Natural)
+        : (Equality.{0}(Natural, successor(n), zero)) → False := ?
+)",
+        "hammer disjointness: successor(n) ≠ zero",
+        __LINE__);
+
+    // Symmetric direction: zero ≠ successor(n).
+    expectVerifies(R"(
+module Test.hammer_disjointness_zero_successor
+
+inductive True : Proposition where
+  | True.trivial : True
+
+inductive False : Proposition where
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+theorem zero_disjoint_from_successor (n : Natural)
+        : (Equality.{0}(Natural, zero, successor(n))) → False := ?
+)",
+        "hammer disjointness: zero ≠ successor(n)",
+        __LINE__);
+
+    // Two-constructor enum: distinct constructors are unequal.
+    expectVerifies(R"(
+module Test.hammer_disjointness_enum
+
+inductive True : Proposition where
+  | True.trivial : True
+
+inductive False : Proposition where
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+inductive Color : Type(0) where
+  | red    : Color
+  | green  : Color
+  | blue   : Color
+
+theorem red_is_not_blue
+        : (Equality.{0}(Color, red, blue)) → False := ?
+)",
+        "hammer disjointness: distinct nullary constructors",
+        __LINE__);
+
+    // Negative: same constructor on both sides should fall through.
+    expectErrorContains(R"(
+module Test.hammer_disjointness_same_constructor
+
+inductive True : Proposition where
+  | True.trivial : True
+
+inductive False : Proposition where
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+theorem succ_eq_succ_not_disjoint
+        : (Equality.{0}(Natural, successor(zero), successor(zero))) → False := ?
+)",
+        {"could not find a proof",
+         "succ_eq_succ_not_disjoint"},
+        "hammer rejects same-constructor disjointness",
+        __LINE__);
+
     // calc in a pattern-match body verifies. (A recursive call inside
     // a calc step PROOF is exercised end-to-end by the rewrite of
     // Natural.add_commutative in library/Natural/arithmetic.math —

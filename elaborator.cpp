@@ -2264,6 +2264,332 @@ private:
         return nullptr;
     }
 
+    // Try constructor-disjointness: if the goal is
+    // `Not(Equality(I, C_i(...), C_j(...)))` for distinct constructors
+    // C_i, C_j of the same inductive I, synthesize a discriminator
+    // (I_recursor applied to a constant Proposition motive that
+    // returns True for case i and False for everything else) and
+    // build the proof via Equality_recursor. Currently restricted to
+    // non-indexed inductives.
+    ExpressionPointer tryConstructorDisjointness(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer goalType) {
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalType, localBinders, localBinders.size());
+        ExpressionPointer goalNormalised = weakHeadNormalForm(
+            environment_, goalOpened);
+        // `Not(X)` desugars to `X → False`, i.e. Pi with non-dependent
+        // codomain False.
+        auto* topPi = std::get_if<Pi>(&goalNormalised->node);
+        if (!topPi) return nullptr;
+        if (referencesBoundBelowThreshold(topPi->codomain, 1)) return nullptr;
+        ExpressionPointer codomainNormalised = weakHeadNormalForm(
+            environment_, topPi->codomain);
+        auto* codomainConstant =
+            std::get_if<Constant>(&codomainNormalised->node);
+        if (!codomainConstant || codomainConstant->name != "False") {
+            return nullptr;
+        }
+        // Domain must be Equality.{u}(I, lhs, rhs) applied to three args.
+        ExpressionPointer domainNormalised = weakHeadNormalForm(
+            environment_, topPi->domain);
+        std::vector<ExpressionPointer> equalityArguments;
+        ExpressionPointer cursor = domainNormalised;
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            equalityArguments.insert(equalityArguments.begin(),
+                                      application->argument);
+            cursor = application->function;
+        }
+        auto* equalityConstant = std::get_if<Constant>(&cursor->node);
+        if (!equalityConstant || equalityConstant->name != "Equality"
+            || equalityArguments.size() != 3) {
+            return nullptr;
+        }
+        ExpressionPointer inductiveTypeApplied = equalityArguments[0];
+        ExpressionPointer leftHandSide  = equalityArguments[1];
+        ExpressionPointer rightHandSide = equalityArguments[2];
+        LevelPointer equalityUniverse =
+            equalityConstant->universeArguments.empty()
+                ? makeLevelConst(0)
+                : equalityConstant->universeArguments[0];
+
+        auto extractConstructorHead =
+                [&](ExpressionPointer expression)
+                    -> std::pair<const Constructor*, std::string> {
+            ExpressionPointer e = weakHeadNormalForm(
+                environment_, expression);
+            while (auto* application =
+                       std::get_if<Application>(&e->node)) {
+                e = application->function;
+            }
+            auto* constant = std::get_if<Constant>(&e->node);
+            if (!constant) return {nullptr, ""};
+            const Declaration* declaration =
+                environment_.lookup(constant->name);
+            if (!declaration) return {nullptr, ""};
+            auto* constructor =
+                std::get_if<Constructor>(declaration);
+            if (!constructor) return {nullptr, ""};
+            return {constructor, constant->name};
+        };
+        auto leftHead  = extractConstructorHead(leftHandSide);
+        auto rightHead = extractConstructorHead(rightHandSide);
+        if (!leftHead.first || !rightHead.first) return nullptr;
+        if (leftHead.first->inductiveName
+            != rightHead.first->inductiveName) return nullptr;
+        if (leftHead.first->constructorIndex
+            == rightHead.first->constructorIndex) return nullptr;
+
+        const std::string& inductiveName =
+            leftHead.first->inductiveName;
+        const Declaration* inductiveDeclaration =
+            environment_.lookup(inductiveName);
+        auto* inductive = inductiveDeclaration
+            ? std::get_if<Inductive>(inductiveDeclaration) : nullptr;
+        if (!inductive) return nullptr;
+        std::string recursorName = inductiveName + "_recursor";
+        const Declaration* recursorDeclaration =
+            environment_.lookup(recursorName);
+        auto* recursor = recursorDeclaration
+            ? std::get_if<Recursor>(recursorDeclaration) : nullptr;
+        if (!recursor) return nullptr;
+        if (recursor->numIndices != 0) return nullptr;  // v1: non-indexed.
+
+        // Extract the inductive's universe args + parameter values from
+        // the applied form `I.{...}(p1, p2, ..., pN)` of the type.
+        std::vector<ExpressionPointer> parameterValues;
+        std::vector<LevelPointer> inductiveUniverseArguments;
+        {
+            ExpressionPointer e = weakHeadNormalForm(
+                environment_, inductiveTypeApplied);
+            std::vector<ExpressionPointer> appliedArgs;
+            while (auto* application =
+                       std::get_if<Application>(&e->node)) {
+                appliedArgs.insert(appliedArgs.begin(),
+                                    application->argument);
+                e = application->function;
+            }
+            auto* inductiveConstant = std::get_if<Constant>(&e->node);
+            if (!inductiveConstant
+                || inductiveConstant->name != inductiveName) {
+                return nullptr;
+            }
+            inductiveUniverseArguments =
+                inductiveConstant->universeArguments;
+            if (static_cast<int>(appliedArgs.size())
+                != inductive->numParameters) {
+                return nullptr;
+            }
+            parameterValues = std::move(appliedArgs);
+        }
+
+        // Required environment dependencies.
+        if (!environment_.lookup("True")
+            || !environment_.lookup("True.trivial")
+            || !environment_.lookup("False")
+            || !environment_.lookup("Equality_recursor")) {
+            return nullptr;
+        }
+
+        // Build the constant motive: `function (_ : I_applied) => Proposition`.
+        // The motive's domain is the fully-applied inductive type.
+        ExpressionPointer constantMotive = makeLambda(
+            "_discriminator_target", inductiveTypeApplied,
+            makeProposition());
+
+        // Build a case body for each constructor. The body is the
+        // constant True (for the lhs's constructor index) or False
+        // (for all others), wrapped in lambdas matching the recursor's
+        // case signature: one lambda per constructor value-arg, plus an
+        // extra lambda per recursive arg (immediately following it).
+        // The recursive-arg lambdas have domain `Proposition` —
+        // definitionally equal to `motive(arg)` for our constant motive,
+        // which is what the recursor expects.
+        std::vector<ExpressionPointer> caseLambdas;
+        for (size_t constructorIndex = 0;
+             constructorIndex < inductive->constructorNames.size();
+             ++constructorIndex) {
+            const std::string& constructorName =
+                inductive->constructorNames[constructorIndex];
+            const Declaration* constructorDeclaration =
+                environment_.lookup(constructorName);
+            auto* constructor = constructorDeclaration
+                ? std::get_if<Constructor>(constructorDeclaration)
+                : nullptr;
+            if (!constructor) return nullptr;
+            ExpressionPointer constructorCursor = constructor->type;
+            for (const auto& parameterValue : parameterValues) {
+                auto* parameterPi =
+                    std::get_if<Pi>(&constructorCursor->node);
+                if (!parameterPi) return nullptr;
+                constructorCursor = substitute(parameterPi->codomain,
+                                                0, parameterValue);
+            }
+            struct ValueArgument {
+                std::string defaultName;
+                ExpressionPointer type;
+                bool isRecursive;
+            };
+            std::vector<ValueArgument> valueArguments;
+            while (auto* valuePi =
+                       std::get_if<Pi>(&constructorCursor->node)) {
+                ValueArgument argument;
+                argument.defaultName = valuePi->displayHint;
+                argument.type = valuePi->domain;
+                ExpressionPointer typeHead = valuePi->domain;
+                while (auto* application =
+                           std::get_if<Application>(&typeHead->node)) {
+                    typeHead = application->function;
+                }
+                auto* typeHeadConstant =
+                    std::get_if<Constant>(&typeHead->node);
+                argument.isRecursive = typeHeadConstant
+                    && typeHeadConstant->name == inductiveName;
+                valueArguments.push_back(std::move(argument));
+                constructorCursor = valuePi->codomain;
+            }
+            bool returnsTrue =
+                static_cast<int>(constructorIndex)
+                    == leftHead.first->constructorIndex;
+            ExpressionPointer caseBody =
+                makeConstant(returnsTrue ? "True" : "False");
+            // Wrap in reverse order: innermost = caseBody, outermost
+            // = the first value arg. Recursion lambdas sit immediately
+            // INSIDE their corresponding constructor-arg lambda — i.e.
+            // after the constructor arg in declaration order.
+            for (int argumentIndex =
+                     static_cast<int>(valueArguments.size()) - 1;
+                 argumentIndex >= 0; --argumentIndex) {
+                const ValueArgument& argument =
+                    valueArguments[argumentIndex];
+                if (argument.isRecursive) {
+                    caseBody = makeLambda(
+                        argument.defaultName.empty()
+                            ? "_unused_recursion_argument"
+                            : argument.defaultName
+                                  + "_recursion_argument",
+                        makeProposition(),
+                        std::move(caseBody));
+                }
+                caseBody = makeLambda(
+                    argument.defaultName.empty()
+                        ? "_unused_value_argument"
+                        : argument.defaultName,
+                    argument.type,
+                    std::move(caseBody));
+            }
+            caseLambdas.push_back(std::move(caseBody));
+        }
+
+        // Assemble the discriminator: I_recursor.{...inductiveUniArgs, 1}
+        // applied to (parameterValues, constantMotive, caseLambdas...,
+        // discriminatorTargetVar). The motive `λ _ : I. Proposition`
+        // returns the Proposition universe — whose type is `Type 0`
+        // (= Sort 1) — so the motive's universe level is 1.
+        bool recursorHasMotiveLevel =
+            recursor->universeParameters.size()
+                > inductive->universeParameters.size();
+        std::vector<LevelPointer> recursorUniverseArguments =
+            inductiveUniverseArguments;
+        if (recursorHasMotiveLevel) {
+            recursorUniverseArguments.push_back(makeLevelConst(1));
+        }
+        ExpressionPointer discriminatorApplied = makeConstant(
+            recursorName,
+            std::move(recursorUniverseArguments));
+        for (const auto& parameterValue : parameterValues) {
+            discriminatorApplied = makeApplication(
+                discriminatorApplied, parameterValue);
+        }
+        discriminatorApplied = makeApplication(
+            discriminatorApplied, constantMotive);
+        for (const auto& caseLambda : caseLambdas) {
+            discriminatorApplied = makeApplication(
+                discriminatorApplied, caseLambda);
+        }
+        // No index args (numIndices == 0). Apply the discriminator's
+        // bound target var (de Bruijn 0 inside the outer Lambda).
+        discriminatorApplied = makeApplication(
+            discriminatorApplied, makeBoundVariable(0));
+        // Wrap in a Lambda over the target.
+        ExpressionPointer discriminator = makeLambda(
+            "_discriminator_target", inductiveTypeApplied,
+            std::move(discriminatorApplied));
+
+        // Build the J/Equality_recursor motive:
+        //   function (other : I) (_ : Equality(I, lhs, other)) =>
+        //     discriminator(other)
+        // The target Lambda sits at de Bruijn 1 (when we're in the
+        // motive body); we shift discriminator down so the outer Lambda
+        // it carries is unaffected (it has no free bound vars referring
+        // to our local context since it's a closed kernel term).
+        // Wait — discriminator may reference parameterValues which DO
+        // come from the local context. Treat them carefully: the
+        // discriminator was built with closed kernel expressions
+        // (parameterValues are closed) so it's a closed term modulo
+        // any free Bound vars referring to outer binders.
+        //
+        // The motive body `discriminator(other)` references `other`
+        // (Bound 1 inside motive's nested-Lambda body). All other free
+        // Bound refs in discriminator need to be SHIFTED by +2 (we're
+        // adding two binders: `other` and the equality-proof).
+        ExpressionPointer discriminatorShifted = shift(discriminator, 2);
+        ExpressionPointer motiveBody = makeApplication(
+            discriminatorShifted,
+            makeBoundVariable(1));  // `other` arg of the motive
+        // motive = λ (other : I). λ (_ : Equality(I, lhs, other)).
+        //                discriminator(other)
+        // Build the Equality-type expression for the inner Pi/Lambda
+        // domain — Equality.{u}(I, lhs_shifted, Bound(0)).
+        // Since we're at depth 1 (inside `other` Lambda), references to
+        // lhs and inductiveTypeApplied (which come from the local
+        // context) must be shifted by 1.
+        ExpressionPointer equalityForMotive = makeConstant(
+            "Equality", {equalityUniverse});
+        equalityForMotive = makeApplication(
+            equalityForMotive, shift(inductiveTypeApplied, 1));
+        equalityForMotive = makeApplication(
+            equalityForMotive, shift(leftHandSide, 1));
+        equalityForMotive = makeApplication(
+            equalityForMotive, makeBoundVariable(0));
+        ExpressionPointer jMotive = makeLambda(
+            "_equality_proof_for_motive", equalityForMotive, motiveBody);
+        jMotive = makeLambda("_motive_other", inductiveTypeApplied,
+                              std::move(jMotive));
+
+        // Build the reflexivity case: True.trivial.
+        ExpressionPointer reflexivityCase =
+            makeConstant("True.trivial");
+
+        // Assemble Equality_recursor.{0, equalityUniverse}(
+        //   I, lhs, jMotive, True.trivial, rhs, equalityProofBound)
+        // where equalityProofBound is the outer-most Lambda we wrap at
+        // the end (the user's eq proof, Bound 0).
+        ExpressionPointer recursorCall = makeConstant(
+            "Equality_recursor",
+            {makeLevelConst(0), equalityUniverse});
+        recursorCall = makeApplication(
+            recursorCall, shift(inductiveTypeApplied, 1));
+        recursorCall = makeApplication(
+            recursorCall, shift(leftHandSide, 1));
+        recursorCall = makeApplication(
+            recursorCall, shift(jMotive, 1));
+        recursorCall = makeApplication(recursorCall, reflexivityCase);
+        recursorCall = makeApplication(
+            recursorCall, shift(rightHandSide, 1));
+        recursorCall = makeApplication(recursorCall,
+                                        makeBoundVariable(0));
+
+        // Wrap in λ (equalityProof : Equality(I, lhs, rhs)). recursorCall.
+        ExpressionPointer proofLambda = makeLambda(
+            "_disjointness_equality", topPi->domain, recursorCall);
+        // Close back over local binders so the caller's `expectedType`
+        // (which is in closed form) matches.
+        return closeOverLocalBinders(proofLambda, localBinders,
+                                       localBinders.size());
+    }
+
     ExpressionPointer elaborateHammerPlaceholder(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
@@ -2283,6 +2609,10 @@ private:
         if (auto applied =
                 tryLocalHypothesisApplication(localBinders, expectedType)) {
             return applied;
+        }
+        if (auto disjoint =
+                tryConstructorDisjointness(localBinders, expectedType)) {
+            return disjoint;
         }
         std::string message =
             "could not find a proof of:\n      "
