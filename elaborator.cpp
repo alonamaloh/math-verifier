@@ -81,6 +81,63 @@ private:
         resetAutoBoundState();
     }
 
+    // Rewrites `expression` so that BoundVariable(targetIndex) becomes
+    // BoundVariable(0) at every depth, and every OTHER BoundVariable
+    // that refers to outer scope is shifted up by one. Used to build
+    // a motive that abstracts over a specific local-binder variable
+    // (the scrutinee of a `cases` expression): the resulting term is
+    // suitable as the body of a Lambda whose binder takes the
+    // scrutinee's place at index 0.
+    ExpressionPointer abstractOverBoundVariable(
+        ExpressionPointer expression,
+        int targetIndex,
+        int currentDepth = 0) {
+        if (auto* boundVariable =
+                std::get_if<BoundVariable>(&expression->node)) {
+            int index = boundVariable->deBruijnIndex;
+            int effective = index - currentDepth;
+            if (effective == targetIndex) {
+                return makeBoundVariable(currentDepth);
+            }
+            if (effective >= 0) {
+                return makeBoundVariable(index + 1);
+            }
+            return expression;  // refers to a binder we've descended into
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return makePi(pi->displayHint,
+                abstractOverBoundVariable(pi->domain, targetIndex,
+                                            currentDepth),
+                abstractOverBoundVariable(pi->codomain, targetIndex,
+                                            currentDepth + 1));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return makeLambda(lambda->displayHint,
+                abstractOverBoundVariable(lambda->domain, targetIndex,
+                                            currentDepth),
+                abstractOverBoundVariable(lambda->body, targetIndex,
+                                            currentDepth + 1));
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return makeApplication(
+                abstractOverBoundVariable(application->function,
+                                            targetIndex, currentDepth),
+                abstractOverBoundVariable(application->argument,
+                                            targetIndex, currentDepth));
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            return makeLet(let->displayHint,
+                abstractOverBoundVariable(let->type, targetIndex,
+                                            currentDepth),
+                abstractOverBoundVariable(let->value, targetIndex,
+                                            currentDepth),
+                abstractOverBoundVariable(let->body, targetIndex,
+                                            currentDepth + 1));
+        }
+        return expression;
+    }
+
     // Counts leading implicit binder names in a declaration's argument
     // list. Throws if `{x:T}` and `(y:U)` are interleaved (Phase 2.1
     // restricts implicit binders to a leading consecutive prefix). The
@@ -1777,12 +1834,38 @@ private:
                 + ": '" + recursorName + "' is not a recursor");
         }
 
-        // Build the motive: fun (target : scrutineeType) => expectedType.
-        // The expected type lives in the outer scope; shift by 1 to make
-        // it valid under the motive's target binder. (BoundVariable
-        // references to local binders need to skip past the new binder.)
+        // Build the motive: fun (target : scrutineeType) => motiveBody.
+        // When the scrutinee is itself a local variable (BoundVariable),
+        // the motive ABSTRACTS over that variable: any reference to it
+        // inside expectedType becomes the target binder. This is what
+        // makes induction-by-cases sound — without it, a goal like
+        // `cases n { | zero => ...; | successor(k) => ... } : n = n`
+        // would have an unprovable motiveAtCase (each case would need
+        // to produce `n = n`, but only knows about zero or successor(k)).
+        // For non-variable scrutinees, fall back to the simpler shift —
+        // the goal genuinely doesn't depend on the scrutinee value.
+        int scrutineeLocalIndex = -1;
+        if (auto* boundVariable =
+                std::get_if<BoundVariable>(&scrutinee->node)) {
+            int index = boundVariable->deBruijnIndex;
+            if (index >= 0
+                && index < static_cast<int>(localBinders.size())) {
+                scrutineeLocalIndex = index;
+            }
+        }
+        ExpressionPointer motiveBody;
+        if (scrutineeLocalIndex >= 0) {
+            // Abstract over the scrutinee's BoundVariable: rewrite the
+            // expected type so references to that variable become the
+            // motive's target binder, while every other reference is
+            // shifted up by one to make room for it.
+            motiveBody = abstractOverBoundVariable(
+                expectedType, scrutineeLocalIndex);
+        } else {
+            motiveBody = shift(expectedType, 1);
+        }
         ExpressionPointer motive = makeLambda(
-            "_cases_target", scrutineeType, shift(expectedType, 1));
+            "_cases_target", scrutineeType, motiveBody);
 
         // Infer the motive's universe level by asking the kernel for
         // its type (a Pi ending in a Sort). Local binders' types may
