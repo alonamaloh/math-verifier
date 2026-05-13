@@ -3417,8 +3417,45 @@ Environment verifyMathSource(const std::string& source) {
     auto tokens = lex(source);
     auto module = parseModule(tokens);
     std::vector<std::string> importedModules;
-    elaborateModule(module, environment, importedModules);
+    // The elaborator writes axiom-admission warnings straight to
+    // std::cerr; redirect to a sink during ordinary unit tests so they
+    // don't clutter the suite output. Tests that want to assert on the
+    // warning text can call elaborateModule directly with cerr restored.
+    std::ostringstream warningSink;
+    std::streambuf* originalCerrBuffer = std::cerr.rdbuf(warningSink.rdbuf());
+    try {
+        elaborateModule(module, environment, importedModules);
+    } catch (...) {
+        std::cerr.rdbuf(originalCerrBuffer);
+        throw;
+    }
+    std::cerr.rdbuf(originalCerrBuffer);
     return environment;
+}
+
+// Like verifyMathSource, but returns the captured stderr alongside the
+// environment so tests can inspect axiom-admission warnings.
+struct VerifyResult {
+    Environment environment;
+    std::string capturedStderr;
+};
+
+VerifyResult verifyMathSourceCapturingStderr(const std::string& source) {
+    VerifyResult result;
+    auto tokens = lex(source);
+    auto module = parseModule(tokens);
+    std::vector<std::string> importedModules;
+    std::ostringstream warningSink;
+    std::streambuf* originalCerrBuffer = std::cerr.rdbuf(warningSink.rdbuf());
+    try {
+        elaborateModule(module, result.environment, importedModules);
+    } catch (...) {
+        std::cerr.rdbuf(originalCerrBuffer);
+        throw;
+    }
+    std::cerr.rdbuf(originalCerrBuffer);
+    result.capturedStderr = warningSink.str();
+    return result;
 }
 
 // Exercises the elaborator's diagnostic output — checks that intended
@@ -3621,6 +3658,54 @@ theorem unfillable (A B : Proposition) (h : A → B) : B := ?
          "depth-1 hypothesis-application"},
         "hammer fails when an application arg is unfillable",
         __LINE__);
+
+    // Axiom-admission warning: every `axiom` declaration must surface
+    // on stderr so a verified file is never silent about its unproved
+    // assumptions. Two axioms in one module → two warning lines.
+    {
+        auto result = verifyMathSourceCapturingStderr(R"(
+module Test.axiom_warnings
+axiom AssumedFact : Type(0)
+axiom AnotherFact : Type(0)
+)");
+        const std::string& captured = result.capturedStderr;
+        std::vector<std::string> mustContain = {
+            "warning: axiom 'AssumedFact' admitted without proof",
+            "warning: axiom 'AnotherFact' admitted without proof",
+        };
+        std::vector<std::string> missing;
+        for (const auto& needle : mustContain) {
+            if (captured.find(needle) == std::string::npos)
+                missing.push_back(needle);
+        }
+        if (missing.empty()) ++passed;
+        else {
+            ++failed;
+            std::cerr << "FAIL (line " << __LINE__
+                      << "): axiom-admission warning missing substring(s):\n";
+            for (const auto& needle : missing)
+                std::cerr << "    expected: " << needle << "\n";
+            std::cerr << "    actual captured stderr:\n" << captured << "\n";
+        }
+    }
+
+    // Definitions and theorems must NOT trigger the axiom warning.
+    {
+        auto result = verifyMathSourceCapturingStderr(R"(
+module Test.no_warning_on_definition
+inductive Bool : Type(0) where
+  | true : Bool
+  | false : Bool
+definition Bool.identity : Bool → Bool := fun (b : Bool) => b
+)");
+        if (result.capturedStderr.empty()) ++passed;
+        else {
+            ++failed;
+            std::cerr << "FAIL (line " << __LINE__
+                      << "): non-axiom declarations should not emit warnings."
+                      << " stderr captured: " << result.capturedStderr << "\n";
+        }
+    }
 }
 
 void runEndToEndPipelineTests() {

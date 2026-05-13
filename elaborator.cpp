@@ -233,6 +233,10 @@ private:
         } catch (const TypeError& kernelError) {
             rethrowKernelError(kernelError);
         }
+        // Axioms are accepted without proof — flag every one so that
+        // verifying a file is never silent about its unproved assumptions.
+        std::cerr << "warning: axiom '" << declaration.name
+                  << "' admitted without proof\n";
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
