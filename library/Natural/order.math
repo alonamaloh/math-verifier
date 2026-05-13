@@ -42,7 +42,7 @@ theorem LessOrEqual.transitive (a b c : Natural)
               a, b, cPredecessor,
               secondProofSubdivided, firstProof))
 
--- Successor preserves ≤: a ≤ b implies succ(a) ≤ succ(b). By induction
+-- Successor preserves ≤: a ≤ b implies successor(a) ≤ successor(b). By induction
 -- on the proof.
 --
 -- In the case bodies we use the DESTRUCTURED names (commonValue,
@@ -52,7 +52,7 @@ theorem LessOrEqual.transitive (a b c : Natural)
 -- resolves `a` and `b` to the OUTER binders (which kernel-level
 -- aren't equal to the destructured values, even though they are
 -- propositionally so in each case).
-theorem Natural.succ_le_succ (a b : Natural)
+theorem Natural.successor_less_or_equal_successor (a b : Natural)
         : LessOrEqual(a, b)
           → LessOrEqual(successor(a), successor(b))
   | LessOrEqual.reflexivity(commonValue) =>
@@ -60,30 +60,30 @@ theorem Natural.succ_le_succ (a b : Natural)
   | LessOrEqual.step(smallerD, largerPredecessor, subproof) =>
       LessOrEqual.step(
           successor(smallerD), successor(largerPredecessor),
-          Natural.succ_le_succ(smallerD, largerPredecessor, subproof))
+          Natural.successor_less_or_equal_successor(smallerD, largerPredecessor, subproof))
 
 -- a ≤ a + b. Induction on a, using that successor(_) + m and zero + m
 -- reduce definitionally on the first argument.
-theorem Natural.le_add_right
+theorem Natural.less_or_equal_add_right
         : (a b : Natural) → LessOrEqual(a, Natural.add(a, b))
   | zero, b =>
       Natural.zero_least(b)
   | successor(predecessor), b =>
-      Natural.succ_le_succ(
+      Natural.successor_less_or_equal_successor(
           predecessor, Natural.add(predecessor, b),
-          Natural.le_add_right(predecessor, b))
+          Natural.less_or_equal_add_right(predecessor, b))
 
--- succ(p) ≤ upperBound implies p ≤ upperBound. Transitive via the
--- single-step `p ≤ succ(p)`.
-theorem Natural.le_predecessor_le (p upperBound : Natural)
+-- successor(p) ≤ upperBound implies p ≤ upperBound. Transitive via the
+-- single-step `p ≤ successor(p)`.
+theorem Natural.less_or_equal_predecessor_less_or_equal (p upperBound : Natural)
         : LessOrEqual(successor(p), upperBound)
           → LessOrEqual(p, upperBound) :=
-  fun (succLe : LessOrEqual(successor(p), upperBound)) =>
+  function (successorLessOrEqual : LessOrEqual(successor(p), upperBound)) =>
     LessOrEqual.transitive(
         p, successor(p), upperBound,
-        succLe,
+        successorLessOrEqual,
         LessOrEqual.step(p, p, LessOrEqual.reflexivity(p)))
 
 -- 1 ≤ 2. Built from reflexivity by stepping the upper bound once.
-theorem Natural.one_le_two : LessOrEqual(one, two) :=
+theorem Natural.one_less_or_equal_two : LessOrEqual(one, two) :=
   LessOrEqual.step(one, one, LessOrEqual.reflexivity(one))

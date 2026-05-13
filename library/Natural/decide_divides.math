@@ -11,7 +11,7 @@
 --      with n = d·q, or rule out every such q.
 --
 --   3. Natural.decides_divides itself: for d = 0, dispatch via
---      decides_equality(n, 0); for d = succ(dP), invoke the bounded
+--      decides_equality(n, 0); for d = successor(dPredecessor), invoke the bounded
 --      search at bound = n. The "no quotient in [0, n]" branch
 --      combines with the cap lemma to give "no quotient anywhere".
 
@@ -35,18 +35,18 @@ import Logic.exists
 theorem Natural.le_q_d_mult_q
         : (d q : Natural) → LessOrEqual(one, d)
           → LessOrEqual(q, Natural.multiply(d, q))
-  | zero, q, oneLeZero =>
+  | zero, q, oneLessOrEqualZero =>
       False.eliminate_proposition(
           LessOrEqual(q, Natural.multiply(zero, q)),
-          Natural.not_le_succ_zero(zero, oneLeZero))
+          Natural.not_less_or_equal_successor_zero(zero, oneLessOrEqualZero))
   | successor(predD), q, _ =>
-      Natural.le_add_right(q, Natural.multiply(predD, q))
+      Natural.less_or_equal_add_right(q, Natural.multiply(predD, q))
 
 -- Bounded quotient search. Returns either a witness q ≤ bound with
 -- n = d·q, or a function rejecting every such q.
 theorem Natural.search_quotient_witness_up_to (d n : Natural)
         : (quotientBound : Natural)
-          → Or(Exists(Natural, fun (q : Natural) =>
+          → Or(Exists(Natural, function (q : Natural) =>
                   And(LessOrEqual(q, quotientBound),
                       n = Natural.multiply(d, q))),
                 (q : Natural)
@@ -56,104 +56,104 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
       Or.eliminate(
           n = Natural.multiply(d, zero),
           Not(n = Natural.multiply(d, zero)),
-          Or(Exists(Natural, fun (q : Natural) =>
+          Or(Exists(Natural, function (q : Natural) =>
                   And(LessOrEqual(q, zero),
                       n = Natural.multiply(d, q))),
               (q : Natural)
                 → LessOrEqual(q, zero)
                 → Not(n = Natural.multiply(d, q))),
-          fun (nEqDtimesZero : n = Natural.multiply(d, zero)) =>
+          function (nEqualsDTimesZero : n = Natural.multiply(d, zero)) =>
               Or.introduceLeft(
                   Exists.introduce(
                       zero,
                       And.introduction(
                           LessOrEqual.reflexivity(zero),
-                          nEqDtimesZero))),
-          fun (nNotDtimesZero :
+                          nEqualsDTimesZero))),
+          function (nNotDTimesZero :
                   Not(n = Natural.multiply(d, zero))) =>
               Or.introduceRight(
-                  fun (q : Natural)
-                      (qLeZero : LessOrEqual(q, zero))
-                      (nEqDq : n = Natural.multiply(d, q)) =>
-                    nNotDtimesZero(
+                  function (q : Natural)
+                      (quotientLessOrEqualZero : LessOrEqual(q, zero))
+                      (nEqualsDTimesQuotient : n = Natural.multiply(d, q)) =>
+                    nNotDTimesZero(
                         Equality.transport_proposition(
                             Natural,
-                            fun (qValue : Natural) =>
+                            function (qValue : Natural) =>
                                 n = Natural.multiply(d, qValue),
                             q, zero,
-                            Natural.le_zero_implies_eq_zero(
-                                q, qLeZero),
-                            nEqDq))),
+                            Natural.less_or_equal_zero_implies_equals_zero(
+                                q, quotientLessOrEqualZero),
+                            nEqualsDTimesQuotient))),
           Natural.decides_equality(n, Natural.multiply(d, zero)))
   | successor(prevBound) =>
       Or.eliminate(
-          Exists(Natural, fun (q : Natural) =>
+          Exists(Natural, function (q : Natural) =>
               And(LessOrEqual(q, prevBound),
                   n = Natural.multiply(d, q))),
           (q : Natural)
               → LessOrEqual(q, prevBound)
               → Not(n = Natural.multiply(d, q)),
-          Or(Exists(Natural, fun (q : Natural) =>
+          Or(Exists(Natural, function (q : Natural) =>
                   And(LessOrEqual(q, successor(prevBound)),
                       n = Natural.multiply(d, q))),
               (q : Natural)
                 → LessOrEqual(q, successor(prevBound))
                 → Not(n = Natural.multiply(d, q))),
           -- Found earlier: propagate, boosting the bound proof.
-          fun (foundEarlier : Exists(Natural,
-                  fun (q : Natural) =>
+          function (foundEarlier : Exists(Natural,
+                  function (q : Natural) =>
                       And(LessOrEqual(q, prevBound),
                           n = Natural.multiply(d, q)))) =>
               Exists.eliminate(
                   Natural,
-                  fun (q : Natural) =>
+                  function (q : Natural) =>
                       And(LessOrEqual(q, prevBound),
                           n = Natural.multiply(d, q)),
-                  Or(Exists(Natural, fun (q : Natural) =>
+                  Or(Exists(Natural, function (q : Natural) =>
                           And(LessOrEqual(q, successor(prevBound)),
                               n = Natural.multiply(d, q))),
                       (q : Natural)
                         → LessOrEqual(q, successor(prevBound))
                         → Not(n = Natural.multiply(d, q))),
-                  fun (q : Natural)
+                  function (q : Natural)
                       (combined : And(LessOrEqual(q, prevBound),
                                        n = Natural.multiply(d, q))) =>
                     And.eliminate(
                         LessOrEqual(q, prevBound),
                         n = Natural.multiply(d, q),
-                        Or(Exists(Natural, fun (qInner : Natural) =>
+                        Or(Exists(Natural, function (qInner : Natural) =>
                                 And(LessOrEqual(qInner,
                                                  successor(prevBound)),
                                     n = Natural.multiply(d, qInner))),
                             (qInner : Natural)
                               → LessOrEqual(qInner, successor(prevBound))
                               → Not(n = Natural.multiply(d, qInner))),
-                        fun (qLePrevBound : LessOrEqual(q, prevBound))
-                            (nEqDq : n = Natural.multiply(d, q)) =>
+                        function (qLePrevBound : LessOrEqual(q, prevBound))
+                            (nEqualsDTimesQuotient : n = Natural.multiply(d, q)) =>
                           Or.introduceLeft(
                               Exists.introduce(
                                   q,
                                   And.introduction(
                                       LessOrEqual.step(
                                           q, prevBound, qLePrevBound),
-                                      nEqDq))),
+                                      nEqualsDTimesQuotient))),
                         combined),
                   foundEarlier),
-          -- Not found in [0, prevBound]: check q = succ(prevBound).
-          fun (noneEarlier :
+          -- Not found in [0, prevBound]: check q = successor(prevBound).
+          function (noneEarlier :
                   (q : Natural)
                   → LessOrEqual(q, prevBound)
                   → Not(n = Natural.multiply(d, q))) =>
               Or.eliminate(
                   n = Natural.multiply(d, successor(prevBound)),
                   Not(n = Natural.multiply(d, successor(prevBound))),
-                  Or(Exists(Natural, fun (qInner : Natural) =>
+                  Or(Exists(Natural, function (qInner : Natural) =>
                           And(LessOrEqual(qInner, successor(prevBound)),
                               n = Natural.multiply(d, qInner))),
                       (qInner : Natural)
                         → LessOrEqual(qInner, successor(prevBound))
                         → Not(n = Natural.multiply(d, qInner))),
-                  fun (nEqDtimesSuccPrev :
+                  function (nEqualsDTimesSuccessorPrevious :
                           n = Natural.multiply(d, successor(prevBound))) =>
                       Or.introduceLeft(
                           Exists.introduce(
@@ -161,49 +161,49 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
                               And.introduction(
                                   LessOrEqual.reflexivity(
                                       successor(prevBound)),
-                                  nEqDtimesSuccPrev))),
-                  fun (nNotDtimesSuccPrev :
+                                  nEqualsDTimesSuccessorPrevious))),
+                  function (nNotDTimesSuccessorPrevious :
                           Not(n = Natural.multiply(d, successor(prevBound)))) =>
                       Or.introduceRight(
-                          fun (q : Natural)
-                              (qLeSuccPrev :
+                          function (q : Natural)
+                              (quotientLessOrEqualSuccessorPrevious :
                                   LessOrEqual(q, successor(prevBound)))
-                              (nEqDq : n = Natural.multiply(d, q)) =>
-                            -- q ≤ succ(prevBound): either q = succ(prevBound)
-                            -- (contradicts nNotDtimesSuccPrev) or q ≤ prevBound
+                              (nEqualsDTimesQuotient : n = Natural.multiply(d, q)) =>
+                            -- q ≤ successor(prevBound): either q = successor(prevBound)
+                            -- (contradicts nNotDTimesSuccessorPrevious) or q ≤ prevBound
                             -- (contradicts noneEarlier).
                             Or.eliminate(
                                 q = successor(prevBound),
                                 Exists(Natural,
-                                    fun (bPredecessor : Natural) =>
+                                    function (bPredecessor : Natural) =>
                                         And(successor(prevBound) =
                                                 successor(bPredecessor),
                                              LessOrEqual(q, bPredecessor))),
                                 False,
-                                fun (qEqSuccPrev :
+                                function (quotientEqualsSuccessorPrevious :
                                         q = successor(prevBound)) =>
-                                    nNotDtimesSuccPrev(
+                                    nNotDTimesSuccessorPrevious(
                                         Equality.transport_proposition(
                                             Natural,
-                                            fun (qValue : Natural) =>
+                                            function (qValue : Natural) =>
                                                 n = Natural.multiply(d, qValue),
                                             q, successor(prevBound),
-                                            qEqSuccPrev,
-                                            nEqDq)),
-                                fun (existsProof :
+                                            quotientEqualsSuccessorPrevious,
+                                            nEqualsDTimesQuotient)),
+                                function (existsProof :
                                         Exists(Natural,
-                                            fun (bPredecessor : Natural) =>
+                                            function (bPredecessor : Natural) =>
                                                 And(successor(prevBound) =
                                                         successor(bPredecessor),
                                                      LessOrEqual(q, bPredecessor)))) =>
                                     Exists.eliminate(
                                         Natural,
-                                        fun (bPredecessor : Natural) =>
+                                        function (bPredecessor : Natural) =>
                                             And(successor(prevBound) =
                                                     successor(bPredecessor),
                                                  LessOrEqual(q, bPredecessor)),
                                         False,
-                                        fun (bPredecessor : Natural)
+                                        function (bPredecessor : Natural)
                                             (combined : And(successor(prevBound) =
                                                                 successor(bPredecessor),
                                                              LessOrEqual(q,
@@ -213,17 +213,17 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
                                                   successor(bPredecessor),
                                               LessOrEqual(q, bPredecessor),
                                               False,
-                                              fun (succEq :
+                                              function (successorEquals :
                                                       successor(prevBound) =
                                                           successor(bPredecessor))
-                                                  (qLeBP :
+                                                  (quotientLessOrEqualBPredecessor :
                                                       LessOrEqual(q,
                                                                    bPredecessor)) =>
                                                   noneEarlier(
                                                       q,
                                                       Equality.transport_proposition(
                                                           Natural,
-                                                          fun (rightEnd : Natural) =>
+                                                          function (rightEnd : Natural) =>
                                                               LessOrEqual(q,
                                                                            rightEnd),
                                                           bPredecessor,
@@ -232,21 +232,21 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
                                                               Natural.successor_injective(
                                                                   prevBound,
                                                                   bPredecessor,
-                                                                  succEq)),
-                                                          qLeBP),
-                                                      nEqDq),
+                                                                  successorEquals)),
+                                                          quotientLessOrEqualBPredecessor),
+                                                      nEqualsDTimesQuotient),
                                               combined),
                                         existsProof),
                                 LessOrEqual.invert(
                                     q, successor(prevBound),
-                                    qLeSuccPrev))),
+                                    quotientLessOrEqualSuccessorPrevious))),
                   Natural.decides_equality(
                       n,
                       Natural.multiply(d, successor(prevBound)))),
           Natural.search_quotient_witness_up_to(d, n, prevBound))
 
 -- Decidable divisibility on Natural. For d = 0, dispatches via
--- decides_equality(n, 0). For d = succ(dP), runs the bounded search
+-- decides_equality(n, 0). For d = successor(dPredecessor), runs the bounded search
 -- at bound = n; the "not found" branch combines with the cap lemma
 -- to rule out any q (because q > n would force d·q > n).
 theorem Natural.decides_divides
@@ -257,32 +257,32 @@ theorem Natural.decides_divides
           n = zero,
           Not(n = zero),
           Or(Natural.divides(zero, n), Not(Natural.divides(zero, n))),
-          fun (nEqZero : n = zero) =>
+          function (nEqualsZero : n = zero) =>
               -- divides(0, n) with witness q = 0: need n = 0*0 = 0.
               Or.introduceLeft(
                   Exists.introduce(
                       zero,
-                      nEqZero)),
-          fun (nNotZero : Not(n = zero)) =>
+                      nEqualsZero)),
+          function (nNotEqualZero : Not(n = zero)) =>
               Or.introduceRight(
-                  fun (divProof : Natural.divides(zero, n)) =>
+                  function (divProof : Natural.divides(zero, n)) =>
                       Exists.eliminate(
                           Natural,
-                          fun (q : Natural) =>
+                          function (q : Natural) =>
                               n = Natural.multiply(zero, q),
                           False,
-                          fun (q : Natural)
+                          function (q : Natural)
                               (nEqMulZeroQ :
                                   n = Natural.multiply(zero, q)) =>
                               -- multiply(zero, q) reduces to zero
-                              -- definitionally (first-arg rule of
+                              -- definitionally (first-argument rule of
                               -- multiply), so nEqMulZeroQ : n = zero.
-                              nNotZero(nEqMulZeroQ),
+                              nNotEqualZero(nEqMulZeroQ),
                           divProof)),
           Natural.decides_equality(n, zero))
   | successor(predD), n =>
       Or.eliminate(
-          Exists(Natural, fun (q : Natural) =>
+          Exists(Natural, function (q : Natural) =>
               And(LessOrEqual(q, n),
                   n = Natural.multiply(successor(predD), q))),
           (q : Natural)
@@ -290,18 +290,18 @@ theorem Natural.decides_divides
               → Not(n = Natural.multiply(successor(predD), q)),
           Or(Natural.divides(successor(predD), n),
               Not(Natural.divides(successor(predD), n))),
-          fun (foundWitness : Exists(Natural,
-                  fun (q : Natural) =>
+          function (foundWitness : Exists(Natural,
+                  function (q : Natural) =>
                       And(LessOrEqual(q, n),
                           n = Natural.multiply(successor(predD), q)))) =>
               Exists.eliminate(
                   Natural,
-                  fun (q : Natural) =>
+                  function (q : Natural) =>
                       And(LessOrEqual(q, n),
                           n = Natural.multiply(successor(predD), q)),
                   Or(Natural.divides(successor(predD), n),
                       Not(Natural.divides(successor(predD), n))),
-                  fun (q : Natural)
+                  function (q : Natural)
                       (combined : And(LessOrEqual(q, n),
                                        n = Natural.multiply(successor(predD), q))) =>
                     And.eliminate(
@@ -309,28 +309,28 @@ theorem Natural.decides_divides
                         n = Natural.multiply(successor(predD), q),
                         Or(Natural.divides(successor(predD), n),
                             Not(Natural.divides(successor(predD), n))),
-                        fun (_ : LessOrEqual(q, n))
-                            (nEqDq :
+                        function (_ : LessOrEqual(q, n))
+                            (nEqualsDTimesQuotient :
                                 n = Natural.multiply(successor(predD), q)) =>
                           Or.introduceLeft(
                               Exists.introduce(
                                   q,
-                                  nEqDq)),
+                                  nEqualsDTimesQuotient)),
                         combined),
                   foundWitness),
-          fun (noQuotientInRange :
+          function (noQuotientInRange :
                   (q : Natural)
                   → LessOrEqual(q, n)
                   → Not(n = Natural.multiply(successor(predD), q))) =>
               Or.introduceRight(
-                  fun (divProof : Natural.divides(successor(predD), n)) =>
+                  function (divProof : Natural.divides(successor(predD), n)) =>
                       Exists.eliminate(
                           Natural,
-                          fun (q : Natural) =>
+                          function (q : Natural) =>
                               n = Natural.multiply(successor(predD), q),
                           False,
-                          fun (q : Natural)
-                              (nEqDq :
+                          function (q : Natural)
+                              (nEqualsDTimesQuotient :
                                   n = Natural.multiply(successor(predD), q)) =>
                             -- We have q : Natural and n = d·q. Cap
                             -- lemma gives q ≤ d·q = n, so q ≤ n.
@@ -339,17 +339,17 @@ theorem Natural.decides_divides
                                 q,
                                 Equality.transport_proposition(
                                     Natural,
-                                    fun (rightEnd : Natural) =>
+                                    function (rightEnd : Natural) =>
                                         LessOrEqual(q, rightEnd),
                                     Natural.multiply(successor(predD), q),
                                     n,
-                                    Equality.symmetry(nEqDq),
+                                    Equality.symmetry(nEqualsDTimesQuotient),
                                     Natural.le_q_d_mult_q(
                                         successor(predD), q,
-                                        Natural.succ_le_succ(
+                                        Natural.successor_less_or_equal_successor(
                                             zero, predD,
                                             Natural.zero_least(predD)))),
-                                nEqDq),
+                                nEqualsDTimesQuotient),
                           divProof)),
           Natural.search_quotient_witness_up_to(
               successor(predD), n, n))

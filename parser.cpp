@@ -365,13 +365,13 @@ private:
 
 private:
     SurfaceExpressionPointer parseExpression() {
-        if (peek().kind == TokenKind::KeywordFun) return parseLambda();
+        if (peek().kind == TokenKind::KeywordFunction) return parseLambda();
         if (peek().kind == TokenKind::KeywordLet) return parseLet();
         return parseImplication();
     }
 
     SurfaceExpressionPointer parseLambda() {
-        const Token& start = consumeAny();  // 'fun'
+        const Token& start = consumeAny();  // 'function'
         std::vector<SurfaceBinder> binders;
         while (peek().kind == TokenKind::LeftParen
                || peek().kind == TokenKind::LeftBrace
@@ -389,9 +389,9 @@ private:
             }
         }
         if (binders.empty()) {
-            throwHere("expected at least one binder after 'fun'");
+            throwHere("expected at least one binder after 'function'");
         }
-        expect(TokenKind::FatArrow, "after binders in 'fun'");
+        expect(TokenKind::FatArrow, "after binders in 'function'");
         auto body = parseExpression();
         // Curry: fun (b1) (b2) ... => body  ↦  λ b1. λ b2. ... body
         for (auto iterator = binders.rbegin(); iterator != binders.rend();

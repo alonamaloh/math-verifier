@@ -40,7 +40,7 @@ theorem Natural.decides_equality_successor_against
                 Not(successor(predecessor) = other))
   | zero =>
       Or.introduceRight(
-          fun (impossible : successor(predecessor) = zero) =>
+          function (impossible : successor(predecessor) = zero) =>
               Natural.successor_not_zero(predecessor, impossible))
   | successor(otherPredecessor) =>
       Or.eliminate(
@@ -48,16 +48,16 @@ theorem Natural.decides_equality_successor_against
           Not(predecessor = otherPredecessor),
           Or(successor(predecessor) = successor(otherPredecessor),
               Not(successor(predecessor) = successor(otherPredecessor))),
-          fun (predEqOther : predecessor = otherPredecessor) =>
+          function (predEqOther : predecessor = otherPredecessor) =>
               Or.introduceLeft(
                   congruenceOf(successor, predEqOther)),
-          fun (predNeqOther : Not(predecessor = otherPredecessor)) =>
+          function (predNeqOther : Not(predecessor = otherPredecessor)) =>
               Or.introduceRight(
-                  fun (succEq : successor(predecessor) = successor(otherPredecessor)) =>
+                  function (successorEquals : successor(predecessor) = successor(otherPredecessor)) =>
                       predNeqOther(
                           Natural.successor_injective(
                               predecessor, otherPredecessor,
-                              succEq))),
+                              successorEquals))),
           decidePredecessor(otherPredecessor))
 
 -- Decidable equality on Natural.
@@ -72,12 +72,12 @@ theorem Natural.decides_equality
           b)
 
 -- decidable ≤, with zero as the left operand: always true.
-theorem Natural.decides_le_zero_against (other : Natural)
+theorem Natural.decides_less_or_equal_zero_against (other : Natural)
         : Or(LessOrEqual(zero, other), Not(LessOrEqual(zero, other))) :=
   Or.introduceLeft(Natural.zero_least(other))
 
 -- decidable ≤, successor case.
-theorem Natural.decides_le_successor_against
+theorem Natural.decides_less_or_equal_successor_against
         (predecessor : Natural)
         (decidePredecessor :
             (other : Natural)
@@ -87,7 +87,7 @@ theorem Natural.decides_le_successor_against
           → Or(LessOrEqual(successor(predecessor), other),
                 Not(LessOrEqual(successor(predecessor), other)))
   | zero =>
-      Or.introduceRight(Natural.not_le_succ_zero(predecessor))
+      Or.introduceRight(Natural.not_less_or_equal_successor_zero(predecessor))
   | successor(otherPredecessor) =>
       Or.eliminate(
           LessOrEqual(predecessor, otherPredecessor),
@@ -96,30 +96,30 @@ theorem Natural.decides_le_successor_against
                           successor(otherPredecessor)),
               Not(LessOrEqual(successor(predecessor),
                                successor(otherPredecessor)))),
-          fun (predLe : LessOrEqual(predecessor, otherPredecessor)) =>
+          function (predecessorLessOrEqual : LessOrEqual(predecessor, otherPredecessor)) =>
               Or.introduceLeft(
-                  Natural.succ_le_succ(
-                      predecessor, otherPredecessor, predLe)),
-          fun (predNotLe :
+                  Natural.successor_less_or_equal_successor(
+                      predecessor, otherPredecessor, predecessorLessOrEqual)),
+          function (predecessorNotLessOrEqual :
                   Not(LessOrEqual(predecessor, otherPredecessor))) =>
               Or.introduceRight(
-                  fun (succLe :
+                  function (successorLessOrEqual :
                           LessOrEqual(successor(predecessor),
                                        successor(otherPredecessor))) =>
-                      predNotLe(
-                          Natural.le_succ_succ_descend(
-                              predecessor, otherPredecessor, succLe))),
+                      predecessorNotLessOrEqual(
+                          Natural.less_or_equal_successor_successor_descend(
+                              predecessor, otherPredecessor, successorLessOrEqual))),
           decidePredecessor(otherPredecessor))
 
 -- Decidable ≤ on Natural.
-theorem Natural.decides_le
+theorem Natural.decides_less_or_equal
         : (a b : Natural)
           → Or(LessOrEqual(a, b), Not(LessOrEqual(a, b)))
   | zero, b =>
-      Natural.decides_le_zero_against(b)
+      Natural.decides_less_or_equal_zero_against(b)
   | successor(predecessor), b =>
-      Natural.decides_le_successor_against(
+      Natural.decides_less_or_equal_successor_against(
           predecessor,
-          Natural.decides_le(predecessor),
+          Natural.decides_less_or_equal(predecessor),
           b)
 

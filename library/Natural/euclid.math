@@ -40,20 +40,20 @@ theorem Natural.multiply_at_least_one
           → LessOrEqual(one, a)
           → LessOrEqual(one, b)
           → LessOrEqual(one, a * b)
-  | zero, b, oneLeZero, _ =>
+  | zero, b, oneLessOrEqualZero, _ =>
       False.eliminate_proposition(
         LessOrEqual(one, zero * b),
-        Natural.not_le_succ_zero(zero, oneLeZero))
-  | successor(predecessor), b, _, oneLeB =>
+        Natural.not_less_or_equal_successor_zero(zero, oneLessOrEqualZero))
+  | successor(predecessor), b, _, oneLessOrEqualB =>
       LessOrEqual.transitive(
         one, b,
         Natural.add(b, Natural.multiply(predecessor, b)),
-        Natural.le_add_right(b, Natural.multiply(predecessor, b)),
-        oneLeB)
+        Natural.less_or_equal_add_right(b, Natural.multiply(predecessor, b)),
+        oneLessOrEqualB)
 
 -- The product of a list of primes is at least 1. Empty case is
--- reflexivity on 1; cons case multiplies head (≥ 2 because prime)
--- with the IH on the tail.
+-- reflexivity on 1; prepend case multiplies head (≥ 2 because prime)
+-- with the induction hypothesis on the tail.
 theorem NaturalList.productOf_at_least_one
         : (list : NaturalList)
           → ((p : Natural) → NaturalList.member(p, list)
@@ -61,7 +61,7 @@ theorem NaturalList.productOf_at_least_one
           → LessOrEqual(one, NaturalList.productOf(list))
   | NaturalList.empty, _ =>
       LessOrEqual.reflexivity(one)
-  | NaturalList.cons(head, tail), allPrime =>
+  | NaturalList.prepend(head, tail), allPrime =>
       Natural.multiply_at_least_one(
           head, NaturalList.productOf(tail),
           LessOrEqual.transitive(
@@ -74,12 +74,12 @@ theorem NaturalList.productOf_at_least_one
                        Equality(Natural, k, head)),
                 allPrime(head,
                   NaturalList.member.here(tail))),
-            Natural.one_le_two),
+            Natural.one_less_or_equal_two),
           NaturalList.productOf_at_least_one(tail,
-            fun (p : Natural)
-                (memTail : NaturalList.member(p, tail)) =>
+            function (p : Natural)
+                (memberOfTail : NaturalList.member(p, tail)) =>
               allPrime(p,
-                NaturalList.member.there(head, tail, memTail))))
+                NaturalList.member.there(head, tail, memberOfTail))))
 
 -- Euclid's theorem. Construction is inlined — local `let X := …`
 -- bindings of intermediate values would be opaque to the kernel's
@@ -91,32 +91,32 @@ theorem Natural.infinitely_many_primes
         (allPrime : (p : Natural)
                     → NaturalList.member(p, primes)
                     → Natural.is_prime(p))
-        : Exists(Natural, fun (q : Natural) =>
+        : Exists(Natural, function (q : Natural) =>
             And(Natural.is_prime(q),
                 Not(NaturalList.member(q, primes)))) :=
-  let ⟨q, qIsPrime, qDividesBig⟩
+  let ⟨q, qIsPrime, quotientDividesLargeNumber⟩
       := Natural.has_prime_divisor(
           successor(NaturalList.productOf(primes)),
-          Natural.succ_le_succ(
+          Natural.successor_less_or_equal_successor(
               one, NaturalList.productOf(primes),
               NaturalList.productOf_at_least_one(primes, allPrime)))
   in
   ⟨q, qIsPrime,
-    fun (qInPrimes : NaturalList.member(q, primes)) =>
+    function (qInPrimes : NaturalList.member(q, primes)) =>
       Or.eliminate(
           Equality(Natural, one, zero),
           LessOrEqual(q, one),
           False,
-          fun (oneEqZero : Equality(Natural, one, zero)) =>
-              Natural.successor_not_zero(zero, oneEqZero),
-          fun (qLeOne : LessOrEqual(q, one)) =>
-              Natural.not_le_succ_zero(
+          function (oneEqualsZero : Equality(Natural, one, zero)) =>
+              Natural.successor_not_zero(zero, oneEqualsZero),
+          function (quotientLessOrEqualOne : LessOrEqual(q, one)) =>
+              Natural.not_less_or_equal_successor_zero(
                   zero,
-                  Natural.le_succ_succ_descend(
+                  Natural.less_or_equal_successor_successor_descend(
                       one, zero,
                       LessOrEqual.transitive(
                           two, q, one,
-                          qLeOne,
+                          quotientLessOrEqualOne,
                           And.left(
                               LessOrEqual(two, q),
                               (k : Natural)
@@ -124,10 +124,10 @@ theorem Natural.infinitely_many_primes
                                 → Or(Equality(Natural, k, one),
                                      Equality(Natural, k, q)),
                               qIsPrime)))),
-          Natural.divides_le_or_zero(
+          Natural.divides_less_or_equal_or_zero(
               q, one,
               Natural.divides_consecutive_implies_one(
                   q, NaturalList.productOf(primes),
                   NaturalList.member_divides_product(
                       q, primes, qInPrimes),
-                  qDividesBig)))⟩
+                  quotientDividesLargeNumber)))⟩

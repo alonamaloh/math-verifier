@@ -2464,7 +2464,7 @@ void runNaturalNumberGameProofs() {
                makeBoundVariable(0)));
         auto caseZero = reflexivity(Natural(), zero());
         auto caseSucc = makeLambda("k", Natural(),
-            makeLambda("IH",
+            makeLambda("inductionHypothesis",
                 equality(Natural(),
                    plus(makeBoundVariable(0), zero()),
                    makeBoundVariable(0)),
@@ -2474,7 +2474,7 @@ void runNaturalNumberGameProofs() {
                                         plus(makeBoundVariable(1) /* k */,
                                               zero())),
                         makeBoundVariable(1) /* k */),
-                    makeBoundVariable(0) /* IH */)));
+                    makeBoundVariable(0) /* inductionHypothesis */)));
 
         auto theoremType =
             makePi("a", Natural(),
@@ -2867,7 +2867,7 @@ void runInductiveLibraryProofs() {
                     makePi("A", makeType(0),
                         makeApplication(makeConstant("List"),
                                           makeBoundVariable(0)))},
-                {"List.cons",
+                {"List.prepend",
                     makePi("A", makeType(0),
                         makePi("_head", makeBoundVariable(0),
                             makePi("_tail",
@@ -2879,34 +2879,34 @@ void runInductiveLibraryProofs() {
 
         // length : Π(A : Type 0). List A → Natural.
         // Recurses on the list. The case for List.nil returns zero; the
-        // case for List.cons takes head, tail, and IH (the length of the
+        // case for List.prepend takes head, tail, and IH (the length of the
         // tail), and returns successor IH.
         //
         // motive = λ _ : List A. Natural.  (No A dependence in the
         // codomain, so no Bound refs to A needed.)
         //
         // At the body level (2 outer lambdas A, list): list=0, A=1.
-        // Case for List.cons:  λ head tail IH. successor IH.
-        //   Inside IH body (5 binders deep: IH=0, tail=1, head=2, list=3, A=4):
-        //   IH = Bound 0.
+        // Case for List.prepend:  λ head tail IH. successor IH.
+        //   Inside inductionHypothesis body (5 binders deep: inductionHypothesis=0, tail=1, head=2, list=3, A=4):
+        //   inductionHypothesis = Bound 0.
         auto motiveLength = makeLambda("_",
             makeApplication(makeConstant("List"),
                               makeBoundVariable(1) /* A */),
             Natural());
         auto caseListNil = zero();
-        auto caseListCons =
+        auto caseListPrepend =
             makeLambda("head", makeBoundVariable(1) /* A */,
                 makeLambda("tail",
                     makeApplication(makeConstant("List"),
                                       makeBoundVariable(2) /* A */),
-                    makeLambda("IH", Natural(),
-                        successor(makeBoundVariable(0) /* IH */))));
+                    makeLambda("inductionHypothesis", Natural(),
+                        successor(makeBoundVariable(0) /* inductionHypothesis */))));
         auto lengthBody = makeLambda("A", makeType(0),
             makeLambda("list",
                 makeApplication(makeConstant("List"),
                                   makeBoundVariable(0) /* A */),
                 makeApplication(  // apply to list
-                    makeApplication(  // apply to caseListCons
+                    makeApplication(  // apply to caseListPrepend
                         makeApplication(  // apply to caseListNil
                             makeApplication(  // apply to motive
                                 makeApplication(  // apply to A
@@ -2914,7 +2914,7 @@ void runInductiveLibraryProofs() {
                                     makeBoundVariable(1) /* A */),
                                 motiveLength),
                             caseListNil),
-                        caseListCons),
+                        caseListPrepend),
                     makeBoundVariable(0) /* list */)));
         auto lengthType = makePi("A", makeType(0),
             makePi("_list",
@@ -2925,7 +2925,7 @@ void runInductiveLibraryProofs() {
         std::cout << "  List.length       ⊨  "
                      "Π(A : Type 0). List A → Natural\n";
 
-        // Test: List.length Natural (List.cons zero List.nil)
+        // Test: List.length Natural (List.prepend zero List.nil)
         //       ≡ successor zero.
         // And:  List.length Natural List.nil ≡ zero.
         auto nilOfNaturals =
@@ -2933,7 +2933,7 @@ void runInductiveLibraryProofs() {
         auto singletonZero =
             makeApplication(
                 makeApplication(
-                    makeApplication(makeConstant("List.cons"), Natural()),
+                    makeApplication(makeConstant("List.prepend"), Natural()),
                     zero()),
                 nilOfNaturals);
         auto lengthEmpty =
@@ -3161,9 +3161,9 @@ void runLexerTests() {
         EXPECT_TRUE(kinds == expected);
     }
     {
-        auto kinds = kindsOf("fun (x : T) => x");
+        auto kinds = kindsOf("function (x : T) => x");
         std::vector<TokenKind> expected = {
-            TokenKind::KeywordFun, TokenKind::LeftParen,
+            TokenKind::KeywordFunction, TokenKind::LeftParen,
             TokenKind::Identifier, TokenKind::Colon, TokenKind::Identifier,
             TokenKind::RightParen, TokenKind::FatArrow,
             TokenKind::Identifier, TokenKind::EndOfFile};
@@ -3386,8 +3386,8 @@ void runParserTests() {
                 "Pi(A : Type(0), Pi(_ : A, A))",                            __LINE__);
 
     // Lambdas.
-    expectParse("fun (x : T) => x",   "Lambda(x : T, x)",                   __LINE__);
-    expectParse("fun (x : T) (y : U) => x",
+    expectParse("function (x : T) => x",   "Lambda(x : T, x)",                   __LINE__);
+    expectParse("function (x : T) (y : U) => x",
                 "Lambda(x : T, Lambda(y : U, x))",                          __LINE__);
 
     // Let.
@@ -3696,7 +3696,7 @@ module Test.no_warning_on_definition
 inductive Bool : Type(0) where
   | true : Bool
   | false : Bool
-definition Bool.identity : Bool → Bool := fun (b : Bool) => b
+definition Bool.identity : Bool → Bool := function (b : Bool) => b
 )");
         if (result.capturedStderr.empty()) ++passed;
         else {
@@ -3862,7 +3862,7 @@ inductive Natural : Type(0) where
   | successor : Natural -> Natural
 
 definition apply_zero (f : Natural -> Natural) : Natural := f(zero)
-definition succ_zero : Natural := apply_zero(fun (n : Natural) => successor(n))
+definition succ_zero : Natural := apply_zero(function (n : Natural) => successor(n))
 )");
         EXPECT_TRUE(isDefinitionallyEqual(
             environment, {},

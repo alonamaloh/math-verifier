@@ -1045,7 +1045,7 @@ bool mentionsConstant(ExpressionPointer expression,
 //   - the type may be `T params indices` — an Application chain whose
 //     head is the inductive's Constant — provided T doesn't appear in
 //     any of those arguments (no nested inductives). This catches
-//     direct recursive args like (List A) for List.cons.
+//     direct recursive args like (List A) for List.prepend.
 //   - the type may be Π(_ : A). B where A doesn't mention T and B is
 //     strictly positive in T (higher-order recursive arg, like
 //     mkInfTree : (Nat → Tree) → Tree).

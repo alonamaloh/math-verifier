@@ -18,7 +18,7 @@ enum class TokenKind {
     KeywordWhere,
 
     // Expression keywords
-    KeywordFun, KeywordLet, KeywordIn,
+    KeywordFunction, KeywordLet, KeywordIn,
     KeywordType, KeywordProposition,
     KeywordMax, KeywordImax,
 

@@ -4,14 +4,14 @@
 -- derivation goes through three small lemmas:
 --
 --   1. LessOrEqual.invert (a "view" theorem): every `LessOrEqual(s, b)`
---      is either `s = b` (reflexivity case) or `b = succ(bPred) ∧ s ≤ bPred`
---      for some `bPred` (step case).
---   2. Natural.not_le_succ_zero: `Not(LessOrEqual(successor(k), zero))`.
---      Both reflexivity and step cases lead to `succ(_) = zero`, which
+--      is either `s = b` (reflexivity case) or `b = successor(bPredecessor) ∧ s ≤ bPredecessor`
+--      for some `bPredecessor` (step case).
+--   2. Natural.not_less_or_equal_successor_zero: `Not(LessOrEqual(successor(k), zero))`.
+--      Both reflexivity and step cases lead to `successor(_) = zero`, which
 --      Natural.successor_not_zero rules out.
 --   3. The "below" predicate `forAllBelow n` asserts P holds for every
 --      k < n. Build it by ordinary induction on n, using (1) to
---      decompose `succ(k) ≤ succ(m)` and (2) to reject `succ(k) ≤ 0`.
+--      decompose `successor(k) ≤ successor(m)` and (2) to reject `successor(k) ≤ 0`.
 --
 -- Then `strong_induction n := step n (forAllBelow n)`.
 
@@ -25,11 +25,11 @@ import Logic.basics
 import Logic.exists
 
 -- View lemma: any LessOrEqual proof is either an equality (reflexivity
--- constructor) or has an upper bound that is `succ` of something.
+-- constructor) or has an upper bound that is `successor` of something.
 theorem LessOrEqual.invert (s b : Natural)
         : LessOrEqual(s, b)
           → Or(s = b,
-                Exists(Natural, fun (bPredecessor : Natural) =>
+                Exists(Natural, function (bPredecessor : Natural) =>
                     And(b = successor(bPredecessor),
                          LessOrEqual(s, bPredecessor))))
   | LessOrEqual.reflexivity(commonValue) =>
@@ -42,30 +42,30 @@ theorem LessOrEqual.invert (s b : Natural)
                   reflexivity(successor(bPredecessorD)),
                   subproof)))
 
--- Not(succ(k) ≤ 0). Apply invert and discharge both disjuncts via
+-- Not(successor(k) ≤ 0). Apply invert and discharge both disjuncts via
 -- Natural.successor_not_zero.
-theorem Natural.not_le_succ_zero (k : Natural)
+theorem Natural.not_less_or_equal_successor_zero (k : Natural)
         : LessOrEqual(successor(k), zero) → False :=
-  fun (impossible : LessOrEqual(successor(k), zero)) =>
+  function (impossible : LessOrEqual(successor(k), zero)) =>
     Or.eliminate(
         successor(k) = zero,
-        Exists(Natural, fun (bPredecessor : Natural) =>
+        Exists(Natural, function (bPredecessor : Natural) =>
             And(zero = successor(bPredecessor),
                  LessOrEqual(successor(k), bPredecessor))),
         False,
-        fun (succKEqualsZero : successor(k) = zero) =>
-            Natural.successor_not_zero(k, succKEqualsZero),
-        fun (existsProof : Exists(Natural,
-                fun (bPredecessor : Natural) =>
+        function (successorKEqualsZero : successor(k) = zero) =>
+            Natural.successor_not_zero(k, successorKEqualsZero),
+        function (existsProof : Exists(Natural,
+                function (bPredecessor : Natural) =>
                     And(zero = successor(bPredecessor),
                          LessOrEqual(successor(k), bPredecessor)))) =>
             Exists.eliminate(
                 Natural,
-                fun (bPredecessor : Natural) =>
+                function (bPredecessor : Natural) =>
                     And(zero = successor(bPredecessor),
                          LessOrEqual(successor(k), bPredecessor)),
                 False,
-                fun (bPredecessor : Natural)
+                function (bPredecessor : Natural)
                     (combined : And(zero = successor(bPredecessor),
                                      LessOrEqual(successor(k),
                                                   bPredecessor))) =>
@@ -73,7 +73,7 @@ theorem Natural.not_le_succ_zero (k : Natural)
                       zero = successor(bPredecessor),
                       LessOrEqual(successor(k), bPredecessor),
                       False,
-                      fun (zeroEqualsSucc :
+                      function (zeroEqualsSucc :
                               zero = successor(bPredecessor))
                           (_ : LessOrEqual(successor(k), bPredecessor)) =>
                           Natural.zero_not_successor(
@@ -82,33 +82,33 @@ theorem Natural.not_le_succ_zero (k : Natural)
                 existsProof),
         LessOrEqual.invert(successor(k), zero, impossible))
 
--- Inversion specifically for `succ(k) ≤ succ(m)`: either `k = m` or
--- `succ(k) ≤ m`. Derived from LessOrEqual.invert plus
+-- Inversion specifically for `successor(k) ≤ successor(m)`: either `k = m` or
+-- `successor(k) ≤ m`. Derived from LessOrEqual.invert plus
 -- successor_injective.
-theorem Natural.le_succ_succ_inversion (k m : Natural)
+theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
         : LessOrEqual(successor(k), successor(m))
           → Or(k = m, LessOrEqual(successor(k), m)) :=
-  fun (succKLeSuccMProof : LessOrEqual(successor(k), successor(m))) =>
+  function (successorKLessOrEqualSuccessorMProof : LessOrEqual(successor(k), successor(m))) =>
     Or.eliminate(
         successor(k) = successor(m),
-        Exists(Natural, fun (bPredecessor : Natural) =>
+        Exists(Natural, function (bPredecessor : Natural) =>
             And(successor(m) = successor(bPredecessor),
                  LessOrEqual(successor(k), bPredecessor))),
         Or(k = m, LessOrEqual(successor(k), m)),
-        fun (succKEqSuccM : successor(k) = successor(m)) =>
+        function (successorKEqualsSuccessorM : successor(k) = successor(m)) =>
             Or.introduceLeft(
-                Natural.successor_injective(k, m, succKEqSuccM)),
-        fun (existsProof : Exists(Natural,
-                fun (bPredecessor : Natural) =>
+                Natural.successor_injective(k, m, successorKEqualsSuccessorM)),
+        function (existsProof : Exists(Natural,
+                function (bPredecessor : Natural) =>
                     And(successor(m) = successor(bPredecessor),
                          LessOrEqual(successor(k), bPredecessor)))) =>
             Exists.eliminate(
                 Natural,
-                fun (bPredecessor : Natural) =>
+                function (bPredecessor : Natural) =>
                     And(successor(m) = successor(bPredecessor),
                          LessOrEqual(successor(k), bPredecessor)),
                 Or(k = m, LessOrEqual(successor(k), m)),
-                fun (bPredecessor : Natural)
+                function (bPredecessor : Natural)
                     (combined : And(successor(m) = successor(bPredecessor),
                                      LessOrEqual(successor(k),
                                                   bPredecessor))) =>
@@ -116,28 +116,28 @@ theorem Natural.le_succ_succ_inversion (k m : Natural)
                       successor(m) = successor(bPredecessor),
                       LessOrEqual(successor(k), bPredecessor),
                       Or(k = m, LessOrEqual(successor(k), m)),
-                      fun (succMEqSuccBP :
+                      function (successorMEqualsSuccessorBPredecessor :
                               successor(m) = successor(bPredecessor))
-                          (succKLeBP :
+                          (successorKLessOrEqualBPredecessor :
                               LessOrEqual(successor(k), bPredecessor)) =>
                           -- We have m = bPredecessor by injectivity,
-                          -- and succ(k) ≤ bPredecessor. Transport
-                          -- succKLeBP along the symmetry of
-                          -- successor_injective to get succ(k) ≤ m.
+                          -- and successor(k) ≤ bPredecessor. Transport
+                          -- successorKLessOrEqualBPredecessor along the symmetry of
+                          -- successor_injective to get successor(k) ≤ m.
                           Or.introduceRight(
                               Equality.transport_proposition(
                                   Natural,
-                                  fun (rightEnd : Natural) =>
+                                  function (rightEnd : Natural) =>
                                       LessOrEqual(successor(k), rightEnd),
                                   bPredecessor, m,
                                   Equality.symmetry(
                                       Natural.successor_injective(
-                                          m, bPredecessor, succMEqSuccBP)),
-                                  succKLeBP)),
+                                          m, bPredecessor, successorMEqualsSuccessorBPredecessor)),
+                                  successorKLessOrEqualBPredecessor)),
                       combined),
                 existsProof),
         LessOrEqual.invert(
-            successor(k), successor(m), succKLeSuccMProof))
+            successor(k), successor(m), successorKLessOrEqualSuccessorMProof))
 
 -- forAllBelow n : for every k < n, P holds. Ordinary induction on n.
 theorem Natural.for_all_below
@@ -149,19 +149,19 @@ theorem Natural.for_all_below
         : (n : Natural) → (k : Natural)
           → LessOrEqual(successor(k), n) → P(k)
   | zero =>
-      fun (k : Natural)
+      function (k : Natural)
           (impossible : LessOrEqual(successor(k), zero)) =>
         False.eliminate_proposition(
             P(k),
-            Natural.not_le_succ_zero(k, impossible))
+            Natural.not_less_or_equal_successor_zero(k, impossible))
   | successor(predecessor) =>
-      fun (k : Natural)
-          (succKLeSuccM : LessOrEqual(successor(k), successor(predecessor))) =>
+      function (k : Natural)
+          (successorKLessOrEqualSuccessorM : LessOrEqual(successor(k), successor(predecessor))) =>
         Or.eliminate(
             k = predecessor,
             LessOrEqual(successor(k), predecessor),
             P(k),
-            fun (kEqualsPredecessor : k = predecessor) =>
+            function (kEqualsPredecessor : k = predecessor) =>
                 -- We need P(k). Use step(predecessor,
                 -- for_all_below(predecessor)) to get P(predecessor),
                 -- then transport along k = predecessor reversed.
@@ -173,75 +173,75 @@ theorem Natural.for_all_below
                     step(predecessor,
                           Natural.for_all_below(
                               P, step, predecessor))),
-            fun (succKLePredecessor : LessOrEqual(successor(k),
+            function (successorKLessOrEqualPredecessor : LessOrEqual(successor(k),
                                                    predecessor)) =>
                 -- Recurse on the predecessor level: for_all_below for
-                -- `predecessor` directly handles k with succ(k) ≤
+                -- `predecessor` directly handles k with successor(k) ≤
                 -- predecessor.
                 Natural.for_all_below(
-                    P, step, predecessor, k, succKLePredecessor),
-            Natural.le_succ_succ_inversion(
-                k, predecessor, succKLeSuccM))
+                    P, step, predecessor, k, successorKLessOrEqualPredecessor),
+            Natural.less_or_equal_successor_successor_inversion(
+                k, predecessor, successorKLessOrEqualSuccessorM))
 
 -- q ≤ 0 forces q = 0. Apply LessOrEqual.invert and discharge the
 -- step disjunct via zero_not_successor.
-theorem Natural.le_zero_implies_eq_zero (q : Natural)
+theorem Natural.less_or_equal_zero_implies_equals_zero (q : Natural)
         : LessOrEqual(q, zero) → q = zero :=
-  fun (qLeZero : LessOrEqual(q, zero)) =>
+  function (quotientLessOrEqualZero : LessOrEqual(q, zero)) =>
     Or.eliminate(
         q = zero,
-        Exists(Natural, fun (bPredecessor : Natural) =>
+        Exists(Natural, function (bPredecessor : Natural) =>
             And(zero = successor(bPredecessor),
                  LessOrEqual(q, bPredecessor))),
         q = zero,
-        fun (qEqualsZero : q = zero) => qEqualsZero,
-        fun (existsProof : Exists(Natural,
-                fun (bPredecessor : Natural) =>
+        function (quotientEqualsZero : q = zero) => quotientEqualsZero,
+        function (existsProof : Exists(Natural,
+                function (bPredecessor : Natural) =>
                     And(zero = successor(bPredecessor),
                          LessOrEqual(q, bPredecessor)))) =>
             Exists.eliminate(
                 Natural,
-                fun (bPredecessor : Natural) =>
+                function (bPredecessor : Natural) =>
                     And(zero = successor(bPredecessor),
                          LessOrEqual(q, bPredecessor)),
                 q = zero,
-                fun (bPredecessor : Natural)
+                function (bPredecessor : Natural)
                     (combined : And(zero = successor(bPredecessor),
                                      LessOrEqual(q, bPredecessor))) =>
                   And.eliminate(
                       zero = successor(bPredecessor),
                       LessOrEqual(q, bPredecessor),
                       q = zero,
-                      fun (zeroEqSucc :
+                      function (zeroEqualsSuccessor :
                               zero = successor(bPredecessor))
                           (_ : LessOrEqual(q, bPredecessor)) =>
                           False.eliminate_proposition(
                               q = zero,
                               Natural.zero_not_successor(
-                                  bPredecessor, zeroEqSucc)),
+                                  bPredecessor, zeroEqualsSuccessor)),
                       combined),
                 existsProof),
-        LessOrEqual.invert(q, zero, qLeZero))
+        LessOrEqual.invert(q, zero, quotientLessOrEqualZero))
 
--- Inversion of `succ(p) ≤ succ(oP)`: yields `p ≤ oP`. Combines
+-- Inversion of `successor(p) ≤ successor(otherPredecessor)`: yields `p ≤ otherPredecessor`. Combines
 -- le_succ_succ_inversion with le_predecessor_le.
-theorem Natural.le_succ_succ_descend (p oP : Natural)
-        : LessOrEqual(successor(p), successor(oP))
-          → LessOrEqual(p, oP) :=
-  fun (succLe : LessOrEqual(successor(p), successor(oP))) =>
+theorem Natural.less_or_equal_successor_successor_descend (p otherPredecessor : Natural)
+        : LessOrEqual(successor(p), successor(otherPredecessor))
+          → LessOrEqual(p, otherPredecessor) :=
+  function (successorLessOrEqual : LessOrEqual(successor(p), successor(otherPredecessor))) =>
     Or.eliminate(
-        p = oP,
-        LessOrEqual(successor(p), oP),
-        LessOrEqual(p, oP),
-        fun (eq : p = oP) =>
+        p = otherPredecessor,
+        LessOrEqual(successor(p), otherPredecessor),
+        LessOrEqual(p, otherPredecessor),
+        function (equality : p = otherPredecessor) =>
             Equality.transport_proposition(
                 Natural,
-                fun (rightEnd : Natural) => LessOrEqual(p, rightEnd),
-                p, oP, eq,
+                function (rightEnd : Natural) => LessOrEqual(p, rightEnd),
+                p, otherPredecessor, equality,
                 LessOrEqual.reflexivity(p)),
-        fun (succPLeOP : LessOrEqual(successor(p), oP)) =>
-            Natural.le_predecessor_le(p, oP, succPLeOP),
-        Natural.le_succ_succ_inversion(p, oP, succLe))
+        function (successorPLessOrEqualOtherPredecessor : LessOrEqual(successor(p), otherPredecessor)) =>
+            Natural.less_or_equal_predecessor_less_or_equal(p, otherPredecessor, successorPLessOrEqualOtherPredecessor),
+        Natural.less_or_equal_successor_successor_inversion(p, otherPredecessor, successorLessOrEqual))
 
 -- Strong induction: combine for_all_below with the step at level n.
 theorem Natural.strong_induction
