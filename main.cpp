@@ -3908,6 +3908,67 @@ theorem one_lt_two : 1 < 2 := LessOrEqual.reflexivity(2)
         "< operator desugars to LessOrEqual on successor of left",
         __LINE__);
 
+    // `∀ (x : T). body` desugars to `(x : T) → body` (Pi type).
+    expectVerifies(R"(
+module Test.forall_quantifier
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem reflexive_for_all : ∀ (n : Natural). Equality.{0}(Natural, n, n) :=
+  function (n : Natural) => reflexivity.{0}(Natural, n)
+)",
+        "∀ desugars to a Pi type",
+        __LINE__);
+
+    // `∃ (x : T). body` desugars to `Exists(T, function (x : T) => body)`.
+    expectVerifies(R"(
+module Test.exists_quantifier
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
+  | Exists.introduce : (witness : A) → P(witness) → Exists(A, P)
+
+theorem some_natural_equals_zero
+        : ∃ (n : Natural). Equality.{0}(Natural, n, zero) :=
+  Exists.introduce.{0}(Natural,
+      function (n : Natural) => Equality.{0}(Natural, n, zero),
+      zero,
+      reflexivity.{0}(Natural, zero))
+)",
+        "∃ desugars to Exists",
+        __LINE__);
+
+    // Multi-name binder: `∀ (x y : T). body` chains Pi.
+    expectVerifies(R"(
+module Test.forall_multi_binder
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem swap_or_keep
+        : ∀ (a b : Natural). Equality.{0}(Natural, a, b)
+                              → Equality.{0}(Natural, a, b) :=
+  function (a b : Natural)
+           (h : Equality.{0}(Natural, a, b)) => h
+)",
+        "∀ with multiple names in one binder chains Pi",
+        __LINE__);
+
     // Hammer constructor disjointness: `Not(C(...) = D(...))` for
     // distinct constructors of the same inductive elaborates to a
     // synthesized discriminator + Equality_recursor proof.

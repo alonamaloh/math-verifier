@@ -719,6 +719,10 @@ private:
         if (current.kind == TokenKind::KeywordCalc) {
             return parseCalc();
         }
+        if (current.kind == TokenKind::ForAll
+            || current.kind == TokenKind::Exists) {
+            return parseQuantifier();
+        }
         if (current.kind == TokenKind::LeftBrace) {
             // `{ let pat := v; ...; final_expr }` as an expression.
             // Same shape as the theorem-body block form; useful inside
@@ -847,6 +851,69 @@ private:
         return makeSurfaceCalc(std::move(initialExpression),
                                 std::move(steps),
                                 calcToken.line, calcToken.column);
+    }
+
+    // `∀ (binder)+ . body` desugars to a Pi chain `(binder)+ → body`.
+    // `∃ (binder)+ . body` desugars to a nested `Exists` chain
+    //   `Exists(T₁, function (x : T₁) => Exists(T₂, … body))`.
+    // Each binder must be parenthesised (`(name+ : type)`); a bare-name
+    // form would leave the `.` separator ambiguous with qualified
+    // identifiers like `Natural.add`.
+    SurfaceExpressionPointer parseQuantifier() {
+        Token quantifierToken = consumeAny();  // '∀' or '∃'
+        bool isUniversal = quantifierToken.kind == TokenKind::ForAll;
+        std::vector<SurfaceBinder> binders;
+        while (peek().kind == TokenKind::LeftParen
+               || peek().kind == TokenKind::LeftBrace) {
+            binders.push_back(parseExplicitBinder());
+        }
+        if (binders.empty()) {
+            throwHere("quantifier needs at least one "
+                      "'(name+ : type)' binder");
+        }
+        expect(TokenKind::Dot,
+               isUniversal
+                   ? "after binders in '∀'"
+                   : "after binders in '∃'");
+        auto body = parseExpression();
+        if (isUniversal) {
+            // Build a Pi chain from the binders, right-to-left.
+            for (auto iterator = binders.rbegin();
+                 iterator != binders.rend(); ++iterator) {
+                body = makeSurfacePiType(
+                    std::move(*iterator), std::move(body),
+                    quantifierToken.line, quantifierToken.column);
+            }
+            return body;
+        }
+        // Existential: one Exists application per binder name. A binder
+        // `(x y z : T)` expands to three nested Exists.
+        for (auto binderIterator = binders.rbegin();
+             binderIterator != binders.rend(); ++binderIterator) {
+            for (auto nameIterator = binderIterator->names.rbegin();
+                 nameIterator != binderIterator->names.rend();
+                 ++nameIterator) {
+                SurfaceBinder lambdaBinder;
+                lambdaBinder.names = {*nameIterator};
+                lambdaBinder.type = binderIterator->type;
+                lambdaBinder.isImplicit = false;
+                SurfaceExpressionPointer predicate = makeSurfaceLambda(
+                    std::move(lambdaBinder), std::move(body),
+                    quantifierToken.line, quantifierToken.column);
+                SurfaceExpressionPointer existsHead =
+                    makeSurfaceIdentifier("Exists", {},
+                                           quantifierToken.line,
+                                           quantifierToken.column);
+                std::vector<SurfaceExpressionPointer> arguments;
+                arguments.push_back(binderIterator->type);
+                arguments.push_back(std::move(predicate));
+                body = makeSurfaceApplication(
+                    std::move(existsHead),
+                    std::move(arguments),
+                    quantifierToken.line, quantifierToken.column);
+            }
+        }
+        return body;
     }
 
     // A qualified name like Natural.add_zero with an optional universe
