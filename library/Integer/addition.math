@@ -1,0 +1,250 @@
+-- Integer/addition.math
+--
+-- Addition on Integer, lifted from componentwise addition on
+-- `IntegerRepresentative`. The lift uses Quotient.lift twice — once
+-- for each Integer argument — and discharges respect for the
+-- equivalence in two pieces (one per argument). Both respect proofs
+-- factor through a Natural-level kernel lemma and a small destructure
+-- chain.
+
+module Integer.addition
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+
+-- Componentwise addition: (a - b) + (c - d) = (a + c) - (b + d).
+definition Integer.add_representatives
+        : IntegerRepresentative
+          → IntegerRepresentative
+          → IntegerRepresentative
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d) =>
+      IntegerRepresentative.make(a + c, b + d)
+
+-- ----------------------------------------------------------------------
+-- Respect of add_representatives in the first argument:
+-- (a, b) ~ (a', b') implies add(a, b)(c, d) ~ add(a', b')(c, d).
+
+-- Natural-level kernel: with a + b' = b + a' as the equivalence
+-- hypothesis, conclude (a + c) + (b' + d) = (b + d) + (a' + c).
+-- Reshuffle both sides via `add_two_two_swap` to bring (c + d) to the
+-- outside, then substitute the hypothesis on the (a + b')/(b + a')
+-- term.
+theorem Integer.add_respects_first_natural
+        (a b a' b' c d : Natural)
+        (aPlusBPrimeEqualsBPlusAPrime : a + b' = b + a')
+        : (a + c) + (b' + d) = (b + d) + (a' + c) :=
+  calc (a + c) + (b' + d)
+     = (a + b') + (c + d)
+            by Natural.add_two_two_swap(a, c, b', d)
+     = (b + a') + (c + d)
+            by congruenceOf(
+                   function (lhs : Natural) => lhs + (c + d),
+                   aPlusBPrimeEqualsBPlusAPrime)
+     = (b + a') + (d + c)
+            by congruenceOf(
+                   function (rhs : Natural) => (b + a') + rhs,
+                   Natural.add_commutative(c, d))
+     = (b + d) + (a' + c)
+            by Natural.add_two_two_swap(b, a', d, c)
+
+-- After destructuring rep1 = make(a, b): destructure rep1' AND rep2
+-- in the same pattern (multi-constructor in non-first position
+-- desugars via inner cases; eq's type is already refined by the
+-- outer first-position destructure of rep1').
+theorem Integer.add_respects_first_after_first (a b : Natural)
+        : (rep1' rep2 : IntegerRepresentative)
+          → IntegerEquivalent(IntegerRepresentative.make(a, b), rep1')
+          → IntegerEquivalent(
+                Integer.add_representatives(
+                    IntegerRepresentative.make(a, b), rep2),
+                Integer.add_representatives(rep1', rep2))
+  | IntegerRepresentative.make(a', b'),
+    IntegerRepresentative.make(c, d),
+    eq =>
+      Integer.add_respects_first_natural(a, b, a', b', c, d, eq)
+
+theorem Integer.add_respects_first
+        : (rep1 rep1' rep2 : IntegerRepresentative)
+          → IntegerEquivalent(rep1, rep1')
+          → IntegerEquivalent(
+                Integer.add_representatives(rep1, rep2),
+                Integer.add_representatives(rep1', rep2))
+  | IntegerRepresentative.make(a, b), rep1', rep2, eq =>
+      Integer.add_respects_first_after_first(a, b, rep1', rep2, eq)
+
+-- ----------------------------------------------------------------------
+-- Respect of add_representatives in the second argument:
+-- (c, d) ~ (c', d') implies add(a, b)(c, d) ~ add(a, b)(c', d').
+
+-- Natural-level kernel: with c + d' = d + c' as the equivalence
+-- hypothesis, conclude (a + c) + (b + d') = (b + d) + (a + c').
+theorem Integer.add_respects_second_natural
+        (a b c d c' d' : Natural)
+        (cPlusDPrimeEqualsDPlusCPrime : c + d' = d + c')
+        : (a + c) + (b + d') = (b + d) + (a + c') :=
+  calc (a + c) + (b + d')
+     = (a + b) + (c + d')
+            by Natural.add_two_two_swap(a, c, b, d')
+     = (a + b) + (d + c')
+            by congruenceOf(
+                   function (rhs : Natural) => (a + b) + rhs,
+                   cPlusDPrimeEqualsDPlusCPrime)
+     = (b + a) + (d + c')
+            by congruenceOf(
+                   function (lhs : Natural) => lhs + (d + c'),
+                   Natural.add_commutative(a, b))
+     = (b + d) + (a + c')
+            by Natural.add_two_two_swap(b, a, d, c')
+
+-- Two-step helper chain for add_respects_second: both rep2 and rep2'
+-- must be destructured before the IntegerEquivalent hypothesis
+-- refines to the c + d' = d + c' Natural-level form. The first-arg
+-- recursor case only refines hypotheses against the first function
+-- arg, so we descend through TWO helpers.
+theorem Integer.add_respects_second_after_first_second
+        (a b c d : Natural)
+        : (rep2' : IntegerRepresentative)
+          → IntegerEquivalent(IntegerRepresentative.make(c, d), rep2')
+          → IntegerEquivalent(
+                Integer.add_representatives(
+                    IntegerRepresentative.make(a, b),
+                    IntegerRepresentative.make(c, d)),
+                Integer.add_representatives(
+                    IntegerRepresentative.make(a, b), rep2'))
+  | IntegerRepresentative.make(cPrime, dPrime), eq =>
+      Integer.add_respects_second_natural(
+          a, b, c, d, cPrime, dPrime, eq)
+
+theorem Integer.add_respects_second_after_first
+        (a b : Natural)
+        : (rep2 rep2' : IntegerRepresentative)
+          → IntegerEquivalent(rep2, rep2')
+          → IntegerEquivalent(
+                Integer.add_representatives(
+                    IntegerRepresentative.make(a, b), rep2),
+                Integer.add_representatives(
+                    IntegerRepresentative.make(a, b), rep2'))
+  | IntegerRepresentative.make(c, d), rep2', eq =>
+      Integer.add_respects_second_after_first_second(
+          a, b, c, d, rep2', eq)
+
+theorem Integer.add_respects_second
+        : (rep1 rep2 rep2' : IntegerRepresentative)
+          → IntegerEquivalent(rep2, rep2')
+          → IntegerEquivalent(
+                Integer.add_representatives(rep1, rep2),
+                Integer.add_representatives(rep1, rep2'))
+  | IntegerRepresentative.make(a, b), rep2, rep2', eq =>
+      Integer.add_respects_second_after_first(a, b, rep2, rep2', eq)
+
+-- ----------------------------------------------------------------------
+-- Integer.add itself: lift add_representatives over both arguments.
+-- The outer Quotient.lift varies rep1; the inner one (captured by the
+-- outer function) varies rep2 with the chosen rep1. The kernel's
+-- Quotient.lift reduction rule makes both lifts collapse on
+-- Quotient.mk inputs to a plain mk(add_representatives(...)), which
+-- is what the respect proofs need to compare.
+
+-- Helper: builds the "add this representative to any integer" function.
+-- Inner lift over the SECOND argument with the first held fixed.
+definition Integer.add_after_first (rep1 : IntegerRepresentative)
+        (secondInteger : Integer)
+        : Integer :=
+  Quotient.lift.{0, 0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      Integer,
+      function (rep2 : IntegerRepresentative) =>
+          Quotient.mk.{0}(
+              IntegerRepresentative,
+              IntegerEquivalent,
+              Integer.add_representatives(rep1, rep2)),
+      function (rep2 rep2Prime : IntegerRepresentative)
+               (rep2EquivalentRep2Prime
+                   : IntegerEquivalent(rep2, rep2Prime)) =>
+          Quotient.sound.{0}(
+              IntegerRepresentative,
+              IntegerEquivalent,
+              Integer.add_representatives(rep1, rep2),
+              Integer.add_representatives(rep1, rep2Prime),
+              Integer.add_respects_second(
+                  rep1, rep2, rep2Prime,
+                  rep2EquivalentRep2Prime)),
+      secondInteger)
+
+-- Respect for `add_after_first` when the first representative varies.
+-- Uses Quotient.induct on the second-Integer argument: every q
+-- factors as Quotient.mk(rep2), where Quotient.lift's kernel reduction
+-- collapses `add_after_first(rep, mk(rep2))` to
+-- `mk(add_representatives(rep, rep2))`. Sound + add_respects_first
+-- closes it.
+theorem Integer.add_after_first_respects
+        (rep1 rep1Prime : IntegerRepresentative)
+        (rep1EquivalentRep1Prime : IntegerEquivalent(rep1, rep1Prime))
+        (secondInteger : Integer)
+        : Equality.{0}(Integer,
+                       Integer.add_after_first(rep1, secondInteger),
+                       Integer.add_after_first(rep1Prime, secondInteger)) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (q : Integer) =>
+          Equality.{0}(Integer,
+                       Integer.add_after_first(rep1, q),
+                       Integer.add_after_first(rep1Prime, q)),
+      function (rep2 : IntegerRepresentative) =>
+          Quotient.sound.{0}(
+              IntegerRepresentative,
+              IntegerEquivalent,
+              Integer.add_representatives(rep1, rep2),
+              Integer.add_representatives(rep1Prime, rep2),
+              Integer.add_respects_first(
+                  rep1, rep1Prime, rep2,
+                  rep1EquivalentRep1Prime)),
+      secondInteger)
+
+-- The main definition: lift over the first Integer argument. The
+-- respect proof feeds `add_after_first_respects` with the captured
+-- secondInteger.
+definition Integer.add (firstInteger secondInteger : Integer) : Integer :=
+  Quotient.lift.{0, 0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      Integer,
+      function (rep1 : IntegerRepresentative) =>
+          Integer.add_after_first(rep1, secondInteger),
+      function (rep1 rep1Prime : IntegerRepresentative)
+               (rep1EquivalentRep1Prime
+                   : IntegerEquivalent(rep1, rep1Prime)) =>
+          Integer.add_after_first_respects(
+              rep1, rep1Prime, rep1EquivalentRep1Prime,
+              secondInteger),
+      firstInteger)
+
+-- ----------------------------------------------------------------------
+-- Canonical constants.
+
+definition Integer.zero : Integer :=
+  Quotient.mk.{0}(
+      IntegerRepresentative, IntegerEquivalent,
+      IntegerRepresentative.make(zero, zero))
+
+definition Integer.one : Integer :=
+  Quotient.mk.{0}(
+      IntegerRepresentative, IntegerEquivalent,
+      IntegerRepresentative.make(successor(zero), zero))
+
+-- Smoke test: zero + one = one (definitionally via the kernel
+-- Quotient.lift reduction — both lifts collapse on the mk-form
+-- inputs).
+theorem Integer.add_zero_one_equals_one
+        : Equality.{0}(Integer, Integer.add(Integer.zero, Integer.one),
+                       Integer.one) :=
+  reflexivity.{0}(Integer, Integer.one)

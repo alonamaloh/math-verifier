@@ -197,6 +197,32 @@ theorem Natural.add_cancel_right (a b c : Natural)
               equality,
               Natural.add_commutative(b, c))))
 
+-- "Two-pair swap": (p + q) + (r + s) = (p + r) + (q + s). Swap the
+-- inner two elements between the outer pairs. Used in quotient
+-- equivalence-respect proofs where we want `(a + b') + (c + d)`
+-- forms from `(a + c) + (b' + d)`.
+theorem Natural.add_two_two_swap (p q r s : Natural)
+        : (p + q) + (r + s) = (p + r) + (q + s) :=
+  calc (p + q) + (r + s)
+     = p + (q + (r + s))
+            by Natural.add_associative(p, q, r + s)
+     = p + ((q + r) + s)
+            by congruenceOf(
+                   function (innerSum : Natural) => p + innerSum,
+                   Equality.symmetry(
+                       Natural.add_associative(q, r, s)))
+     = p + ((r + q) + s)
+            by congruenceOf(
+                   function (innerSum : Natural) => p + (innerSum + s),
+                   Natural.add_commutative(q, r))
+     = p + (r + (q + s))
+            by congruenceOf(
+                   function (innerSum : Natural) => p + innerSum,
+                   Natural.add_associative(r, q, s))
+     = (p + r) + (q + s)
+            by Equality.symmetry(
+                   Natural.add_associative(p, r, q + s))
+
 -- "Four-term swap": (a + b) + (c + d) = (a + d) + (c + b). Useful
 -- whenever we have a sum of two sums and want to rearrange which
 -- elements pair up. Proof is a calc chain of associativity and
