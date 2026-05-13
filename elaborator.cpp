@@ -127,6 +127,24 @@ private:
         return false;
     }
 
+    // Repeatedly abstracts over a sequence of BoundVariable indices.
+    // `indices` is in outermost-to-innermost binder order — i.e.
+    // indices[0] becomes the outer Lambda's binder and indices.back()
+    // becomes the inner Lambda's binder. After each abstraction every
+    // other outer reference shifts up by one, so the i-th abstraction
+    // targets the original index shifted by i.
+    ExpressionPointer abstractOverBoundVariables(
+        ExpressionPointer expression,
+        const std::vector<int>& indices) {
+        ExpressionPointer result = expression;
+        for (size_t i = 0; i < indices.size(); ++i) {
+            int adjustedIndex =
+                indices[i] + static_cast<int>(i);
+            result = abstractOverBoundVariable(result, adjustedIndex);
+        }
+        return result;
+    }
+
     // Rewrites `expression` so that BoundVariable(targetIndex) becomes
     // BoundVariable(0) at every depth, and every OTHER BoundVariable
     // that refers to outer scope is shifted up by one. Used to build
@@ -1881,11 +1899,45 @@ private:
         std::vector<ExpressionPointer> indexValues(
             inductiveArguments.begin() + inductive->numParameters,
             inductiveArguments.end());
-        if (!indexValues.empty()) {
-            throw ElaborateError(
-                "cases at line " + std::to_string(line)
-                + ": pattern matching on indexed inductive '"
-                + constant->name + "' is not supported in Phase 1");
+        // For indexed inductives, each index must be a distinct local
+        // variable BoundVariable. The motive will abstract over those
+        // variables, and the recursor will take their values back as
+        // arguments after the case lambdas.
+        std::vector<int> indexLocalIndices;
+        for (size_t k = 0; k < indexValues.size(); ++k) {
+            // After closeOverLocalBinders the value is in localBinders'
+            // BoundVariable form. Look up the index value's variable.
+            ExpressionPointer indexClosed = closeOverLocalBinders(
+                indexValues[k], localBinders, localBinders.size());
+            auto* boundVariable =
+                std::get_if<BoundVariable>(&indexClosed->node);
+            if (!boundVariable) {
+                throw ElaborateError(
+                    "cases at line " + std::to_string(line)
+                    + ": index " + std::to_string(k)
+                    + " of scrutinee type must be a local variable");
+            }
+            int idx = boundVariable->deBruijnIndex;
+            if (idx < 0
+                || idx >= static_cast<int>(localBinders.size())) {
+                throw ElaborateError(
+                    "cases at line " + std::to_string(line)
+                    + ": index " + std::to_string(k)
+                    + " of scrutinee type references an out-of-scope "
+                      "binder");
+            }
+            for (int seen : indexLocalIndices) {
+                if (seen == idx) {
+                    throw ElaborateError(
+                        "cases at line " + std::to_string(line)
+                        + ": the same local variable is used for "
+                          "two different scrutinee indices");
+                }
+            }
+            indexLocalIndices.push_back(idx);
+            // Replace the opened-form index value with its closed form
+            // so downstream code uses local-binder BoundVariables.
+            indexValues[k] = indexClosed;
         }
         const std::vector<LevelPointer>& inductiveUniverseArguments =
             constant->universeArguments;
@@ -1906,16 +1958,21 @@ private:
                 + ": '" + recursorName + "' is not a recursor");
         }
 
-        // Build the motive: fun (target : scrutineeType) => motiveBody.
-        // When the scrutinee is itself a local variable (BoundVariable),
-        // the motive ABSTRACTS over that variable: any reference to it
-        // inside expectedType becomes the target binder. This is what
-        // makes induction-by-cases sound — without it, a goal like
-        // `cases n { | zero => ...; | successor(k) => ... } : n = n`
-        // would have an unprovable motiveAtCase (each case would need
-        // to produce `n = n`, but only knows about zero or successor(k)).
-        // For non-variable scrutinees, fall back to the simpler shift —
-        // the goal genuinely doesn't depend on the scrutinee value.
+        // Build the motive. The structure depends on whether the
+        // inductive is indexed and whether the scrutinee is a local
+        // variable:
+        //
+        //   motive = Lambda(idx_0, T_0,
+        //              Lambda(idx_1, T_1,
+        //                …
+        //                Lambda(target, ScrutTypeInMotive,
+        //                  expectedType abstracted over [idx_0, …, scrutVar]))).
+        //
+        // Each index's BoundVariable in expectedType is replaced with
+        // the corresponding motive-bound index variable; the
+        // scrutinee variable (if local) is replaced with the target
+        // binder; other references are shifted up by N+1 (N indices
+        // plus 1 target).
         int scrutineeLocalIndex = -1;
         if (auto* boundVariable =
                 std::get_if<BoundVariable>(&scrutinee->node)) {
@@ -1925,19 +1982,50 @@ private:
                 scrutineeLocalIndex = index;
             }
         }
-        ExpressionPointer motiveBody;
+        // Build the abstraction list: indices first (outermost
+        // Lambdas), then the scrutinee variable (innermost / target).
+        std::vector<int> abstractionList = indexLocalIndices;
         if (scrutineeLocalIndex >= 0) {
-            // Abstract over the scrutinee's BoundVariable: rewrite the
-            // expected type so references to that variable become the
-            // motive's target binder, while every other reference is
-            // shifted up by one to make room for it.
-            motiveBody = abstractOverBoundVariable(
-                expectedType, scrutineeLocalIndex);
+            abstractionList.push_back(scrutineeLocalIndex);
+        }
+        ExpressionPointer motiveBody;
+        if (!abstractionList.empty()) {
+            motiveBody =
+                abstractOverBoundVariables(expectedType, abstractionList);
         } else {
             motiveBody = shift(expectedType, 1);
         }
+        // Compute the scrutinee type as it should appear in the
+        // motive's target-Lambda position (i.e., after the index
+        // Lambdas have been wrapped but before the target Lambda is).
+        // The scrutinee type lives in localBinders scope; abstracting
+        // it over the indices yields the same value in
+        // {localBinders - indices + index_Lambdas} scope.
+        ExpressionPointer scrutineeTypeInMotive;
+        if (indexLocalIndices.empty()) {
+            scrutineeTypeInMotive = scrutineeType;
+        } else {
+            scrutineeTypeInMotive = abstractOverBoundVariables(
+                scrutineeType, indexLocalIndices);
+        }
+        // Wrap motiveBody with the innermost Lambda (target), using
+        // scrutineeTypeInMotive as its domain.
         ExpressionPointer motive = makeLambda(
-            "_cases_target", scrutineeType, motiveBody);
+            "_cases_target", scrutineeTypeInMotive, motiveBody);
+        // For each index, wrap with another outer Lambda. We walk in
+        // reverse so the OUTERMOST Lambda (indices[0]) ends up last.
+        // `indexLocalIndices[k]` is a de Bruijn index; convert to the
+        // localBinders array position by inverting against size.
+        for (int k = static_cast<int>(indexLocalIndices.size()) - 1;
+             k >= 0; --k) {
+            int deBruijn = indexLocalIndices[k];
+            int arrayPosition = static_cast<int>(localBinders.size())
+                - 1 - deBruijn;
+            ExpressionPointer indexType =
+                localBinders[arrayPosition].type;
+            motive = makeLambda(localBinders[arrayPosition].name,
+                                 indexType, motive);
+        }
 
         // Infer the motive's universe level by asking the kernel for
         // its type (a Pi ending in a Sort). Local binders' types may
@@ -2104,7 +2192,11 @@ private:
             applied =
                 makeApplication(applied, std::move(caseLambda));
         }
-        // No indices to apply (Phase 1 forbids indexed inductives).
+        // Apply index values in scrutinee order, then the scrutinee
+        // itself. For non-indexed inductives this loop is empty.
+        for (const auto& indexValue : indexValues) {
+            applied = makeApplication(applied, indexValue);
+        }
         applied = makeApplication(applied, scrutinee);
         return applied;
     }
