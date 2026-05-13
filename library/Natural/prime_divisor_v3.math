@@ -34,21 +34,24 @@ theorem Natural.has_prime_divisor_v3 (n : Natural)
             → successor(smaller) ≤ subject
             → 2 ≤ smaller
             → ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ smaller)
-        (subjectAtLeastTwo : 2 ≤ subject) =>
-      cases Natural.prime_or_proper_divisor(subject, subjectAtLeastTwo) {
-        | Or.introduceLeft(subjectIsPrime) =>
-            ⟨subject, subjectIsPrime, Natural.divides_reflexive(subject)⟩
-        | Or.introduceRight(properDivisorWitness) => {
+        (subjectAtLeastTwo : 2 ≤ subject) => {
+      by_cases on Natural.prime_or_proper_divisor(subject, subjectAtLeastTwo) {
+        case Or.introduceLeft(subjectIsPrime):
+            witness subject with
+                ⟨subjectIsPrime, Natural.divides_reflexive(subject)⟩;
+        case Or.introduceRight(properDivisorWitness): {
             let ⟨divisor, divisorAtLeastTwo,
                   divisorBelowSubject, divisorDividesSubject⟩
                 := properDivisorWitness;
             let ⟨prime, primeIsPrime, primeDividesDivisor⟩
                 := inductionHypothesis(
                        divisor, divisorBelowSubject, divisorAtLeastTwo);
-            ⟨prime, primeIsPrime,
-              Natural.divides_transitive(
-                  primeDividesDivisor, divisorDividesSubject)⟩
+            witness prime with
+                ⟨primeIsPrime,
+                  Natural.divides_transitive(
+                      primeDividesDivisor, divisorDividesSubject)⟩;
           }
-      },
+      }
+    },
     n,
     ?)

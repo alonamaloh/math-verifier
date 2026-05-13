@@ -246,26 +246,7 @@ private:
             wrappers.push_back(std::move(wrapper));
         }
         SurfaceExpressionPointer finalExpression;
-        if (peek().kind == TokenKind::KeywordWitness) {
-            // `witness E with P;` is terminal: this becomes the block's
-            // trailing expression as ⟨E, P⟩, which the anonymous-tuple
-            // elaborator picks the right constructor for (typically
-            // Exists.introduce when the goal is ∃-shaped).
-            Token witnessToken = consumeAny();
-            auto witnessExpression = parseExpression();
-            expect(TokenKind::KeywordWith,
-                   "after witness expression");
-            auto witnessProof = parseExpression();
-            if (peek().kind == TokenKind::Semicolon) {
-                consumeAny();
-            }
-            std::vector<SurfaceExpressionPointer> components;
-            components.push_back(std::move(witnessExpression));
-            components.push_back(std::move(witnessProof));
-            finalExpression = makeSurfaceAnonymousTuple(
-                std::move(components),
-                witnessToken.line, witnessToken.column);
-        } else if (peek().kind == TokenKind::KeywordSuffices) {
+        if (peek().kind == TokenKind::KeywordSuffices) {
             // `suffices Q by Reduction; <rest>` becomes
             // `Reduction(<rest as a block>)` — the rest of the
             // statements prove Q, and Reduction : Q → current_goal
@@ -289,6 +270,43 @@ private:
                 std::move(reductionLemma),
                 std::move(arguments),
                 sufficesToken.line, sufficesToken.column);
+        } else if (peek().kind == TokenKind::KeywordByCases
+                   || peek().kind == TokenKind::KeywordByInduction) {
+            // `by_cases on E { case P: body; ... }` is terminal
+            // sugar for `cases E { case P: body; ... }` — and
+            // `by_induction on E with IH { case P: body; ... }`
+            // additionally appends `IH` to each constructor pattern
+            // that has any recursive arguments. Both consume the
+            // rest of the block as their case-clause block.
+            Token byToken = consumeAny();
+            bool isInduction =
+                byToken.kind == TokenKind::KeywordByInduction;
+            expect(TokenKind::KeywordOn,
+                   isInduction ? "after 'by_induction'"
+                               : "after 'by_cases'");
+            auto scrutinee = parseExpression();
+            std::string ihName;
+            if (isInduction) {
+                expect(TokenKind::KeywordWith,
+                       "after 'by_induction on <expr>'");
+                if (peek().kind != TokenKind::Identifier) {
+                    throwHere("expected an identifier (the induction "
+                              "hypothesis name) after 'with'");
+                }
+                ihName = consumeAny().lexeme;
+            }
+            expect(TokenKind::LeftBrace,
+                   isInduction
+                       ? "after 'by_induction on <expr> with <ih>'"
+                       : "after 'by_cases on <expr>'");
+            auto clauses = parseCasesClauseBlock(
+                ihName, TokenKind::Colon);
+            expect(TokenKind::RightBrace,
+                   isInduction ? "ending by_induction block"
+                               : "ending by_cases block");
+            finalExpression = makeSurfaceCases(
+                std::move(scrutinee), std::move(clauses),
+                byToken.line, byToken.column);
         } else {
             finalExpression = parseExpression();
             // Optional trailing semicolon for the final expression.
@@ -813,6 +831,9 @@ private:
             || current.kind == TokenKind::Exists) {
             return parseQuantifier();
         }
+        if (current.kind == TokenKind::KeywordWitness) {
+            return parseWitnessExpression();
+        }
         if (current.kind == TokenKind::LeftBrace) {
             // `{ let pat := v; ...; final_expr }` as an expression.
             // Same shape as the theorem-body block form; useful inside
@@ -877,30 +898,98 @@ private:
                                           openAngle.line, openAngle.column);
     }
 
-    // `cases scrutinee { | pattern => body  | pattern => body  ... }`.
-    // Builds an inductive eliminator at elaboration time; the motive is
-    // derived from the enclosing expected type.
+    // `cases scrutinee { | pattern => body  | pattern => body  ... }`
+    // — the original form. Also accepts the math-style form
+    // `cases scrutinee { case pattern: body;  case pattern: body;  ... }`
+    // alongside (a single block may pick either, but the two cannot be
+    // mixed inside the same `cases`). Builds an inductive eliminator at
+    // elaboration time; the motive is derived from the enclosing
+    // expected type.
     SurfaceExpressionPointer parseCasesExpression() {
         Token casesToken = consumeAny();  // 'cases'
         auto scrutinee = parseExpression();
         expect(TokenKind::LeftBrace, "after cases scrutinee");
-        std::vector<SurfaceCasesClause> clauses;
-        while (peek().kind == TokenKind::Pipe) {
-            Token pipeToken = consumeAny();
-            SurfaceCasesClause clause;
-            clause.line = pipeToken.line;
-            clause.column = pipeToken.column;
-            clause.pattern = parsePattern();
-            expect(TokenKind::FatArrow, "between cases pattern and body");
-            clause.body = parseExpression();
-            clauses.push_back(std::move(clause));
-        }
-        if (clauses.empty()) {
-            throwHere("cases expression needs at least one '|' clause");
-        }
+        auto clauses = parseCasesClauseBlock(
+            /*injectedIhName=*/std::string(),
+            /*caseFollowedBy=*/TokenKind::Colon);
         expect(TokenKind::RightBrace, "ending cases expression");
         return makeSurfaceCases(std::move(scrutinee), std::move(clauses),
                                  casesToken.line, casesToken.column);
+    }
+
+    // Parses the inside of a `{ … }` of a cases-style block: either a
+    // sequence of `| pattern => body` clauses (legacy form) or a
+    // sequence of `case pattern <separator> body;` clauses (math-style
+    // form). When `injectedIhName` is non-empty (set by `by_induction`),
+    // an extra bare-name pattern with that name is appended to each
+    // constructor pattern that has any recursive arguments — the
+    // existing IH-naming convention in cases patterns picks it up.
+    std::vector<SurfaceCasesClause> parseCasesClauseBlock(
+        const std::string& injectedIhName,
+        TokenKind caseFollowedBy) {
+        std::vector<SurfaceCasesClause> clauses;
+        bool sawCaseForm = false;
+        bool sawPipeForm = false;
+        while (peek().kind == TokenKind::Pipe
+               || peek().kind == TokenKind::KeywordCase) {
+            SurfaceCasesClause clause;
+            if (peek().kind == TokenKind::Pipe) {
+                if (sawCaseForm) {
+                    throwHere("can't mix '|' clauses and 'case' clauses "
+                              "in the same cases block");
+                }
+                sawPipeForm = true;
+                Token pipeToken = consumeAny();
+                clause.line = pipeToken.line;
+                clause.column = pipeToken.column;
+                clause.pattern = parsePattern();
+                expect(TokenKind::FatArrow,
+                       "between cases pattern and body");
+                clause.body = parseExpression();
+            } else {
+                if (sawPipeForm) {
+                    throwHere("can't mix 'case' clauses and '|' clauses "
+                              "in the same cases block");
+                }
+                sawCaseForm = true;
+                Token caseToken = consumeAny();
+                clause.line = caseToken.line;
+                clause.column = caseToken.column;
+                clause.pattern = parsePattern();
+                if (!injectedIhName.empty()) {
+                    if (auto* constructorPattern =
+                            std::get_if<SurfacePatternConstructor>(
+                                &clause.pattern->node)) {
+                        std::vector<SurfacePatternPointer>
+                            extendedArguments(
+                                constructorPattern->arguments);
+                        extendedArguments.push_back(
+                            makeSurfacePatternBareName(
+                                injectedIhName,
+                                clause.line, clause.column));
+                        clause.pattern =
+                            makeSurfacePatternConstructor(
+                                constructorPattern->constructorName,
+                                std::move(extendedArguments),
+                                clause.line, clause.column);
+                    }
+                }
+                expect(caseFollowedBy,
+                       caseFollowedBy == TokenKind::Colon
+                           ? "between case pattern and body"
+                           : "between case pattern and body");
+                clause.body = parseExpression();
+                if (peek().kind == TokenKind::Semicolon) {
+                    consumeAny();
+                }
+            }
+            clauses.push_back(std::move(clause));
+        }
+        if (clauses.empty()) {
+            throwHere("cases block needs at least one clause "
+                      "('| pattern => body' or 'case pattern: body;')");
+        }
+        return clauses;
     }
 
     // Calc-step proof bodies are parsed at a precedence below `=` so the
@@ -941,6 +1030,24 @@ private:
         return makeSurfaceCalc(std::move(initialExpression),
                                 std::move(steps),
                                 calcToken.line, calcToken.column);
+    }
+
+    // `witness E with P` — a shorthand for the anonymous tuple
+    // `⟨E, P⟩`. Works anywhere an expression is expected, including
+    // as the trailing expression of a block or the body of a `case`
+    // clause.
+    SurfaceExpressionPointer parseWitnessExpression() {
+        Token witnessToken = consumeAny();  // 'witness'
+        auto witnessExpression = parseRelational();
+        expect(TokenKind::KeywordWith,
+               "after witness expression");
+        auto witnessProof = parseExpression();
+        std::vector<SurfaceExpressionPointer> components;
+        components.push_back(std::move(witnessExpression));
+        components.push_back(std::move(witnessProof));
+        return makeSurfaceAnonymousTuple(
+            std::move(components),
+            witnessToken.line, witnessToken.column);
     }
 
     // `∀ (binder)+ . body` desugars to a Pi chain `(binder)+ → body`.

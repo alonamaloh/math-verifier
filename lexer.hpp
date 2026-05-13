@@ -32,6 +32,8 @@ enum class TokenKind {
     KeywordClaim,
     KeywordWitness,
     KeywordSuffices,
+    KeywordByCases,         // `by_cases` — math-style case-split
+    KeywordByInduction,     // `by_induction` — case-split with IH
 
     // Punctuation
     LeftParen, RightParen,

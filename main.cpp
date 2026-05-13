@@ -3926,6 +3926,54 @@ theorem flipped : Equality.{0}(Natural, zero, zero) := {
         "suffices reduces the goal via a lemma",
         __LINE__);
 
+    // `by_cases on E { case Pattern: body; … }` — math-style case-split.
+    expectVerifies(R"(
+module Test.by_cases_statement
+
+inductive Or (A B : Proposition) : Proposition where
+  | Or.introduceLeft  : A → Or(A, B)
+  | Or.introduceRight : B → Or(A, B)
+
+theorem disjunction_swap (A B : Proposition) (h : Or(A, B)) : Or(B, A) := {
+  by_cases on h {
+    case Or.introduceLeft(a):  Or.introduceRight(B, A, a);
+    case Or.introduceRight(b): Or.introduceLeft(B, A, b);
+  }
+}
+)",
+        "by_cases statement is sugar for cases",
+        __LINE__);
+
+    // `by_induction on n with ih { case Constructor(args): body; … }` —
+    // the `ih` name is appended to constructor patterns with recursive
+    // arguments (e.g. `successor(predecessor)` becomes
+    // `successor(predecessor, ih)`).
+    expectVerifies(R"(
+module Test.by_induction_statement
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+axiom Equality.congruence.{u, v}
+  : (A : Type(u)) → (B : Type(v)) → (f : A → B) → (x y : A)
+    → Equality.{u}(A, x, y) → Equality.{v}(B, f(x), f(y))
+
+theorem reflexive (n : Natural) : Equality.{0}(Natural, n, n) := {
+  by_induction on n with ih {
+    case zero: reflexivity.{0}(Natural, zero);
+    case successor(predecessor):
+        Equality.congruence.{0, 0}(
+            Natural, Natural, successor, predecessor, predecessor, ih);
+  }
+}
+)",
+        "by_induction injects IH into recursive constructor patterns",
+        __LINE__);
+
     // Mixing `claim` and `let` in the same block.
     expectVerifies(R"(
 module Test.claim_and_let
