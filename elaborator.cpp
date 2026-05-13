@@ -1971,21 +1971,16 @@ private:
     //      `reflexivity(x)`.
     // If neither succeeds we throw with a diagnostic listing the
     // expected type and the in-scope candidates.
-    ExpressionPointer elaborateHammerPlaceholder(
+    // Try the direct hammer strategies (hypothesis-match and
+    // reflexivity-match) for the given goal. Returns the proof on
+    // success (in closed local-binder form) or nullptr on failure.
+    // Used both at the top level and recursively when trying
+    // local-hypothesis application.
+    ExpressionPointer tryDirectHammer(
         const std::vector<LocalBinder>& localBinders,
-        ExpressionPointer expectedType,
-        int line, int column) {
-        (void)column;
-        Frame frame(*this,
-            "hammer placeholder '?' at line " + std::to_string(line));
-        if (!expectedType) {
-            throwElaborate(
-                "needs an expected type from context — '?' fills in a "
-                "proof of the expected type, so the elaborator must "
-                "know what that type is");
-        }
+        ExpressionPointer goalType) {
         ExpressionPointer goalOpened = openOverLocalBinders(
-            expectedType, localBinders, localBinders.size());
+            goalType, localBinders, localBinders.size());
         ExpressionPointer goalNormalised =
             weakHeadNormalForm(environment_, goalOpened);
         Context openedContext;
@@ -2007,46 +2002,141 @@ private:
                 return makeBoundVariable(deBruijnIndex);
             }
         }
-        // Reflexivity match: expected `Equality(A, x, x)` with the two
-        // endpoints definitionally equal.
-        {
-            ExpressionPointer cursor = goalNormalised;
-            std::vector<ExpressionPointer> applicationArguments;
-            while (auto* application =
-                       std::get_if<Application>(&cursor->node)) {
-                applicationArguments.insert(
-                    applicationArguments.begin(),
-                    application->argument);
-                cursor = application->function;
-            }
-            if (auto* constant = std::get_if<Constant>(&cursor->node)) {
-                if (constant->name == "Equality"
-                    && applicationArguments.size() == 3) {
-                    if (isDefinitionallyEqual(
-                            environment_, openedContext,
-                            applicationArguments[1],
-                            applicationArguments[2])) {
-                        ExpressionPointer reflexivity = makeConstant(
-                            "reflexivity",
-                            constant->universeArguments);
-                        ExpressionPointer applied = makeApplication(
-                            reflexivity, applicationArguments[0]);
-                        applied = makeApplication(
-                            applied, applicationArguments[1]);
-                        ExpressionPointer closed = closeOverLocalBinders(
-                            applied, localBinders,
-                            localBinders.size());
-                        return closed;
-                    }
+        // Reflexivity match.
+        ExpressionPointer cursor = goalNormalised;
+        std::vector<ExpressionPointer> applicationArguments;
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            applicationArguments.insert(
+                applicationArguments.begin(),
+                application->argument);
+            cursor = application->function;
+        }
+        if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+            if (constant->name == "Equality"
+                && applicationArguments.size() == 3) {
+                if (isDefinitionallyEqual(
+                        environment_, openedContext,
+                        applicationArguments[1],
+                        applicationArguments[2])) {
+                    ExpressionPointer reflexivity = makeConstant(
+                        "reflexivity", constant->universeArguments);
+                    ExpressionPointer applied = makeApplication(
+                        reflexivity, applicationArguments[0]);
+                    applied = makeApplication(
+                        applied, applicationArguments[1]);
+                    return closeOverLocalBinders(
+                        applied, localBinders, localBinders.size());
                 }
             }
+        }
+        return nullptr;
+    }
+
+    // Try depth-1 application of an in-scope hypothesis. For each
+    // local binder whose type is a non-dependent Pi chain ending in
+    // (something definitionally equal to) the goal, recursively
+    // hammer each domain with the direct strategies. If every arg is
+    // fillable, return the application.
+    //
+    // "Non-dependent" means each Pi's codomain doesn't reference its
+    // own binder. Dependent chains would need higher-order matching
+    // to figure out what to fill the bound variable with — out of
+    // scope for Phase 3.1.
+    ExpressionPointer tryLocalHypothesisApplication(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer goalType) {
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalType, localBinders, localBinders.size());
+        ExpressionPointer goalNormalised =
+            weakHeadNormalForm(environment_, goalOpened);
+        Context openedContext;
+        for (size_t i = 0; i < localBinders.size(); ++i) {
+            ExpressionPointer openedType = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            openedContext.push_back({localBinders[i].name, openedType,
+                                       FreeVariableOrigin::Internal});
+        }
+        for (int i = static_cast<int>(localBinders.size()) - 1;
+             i >= 0; --i) {
+            ExpressionPointer binderTypeOpened = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            std::vector<ExpressionPointer> openedDomains;
+            ExpressionPointer cursor = weakHeadNormalForm(
+                environment_, binderTypeOpened);
+            bool nonDependent = true;
+            while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+                if (referencesBoundBelowThreshold(pi->codomain, 1)) {
+                    nonDependent = false;
+                    break;
+                }
+                openedDomains.push_back(pi->domain);
+                // Non-dependent: shift codomain down by 1 to drop the
+                // unused binder, then continue walking.
+                cursor = weakHeadNormalForm(
+                    environment_, shift(pi->codomain, -1));
+            }
+            if (!nonDependent || openedDomains.empty()) continue;
+            if (!isDefinitionallyEqual(environment_, openedContext,
+                                         cursor, goalNormalised)) {
+                continue;
+            }
+            // Recursively hammer each domain. Close back to local-
+            // binder form first so `tryDirectHammer` sees the goal
+            // shape it expects.
+            std::vector<ExpressionPointer> arguments;
+            bool allArgumentsFilled = true;
+            for (const auto& openedDomain : openedDomains) {
+                ExpressionPointer closedDomain = closeOverLocalBinders(
+                    openedDomain, localBinders,
+                    localBinders.size());
+                ExpressionPointer argumentProof = tryDirectHammer(
+                    localBinders, closedDomain);
+                if (!argumentProof) {
+                    allArgumentsFilled = false;
+                    break;
+                }
+                arguments.push_back(std::move(argumentProof));
+            }
+            if (!allArgumentsFilled) continue;
+            int deBruijnIndex =
+                static_cast<int>(localBinders.size()) - 1 - i;
+            ExpressionPointer applied = makeBoundVariable(deBruijnIndex);
+            for (auto& argument : arguments) {
+                applied = makeApplication(applied, std::move(argument));
+            }
+            return applied;
+        }
+        return nullptr;
+    }
+
+    ExpressionPointer elaborateHammerPlaceholder(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        (void)column;
+        Frame frame(*this,
+            "hammer placeholder '?' at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "needs an expected type from context — '?' fills in a "
+                "proof of the expected type, so the elaborator must "
+                "know what that type is");
+        }
+        if (auto direct = tryDirectHammer(localBinders, expectedType)) {
+            return direct;
+        }
+        if (auto applied =
+                tryLocalHypothesisApplication(localBinders, expectedType)) {
+            return applied;
         }
         std::string message =
             "could not find a proof of:\n      "
             + prettyPrintInLocalScope(expectedType, localBinders)
-            + "\n  Tried: hypothesis-match against "
+            + "\n  Tried: hypothesis-match, reflexivity-match, "
+              "depth-1 hypothesis-application against "
             + std::to_string(localBinders.size())
-            + " in-scope binders, reflexivity-match.";
+            + " in-scope binders.";
         if (!localBinders.empty()) {
             message += "\n  Candidates in scope:";
             for (int i =

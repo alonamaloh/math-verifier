@@ -3562,6 +3562,65 @@ theorem hammer_ok (A : Proposition) (h : A) : A := ?
                       << e.what() << "\n";
         }
     }
+
+    // Phase 3.1: depth-1 hypothesis application — `h : A → B`, `a : A`
+    // in scope and goal `B`, the hammer should apply `h(a)`.
+    auto expectVerifies = [](const std::string& source,
+                              const char* description,
+                              int testLine) {
+        try {
+            verifyMathSource(source);
+            ++passed;
+        } catch (const std::exception& e) {
+            ++failed;
+            std::cerr << "FAIL (line " << testLine
+                      << "): " << description << ": "
+                      << e.what() << "\n";
+        }
+    };
+
+    expectVerifies(R"(
+module Test.hammer_app_one_step
+
+theorem one_step (A B : Proposition) (h : A → B) (a : A) : B := ?
+)",
+        "depth-1 hypothesis application (single arg)",
+        __LINE__);
+
+    expectVerifies(R"(
+module Test.hammer_app_two_step
+
+theorem two_step (A B C : Proposition)
+                 (h : A → B → C)
+                 (a : A) (b : B) : C := ?
+)",
+        "depth-1 hypothesis application (two args)",
+        __LINE__);
+
+    // Application strategy must not shadow hypothesis-match: when the
+    // goal is directly in scope, prefer the cheaper direct match.
+    expectVerifies(R"(
+module Test.hammer_app_prefers_direct
+
+theorem prefers_direct (A : Proposition) (h : A → A) (a : A) : A := ?
+)",
+        "direct match still wins over application",
+        __LINE__);
+
+    // When the application's argument is itself missing from scope,
+    // the hammer reports failure (we don't yet recurse into multi-
+    // level application).
+    expectErrorContains(R"(
+module Test.hammer_app_unfillable
+
+theorem unfillable (A B : Proposition) (h : A → B) : B := ?
+)",
+        {"hammer placeholder '?'",
+         "theorem 'unfillable'",
+         "could not find a proof",
+         "depth-1 hypothesis-application"},
+        "hammer fails when an application arg is unfillable",
+        __LINE__);
 }
 
 void runEndToEndPipelineTests() {
