@@ -241,3 +241,53 @@ Restriction (Phase 2.1): when an implicit binder has type `Type`
 with explicit `.{u}` universe arguments. Combining leading-arg
 inference with universe-arg inference at the call site is a separate
 slice.
+
+### Phase 2.2 — Motive abstraction in `cases`
+
+When a `cases` expression's scrutinee is a local variable, the motive
+now abstracts over that variable so that the case bodies see a goal
+specialised to the constructor they handle. This is what makes
+induction-by-cases sound:
+
+  theorem reflexive (n : Natural) : n = n :=
+    cases n {
+      | zero => reflexivity(zero)
+      | successor(k) => reflexivity(successor(k))
+    }
+
+For non-variable scrutinees the previous shift-by-one behaviour is
+preserved.
+
+### Phase 2.3 — IH naming in `cases` patterns
+
+A `cases` pattern over a recursive inductive may now bind names to
+the induction hypotheses produced for each recursive constructor
+argument:
+
+  cases a {
+    | zero => reflexivity(zero)
+    | successor(predecessor, ih) => congruenceOf(successor, ih)
+  }
+
+For a constructor with N value arguments of which R are recursive,
+the pattern accepts either N names (no IH access, auto-generated
+internal names) or N + R names (trailing R name the IH binders in
+declaration order). Combined with 2.2 this is enough to replace
+many pattern-match-definition uses with the more compositional
+`cases` form.
+
+### Phase 2.4 — Statement-level proof blocks
+
+New theorem body form: `{ let pat := v; …; final_expr }`. Each `let`
+statement is semicolon-terminated and may use either typed-name form
+(`let x : T := v`) or anonymous-tuple destructure (`let ⟨a, b⟩ := v`).
+The block desugars at parse time to a nested `let-in` chain ending in
+the trailing expression. `{ … }` blocks also work as expression
+atoms, so the same syntax appears inside case clauses.
+
+Library impact: `Natural/prime_divisor_v3.math` proves the prime-
+divisor theorem in 60 lines (vs 71 for v2, 170 for the original
+eliminator-chain version). The remaining bulk is the explicit motive
+lambda passed to `Natural.strong_induction` and its step's IH-type
+spell-out — both of which would require motive inference (a form of
+higher-order pattern unification) to eliminate.
