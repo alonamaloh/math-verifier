@@ -169,13 +169,32 @@ struct SurfaceCases {
 // expected type from context.
 struct SurfaceHammer { };
 
+// One step of a `calc` block: a target expression that the previous
+// expression should equal, plus the proof of that single step.
+struct SurfaceCalcStep {
+    SurfaceExpressionPointer nextExpression;
+    SurfaceExpressionPointer stepProof;
+    int line = 0;
+    int column = 0;
+};
+
+// `calc <initial> = <next1> by <p1> = <next2> by <p2> ...`. Each step's
+// proof `pₖ` proves `<previous-expression> = <nextₖ>`. Elaborates to a
+// left-fold of Equality.transitivity over the step proofs (or just the
+// single proof when there's exactly one step).
+struct SurfaceCalc {
+    SurfaceExpressionPointer initialExpression;
+    std::vector<SurfaceCalcStep> steps;
+};
+
 struct SurfaceExpression {
     std::variant<
         SurfaceIdentifier, SurfaceNumericLiteral,
         SurfaceApplication, SurfacePiType, SurfaceLambda,
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation,
-        SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer
+        SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer,
+        SurfaceCalc
     > node;
     int line = 0;
     int column = 0;
@@ -265,6 +284,14 @@ inline SurfaceExpressionPointer makeSurfaceAnonymousTuple(
 inline SurfaceExpressionPointer makeSurfaceHammer(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceHammer{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceCalc(
+    SurfaceExpressionPointer initialExpression,
+    std::vector<SurfaceCalcStep> steps,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceCalc{std::move(initialExpression), std::move(steps)},
+        line, column});
 }
 // Forward-declared above; full SurfaceCasesClause type lives later in
 // this header (it depends on SurfacePattern). The builder is defined

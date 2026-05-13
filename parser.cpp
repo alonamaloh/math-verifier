@@ -714,6 +714,9 @@ private:
         if (current.kind == TokenKind::KeywordCases) {
             return parseCasesExpression();
         }
+        if (current.kind == TokenKind::KeywordCalc) {
+            return parseCalc();
+        }
         if (current.kind == TokenKind::LeftBrace) {
             // `{ let pat := v; ...; final_expr }` as an expression.
             // Same shape as the theorem-body block form; useful inside
@@ -802,6 +805,46 @@ private:
         expect(TokenKind::RightBrace, "ending cases expression");
         return makeSurfaceCases(std::move(scrutinee), std::move(clauses),
                                  casesToken.line, casesToken.column);
+    }
+
+    // Calc-step proof bodies are parsed at a precedence below `=` so the
+    // next `=` (if any) starts the next calc step rather than being
+    // consumed as a top-level equality. `function`/`let` are still
+    // allowed at the top of a step proof; users who need a top-level
+    // `→`, `∧`, `∨`, or `=` inside a step proof must parenthesise.
+    SurfaceExpressionPointer parseCalcStepProof() {
+        if (peek().kind == TokenKind::KeywordFunction) return parseLambda();
+        if (peek().kind == TokenKind::KeywordLet)      return parseLet();
+        return parseRelational();
+    }
+
+    // `calc <initial> = <next1> by <proof1> = <next2> by <proof2> …`.
+    // Each `proofₖ` proves `<previous-expression> = <nextₖ>`. The
+    // elaborator turns the chain into nested Equality.transitivity calls.
+    SurfaceExpressionPointer parseCalc() {
+        Token calcToken = consumeAny();  // 'calc'
+        auto initialExpression = parseRelational();
+        std::vector<SurfaceCalcStep> steps;
+        while (peek().kind == TokenKind::Equal) {
+            Token equalToken = consumeAny();  // '='
+            auto nextExpression = parseRelational();
+            expect(TokenKind::KeywordBy,
+                   "after target expression in calc step");
+            auto stepProof = parseCalcStepProof();
+            SurfaceCalcStep step;
+            step.nextExpression = std::move(nextExpression);
+            step.stepProof = std::move(stepProof);
+            step.line = equalToken.line;
+            step.column = equalToken.column;
+            steps.push_back(std::move(step));
+        }
+        if (steps.empty()) {
+            throwHere("calc block needs at least one "
+                      "'= <expression> by <proof>' step");
+        }
+        return makeSurfaceCalc(std::move(initialExpression),
+                                std::move(steps),
+                                calcToken.line, calcToken.column);
     }
 
     // A qualified name like Natural.add_zero with an optional universe

@@ -3706,6 +3706,119 @@ definition Bool.identity : Bool → Bool := function (b : Bool) => b
                       << " stderr captured: " << result.capturedStderr << "\n";
         }
     }
+
+    // calc block, single step: just returns the proof.
+    expectVerifies(R"(
+module Test.calc_single_step
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem trivial (A : Type(0)) (x : A) : Equality.{0}(A, x, x) :=
+  calc x = x by reflexivity.{0}(A, x)
+)",
+        "calc with a single step elaborates to the step proof",
+        __LINE__);
+
+    // calc block, two-step transitivity chain.
+    expectVerifies(R"(
+module Test.calc_two_step
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+axiom Equality.transitivity.{u}
+  : (A : Type(u)) → (x y z : A)
+    → Equality.{u}(A, x, y) → Equality.{u}(A, y, z)
+    → Equality.{u}(A, x, z)
+
+axiom step_ab : Equality.{0}(Natural, zero, successor(zero))
+axiom step_bc : Equality.{0}(Natural, successor(zero),
+                              successor(successor(zero)))
+
+theorem chained
+        : Equality.{0}(Natural, zero, successor(successor(zero))) :=
+  calc zero
+     = successor(zero)             by step_ab
+     = successor(successor(zero))  by step_bc
+)",
+        "calc with two steps folds into Equality.transitivity",
+        __LINE__);
+
+    // Pattern-match definition with a recursive call inside a cases
+    // clause's body. Exercises rewriteRecursiveCalls's descent into
+    // SurfaceCases — without it the recursive call wouldn't be
+    // rewritten to the recursion hypothesis and elaboration fails.
+    expectVerifies(R"(
+module Test.recursive_call_inside_cases
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+definition recursive_through_cases : Natural → Natural
+  | zero                   => zero
+  | successor(predecessor) =>
+      cases predecessor {
+        | zero               => successor(zero)
+        | successor(_inner)  => recursive_through_cases(predecessor)
+      }
+)",
+        "recursive call inside cases body is rewritten",
+        __LINE__);
+
+    // calc in a pattern-match body verifies. (A recursive call inside
+    // a calc step PROOF is exercised end-to-end by the rewrite of
+    // Natural.add_commutative in library/Natural/arithmetic.math —
+    // without the rewriter descending into SurfaceCalc that proof
+    // wouldn't elaborate.)
+    expectVerifies(R"(
+module Test.calc_inside_pattern_match
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem identity_reflexive
+        : (n : Natural) → Equality.{0}(Natural, n, n)
+  | zero => reflexivity.{0}(Natural, zero)
+  | successor(predecessor) =>
+      calc successor(predecessor)
+         = successor(predecessor)
+              by reflexivity.{0}(Natural, successor(predecessor))
+)",
+        "calc inside pattern-match body verifies",
+        __LINE__);
+
+    // calc block: ill-typed step proof reports the failing step.
+    expectErrorContains(R"(
+module Test.calc_bad_step
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+axiom step_ab : Equality.{0}(Natural, zero, successor(zero))
+
+theorem mismatched
+        : Equality.{0}(Natural, zero, successor(successor(zero))) :=
+  calc zero
+     = successor(zero)             by step_ab
+     = successor(successor(zero))  by step_ab
+)",
+        {"calc step 2", "theorem 'mismatched'"},
+        "calc surfaces step-level error attribution",
+        __LINE__);
 }
 
 void runEndToEndPipelineTests() {

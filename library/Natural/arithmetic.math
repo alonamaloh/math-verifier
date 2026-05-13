@@ -60,10 +60,15 @@ theorem Natural.add_commutative : (a b : Natural) → a + b = b + a
   | zero, b =>
       Equality.symmetry(Natural.add_zero(b))
   | successor(predecessor), b =>
-      Equality.transitivity(
-          congruenceOf(successor,
-                        Natural.add_commutative(predecessor, b)),
-          Equality.symmetry(Natural.add_successor(b, predecessor)))
+      -- Definitionally, successor(predecessor) + b ≡ successor(predecessor + b),
+      -- so the calc chain starts with the reduced form.
+      calc successor(Natural.add(predecessor, b))
+         = successor(Natural.add(b, predecessor))
+                by congruenceOf(successor,
+                                 Natural.add_commutative(predecessor, b))
+         = Natural.add(b, successor(predecessor))
+                by Equality.symmetry(
+                       Natural.add_successor(b, predecessor))
 
 -- Theorem: 0 * a = 0. Definitional.
 theorem Natural.zero_multiply(a : Natural) : zero * a = zero :=
@@ -134,9 +139,9 @@ theorem Natural.multiply_commutative
 
 -- Theorem: a * 1 = a. From commutativity + one_multiply.
 theorem Natural.multiply_one(a : Natural) : a * one = a :=
-  Equality.transitivity(
-    Natural.multiply_commutative(a, one),
-    Natural.one_multiply(a))
+  calc a * one
+     = one * a  by Natural.multiply_commutative(a, one)
+     = a        by Natural.one_multiply(a)
 
 -- Distributivity (right): (a + b) * c = a * c + b * c. Induction on a.
 -- Leverages that successor(_) * m and zero * m reduce definitionally

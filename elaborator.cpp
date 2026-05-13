@@ -1513,8 +1513,48 @@ private:
                                        outerBinderCount),
                 node.line, node.column);
         }
-        // Atomic forms (identifier, numeric literal, Type, Proposition) are
-        // unchanged.
+        if (auto* cases = std::get_if<SurfaceCases>(&node.node)) {
+            auto rewrittenScrutinee = rewriteRecursiveCalls(
+                cases->scrutinee, thisDeclName,
+                recursiveArgToHypothesis, outerBinderCount);
+            std::vector<SurfaceCasesClause> rewrittenClauses;
+            for (const auto& clause : cases->clauses) {
+                SurfaceCasesClause rewrittenClause;
+                rewrittenClause.pattern = clause.pattern;
+                rewrittenClause.body = rewriteRecursiveCalls(
+                    clause.body, thisDeclName,
+                    recursiveArgToHypothesis, outerBinderCount);
+                rewrittenClause.line = clause.line;
+                rewrittenClause.column = clause.column;
+                rewrittenClauses.push_back(std::move(rewrittenClause));
+            }
+            return makeSurfaceCases(std::move(rewrittenScrutinee),
+                                     std::move(rewrittenClauses),
+                                     node.line, node.column);
+        }
+        if (auto* calc = std::get_if<SurfaceCalc>(&node.node)) {
+            auto rewrittenInitial = rewriteRecursiveCalls(
+                calc->initialExpression, thisDeclName,
+                recursiveArgToHypothesis, outerBinderCount);
+            std::vector<SurfaceCalcStep> rewrittenSteps;
+            for (const auto& step : calc->steps) {
+                SurfaceCalcStep rewrittenStep;
+                rewrittenStep.nextExpression = rewriteRecursiveCalls(
+                    step.nextExpression, thisDeclName,
+                    recursiveArgToHypothesis, outerBinderCount);
+                rewrittenStep.stepProof = rewriteRecursiveCalls(
+                    step.stepProof, thisDeclName,
+                    recursiveArgToHypothesis, outerBinderCount);
+                rewrittenStep.line = step.line;
+                rewrittenStep.column = step.column;
+                rewrittenSteps.push_back(std::move(rewrittenStep));
+            }
+            return makeSurfaceCalc(std::move(rewrittenInitial),
+                                    std::move(rewrittenSteps),
+                                    node.line, node.column);
+        }
+        // Atomic forms (identifier, numeric literal, Type, Proposition,
+        // hammer placeholder) carry no sub-expressions and are unchanged.
         return expression;
     }
 
@@ -1904,11 +1944,15 @@ private:
         }
         if (auto* ascription =
                 std::get_if<SurfaceAscription>(&expression.node)) {
-            // For v0 the type ascription is informative only; we trust
-            // the user and elaborate the inner expression. Type checking
-            // happens when the kernel sees the term.
+            // Pass the ascribed type as the expected type so bidirectional
+            // elaborators (cases, anonymous tuples, hammer, calc) can
+            // use it. The kernel still type-checks the resulting term,
+            // so a wrong ascription will surface as a regular type
+            // error downstream.
+            ExpressionPointer ascribedType =
+                elaborateExpression(*ascription->type, localBinders);
             return elaborateExpression(*ascription->expression,
-                                        localBinders);
+                                        localBinders, ascribedType);
         }
         if (auto* typeExpression =
                 std::get_if<SurfaceType>(&expression.node)) {
@@ -1970,7 +2014,104 @@ private:
                                                 expression.line,
                                                 expression.column);
         }
+        if (auto* calc = std::get_if<SurfaceCalc>(&expression.node)) {
+            return elaborateCalc(*calc, localBinders, expectedType,
+                                  expression.line, expression.column);
+        }
         throw ElaborateError("unhandled surface expression variant");
+    }
+
+    // Elaborates a calc chain to a fold of Equality.transitivity calls.
+    // Each step's proof is elaborated against the specific equality type
+    // `Equality(carrier, previous, next)` so a type error points at the
+    // failing step.
+    //
+    // For a single step the result is just the step proof (no transitivity
+    // wrapper). For N ≥ 2 steps the result is left-folded:
+    //   transitivity(... transitivity(transitivity(p1, p2), p3) ..., pN).
+    ExpressionPointer elaborateCalc(
+        const SurfaceCalc& calc,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer /*expectedType*/,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "calc block at line " + std::to_string(line));
+        ExpressionPointer previousKernel = elaborateExpression(
+            *calc.initialExpression, localBinders);
+        ExpressionPointer carrierTypeOpen =
+            inferTypeInLocalContext(localBinders, previousKernel);
+        ExpressionPointer carrierType = closeOverLocalBinders(
+            carrierTypeOpen, localBinders, localBinders.size());
+        LevelPointer carrierLevel =
+            typeUniverseOf(localBinders, previousKernel);
+        std::vector<ExpressionPointer> stepProofKernels;
+        std::vector<ExpressionPointer> endpointKernels;
+        endpointKernels.push_back(previousKernel);
+        for (size_t k = 0; k < calc.steps.size(); ++k) {
+            const auto& step = calc.steps[k];
+            Frame stepFrame(*this,
+                "calc step " + std::to_string(k + 1)
+                + " at line " + std::to_string(step.line));
+            ExpressionPointer nextKernel = elaborateExpression(
+                *step.nextExpression, localBinders, carrierType);
+            ExpressionPointer stepEqualityType = makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeConstant("Equality", {carrierLevel}),
+                        carrierType),
+                    previousKernel),
+                nextKernel);
+            ExpressionPointer stepProofKernel = elaborateExpression(
+                *step.stepProof, localBinders, stepEqualityType);
+            // Verify the proof actually has the equality type the step
+            // claims — bare identifier proofs don't get checked against
+            // expectedType during elaboration, so a wrong proof would
+            // otherwise leak through to a confusing kernel error later.
+            ExpressionPointer stepProofType = inferTypeInLocalContext(
+                localBinders, stepProofKernel);
+            ExpressionPointer stepEqualityTypeOpened = openOverLocalBinders(
+                stepEqualityType, localBinders, localBinders.size());
+            Context stepContext;
+            for (size_t i = 0; i < localBinders.size(); ++i) {
+                ExpressionPointer openedType = openOverLocalBinders(
+                    localBinders[i].type, localBinders, i);
+                stepContext.push_back({localBinders[i].name, openedType,
+                                          FreeVariableOrigin::Internal});
+            }
+            if (!isDefinitionallyEqual(environment_, stepContext,
+                                        stepProofType,
+                                        stepEqualityTypeOpened)) {
+                TypeError error(
+                    "calc step proof's type does not match the equality "
+                    "claimed by this step");
+                error.expectedType = stepEqualityTypeOpened;
+                error.actualType = stepProofType;
+                rethrowKernelError(error);
+            }
+            stepProofKernels.push_back(stepProofKernel);
+            endpointKernels.push_back(nextKernel);
+            previousKernel = nextKernel;
+        }
+        // One-step calc: the proof already has the desired type.
+        if (stepProofKernels.size() == 1) {
+            return stepProofKernels[0];
+        }
+        // Left-fold transitivity. After step k (0-indexed, k ≥ 1) the
+        // running proof spans endpoints[0] → endpoints[k+1] via the
+        // running middle endpoints[k].
+        ExpressionPointer running = stepProofKernels[0];
+        for (size_t k = 1; k < stepProofKernels.size(); ++k) {
+            ExpressionPointer call = makeConstant(
+                "Equality.transitivity", {carrierLevel});
+            call = makeApplication(std::move(call), carrierType);
+            call = makeApplication(std::move(call), endpointKernels[0]);
+            call = makeApplication(std::move(call), endpointKernels[k]);
+            call = makeApplication(std::move(call), endpointKernels[k + 1]);
+            call = makeApplication(std::move(call), std::move(running));
+            call = makeApplication(std::move(call), stepProofKernels[k]);
+            running = std::move(call);
+        }
+        return running;
     }
 
     // Phase 3.0 hammer: a `?` placeholder asks the elaborator to fill

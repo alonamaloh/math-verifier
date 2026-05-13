@@ -147,18 +147,18 @@ theorem Natural.divides_multiple_left (d k m : Natural)
           Natural.multiply_associative(d, k, q))))⟩
 }
 
--- Helper: if successor(d * q1) = d * q2, then d divides one. The
--- structurally decreasing argument is q1. In the q1 = successor case
--- we use Natural_recursor directly on q2 — the surface `cases`
--- expression's recursive-call rewriter doesn't yet descend into
--- cases bodies, so we expand the q2-split into an explicit recursor
--- application whose case lambdas the rewriter can see through.
+-- Helper: if successor(d * q1) = d * q2, then d divides one. Structural
+-- recursion on q1. In the q1 = successor case we case-split q2; an
+-- ascription on the `cases` expression makes the motive
+-- `function (q2_value) => Equality(…, d * q2_value) → divides(d, one)`,
+-- which refines the equality's type in each branch when we apply the
+-- result to the original equalityProof.
 --
---   q1 = 0          → successor(d*0) = successor(0) = 1; witness q2.
---   q1 = successor, q2=0 → successor(_) cannot equal d*0 = 0, contradiction.
---   q1 = successor, q2=successor → cancel `d` from both sides of
---                        d + successor(d*q1') = d + d*q2' to reduce to
---                        successor(d*q1') = d*q2' and recurse.
+--   q1 = 0                       → successor(d*0) = successor(0) = 1; witness q2.
+--   q1 = successor, q2 = 0       → successor(_) ≠ 0, contradiction.
+--   q1 = successor, q2 = successor → cancel `d` from both sides of
+--                                    d + successor(d*q1') = d + d*q2'
+--                                    via add_cancel_left and recurse.
 theorem Natural.divides_one_of_consecutive_helper
         (d : Natural)
         : (q1 q2 : Natural)
@@ -174,45 +174,44 @@ theorem Natural.divides_one_of_consecutive_helper
                   Equality.symmetry(Natural.multiply_zero(d))),
               equalityProof))
   | successor(q1Predecessor), q2, equalityProof =>
-      Natural_recursor.{0}(
-          function (q2_value : Natural) =>
-              Equality(Natural,
-                       successor(d * successor(q1Predecessor)),
-                       d * q2_value)
-              → Natural.divides(d, one),
-          function (zeroEquality : Equality(Natural,
-                                       successor(d * successor(q1Predecessor)),
-                                       d * zero)) =>
+      (cases q2 {
+        | zero =>
+            function (zeroEquality :
+                Equality(Natural,
+                         successor(d * successor(q1Predecessor)),
+                         d * zero)) =>
               False.eliminate_proposition(
                   Natural.divides(d, one),
                   Natural.successor_not_zero(
                       d * successor(q1Predecessor),
                       Equality.transitivity(zeroEquality,
-                          Natural.multiply_zero(d)))),
-          function (q2Predecessor : Natural)
-              (_inductionHypothesis :
-                  Equality(Natural,
-                           successor(d * successor(q1Predecessor)),
-                           d * q2Predecessor)
-                  → Natural.divides(d, one))
-              (successorEquality :
-                  Equality(Natural,
-                           successor(d * successor(q1Predecessor)),
-                           d * successor(q2Predecessor))) =>
-              Natural.divides_one_of_consecutive_helper(d, q1Predecessor, q2Predecessor,
+                          Natural.multiply_zero(d))))
+        | successor(q2Predecessor) =>
+            function (successorEquality :
+                Equality(Natural,
+                         successor(d * successor(q1Predecessor)),
+                         d * successor(q2Predecessor))) =>
+              Natural.divides_one_of_consecutive_helper(
+                  d, q1Predecessor, q2Predecessor,
                   Natural.add_cancel_left(
-                      d, successor(d * q1Predecessor), d * q2Predecessor,
-                      Equality.transitivity(
-                          Natural.add_successor(d, d * q1Predecessor),
-                          Equality.transitivity(
-                              congruenceOf(successor,
-                                  Equality.symmetry(
-                                      Natural.multiply_successor(d, q1Predecessor))),
-                              Equality.transitivity(
-                                  successorEquality,
-                                  Natural.multiply_successor(d, q2Predecessor)))))),
-          q2,
-          equalityProof)
+                      d, successor(d * q1Predecessor),
+                      d * q2Predecessor,
+                      calc d + successor(d * q1Predecessor)
+                         = successor(d + d * q1Predecessor)
+                              by Natural.add_successor(d, d * q1Predecessor)
+                         = successor(d * successor(q1Predecessor))
+                              by congruenceOf(successor,
+                                     Equality.symmetry(
+                                         Natural.multiply_successor(
+                                             d, q1Predecessor)))
+                         = d * successor(q2Predecessor)
+                              by successorEquality
+                         = d + d * q2Predecessor
+                              by Natural.multiply_successor(d, q2Predecessor)))
+      } : Equality(Natural,
+                   successor(d * successor(q1Predecessor)),
+                   d * q2)
+          → Natural.divides(d, one))(equalityProof)
 
 -- If d divides both a and a+1, then d divides 1. Destructure both
 -- divisibility witnesses (a = d*q1, successor(a) = d*q2) into the equation
