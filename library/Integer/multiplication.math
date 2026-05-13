@@ -1,0 +1,318 @@
+-- Integer/multiplication.math
+--
+-- Multiplication on Integer, lifted from the "FOIL"-style formula on
+-- representatives: (a − b)·(c − d) = (a·c + b·d) − (a·d + b·c). The
+-- structure parallels addition (Integer/addition.math): a natural-
+-- level respect kernel, a destructure-chain adapter, and two nested
+-- Quotient.lift's. The kernel arithmetic is heavier — both sides of
+-- the respect equation reduce to `(b + a')·(c + d)` (first-arg
+-- case) or `(a + b)·(d + c')` (second-arg case) via the standard
+-- distribute-regroup-substitute pattern.
+
+module Integer.multiplication
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+
+-- (a − b)·(c − d) = (a·c + b·d) − (a·d + b·c).
+definition Integer.multiply_representatives
+        : IntegerRepresentative
+          → IntegerRepresentative
+          → IntegerRepresentative
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d) =>
+      IntegerRepresentative.make(a * c + b * d, a * d + b * c)
+
+-- ----------------------------------------------------------------------
+-- Respect of multiply_representatives in the first argument:
+-- (a, b) ~ (a', b') implies multiply((a, b), (c, d)) ~ multiply((a',
+-- b'), (c, d)).
+
+-- Natural-level kernel: given a + b' = b + a', both sides of the
+-- equivalence reduce to (b + a')·(c + d). Strategy: regroup so a and
+-- b' multiply c, and b and a' multiply d (or the symmetric pairing
+-- for RHS), then apply distributivity backwards and substitute the
+-- hypothesis.
+theorem Integer.multiply_respects_first_natural
+        (a b a' b' c d : Natural)
+        (aPlusBPrimeEqualsBPlusAPrime : a + b' = b + a')
+        : (a * c + b * d) + (a' * d + b' * c)
+          = (a * d + b * c) + (a' * c + b' * d) := {
+  claim lhsToProduct
+        : (a * c + b * d) + (a' * d + b' * c)
+          = (b + a') * (c + d)
+    by calc (a * c + b * d) + (a' * d + b' * c)
+          = (a * c + b * d) + (b' * c + a' * d)
+                 by congruenceOf(
+                        function (rhs : Natural) =>
+                            (a * c + b * d) + rhs,
+                        Natural.add_commutative(a' * d, b' * c))
+          = (a * c + b' * c) + (b * d + a' * d)
+                 by Natural.add_two_two_swap(a * c, b * d, b' * c, a' * d)
+          = (a + b') * c + (b * d + a' * d)
+                 by congruenceOf(
+                        function (lhs : Natural) =>
+                            lhs + (b * d + a' * d),
+                        Equality.symmetry(
+                            Natural.distributivity_right(a, b', c)))
+          = (a + b') * c + (b + a') * d
+                 by congruenceOf(
+                        function (rhs : Natural) =>
+                            (a + b') * c + rhs,
+                        Equality.symmetry(
+                            Natural.distributivity_right(b, a', d)))
+          = (b + a') * c + (b + a') * d
+                 by congruenceOf(
+                        function (sum : Natural) =>
+                            sum * c + (b + a') * d,
+                        aPlusBPrimeEqualsBPlusAPrime)
+          = (b + a') * (c + d)
+                 by Equality.symmetry(
+                        Natural.multiply_distributes_left_over_add(
+                            b + a', c, d));
+  claim rhsToProduct
+        : (a * d + b * c) + (a' * c + b' * d)
+          = (b + a') * (c + d)
+    by calc (a * d + b * c) + (a' * c + b' * d)
+          = (a * d + b * c) + (b' * d + a' * c)
+                 by congruenceOf(
+                        function (rhs : Natural) =>
+                            (a * d + b * c) + rhs,
+                        Natural.add_commutative(a' * c, b' * d))
+          = (a * d + b' * d) + (b * c + a' * c)
+                 by Natural.add_two_two_swap(a * d, b * c, b' * d, a' * c)
+          = (a + b') * d + (b * c + a' * c)
+                 by congruenceOf(
+                        function (lhs : Natural) =>
+                            lhs + (b * c + a' * c),
+                        Equality.symmetry(
+                            Natural.distributivity_right(a, b', d)))
+          = (a + b') * d + (b + a') * c
+                 by congruenceOf(
+                        function (rhs : Natural) =>
+                            (a + b') * d + rhs,
+                        Equality.symmetry(
+                            Natural.distributivity_right(b, a', c)))
+          = (b + a') * d + (b + a') * c
+                 by congruenceOf(
+                        function (sum : Natural) =>
+                            sum * d + (b + a') * c,
+                        aPlusBPrimeEqualsBPlusAPrime)
+          = (b + a') * c + (b + a') * d
+                 by Natural.add_commutative((b + a') * d, (b + a') * c)
+          = (b + a') * (c + d)
+                 by Equality.symmetry(
+                        Natural.multiply_distributes_left_over_add(
+                            b + a', c, d));
+  Equality.transitivity(lhsToProduct, Equality.symmetry(rhsToProduct))
+}
+
+theorem Integer.multiply_respects_first_after_first (a b : Natural)
+        : (rep1' rep2 : IntegerRepresentative)
+          → IntegerEquivalent(IntegerRepresentative.make(a, b), rep1')
+          → IntegerEquivalent(
+                Integer.multiply_representatives(
+                    IntegerRepresentative.make(a, b), rep2),
+                Integer.multiply_representatives(rep1', rep2))
+  | IntegerRepresentative.make(a', b'),
+    IntegerRepresentative.make(c, d),
+    eq =>
+      Integer.multiply_respects_first_natural(a, b, a', b', c, d, eq)
+
+theorem Integer.multiply_respects_first
+        : (rep1 rep1' rep2 : IntegerRepresentative)
+          → IntegerEquivalent(rep1, rep1')
+          → IntegerEquivalent(
+                Integer.multiply_representatives(rep1, rep2),
+                Integer.multiply_representatives(rep1', rep2))
+  | IntegerRepresentative.make(a, b), rep1', rep2, eq =>
+      Integer.multiply_respects_first_after_first(a, b, rep1', rep2, eq)
+
+-- ----------------------------------------------------------------------
+-- Respect of multiply_representatives in the second argument:
+-- (c, d) ~ (c', d') implies multiply((a, b), (c, d)) ~ multiply((a,
+-- b), (c', d')).
+
+-- Natural-level kernel: given c + d' = d + c', both sides of the
+-- equivalence reduce to (a + b)·(d + c'). Same distribute-regroup-
+-- substitute pattern, this time pairing a and b with each side of
+-- the (c, d, c', d') equation.
+theorem Integer.multiply_respects_second_natural
+        (a b c d cPrime dPrime : Natural)
+        (cPlusDPrimeEqualsDPlusCPrime : c + dPrime = d + cPrime)
+        : (a * c + b * d) + (a * dPrime + b * cPrime)
+          = (a * d + b * c) + (a * cPrime + b * dPrime) := {
+  claim lhsToProduct
+        : (a * c + b * d) + (a * dPrime + b * cPrime)
+          = (a + b) * (d + cPrime)
+    by calc (a * c + b * d) + (a * dPrime + b * cPrime)
+          = (a * c + a * dPrime) + (b * d + b * cPrime)
+                 by Natural.add_two_two_swap(
+                        a * c, b * d, a * dPrime, b * cPrime)
+          = a * (c + dPrime) + (b * d + b * cPrime)
+                 by congruenceOf(
+                        function (lhs : Natural) =>
+                            lhs + (b * d + b * cPrime),
+                        Equality.symmetry(
+                            Natural.multiply_distributes_left_over_add(
+                                a, c, dPrime)))
+          = a * (c + dPrime) + b * (d + cPrime)
+                 by congruenceOf(
+                        function (rhs : Natural) =>
+                            a * (c + dPrime) + rhs,
+                        Equality.symmetry(
+                            Natural.multiply_distributes_left_over_add(
+                                b, d, cPrime)))
+          = a * (d + cPrime) + b * (d + cPrime)
+                 by congruenceOf(
+                        function (sum : Natural) =>
+                            a * sum + b * (d + cPrime),
+                        cPlusDPrimeEqualsDPlusCPrime)
+          = (a + b) * (d + cPrime)
+                 by Equality.symmetry(
+                        Natural.distributivity_right(a, b, d + cPrime));
+  claim rhsToProduct
+        : (a * d + b * c) + (a * cPrime + b * dPrime)
+          = (a + b) * (d + cPrime)
+    by calc (a * d + b * c) + (a * cPrime + b * dPrime)
+          = (a * d + a * cPrime) + (b * c + b * dPrime)
+                 by Natural.add_two_two_swap(
+                        a * d, b * c, a * cPrime, b * dPrime)
+          = a * (d + cPrime) + (b * c + b * dPrime)
+                 by congruenceOf(
+                        function (lhs : Natural) =>
+                            lhs + (b * c + b * dPrime),
+                        Equality.symmetry(
+                            Natural.multiply_distributes_left_over_add(
+                                a, d, cPrime)))
+          = a * (d + cPrime) + b * (c + dPrime)
+                 by congruenceOf(
+                        function (rhs : Natural) =>
+                            a * (d + cPrime) + rhs,
+                        Equality.symmetry(
+                            Natural.multiply_distributes_left_over_add(
+                                b, c, dPrime)))
+          = a * (d + cPrime) + b * (d + cPrime)
+                 by congruenceOf(
+                        function (sum : Natural) =>
+                            a * (d + cPrime) + b * sum,
+                        cPlusDPrimeEqualsDPlusCPrime)
+          = (a + b) * (d + cPrime)
+                 by Equality.symmetry(
+                        Natural.distributivity_right(a, b, d + cPrime));
+  Equality.transitivity(lhsToProduct, Equality.symmetry(rhsToProduct))
+}
+
+-- Two-step helper chain for multiply_respects_second (same shape as
+-- the addition version).
+theorem Integer.multiply_respects_second_after_first_second
+        (a b c d : Natural)
+        : (rep2' : IntegerRepresentative)
+          → IntegerEquivalent(IntegerRepresentative.make(c, d), rep2')
+          → IntegerEquivalent(
+                Integer.multiply_representatives(
+                    IntegerRepresentative.make(a, b),
+                    IntegerRepresentative.make(c, d)),
+                Integer.multiply_representatives(
+                    IntegerRepresentative.make(a, b), rep2'))
+  | IntegerRepresentative.make(cPrime, dPrime), eq =>
+      Integer.multiply_respects_second_natural(
+          a, b, c, d, cPrime, dPrime, eq)
+
+theorem Integer.multiply_respects_second_after_first
+        (a b : Natural)
+        : (rep2 rep2' : IntegerRepresentative)
+          → IntegerEquivalent(rep2, rep2')
+          → IntegerEquivalent(
+                Integer.multiply_representatives(
+                    IntegerRepresentative.make(a, b), rep2),
+                Integer.multiply_representatives(
+                    IntegerRepresentative.make(a, b), rep2'))
+  | IntegerRepresentative.make(c, d), rep2', eq =>
+      Integer.multiply_respects_second_after_first_second(
+          a, b, c, d, rep2', eq)
+
+theorem Integer.multiply_respects_second
+        : (rep1 rep2 rep2' : IntegerRepresentative)
+          → IntegerEquivalent(rep2, rep2')
+          → IntegerEquivalent(
+                Integer.multiply_representatives(rep1, rep2),
+                Integer.multiply_representatives(rep1, rep2'))
+  | IntegerRepresentative.make(a, b), rep2, rep2', eq =>
+      Integer.multiply_respects_second_after_first(a, b, rep2, rep2', eq)
+
+-- ----------------------------------------------------------------------
+-- Integer.multiply: same two-nested-lift structure as Integer.add.
+
+definition Integer.multiply_after_first (rep1 : IntegerRepresentative)
+        (secondInteger : Integer)
+        : Integer :=
+  Quotient.lift.{0, 0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      Integer,
+      function (rep2 : IntegerRepresentative) =>
+          Quotient.mk.{0}(
+              IntegerRepresentative,
+              IntegerEquivalent,
+              Integer.multiply_representatives(rep1, rep2)),
+      function (rep2 rep2Prime : IntegerRepresentative)
+               (rep2EquivalentRep2Prime
+                   : IntegerEquivalent(rep2, rep2Prime)) =>
+          Quotient.sound.{0}(
+              IntegerRepresentative,
+              IntegerEquivalent,
+              Integer.multiply_representatives(rep1, rep2),
+              Integer.multiply_representatives(rep1, rep2Prime),
+              Integer.multiply_respects_second(
+                  rep1, rep2, rep2Prime,
+                  rep2EquivalentRep2Prime)),
+      secondInteger)
+
+theorem Integer.multiply_after_first_respects
+        (rep1 rep1Prime : IntegerRepresentative)
+        (rep1EquivalentRep1Prime : IntegerEquivalent(rep1, rep1Prime))
+        (secondInteger : Integer)
+        : Equality.{0}(Integer,
+                       Integer.multiply_after_first(rep1, secondInteger),
+                       Integer.multiply_after_first(rep1Prime,
+                                                    secondInteger)) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (q : Integer) =>
+          Equality.{0}(Integer,
+                       Integer.multiply_after_first(rep1, q),
+                       Integer.multiply_after_first(rep1Prime, q)),
+      function (rep2 : IntegerRepresentative) =>
+          Quotient.sound.{0}(
+              IntegerRepresentative,
+              IntegerEquivalent,
+              Integer.multiply_representatives(rep1, rep2),
+              Integer.multiply_representatives(rep1Prime, rep2),
+              Integer.multiply_respects_first(
+                  rep1, rep1Prime, rep2,
+                  rep1EquivalentRep1Prime)),
+      secondInteger)
+
+definition Integer.multiply (firstInteger secondInteger : Integer)
+        : Integer :=
+  Quotient.lift.{0, 0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      Integer,
+      function (rep1 : IntegerRepresentative) =>
+          Integer.multiply_after_first(rep1, secondInteger),
+      function (rep1 rep1Prime : IntegerRepresentative)
+               (rep1EquivalentRep1Prime
+                   : IntegerEquivalent(rep1, rep1Prime)) =>
+          Integer.multiply_after_first_respects(
+              rep1, rep1Prime, rep1EquivalentRep1Prime,
+              secondInteger),
+      firstInteger)
