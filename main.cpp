@@ -3558,6 +3558,63 @@ theorem caller (P Q : Proposition) (h : Q) : Q := pick_b(h)
         "under-applied implicit inference",
         __LINE__);
 
+    // Regression: trailing-arg placeholders from an outer constructor's
+    // leading-argument inference must not leak into the expectedType of
+    // a *later* trailing arg whose elaboration itself triggers nested
+    // constructor inference. Pattern: outer `Exists.introduce` for a
+    // predicate `True ∧ ¬Equality(q, zero)`, where the second component
+    // (an `And.introduce`) depends on the bound `q`. Without binding
+    // the trailing-arg placeholder in the assignment, the inner And's
+    // expectedDomain contains `_callTrailingArgument_0`, and the
+    // `containsValueArgumentFreeVar` guard in `unifyConstructorParameters`
+    // blocks the inner inference from filling its leading args.
+    {
+        try {
+            verifyMathSource(R"(
+module Test.trailing_arg_inference_through_nested_tuple
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive False : Proposition where
+
+inductive True : Proposition where
+  | True.trivial : True
+
+inductive And (A B : Proposition) : Proposition where
+  | And.introduction : A → B → And(A, B)
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | Equality.reflexivity : Equality(A, x, x)
+
+inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
+  | Exists.introduce : (witnessValue : A) → P(witnessValue) → Exists(A, P)
+
+definition Not (P : Proposition) : Proposition := P → False
+
+axiom magic
+  : Exists.{0}(Natural, function (q : Natural) =>
+                          And(True, Not(Equality.{0}(Natural, q, zero))))
+
+theorem destructure_then_witness
+        : Exists.{0}(Natural, function (q : Natural) =>
+                                And(True, Not(Equality.{0}(Natural, q, zero)))) :=
+  let ⟨q, qFlag, qNotZero⟩ := magic in
+  Exists.introduce(q,
+    And.introduction(qFlag,
+      function (h : Equality.{0}(Natural, q, zero)) =>
+        qNotZero(h)))
+)");
+            ++passed;
+        } catch (const std::exception& e) {
+            ++failed;
+            std::cerr << "FAIL (line " << __LINE__
+                      << "): trailing-arg placeholder leaks into nested"
+                      << " constructor inference: " << e.what() << "\n";
+        }
+    }
+
     // Constructor argument type mismatch: kernel error attribution to
     // the theorem, with expected and actual types pretty-printed.
     expectErrorContains(R"(

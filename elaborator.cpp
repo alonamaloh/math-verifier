@@ -3659,6 +3659,15 @@ private:
             elaboratedTrailingArguments.push_back(kernelTrailingArgument);
             std::string trailingArgumentFresh =
                 "_callTrailingArgument_" + std::to_string(j);
+            // Bind the trailing-arg placeholder to its elaborated
+            // value so that subsequent expectedDomain substitutions for
+            // later trailing args (and the final result-pattern
+            // unification) don't leak `_callTrailingArgument_N`
+            // placeholders into nested constructor inferences — those
+            // placeholders would otherwise block assignments via the
+            // `containsValueArgumentFreeVar` guard in
+            // unifyConstructorParameters.
+            assignment[trailingArgumentFresh] = kernelTrailingArgument;
             cursor = openBinder(pi->codomain, trailingArgumentFresh,
                                  FreeVariableOrigin::Internal);
         }
