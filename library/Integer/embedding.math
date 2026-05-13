@@ -1,0 +1,83 @@
+-- Integer/embedding.math
+--
+-- Embed Natural into Integer as the non-negative integers: a natural
+-- `n` becomes the equivalence class of `(n, 0)`. The embedding
+-- preserves zero, one, addition, and multiplication — each by
+-- `reflexivity`, since the Quotient.lift kernel rule plus the
+-- definitional reductions on `add`/`multiply` collapse both sides to
+-- the same `mk(make(_, _))` form.
+
+module Integer.embedding
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+
+-- Embed a natural as the equivalence class of (n, 0).
+definition Natural.to_integer (n : Natural) : Integer :=
+  Quotient.mk.{0}(
+      IntegerRepresentative, IntegerEquivalent,
+      IntegerRepresentative.make(n, zero))
+
+-- Embedding preserves zero (definitionally).
+theorem Natural.to_integer.zero_preserves
+        : Equality.{0}(Integer,
+                       Natural.to_integer(zero),
+                       Integer.zero) :=
+  reflexivity.{0}(Integer, Integer.zero)
+
+-- Embedding preserves one (definitionally).
+theorem Natural.to_integer.one_preserves
+        : Equality.{0}(Integer,
+                       Natural.to_integer(successor(zero)),
+                       Integer.one) :=
+  reflexivity.{0}(Integer, Integer.one)
+
+-- Embedding preserves addition. LHS reduces to mk(make(a + b, 0));
+-- RHS reduces (via two Quotient.lift kernel rules + add_representatives
+-- + zero + zero ≡ zero) to mk(make(a + b, 0)). Reflexivity closes.
+theorem Natural.to_integer.add_preserves (a b : Natural)
+        : Equality.{0}(Integer,
+                       Natural.to_integer(a + b),
+                       Integer.add(Natural.to_integer(a),
+                                    Natural.to_integer(b))) :=
+  reflexivity.{0}(Integer, Natural.to_integer(a + b))
+
+-- Embedding preserves multiplication. Reduction yields
+-- mk(make(a·b + 0, a·0 + 0)), which is *not* definitionally equal to
+-- mk(make(a·b, 0)) — the asymmetric `a · 0` term doesn't simplify by
+-- kernel reduction alone. Quotient.sound bridges the gap with a
+-- Natural-level proof of equivalence.
+theorem Natural.to_integer.multiply_preserves (a b : Natural)
+        : Equality.{0}(Integer,
+                       Natural.to_integer(a * b),
+                       Integer.multiply(Natural.to_integer(a),
+                                         Natural.to_integer(b))) :=
+  Quotient.sound.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      IntegerRepresentative.make(a * b, zero),
+      IntegerRepresentative.make(a * b + zero, a * zero + zero),
+      -- IntegerEquivalent(make(a·b, 0), make(a·b + 0, a·0 + 0))
+      -- reduces definitionally to
+      --   a·b + (a·0 + 0) = 0 + (a·b + 0)
+      -- The RHS definitionally reduces to a·b + 0 (add reduces on
+      -- its first argument when it's zero), so it suffices to bring
+      -- the LHS to a·b + 0 too: drop the inner trailing zero, replace
+      -- a·0 by zero, and stop.
+      calc a * b + (a * zero + zero)
+         = a * b + a * zero
+                by congruenceOf(
+                       function (rhs : Natural) => a * b + rhs,
+                       Natural.add_zero(a * zero))
+         = a * b + zero
+                by congruenceOf(
+                       function (rhs : Natural) => a * b + rhs,
+                       Natural.multiply_zero(a)))
