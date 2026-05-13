@@ -12,7 +12,7 @@
 --
 -- Surface affordances exercised here:
 --   * `cases` for case-split on Or.
---   * `let ⟨…⟩ := …` (one-level destructuring let) for And and Exists.
+--   * `let ⟨…⟩ := …` (1-level destructuring let) for And and Exists.
 --   * Anonymous tuple `⟨…⟩` for Exists.introduce / And.introduction
 --     with right-associate flattening into nested And.
 --   * Implicit-argument inference at theorem call sites: trailing args
@@ -32,25 +32,19 @@ import Logic.basics
 import Logic.exists
 
 theorem Natural.has_prime_divisor_v2 (n : Natural)
-        (atLeastTwo : LessOrEqual(two, n))
-        : Exists(Natural, function (prime : Natural) =>
-            And(Natural.is_prime(prime),
-                Natural.divides(prime, n))) :=
+        (atLeastTwo : 2 ≤ n)
+        : ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ n :=
   Natural.strong_induction(
     function (subject : Natural) =>
-        LessOrEqual(two, subject)
-        → Exists(Natural, function (prime : Natural) =>
-              And(Natural.is_prime(prime),
-                   Natural.divides(prime, subject))),
+        2 ≤ subject
+        → ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
     function (subject : Natural)
         (inductionHypothesis :
             (smaller : Natural)
-            → LessOrEqual(successor(smaller), subject)
-            → LessOrEqual(two, smaller)
-            → Exists(Natural, function (prime : Natural) =>
-                  And(Natural.is_prime(prime),
-                       Natural.divides(prime, smaller))))
-        (subjectAtLeastTwo : LessOrEqual(two, subject)) =>
+            → successor(smaller) ≤ subject
+            → 2 ≤ smaller
+            → ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ smaller)
+        (subjectAtLeastTwo : 2 ≤ subject) =>
       cases Natural.prime_or_proper_divisor(subject, subjectAtLeastTwo) {
         | Or.introduceLeft(subjectIsPrime) =>
             ⟨subject, subjectIsPrime, Natural.divides_reflexive(subject)⟩

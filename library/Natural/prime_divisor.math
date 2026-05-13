@@ -8,7 +8,7 @@
 -- inductive hypothesis gives a prime divisor of d, which divides n
 -- transitively.
 --
--- The proof currently takes two axioms:
+-- The proof currently takes 2 axioms:
 --
 --   * `Natural.strong_induction` — derivable from ordinary induction
 --     via a generalised "P holds for everything ≤ n" statement, but
@@ -44,34 +44,23 @@ import Logic.exists
 
 -- The main theorem: every natural number ≥ 2 has a prime divisor.
 theorem Natural.has_prime_divisor (n : Natural)
-        (atLeastTwo : LessOrEqual(two, n))
-        : Exists(Natural, function (prime : Natural) =>
-            And(Natural.is_prime(prime),
-                 Natural.divides(prime, n))) :=
+        (atLeastTwo : 2 ≤ n)
+        : ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ n :=
   Natural.strong_induction(
     function (subject : Natural) =>
-        LessOrEqual(two, subject)
-        → Exists(Natural, function (prime : Natural) =>
-              And(Natural.is_prime(prime),
-                   Natural.divides(prime, subject))),
+        2 ≤ subject
+        → ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
     function (subject : Natural)
         (inductionHypothesis :
             (smaller : Natural)
-            → LessOrEqual(successor(smaller), subject)
-            → LessOrEqual(two, smaller)
-            → Exists(Natural, function (prime : Natural) =>
-                  And(Natural.is_prime(prime),
-                       Natural.divides(prime, smaller))))
-        (subjectAtLeastTwo : LessOrEqual(two, subject)) =>
+            → successor(smaller) ≤ subject
+            → 2 ≤ smaller
+            → ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ smaller)
+        (subjectAtLeastTwo : 2 ≤ subject) =>
       Or.eliminate(
           Natural.is_prime(subject),
-          Exists(Natural, function (divisor : Natural) =>
-              And(LessOrEqual(two, divisor),
-                  And(LessOrEqual(successor(divisor), subject),
-                      Natural.divides(divisor, subject)))),
-          Exists(Natural, function (prime : Natural) =>
-              And(Natural.is_prime(prime),
-                   Natural.divides(prime, subject))),
+          ∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject,
+          ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
           function (subjectIsPrime : Natural.is_prime(subject)) =>
               Exists.introduce(
                   subject,
@@ -79,75 +68,46 @@ theorem Natural.has_prime_divisor (n : Natural)
                       subjectIsPrime,
                       Natural.divides_reflexive(subject))),
           function (properDivisorWitness :
-                  Exists(Natural, function (divisor : Natural) =>
-                      And(LessOrEqual(two, divisor),
-                          And(LessOrEqual(successor(divisor), subject),
-                              Natural.divides(divisor, subject))))) =>
+                  ∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject) =>
               Exists.eliminate(
                   Natural,
                   function (divisor : Natural) =>
-                      And(LessOrEqual(two, divisor),
-                          And(LessOrEqual(successor(divisor), subject),
-                              Natural.divides(divisor, subject))),
-                  Exists(Natural, function (prime : Natural) =>
-                      And(Natural.is_prime(prime),
-                           Natural.divides(prime, subject))),
+                      2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject,
+                  ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
                   function (divisor : Natural)
                       (divisorProofs :
-                          And(LessOrEqual(two, divisor),
-                              And(LessOrEqual(successor(divisor), subject),
-                                  Natural.divides(divisor, subject)))) =>
+                          2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject) =>
                     And.eliminate(
-                        LessOrEqual(two, divisor),
-                        And(LessOrEqual(successor(divisor), subject),
-                            Natural.divides(divisor, subject)),
-                        Exists(Natural, function (prime : Natural) =>
-                            And(Natural.is_prime(prime),
-                                 Natural.divides(prime, subject))),
-                        function (divisorAtLeastTwo : LessOrEqual(two, divisor))
+                        2 ≤ divisor,
+                        successor(divisor) ≤ subject ∧ divisor ∣ subject,
+                        ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
+                        function (divisorAtLeastTwo : 2 ≤ divisor)
                             (rest :
-                                And(LessOrEqual(successor(divisor),
-                                                subject),
-                                    Natural.divides(divisor, subject))) =>
+                                successor(divisor) ≤ subject ∧ divisor ∣ subject) =>
                           And.eliminate(
-                              LessOrEqual(successor(divisor), subject),
-                              Natural.divides(divisor, subject),
-                              Exists(Natural, function (prime : Natural) =>
-                                  And(Natural.is_prime(prime),
-                                       Natural.divides(prime, subject))),
+                              successor(divisor) ≤ subject,
+                              divisor ∣ subject,
+                              ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
                               function (divisorBelowSubject :
-                                      LessOrEqual(successor(divisor),
-                                                  subject))
+                                      successor(divisor) ≤ subject)
                                   (divisorDividesSubject :
-                                      Natural.divides(divisor, subject)) =>
+                                      divisor ∣ subject) =>
                                 Exists.eliminate(
                                     Natural,
                                     function (prime : Natural) =>
-                                        And(Natural.is_prime(prime),
-                                             Natural.divides(prime,
-                                                              divisor)),
-                                    Exists(Natural, function (prime : Natural) =>
-                                        And(Natural.is_prime(prime),
-                                             Natural.divides(prime,
-                                                              subject))),
+                                        Natural.is_prime(prime) ∧ prime ∣ divisor,
+                                    ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
                                     function (prime : Natural)
                                         (primeProofs :
-                                            And(Natural.is_prime(prime),
-                                                 Natural.divides(prime,
-                                                                  divisor))) =>
+                                            Natural.is_prime(prime) ∧ prime ∣ divisor) =>
                                       And.eliminate(
                                           Natural.is_prime(prime),
-                                          Natural.divides(prime, divisor),
-                                          Exists(Natural,
-                                              function (p : Natural) =>
-                                                  And(Natural.is_prime(p),
-                                                       Natural.divides(p,
-                                                                        subject))),
+                                          prime ∣ divisor,
+                                          ∃ (p : Natural). Natural.is_prime(p) ∧ p ∣ subject,
                                           function (primeIsPrime :
                                                   Natural.is_prime(prime))
                                               (primeDividesDivisor :
-                                                  Natural.divides(prime,
-                                                                   divisor)) =>
+                                                  prime ∣ divisor) =>
                                             Exists.introduce(
                                                 prime,
                                                 And.introduction(

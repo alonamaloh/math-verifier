@@ -2,11 +2,11 @@
 --
 -- Decision procedures on Natural: decidable equality, decidable
 -- ordering, decidable divisibility. Each procedure returns an
--- `Or(positive proof, negative proof)`, giving the constructive
+-- `positive proof ∨ negative proof`, giving the constructive
 -- analogue of a Boolean test along with a proof of the result.
 --
--- The proofs go through one-level pattern matches and explicit helper
--- definitions because our pattern matching can only destructure one
+-- The proofs go through 1-level pattern matches and explicit helper
+-- definitions because our pattern matching can only destructure 1
 -- scrutinee at a time. Helpers that "remember" the predecessor of an
 -- earlier pattern take the inductive hypothesis explicitly so that
 -- recursion on the predecessor is structural.
@@ -22,7 +22,7 @@ import Logic.basics
 
 -- decidable equality, with zero as the left operand.
 theorem Natural.decides_equality_zero_against
-        : (other : Natural) → Or(zero = other, Not(zero = other))
+        : (other : Natural) → zero = other ∨ ¬zero = other
   | zero =>
       Or.introduceLeft(reflexivity(zero))
   | successor(predecessor) =>
@@ -34,10 +34,9 @@ theorem Natural.decides_equality_successor_against
         (predecessor : Natural)
         (decidePredecessor :
             (other : Natural)
-            → Or(predecessor = other, Not(predecessor = other)))
+            → predecessor = other ∨ ¬predecessor = other)
         : (other : Natural)
-          → Or(successor(predecessor) = other,
-                Not(successor(predecessor) = other))
+          → successor(predecessor) = other ∨ ¬successor(predecessor) = other
   | zero =>
       Or.introduceRight(
           function (impossible : successor(predecessor) = zero) =>
@@ -45,13 +44,12 @@ theorem Natural.decides_equality_successor_against
   | successor(otherPredecessor) =>
       Or.eliminate(
           predecessor = otherPredecessor,
-          Not(predecessor = otherPredecessor),
-          Or(successor(predecessor) = successor(otherPredecessor),
-              Not(successor(predecessor) = successor(otherPredecessor))),
+          ¬predecessor = otherPredecessor,
+          successor(predecessor) = successor(otherPredecessor) ∨ ¬successor(predecessor) = successor(otherPredecessor),
           function (predEqOther : predecessor = otherPredecessor) =>
               Or.introduceLeft(
                   congruenceOf(successor, predEqOther)),
-          function (predNeqOther : Not(predecessor = otherPredecessor)) =>
+          function (predNeqOther : ¬predecessor = otherPredecessor) =>
               Or.introduceRight(
                   function (successorEquals : successor(predecessor) = successor(otherPredecessor)) =>
                       predNeqOther(
@@ -62,7 +60,7 @@ theorem Natural.decides_equality_successor_against
 
 -- Decidable equality on Natural.
 theorem Natural.decides_equality
-        : (a b : Natural) → Or(a = b, Not(a = b))
+        : (a b : Natural) → a = b ∨ ¬a = b
   | zero, b =>
       Natural.decides_equality_zero_against(b)
   | successor(predecessor), b =>
@@ -73,7 +71,7 @@ theorem Natural.decides_equality
 
 -- decidable ≤, with zero as the left operand: always true.
 theorem Natural.decides_less_or_equal_zero_against (other : Natural)
-        : Or(LessOrEqual(zero, other), Not(LessOrEqual(zero, other))) :=
+        : zero ≤ other ∨ ¬zero ≤ other :=
   Or.introduceLeft(Natural.zero_least(other))
 
 -- decidable ≤, successor case.
@@ -81,31 +79,25 @@ theorem Natural.decides_less_or_equal_successor_against
         (predecessor : Natural)
         (decidePredecessor :
             (other : Natural)
-            → Or(LessOrEqual(predecessor, other),
-                  Not(LessOrEqual(predecessor, other))))
+            → predecessor ≤ other ∨ ¬predecessor ≤ other)
         : (other : Natural)
-          → Or(LessOrEqual(successor(predecessor), other),
-                Not(LessOrEqual(successor(predecessor), other)))
+          → successor(predecessor) ≤ other ∨ ¬successor(predecessor) ≤ other
   | zero =>
       Or.introduceRight(Natural.not_less_or_equal_successor_zero(predecessor))
   | successor(otherPredecessor) =>
       Or.eliminate(
-          LessOrEqual(predecessor, otherPredecessor),
-          Not(LessOrEqual(predecessor, otherPredecessor)),
-          Or(LessOrEqual(successor(predecessor),
-                          successor(otherPredecessor)),
-              Not(LessOrEqual(successor(predecessor),
-                               successor(otherPredecessor)))),
-          function (predecessorLessOrEqual : LessOrEqual(predecessor, otherPredecessor)) =>
+          predecessor ≤ otherPredecessor,
+          ¬predecessor ≤ otherPredecessor,
+          successor(predecessor) ≤ successor(otherPredecessor) ∨ ¬successor(predecessor) ≤ successor(otherPredecessor),
+          function (predecessorLessOrEqual : predecessor ≤ otherPredecessor) =>
               Or.introduceLeft(
                   Natural.successor_less_or_equal_successor(
                       predecessor, otherPredecessor, predecessorLessOrEqual)),
           function (predecessorNotLessOrEqual :
-                  Not(LessOrEqual(predecessor, otherPredecessor))) =>
+                  ¬predecessor ≤ otherPredecessor) =>
               Or.introduceRight(
                   function (successorLessOrEqual :
-                          LessOrEqual(successor(predecessor),
-                                       successor(otherPredecessor))) =>
+                          successor(predecessor) ≤ successor(otherPredecessor)) =>
                       predecessorNotLessOrEqual(
                           Natural.less_or_equal_successor_successor_descend(
                               predecessor, otherPredecessor, successorLessOrEqual))),
@@ -114,7 +106,7 @@ theorem Natural.decides_less_or_equal_successor_against
 -- Decidable ≤ on Natural.
 theorem Natural.decides_less_or_equal
         : (a b : Natural)
-          → Or(LessOrEqual(a, b), Not(LessOrEqual(a, b)))
+          → a ≤ b ∨ ¬a ≤ b
   | zero, b =>
       Natural.decides_less_or_equal_zero_against(b)
   | successor(predecessor), b =>

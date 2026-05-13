@@ -544,28 +544,46 @@ private:
         return left;
     }
 
+    // ∧ and ∨ are RIGHT-associative — `a ∧ b ∧ c` parses as
+    // `a ∧ (b ∧ c)`, matching the kernel's `And(A, B)` shape (whose
+    // second component is the inductive itself) and standard math
+    // convention.
     SurfaceExpressionPointer parseLogicalOr() {
         auto left = parseLogicalAnd();
-        while (peek().kind == TokenKind::LogicalOr) {
+        if (peek().kind == TokenKind::LogicalOr) {
             Token op = consumeAny();
-            auto right = parseLogicalAnd();
-            left = makeSurfaceBinaryOperation("∨", std::move(left),
-                                               std::move(right),
-                                               op.line, op.column);
+            auto right = parseLogicalOr();
+            return makeSurfaceBinaryOperation("∨", std::move(left),
+                                                std::move(right),
+                                                op.line, op.column);
         }
         return left;
     }
 
     SurfaceExpressionPointer parseLogicalAnd() {
-        auto left = parseEquality();
-        while (peek().kind == TokenKind::LogicalAnd) {
+        auto left = parseLogicalNot();
+        if (peek().kind == TokenKind::LogicalAnd) {
             Token op = consumeAny();
-            auto right = parseEquality();
-            left = makeSurfaceBinaryOperation("∧", std::move(left),
-                                               std::move(right),
-                                               op.line, op.column);
+            auto right = parseLogicalAnd();
+            return makeSurfaceBinaryOperation("∧", std::move(left),
+                                                std::move(right),
+                                                op.line, op.column);
         }
         return left;
+    }
+
+    // `¬` sits between the connectives (∧, ∨) and the relations
+    // (=, ≤, …), matching math convention: `¬P ∧ Q` is `(¬P) ∧ Q`,
+    // but `¬P = Q` is `¬(P = Q)`. We deliberately do NOT put `¬` in
+    // parseUnary alongside arithmetic minus.
+    SurfaceExpressionPointer parseLogicalNot() {
+        if (peek().kind == TokenKind::LogicalNot) {
+            Token op = consumeAny();
+            auto operand = parseEquality();
+            return makeSurfaceUnaryOperation("¬", std::move(operand),
+                                              op.line, op.column);
+        }
+        return parseEquality();
     }
 
     // Non-associative: `a = b = c` is a parse error. Forces users to
@@ -667,12 +685,9 @@ private:
             return makeSurfaceUnaryOperation("-", std::move(operand),
                                               op.line, op.column);
         }
-        if (peek().kind == TokenKind::LogicalNot) {
-            Token op = consumeAny();
-            auto operand = parseUnary();
-            return makeSurfaceUnaryOperation("¬", std::move(operand),
-                                              op.line, op.column);
-        }
+        // `¬` is handled at parseLogicalNot (between ∧ and =), not here:
+        // we want `¬P = Q` to read as `¬(P = Q)` while `¬P ∧ Q` reads
+        // as `(¬P) ∧ Q`.
         return parseApplication();
     }
 
