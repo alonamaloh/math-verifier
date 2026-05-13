@@ -81,6 +81,52 @@ private:
         resetAutoBoundState();
     }
 
+    // Like `referencesBoundBelowThreshold` but allows the abstraction
+    // index `abstractIndex` — any Bound var equal to that index (after
+    // depth adjustment) is treated as the variable we plan to abstract
+    // over and so isn't counted as a capture. Other Bound vars below
+    // threshold ARE counted as captures and force the caller to give up.
+    bool referencesOtherBoundsBelowThreshold(
+        ExpressionPointer expression,
+        int threshold,
+        int abstractIndex,
+        int currentDepth = 0) {
+        if (auto* boundVariable =
+                std::get_if<BoundVariable>(&expression->node)) {
+            int effective =
+                boundVariable->deBruijnIndex - currentDepth;
+            if (effective < 0) return false;
+            if (effective == abstractIndex) return false;
+            return effective < threshold;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return referencesOtherBoundsBelowThreshold(
+                       pi->domain, threshold, abstractIndex,
+                       currentDepth)
+                || referencesOtherBoundsBelowThreshold(
+                       pi->codomain, threshold, abstractIndex,
+                       currentDepth + 1);
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return referencesOtherBoundsBelowThreshold(
+                       lambda->domain, threshold, abstractIndex,
+                       currentDepth)
+                || referencesOtherBoundsBelowThreshold(
+                       lambda->body, threshold, abstractIndex,
+                       currentDepth + 1);
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return referencesOtherBoundsBelowThreshold(
+                       application->function, threshold, abstractIndex,
+                       currentDepth)
+                || referencesOtherBoundsBelowThreshold(
+                       application->argument, threshold, abstractIndex,
+                       currentDepth);
+        }
+        return false;
+    }
+
     // Rewrites `expression` so that BoundVariable(targetIndex) becomes
     // BoundVariable(0) at every depth, and every OTHER BoundVariable
     // that refers to outer scope is shifted up by one. Used to build
@@ -2301,10 +2347,16 @@ private:
                 inferredArgumentType, localBinders,
                 localBinders.size());
             // Structural attempt first; WHNF both sides as fallback
-            // for Definition-headed mismatches.
+            // for Definition-headed mismatches. We pass a binder-type
+            // stack so the unifier can apply Miller-pattern HO
+            // unification when it descends into Pi/Lambda binders and
+            // a metavariable head is applied to a local-binder
+            // BoundVariable.
+            std::vector<ExpressionPointer> binderStack;
             unifyConstructorParameters(expectedDomain,
                                           inferredArgumentType,
-                                          metavariableNames, assignment);
+                                          metavariableNames, assignment,
+                                          0, &binderStack);
             bool anyLeftUnassigned = false;
             for (const auto& name : leadingFreshNames) {
                 if (!assignment.count(name)) {
@@ -2317,9 +2369,11 @@ private:
                 ExpressionPointer inferredArgumentTypeRenormalised =
                     weakHeadNormalForm(environment_,
                                         inferredArgumentType);
+                binderStack.clear();
                 unifyConstructorParameters(expectedDomainNormalised,
                                               inferredArgumentTypeRenormalised,
-                                              metavariableNames, assignment);
+                                              metavariableNames, assignment,
+                                              0, &binderStack);
             }
             elaboratedTrailingArguments.push_back(kernelTrailingArgument);
             std::string trailingArgumentFresh =
@@ -3059,7 +3113,8 @@ private:
         ExpressionPointer target,
         const std::set<std::string>& metavariableNames,
         std::map<std::string, ExpressionPointer>& assignment,
-        int binderDepth = 0) {
+        int binderDepth = 0,
+        std::vector<ExpressionPointer>* binderTypeStack = nullptr) {
         if (auto* freeVariable =
                 std::get_if<FreeVariable>(&pattern->node)) {
             if (metavariableNames.count(freeVariable->name)
@@ -3080,10 +3135,15 @@ private:
             if (auto* targetPi = std::get_if<Pi>(&target->node)) {
                 unifyConstructorParameters(
                     patternPi->domain, targetPi->domain,
-                    metavariableNames, assignment, binderDepth);
+                    metavariableNames, assignment, binderDepth,
+                    binderTypeStack);
+                if (binderTypeStack)
+                    binderTypeStack->push_back(patternPi->domain);
                 unifyConstructorParameters(
                     patternPi->codomain, targetPi->codomain,
-                    metavariableNames, assignment, binderDepth + 1);
+                    metavariableNames, assignment, binderDepth + 1,
+                    binderTypeStack);
+                if (binderTypeStack) binderTypeStack->pop_back();
             }
             return;
         }
@@ -3093,18 +3153,20 @@ private:
                     std::get_if<Lambda>(&target->node)) {
                 unifyConstructorParameters(
                     patternLambda->domain, targetLambda->domain,
-                    metavariableNames, assignment, binderDepth);
+                    metavariableNames, assignment, binderDepth,
+                    binderTypeStack);
+                if (binderTypeStack)
+                    binderTypeStack->push_back(patternLambda->domain);
                 unifyConstructorParameters(
                     patternLambda->body, targetLambda->body,
-                    metavariableNames, assignment, binderDepth + 1);
+                    metavariableNames, assignment, binderDepth + 1,
+                    binderTypeStack);
+                if (binderTypeStack) binderTypeStack->pop_back();
             }
             return;
         }
         if (auto* patternApplication =
                 std::get_if<Application>(&pattern->node)) {
-            // Skip unification when the function head is a metavariable:
-            // higher-order unification, our structural matcher can't
-            // pick the right answer.
             ExpressionPointer patternHead = patternApplication->function;
             while (auto* nestedApp =
                        std::get_if<Application>(&patternHead->node)) {
@@ -3113,6 +3175,86 @@ private:
             if (auto* headFreeVariable =
                     std::get_if<FreeVariable>(&patternHead->node)) {
                 if (metavariableNames.count(headFreeVariable->name)) {
+                    // Miller-pattern higher-order unification: if the
+                    // pattern is `metavar(Bound(k))` with k < binderDepth
+                    // (referring to a binder we descended into), and
+                    // the target doesn't reference any DEEPER binders
+                    // (those would also be captured), solve the
+                    // metavariable by abstracting target over Bound(k).
+                    // For now we handle only the unary case — enough for
+                    // motive-style implicit predicates like
+                    // `{P : T → Prop}` in `strong_induction`.
+                    if (binderTypeStack
+                        && !assignment.count(
+                               headFreeVariable->name)) {
+                        auto* singleArgBound =
+                            std::get_if<BoundVariable>(
+                                &patternApplication->argument->node);
+                        if (singleArgBound) {
+                            int k = singleArgBound->deBruijnIndex;
+                            if (k >= 0 && k < binderDepth) {
+                                int captureThreshold = binderDepth;
+                                // Bound(k) IS allowed (we abstract it
+                                // away); reject only other captures.
+                                if (!referencesOtherBoundsBelowThreshold(
+                                        target, captureThreshold, k)
+                                    && !containsValueArgumentFreeVar(
+                                           target)) {
+                                    // Build Lambda(_, T_k, body) where
+                                    // body abstracts over Bound(k).
+                                    // T_k is the binder at depth k
+                                    // from the innermost in the stack.
+                                    int stackPosition =
+                                        static_cast<int>(
+                                            binderTypeStack->size())
+                                        - 1 - k;
+                                    if (stackPosition >= 0) {
+                                        ExpressionPointer kType =
+                                            (*binderTypeStack)
+                                                [stackPosition];
+                                        // The binder type was captured
+                                        // at the depth it was bound;
+                                        // shift to the outer scope by
+                                        // dropping that many binders.
+                                        ExpressionPointer kTypeOuter =
+                                            shift(kType,
+                                                   -(stackPosition));
+                                        ExpressionPointer abstracted =
+                                            abstractOverBoundVariable(
+                                                target, k);
+                                        // The abstracted body lives in
+                                        // a scope with binderDepth
+                                        // pattern-internal binders +
+                                        // the new Lambda binder. We
+                                        // need to lift it to the outer
+                                        // scope (just the new Lambda
+                                        // binder). Shift everything
+                                        // not bound by the new Lambda
+                                        // down by binderDepth.
+                                        // abstractOverBoundVariable
+                                        // shifted other outer refs by
+                                        // +1; binderDepth-1 internal
+                                        // refs (other than k) become
+                                        // captured if they appear, but
+                                        // we checked that target has
+                                        // no refs below
+                                        // captureThreshold.
+                                        ExpressionPointer body =
+                                            shift(abstracted,
+                                                  -binderDepth + 1);
+                                        ExpressionPointer solution =
+                                            makeLambda(
+                                                "_motiveBinder",
+                                                kTypeOuter,
+                                                body);
+                                        assignment[
+                                            headFreeVariable->name] =
+                                            solution;
+                                    }
+                                }
+                            }
+                        }
+                    }
                     return;
                 }
             }
