@@ -561,7 +561,7 @@ private:
     }
 
     SurfaceExpressionPointer parseLogicalAnd() {
-        auto left = parseLogicalNot();
+        auto left = parseEquality();
         if (peek().kind == TokenKind::LogicalAnd) {
             Token op = consumeAny();
             auto right = parseLogicalAnd();
@@ -570,20 +570,6 @@ private:
                                                 op.line, op.column);
         }
         return left;
-    }
-
-    // `¬` sits between the connectives (∧, ∨) and the relations
-    // (=, ≤, …), matching math convention: `¬P ∧ Q` is `(¬P) ∧ Q`,
-    // but `¬P = Q` is `¬(P = Q)`. We deliberately do NOT put `¬` in
-    // parseUnary alongside arithmetic minus.
-    SurfaceExpressionPointer parseLogicalNot() {
-        if (peek().kind == TokenKind::LogicalNot) {
-            Token op = consumeAny();
-            auto operand = parseEquality();
-            return makeSurfaceUnaryOperation("¬", std::move(operand),
-                                              op.line, op.column);
-        }
-        return parseEquality();
     }
 
     // Non-associative: `a = b = c` is a parse error. Forces users to
@@ -610,7 +596,9 @@ private:
     static bool isRelationalKind(TokenKind kind) {
         return kind == TokenKind::Less || kind == TokenKind::LessOrEqual
             || kind == TokenKind::Greater || kind == TokenKind::GreaterOrEqual
-            || kind == TokenKind::Divides;
+            || kind == TokenKind::Divides
+            || kind == TokenKind::NotDivides
+            || kind == TokenKind::NotLessOrEqual;
     }
 
     SurfaceExpressionPointer parseRelational() {
@@ -628,6 +616,8 @@ private:
                 case TokenKind::Greater:        sym = ">"; break;
                 case TokenKind::GreaterOrEqual: sym = "≥"; break;
                 case TokenKind::Divides:        sym = "∣"; break;
+                case TokenKind::NotDivides:     sym = "∤"; break;
+                case TokenKind::NotLessOrEqual: sym = "≰"; break;
                 default: break;
             }
             left = makeSurfaceBinaryOperation(sym, std::move(left),
@@ -685,9 +675,12 @@ private:
             return makeSurfaceUnaryOperation("-", std::move(operand),
                                               op.line, op.column);
         }
-        // `¬` is handled at parseLogicalNot (between ∧ and =), not here:
-        // we want `¬P = Q` to read as `¬(P = Q)` while `¬P ∧ Q` reads
-        // as `(¬P) ∧ Q`.
+        if (peek().kind == TokenKind::LogicalNot) {
+            Token op = consumeAny();
+            auto operand = parseUnary();
+            return makeSurfaceUnaryOperation("¬", std::move(operand),
+                                              op.line, op.column);
+        }
         return parseApplication();
     }
 

@@ -218,6 +218,8 @@ private:
             {"∨", TokenKind::LogicalOr},
             {"¬", TokenKind::LogicalNot},
             {"∣", TokenKind::Divides},
+            {"∤", TokenKind::NotDivides},
+            {"≰", TokenKind::NotLessOrEqual},
             {"∀", TokenKind::ForAll},
             {"∃", TokenKind::Exists},
             {"⟨", TokenKind::LeftAngle},
@@ -369,6 +371,8 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::LogicalOr:            return "'\\/' or '∨'";
         case TokenKind::LogicalNot:           return "'¬'";
         case TokenKind::Divides:              return "'∣'";
+        case TokenKind::NotDivides:           return "'∤'";
+        case TokenKind::NotLessOrEqual:       return "'≰'";
         case TokenKind::ForAll:               return "'∀'";
         case TokenKind::Exists:               return "'∃'";
         case TokenKind::Arrow:                return "'->' or '→'";

@@ -3837,6 +3837,57 @@ theorem left_in (A B : Proposition) (a : A) : A ∨ B :=
         "∨ operator desugars to Or",
         __LINE__);
 
+    // `¬` is at tight (parseUnary) precedence — `¬P = Q` parses as
+    // `(¬P) = Q`, matching C's `!P == Q` and contrasting with the
+    // looser-precedence reading some math texts use. Users who want
+    // `Not(P = Q)` should write `P ≠ Q`.
+    expectVerifies(R"(
+module Test.not_precedence
+
+inductive False : Proposition where
+
+definition Not (A : Proposition) : Proposition := A → False
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+-- If `¬` bound looser than `=`, `¬P = ¬P` would parse as
+-- `¬(P = ¬P)`. With tight `¬` (matching C-style `!`), it's
+-- `(¬P) = (¬P)`, so this reflexivity goes through.
+theorem refl_of_not (P : Proposition)
+        : Equality.{0}(Proposition, ¬P, ¬P) :=
+  reflexivity.{0}(Proposition, ¬P)
+)",
+        "¬ binds tighter than =",
+        __LINE__);
+
+    // `a ≠ b` desugars to `Not(a = b)`.
+    expectVerifies(R"(
+module Test.not_equal_operator
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive False : Proposition where
+
+definition Not (A : Proposition) : Proposition := A → False
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+inductive True : Proposition where
+  | True.trivial : True
+
+inductive Or (A B : Proposition) : Proposition where
+  | Or.introduceLeft  : A → Or(A, B)
+  | Or.introduceRight : B → Or(A, B)
+
+theorem successor_not_equal_zero (n : Natural) : successor(n) ≠ zero := ?
+)",
+        "≠ desugars to Not of equality",
+        __LINE__);
+
     // `¬` desugars to `Not(P)`.
     expectVerifies(R"(
 module Test.not_operator

@@ -47,6 +47,8 @@ enum class TokenKind {
     Equal, NotEqual,
     LogicalAnd, LogicalOr, LogicalNot,
     Divides,         // "∣" (divides relation on Naturals)
+    NotDivides,      // "∤" (negated divides)
+    NotLessOrEqual,  // "≰" (negated ≤)
     ForAll,          // "∀" (universal-quantifier prefix)
     Exists,          // "∃" (existential-quantifier prefix)
     Arrow,           // "→" or "->"

@@ -38,7 +38,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                 (divisor : Natural)
                 → 2 ≤ divisor
                 → divisor ≤ candidateBound
-                → ¬divisor ∣ n)
+                → divisor ∤ n)
   | zero =>
       -- candidateBound = 0: range [2, 0] is empty, no candidate
       -- divisor exists. Anyone claiming 2 ≤ d ≤ 0 hits a contradiction
@@ -64,13 +64,13 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
           (divisor : Natural)
               → 2 ≤ divisor
               → divisor ≤ predecessorOfBound
-              → ¬divisor ∣ n,
+              → divisor ∤ n,
           Or(Exists(Natural, function (divisor : Natural) =>
                   2 ≤ divisor ∧ divisor ≤ successor(predecessorOfBound) ∧ divisor ∣ n),
               (divisor : Natural)
                 → 2 ≤ divisor
                 → divisor ≤ successor(predecessorOfBound)
-                → ¬divisor ∣ n),
+                → divisor ∤ n),
           function (foundEarlier : Exists(Natural,
                   function (divisor : Natural) =>
                       2 ≤ divisor ∧ divisor ≤ predecessorOfBound ∧ divisor ∣ n)) =>
@@ -83,7 +83,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                       (divisor : Natural)
                         → 2 ≤ divisor
                         → divisor ≤ successor(predecessorOfBound)
-                        → ¬divisor ∣ n),
+                        → divisor ∤ n),
                   function (divisor : Natural)
                       (combined : 2 ≤ divisor ∧ divisor ≤ predecessorOfBound ∧ divisor ∣ n) =>
                     And.eliminate(
@@ -94,7 +94,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                             (d : Natural)
                               → 2 ≤ d
                               → d ≤ successor(predecessorOfBound)
-                              → ¬d ∣ n),
+                              → d ∤ n),
                         function (twoLessOrEqualDivisor : 2 ≤ divisor)
                             (rest : divisor ≤ predecessorOfBound ∧ divisor ∣ n) =>
                           And.eliminate(
@@ -105,7 +105,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                                   (d : Natural)
                                     → 2 ≤ d
                                     → d ≤ successor(predecessorOfBound)
-                                    → ¬d ∣ n),
+                                    → d ∤ n),
                               function (divLePredBound : divisor ≤ predecessorOfBound)
                                   (divDivides : divisor ∣ n) =>
                                 Or.introduceLeft(
@@ -125,7 +125,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                   (divisor : Natural)
                   → 2 ≤ divisor
                   → divisor ≤ predecessorOfBound
-                  → ¬divisor ∣ n) =>
+                  → divisor ∤ n) =>
               -- induction hypothesis says no divisor in [2, predecessorOfBound]. Check the boundary
               -- candidate successor(predecessorOfBound): either ≥ 2 and divides n
               -- (in which case we have a witness), or doesn't divide
@@ -134,24 +134,24 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
               -- only includes [2, predecessorOfBound]).
               Or.eliminate(
                   2 ≤ successor(predecessorOfBound),
-                  ¬2 ≤ successor(predecessorOfBound),
+                  2 ≰ successor(predecessorOfBound),
                   Or(Exists(Natural, function (d : Natural) =>
                           2 ≤ d ∧ d ≤ successor(predecessorOfBound) ∧ d ∣ n),
                       (d : Natural)
                         → 2 ≤ d
                         → d ≤ successor(predecessorOfBound)
-                        → ¬d ∣ n),
+                        → d ∤ n),
                   function (twoLeSuccPredBound :
                           2 ≤ successor(predecessorOfBound)) =>
                       Or.eliminate(
                           successor(predecessorOfBound) ∣ n,
-                          ¬successor(predecessorOfBound) ∣ n,
+                          successor(predecessorOfBound) ∤ n,
                           Or(Exists(Natural, function (d : Natural) =>
                                   2 ≤ d ∧ d ≤ successor(predecessorOfBound) ∧ d ∣ n),
                               (d : Natural)
                                 → 2 ≤ d
                                 → d ≤ successor(predecessorOfBound)
-                                → ¬d ∣ n),
+                                → d ∤ n),
                           function (successorPredecessorBoundDivides :
                                   successor(predecessorOfBound) ∣ n) =>
                               Or.introduceLeft(
@@ -164,7 +164,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                                                   successor(predecessorOfBound)),
                                               successorPredecessorBoundDivides)))),
                           function (successorPredecessorBoundDoesNotDivide :
-                                  ¬successor(predecessorOfBound) ∣ n) =>
+                                  successor(predecessorOfBound) ∤ n) =>
                               Or.introduceRight(
                                   function (divisor : Natural)
                                       (twoLessOrEqualDivisor : 2 ≤ divisor)
@@ -242,7 +242,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                           Natural.decides_divides(
                               successor(predecessorOfBound), n)),
                   function (notTwoLeSuccPredBound :
-                          ¬2 ≤ successor(predecessorOfBound)) =>
+                          2 ≰ successor(predecessorOfBound)) =>
                       -- successor(predecessorOfBound) < 2, so the range [2, successor(predecessorOfBound)]
                       -- only contains things ≤ predecessorOfBound. Same conclusion
                       -- as noEarlierDivisor but extended to the wider
@@ -264,7 +264,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
 
 -- d ≠ 0 implies 1 ≤ d.
 theorem Natural.geq_one_when_not_zero
-        : (d : Natural) → ¬d = zero → 1 ≤ d
+        : (d : Natural) → d ≠ zero → 1 ≤ d
   | zero, notZero =>
       False.eliminate_proposition(
           1 ≤ zero,
@@ -276,7 +276,7 @@ theorem Natural.geq_one_when_not_zero
 -- Helper: if d is neither 0 nor 1, then 2 ≤ d. Pattern-match on d.
 theorem Natural.geq_two_when_not_zero_or_one
         : (d : Natural)
-          → ¬d = zero → ¬d = 1 → 2 ≤ d
+          → d ≠ zero → d ≠ 1 → 2 ≤ d
   | zero, notZero, _ =>
       False.eliminate_proposition(
           2 ≤ zero,
@@ -288,11 +288,11 @@ theorem Natural.geq_two_when_not_zero_or_one
               function (predecessorEqualsZero : predD = zero) =>
                   notOne(congruenceOf(successor, predecessorEqualsZero))))
 
--- Antisymmetry-like: if a ≤ b and ¬successor(a) ≤ b, then a = b.
+-- Antisymmetry-like: if a ≤ b and successor(a) ≰ b, then a = b.
 -- (Equivalently, ≤ is total and ¬less than gives equality.)
 theorem Natural.equals_when_less_or_equal_and_not_less_than (a b : Natural)
         (aLessOrEqualB : a ≤ b)
-        (notSuccessorALessOrEqualB : ¬successor(a) ≤ b)
+        (notSuccessorALessOrEqualB : successor(a) ≰ b)
         : a = b :=
   Or.eliminate(
       a = b,
@@ -343,13 +343,13 @@ theorem Natural.classify_divisor_when_no_proper
             (divisor : Natural)
             → 2 ≤ divisor
             → divisor ≤ predecessorOfN
-            → ¬divisor ∣ successor(predecessorOfN))
+            → divisor ∤ successor(predecessorOfN))
         (divisor : Natural)
         (divDivides : divisor ∣ successor(predecessorOfN))
         : Or(divisor = 1, divisor = successor(predecessorOfN)) :=
   Or.eliminate(
       divisor = zero,
-      ¬divisor = zero,
+      divisor ≠ zero,
       Or(divisor = 1, divisor = successor(predecessorOfN)),
       function (divisorIsZero : divisor = zero) =>
           -- divisor = 0 → divides(0, successor(predecessorOfN)) means
@@ -376,14 +376,14 @@ theorem Natural.classify_divisor_when_no_proper
                                   -- multiply's first-case rule).
                                   reflexivity(zero)))),
                   divDivides)),
-      function (divisorNotZero : ¬divisor = zero) =>
+      function (divisorNotZero : divisor ≠ zero) =>
           Or.eliminate(
               divisor = 1,
-              ¬divisor = 1,
+              divisor ≠ 1,
               Or(divisor = 1, divisor = successor(predecessorOfN)),
               function (divisorIsOne : divisor = 1) =>
                   Or.introduceLeft(divisorIsOne),
-              function (divisorNotOne : ¬divisor = 1) =>
+              function (divisorNotOne : divisor ≠ 1) =>
                   -- divisor ≥ 2 (it's neither 0 nor 1). Now classify
                   -- against successor(predecessorOfN): either successor(divisor) ≤ successor(predecessorOfN)
                   -- (i.e. divisor ≤ predecessorOfN) leading to a contradiction
@@ -392,7 +392,7 @@ theorem Natural.classify_divisor_when_no_proper
                   -- divides_le_or_zero) forces divisor = successor(predecessorOfN).
                   Or.eliminate(
                       successor(divisor) ≤ successor(predecessorOfN),
-                      ¬successor(divisor) ≤ successor(predecessorOfN),
+                      successor(divisor) ≰ successor(predecessorOfN),
                       Or(divisor = 1, divisor = successor(predecessorOfN)),
                       function (successorDivisorLessOrEqualSuccessorPredecessorOfN :
                               successor(divisor) ≤ successor(predecessorOfN)) =>
@@ -415,7 +415,7 @@ theorem Natural.classify_divisor_when_no_proper
                                       successorDivisorLessOrEqualSuccessorPredecessorOfN),
                                   divDivides)),
                       function (notSuccessorDivisorLessOrEqualSuccessorPredecessorOfN :
-                              ¬successor(divisor) ≤ successor(predecessorOfN)) =>
+                              successor(divisor) ≰ successor(predecessorOfN)) =>
                           -- divisor ≤ successor(predecessorOfN) from divides_le_or_zero.
                           -- Combined with NOT(successor(divisor) ≤ successor(predecessorOfN)),
                           -- forces divisor = successor(predecessorOfN).
@@ -464,7 +464,7 @@ theorem Natural.prime_or_proper_divisor
           (divisor : Natural)
               → 2 ≤ divisor
               → divisor ≤ predecessorOfN
-              → ¬divisor ∣ successor(predecessorOfN),
+              → divisor ∤ successor(predecessorOfN),
           Or(Natural.is_prime(successor(predecessorOfN)),
               Exists(Natural, function (divisor : Natural) =>
                   2 ≤ divisor ∧ successor(divisor) ≤ successor(predecessorOfN) ∧ divisor ∣ successor(predecessorOfN))),
@@ -514,7 +514,7 @@ theorem Natural.prime_or_proper_divisor
                   (divisor : Natural)
                   → 2 ≤ divisor
                   → divisor ≤ predecessorOfN
-                  → ¬divisor ∣ successor(predecessorOfN)) =>
+                  → divisor ∤ successor(predecessorOfN)) =>
               Or.introduceLeft(
                   And.introduction(
                       atLeastTwo,

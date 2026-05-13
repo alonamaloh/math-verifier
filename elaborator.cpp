@@ -1989,6 +1989,32 @@ private:
                                            std::move(rightKernel));
                 return applied;
             }
+            // Negated relations: `a ≠ b` → `Not(a = b)`,
+            // `a ≰ b` → `Not(a ≤ b)`, `a ∤ b` → `Not(a ∣ b)`. We
+            // build the surface call to the positive relation and
+            // recursively elaborate inside a `Not`.
+            const std::string& sym = binary->opSymbol;
+            const char* positive = nullptr;
+            if (sym == "≠") positive = "=";
+            else if (sym == "≰") positive = "≤";
+            else if (sym == "∤") positive = "∣";
+            if (positive) {
+                if (environment_.lookup("Not") == nullptr) {
+                    throw ElaborateError(
+                        "operator '" + sym + "' requires `Not` in scope "
+                        "(import Logic.basics) at line "
+                        + std::to_string(expression.line));
+                }
+                SurfaceExpressionPointer positiveSurface =
+                    makeSurfaceBinaryOperation(
+                        positive, binary->left, binary->right,
+                        expression.line, expression.column);
+                ExpressionPointer positiveKernel =
+                    elaborateExpression(*positiveSurface, localBinders);
+                ExpressionPointer notCall = makeConstant("Not");
+                return makeApplication(std::move(notCall),
+                                        std::move(positiveKernel));
+            }
             return desugarArithmeticOperator(
                 binary->opSymbol, *binary->left, *binary->right,
                 localBinders, expression.line);
