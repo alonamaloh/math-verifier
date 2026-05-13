@@ -80,46 +80,48 @@ theorem NaturalList.productOf_at_least_one
               allPrime(p,
                 NaturalList.member.there(head, tail, memberOfTail))))
 
--- Euclid's theorem. Construction is inlined — local `let X := …`
--- bindings of intermediate values would be opaque to the kernel's
--- definitional equality (zeta-reduction is only at the head), so
--- writing `NaturalList.productOf(primes)` everywhere is required
--- for the type annotations to line up.
+-- Euclid's theorem. Let n be the product of all the primes, plus one.
+-- By has_prime_divisor, n has a prime divisor q. q is our witness: it
+-- is prime, and we show it is not in `primes` by contradiction —
+-- suppose otherwise; then q divides the product, and also divides
+-- n = product + 1, so q divides 1 — but q ≥ 2 from primality.
 theorem Natural.infinitely_many_primes
         (primes : NaturalList)
         (allPrime : ∀ (p : Natural).
                       NaturalList.member(p, primes)
                       → Natural.is_prime(p))
         : ∃ (q : Natural).
-            Natural.is_prime(q) ∧ ¬NaturalList.member(q, primes) :=
-  let ⟨q, qIsPrime, qDividesSuccessor⟩
-      := Natural.has_prime_divisor(
-             successor(NaturalList.productOf(primes)),
-             Natural.successor_less_or_equal_successor(
-                 1, NaturalList.productOf(primes),
-                 NaturalList.productOf_at_least_one(primes, allPrime)))
-  in
-  ⟨q, qIsPrime,
-    function (qInPrimes : NaturalList.member(q, primes)) =>
-      cases Natural.divides_less_or_equal_or_zero(
-                q, 1,
-                Natural.divides_consecutive_implies_one(
-                    q, NaturalList.productOf(primes),
-                    NaturalList.member_divides_product(
-                        q, primes, qInPrimes),
-                    qDividesSuccessor)) {
-        | Or.introduceLeft(oneEqualsZero) =>
-            Natural.successor_not_zero(zero, oneEqualsZero)
-        | Or.introduceRight(qLessOrEqualOne) =>
-            Natural.not_less_or_equal_successor_zero(
-                zero,
-                Natural.less_or_equal_successor_successor_descend(
-                    1, zero,
-                    LessOrEqual.transitive(
-                        2, q, 1, qLessOrEqualOne,
-                        And.left(
-                            2 ≤ q,
-                            ∀ (k : Natural).
-                              k ∣ q → k = 1 ∨ k = q,
-                            qIsPrime))))
-      }⟩
+            Natural.is_prime(q) ∧ ¬NaturalList.member(q, primes) := {
+  set n := successor(NaturalList.productOf(primes));
+  claim nAtLeastTwo : 2 ≤ n
+    by Natural.successor_less_or_equal_successor(
+           1, NaturalList.productOf(primes),
+           NaturalList.productOf_at_least_one(primes, allPrime));
+  obtain ⟨q, qIsPrime, qDividesN⟩
+    from Natural.has_prime_divisor(n, nAtLeastTwo);
+  witness q with ⟨qIsPrime, {
+    assume qInPrimes : NaturalList.member(q, primes);
+    claim qAtLeastTwo : 2 ≤ q
+      by And.left(
+             2 ≤ q,
+             ∀ (k : Natural). k ∣ q → k = 1 ∨ k = q,
+             qIsPrime);
+    by_cases on Natural.divides_less_or_equal_or_zero(
+                    q, 1,
+                    Natural.divides_consecutive_implies_one(
+                        q, NaturalList.productOf(primes),
+                        NaturalList.member_divides_product(
+                            q, primes, qInPrimes),
+                        qDividesN)) {
+      case Or.introduceLeft(oneEqualsZero):
+          Natural.successor_not_zero(zero, oneEqualsZero);
+      case Or.introduceRight(qLessOrEqualOne):
+          Natural.not_less_or_equal_successor_zero(
+              zero,
+              Natural.less_or_equal_successor_successor_descend(
+                  1, zero,
+                  LessOrEqual.transitive(
+                      2, q, 1, qLessOrEqualOne, qAtLeastTwo)));
+    }
+  }⟩
+}
