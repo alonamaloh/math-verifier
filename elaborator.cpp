@@ -1929,8 +1929,12 @@ private:
         if (auto* let = std::get_if<SurfaceLet>(&expression.node)) {
             ExpressionPointer letType =
                 elaborateExpression(*let->type, localBinders);
+            // Pass the declared type as the expected type for the value
+            // so bidirectional elaborators (cases, anonymous tuples,
+            // hammer, calc) can use it — without this, `let h : T := ?;`
+            // can't trigger the hammer's reflexivity-match etc.
             ExpressionPointer letValue =
-                elaborateExpression(*let->value, localBinders);
+                elaborateExpression(*let->value, localBinders, letType);
             std::vector<LocalBinder> extended = localBinders;
             extended.push_back({let->name, letType});
             // Propagate expectedType to body (shifted for new binder).

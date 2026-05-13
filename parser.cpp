@@ -161,13 +161,16 @@ private:
         return declaration;
     }
 
-    // Parses a `{ let pat := v; ...; final_expr }` block. Each `let pat
-    // := value;` statement becomes a nested let-in around the trailing
-    // expression. Tuple-patterned lets desugar to single-clause cases
-    // (same as `let ⟨...⟩ := v in body` in expression position).
+    // Parses a `{ stmt; stmt; ...; final_expr }` block. Each statement
+    // is either a `let pat := value;` / `let name : type := value;` or a
+    // `claim name : type [by expr];` (a stylistic synonym for `let
+    // name : type := …;` — with `?` as the value when `by` is omitted,
+    // letting the hammer fill it). All statements become nested let-in
+    // (or single-clause cases, for tuple patterns) wrappers around the
+    // trailing expression.
     SurfaceExpressionPointer parseBlockBody() {
         Token openBrace = consumeAny();  // '{'
-        // Collect (line, column, builder) for each let statement.
+        // Collect (line, column, builder) for each let-like statement.
         // We'll apply them in reverse order around the final expression.
         struct LetWrapper {
             SurfacePatternPointer pattern;     // null if name-with-type form
@@ -178,12 +181,15 @@ private:
             int column = 0;
         };
         std::vector<LetWrapper> wrappers;
-        while (peek().kind == TokenKind::KeywordLet) {
-            Token letToken = consumeAny();
+        while (peek().kind == TokenKind::KeywordLet
+               || peek().kind == TokenKind::KeywordClaim) {
+            Token statementToken = consumeAny();
+            bool isClaim =
+                statementToken.kind == TokenKind::KeywordClaim;
             LetWrapper wrapper;
-            wrapper.line = letToken.line;
-            wrapper.column = letToken.column;
-            if (peek().kind == TokenKind::LeftAngle) {
+            wrapper.line = statementToken.line;
+            wrapper.column = statementToken.column;
+            if (!isClaim && peek().kind == TokenKind::LeftAngle) {
                 wrapper.pattern = parsePattern();
                 expect(TokenKind::Assign,
                        "after let-pattern in block body");
@@ -192,19 +198,37 @@ private:
                 Token nameToken = consumeAny();
                 wrapper.name = nameToken.lexeme;
                 if (peek().kind != TokenKind::Colon) {
-                    throwHere("typed let in block body requires ': type "
-                              "after the name (use let ⟨…⟩ := … ; for "
-                              "destructuring without a type)");
+                    throwHere(isClaim
+                        ? "claim requires ': type [by proof]'"
+                        : "typed let in block body requires ': type "
+                          "after the name (use let ⟨…⟩ := … ; for "
+                          "destructuring without a type)");
                 }
                 consumeAny();  // ':'
                 wrapper.type = parseExpression();
-                expect(TokenKind::Assign, "after let type");
-                wrapper.value = parseExpression();
+                if (isClaim) {
+                    if (peek().kind == TokenKind::KeywordBy) {
+                        consumeAny();  // 'by'
+                        wrapper.value = parseExpression();
+                    } else {
+                        // No `by`: the hammer fills the proof. We
+                        // build a `?` placeholder so the standard
+                        // let-binding path sees the same machinery.
+                        wrapper.value = makeSurfaceHammer(
+                            statementToken.line, statementToken.column);
+                    }
+                } else {
+                    expect(TokenKind::Assign, "after let type");
+                    wrapper.value = parseExpression();
+                }
             } else {
-                throwHere("expected identifier or '⟨' after 'let'");
+                throwHere(isClaim
+                    ? "expected identifier after 'claim'"
+                    : "expected identifier or '⟨' after 'let'");
             }
             expect(TokenKind::Semicolon,
-                   "ending let statement in block body");
+                   isClaim ? "ending claim statement"
+                           : "ending let statement in block body");
             wrappers.push_back(std::move(wrapper));
         }
         SurfaceExpressionPointer finalExpression = parseExpression();

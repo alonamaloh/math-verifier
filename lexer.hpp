@@ -29,6 +29,7 @@ enum class TokenKind {
     KeywordCase, KeywordCases, KeywordOf, KeywordWith, KeywordHypothesis,
     KeywordApply, KeywordReduction,
     KeywordMotive, KeywordTarget,
+    KeywordClaim,
 
     // Punctuation
     LeftParen, RightParen,

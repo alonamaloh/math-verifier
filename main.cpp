@@ -3837,6 +3837,68 @@ theorem left_in (A B : Proposition) (a : A) : A ∨ B :=
         "∨ operator desugars to Or",
         __LINE__);
 
+    // `claim P : T by E;` in a block body desugars to `let P : T :=
+    // E;`. `claim P : T;` (no body) uses the hammer.
+    expectVerifies(R"(
+module Test.claim_with_body
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem trivial : Equality.{0}(Natural, zero, zero) := {
+  claim self_equality : Equality.{0}(Natural, zero, zero)
+       by reflexivity.{0}(Natural, zero);
+  self_equality
+}
+)",
+        "claim with explicit body desugars to let",
+        __LINE__);
+
+    // `claim P : T;` (no body) — hammer fills the proof.
+    expectVerifies(R"(
+module Test.claim_hammer
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem trivial_via_hammer
+        : Equality.{0}(Natural, zero, zero) := {
+  claim self_equality : Equality.{0}(Natural, zero, zero);
+  self_equality
+}
+)",
+        "claim with no body invokes the hammer",
+        __LINE__);
+
+    // Mixing `claim` and `let` in the same block.
+    expectVerifies(R"(
+module Test.claim_and_let
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem mixed : Equality.{0}(Natural, zero, zero) := {
+  let value : Natural := zero;
+  claim self_equality : Equality.{0}(Natural, value, value)
+       by reflexivity.{0}(Natural, value);
+  self_equality
+}
+)",
+        "claim and let mix freely in block bodies",
+        __LINE__);
+
     // `¬` is at tight (parseUnary) precedence — `¬P = Q` parses as
     // `(¬P) = Q`, matching C's `!P == Q` and contrasting with the
     // looser-precedence reading some math texts use. Users who want
