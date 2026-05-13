@@ -1,5 +1,7 @@
 #include "elaborator.hpp"
 
+#include "printer.hpp"
+
 #include <iostream>
 #include <set>
 #include <string>
@@ -36,6 +38,105 @@ public:
     }
 
 private:
+    // -------- diagnostic context stack --------
+    //
+    // The elaborator keeps a stack of "while doing X at line Y" frames
+    // as it descends. Errors prepend the stack so the user sees a
+    // breadcrumb trail from the surface position to the failure. The
+    // Frame guard is RAII: construct to push, destruct to pop. Push
+    // before any non-trivial elaboration step; the destructor will run
+    // even on exception unwinding, so we don't need explicit pops.
+
+    struct Frame {
+        Elaborator& elaborator;
+        Frame(Elaborator& target, std::string description)
+            : elaborator(target) {
+            elaborator.contextFrames_.push_back(std::move(description));
+        }
+        ~Frame() { elaborator.contextFrames_.pop_back(); }
+        Frame(const Frame&) = delete;
+        Frame& operator=(const Frame&) = delete;
+    };
+
+    // Pretty-print an expression that lives in a local-binder scope.
+    // Opens each binder as a named FreeVariable so the printer shows
+    // the user's name rather than a bare `<bound k>` index. `count`
+    // optionally limits how many binders are visible (useful when
+    // printing the type of binder `i`, which references only the
+    // first `i` binders).
+    std::string prettyPrintInLocalScope(
+        ExpressionPointer expression,
+        const std::vector<LocalBinder>& localBinders,
+        size_t count) const {
+        // Open with User-origin so the printer doesn't mark the
+        // resulting FreeVariables with `@` (which is reserved for
+        // signalling that an Internal-origin variable leaked).
+        ExpressionPointer opened = expression;
+        for (size_t i = count; i > 0; --i) {
+            opened = openBinder(opened, localBinders[i - 1].name,
+                                 FreeVariableOrigin::User);
+        }
+        return prettyPrint(opened);
+    }
+    std::string prettyPrintInLocalScope(
+        ExpressionPointer expression,
+        const std::vector<LocalBinder>& localBinders) const {
+        return prettyPrintInLocalScope(expression, localBinders,
+                                         localBinders.size());
+    }
+
+    // Const version of openOverLocalBinders (the existing one in this
+    // class is non-const because it shares the helper used during
+    // mutating elaboration).
+    ExpressionPointer openOverLocalBinders(
+        ExpressionPointer term,
+        const std::vector<LocalBinder>& localBinders,
+        size_t count) const {
+        for (size_t i = count; i > 0; --i) {
+            term = openBinder(term, localBinders[i - 1].name,
+                              FreeVariableOrigin::Internal);
+        }
+        return term;
+    }
+
+    std::string formatErrorWithContext(const std::string& message) const {
+        if (contextFrames_.empty()) return message;
+        std::string result;
+        // Most-recent frame first (innermost work), then progressively
+        // outer frames. Each frame on its own line indented under the
+        // last so the breadcrumb reads top-to-bottom from outer cause
+        // to inner failure.
+        for (auto iterator = contextFrames_.rbegin();
+             iterator != contextFrames_.rend(); ++iterator) {
+            result += *iterator;
+            result += "\n  ";
+        }
+        result += message;
+        return result;
+    }
+
+    [[noreturn]] void throwElaborate(const std::string& message) const {
+        throw ElaborateError(formatErrorWithContext(message));
+    }
+
+    // Wraps a kernel TypeError with the elaborator's context stack and
+    // any pretty-printed types the kernel attached. Use in catch
+    // blocks around kernel `inferType` / `isDefinitionallyEqual`
+    // calls.
+    [[noreturn]] void rethrowKernelError(const TypeError& error) const {
+        std::string message = "kernel: ";
+        message += error.what();
+        if (error.expectedType) {
+            message += "\n    expected type: ";
+            message += prettyPrint(error.expectedType);
+        }
+        if (error.actualType) {
+            message += "\n    actual type:   ";
+            message += prettyPrint(error.actualType);
+        }
+        throw ElaborateError(formatErrorWithContext(message));
+    }
+
     // -------- top-level statements --------
 
     void elaborateTopStatement(const SurfaceTopStatement& statement) {
@@ -64,6 +165,7 @@ private:
     }
 
     void elaborateAxiom(const SurfaceAxiomDeclaration& declaration) {
+        Frame frame(*this, "axiom '" + declaration.name + "'");
         currentUniverseParametersOrdered_ = declaration.universeParameters;
         currentUniverseParameters_ = std::set<std::string>(
             declaration.universeParameters.begin(),
@@ -72,9 +174,13 @@ private:
         resetAutoBoundState();
         ExpressionPointer type =
             elaborateExpression(*declaration.type, {});
-        addAxiom(environment_, declaration.name,
-                 finalUniverseParameters(declaration.universeParameters),
-                 std::move(type));
+        try {
+            addAxiom(environment_, declaration.name,
+                     finalUniverseParameters(declaration.universeParameters),
+                     std::move(type));
+        } catch (const TypeError& kernelError) {
+            rethrowKernelError(kernelError);
+        }
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
@@ -232,6 +338,9 @@ private:
             elaboratePatternMatchDefinition(declaration);
             return;
         }
+        Frame frame(*this,
+            (declaration.isTheorem ? "theorem '" : "definition '")
+            + declaration.name + "'");
         currentUniverseParametersOrdered_ = declaration.universeParameters;
         currentUniverseParameters_ = std::set<std::string>(
             declaration.universeParameters.begin(),
@@ -276,9 +385,13 @@ private:
                                    fullBody);
         }
 
-        addDefinition(environment_, declaration.name,
-                      finalUniverseParameters(declaration.universeParameters),
-                      std::move(fullType), std::move(fullBody));
+        try {
+            addDefinition(environment_, declaration.name,
+                          finalUniverseParameters(declaration.universeParameters),
+                          std::move(fullType), std::move(fullBody));
+        } catch (const TypeError& kernelError) {
+            rethrowKernelError(kernelError);
+        }
         int implicitCount =
             countLeadingImplicitArgumentNames(declaration);
         if (implicitCount > 0) {
@@ -315,6 +428,9 @@ private:
     void elaboratePatternMatchDefinition(
         const SurfaceDefinitionDeclaration& declaration) {
 
+        Frame frame(*this,
+            (declaration.isTheorem ? "theorem '" : "definition '")
+            + declaration.name + "' (pattern-match form)");
         currentUniverseParametersOrdered_ = declaration.universeParameters;
         currentUniverseParameters_ = std::set<std::string>(
             declaration.universeParameters.begin(),
@@ -720,9 +836,13 @@ private:
                                    std::move(fullBody));
         }
 
-        addDefinition(environment_, declaration.name,
-                      finalUniverseParameters(declaration.universeParameters),
-                      std::move(fullType), std::move(fullBody));
+        try {
+            addDefinition(environment_, declaration.name,
+                          finalUniverseParameters(declaration.universeParameters),
+                          std::move(fullType), std::move(fullBody));
+        } catch (const TypeError& kernelError) {
+            rethrowKernelError(kernelError);
+        }
         int implicitCount =
             countLeadingImplicitArgumentNames(declaration);
         if (implicitCount > 0) {
@@ -1296,6 +1416,7 @@ private:
     }
 
     void elaborateInductive(const SurfaceInductiveDeclaration& declaration) {
+        Frame frame(*this, "inductive '" + declaration.name + "'");
         currentUniverseParametersOrdered_ = declaration.universeParameters;
         currentUniverseParameters_ = std::set<std::string>(
             declaration.universeParameters.begin(),
@@ -1355,10 +1476,14 @@ private:
         for (const auto& binder : declaration.parameters) {
             numParameters += static_cast<int>(binder.names.size());
         }
-        addInductive(environment_, declaration.name,
-                     finalUniverseParameters(declaration.universeParameters),
-                     fullKind, numParameters,
-                     std::move(kernelConstructors));
+        try {
+            addInductive(environment_, declaration.name,
+                         finalUniverseParameters(declaration.universeParameters),
+                         fullKind, numParameters,
+                         std::move(kernelConstructors));
+        } catch (const TypeError& kernelError) {
+            rethrowKernelError(kernelError);
+        }
 
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
@@ -1741,10 +1866,13 @@ private:
         ExpressionPointer expectedType,
         int line, int column) {
         (void)column;
+        Frame frame(*this,
+            "hammer placeholder '?' at line " + std::to_string(line));
         if (!expectedType) {
-            throw ElaborateError(
-                "hammer placeholder '?' needs an expected type from "
-                "context (line " + std::to_string(line) + ")");
+            throwElaborate(
+                "needs an expected type from context — '?' fills in a "
+                "proof of the expected type, so the elaborator must "
+                "know what that type is");
         }
         ExpressionPointer goalOpened = openOverLocalBinders(
             expectedType, localBinders, localBinders.size());
@@ -1804,10 +1932,24 @@ private:
             }
         }
         std::string message =
-            "hammer placeholder '?' at line " + std::to_string(line)
-            + " could not find a proof; tried hypothesis-match and "
-              "reflexivity-match";
-        throw ElaborateError(message);
+            "could not find a proof of:\n      "
+            + prettyPrintInLocalScope(expectedType, localBinders)
+            + "\n  Tried: hypothesis-match against "
+            + std::to_string(localBinders.size())
+            + " in-scope binders, reflexivity-match.";
+        if (!localBinders.empty()) {
+            message += "\n  Candidates in scope:";
+            for (int i =
+                     static_cast<int>(localBinders.size()) - 1;
+                 i >= 0; --i) {
+                message += "\n    ";
+                message += localBinders[i].name;
+                message += " : ";
+                message += prettyPrintInLocalScope(
+                    localBinders[i].type, localBinders, i);
+            }
+        }
+        throwElaborate(message);
     }
 
     // `⟨a, b, ..., n⟩` at expected type `I(...)`: desugars to a call of
@@ -1926,10 +2068,12 @@ private:
         ExpressionPointer expectedType,
         int line, int column) {
 
+        Frame frame(*this,
+            "cases expression at line " + std::to_string(line));
         if (!expectedType) {
-            throw ElaborateError(
-                "cases expression needs an expected type from context "
-                "(line " + std::to_string(line) + ")");
+            throwElaborate(
+                "needs an expected type from context — wrap with an "
+                "ascription `(cases … : T)` or supply one via context");
         }
 
         // Elaborate scrutinee + infer + normalise type. The inferred type
@@ -3784,6 +3928,13 @@ private:
     std::vector<std::string>& importedModules_;
     std::string moduleName_;
     std::string currentDeclarationName_;
+    // Context frames describing what the elaborator is currently doing.
+    // Each frame is a short phrase like "while elaborating cases at
+    // line 42". `Frame` is an RAII guard that pushes on construction
+    // and pops on destruction; `throwElaborate` (and the kernel-error
+    // catch path) prepends the frames to the diagnostic so the user
+    // sees a breadcrumb trail from their source line to the failure.
+    std::vector<std::string> contextFrames_;
     // Ordered list of universe parameters of the current declaration —
     // ordered so we can auto-fill universe arguments at self-reference
     // sites (the user writes `Equality(A, x, x)` inside reflexivity's

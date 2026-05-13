@@ -912,11 +912,16 @@ ExpressionPointer inferTypeWork(const Environment& environment,
             inferType(environment, context, application->function));
         auto* functionAsPi = std::get_if<Pi>(&functionType->node);
         if (!functionAsPi) {
-            throw TypeError("Application: function is not of Pi type");
+            TypeError error("Application: function is not of Pi type");
+            error.actualType = functionType;
+            throw error;
         }
         auto argumentType = inferType(environment, context, application->argument);
         if (!isSubtype(environment, context, argumentType, functionAsPi->domain)) {
-            throw TypeError("Application: argument type does not match Pi domain");
+            TypeError error("Application: argument type does not match Pi domain");
+            error.expectedType = functionAsPi->domain;
+            error.actualType = argumentType;
+            throw error;
         }
         return substitute(functionAsPi->codomain, 0, application->argument);
     }
@@ -930,7 +935,10 @@ ExpressionPointer inferTypeWork(const Environment& environment,
         // Check the value's inferred type matches the declared type.
         auto inferredValueType = inferType(environment, context, let->value);
         if (!isSubtype(environment, context, inferredValueType, let->type)) {
-            throw TypeError("Let: value type does not match declared type");
+            TypeError error("Let: value type does not match declared type");
+            error.expectedType = let->type;
+            error.actualType = inferredValueType;
+            throw error;
         }
         // Substitute the value into the body and infer that.
         return inferType(environment, context,

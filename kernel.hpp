@@ -10,6 +10,15 @@
 
 struct TypeError : std::runtime_error {
     using std::runtime_error::runtime_error;
+
+    // Optional structured info. The kernel populates these for the
+    // type-mismatch case (Application argument vs Pi domain, Let value
+    // vs declared type, etc.) so callers can paraphrase the error
+    // with pretty-printed types rather than the bare message. They
+    // are `nullptr` when the error has no meaningful "expected/actual"
+    // pair (e.g. "internal" errors, name-collision errors).
+    ExpressionPointer expectedType;
+    ExpressionPointer actualType;
 };
 
 struct ContextEntry {
