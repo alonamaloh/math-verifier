@@ -161,17 +161,31 @@ private:
         return declaration;
     }
 
-    // Parses a `{ stmt; stmt; ...; final_expr }` block. Each statement
-    // is either a `let pat := value;` / `let name : type := value;` or a
-    // `claim name : type [by expr];` (a stylistic synonym for `let
-    // name : type := …;` — with `?` as the value when `by` is omitted,
-    // letting the hammer fill it). All statements become nested let-in
-    // (or single-clause cases, for tuple patterns) wrappers around the
-    // trailing expression.
+    // Parses a `{ stmt; stmt; ...; final_expr }` block. Statement
+    // forms supported:
+    //   - `let pat := value;`            (tuple-pattern destructure)
+    //   - `let name : type := value;`    (typed binding)
+    //   - `claim name : type [by expr];` (let synonym; hammer fills if
+    //                                     no `by`)
+    //   - `witness expr with proof;`     (terminal; builds ⟨expr, proof⟩
+    //                                     for ∃-shaped goals)
+    //   - `suffices Q by Reduction;`     (then the rest of the block
+    //                                     proves Q; the block's value
+    //                                     becomes Reduction(rest))
+    // and a trailing expression. The whole block desugars to nested
+    // let-in / single-clause cases wrappers around the final
+    // expression.
     SurfaceExpressionPointer parseBlockBody() {
-        Token openBrace = consumeAny();  // '{'
-        // Collect (line, column, builder) for each let-like statement.
-        // We'll apply them in reverse order around the final expression.
+        consumeAny();  // '{'
+        auto result = parseBlockContents();
+        expect(TokenKind::RightBrace, "ending block body");
+        return result;
+    }
+
+    // Parses the inside of a block (without the surrounding `{ … }`).
+    // Used both by parseBlockBody and recursively by the `suffices`
+    // continuation.
+    SurfaceExpressionPointer parseBlockContents() {
         struct LetWrapper {
             SurfacePatternPointer pattern;     // null if name-with-type form
             std::string name;                  // populated when pattern is null
@@ -231,12 +245,57 @@ private:
                            : "ending let statement in block body");
             wrappers.push_back(std::move(wrapper));
         }
-        SurfaceExpressionPointer finalExpression = parseExpression();
-        // Optional trailing semicolon for the final expression.
-        if (peek().kind == TokenKind::Semicolon) {
-            consumeAny();
+        SurfaceExpressionPointer finalExpression;
+        if (peek().kind == TokenKind::KeywordWitness) {
+            // `witness E with P;` is terminal: this becomes the block's
+            // trailing expression as ⟨E, P⟩, which the anonymous-tuple
+            // elaborator picks the right constructor for (typically
+            // Exists.introduce when the goal is ∃-shaped).
+            Token witnessToken = consumeAny();
+            auto witnessExpression = parseExpression();
+            expect(TokenKind::KeywordWith,
+                   "after witness expression");
+            auto witnessProof = parseExpression();
+            if (peek().kind == TokenKind::Semicolon) {
+                consumeAny();
+            }
+            std::vector<SurfaceExpressionPointer> components;
+            components.push_back(std::move(witnessExpression));
+            components.push_back(std::move(witnessProof));
+            finalExpression = makeSurfaceAnonymousTuple(
+                std::move(components),
+                witnessToken.line, witnessToken.column);
+        } else if (peek().kind == TokenKind::KeywordSuffices) {
+            // `suffices Q by Reduction; <rest>` becomes
+            // `Reduction(<rest as a block>)` — the rest of the
+            // statements prove Q, and Reduction : Q → current_goal
+            // closes the original.
+            Token sufficesToken = consumeAny();
+            auto reducedGoal = parseExpression();
+            expect(TokenKind::KeywordBy,
+                   "after suffices goal");
+            auto reductionLemma = parseExpression();
+            expect(TokenKind::Semicolon,
+                   "ending suffices statement");
+            // The continuation must prove `reducedGoal`; we ascribe so
+            // the elaborator typechecks accordingly.
+            auto continuation = parseBlockContents();
+            auto ascribedContinuation = makeSurfaceAscription(
+                std::move(continuation), reducedGoal,
+                sufficesToken.line, sufficesToken.column);
+            std::vector<SurfaceExpressionPointer> arguments;
+            arguments.push_back(std::move(ascribedContinuation));
+            finalExpression = makeSurfaceApplication(
+                std::move(reductionLemma),
+                std::move(arguments),
+                sufficesToken.line, sufficesToken.column);
+        } else {
+            finalExpression = parseExpression();
+            // Optional trailing semicolon for the final expression.
+            if (peek().kind == TokenKind::Semicolon) {
+                consumeAny();
+            }
         }
-        expect(TokenKind::RightBrace, "ending block body");
         // Apply wrappers in reverse order around the final expression.
         SurfaceExpressionPointer result = std::move(finalExpression);
         for (auto iterator = wrappers.rbegin();
@@ -262,7 +321,6 @@ private:
                     iterator->line, iterator->column);
             }
         }
-        (void)openBrace;
         return result;
     }
 

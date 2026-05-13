@@ -30,6 +30,8 @@ enum class TokenKind {
     KeywordApply, KeywordReduction,
     KeywordMotive, KeywordTarget,
     KeywordClaim,
+    KeywordWitness,
+    KeywordSuffices,
 
     // Punctuation
     LeftParen, RightParen,

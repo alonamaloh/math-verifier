@@ -3878,6 +3878,54 @@ theorem trivial_via_hammer
         "claim with no body invokes the hammer",
         __LINE__);
 
+    // `witness E with P;` in a block: terminal statement that
+    // becomes the trailing `⟨E, P⟩` for an ∃-shaped goal.
+    expectVerifies(R"(
+module Test.witness_statement
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
+  | Exists.introduce : (witnessValue : A) → P(witnessValue) → Exists(A, P)
+
+theorem some_natural_equals_zero
+        : Exists.{0}(Natural, function (n : Natural) =>
+                       Equality.{0}(Natural, n, zero)) := {
+  witness zero with reflexivity.{0}(Natural, zero);
+}
+)",
+        "witness statement builds ⟨E, P⟩",
+        __LINE__);
+
+    // `suffices Q by R; rest` becomes `R(rest)` where `rest` proves Q.
+    expectVerifies(R"(
+module Test.suffices_statement
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+axiom Equality.symmetry.{u}
+  : (A : Type(u)) → (x y : A) → Equality.{u}(A, x, y)
+    → Equality.{u}(A, y, x)
+
+theorem flipped : Equality.{0}(Natural, zero, zero) := {
+  suffices Equality.{0}(Natural, zero, zero)
+        by Equality.symmetry.{0}(Natural, zero, zero);
+  reflexivity.{0}(Natural, zero)
+}
+)",
+        "suffices reduces the goal via a lemma",
+        __LINE__);
+
     // Mixing `claim` and `let` in the same block.
     expectVerifies(R"(
 module Test.claim_and_let
@@ -3979,7 +4027,7 @@ inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
   | reflexivity : Equality(A, x, x)
 
 inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
-  | Exists.introduce : (witness : A) → P(witness) → Exists(A, P)
+  | Exists.introduce : (witnessValue : A) → P(witnessValue) → Exists(A, P)
 
 definition Natural.multiply : Natural → Natural → Natural
   | zero,         _ => zero
@@ -4050,7 +4098,7 @@ inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
   | reflexivity : Equality(A, x, x)
 
 inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
-  | Exists.introduce : (witness : A) → P(witness) → Exists(A, P)
+  | Exists.introduce : (witnessValue : A) → P(witnessValue) → Exists(A, P)
 
 theorem some_natural_equals_zero
         : ∃ (n : Natural). Equality.{0}(Natural, n, zero) :=
