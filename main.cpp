@@ -3944,6 +3944,25 @@ theorem disjunction_swap (A B : Proposition) (h : Or(A, B)) : Or(B, A) := {
         "by_cases statement is sugar for cases",
         __LINE__);
 
+    // `apply Expr;` — terminal block statement; Expr becomes the
+    // trailing value. Just keyword sugar.
+    expectVerifies(R"(
+module Test.apply_statement
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem reflexive_zero : Equality.{0}(Natural, zero, zero) := {
+  apply reflexivity.{0}(Natural, zero);
+}
+)",
+        "apply is a terminal sugar for the trailing expression",
+        __LINE__);
+
     // `contradiction;` — closes the goal from a contradictory pair
     // (H : P, H' : ¬P) in scope, building False.eliminate(goal, H'(H)).
     expectVerifies(R"(

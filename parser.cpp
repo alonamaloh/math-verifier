@@ -276,6 +276,17 @@ private:
                 std::move(reductionLemma),
                 std::move(arguments),
                 sufficesToken.line, sufficesToken.column);
+        } else if (peek().kind == TokenKind::KeywordApply) {
+            // `apply Expr;` — terminal block statement. Reads as "we
+            // apply Lemma, producing this conclusion". The expression
+            // (with any `?` placeholders the hammer fills) becomes the
+            // block's trailing value. No new semantics beyond letting
+            // the user mark the conclusion with the math keyword.
+            consumeAny();  // 'apply'
+            finalExpression = parseExpression();
+            if (peek().kind == TokenKind::Semicolon) {
+                consumeAny();
+            }
         } else if (peek().kind == TokenKind::KeywordContradiction) {
             // `contradiction;` — terminal. The trailing expression is
             // a `?` hammer placeholder; the elaborator's contradiction
