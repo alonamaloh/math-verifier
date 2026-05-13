@@ -1,0 +1,68 @@
+-- Natural/multiply_order.math
+--
+-- Arithmetic facts crossing the multiplication/ordering boundary.
+-- They live below euclid/factorization so both can import them, and
+-- above strong_recursion because `not_less_or_equal_successor_zero`
+-- (used in the contradiction branches) lives there.
+
+module Natural.multiply_order
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.strong_recursion
+
+-- Multiplying two positive naturals is positive. Induction on `a`:
+-- the zero case is impossible (1 ≤ 0 is False); for successor(p)
+-- the product reduces to b + p*b, which is ≥ b ≥ 1 by le_add_right.
+theorem Natural.multiply_at_least_one
+        : (a b : Natural)
+          → 1 ≤ a
+          → 1 ≤ b
+          → 1 ≤ a * b
+  | zero, b, oneLessOrEqualZero, _ =>
+      False.eliminate_proposition(
+          1 ≤ zero * b,
+          Natural.not_less_or_equal_successor_zero(zero, oneLessOrEqualZero))
+  | successor(predecessor), b, _, oneLessOrEqualB =>
+      LessOrEqual.transitive(
+          1, b,
+          b + predecessor * b,
+          Natural.less_or_equal_add_right(b, predecessor * b),
+          oneLessOrEqualB)
+
+-- successor(a) ≤ a + b when 1 ≤ b. Induct on a; both cases use that
+-- add reduces on its first argument (zero + b ≡ b, successor(k) + b ≡
+-- successor(k + b)).
+theorem Natural.successor_less_or_equal_add_at_least_one
+        : (a b : Natural) → 1 ≤ b → successor(a) ≤ a + b
+  | zero, _, bAtLeastOne =>
+      bAtLeastOne
+  | successor(predA), b, bAtLeastOne =>
+      Natural.successor_less_or_equal_successor(
+          successor(predA), predA + b,
+          Natural.successor_less_or_equal_add_at_least_one(
+              predA, b, bAtLeastOne))
+
+-- successor(q) ≤ p * q when 2 ≤ p and 1 ≤ q. With p = successor(predP)
+-- and predP ≥ 1 (from 2 ≤ p), multiply_at_least_one gives predP * q ≥ 1;
+-- then p * q reduces to q + predP * q, and
+-- `successor_less_or_equal_add_at_least_one` finishes.
+theorem Natural.successor_less_or_equal_multiply
+        : (p q : Natural) → 2 ≤ p → 1 ≤ q → successor(q) ≤ p * q
+  | zero, q, twoLessOrEqualZero, _ =>
+      False.eliminate_proposition(
+          successor(q) ≤ zero * q,
+          Natural.not_less_or_equal_successor_zero(1, twoLessOrEqualZero))
+  | successor(predP), q, twoLessOrEqualSuccessorPredP, qAtLeastOne => {
+      claim predPAtLeastOne : 1 ≤ predP
+        by Natural.less_or_equal_successor_successor_descend(
+               1, predP, twoLessOrEqualSuccessorPredP);
+      Natural.successor_less_or_equal_add_at_least_one(
+          q, predP * q,
+          Natural.multiply_at_least_one(
+              predP, q, predPAtLeastOne, qAtLeastOne))
+    }

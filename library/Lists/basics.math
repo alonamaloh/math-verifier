@@ -55,3 +55,53 @@ theorem NaturalList.member_divides_product
       Natural.divides_multiple_left(
         n, head, NaturalList.productOf(rest),
         NaturalList.member_divides_product(n, rest, sub_h))
+
+-- Discriminator: True on `prepend(_, _)`, False on `empty`. Used to
+-- refute membership claims against the empty list — a `member` proof
+-- always lifts to `is_nonempty`, but `is_nonempty(empty) = False`.
+definition NaturalList.is_nonempty : NaturalList → Proposition
+  | NaturalList.empty            => False
+  | NaturalList.prepend(_, _)    => True
+
+-- Any membership proof says its list is nonempty. The two cases each
+-- have a `prepend(...)` index, where `is_nonempty` is True.
+theorem NaturalList.member_implies_nonempty
+        (n : Natural) (list : NaturalList)
+        : NaturalList.member(n, list)
+          → NaturalList.is_nonempty(list)
+  | NaturalList.member.here(_)         => True.trivial
+  | NaturalList.member.there(_, _, _)  => True.trivial
+
+-- No element belongs to the empty list — the standard absurdity proof
+-- for membership in a vacuous list.
+theorem NaturalList.no_member_in_empty (n : Natural)
+        : ¬NaturalList.member(n, NaturalList.empty) :=
+  NaturalList.member_implies_nonempty(n, NaturalList.empty)
+
+-- Head extractor: returns `default` on empty, else the head. The
+-- definitional reduction on `prepend` is what gives prepend-head
+-- injectivity by `congruenceOf`.
+definition NaturalList.head_or (default : Natural) : NaturalList → Natural
+  | NaturalList.empty            => default
+  | NaturalList.prepend(head, _) => head
+
+-- Tail extractor: returns `default` on empty, else the tail.
+definition NaturalList.tail_or (default : NaturalList) : NaturalList → NaturalList
+  | NaturalList.empty            => default
+  | NaturalList.prepend(_, tail) => tail
+
+-- `prepend` is injective in its head.
+theorem NaturalList.prepend_injective_head
+        (head1 head2 : Natural) (tail1 tail2 : NaturalList)
+        (equality : NaturalList.prepend(head1, tail1)
+                  = NaturalList.prepend(head2, tail2))
+        : head1 = head2 :=
+  congruenceOf(NaturalList.head_or(head1), equality)
+
+-- `prepend` is injective in its tail.
+theorem NaturalList.prepend_injective_tail
+        (head1 head2 : Natural) (tail1 tail2 : NaturalList)
+        (equality : NaturalList.prepend(head1, tail1)
+                  = NaturalList.prepend(head2, tail2))
+        : tail1 = tail2 :=
+  congruenceOf(NaturalList.tail_or(tail1), equality)

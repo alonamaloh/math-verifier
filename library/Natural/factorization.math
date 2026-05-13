@@ -1,0 +1,231 @@
+-- Natural/factorization.math
+--
+-- Existence of prime factorization: every n ≥ 1 can be written as a
+-- product of primes (allowing the empty product, which is 1).
+--
+-- Construction is strong induction on n. The base case (n = 1) returns
+-- the empty list — its product is 1. For n ≥ 2, `has_prime_divisor`
+-- supplies a prime p dividing n; the quotient q = n/p satisfies
+-- 1 ≤ q < n, so the induction hypothesis gives a factorization of q;
+-- prepending p produces a factorization of n.
+
+module Natural.factorization
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.divisibility
+import Natural.strong_recursion
+import Natural.multiply_order
+import Natural.prime
+import Natural.prime_divisor
+import Lists.basics
+
+-- ----------------------------------------------------------------------
+-- Helpers (arithmetic + order facts not yet in the upstream modules).
+
+-- Every natural is either zero or ≥ 1. Pattern-match on the natural.
+theorem Natural.is_zero_or_at_least_one
+        : (k : Natural) → k = zero ∨ 1 ≤ k
+  | zero =>
+      Or.introduceLeft(reflexivity(zero))
+  | successor(kPredecessor) =>
+      Or.introduceRight(
+          Natural.successor_less_or_equal_successor(
+              zero, kPredecessor, Natural.zero_least(kPredecessor)))
+
+-- 1 ≤ n splits into n = 1 ∨ 2 ≤ n. Pattern-match on n: zero
+-- contradicts the hypothesis, successor(predN) re-splits via
+-- is_zero_or_at_least_one on predN.
+theorem Natural.equals_one_or_at_least_two
+        : (n : Natural) → 1 ≤ n → n = 1 ∨ 2 ≤ n
+  | zero, oneLessOrEqualZero =>
+      False.eliminate_proposition(
+          zero = 1 ∨ 2 ≤ zero,
+          Natural.not_less_or_equal_successor_zero(
+              zero, oneLessOrEqualZero))
+  | successor(nPredecessor), _ =>
+      Or.eliminate(
+          nPredecessor = zero,
+          1 ≤ nPredecessor,
+          successor(nPredecessor) = 1 ∨ 2 ≤ successor(nPredecessor),
+          function (nPredecessorIsZero : nPredecessor = zero) =>
+              Or.introduceLeft(
+                  congruenceOf(successor, nPredecessorIsZero)),
+          function (nPredecessorAtLeastOne : 1 ≤ nPredecessor) =>
+              Or.introduceRight(
+                  Natural.successor_less_or_equal_successor(
+                      1, nPredecessor, nPredecessorAtLeastOne)),
+          Natural.is_zero_or_at_least_one(nPredecessor))
+
+-- If 1 ≤ n and n = p * q, then 1 ≤ q. By cases on q: q = 0 forces
+-- n = p * 0 = 0, contradicting 1 ≤ n. (p and n live outside the
+-- pattern-match so the inducted-on argument q is in first position.)
+theorem Natural.right_factor_at_least_one
+        (p n : Natural)
+        : (q : Natural) → 1 ≤ n → n = p * q → 1 ≤ q
+  | zero, oneLessOrEqualN, nEqualsPTimesZero =>
+      False.eliminate_proposition(
+          1 ≤ zero,
+          Natural.not_less_or_equal_successor_zero(
+              zero,
+              Equality.transport_proposition(
+                  Natural,
+                  function (x : Natural) => 1 ≤ x,
+                  n, zero,
+                  Equality.transitivity(
+                      nEqualsPTimesZero,
+                      Natural.multiply_zero(p)),
+                  oneLessOrEqualN)))
+  | successor(qPredecessor), _, _ =>
+      Natural.successor_less_or_equal_successor(
+          zero, qPredecessor, Natural.zero_least(qPredecessor))
+
+-- ----------------------------------------------------------------------
+-- "All-prime" lift across `prepend`: if the head is prime and all
+-- elements of `tail` are prime, then all elements of `prepend(head,
+-- tail)` are prime. Pattern-matching on the `member` proof needs the
+-- scrutinee's list-index to be a local variable, so we take `list` as
+-- an outer binder with an equality witness `list = prepend(head, tail)`
+-- and apply prepend-injectivity inside each branch.
+
+theorem NaturalList.all_prime_under_prepend_equality
+        (head : Natural) (tail : NaturalList)
+        (headIsPrime : Natural.is_prime(head))
+        (allPrimeTail : (k : Natural)
+                        → NaturalList.member(k, tail)
+                        → Natural.is_prime(k))
+        (candidate : Natural) (list : NaturalList)
+        : NaturalList.member(candidate, list)
+          → list = NaturalList.prepend(head, tail)
+          → Natural.is_prime(candidate)
+  | NaturalList.member.here(rest), listEquality => {
+      -- From `here`, list = prepend(candidate, rest); combined with
+      -- listEquality, prepend(candidate, rest) = prepend(head, tail),
+      -- so candidate = head and is_prime(candidate) = is_prime(head).
+      claim candidateEqualsHead : candidate = head
+        by NaturalList.prepend_injective_head(
+               candidate, head, rest, tail, listEquality);
+      Equality.transport_proposition(
+          Natural,
+          function (x : Natural) => Natural.is_prime(x),
+          head, candidate,
+          Equality.symmetry(candidateEqualsHead),
+          headIsPrime)
+    }
+  | NaturalList.member.there(headInList, restInList, subMembership),
+    listEquality => {
+      -- From `there`, list = prepend(headInList, restInList); combined
+      -- with listEquality, restInList = tail, so subMembership lifts to
+      -- member(candidate, tail) via Equality.transport.
+      claim restInListEqualsTail : restInList = tail
+        by NaturalList.prepend_injective_tail(
+               headInList, head, restInList, tail, listEquality);
+      allPrimeTail(
+          candidate,
+          Equality.transport_proposition(
+              NaturalList,
+              function (l : NaturalList) =>
+                  NaturalList.member(candidate, l),
+              restInList, tail,
+              restInListEqualsTail,
+              subMembership))
+    }
+
+-- Thin wrapper: the prepend equality is reflexivity at the use site.
+theorem NaturalList.all_prime_prepend
+        (head : Natural) (tail : NaturalList)
+        (headIsPrime : Natural.is_prime(head))
+        (allPrimeTail : (k : Natural)
+                        → NaturalList.member(k, tail)
+                        → Natural.is_prime(k))
+        (candidate : Natural)
+        (membership :
+            NaturalList.member(candidate, NaturalList.prepend(head, tail)))
+        : Natural.is_prime(candidate) :=
+  NaturalList.all_prime_under_prepend_equality(
+      head, tail, headIsPrime, allPrimeTail, candidate,
+      NaturalList.prepend(head, tail), membership,
+      reflexivity(NaturalList.prepend(head, tail)))
+
+-- ----------------------------------------------------------------------
+-- The main theorem.
+
+theorem Natural.prime_factorization_exists
+        (n : Natural) (atLeastOne : 1 ≤ n)
+        : ∃ (list : NaturalList).
+            ((k : Natural)
+             → NaturalList.member(k, list)
+             → Natural.is_prime(k))
+            ∧ NaturalList.productOf(list) = n :=
+  (by_induction on n using Natural.strong_induction
+       with subject, inductionHypothesis {
+     function (subjectAtLeastOne : 1 ≤ subject) => {
+       by_cases on Natural.equals_one_or_at_least_two(
+                       subject, subjectAtLeastOne) {
+         case Or.introduceLeft(subjectEqualsOne):
+             witness NaturalList.empty
+                 with ⟨function (k : Natural)
+                                (memberOfEmpty :
+                                    NaturalList.member(k, NaturalList.empty)) =>
+                         False.eliminate_proposition(
+                             Natural.is_prime(k),
+                             NaturalList.no_member_in_empty(k, memberOfEmpty)),
+                       Equality.symmetry(subjectEqualsOne)⟩;
+         case Or.introduceRight(subjectAtLeastTwo): {
+             obtain ⟨prime, primeIsPrime, primeDividesSubject⟩
+               from Natural.has_prime_divisor(subject, subjectAtLeastTwo);
+             obtain ⟨quotient, subjectEqualsPrimeTimesQuotient⟩
+               from primeDividesSubject;
+             claim primeAtLeastTwo : 2 ≤ prime
+               by And.left(
+                      2 ≤ prime,
+                      (k : Natural) → k ∣ prime → k = 1 ∨ k = prime,
+                      primeIsPrime);
+             claim quotientAtLeastOne : 1 ≤ quotient
+               by Natural.right_factor_at_least_one(
+                      prime, subject, quotient,
+                      subjectAtLeastOne,
+                      subjectEqualsPrimeTimesQuotient);
+             claim quotientBelowSubject : successor(quotient) ≤ subject
+               by Equality.transport_proposition(
+                      Natural,
+                      function (rightEnd : Natural) =>
+                          successor(quotient) ≤ rightEnd,
+                      prime * quotient, subject,
+                      Equality.symmetry(subjectEqualsPrimeTimesQuotient),
+                      Natural.successor_less_or_equal_multiply(
+                          prime, quotient,
+                          primeAtLeastTwo, quotientAtLeastOne));
+             obtain ⟨tail, allPrimeTail, productOfTailEqualsQuotient⟩
+               from inductionHypothesis(quotient, quotientBelowSubject)(
+                        quotientAtLeastOne);
+             witness NaturalList.prepend(prime, tail)
+                 with ⟨function (k : Natural)
+                                (memberProof :
+                                    NaturalList.member(
+                                        k, NaturalList.prepend(prime, tail))) =>
+                         NaturalList.all_prime_prepend(
+                             prime, tail, primeIsPrime, allPrimeTail,
+                             k, memberProof),
+                       Equality.transitivity(
+                           congruenceOf(
+                               function (x : Natural) => prime * x,
+                               productOfTailEqualsQuotient),
+                           Equality.symmetry(
+                               subjectEqualsPrimeTimesQuotient))⟩
+         }
+       }
+     }
+   }
+   : 1 ≤ n
+     → ∃ (list : NaturalList).
+         ((k : Natural)
+          → NaturalList.member(k, list)
+          → Natural.is_prime(k))
+         ∧ NaturalList.productOf(list) = n
+   )(atLeastOne)
