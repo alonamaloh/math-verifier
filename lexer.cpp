@@ -50,6 +50,7 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"obtain",        TokenKind::KeywordObtain},
         {"assume",        TokenKind::KeywordAssume},
         {"from",          TokenKind::KeywordFrom},
+        {"set",           TokenKind::KeywordSet},
     };
     return table;
 }
@@ -317,6 +318,7 @@ bool isKeyword(TokenKind kind) {
         case TokenKind::KeywordObtain:
         case TokenKind::KeywordAssume:
         case TokenKind::KeywordFrom:
+        case TokenKind::KeywordSet:
             return true;
         default:
             return false;
@@ -368,6 +370,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::KeywordObtain:        return "'obtain'";
         case TokenKind::KeywordAssume:        return "'assume'";
         case TokenKind::KeywordFrom:          return "'from'";
+        case TokenKind::KeywordSet:           return "'set'";
         case TokenKind::LeftParen:            return "'('";
         case TokenKind::RightParen:           return "')'";
         case TokenKind::LeftBrace:            return "'{'";

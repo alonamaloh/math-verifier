@@ -4109,6 +4109,59 @@ theorem reflexive_of_assumption
         "assume introduces a hypothesis as a block statement",
         __LINE__);
 
+    // `set n := E;` — surface-level substitution. `n` is interchangeable
+    // with `E` in the rest of the block, including inside types — kernel
+    // never sees `n` at all, only its inlined expansion. Differs from
+    // `let n := E in …`, which introduces a kernel binding whose name
+    // isn't transparent across argument positions.
+    expectVerifies(R"(
+module Test.set_statement
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem set_makes_name_transparent
+        : Equality.{0}(Natural, successor(zero), successor(zero)) := {
+  set n := successor(zero);
+  -- The expected type below mentions `successor(zero)`, while the
+  -- proof produces `Equality(Natural, n, n)`. Surface substitution
+  -- inlines `n` to `successor(zero)` before kernel checking, so the
+  -- types match exactly.
+  reflexivity.{0}(Natural, n)
+}
+)",
+        "set substitutes the name with its definition before kernel check",
+        __LINE__);
+
+    // `set` respects shadowing: a binder rebinding the name keeps that
+    // scope unsubstituted. Here we set `n := zero`, then within a lambda
+    // bound at the same name, `n` refers to the parameter.
+    expectVerifies(R"(
+module Test.set_respects_shadowing
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem shadowing_test (k : Natural)
+        : Equality.{0}(Natural, k, k) := {
+  set n := zero;
+  -- The lambda below shadows `n` with the function parameter, so the
+  -- body's `n` is the parameter (= k), not zero. The result type
+  -- depends on identifying the inner `n` as `k`.
+  (function (n : Natural) => reflexivity.{0}(Natural, n))(k)
+}
+)",
+        "set substitution skips scopes that rebind the name",
+        __LINE__);
+
     // `contradiction;` — closes the goal from a contradictory pair
     // (H : P, H' : ¬P) in scope, building False.eliminate(goal, H'(H)).
     expectVerifies(R"(

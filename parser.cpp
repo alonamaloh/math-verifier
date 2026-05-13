@@ -6,6 +6,209 @@
 
 namespace {
 
+// Returns true if `pattern` binds `targetName` somewhere in its tree.
+// A bare-name pattern binds `targetName` iff that's its name (except
+// for "_", which is a wildcard). Constructor / tuple patterns bind
+// whatever their sub-patterns bind.
+bool patternBindsName(const SurfacePattern& pattern,
+                      const std::string& targetName) {
+    if (auto* bare = std::get_if<SurfacePatternBareName>(&pattern.node)) {
+        // Bare names that are nullary constructors (resolved by the
+        // elaborator) don't bind a variable. We can't distinguish
+        // them here, so be conservative: treat any non-"_" bare name
+        // matching targetName as a binder. This shadows `set` —
+        // unusual in practice, but the safe direction.
+        return bare->name != "_" && bare->name == targetName;
+    }
+    if (auto* constructor =
+            std::get_if<SurfacePatternConstructor>(&pattern.node)) {
+        for (const auto& argument : constructor->arguments) {
+            if (patternBindsName(*argument, targetName)) return true;
+        }
+        return false;
+    }
+    if (auto* tuple = std::get_if<SurfacePatternTuple>(&pattern.node)) {
+        for (const auto& component : tuple->components) {
+            if (patternBindsName(*component, targetName)) return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+// Substitutes free occurrences of identifier `targetName` (with no
+// universe args) in `expression` with `replacement`. Used by `set
+// n := E;` in block bodies — every later reference to `n` becomes
+// the surface expression `E`, then elaborates afresh at each site.
+// Respects shadowing by lambda / Pi / let / cases-pattern /
+// by_induction binders.
+SurfaceExpressionPointer substituteSurfaceName(
+    SurfaceExpressionPointer expression,
+    const std::string& targetName,
+    SurfaceExpressionPointer replacement) {
+    const SurfaceExpression& node = *expression;
+    int line = expression->line;
+    int column = expression->column;
+    if (auto* identifier = std::get_if<SurfaceIdentifier>(&node.node)) {
+        if (identifier->qualifiedName == targetName
+            && identifier->universeArgs.empty()) {
+            return replacement;
+        }
+        return expression;
+    }
+    if (std::get_if<SurfaceNumericLiteral>(&node.node)
+        || std::get_if<SurfaceType>(&node.node)
+        || std::get_if<SurfaceProposition>(&node.node)
+        || std::get_if<SurfaceHammer>(&node.node)) {
+        return expression;
+    }
+    if (auto* application = std::get_if<SurfaceApplication>(&node.node)) {
+        auto newFunction = substituteSurfaceName(
+            application->function, targetName, replacement);
+        std::vector<SurfaceExpressionPointer> newArguments;
+        for (const auto& argument : application->arguments) {
+            newArguments.push_back(substituteSurfaceName(
+                argument, targetName, replacement));
+        }
+        return makeSurfaceApplication(std::move(newFunction),
+                                       std::move(newArguments),
+                                       line, column);
+    }
+    auto substituteBinderType =
+        [&](const SurfaceBinder& binder) -> SurfaceBinder {
+        return {binder.names,
+                substituteSurfaceName(binder.type, targetName, replacement),
+                binder.isImplicit};
+    };
+    auto binderShadows = [&](const SurfaceBinder& binder) {
+        for (const auto& name : binder.names) {
+            if (name == targetName) return true;
+        }
+        return false;
+    };
+    if (auto* piType = std::get_if<SurfacePiType>(&node.node)) {
+        SurfaceBinder newBinder = substituteBinderType(piType->binder);
+        SurfaceExpressionPointer newCodomain =
+            binderShadows(piType->binder)
+                ? piType->codomain
+                : substituteSurfaceName(piType->codomain,
+                                         targetName, replacement);
+        return makeSurfacePiType(std::move(newBinder),
+                                  std::move(newCodomain), line, column);
+    }
+    if (auto* lambda = std::get_if<SurfaceLambda>(&node.node)) {
+        SurfaceBinder newBinder = substituteBinderType(lambda->binder);
+        SurfaceExpressionPointer newBody =
+            binderShadows(lambda->binder)
+                ? lambda->body
+                : substituteSurfaceName(lambda->body,
+                                         targetName, replacement);
+        return makeSurfaceLambda(std::move(newBinder),
+                                  std::move(newBody), line, column);
+    }
+    if (auto* let = std::get_if<SurfaceLet>(&node.node)) {
+        SurfaceExpressionPointer newType = substituteSurfaceName(
+            let->type, targetName, replacement);
+        SurfaceExpressionPointer newValue = substituteSurfaceName(
+            let->value, targetName, replacement);
+        SurfaceExpressionPointer newBody =
+            let->name == targetName
+                ? let->body
+                : substituteSurfaceName(let->body,
+                                         targetName, replacement);
+        return makeSurfaceLet(let->name, std::move(newType),
+                               std::move(newValue), std::move(newBody),
+                               line, column);
+    }
+    if (auto* ascription = std::get_if<SurfaceAscription>(&node.node)) {
+        return makeSurfaceAscription(
+            substituteSurfaceName(ascription->expression,
+                                   targetName, replacement),
+            substituteSurfaceName(ascription->type,
+                                   targetName, replacement),
+            line, column);
+    }
+    if (auto* binary = std::get_if<SurfaceBinaryOperation>(&node.node)) {
+        return makeSurfaceBinaryOperation(
+            binary->opSymbol,
+            substituteSurfaceName(binary->left, targetName, replacement),
+            substituteSurfaceName(binary->right, targetName, replacement),
+            line, column);
+    }
+    if (auto* unary = std::get_if<SurfaceUnaryOperation>(&node.node)) {
+        return makeSurfaceUnaryOperation(
+            unary->opSymbol,
+            substituteSurfaceName(unary->operand, targetName, replacement),
+            line, column);
+    }
+    if (auto* tuple = std::get_if<SurfaceAnonymousTuple>(&node.node)) {
+        std::vector<SurfaceExpressionPointer> newComponents;
+        for (const auto& component : tuple->components) {
+            newComponents.push_back(substituteSurfaceName(
+                component, targetName, replacement));
+        }
+        return makeSurfaceAnonymousTuple(std::move(newComponents),
+                                          line, column);
+    }
+    if (auto* cases = std::get_if<SurfaceCases>(&node.node)) {
+        SurfaceExpressionPointer newScrutinee = substituteSurfaceName(
+            cases->scrutinee, targetName, replacement);
+        std::vector<SurfaceCasesClause> newClauses;
+        for (const auto& clause : cases->clauses) {
+            SurfaceCasesClause newClause;
+            newClause.pattern = clause.pattern;
+            newClause.body =
+                patternBindsName(*clause.pattern, targetName)
+                    ? clause.body
+                    : substituteSurfaceName(clause.body,
+                                             targetName, replacement);
+            newClause.line = clause.line;
+            newClause.column = clause.column;
+            newClauses.push_back(std::move(newClause));
+        }
+        return makeSurfaceCases(std::move(newScrutinee),
+                                 std::move(newClauses), line, column);
+    }
+    if (auto* calc = std::get_if<SurfaceCalc>(&node.node)) {
+        auto newInitial = substituteSurfaceName(
+            calc->initialExpression, targetName, replacement);
+        std::vector<SurfaceCalcStep> newSteps;
+        for (const auto& step : calc->steps) {
+            SurfaceCalcStep newStep;
+            newStep.nextExpression = substituteSurfaceName(
+                step.nextExpression, targetName, replacement);
+            newStep.stepProof = substituteSurfaceName(
+                step.stepProof, targetName, replacement);
+            newStep.line = step.line;
+            newStep.column = step.column;
+            newSteps.push_back(std::move(newStep));
+        }
+        return makeSurfaceCalc(std::move(newInitial), std::move(newSteps),
+                                line, column);
+    }
+    if (auto* induction =
+            std::get_if<SurfaceByInductionUsing>(&node.node)) {
+        auto newScrutinee = substituteSurfaceName(
+            induction->scrutinee, targetName, replacement);
+        auto newLemma = substituteSurfaceName(
+            induction->inductionLemma, targetName, replacement);
+        bool shadows = induction->subjectName == targetName
+                    || induction->ihName == targetName;
+        auto newBody = shadows
+            ? induction->body
+            : substituteSurfaceName(induction->body,
+                                     targetName, replacement);
+        return makeSurfaceByInductionUsing(
+            std::move(newScrutinee), std::move(newLemma),
+            induction->subjectName, induction->ihName,
+            std::move(newBody), line, column);
+    }
+    // Unhandled node kind: be conservative and return unchanged. If we
+    // ever add a new SurfaceExpression variant, the `set` substitution
+    // will silently skip it — surfaced by the test suite if it bites.
+    return expression;
+}
+
 // Recursive-descent parser. One method per precedence level for the
 // expression grammar. Lookahead is bounded by one token in most places;
 // Pi binders use a bounded backtracking scheme (tryParseExplicitBinder
@@ -195,12 +398,12 @@ private:
         // and obtain produce a `cases` clause, plain let / claim a
         // `SurfaceLet`, and assume a `SurfaceLambda`.
         struct BlockWrapper {
-            enum Kind { TypedLet, PatternLet, Assume };
+            enum Kind { TypedLet, PatternLet, Assume, Set };
             Kind kind = TypedLet;
             SurfacePatternPointer pattern;     // PatternLet
-            std::string name;                  // TypedLet, Assume
+            std::string name;                  // TypedLet, Assume, Set
             SurfaceExpressionPointer type;     // TypedLet, Assume
-            SurfaceExpressionPointer value;    // TypedLet, PatternLet
+            SurfaceExpressionPointer value;    // TypedLet, PatternLet, Set
             int line = 0;
             int column = 0;
         };
@@ -208,7 +411,8 @@ private:
         while (peek().kind == TokenKind::KeywordLet
                || peek().kind == TokenKind::KeywordClaim
                || peek().kind == TokenKind::KeywordObtain
-               || peek().kind == TokenKind::KeywordAssume) {
+               || peek().kind == TokenKind::KeywordAssume
+               || peek().kind == TokenKind::KeywordSet) {
             Token statementToken = consumeAny();
             bool isClaim =
                 statementToken.kind == TokenKind::KeywordClaim;
@@ -216,10 +420,22 @@ private:
                 statementToken.kind == TokenKind::KeywordObtain;
             bool isAssume =
                 statementToken.kind == TokenKind::KeywordAssume;
+            bool isSet =
+                statementToken.kind == TokenKind::KeywordSet;
             BlockWrapper wrapper;
             wrapper.line = statementToken.line;
             wrapper.column = statementToken.column;
-            if (isAssume) {
+            if (isSet) {
+                if (peek().kind != TokenKind::Identifier) {
+                    throwHere("expected identifier after 'set'");
+                }
+                Token nameToken = consumeAny();
+                wrapper.kind = BlockWrapper::Set;
+                wrapper.name = nameToken.lexeme;
+                expect(TokenKind::Assign,
+                       "after set name (set n := E;)");
+                wrapper.value = parseExpression();
+            } else if (isAssume) {
                 if (peek().kind != TokenKind::Identifier) {
                     throwHere("expected identifier after 'assume'");
                 }
@@ -284,6 +500,7 @@ private:
                 isClaim  ? "ending claim statement"
               : isObtain ? "ending obtain statement"
               : isAssume ? "ending assume statement"
+              : isSet    ? "ending set statement"
                          : "ending let statement in block body";
             expect(TokenKind::Semicolon, terminator);
             wrappers.push_back(std::move(wrapper));
@@ -378,6 +595,18 @@ private:
                         iterator->line, iterator->column);
                     break;
                 }
+                case BlockWrapper::Set:
+                    // Eager surface substitution: every reference to
+                    // `name` in the rest of the block becomes a fresh
+                    // copy of `value`, which then elaborates afresh at
+                    // each site. This makes `n` and its definition
+                    // definitionally interchangeable, sidestepping the
+                    // kernel's lack of contextual zeta-reduction.
+                    result = substituteSurfaceName(
+                        std::move(result),
+                        iterator->name,
+                        std::move(iterator->value));
+                    break;
             }
         }
         return result;

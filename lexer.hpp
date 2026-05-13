@@ -38,6 +38,7 @@ enum class TokenKind {
     KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
     KeywordAssume,          // `assume h : P;` — introduce hypothesis as a step
     KeywordFrom,            // separator for `obtain ⟨…⟩ from E;`
+    KeywordSet,             // `set n := E;` — transparent local definition
 
     // Punctuation
     LeftParen, RightParen,
