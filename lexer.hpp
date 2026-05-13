@@ -35,6 +35,9 @@ enum class TokenKind {
     KeywordByCases,         // `by_cases` — math-style case-split
     KeywordByInduction,     // `by_induction` — case-split with IH
     KeywordContradiction,   // `contradiction` — close goal from P / ¬P
+    KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
+    KeywordAssume,          // `assume h : P;` — introduce hypothesis as a step
+    KeywordFrom,            // separator for `obtain ⟨…⟩ from E;`
 
     // Punctuation
     LeftParen, RightParen,

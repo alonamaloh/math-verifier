@@ -4058,6 +4058,57 @@ theorem reflexive_zero : Equality.{0}(Natural, zero, zero) := {
         "apply is a terminal sugar for the trailing expression",
         __LINE__);
 
+    // `obtain ⟨pat⟩ from E;` — statement-level let-pattern. The rest of
+    // the block sees the destructured names.
+    expectVerifies(R"(
+module Test.obtain_statement
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
+  | Exists.introduce : (witnessValue : A) → P(witnessValue) → Exists(A, P)
+
+axiom magicExists
+  : Exists.{0}(Natural, function (n : Natural) =>
+                          Equality.{0}(Natural, n, zero))
+
+theorem obtain_use
+        : Exists.{0}(Natural, function (n : Natural) =>
+                                Equality.{0}(Natural, n, zero)) := {
+  obtain ⟨w, wEqualsZero⟩ from magicExists;
+  Exists.introduce(w, wEqualsZero)
+}
+)",
+        "obtain destructures an existential into block-scoped names",
+        __LINE__);
+
+    // `assume h : P;` — statement form for `function (h : P) =>`. Used
+    // to introduce a hypothesis as a step in a block (e.g. for negation
+    // proofs and proofs of implications).
+    expectVerifies(R"(
+module Test.assume_statement
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+theorem reflexive_of_assumption
+        : Equality.{0}(Natural, zero, zero) → Equality.{0}(Natural, zero, zero) := {
+  assume h : Equality.{0}(Natural, zero, zero);
+  h
+}
+)",
+        "assume introduces a hypothesis as a block statement",
+        __LINE__);
+
     // `contradiction;` — closes the goal from a contradictory pair
     // (H : P, H' : ¬P) in scope, building False.eliminate(goal, H'(H)).
     expectVerifies(R"(

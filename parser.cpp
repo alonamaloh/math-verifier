@@ -186,30 +186,64 @@ private:
     // Used both by parseBlockBody and recursively by the `suffices`
     // continuation.
     SurfaceExpressionPointer parseBlockContents() {
-        struct LetWrapper {
-            SurfacePatternPointer pattern;     // null if name-with-type form
-            std::string name;                  // populated when pattern is null
-            SurfaceExpressionPointer type;     // populated for name-with-type form
-            SurfaceExpressionPointer value;
+        // A leading block statement always wraps the block's tail. Three
+        // forms share the same fold:
+        //   `let n : T := V;` / `claim n : T [by V | { proof } | ];`
+        //   `let ⟨pat⟩ := V;` / `obtain ⟨pat⟩ from V;`  (destructure)
+        //   `assume h : T;`                              (introduce hypothesis)
+        // Folded back-to-front around the final expression: pattern-let
+        // and obtain produce a `cases` clause, plain let / claim a
+        // `SurfaceLet`, and assume a `SurfaceLambda`.
+        struct BlockWrapper {
+            enum Kind { TypedLet, PatternLet, Assume };
+            Kind kind = TypedLet;
+            SurfacePatternPointer pattern;     // PatternLet
+            std::string name;                  // TypedLet, Assume
+            SurfaceExpressionPointer type;     // TypedLet, Assume
+            SurfaceExpressionPointer value;    // TypedLet, PatternLet
             int line = 0;
             int column = 0;
         };
-        std::vector<LetWrapper> wrappers;
+        std::vector<BlockWrapper> wrappers;
         while (peek().kind == TokenKind::KeywordLet
-               || peek().kind == TokenKind::KeywordClaim) {
+               || peek().kind == TokenKind::KeywordClaim
+               || peek().kind == TokenKind::KeywordObtain
+               || peek().kind == TokenKind::KeywordAssume) {
             Token statementToken = consumeAny();
             bool isClaim =
                 statementToken.kind == TokenKind::KeywordClaim;
-            LetWrapper wrapper;
+            bool isObtain =
+                statementToken.kind == TokenKind::KeywordObtain;
+            bool isAssume =
+                statementToken.kind == TokenKind::KeywordAssume;
+            BlockWrapper wrapper;
             wrapper.line = statementToken.line;
             wrapper.column = statementToken.column;
-            if (!isClaim && peek().kind == TokenKind::LeftAngle) {
+            if (isAssume) {
+                if (peek().kind != TokenKind::Identifier) {
+                    throwHere("expected identifier after 'assume'");
+                }
+                Token nameToken = consumeAny();
+                wrapper.kind = BlockWrapper::Assume;
+                wrapper.name = nameToken.lexeme;
+                expect(TokenKind::Colon,
+                       "after assume name (assume h : P;)");
+                wrapper.type = parseExpression();
+            } else if (isObtain) {
+                wrapper.kind = BlockWrapper::PatternLet;
+                wrapper.pattern = parsePattern();
+                expect(TokenKind::KeywordFrom,
+                       "after obtain-pattern (obtain ⟨…⟩ from E;)");
+                wrapper.value = parseExpression();
+            } else if (!isClaim && peek().kind == TokenKind::LeftAngle) {
+                wrapper.kind = BlockWrapper::PatternLet;
                 wrapper.pattern = parsePattern();
                 expect(TokenKind::Assign,
                        "after let-pattern in block body");
                 wrapper.value = parseExpression();
             } else if (peek().kind == TokenKind::Identifier) {
                 Token nameToken = consumeAny();
+                wrapper.kind = BlockWrapper::TypedLet;
                 wrapper.name = nameToken.lexeme;
                 if (peek().kind != TokenKind::Colon) {
                     throwHere(isClaim
@@ -246,9 +280,12 @@ private:
                     ? "expected identifier after 'claim'"
                     : "expected identifier or '⟨' after 'let'");
             }
-            expect(TokenKind::Semicolon,
-                   isClaim ? "ending claim statement"
-                           : "ending let statement in block body");
+            const char* terminator =
+                isClaim  ? "ending claim statement"
+              : isObtain ? "ending obtain statement"
+              : isAssume ? "ending assume statement"
+                         : "ending let statement in block body";
+            expect(TokenKind::Semicolon, terminator);
             wrappers.push_back(std::move(wrapper));
         }
         SurfaceExpressionPointer finalExpression;
@@ -307,25 +344,40 @@ private:
         SurfaceExpressionPointer result = std::move(finalExpression);
         for (auto iterator = wrappers.rbegin();
              iterator != wrappers.rend(); ++iterator) {
-            if (iterator->pattern) {
-                SurfaceCasesClause clause;
-                clause.pattern = std::move(iterator->pattern);
-                clause.body = std::move(result);
-                clause.line = iterator->line;
-                clause.column = iterator->column;
-                std::vector<SurfaceCasesClause> clauses;
-                clauses.push_back(std::move(clause));
-                result = makeSurfaceCases(
-                    std::move(iterator->value),
-                    std::move(clauses),
-                    iterator->line, iterator->column);
-            } else {
-                result = makeSurfaceLet(
-                    std::move(iterator->name),
-                    std::move(iterator->type),
-                    std::move(iterator->value),
-                    std::move(result),
-                    iterator->line, iterator->column);
+            switch (iterator->kind) {
+                case BlockWrapper::PatternLet: {
+                    SurfaceCasesClause clause;
+                    clause.pattern = std::move(iterator->pattern);
+                    clause.body = std::move(result);
+                    clause.line = iterator->line;
+                    clause.column = iterator->column;
+                    std::vector<SurfaceCasesClause> clauses;
+                    clauses.push_back(std::move(clause));
+                    result = makeSurfaceCases(
+                        std::move(iterator->value),
+                        std::move(clauses),
+                        iterator->line, iterator->column);
+                    break;
+                }
+                case BlockWrapper::TypedLet:
+                    result = makeSurfaceLet(
+                        std::move(iterator->name),
+                        std::move(iterator->type),
+                        std::move(iterator->value),
+                        std::move(result),
+                        iterator->line, iterator->column);
+                    break;
+                case BlockWrapper::Assume: {
+                    SurfaceBinder binder;
+                    binder.names.push_back(std::move(iterator->name));
+                    binder.type = std::move(iterator->type);
+                    binder.isImplicit = false;
+                    result = makeSurfaceLambda(
+                        std::move(binder),
+                        std::move(result),
+                        iterator->line, iterator->column);
+                    break;
+                }
             }
         }
         return result;
