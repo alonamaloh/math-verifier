@@ -291,3 +291,50 @@ eliminator-chain version). The remaining bulk is the explicit motive
 lambda passed to `Natural.strong_induction` and its step's IH-type
 spell-out — both of which would require motive inference (a form of
 higher-order pattern unification) to eliminate.
+
+### Phase 2.5 — Miller-pattern higher-order unification
+
+The unifier now handles the canonical Miller-pattern case: when the
+pattern is `App(FreeVar(metavar), Bound(k))` with `k` referring to a
+binder the unifier has descended into, it solves the metavariable by
+abstracting the target over that bound variable. This unlocks
+predicate inference for implicit binders like `{P : T → Proposition}`:
+
+  theorem nat_ind {P : Natural → Proposition}
+          (zero_case : P(zero))
+          (step : (k : Natural) → P(k) → P(successor(k)))
+          (n : Natural) : P(n) := …
+
+  -- caller omits P; it is inferred from step's type
+  theorem n_equals_n (n : Natural) : Equality(Natural, n, n) :=
+    nat_ind(
+      reflexivity(zero),
+      fun (k : Natural) (ih : Equality(Natural, k, k)) =>
+        congruenceOf(successor, ih),
+      n)
+
+Restriction (Phase 2.5): only the unary case is implemented
+(metavariable applied to one bound variable). Multi-argument
+abstractions and motive inference for theorems whose body needs
+expected-type propagation through a Lambda with a metavar-headed
+return type remain unsupported.
+
+### Phase 2.6 — Indexed-inductive support in `cases`
+
+`cases` now works on indexed inductives like `LessOrEqual(s, b)` and
+`Equality(A, x, y)`. The motive is constructed by wrapping the body
+in one Lambda per index (in scrutinee order, outermost first), and
+the recursor is applied to the index values in the same order before
+the scrutinee.
+
+Restriction (matches the pattern-match-definition rule): each index
+value in the scrutinee's type must be a distinct local-binder
+BoundVariable.
+
+  theorem LessOrEqual.invert (s b : Natural) (h : LessOrEqual(s, b))
+        : Or(s = b, ∃ p. b = succ(p) ∧ s ≤ p) :=
+    cases h {
+      | LessOrEqual.reflexivity(n) => Or.introduceLeft(reflexivity(n))
+      | LessOrEqual.step(small, large, sub) =>
+          Or.introduceRight(Exists.introduce(large, …))
+    }
