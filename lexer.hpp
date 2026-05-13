@@ -35,6 +35,7 @@ enum class TokenKind {
     LeftBrace, RightBrace,
     LeftAngle, RightAngle,    // "⟨" / "⟩" — anonymous tuples
     Comma, Colon, Semicolon, Pipe,
+    Question,                 // "?" — hammer placeholder (Phase 3)
     Dot,
     DotLeftBrace,    // ".{"  introduces universe-argument list
     Assign,          // ":="

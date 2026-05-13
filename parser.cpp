@@ -720,6 +720,11 @@ private:
             // case clauses or anywhere an expression is expected.
             return parseBlockBody();
         }
+        if (current.kind == TokenKind::Question) {
+            Token questionToken = consumeAny();
+            return makeSurfaceHammer(questionToken.line,
+                                      questionToken.column);
+        }
         if (current.kind == TokenKind::KeywordType) {
             Token token = consumeAny();
             if (peek().kind == TokenKind::LeftParen) {

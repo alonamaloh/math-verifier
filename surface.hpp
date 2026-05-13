@@ -163,13 +163,19 @@ struct SurfaceCases {
     std::vector<SurfaceCasesClause> clauses;
 };
 
+// `?` — placeholder for a proof the elaborator should fill in. Phase 3
+// tries simple hammer steps: hypothesis match against local binders
+// and reflexivity-match for `Equality(A, x, x)` goals. Requires an
+// expected type from context.
+struct SurfaceHammer { };
+
 struct SurfaceExpression {
     std::variant<
         SurfaceIdentifier, SurfaceNumericLiteral,
         SurfaceApplication, SurfacePiType, SurfaceLambda,
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation,
-        SurfaceAnonymousTuple, SurfaceCases
+        SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer
     > node;
     int line = 0;
     int column = 0;
@@ -255,6 +261,10 @@ inline SurfaceExpressionPointer makeSurfaceAnonymousTuple(
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceAnonymousTuple{std::move(components)}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceHammer(int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceHammer{}, line, column});
 }
 // Forward-declared above; full SurfaceCasesClause type lives later in
 // this header (it depends on SurfacePattern). The builder is defined

@@ -165,6 +165,7 @@ private:
             case ',':  advanceOne(); return {TokenKind::Comma,       ",", startLine, startColumn};
             case ':':  advanceOne(); return {TokenKind::Colon,       ":", startLine, startColumn};
             case ';':  advanceOne(); return {TokenKind::Semicolon,   ";", startLine, startColumn};
+            case '?':  advanceOne(); return {TokenKind::Question,    "?", startLine, startColumn};
             case '|':  advanceOne(); return {TokenKind::Pipe,        "|", startLine, startColumn};
             case '.':  advanceOne(); return {TokenKind::Dot,         ".", startLine, startColumn};
             case '+':  advanceOne(); return {TokenKind::Plus,        "+", startLine, startColumn};
@@ -344,6 +345,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::Comma:                return "','";
         case TokenKind::Colon:                return "':'";
         case TokenKind::Semicolon:            return "';'";
+        case TokenKind::Question:             return "'?'";
         case TokenKind::Pipe:                 return "'|'";
         case TokenKind::Dot:                  return "'.'";
         case TokenKind::DotLeftBrace:         return "'.{'";

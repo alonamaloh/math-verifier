@@ -1717,7 +1717,97 @@ private:
             return elaborateCasesExpression(*cases, localBinders, expectedType,
                                              expression.line, expression.column);
         }
+        if (std::get_if<SurfaceHammer>(&expression.node)) {
+            return elaborateHammerPlaceholder(localBinders, expectedType,
+                                                expression.line,
+                                                expression.column);
+        }
         throw ElaborateError("unhandled surface expression variant");
+    }
+
+    // Phase 3.0 hammer: a `?` placeholder asks the elaborator to fill
+    // in a proof of the expected type. Current heuristics, tried in
+    // order:
+    //   1. Hypothesis match: scan local binders for one whose type is
+    //      definitionally equal to the expected type; return that
+    //      binder. Handles "I have a proof in scope; just use it".
+    //   2. Reflexivity match: if the expected type is `Equality(A, x,
+    //      x)` (the two endpoints are definitionally equal), return
+    //      `reflexivity(x)`.
+    // If neither succeeds we throw with a diagnostic listing the
+    // expected type and the in-scope candidates.
+    ExpressionPointer elaborateHammerPlaceholder(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        (void)column;
+        if (!expectedType) {
+            throw ElaborateError(
+                "hammer placeholder '?' needs an expected type from "
+                "context (line " + std::to_string(line) + ")");
+        }
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            expectedType, localBinders, localBinders.size());
+        ExpressionPointer goalNormalised =
+            weakHeadNormalForm(environment_, goalOpened);
+        Context openedContext;
+        for (size_t i = 0; i < localBinders.size(); ++i) {
+            ExpressionPointer openedType = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            openedContext.push_back({localBinders[i].name, openedType,
+                                       FreeVariableOrigin::Internal});
+        }
+        // Hypothesis match.
+        for (int i = static_cast<int>(localBinders.size()) - 1;
+             i >= 0; --i) {
+            ExpressionPointer candidateType = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            if (isDefinitionallyEqual(environment_, openedContext,
+                                        candidateType, goalNormalised)) {
+                int deBruijnIndex =
+                    static_cast<int>(localBinders.size()) - 1 - i;
+                return makeBoundVariable(deBruijnIndex);
+            }
+        }
+        // Reflexivity match: expected `Equality(A, x, x)` with the two
+        // endpoints definitionally equal.
+        {
+            ExpressionPointer cursor = goalNormalised;
+            std::vector<ExpressionPointer> applicationArguments;
+            while (auto* application =
+                       std::get_if<Application>(&cursor->node)) {
+                applicationArguments.insert(
+                    applicationArguments.begin(),
+                    application->argument);
+                cursor = application->function;
+            }
+            if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+                if (constant->name == "Equality"
+                    && applicationArguments.size() == 3) {
+                    if (isDefinitionallyEqual(
+                            environment_, openedContext,
+                            applicationArguments[1],
+                            applicationArguments[2])) {
+                        ExpressionPointer reflexivity = makeConstant(
+                            "reflexivity",
+                            constant->universeArguments);
+                        ExpressionPointer applied = makeApplication(
+                            reflexivity, applicationArguments[0]);
+                        applied = makeApplication(
+                            applied, applicationArguments[1]);
+                        ExpressionPointer closed = closeOverLocalBinders(
+                            applied, localBinders,
+                            localBinders.size());
+                        return closed;
+                    }
+                }
+            }
+        }
+        std::string message =
+            "hammer placeholder '?' at line " + std::to_string(line)
+            + " could not find a proof; tried hypothesis-match and "
+              "reflexivity-match";
+        throw ElaborateError(message);
     }
 
     // `⟨a, b, ..., n⟩` at expected type `I(...)`: desugars to a call of
