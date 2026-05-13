@@ -92,39 +92,34 @@ theorem Natural.infinitely_many_primes
                       → Natural.is_prime(p))
         : ∃ (q : Natural).
             Natural.is_prime(q) ∧ ¬NaturalList.member(q, primes) :=
-  let ⟨q, qIsPrime, quotientDividesLargeNumber⟩
+  let ⟨q, qIsPrime, qDividesSuccessor⟩
       := Natural.has_prime_divisor(
-          successor(NaturalList.productOf(primes)),
-          Natural.successor_less_or_equal_successor(
-              1, NaturalList.productOf(primes),
-              NaturalList.productOf_at_least_one(primes, allPrime)))
+             successor(NaturalList.productOf(primes)),
+             Natural.successor_less_or_equal_successor(
+                 1, NaturalList.productOf(primes),
+                 NaturalList.productOf_at_least_one(primes, allPrime)))
   in
   ⟨q, qIsPrime,
     function (qInPrimes : NaturalList.member(q, primes)) =>
-      Or.eliminate(
-          1 = zero,
-          q ≤ 1,
-          False,
-          function (oneEqualsZero : 1 = zero) =>
-              Natural.successor_not_zero(zero, oneEqualsZero),
-          function (quotientLessOrEqualOne : q ≤ 1) =>
-              Natural.not_less_or_equal_successor_zero(
-                  zero,
-                  Natural.less_or_equal_successor_successor_descend(
-                      1, zero,
-                      LessOrEqual.transitive(
-                          2, q, 1,
-                          quotientLessOrEqualOne,
-                          And.left(
-                              2 ≤ q,
-                              (k : Natural)
-                                → k ∣ q
-                                → k = 1 ∨ k = q,
-                              qIsPrime)))),
-          Natural.divides_less_or_equal_or_zero(
-              q, 1,
-              Natural.divides_consecutive_implies_one(
-                  q, NaturalList.productOf(primes),
-                  NaturalList.member_divides_product(
-                      q, primes, qInPrimes),
-                  quotientDividesLargeNumber)))⟩
+      cases Natural.divides_less_or_equal_or_zero(
+                q, 1,
+                Natural.divides_consecutive_implies_one(
+                    q, NaturalList.productOf(primes),
+                    NaturalList.member_divides_product(
+                        q, primes, qInPrimes),
+                    qDividesSuccessor)) {
+        | Or.introduceLeft(oneEqualsZero) =>
+            Natural.successor_not_zero(zero, oneEqualsZero)
+        | Or.introduceRight(qLessOrEqualOne) =>
+            Natural.not_less_or_equal_successor_zero(
+                zero,
+                Natural.less_or_equal_successor_successor_descend(
+                    1, zero,
+                    LessOrEqual.transitive(
+                        2, q, 1, qLessOrEqualOne,
+                        And.left(
+                            2 ≤ q,
+                            ∀ (k : Natural).
+                              k ∣ q → k = 1 ∨ k = q,
+                            qIsPrime))))
+      }⟩
