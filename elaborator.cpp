@@ -58,33 +58,38 @@ private:
         Frame& operator=(const Frame&) = delete;
     };
 
-    // Recursively beta-normalises an expression for display. Walks
-    // Pi/Lambda/Application bodies applying weakHeadNormalForm at each
-    // level so that the printed form has no remaining
-    // `(λ. body)(arg)` redexes — these crop up in error messages when
-    // we show the recursor's expected case-lambda type (the motive
-    // application hasn't been beta-reduced yet at error time).
+    // Recursively reduces beta-redexes in an expression for display.
+    // Unlike `weakHeadNormalForm`, this does NOT unfold Definition
+    // applications — those produce huge expanded forms in errors
+    // ("Natural.multiply 3 4" stays as written rather than expanding
+    // into the Natural_recursor chain). We only reduce
+    // `App(Lambda(x, T, body), arg)` patterns at any depth.
     ExpressionPointer betaNormalizeForDisplay(
         ExpressionPointer expression) const {
-        ExpressionPointer current = weakHeadNormalForm(
-            environment_, expression);
-        if (auto* pi = std::get_if<Pi>(&current->node)) {
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
             return makePi(pi->displayHint,
                 betaNormalizeForDisplay(pi->domain),
                 betaNormalizeForDisplay(pi->codomain));
         }
-        if (auto* lambda = std::get_if<Lambda>(&current->node)) {
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
             return makeLambda(lambda->displayHint,
                 betaNormalizeForDisplay(lambda->domain),
                 betaNormalizeForDisplay(lambda->body));
         }
         if (auto* application =
-                std::get_if<Application>(&current->node)) {
-            return makeApplication(
-                betaNormalizeForDisplay(application->function),
-                betaNormalizeForDisplay(application->argument));
+                std::get_if<Application>(&expression->node)) {
+            ExpressionPointer fn = betaNormalizeForDisplay(
+                application->function);
+            ExpressionPointer arg = betaNormalizeForDisplay(
+                application->argument);
+            if (auto* lambda = std::get_if<Lambda>(&fn->node)) {
+                ExpressionPointer reduced = substitute(
+                    lambda->body, 0, arg);
+                return betaNormalizeForDisplay(reduced);
+            }
+            return makeApplication(fn, arg);
         }
-        return current;
+        return expression;
     }
 
     std::string prettyPrintForDisplay(
@@ -116,12 +121,14 @@ private:
         // Open with User-origin so the printer doesn't mark the
         // resulting FreeVariables with `@` (which is reserved for
         // signalling that an Internal-origin variable leaked).
+        // Beta-normalise too so the printed form has no left-over
+        // redexes (motive applications, etc.).
         ExpressionPointer opened = expression;
         for (size_t i = count; i > 0; --i) {
             opened = openBinder(opened, localBinders[i - 1].name,
                                  FreeVariableOrigin::User);
         }
-        return prettyPrint(opened);
+        return prettyPrint(betaNormalizeForDisplay(opened));
     }
     std::string prettyPrintInLocalScope(
         ExpressionPointer expression,
@@ -2813,16 +2820,68 @@ private:
         }
 
         CallInferenceResult result;
+        std::vector<std::string> unassigned;
+        std::vector<std::pair<std::string, ExpressionPointer>> assigned;
         for (const auto& name : leadingFreshNames) {
             auto iterator = assignment.find(name);
             if (iterator == assignment.end()) {
-                throw ElaborateError(
-                    "cannot infer leading argument for '"
-                    + diagnosticName
-                    + "' at line " + std::to_string(line)
-                    + "; supply it explicitly");
+                unassigned.push_back(name);
+            } else {
+                assigned.push_back({name, iterator->second});
+                result.leadingValues.push_back(iterator->second);
             }
-            result.leadingValues.push_back(iterator->second);
+        }
+        if (!unassigned.empty()) {
+            std::string message =
+                "could not infer all leading arguments of '"
+                + diagnosticName + "':";
+            for (const auto& name : unassigned) {
+                // Names are like `_callLeadingArgument_2_Foo`; the
+                // index after the prefix tells the user which
+                // declaration parameter the elaborator gave up on.
+                message += "\n    position ";
+                size_t firstUnderscore = name.find('_', 1);
+                size_t secondUnderscore = name.find(
+                    '_', firstUnderscore + 1);
+                if (firstUnderscore != std::string::npos
+                    && secondUnderscore != std::string::npos) {
+                    message += name.substr(
+                        firstUnderscore + 1,
+                        secondUnderscore - firstUnderscore - 1);
+                } else {
+                    message += "(?)";
+                }
+                message += " is unassigned";
+            }
+            if (!assigned.empty()) {
+                message += "\n  inferred so far:";
+                for (const auto& pair : assigned) {
+                    message += "\n    ";
+                    size_t firstUnderscore = pair.first.find('_', 1);
+                    size_t secondUnderscore = pair.first.find(
+                        '_', firstUnderscore + 1);
+                    if (firstUnderscore != std::string::npos
+                        && secondUnderscore != std::string::npos) {
+                        message += "position ";
+                        message += pair.first.substr(
+                            firstUnderscore + 1,
+                            secondUnderscore - firstUnderscore - 1);
+                    } else {
+                        message += pair.first;
+                    }
+                    message += " = ";
+                    message += prettyPrintInLocalScope(
+                        pair.second, localBinders);
+                }
+            }
+            if (expectedType) {
+                message += "\n  expected return type: ";
+                message += prettyPrintInLocalScope(
+                    expectedType, localBinders);
+            }
+            message += "\n  Provide the missing argument(s) explicitly "
+                       "to disambiguate.";
+            throwElaborate(message);
         }
         result.trailingValues = std::move(elaboratedTrailingArguments);
         return result;
