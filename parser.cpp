@@ -149,10 +149,97 @@ private:
             while (peek().kind == TokenKind::Pipe) {
                 declaration.cases.push_back(parsePatternCase());
             }
+        } else if (peek().kind == TokenKind::LeftBrace) {
+            // Block body form: `theorem foo : T { let pat := v; ...; final_expr }`.
+            // Statements are semicolon-terminated; the trailing non-let
+            // expression is the block's value. Desugars at parse time to
+            // a nested let-in chain.
+            declaration.body = parseBlockBody();
         } else {
-            throwHere("expected ':=' or '|' after declaration type");
+            throwHere("expected ':=', '|', or '{' after declaration type");
         }
         return declaration;
+    }
+
+    // Parses a `{ let pat := v; ...; final_expr }` block. Each `let pat
+    // := value;` statement becomes a nested let-in around the trailing
+    // expression. Tuple-patterned lets desugar to single-clause cases
+    // (same as `let ⟨...⟩ := v in body` in expression position).
+    SurfaceExpressionPointer parseBlockBody() {
+        Token openBrace = consumeAny();  // '{'
+        // Collect (line, column, builder) for each let statement.
+        // We'll apply them in reverse order around the final expression.
+        struct LetWrapper {
+            SurfacePatternPointer pattern;     // null if name-with-type form
+            std::string name;                  // populated when pattern is null
+            SurfaceExpressionPointer type;     // populated for name-with-type form
+            SurfaceExpressionPointer value;
+            int line = 0;
+            int column = 0;
+        };
+        std::vector<LetWrapper> wrappers;
+        while (peek().kind == TokenKind::KeywordLet) {
+            Token letToken = consumeAny();
+            LetWrapper wrapper;
+            wrapper.line = letToken.line;
+            wrapper.column = letToken.column;
+            if (peek().kind == TokenKind::LeftAngle) {
+                wrapper.pattern = parsePattern();
+                expect(TokenKind::Assign,
+                       "after let-pattern in block body");
+                wrapper.value = parseExpression();
+            } else if (peek().kind == TokenKind::Identifier) {
+                Token nameToken = consumeAny();
+                wrapper.name = nameToken.lexeme;
+                if (peek().kind != TokenKind::Colon) {
+                    throwHere("typed let in block body requires ': type "
+                              "after the name (use let ⟨…⟩ := … ; for "
+                              "destructuring without a type)");
+                }
+                consumeAny();  // ':'
+                wrapper.type = parseExpression();
+                expect(TokenKind::Assign, "after let type");
+                wrapper.value = parseExpression();
+            } else {
+                throwHere("expected identifier or '⟨' after 'let'");
+            }
+            expect(TokenKind::Semicolon,
+                   "ending let statement in block body");
+            wrappers.push_back(std::move(wrapper));
+        }
+        SurfaceExpressionPointer finalExpression = parseExpression();
+        // Optional trailing semicolon for the final expression.
+        if (peek().kind == TokenKind::Semicolon) {
+            consumeAny();
+        }
+        expect(TokenKind::RightBrace, "ending block body");
+        // Apply wrappers in reverse order around the final expression.
+        SurfaceExpressionPointer result = std::move(finalExpression);
+        for (auto iterator = wrappers.rbegin();
+             iterator != wrappers.rend(); ++iterator) {
+            if (iterator->pattern) {
+                SurfaceCasesClause clause;
+                clause.pattern = std::move(iterator->pattern);
+                clause.body = std::move(result);
+                clause.line = iterator->line;
+                clause.column = iterator->column;
+                std::vector<SurfaceCasesClause> clauses;
+                clauses.push_back(std::move(clause));
+                result = makeSurfaceCases(
+                    std::move(iterator->value),
+                    std::move(clauses),
+                    iterator->line, iterator->column);
+            } else {
+                result = makeSurfaceLet(
+                    std::move(iterator->name),
+                    std::move(iterator->type),
+                    std::move(iterator->value),
+                    std::move(result),
+                    iterator->line, iterator->column);
+            }
+        }
+        (void)openBrace;
+        return result;
     }
 
     SurfacePatternCase parsePatternCase() {
@@ -626,6 +713,12 @@ private:
         }
         if (current.kind == TokenKind::KeywordCases) {
             return parseCasesExpression();
+        }
+        if (current.kind == TokenKind::LeftBrace) {
+            // `{ let pat := v; ...; final_expr }` as an expression.
+            // Same shape as the theorem-body block form; useful inside
+            // case clauses or anywhere an expression is expected.
+            return parseBlockBody();
         }
         if (current.kind == TokenKind::KeywordType) {
             Token token = consumeAny();

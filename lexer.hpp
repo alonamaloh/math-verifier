@@ -34,7 +34,7 @@ enum class TokenKind {
     LeftParen, RightParen,
     LeftBrace, RightBrace,
     LeftAngle, RightAngle,    // "⟨" / "⟩" — anonymous tuples
-    Comma, Colon, Pipe,
+    Comma, Colon, Semicolon, Pipe,
     Dot,
     DotLeftBrace,    // ".{"  introduces universe-argument list
     Assign,          // ":="
