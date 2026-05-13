@@ -1995,6 +1995,19 @@ private:
         }
         if (auto* unary =
                 std::get_if<SurfaceUnaryOperation>(&expression.node)) {
+            if (unary->opSymbol == "¬") {
+                if (environment_.lookup("Not") == nullptr) {
+                    throw ElaborateError(
+                        "unary operator '¬' requires `Not` in scope "
+                        "(import Logic.basics) at line "
+                        + std::to_string(expression.line));
+                }
+                ExpressionPointer operandKernel =
+                    elaborateExpression(*unary->operand, localBinders);
+                ExpressionPointer call = makeConstant("Not");
+                return makeApplication(std::move(call),
+                                        std::move(operandKernel));
+            }
             throw ElaborateError(
                 "unary operator '" + unary->opSymbol + "' is not yet "
                 "supported by the elaborator");
@@ -3669,6 +3682,30 @@ private:
         const SurfaceExpression& rightSurface,
         const std::vector<LocalBinder>& localBinders,
         int line) {
+        // Logical operators are dispatched first because their operand
+        // type is a Proposition (a `Sort`, not a `Constant`), so the
+        // numeric-operator dispatch below — which looks for a Constant
+        // head on the inferred operand type — wouldn't see them.
+        std::string logicalTarget;
+        if (operatorSymbol == "∧") logicalTarget = "And";
+        else if (operatorSymbol == "∨") logicalTarget = "Or";
+        if (!logicalTarget.empty()) {
+            if (environment_.lookup(logicalTarget) == nullptr) {
+                throw ElaborateError(
+                    "operator '" + operatorSymbol + "' resolves to '"
+                    + logicalTarget + "' but that inductive is not in "
+                    "scope (line " + std::to_string(line)
+                    + "); import Logic.basics");
+            }
+            ExpressionPointer leftLogical =
+                elaborateExpression(leftSurface, localBinders);
+            ExpressionPointer rightLogical =
+                elaborateExpression(rightSurface, localBinders);
+            ExpressionPointer call = makeConstant(logicalTarget);
+            call = makeApplication(std::move(call), std::move(leftLogical));
+            call = makeApplication(std::move(call), std::move(rightLogical));
+            return call;
+        }
         ExpressionPointer leftKernel =
             elaborateExpression(leftSurface, localBinders);
         ExpressionPointer rightKernel =
@@ -3693,13 +3730,15 @@ private:
                 targetFunction = "LessOrEqual";
                 wrapLeftInSuccessor = true;
             }
+            else if (operatorSymbol == "∣") targetFunction = "Natural.divides";
         }
         if (targetFunction.empty()) {
             throw ElaborateError(
                 "operator '" + operatorSymbol + "' is not supported for "
                 "operand type '" + operandTypeName + "' (line "
                 + std::to_string(line)
-                + "); v1 supports +, *, ≤, < on Natural only");
+                + "); v1 supports +, *, ≤, <, ∣ on Natural and ∧, ∨ "
+                "on Proposition");
         }
         if (environment_.lookup(targetFunction) == nullptr) {
             throw ElaborateError(

@@ -217,6 +217,7 @@ private:
             {"∧", TokenKind::LogicalAnd},
             {"∨", TokenKind::LogicalOr},
             {"¬", TokenKind::LogicalNot},
+            {"∣", TokenKind::Divides},
             {"⟨", TokenKind::LeftAngle},
             {"⟩", TokenKind::RightAngle},
         };
@@ -365,6 +366,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::LogicalAnd:           return "'/\\' or '∧'";
         case TokenKind::LogicalOr:            return "'\\/' or '∨'";
         case TokenKind::LogicalNot:           return "'¬'";
+        case TokenKind::Divides:              return "'∣'";
         case TokenKind::Arrow:                return "'->' or '→'";
         case TokenKind::EndOfFile:            return "end of file";
     }

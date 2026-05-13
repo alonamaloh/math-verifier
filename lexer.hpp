@@ -46,6 +46,7 @@ enum class TokenKind {
     Less, Greater, LessOrEqual, GreaterOrEqual,
     Equal, NotEqual,
     LogicalAnd, LogicalOr, LogicalNot,
+    Divides,         // "∣" (divides relation on Naturals)
     Arrow,           // "→" or "->"
 
     EndOfFile,

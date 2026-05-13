@@ -591,7 +591,8 @@ private:
 
     static bool isRelationalKind(TokenKind kind) {
         return kind == TokenKind::Less || kind == TokenKind::LessOrEqual
-            || kind == TokenKind::Greater || kind == TokenKind::GreaterOrEqual;
+            || kind == TokenKind::Greater || kind == TokenKind::GreaterOrEqual
+            || kind == TokenKind::Divides;
     }
 
     SurfaceExpressionPointer parseRelational() {
@@ -608,6 +609,7 @@ private:
                 case TokenKind::LessOrEqual:    sym = "≤"; break;
                 case TokenKind::Greater:        sym = ">"; break;
                 case TokenKind::GreaterOrEqual: sym = "≥"; break;
+                case TokenKind::Divides:        sym = "∣"; break;
                 default: break;
             }
             left = makeSurfaceBinaryOperation(sym, std::move(left),

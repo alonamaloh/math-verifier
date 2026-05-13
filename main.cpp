@@ -3810,6 +3810,83 @@ theorem two_le_three : 2 ≤ 3 :=
         "≤ operator desugars to LessOrEqual",
         __LINE__);
 
+    // `∧` on propositions desugars to `And(P, Q)`.
+    expectVerifies(R"(
+module Test.and_operator
+
+inductive And (A B : Proposition) : Proposition where
+  | And.introduction : A → B → And(A, B)
+
+theorem both_intro (A B : Proposition) (a : A) (b : B) : A ∧ B :=
+  And.introduction(A, B, a, b)
+)",
+        "∧ operator desugars to And",
+        __LINE__);
+
+    // `∨` on propositions desugars to `Or(P, Q)`.
+    expectVerifies(R"(
+module Test.or_operator
+
+inductive Or (A B : Proposition) : Proposition where
+  | Or.introduceLeft  : A → Or(A, B)
+  | Or.introduceRight : B → Or(A, B)
+
+theorem left_in (A B : Proposition) (a : A) : A ∨ B :=
+  Or.introduceLeft(A, B, a)
+)",
+        "∨ operator desugars to Or",
+        __LINE__);
+
+    // `¬` desugars to `Not(P)`.
+    expectVerifies(R"(
+module Test.not_operator
+
+inductive False : Proposition where
+
+definition Not (A : Proposition) : Proposition := A → False
+
+inductive True : Proposition where
+  | True.trivial : True
+
+theorem trivial_does_not_imply_false (h : True) : ¬False :=
+  function (f : False) => f
+)",
+        "¬ operator desugars to Not",
+        __LINE__);
+
+    // `∣` on Naturals desugars to `Natural.divides(a, b)`.
+    expectVerifies(R"(
+module Test.divides_operator
+
+inductive Natural : Type(0) where
+  | zero : Natural
+  | successor : Natural → Natural
+
+inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
+  | reflexivity : Equality(A, x, x)
+
+inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
+  | Exists.introduce : (witness : A) → P(witness) → Exists(A, P)
+
+definition Natural.multiply : Natural → Natural → Natural
+  | zero,         _ => zero
+  | successor(k), m => m
+
+definition Natural.divides (divisor dividend : Natural) : Proposition :=
+  Exists(Natural,
+          function (quotient : Natural)
+              => Equality.{0}(Natural, dividend, Natural.multiply(divisor, quotient)))
+
+theorem one_divides_one : 1 ∣ 1 :=
+  Exists.introduce.{0}(Natural,
+      function (quotient : Natural)
+          => Equality.{0}(Natural, 1, Natural.multiply(1, quotient)),
+      1,
+      reflexivity.{0}(Natural, 1))
+)",
+        "∣ operator desugars to Natural.divides",
+        __LINE__);
+
     // `<` on Naturals desugars to `LessOrEqual(successor(_), _)`.
     expectVerifies(R"(
 module Test.lt_operator
