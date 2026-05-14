@@ -8,8 +8,8 @@
 -- positive Naturals. With our representative
 -- `make(n : Integer, denominatorMinusOne : Natural)`, the formula
 -- becomes:
---     positivePart    = n1·succ(d2) + n2·succ(d1)
---     denominatorMinusOne = d2 + d1·succ(d2)
+--     numerator            = n1·succ(d2) + n2·succ(d1)
+--     denominatorMinusOne  = d2 + d1·succ(d2)
 -- The latter identity uses succ(d1)·succ(d2) = succ(d2 +
 -- d1·succ(d2)), which is the kernel reduction of Natural.multiply
 -- on its first argument.
@@ -43,3 +43,20 @@ definition Rational.add_representatives
               Integer.multiply(n1, Natural.to_integer(successor(d2))),
               Integer.multiply(n2, Natural.to_integer(successor(d1)))),
           d2 + d1 * successor(d2))
+
+-- A small lemma we'll need repeatedly when verifying that addition
+-- respects the equivalence relation: the Integer corresponding to a
+-- product of two positive-Natural successors factors as the product
+-- of their individual Integer lifts.
+theorem Rational.lifted_denominator_factors (d1 d2 : Natural)
+        : Equality.{0}(Integer,
+              Natural.to_integer(successor(d1) * successor(d2)),
+              Integer.multiply(Natural.to_integer(successor(d1)),
+                                Natural.to_integer(successor(d2)))) :=
+  Natural.to_integer.multiply_preserves(successor(d1), successor(d2))
+
+-- The respect-proofs for both arguments + the Quotient.lift wiring
+-- for Rational.add itself remain. The proof shape is mechanical
+-- (mirroring Integer.add) but the calc chains are large Integer-
+-- algebra rearrangements (~150 lines each). Tracking this as the
+-- next focused chunk in TODO.md.
