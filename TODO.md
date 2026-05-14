@@ -7,12 +7,17 @@ pain becomes acute.
 
 ## Active
 
-### 1. More math content — start here
-Build the abstract algebra layer: `Group`,
-`Ring`, `Field`, `CommutativeRing` as Proposition records;
-`Integer` as a `CommutativeRing` instance; then `Rational :=
-(Integer × Natural⁺) / ~`, then `Real` (Cauchy sequences or Dedekind
-cuts), then vector spaces / linear algebra.
+### 1. More math content — in progress
+Abstract algebra layer landed (Monoid, Group, AbelianGroup, Ring,
+CommutativeRing as Proposition predicates; Integer is a
+CommutativeRing; Natural is a commutative monoid under both ops; a
+few generic group lemmas demonstrated). Next:
+- **Field** predicate, with a non-zero-implies-invertible witness.
+- **Rational := (Integer × Natural⁺) / ~** as a quotient. Will exercise
+  `Quotient.lift₂` / `Quotient.induct₂` boilerplate — a likely
+  trigger for the opportunistic library helper.
+- **Real** (Cauchy sequences over Rational, or Dedekind cuts).
+- More generic abelian-group / ring / field lemmas as they're needed.
 
 ### 2. Parallel verification
 Optimistic per-theorem parallelism with a thread pool: register
@@ -47,6 +52,15 @@ Smaller items to land when the motivating pain becomes acute:
 
 ## Completed
 
+- **2026-05-14: Abstract algebra layer.** Monoid, CommutativeMonoid,
+  Group, AbelianGroup, Ring, CommutativeRing as Proposition
+  predicates; Integer is a commutative ring (8 instance witnesses);
+  Natural is a commutative monoid under both + and ·; three generic
+  group lemmas (`right_inverse_unique`, `left_inverse_unique`,
+  `inverse_involution`). Also fixed `desugarCongruenceOf` to close
+  the domain/codomain types — without the fix, generic lemmas over a
+  binder-bound carrier type failed with "unbound internal variable".
+  Commit `a4a4421`.
 - **2026-05-14: Operator overloading for Integer.** `+`, `*`, `-` now
   dispatch on operand type, routing Integer operands to `Integer.add`,
   `Integer.multiply`, `Integer.subtract`. Lookup uses the raw inferred
