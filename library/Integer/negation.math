@@ -1,0 +1,134 @@
+-- Integer/negation.math
+--
+-- Negation and subtraction on Integer. Negation swaps the components
+-- of a representative (`(a, b)` becomes `(b, a)`, i.e. the difference
+-- `a - b` becomes `b - a`). Subtraction is defined the usual way:
+-- `x - y := x + (-y)`. With negation the additive monoid from
+-- Integer/ring.math becomes a commutative group; we close with
+-- `add_negate_left` / `add_negate_right` (the inverse identities).
+
+module Integer.negation
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.ring
+
+-- ----------------------------------------------------------------------
+-- Negation on representatives: swap components.
+definition Integer.negate_representatives
+        : IntegerRepresentative → IntegerRepresentative
+  | IntegerRepresentative.make(a, b) =>
+      IntegerRepresentative.make(b, a)
+
+-- Respect: if `(a, b) ~ (a', b')` then `(b, a) ~ (b', a')`. Both
+-- equivalence statements unfold to the same Natural-level equation
+-- modulo `Equality.symmetry`.
+theorem Integer.negate_respects_after_first (a b : Natural)
+        : (rep' : IntegerRepresentative)
+          → IntegerEquivalent(IntegerRepresentative.make(a, b), rep')
+          → IntegerEquivalent(
+                Integer.negate_representatives(
+                    IntegerRepresentative.make(a, b)),
+                Integer.negate_representatives(rep'))
+  | IntegerRepresentative.make(aPrime, bPrime), eq =>
+      Equality.symmetry(eq)
+
+theorem Integer.negate_respects
+        : (rep1 rep2 : IntegerRepresentative)
+          → IntegerEquivalent(rep1, rep2)
+          → IntegerEquivalent(
+                Integer.negate_representatives(rep1),
+                Integer.negate_representatives(rep2))
+  | IntegerRepresentative.make(a, b), rep2, eq =>
+      Integer.negate_respects_after_first(a, b, rep2, eq)
+
+-- ----------------------------------------------------------------------
+-- Negation on Integer: lift negate_representatives via Quotient.lift.
+definition Integer.negate (x : Integer) : Integer :=
+  Quotient.lift.{0, 0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      Integer,
+      function (rep : IntegerRepresentative) =>
+          Quotient.mk.{0}(
+              IntegerRepresentative, IntegerEquivalent,
+              Integer.negate_representatives(rep)),
+      function (rep1 rep2 : IntegerRepresentative)
+               (rep1EquivalentRep2 : IntegerEquivalent(rep1, rep2)) =>
+          Quotient.sound.{0}(
+              IntegerRepresentative, IntegerEquivalent,
+              Integer.negate_representatives(rep1),
+              Integer.negate_representatives(rep2),
+              Integer.negate_respects(rep1, rep2, rep1EquivalentRep2)),
+      x)
+
+-- ----------------------------------------------------------------------
+-- Subtraction: x − y = x + (−y).
+definition Integer.subtract (x y : Integer) : Integer :=
+  Integer.add(x, Integer.negate(y))
+
+-- ----------------------------------------------------------------------
+-- Inverse identities: x + (−x) = 0 and (−x) + x = 0.
+
+-- Natural-level kernel: at rep (a, b) the LHS reduces to mk(make(b + a,
+-- a + b)) and Integer.zero is mk(make(zero, zero)). Equivalence
+-- requires (b + a) + zero = (a + b) + zero, which reduces to b + a =
+-- a + b via add_zero on both sides.
+theorem Integer.add_negate_left_natural (a b : Natural)
+        : (b + a) + zero = (a + b) + zero :=
+  calc (b + a) + zero
+     = b + a       by Natural.add_zero(b + a)
+     = a + b       by Natural.add_commutative(b, a)
+     = (a + b) + zero
+                   by Equality.symmetry(Natural.add_zero(a + b))
+
+theorem Integer.add_negate_left_at_representative
+        : (rep : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.add(
+                    Integer.negate(
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep)),
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep)),
+                Integer.zero)
+  | IntegerRepresentative.make(a, b) =>
+      Quotient.sound.{0}(
+          IntegerRepresentative, IntegerEquivalent,
+          IntegerRepresentative.make(b + a, a + b),
+          IntegerRepresentative.make(zero, zero),
+          Integer.add_negate_left_natural(a, b))
+
+theorem Integer.add_negate_left (x : Integer)
+        : Equality.{0}(Integer,
+              Integer.add(Integer.negate(x), x),
+              Integer.zero) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (x : Integer) =>
+          Equality.{0}(Integer,
+              Integer.add(Integer.negate(x), x),
+              Integer.zero),
+      Integer.add_negate_left_at_representative,
+      x)
+
+-- Right inverse: derived via commutativity.
+theorem Integer.add_negate_right (x : Integer)
+        : Equality.{0}(Integer,
+              Integer.add(x, Integer.negate(x)),
+              Integer.zero) :=
+  Equality.transitivity.{0}(
+      Integer,
+      Integer.add(x, Integer.negate(x)),
+      Integer.add(Integer.negate(x), x),
+      Integer.zero,
+      Integer.add_commutative(x, Integer.negate(x)),
+      Integer.add_negate_left(x))
