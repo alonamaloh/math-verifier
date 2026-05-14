@@ -75,3 +75,48 @@ theorem Quotient.compute.{u, v}
                            T, R, U, f, h, Quotient.mk.{u}(T, R, x)),
                        f(x)) :=
   reflexivity.{v}(U, f(x))
+
+-- ----------------------------------------------------------------------
+-- Quotient.induct_two: induction on two quotients simultaneously.
+--
+-- Saves the nested-induct boilerplate that every binary-on-quotients
+-- lemma would otherwise need (the `after_first` / `after_xy` helper
+-- chain you see in Integer/basics.math, Integer/addition.math, …).
+--
+-- Implementation: induct on the first quotient with predicate
+-- `λ q1. P(q1, q2)`; at the mk-case for q1, induct on q2 to discharge
+-- `P(mk(x1), q2)` for every q2 from the user-supplied
+-- `atRepresentatives` proof.
+definition Quotient.induct_two.{u, v}
+        (T1 : Type(u)) (R1 : T1 → T1 → Proposition)
+        (T2 : Type(v)) (R2 : T2 → T2 → Proposition)
+        (predicate
+            : Quotient.{u}(T1, R1)
+              → Quotient.{v}(T2, R2)
+              → Proposition)
+        (atRepresentatives
+            : (x1 : T1) → (x2 : T2)
+              → predicate(Quotient.mk.{u}(T1, R1, x1),
+                          Quotient.mk.{v}(T2, R2, x2)))
+        (q1 : Quotient.{u}(T1, R1))
+        (q2 : Quotient.{v}(T2, R2))
+        : predicate(q1, q2) :=
+  Quotient.induct.{u}(
+      T1, R1,
+      function (q : Quotient.{u}(T1, R1)) => predicate(q, q2),
+      function (x1 : T1) =>
+          Quotient.induct.{v}(
+              T2, R2,
+              function (q : Quotient.{v}(T2, R2)) =>
+                  predicate(Quotient.mk.{u}(T1, R1, x1), q),
+              function (x2 : T2) => atRepresentatives(x1, x2),
+              q2),
+      q1)
+
+-- (Quotient.lift_two — a binary lift helper — was sketched here but
+-- the elaborator chokes on the universe-argument plumbing through
+-- nested polymorphic Quotient.lift calls. Binary lifts in practice
+-- use two manual Quotient.lift calls, as in Integer.add /
+-- Integer.multiply. Revisit when the elaborator's level handling
+-- is more robust or when there's clear evidence the manual pattern
+-- is unbearable.)
