@@ -1,0 +1,259 @@
+-- Integer/algebra.math
+--
+-- Extra arithmetic identities on Integer that combine multiplication
+-- with the additive group structure: zero is absorbing for
+-- multiplication, multiplication respects negation, and distributivity
+-- extends over subtraction. Plus a handy cancellation lemma —
+-- `subtract_left_add` — that says `a − b = c` whenever `a = b + c`.
+
+module Integer.algebra
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.ring
+import Integer.negation
+
+-- ----------------------------------------------------------------------
+-- Zero is absorbing for multiplication.
+--
+-- At rep (a, b): Integer.zero · mk(make(a, b)) reduces (via two
+-- Quotient.lift kernel rules + multiply_representatives) to
+-- mk(make(0·a + 0·b, 0·b + 0·a)) = mk(make(0 + 0, 0 + 0)) = mk(make(0,
+-- 0)) — all by definitional reduction since multiply and add reduce on
+-- their first arguments when that argument is `zero`.
+
+theorem Integer.multiply_zero_left_at_representative
+        : (rep : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.multiply(Integer.zero,
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep)),
+                Integer.zero)
+  | IntegerRepresentative.make(a, b) =>
+      reflexivity.{0}(Integer, Integer.zero)
+
+theorem Integer.multiply_zero_left (x : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(Integer.zero, x),
+              Integer.zero) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative, IntegerEquivalent,
+      function (x : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(Integer.zero, x),
+              Integer.zero),
+      Integer.multiply_zero_left_at_representative,
+      x)
+
+theorem Integer.multiply_zero_right (x : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(x, Integer.zero),
+              Integer.zero) :=
+  Equality.transitivity.{0}(
+      Integer,
+      Integer.multiply(x, Integer.zero),
+      Integer.multiply(Integer.zero, x),
+      Integer.zero,
+      Integer.multiply_commutative(x, Integer.zero),
+      Integer.multiply_zero_left(x))
+
+-- ----------------------------------------------------------------------
+-- Multiplication respects negation.
+--
+-- At reps (a, b), (c, d):
+--   a · negate(b) = mk(make(a, b)) · mk(make(d, c))
+--                 = mk(make(a·d + b·c, a·c + b·d))
+--   negate(a · b) = negate(mk(make(a·c + b·d, a·d + b·c)))
+--                 = mk(make(a·d + b·c, a·c + b·d))
+-- Both reduce to the same representative — leaf is reflexivity.
+
+theorem Integer.multiply_negate_right_at_representatives
+        : (rep1 rep2 : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.multiply(
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep1),
+                    Integer.negate(
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep2))),
+                Integer.negate(
+                    Integer.multiply(
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep1),
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep2))))
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d) =>
+      reflexivity.{0}(Integer,
+          Quotient.mk.{0}(
+              IntegerRepresentative, IntegerEquivalent,
+              IntegerRepresentative.make(a * d + b * c, a * c + b * d)))
+
+theorem Integer.multiply_negate_right_after_first
+        (rep1 : IntegerRepresentative) (y : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.negate(y)),
+              Integer.negate(
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      y))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (y : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.negate(y)),
+              Integer.negate(
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      y))),
+      function (rep2 : IntegerRepresentative) =>
+          Integer.multiply_negate_right_at_representatives(rep1, rep2),
+      y)
+
+theorem Integer.multiply_negate_right (x y : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(x, Integer.negate(y)),
+              Integer.negate(Integer.multiply(x, y))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (x : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(x, Integer.negate(y)),
+              Integer.negate(Integer.multiply(x, y))),
+      function (rep1 : IntegerRepresentative) =>
+          Integer.multiply_negate_right_after_first(rep1, y),
+      x)
+
+-- Left companion via commutativity.
+theorem Integer.multiply_negate_left (x y : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(Integer.negate(x), y),
+              Integer.negate(Integer.multiply(x, y))) := {
+    claim swapOuter
+          : Integer.multiply(Integer.negate(x), y)
+            = Integer.multiply(y, Integer.negate(x))
+        by Integer.multiply_commutative(Integer.negate(x), y);
+    claim moveOut
+          : Integer.multiply(y, Integer.negate(x))
+            = Integer.negate(Integer.multiply(y, x))
+        by Integer.multiply_negate_right(y, x);
+    claim swapInner
+          : Integer.negate(Integer.multiply(y, x))
+            = Integer.negate(Integer.multiply(x, y))
+        by congruenceOf(
+               Integer.negate,
+               Integer.multiply_commutative(y, x));
+    Equality.transitivity(swapOuter,
+        Equality.transitivity(moveOut, swapInner))
+}
+
+-- ----------------------------------------------------------------------
+-- Distributivity over subtraction.
+--
+-- a · (b − c) = a · (b + (−c))            [definitional: subtract → add+negate]
+--             = a · b + a · (−c)          [distributivity_left]
+--             = a · b + (−(a · c))         [multiply_negate_right]
+--             = a · b − a · c             [definitional: subtract = add+negate, reversed]
+
+theorem Integer.distributivity_left_over_subtract (x y z : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(x, Integer.subtract(y, z)),
+              Integer.subtract(Integer.multiply(x, y),
+                               Integer.multiply(x, z))) := {
+    claim distributeLeft
+          : Integer.multiply(x, Integer.add(y, Integer.negate(z)))
+            = Integer.add(Integer.multiply(x, y),
+                          Integer.multiply(x, Integer.negate(z)))
+        by Integer.distributivity_left(x, y, Integer.negate(z));
+    claim moveNegateOut
+          : Integer.add(Integer.multiply(x, y),
+                        Integer.multiply(x, Integer.negate(z)))
+            = Integer.add(Integer.multiply(x, y),
+                          Integer.negate(Integer.multiply(x, z)))
+        by congruenceOf(
+               function (term : Integer) =>
+                   Integer.add(Integer.multiply(x, y), term),
+               Integer.multiply_negate_right(x, z));
+    Equality.transitivity(distributeLeft, moveNegateOut)
+}
+
+theorem Integer.distributivity_right_over_subtract (x y z : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(Integer.subtract(x, y), z),
+              Integer.subtract(Integer.multiply(x, z),
+                               Integer.multiply(y, z))) := {
+    claim distributeRight
+          : Integer.multiply(Integer.add(x, Integer.negate(y)), z)
+            = Integer.add(Integer.multiply(x, z),
+                          Integer.multiply(Integer.negate(y), z))
+        by Integer.distributivity_right(x, Integer.negate(y), z);
+    claim moveNegateOut
+          : Integer.add(Integer.multiply(x, z),
+                        Integer.multiply(Integer.negate(y), z))
+            = Integer.add(Integer.multiply(x, z),
+                          Integer.negate(Integer.multiply(y, z)))
+        by congruenceOf(
+               function (term : Integer) =>
+                   Integer.add(Integer.multiply(x, z), term),
+               Integer.multiply_negate_left(y, z));
+    Equality.transitivity(distributeRight, moveNegateOut)
+}
+
+-- ----------------------------------------------------------------------
+-- Cancellation: if a = b + c then a − b = c. The proof reshapes
+-- (b + c) + (−b) into c + (b + (−b)) = c + 0 = c via the additive-
+-- group laws.
+
+theorem Integer.subtract_left_add (a b c : Integer)
+        (decomposition : Equality.{0}(Integer, a, Integer.add(b, c)))
+        : Equality.{0}(Integer, Integer.subtract(a, b), c) := {
+    claim rewriteSubtrahend
+          : Integer.add(a, Integer.negate(b))
+            = Integer.add(Integer.add(b, c), Integer.negate(b))
+        by congruenceOf(
+               function (firstSummand : Integer) =>
+                   Integer.add(firstSummand, Integer.negate(b)),
+               decomposition);
+    claim swapInner
+          : Integer.add(Integer.add(b, c), Integer.negate(b))
+            = Integer.add(Integer.add(c, b), Integer.negate(b))
+        by congruenceOf(
+               function (innerSum : Integer) =>
+                   Integer.add(innerSum, Integer.negate(b)),
+               Integer.add_commutative(b, c));
+    claim reassociate
+          : Integer.add(Integer.add(c, b), Integer.negate(b))
+            = Integer.add(c, Integer.add(b, Integer.negate(b)))
+        by Integer.add_associative(c, b, Integer.negate(b));
+    claim cancelInverse
+          : Integer.add(c, Integer.add(b, Integer.negate(b)))
+            = Integer.add(c, Integer.zero)
+        by congruenceOf(
+               function (inverseSum : Integer) => Integer.add(c, inverseSum),
+               Integer.add_negate_right(b));
+    claim removeZero
+          : Integer.add(c, Integer.zero) = c
+        by Integer.add_identity_right(c);
+    Equality.transitivity(rewriteSubtrahend,
+        Equality.transitivity(swapInner,
+            Equality.transitivity(reassociate,
+                Equality.transitivity(cancelInverse, removeZero))))
+}

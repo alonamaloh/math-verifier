@@ -1,0 +1,446 @@
+-- Natural/bezout.math
+--
+-- Bezout's identity: for any naturals `a, b`, there exist
+-- `x, y : Integer` such that
+--     Natural.to_integer(a) · x + Natural.to_integer(b) · y
+--     = Natural.to_integer(gcd(a, b)).
+-- We state it with an existential over the gcd as well, since the gcd
+-- is not yet a function (only the `is_gcd` predicate exists). The
+-- output carries an `is_gcd(g, a, b)` proof alongside the linear-
+-- combination identity.
+--
+-- The proof is the extended Euclidean algorithm: strong induction on
+-- the second operand. When the divisor is zero, take g = a and
+-- coefficients (1, 0). Otherwise, divide a by b (the divisor is
+-- positive), obtain (q, r), recurse on r < b at first-operand b,
+-- producing (g, x', y') with bx' + ry' = g; substitute via
+-- r = a − qb in Integer to derive ax + by = g with x = y',
+-- y = x' − qy'. Closing requires `is_gcd_remainder_lift` on the
+-- Natural side.
+
+module Natural.bezout
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.subtraction
+import Natural.strong_recursion
+import Natural.multiply_order
+import Natural.divisibility
+import Natural.gcd
+import Natural.division
+import Natural.divides_subtract
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.ring
+import Integer.negation
+import Integer.algebra
+
+-- ----------------------------------------------------------------------
+-- The Bezout existential predicate.
+definition Natural.has_bezout
+        (firstOperand secondOperand : Natural) : Proposition :=
+    ∃ (gcdValue : Natural).
+      ∃ (firstCoefficient : Integer).
+        ∃ (secondCoefficient : Integer).
+          Equality.{0}(Integer,
+              Integer.add(
+                  Integer.multiply(
+                      Natural.to_integer(firstOperand), firstCoefficient),
+                  Integer.multiply(
+                      Natural.to_integer(secondOperand), secondCoefficient)),
+              Natural.to_integer(gcdValue))
+          ∧ Natural.is_gcd(gcdValue, firstOperand, secondOperand)
+
+-- ----------------------------------------------------------------------
+-- Base case: second operand is zero. Take gcd = firstOperand,
+-- coefficients (1, 0). The equation
+--     to_integer(a) · 1 + to_integer(0) · 0 = to_integer(a)
+-- reduces via `multiply_identity_right`, definitional reduction of
+-- `Integer.zero · Integer.zero` to `Integer.zero`, and
+-- `add_identity_right`.
+
+theorem Natural.has_bezout_zero_right (a : Natural)
+        : Natural.has_bezout(a, zero) := {
+    claim multiplyByOne
+          : Integer.multiply(Natural.to_integer(a), Integer.one)
+            = Natural.to_integer(a)
+        by Integer.multiply_identity_right(Natural.to_integer(a));
+    claim zeroTimesZero
+          : Integer.multiply(Natural.to_integer(zero), Integer.zero)
+            = Integer.zero
+        by reflexivity.{0}(Integer, Integer.zero);
+    claim combined
+          : Integer.add(
+                Integer.multiply(Natural.to_integer(a), Integer.one),
+                Integer.multiply(Natural.to_integer(zero), Integer.zero))
+            = Natural.to_integer(a)
+        by Equality.transitivity(
+               congruenceOf(
+                   function (firstSummand : Integer) =>
+                       Integer.add(firstSummand,
+                           Integer.multiply(Natural.to_integer(zero),
+                                            Integer.zero)),
+                   multiplyByOne),
+               Equality.transitivity(
+                   congruenceOf(
+                       function (secondSummand : Integer) =>
+                           Integer.add(Natural.to_integer(a), secondSummand),
+                       zeroTimesZero),
+                   Integer.add_identity_right(Natural.to_integer(a))));
+    ⟨a, Integer.one, Integer.zero, combined, Natural.is_gcd_zero_right(a)⟩
+}
+
+-- ----------------------------------------------------------------------
+-- Integer-level lifting of the Natural decomposition a = q·b + r.
+
+theorem Integer.lift_decomposition
+        (a q b r : Natural)
+        (naturalDecomposition : a = q * b + r)
+        : Equality.{0}(Integer,
+              Natural.to_integer(a),
+              Integer.add(
+                  Integer.multiply(Natural.to_integer(q),
+                                   Natural.to_integer(b)),
+                  Natural.to_integer(r))) :=
+  calc Natural.to_integer(a)
+     = Natural.to_integer(q * b + r)
+            by congruenceOf(Natural.to_integer, naturalDecomposition)
+     = Integer.add(
+           Natural.to_integer(q * b),
+           Natural.to_integer(r))
+            by Natural.to_integer.add_preserves(q * b, r)
+     = Integer.add(
+           Integer.multiply(Natural.to_integer(q),
+                            Natural.to_integer(b)),
+           Natural.to_integer(r))
+            by congruenceOf(
+                   function (productAsInteger : Integer) =>
+                       Integer.add(productAsInteger, Natural.to_integer(r)),
+                   Natural.to_integer.multiply_preserves(q, b))
+
+-- ----------------------------------------------------------------------
+-- The Integer-level substitution at the heart of the Euclidean step.
+--
+-- Given `aInt = qInt · bInt + rInt` and `bInt · x' + rInt · y' = g`,
+-- conclude that `aInt · y' + bInt · (x' − qInt · y') = g`. The
+-- argument: distribute bInt over the subtraction, reassociate the
+-- product `bInt · (qInt · y')` into `(qInt · bInt) · y'`, rearrange
+-- the outer sum so the y'-factored terms group together, and apply
+-- `subtract_left_add` to replace `aInt − qInt · bInt` by `rInt`.
+
+theorem Integer.bezout_substitute
+        (aInt bInt qInt rInt xPrime yPrime gcdInt : Integer)
+        (decomposition
+            : Equality.{0}(Integer,
+                  aInt,
+                  Integer.add(Integer.multiply(qInt, bInt), rInt)))
+        (recursedEquation
+            : Equality.{0}(Integer,
+                  Integer.add(
+                      Integer.multiply(bInt, xPrime),
+                      Integer.multiply(rInt, yPrime)),
+                  gcdInt))
+        : Equality.{0}(Integer,
+              Integer.add(
+                  Integer.multiply(aInt, yPrime),
+                  Integer.multiply(bInt,
+                      Integer.subtract(xPrime,
+                          Integer.multiply(qInt, yPrime)))),
+              gcdInt) := {
+    -- Step 1: distributivity of bInt over (xPrime − qInt · yPrime).
+    claim distributeBInt
+          : Integer.multiply(bInt,
+                Integer.subtract(xPrime, Integer.multiply(qInt, yPrime)))
+            = Integer.subtract(
+                  Integer.multiply(bInt, xPrime),
+                  Integer.multiply(bInt,
+                      Integer.multiply(qInt, yPrime)))
+        by Integer.distributivity_left_over_subtract(
+               bInt, xPrime, Integer.multiply(qInt, yPrime));
+    -- Step 2: reassociate bInt · (qInt · yPrime) into (qInt · bInt) · yPrime.
+    claim reassociateProduct
+          : Integer.multiply(bInt, Integer.multiply(qInt, yPrime))
+            = Integer.multiply(Integer.multiply(qInt, bInt), yPrime)
+        by Equality.transitivity(
+               Equality.symmetry(
+                   Integer.multiply_associative(bInt, qInt, yPrime)),
+               congruenceOf(
+                   function (factor : Integer) =>
+                       Integer.multiply(factor, yPrime),
+                   Integer.multiply_commutative(bInt, qInt)));
+    claim bIntDistributed
+          : Integer.multiply(bInt,
+                Integer.subtract(xPrime, Integer.multiply(qInt, yPrime)))
+            = Integer.subtract(
+                  Integer.multiply(bInt, xPrime),
+                  Integer.multiply(Integer.multiply(qInt, bInt), yPrime))
+        by Equality.transitivity(
+               distributeBInt,
+               congruenceOf(
+                   function (subtrahend : Integer) =>
+                       Integer.subtract(
+                           Integer.multiply(bInt, xPrime),
+                           subtrahend),
+                   reassociateProduct));
+    -- Step 3: rewrite the outer expression.
+    claim outerRewritten
+          : Integer.add(
+                Integer.multiply(aInt, yPrime),
+                Integer.multiply(bInt,
+                    Integer.subtract(xPrime,
+                        Integer.multiply(qInt, yPrime))))
+            = Integer.add(
+                  Integer.multiply(aInt, yPrime),
+                  Integer.subtract(
+                      Integer.multiply(bInt, xPrime),
+                      Integer.multiply(
+                          Integer.multiply(qInt, bInt), yPrime)))
+        by congruenceOf(
+               function (rightSummand : Integer) =>
+                   Integer.add(
+                       Integer.multiply(aInt, yPrime), rightSummand),
+               bIntDistributed);
+    -- Step 4: rearrange so the yPrime-factored pair groups together.
+    -- aInt·y + (bInt·x − qbInt·y)
+    --  = aInt·y + (bInt·x + negate(qbInt·y))     [definitional]
+    --  = (aInt·y + bInt·x) + negate(qbInt·y)     [add_associative, reversed]
+    --  = (bInt·x + aInt·y) + negate(qbInt·y)     [add_commutative]
+    --  = bInt·x + (aInt·y + negate(qbInt·y))     [add_associative]
+    --  = bInt·x + (aInt·y − qbInt·y)              [definitional]
+    claim reassociateOuter
+          : Integer.add(
+                Integer.multiply(aInt, yPrime),
+                Integer.subtract(
+                    Integer.multiply(bInt, xPrime),
+                    Integer.multiply(
+                        Integer.multiply(qInt, bInt), yPrime)))
+            = Integer.add(
+                  Integer.add(
+                      Integer.multiply(aInt, yPrime),
+                      Integer.multiply(bInt, xPrime)),
+                  Integer.negate(
+                      Integer.multiply(
+                          Integer.multiply(qInt, bInt), yPrime)))
+        by Equality.symmetry(
+               Integer.add_associative(
+                   Integer.multiply(aInt, yPrime),
+                   Integer.multiply(bInt, xPrime),
+                   Integer.negate(
+                       Integer.multiply(
+                           Integer.multiply(qInt, bInt), yPrime))));
+    claim swapOuter
+          : Integer.add(
+                Integer.add(
+                    Integer.multiply(aInt, yPrime),
+                    Integer.multiply(bInt, xPrime)),
+                Integer.negate(
+                    Integer.multiply(
+                        Integer.multiply(qInt, bInt), yPrime)))
+            = Integer.add(
+                  Integer.add(
+                      Integer.multiply(bInt, xPrime),
+                      Integer.multiply(aInt, yPrime)),
+                  Integer.negate(
+                      Integer.multiply(
+                          Integer.multiply(qInt, bInt), yPrime)))
+        by congruenceOf(
+               function (firstSummand : Integer) =>
+                   Integer.add(firstSummand,
+                       Integer.negate(
+                           Integer.multiply(
+                               Integer.multiply(qInt, bInt), yPrime))),
+               Integer.add_commutative(
+                   Integer.multiply(aInt, yPrime),
+                   Integer.multiply(bInt, xPrime)));
+    claim reassociateForward
+          : Integer.add(
+                Integer.add(
+                    Integer.multiply(bInt, xPrime),
+                    Integer.multiply(aInt, yPrime)),
+                Integer.negate(
+                    Integer.multiply(
+                        Integer.multiply(qInt, bInt), yPrime)))
+            = Integer.add(
+                  Integer.multiply(bInt, xPrime),
+                  Integer.add(
+                      Integer.multiply(aInt, yPrime),
+                      Integer.negate(
+                          Integer.multiply(
+                              Integer.multiply(qInt, bInt), yPrime))))
+        by Integer.add_associative(
+               Integer.multiply(bInt, xPrime),
+               Integer.multiply(aInt, yPrime),
+               Integer.negate(
+                   Integer.multiply(
+                       Integer.multiply(qInt, bInt), yPrime)));
+    -- Step 5: factor yPrime in (aInt·y − qbInt·y) → (aInt − qInt·bInt)·y.
+    claim factorYPrime
+          : Integer.subtract(
+                Integer.multiply(aInt, yPrime),
+                Integer.multiply(Integer.multiply(qInt, bInt), yPrime))
+            = Integer.multiply(
+                  Integer.subtract(aInt, Integer.multiply(qInt, bInt)),
+                  yPrime)
+        by Equality.symmetry(
+               Integer.distributivity_right_over_subtract(
+                   aInt, Integer.multiply(qInt, bInt), yPrime));
+    -- Step 6: substitute (aInt − qInt·bInt) = rInt via subtract_left_add.
+    claim subtractToRemainder
+          : Integer.subtract(aInt, Integer.multiply(qInt, bInt)) = rInt
+        by Integer.subtract_left_add(
+               aInt, Integer.multiply(qInt, bInt), rInt, decomposition);
+    claim factoredEqualsRYPrime
+          : Integer.subtract(
+                Integer.multiply(aInt, yPrime),
+                Integer.multiply(Integer.multiply(qInt, bInt), yPrime))
+            = Integer.multiply(rInt, yPrime)
+        by Equality.transitivity(
+               factorYPrime,
+               congruenceOf(
+                   function (factor : Integer) =>
+                       Integer.multiply(factor, yPrime),
+                   subtractToRemainder));
+    -- Combine all reshufflings.
+    claim assembledLeft
+          : Integer.add(
+                Integer.multiply(aInt, yPrime),
+                Integer.multiply(bInt,
+                    Integer.subtract(xPrime,
+                        Integer.multiply(qInt, yPrime))))
+            = Integer.add(
+                  Integer.multiply(bInt, xPrime),
+                  Integer.multiply(rInt, yPrime))
+        by Equality.transitivity(
+               outerRewritten,
+               Equality.transitivity(
+                   reassociateOuter,
+                   Equality.transitivity(
+                       swapOuter,
+                       Equality.transitivity(
+                           reassociateForward,
+                           congruenceOf(
+                               function (subtractedPair : Integer) =>
+                                   Integer.add(
+                                       Integer.multiply(bInt, xPrime),
+                                       subtractedPair),
+                               factoredEqualsRYPrime)))));
+    Equality.transitivity(assembledLeft, recursedEquation)
+}
+
+-- ----------------------------------------------------------------------
+-- Inductive-step case: divisor = successor(predB) (so ≥ 1). Divide a
+-- by the divisor, recurse on the remainder, and assemble the new
+-- coefficients.
+
+theorem Natural.has_bezout_successor_step
+        (predB : Natural) (a : Natural)
+        (inductionHypothesis :
+            (k : Natural) → successor(k) ≤ successor(predB)
+            → (aPrime : Natural) → Natural.has_bezout(aPrime, k))
+        : Natural.has_bezout(a, successor(predB)) := {
+    claim divisorPositive : 1 ≤ successor(predB)
+        by Natural.successor_less_or_equal_successor(
+               zero, predB, Natural.zero_least(predB));
+    obtain ⟨q, r, decomposition, remainderBelowDivisor⟩
+        from Natural.divide_with_remainder(
+                 successor(predB), divisorPositive, a);
+    claim hasBezoutForBR : Natural.has_bezout(successor(predB), r)
+        by inductionHypothesis(r, remainderBelowDivisor, successor(predB));
+    obtain ⟨gcdValue, xPrime, yPrime, recursedEquation, isGcdForBR⟩
+        from hasBezoutForBR;
+    -- Lift the natural decomposition `a = q · successor(predB) + r`
+    -- to the integer level.
+    claim integerDecomposition
+          : Equality.{0}(Integer,
+                Natural.to_integer(a),
+                Integer.add(
+                    Integer.multiply(
+                        Natural.to_integer(q),
+                        Natural.to_integer(successor(predB))),
+                    Natural.to_integer(r)))
+        by Integer.lift_decomposition(
+               a, q, successor(predB), r, decomposition);
+    -- Plug into the substitution lemma to get the new linear-
+    -- combination identity for (a, successor(predB)).
+    claim newLinearCombinationIdentity
+          : Equality.{0}(Integer,
+                Integer.add(
+                    Integer.multiply(Natural.to_integer(a), yPrime),
+                    Integer.multiply(
+                        Natural.to_integer(successor(predB)),
+                        Integer.subtract(
+                            xPrime,
+                            Integer.multiply(
+                                Natural.to_integer(q), yPrime)))),
+                Natural.to_integer(gcdValue))
+        by Integer.bezout_substitute(
+               Natural.to_integer(a),
+               Natural.to_integer(successor(predB)),
+               Natural.to_integer(q),
+               Natural.to_integer(r),
+               xPrime, yPrime,
+               Natural.to_integer(gcdValue),
+               integerDecomposition,
+               recursedEquation);
+    -- Lift the gcd from (successor(predB), r) to (a, successor(predB))
+    -- via is_gcd_remainder_lift.
+    claim isGcdForAB : Natural.is_gcd(gcdValue, a, successor(predB))
+        by Natural.is_gcd_remainder_lift(
+               gcdValue, a, successor(predB), q, r,
+               decomposition, isGcdForBR);
+    ⟨gcdValue,
+     yPrime,
+     Integer.subtract(xPrime,
+         Integer.multiply(Natural.to_integer(q), yPrime)),
+     newLinearCombinationIdentity,
+     isGcdForAB⟩
+}
+
+-- ----------------------------------------------------------------------
+-- Step function for the strong induction: dispatch between the base
+-- case and the successor case.
+
+theorem Natural.has_bezout_step (b : Natural)
+        (inductionHypothesis :
+            (k : Natural) → successor(k) ≤ b
+            → (aPrime : Natural) → Natural.has_bezout(aPrime, k))
+        : (a : Natural) → Natural.has_bezout(a, b) :=
+  (cases b {
+    | zero =>
+        function
+            (_ : (k : Natural) → successor(k) ≤ zero
+                  → (aPrime : Natural) → Natural.has_bezout(aPrime, k)) =>
+          function (a : Natural) => Natural.has_bezout_zero_right(a)
+    | successor(predB) =>
+        function
+            (ihAtSuccessor :
+                (k : Natural) → successor(k) ≤ successor(predB)
+                → (aPrime : Natural) → Natural.has_bezout(aPrime, k)) =>
+          function (a : Natural) =>
+              Natural.has_bezout_successor_step(predB, a, ihAtSuccessor)
+  } : ((k : Natural) → successor(k) ≤ b
+       → (aPrime : Natural) → Natural.has_bezout(aPrime, k))
+      → (a : Natural) → Natural.has_bezout(a, b))(inductionHypothesis)
+
+-- ----------------------------------------------------------------------
+-- Main theorem: Bezout's identity.
+theorem Natural.bezout (a b : Natural)
+        : Natural.has_bezout(a, b) :=
+  Natural.strong_induction(
+      function (bArgument : Natural) =>
+          (aPrime : Natural) → Natural.has_bezout(aPrime, bArgument),
+      function (bArgument : Natural)
+               (inductionHypothesis :
+                   (k : Natural) → successor(k) ≤ bArgument
+                   → (aPrime : Natural)
+                   → Natural.has_bezout(aPrime, k)) =>
+          Natural.has_bezout_step(bArgument, inductionHypothesis),
+      b, a)

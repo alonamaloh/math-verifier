@@ -1,0 +1,232 @@
+-- Natural/divides_subtract.math
+--
+-- Arithmetic facts about divisibility involving "removing a divisor
+-- summand from a sum". Used by Bezout (via is_gcd_remainder_lift) to
+-- show that any common divisor of (first, second) also divides the
+-- remainder when first = quotient · second + remainder.
+--
+-- The core lemma is `Natural.divides_subtract_from_sum`:
+--     d ∣ (firstSummand + secondSummand) → d ∣ firstSummand
+--     → d ∣ secondSummand.
+-- Proof: peel `firstSummand = d · q` one divisor at a time. The two
+-- "peel" lemmas (`_after_remove_one`, `_after_remove_multiple`) factor
+-- through a case-split on the witness of the parent divides claim.
+-- A tiny add-zero lemma (`add_equals_zero_right`) closes the bottom
+-- of the zero-witness branch.
+
+module Natural.divides_subtract
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.divisibility
+import Natural.gcd
+
+-- ----------------------------------------------------------------------
+-- a + b = 0 implies b = 0. Mirror lemma; only the right-side variant
+-- is used downstream.
+theorem Natural.add_equals_zero_right
+        : (a b : Natural) → a + b = zero → b = zero
+  | zero, b, equation =>
+      equation
+  | successor(predA), b, equation =>
+      False.eliminate_proposition(
+          b = zero,
+          Natural.successor_not_zero(predA + b, equation))
+
+-- ----------------------------------------------------------------------
+-- "Peel one divisor" lemmas. Two case-helpers, then the main statement
+-- via pattern-matching on the witness.
+
+theorem Natural.divides_after_remove_one_witness_zero
+        (divisor secondSummand : Natural)
+        (equation : divisor + secondSummand = divisor * zero)
+        : divisor ∣ secondSummand := {
+    claim sumEqualsZero : divisor + secondSummand = zero
+        by Equality.transitivity(equation, Natural.multiply_zero(divisor));
+    claim secondEqualsZero : secondSummand = zero
+        by Natural.add_equals_zero_right(
+               divisor, secondSummand, sumEqualsZero);
+    Equality.transport_proposition(
+        Natural,
+        function (rightEnd : Natural) => divisor ∣ rightEnd,
+        zero, secondSummand,
+        Equality.symmetry(secondEqualsZero),
+        Natural.divides_zero(divisor))
+}
+
+theorem Natural.divides_after_remove_one_witness_successor
+        (divisor secondSummand : Natural) (predQ : Natural)
+        (equation : divisor + secondSummand = divisor * successor(predQ))
+        : divisor ∣ secondSummand := {
+    -- divisor + secondSummand = divisor + divisor * predQ
+    claim cancelable : divisor + secondSummand = divisor + divisor * predQ
+        by Equality.transitivity(
+               equation, Natural.multiply_successor(divisor, predQ));
+    claim secondEqualsMultiple
+            : secondSummand = divisor * predQ
+        by Natural.add_cancel_left(
+               divisor, secondSummand, divisor * predQ, cancelable);
+    Exists.introduce(
+        Natural,
+        function (q : Natural) => secondSummand = divisor * q,
+        predQ,
+        secondEqualsMultiple)
+}
+
+theorem Natural.divides_after_remove_one
+        (divisor secondSummand : Natural)
+        (divisorDividesEnlargedSum : divisor ∣ (divisor + secondSummand))
+        : divisor ∣ secondSummand :=
+  Exists.eliminate(
+      Natural,
+      function (q : Natural) => divisor + secondSummand = divisor * q,
+      divisor ∣ secondSummand,
+      function (q : Natural)
+               (equation : divisor + secondSummand = divisor * q) =>
+          (cases q {
+            | zero =>
+                function (zeroEquation :
+                            divisor + secondSummand = divisor * zero) =>
+                  Natural.divides_after_remove_one_witness_zero(
+                      divisor, secondSummand, zeroEquation)
+            | successor(predQ) =>
+                function (successorEquation :
+                            divisor + secondSummand
+                            = divisor * successor(predQ)) =>
+                  Natural.divides_after_remove_one_witness_successor(
+                      divisor, secondSummand, predQ, successorEquation)
+          } : (divisor + secondSummand = divisor * q) → divisor ∣ secondSummand)(
+              equation),
+      divisorDividesEnlargedSum)
+
+-- ----------------------------------------------------------------------
+-- "Peel q copies of divisor": iterate the one-divisor peel by induction
+-- on q. The successor case reshapes `divisor * successor(q') + s` into
+-- `divisor + (divisor * q' + s)` so the one-step peel applies, then
+-- recurses on q'.
+
+theorem Natural.divides_after_remove_multiple
+        (divisor : Natural)
+        : (q : Natural) → (secondSummand : Natural)
+          → divisor ∣ (divisor * q + secondSummand)
+          → divisor ∣ secondSummand
+  | zero, secondSummand, dividesEnlargedSum =>
+      Equality.transport_proposition(
+          Natural,
+          function (rightEnd : Natural) => divisor ∣ rightEnd,
+          divisor * zero + secondSummand, secondSummand,
+          calc divisor * zero + secondSummand
+             = zero + secondSummand
+                    by congruenceOf(
+                           function (lhs : Natural) => lhs + secondSummand,
+                           Natural.multiply_zero(divisor))
+             = secondSummand
+                    by reflexivity(secondSummand),
+          dividesEnlargedSum)
+  | successor(predQ), secondSummand, dividesEnlargedSum =>
+      Natural.divides_after_remove_multiple(
+          divisor, predQ, secondSummand,
+          Natural.divides_after_remove_one(
+              divisor, divisor * predQ + secondSummand,
+              Equality.transport_proposition(
+                  Natural,
+                  function (rightEnd : Natural) => divisor ∣ rightEnd,
+                  divisor * successor(predQ) + secondSummand,
+                  divisor + (divisor * predQ + secondSummand),
+                  calc divisor * successor(predQ) + secondSummand
+                     = (divisor + divisor * predQ) + secondSummand
+                            by congruenceOf(
+                                   function (lhs : Natural) =>
+                                       lhs + secondSummand,
+                                   Natural.multiply_successor(divisor, predQ))
+                     = divisor + (divisor * predQ + secondSummand)
+                            by Natural.add_associative(
+                                   divisor, divisor * predQ, secondSummand),
+                  dividesEnlargedSum)))
+
+-- ----------------------------------------------------------------------
+-- Main lemma: if d divides a sum and divides one of the summands, then
+-- d divides the other summand. Extract witnesses from the two divides
+-- hypotheses, rewrite the first summand as `divisor * q`, then call
+-- the `_after_remove_multiple` lemma.
+
+theorem Natural.divides_subtract_from_sum
+        (divisor firstSummand secondSummand : Natural)
+        (dividesSum : divisor ∣ (firstSummand + secondSummand))
+        (dividesFirst : divisor ∣ firstSummand)
+        : divisor ∣ secondSummand :=
+  Exists.eliminate(
+      Natural,
+      function (q : Natural) => firstSummand = divisor * q,
+      divisor ∣ secondSummand,
+      function (q : Natural)
+               (firstEquation : firstSummand = divisor * q) =>
+          Natural.divides_after_remove_multiple(
+              divisor, q, secondSummand,
+              Equality.transport_proposition(
+                  Natural,
+                  function (lhs : Natural) =>
+                      divisor ∣ (lhs + secondSummand),
+                  firstSummand, divisor * q,
+                  firstEquation,
+                  dividesSum)),
+      dividesFirst)
+
+-- ----------------------------------------------------------------------
+-- is_gcd remainder lift: from `first = quotient · second + remainder`
+-- and `is_gcd(g, second, remainder)`, conclude `is_gcd(g, first,
+-- second)`. The forward direction (g ∣ first) uses divides_add and
+-- divides_multiple_left; the universal-property direction uses
+-- divides_subtract_from_sum to descend from "d divides first" plus
+-- "d divides second" to "d divides remainder".
+
+theorem Natural.is_gcd_remainder_lift
+        (gcdValue first second quotient remainder : Natural)
+        (decomposition : first = quotient * second + remainder)
+        (gcdOfSecondRemainder : Natural.is_gcd(gcdValue, second, remainder))
+        : Natural.is_gcd(gcdValue, first, second) := {
+    let ⟨gcdDividesSecond, gcdDividesRemainder, universalForward⟩
+        := gcdOfSecondRemainder;
+    claim gcdDividesQuotientTimesSecond : gcdValue ∣ (quotient * second)
+        by Natural.divides_multiple_left(
+               gcdValue, quotient, second, gcdDividesSecond);
+    claim gcdDividesSum : gcdValue ∣ (quotient * second + remainder)
+        by Natural.divides_add(
+               gcdValue, quotient * second, remainder,
+               gcdDividesQuotientTimesSecond, gcdDividesRemainder);
+    claim gcdDividesFirst : gcdValue ∣ first
+        by Equality.transport_proposition(
+               Natural,
+               function (rightEnd : Natural) => gcdValue ∣ rightEnd,
+               quotient * second + remainder, first,
+               Equality.symmetry(decomposition),
+               gcdDividesSum);
+    ⟨gcdDividesFirst,
+     gcdDividesSecond,
+     function (commonDivisor : Natural)
+              (dDividesFirst : commonDivisor ∣ first)
+              (dDividesSecond : commonDivisor ∣ second) => {
+       claim dDividesQuotientTimesSecond
+             : commonDivisor ∣ (quotient * second)
+         by Natural.divides_multiple_left(
+                commonDivisor, quotient, second, dDividesSecond);
+       claim dDividesSumForm
+             : commonDivisor ∣ (quotient * second + remainder)
+         by Equality.transport_proposition(
+                Natural,
+                function (rightEnd : Natural) => commonDivisor ∣ rightEnd,
+                first, quotient * second + remainder,
+                decomposition,
+                dDividesFirst);
+       claim dDividesRemainder : commonDivisor ∣ remainder
+         by Natural.divides_subtract_from_sum(
+                commonDivisor, quotient * second, remainder,
+                dDividesSumForm, dDividesQuotientTimesSecond);
+       universalForward(commonDivisor, dDividesSecond, dDividesRemainder)
+     }⟩
+}
