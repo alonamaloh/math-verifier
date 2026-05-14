@@ -1,0 +1,32 @@
+-- Test/sorry_universes_test.math
+--
+-- Exercises the `sorry` placeholder across the universe levels it must
+-- support, confirming the elaborator's split between
+-- `Internal.sorry_proposition` (for goals in `Proposition = Sort 0`)
+-- and `Internal.sorry.{u}` (for goals in `Type(u) = Sort (u+1)`) is
+-- entirely transparent to the user. Each `sorry` use produces a
+-- warning at the use site; the file otherwise verifies.
+
+module Test.sorry_universes_test
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+
+-- (1) Proposition goal. Goal type lives in `Sort 0`, so the elaborator
+-- routes to `Internal.sorry_proposition`.
+theorem sorry_at_proposition (a b : Natural) : a + b = b + a :=
+  sorry
+
+-- (2) `Type(0)` goal. Goal type's type is `Sort 1`, so the elaborator
+-- routes to `Internal.sorry.{0}`. The placeholder stands in for a
+-- value of `Natural`.
+definition sorry_at_type_zero : Natural :=
+  sorry
+
+-- (3) Higher-universe goal: a placeholder for a type itself. The
+-- expected type is `Type(0)`, whose type is `Sort 2 = Type(1)`, so the
+-- elaborator routes to `Internal.sorry.{1}`.
+definition sorry_at_type_one : Type(0) :=
+  sorry
