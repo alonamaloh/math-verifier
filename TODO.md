@@ -8,48 +8,48 @@ pain becomes acute.
 ## Active
 
 ### 1. More math content — in progress
-Plan revision (2026-05-14): the original "Integer cancellation lemma"
-is unworkable. It would require Quotient.exact (the inverse of
-Quotient.sound) or propositional extensionality, neither of which the
-kernel has — the kernel has *proof* irrelevance but not *propositional*
-extensionality, so we can't lift the equivalence relation back through
-a Quotient equality. Switched to a concrete-triple representation for
-Rational (numerator-as-pair inlined inside the Rational triple),
-keeping the equivalence purely Natural-level and reducing transitivity
-to the existing `Natural.multiply_cancel_right`.
+
+**Plan revision history**: The original Integer-cancellation route
+was blocked because the kernel lacked the converse of
+`Quotient.sound`. After a long discussion of foundations, the user
+chose to add **propositional extensionality** as a kernel axiom and
+derive `Quotient.exact` from it. With those in hand, Integer
+cancellation is a straightforward 100-line proof, and Rational can
+be built the natural way (Integer numerator, positive Natural
+denominator). The concrete-triple workaround has been replaced.
 
 Status:
+- **DONE: Foundation upgrade.** Propositional extensionality
+  (`Logic/extensionality.math`), `Quotient.exact` (derived in
+  `Logic/quotient.math`), and `Integer.multiply_cancel_right_by_natural_successor`
+  (in `Integer/cancellation.math`).
 - **DONE: Abstract algebra layer.** Monoid, Group, Ring, CommutativeRing
-  predicates; Integer and Natural instances; a few generic group
-  lemmas (`right_inverse_unique`, etc.).
+  predicates; Integer and Natural instances; a few generic group lemmas.
 - **DONE: Quotient.induct_two** for binary lemmas on quotient types.
 - **DONE: Natural multiplication cancellation** + helpers.
-- **DONE: Rational basics** (`RationalRepresentative`,
-  `RationalEquivalent`, reflexivity / symmetry / transitivity,
-  `Rational := Quotient(...)`, `Rational.zero`, `Rational.one`).
-- **DONE: Rational.add_representatives** (the componentwise formula on
-  representative triples).
+- **DONE: Rational basics, the natural way.**
+  `RationalRepresentative.make(numerator : Integer,
+  denominatorMinusOne : Natural)`; cross-multiplication equivalence
+  at Integer level; reflexivity / symmetry / transitivity verified;
+  `Rational := Quotient(...)`; constants. Transitivity uses
+  `Integer.multiply_cancel_right_by_natural_successor` directly.
+- **DONE: Rational.add_representatives** (the new formula on
+  Integer/Natural pairs).
 
 Next:
 
-- **Rational.add respect proofs + lift.** Two respect proofs (one
-  per argument position) factor `succ(d2)` out of the equation,
-  cancel the p2/n2 cross-terms via commutativity inside the
-  triple-product factors, and reduce the remainder to the
-  equivalence hypothesis times `succ(d2)`. Each is roughly a
-  100-line calc chain; the structure mirrors
-  `Integer.add_respects_first_natural`. Then two Quotient.lifts
-  build `Rational.add`. Probably ~400 lines.
-- **Rational.multiply.** Similar shape. Probably ~400 lines.
-- **Rational.negate, Rational.subtract.** Simpler — negate swaps
-  positive and negative parts of the triple. ~150 lines.
+- **Rational.add respect proofs + lift.** With the Integer-level
+  algebra available (Integer.distributivity, Integer.multiply_associative,
+  Integer.multiply_commutative) and Quotient.exact for any future
+  cancellation steps, the respect proofs should be substantially
+  shorter than the concrete-triple version (~150 lines each rather
+  than ~300). Plus two `Quotient.lift` calls for the actual operation.
+- **Rational.multiply, negate, subtract.** Same shape as `add`.
 - **Rational ring identities.** Commutativity / associativity /
-  identity / distributivity on Rational, all lifted from the
-  representative-level Natural proofs. ~600 lines.
-- **Integer → Rational embedding.** `Integer.to_rational` defined by
-  Quotient.lift on the Integer side: a representative `make(p, q) :
-  IntegerRepresentative` maps to `make(p, q, 0) :
-  RationalRepresentative`. Extends the cast registry: ascription
+  identity / distributivity at Rational level. Lifted from Integer-
+  level analogues via `Quotient.induct` chains.
+- **Integer → Rational embedding.** `Integer.to_rational(n) :=
+  mk(make(n, 0))`. Extends the cast registry: ascription
   `(x : Rational)` on an Integer auto-applies this.
 - **Field** predicate, with a non-zero-implies-invertible witness.
   Rational is then a Field instance.
@@ -91,15 +91,20 @@ Smaller items to land when the motivating pain becomes acute:
 
 ## Completed
 
-- **2026-05-14: Rational basics + add_representatives.** Concrete-
-  triple representation `make(positivePart, negativePart,
-  denominatorMinusOne)` with Natural-level equivalence. Refl /sym /
-  trans verified; transitivity reduces to Natural.multiply_cancel via
-  the standard cross-multiply argument. Plus three Natural helper
-  lemmas in the file (`multiply_associative_right_swap_in_pair`, two
-  add-reshape variants). `Rational.add_representatives` defined. The
-  respect proofs + Quotient.lift remain. Commits `680fb3b`,
-  `15ecebe`.
+- **2026-05-14: Rational rebuilt with Integer numerator.** Replace
+  the concrete-triple workaround with `(Integer, Natural)` — exactly
+  the construction a mathematician writes. Transitivity uses Integer
+  cancellation directly. `Rational.add_representatives` updated to
+  the new formula. The previous Rational/basics.math + Rational/
+  addition.math were rewritten end-to-end. Commit `52dd311`.
+- **2026-05-14: Foundation upgrade.** Added propositional
+  extensionality, derived Quotient.exact, proved Integer
+  cancellation. Together these enable the natural Rational
+  construction (and unblock similar constructions for Complex,
+  polynomial rings, etc.). Commit `a1b4423`.
+- **(superseded) Rational basics + add_representatives, concrete-
+  triple version.** Replaced by the natural Integer-numerator
+  representation above.
 - **2026-05-14: Natural multiplication cancellation.** `a · c = b · c`
   with `c ≥ 1` forces `a = b`. Three supporting helpers
   (`add_equals_zero_left`, `multiply_equals_zero_with_positive_right`,
