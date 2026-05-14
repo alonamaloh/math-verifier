@@ -4074,13 +4074,28 @@ private:
         ExpressionPointer rightKernel =
             elaborateExpression(rightSurface, localBinders);
         // Determine the operand type by inferring the type of the left
-        // operand. We peel any FreeVars from opening because we only
-        // need to peek at the head.
-        ExpressionPointer leftType = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, leftKernel));
-        auto* leftTypeConstant = std::get_if<Constant>(&leftType->node);
-        std::string operandTypeName =
-            leftTypeConstant ? leftTypeConstant->name : "<unknown>";
+        // operand. Check the raw inferred type first: if a binder was
+        // declared with a named type like `Integer` (which δ-reduces
+        // to `Quotient(IntegerRepresentative, IntegerEquivalent)`),
+        // we want to dispatch on `Integer`, not the unfolded form.
+        // Only WHNF as a fallback for types that are themselves
+        // computations (rare in practice but used by let-bindings
+        // whose type-annotation is a reducible expression).
+        ExpressionPointer leftTypeRaw =
+            inferTypeInLocalContext(localBinders, leftKernel);
+        auto* leftTypeConstantRaw =
+            std::get_if<Constant>(&leftTypeRaw->node);
+        std::string operandTypeName;
+        if (leftTypeConstantRaw) {
+            operandTypeName = leftTypeConstantRaw->name;
+        } else {
+            ExpressionPointer leftType =
+                weakHeadNormalForm(environment_, leftTypeRaw);
+            auto* leftTypeConstant =
+                std::get_if<Constant>(&leftType->node);
+            operandTypeName =
+                leftTypeConstant ? leftTypeConstant->name : "<unknown>";
+        }
         std::string targetFunction;
         // For `<` we wrap the left operand in `successor`, since
         // `a < b` is defined as `LessOrEqual(successor(a), b)`.
@@ -4095,13 +4110,18 @@ private:
             }
             else if (operatorSymbol == "∣") targetFunction = "Natural.divides";
         }
+        else if (operandTypeName == "Integer") {
+            if (operatorSymbol == "+") targetFunction = "Integer.add";
+            else if (operatorSymbol == "*") targetFunction = "Integer.multiply";
+            else if (operatorSymbol == "-") targetFunction = "Integer.subtract";
+        }
         if (targetFunction.empty()) {
             throw ElaborateError(
                 "operator '" + operatorSymbol + "' is not supported for "
                 "operand type '" + operandTypeName + "' (line "
                 + std::to_string(line)
-                + "); v1 supports +, *, ≤, <, ∣ on Natural and ∧, ∨ "
-                "on Proposition");
+                + "); supported: +, *, ≤, <, ∣ on Natural; +, *, - on "
+                "Integer; ∧, ∨ on Proposition");
         }
         if (environment_.lookup(targetFunction) == nullptr) {
             throw ElaborateError(
