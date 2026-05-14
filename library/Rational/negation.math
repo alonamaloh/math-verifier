@@ -1,0 +1,123 @@
+-- Rational/negation.math
+--
+-- Negation on Rational. On representatives, negation acts only on the
+-- numerator: `-(n / (d+1)) = (-n) / (d+1)`. The denominator is
+-- unchanged, so the respect proof reduces to negating both sides of
+-- the cross-multiplication hypothesis via
+-- `Integer.multiply_negate_left`. Subtraction is the usual derived
+-- `x - y := x + (-y)`.
+
+module Rational.negation
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.ring
+import Integer.negation
+import Integer.algebra
+import Rational.basics
+import Rational.addition
+
+-- ----------------------------------------------------------------------
+-- Negation on representatives: negate the numerator; preserve the
+-- denominator-minus-one.
+definition Rational.negate_representatives
+        : RationalRepresentative → RationalRepresentative
+  | RationalRepresentative.make(n, d) =>
+      RationalRepresentative.make(Integer.negate(n), d)
+
+-- ----------------------------------------------------------------------
+-- Respect: if `(n1, d1) ~ (n1', d1')` then `(-n1, d1) ~ (-n1', d1')`.
+-- Both equivalences are Integer cross-multiplications; negating both
+-- sides of the original via `multiply_negate_left` yields the negated
+-- equivalence.
+
+theorem Rational.negate_respects_integer
+        (n1 n1Prime : Integer) (d1 d1Prime : Natural)
+        (equivalenceHypothesis
+            : Equality.{0}(Integer,
+                Integer.multiply(n1,
+                    Natural.to_integer(successor(d1Prime))),
+                Integer.multiply(n1Prime,
+                    Natural.to_integer(successor(d1)))))
+        : Equality.{0}(Integer,
+              Integer.multiply(Integer.negate(n1),
+                  Natural.to_integer(successor(d1Prime))),
+              Integer.multiply(Integer.negate(n1Prime),
+                  Natural.to_integer(successor(d1)))) :=
+  calc Integer.multiply(Integer.negate(n1),
+           Natural.to_integer(successor(d1Prime)))
+     = Integer.negate(
+           Integer.multiply(n1,
+               Natural.to_integer(successor(d1Prime))))
+            by Integer.multiply_negate_left(n1,
+                   Natural.to_integer(successor(d1Prime)))
+     = Integer.negate(
+           Integer.multiply(n1Prime,
+               Natural.to_integer(successor(d1))))
+            by congruenceOf(Integer.negate, equivalenceHypothesis)
+     = Integer.multiply(Integer.negate(n1Prime),
+           Natural.to_integer(successor(d1)))
+            by Equality.symmetry(
+                   Integer.multiply_negate_left(n1Prime,
+                       Natural.to_integer(successor(d1))))
+
+theorem Rational.negate_respects_after_first
+        (n1 : Integer) (d1 : Natural)
+        : (rep1Prime : RationalRepresentative)
+          → RationalEquivalent(
+                RationalRepresentative.make(n1, d1), rep1Prime)
+          → RationalEquivalent(
+                Rational.negate_representatives(
+                    RationalRepresentative.make(n1, d1)),
+                Rational.negate_representatives(rep1Prime))
+  | RationalRepresentative.make(n1Prime, d1Prime),
+    equivalenceHypothesis =>
+      Rational.negate_respects_integer(
+          n1, n1Prime, d1, d1Prime, equivalenceHypothesis)
+
+theorem Rational.negate_respects
+        : (rep1 rep1Prime : RationalRepresentative)
+          → RationalEquivalent(rep1, rep1Prime)
+          → RationalEquivalent(
+                Rational.negate_representatives(rep1),
+                Rational.negate_representatives(rep1Prime))
+  | RationalRepresentative.make(n1, d1),
+    rep1Prime, equivalenceHypothesis =>
+      Rational.negate_respects_after_first(
+          n1, d1, rep1Prime, equivalenceHypothesis)
+
+-- ----------------------------------------------------------------------
+-- Negation on Rational: a single Quotient.lift.
+definition Rational.negate (x : Rational) : Rational :=
+  Quotient.lift.{0, 0}(
+      RationalRepresentative,
+      RationalEquivalent,
+      Rational,
+      function (rep : RationalRepresentative) =>
+          Quotient.mk.{0}(
+              RationalRepresentative, RationalEquivalent,
+              Rational.negate_representatives(rep)),
+      function (rep1 rep1Prime : RationalRepresentative)
+               (rep1EquivalentRep1Prime
+                   : RationalEquivalent(rep1, rep1Prime)) =>
+          Quotient.sound.{0}(
+              RationalRepresentative, RationalEquivalent,
+              Rational.negate_representatives(rep1),
+              Rational.negate_representatives(rep1Prime),
+              Rational.negate_respects(
+                  rep1, rep1Prime, rep1EquivalentRep1Prime)),
+      x)
+
+-- ----------------------------------------------------------------------
+-- Subtraction: x − y := x + (−y).
+definition Rational.subtract (x y : Rational) : Rational :=
+  Rational.add(x, Rational.negate(y))
