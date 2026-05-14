@@ -1,428 +1,311 @@
 -- Rational/basics.math
 --
--- The rationals, constructed as a quotient of triples of Naturals.
--- A representative `make(positivePart, negativePart, denominatorMinusOne)`
--- stands for the rational
---     (positivePart − negativePart) / (denominatorMinusOne + 1).
--- The "denominator minus one" trick keeps the denominator
--- automatically positive without a side-condition; the integer
--- numerator is encoded as a pair of Naturals, the same way Integer
--- is built (but inlined here rather than going through Integer, so
--- the equivalence relation stays in Natural and the transitivity
--- proof can use Natural multiplication cancellation directly).
+-- The rationals as equivalence classes of (Integer numerator,
+-- positive Natural denominator) pairs under cross-multiplication.
+-- This is the construction a mathematician would write: a Rational
+-- is an Integer over a positive Natural, with `(n1, d1) ~ (n2, d2)`
+-- iff `n1 · d2 = n2 · d1`. The "positive" side condition is captured
+-- by storing the denominator as `denominatorMinusOne + 1`, so the
+-- type itself rules out zero denominators without an attached proof.
 --
--- The equivalence relation cross-multiplies. With ni : Integer
--- written as `pi − ni` and denominators di + 1:
---     (p1 − n1) · (d2 + 1) = (p2 − n2) · (d1 + 1)
--- becomes, after expansion and avoiding Natural subtraction,
---     p1 · succ(d2) + n2 · succ(d1) = n1 · succ(d2) + p2 · succ(d1).
--- That is the form we use below.
+-- Transitivity is the substantial step. We cross-multiply, reshape
+-- the resulting Integer products into the form
+--     (n1 · succ(d3)) · succ(d2) = (n3 · succ(d1)) · succ(d2),
+-- and apply `Integer.multiply_cancel_right_by_natural_successor` to
+-- strip the common `succ(d2)` factor. The cancellation lemma in turn
+-- rests on `Quotient.exact` (derived from propositional
+-- extensionality in Logic/quotient.math) — recovering the underlying
+-- representative equivalence from a quotient equality is the missing
+-- piece that previously forced an awkward concrete-triple encoding.
 
 module Rational.basics
 
 import Logic.basics
 import Logic.exists
 import Logic.quotient
+import Logic.extensionality
 import Equality.basics
 import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
-import Natural.cancellation
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.ring
+import Integer.cancellation
 
 -- ----------------------------------------------------------------------
--- Small Natural-level helpers used inside the transitivity proof.
-
--- `(a · b) · c = (a · c) · b`. Pulls a chosen factor into the
--- rightmost position of a triple product.
-theorem Natural.multiply_associative_right_swap_in_pair
-        (a b c : Natural)
-        : (a * b) * c = (a * c) * b :=
-  calc (a * b) * c
-     = a * (b * c)   by Natural.multiply_associative(a, b, c)
-     = a * (c * b)   by congruenceOf(
-                            function (rest : Natural) => a * rest,
-                            Natural.multiply_commutative(b, c))
-     = (a * c) * b   by Equality.symmetry(
-                            Natural.multiply_associative(a, c, b))
-
--- `(a + b) + (c + d) = (c + a) + (b + d)`. Swaps the first elements
--- of the two sub-sums (a ↔ c, with c landing left of a). Two-step
--- shuffle: a swap followed by a commute.
-theorem Natural.add_two_two_swap_first
-        (a b c d : Natural)
-        : (a + b) + (c + d) = (c + a) + (b + d) :=
-  calc (a + b) + (c + d)
-     = (a + c) + (b + d)
-            by Natural.add_two_two_swap(a, b, c, d)
-     = (c + a) + (b + d)
-            by congruenceOf(
-                   function (lhs : Natural) => lhs + (b + d),
-                   Natural.add_commutative(a, c))
-
--- `(a + b) + (c + d) = (c + b) + (a + d)`. Swaps a ↔ c keeping each
--- in the "first of pair" position. Three-step: swap, commute, swap.
-theorem Natural.add_two_two_swap_outer_firsts
-        (a b c d : Natural)
-        : (a + b) + (c + d) = (c + b) + (a + d) :=
-  calc (a + b) + (c + d)
-     = (a + c) + (b + d)
-            by Natural.add_two_two_swap(a, b, c, d)
-     = (c + a) + (b + d)
-            by congruenceOf(
-                   function (lhs : Natural) => lhs + (b + d),
-                   Natural.add_commutative(a, c))
-     = (c + b) + (a + d)
-            by Natural.add_two_two_swap(c, a, b, d)
+-- Representatives and the equivalence relation.
 
 inductive RationalRepresentative : Type(0) where
   | RationalRepresentative.make
-      : Natural → Natural → Natural → RationalRepresentative
+      : Integer → Natural → RationalRepresentative
 
--- The equivalence: cross-multiply with the sign convention encoded
--- as "positive part − negative part".
+-- (n1, d1) ~ (n2, d2) iff n1 · (d2 + 1) = n2 · (d1 + 1) in Integer.
 definition RationalEquivalent
         : RationalRepresentative → RationalRepresentative → Proposition
-  | RationalRepresentative.make(p1, n1, d1),
-    RationalRepresentative.make(p2, n2, d2) =>
-      p1 * successor(d2) + n2 * successor(d1)
-      = n1 * successor(d2) + p2 * successor(d1)
+  | RationalRepresentative.make(n1, d1),
+    RationalRepresentative.make(n2, d2) =>
+      Equality.{0}(Integer,
+          Integer.multiply(n1, Natural.to_integer(successor(d2))),
+          Integer.multiply(n2, Natural.to_integer(successor(d1))))
 
 -- ----------------------------------------------------------------------
--- Reflexivity: (p, n, d) ~ (p, n, d). The unfolded definition wants
---     p · succ(d) + n · succ(d) = n · succ(d) + p · succ(d).
--- That's the symmetric version of `add_commutative`.
+-- Reflexivity is just reflexivity of Integer equality.
+
 theorem RationalEquivalent.reflexive
         : (representative : RationalRepresentative)
           → RationalEquivalent(representative, representative)
-  | RationalRepresentative.make(p, n, d) =>
-      Natural.add_commutative(p * successor(d), n * successor(d))
+  | RationalRepresentative.make(n, d) =>
+      reflexivity.{0}(Integer,
+          Integer.multiply(n, Natural.to_integer(successor(d))))
 
 -- ----------------------------------------------------------------------
--- Symmetry. After destructuring both representatives, the goal is
--- the same equation with both sides swapped — three `add_commutative`
--- shuffles via `Equality.symmetry` on the hypothesis.
+-- Symmetry is just symmetry of Integer equality. The destructure
+-- chain matches `IntegerEquivalent.symmetric` from Integer/basics.math.
 
 theorem RationalEquivalent.symmetric_after_first
-        (p1 n1 d1 : Natural)
+        (n1 : Integer) (d1 : Natural)
         : (other : RationalRepresentative)
           → RationalEquivalent(
-                RationalRepresentative.make(p1, n1, d1), other)
+                RationalRepresentative.make(n1, d1), other)
           → RationalEquivalent(
-                other, RationalRepresentative.make(p1, n1, d1))
-  | RationalRepresentative.make(p2, n2, d2), equivalenceProof =>
-      calc p2 * successor(d1) + n1 * successor(d2)
-         = n1 * successor(d2) + p2 * successor(d1)
-                by Natural.add_commutative(
-                       p2 * successor(d1), n1 * successor(d2))
-         = p1 * successor(d2) + n2 * successor(d1)
-                by Equality.symmetry(equivalenceProof)
-         = n2 * successor(d1) + p1 * successor(d2)
-                by Natural.add_commutative(
-                       p1 * successor(d2), n2 * successor(d1))
+                other, RationalRepresentative.make(n1, d1))
+  | RationalRepresentative.make(n2, d2), equivalenceHypothesis =>
+      Equality.symmetry(equivalenceHypothesis)
 
 theorem RationalEquivalent.symmetric
         : (x y : RationalRepresentative)
           → RationalEquivalent(x, y)
           → RationalEquivalent(y, x)
-  | RationalRepresentative.make(p1, n1, d1), y, equivalenceProof =>
+  | RationalRepresentative.make(n1, d1), y, equivalenceHypothesis =>
       RationalEquivalent.symmetric_after_first(
-          p1, n1, d1, y, equivalenceProof)
+          n1, d1, y, equivalenceHypothesis)
 
 -- ----------------------------------------------------------------------
--- Transitivity is the substantial step. With representatives
---     (p1, n1, d1), (p2, n2, d2), (p3, n3, d3)
--- and hypotheses
---     H1: p1·succ(d2) + n2·succ(d1) = n1·succ(d2) + p2·succ(d1)
---     H2: p2·succ(d3) + n3·succ(d2) = n2·succ(d3) + p3·succ(d2)
--- we want
---          p1·succ(d3) + n3·succ(d1) = n1·succ(d3) + p3·succ(d1).
---
--- Strategy: multiply H1 through by succ(d3), multiply H2 through by
--- succ(d1), add them. The terms `p2·succ(d1)·succ(d3)` and
--- `n2·succ(d1)·succ(d3)` appear on both sides (up to commutativity)
--- and cancel. What's left factors a `succ(d2)`, which is positive,
--- so `Natural.multiply_cancel_right` finishes the job.
+-- Transitivity: cross-multiply, reshape so a common `succ(d2)` factor
+-- is rightmost on both sides of the chained equation, cancel via
+-- Integer cancellation.
 
 theorem RationalEquivalent.transitive_natural
-        (p1 n1 d1 p2 n2 d2 p3 n3 d3 : Natural)
-        (hyp1
-            : p1 * successor(d2) + n2 * successor(d1)
-              = n1 * successor(d2) + p2 * successor(d1))
-        (hyp2
-            : p2 * successor(d3) + n3 * successor(d2)
-              = n2 * successor(d3) + p3 * successor(d2))
-        : p1 * successor(d3) + n3 * successor(d1)
-          = n1 * successor(d3) + p3 * successor(d1) := {
-    -- Step 1: scale hyp1 by succ(d3) on the right, distribute, and
-    -- regroup the products so the factor that will eventually
-    -- cancel (succ(d2)) is rightmost.
-    claim hyp1Scaled
-          : (p1 * successor(d3)) * successor(d2)
-            + (n2 * successor(d1)) * successor(d3)
-            = (n1 * successor(d3)) * successor(d2)
-              + (p2 * successor(d1)) * successor(d3)
-        by calc (p1 * successor(d3)) * successor(d2)
-                + (n2 * successor(d1)) * successor(d3)
-              = (p1 * successor(d2)) * successor(d3)
-                + (n2 * successor(d1)) * successor(d3)
+        (n1 : Integer) (d1 : Natural)
+        (n2 : Integer) (d2 : Natural)
+        (n3 : Integer) (d3 : Natural)
+        (firstEquivalence
+            : Equality.{0}(Integer,
+                Integer.multiply(n1, Natural.to_integer(successor(d2))),
+                Integer.multiply(n2, Natural.to_integer(successor(d1)))))
+        (secondEquivalence
+            : Equality.{0}(Integer,
+                Integer.multiply(n2, Natural.to_integer(successor(d3))),
+                Integer.multiply(n3, Natural.to_integer(successor(d2)))))
+        : Equality.{0}(Integer,
+              Integer.multiply(n1, Natural.to_integer(successor(d3))),
+              Integer.multiply(n3,
+                                Natural.to_integer(successor(d1)))) := {
+    -- Multiply firstEquivalence on the right by succ(d3), then
+    -- shuffle (succ(d2) succ(d3)) → (succ(d3) succ(d2)) on the LHS
+    -- so the chained-cancellation factor succ(d2) is rightmost.
+    claim leftChainedToD3
+          : Equality.{0}(Integer,
+                Integer.multiply(
+                    Integer.multiply(n1,
+                        Natural.to_integer(successor(d3))),
+                    Natural.to_integer(successor(d2))),
+                Integer.multiply(
+                    Integer.multiply(n2,
+                        Natural.to_integer(successor(d1))),
+                    Natural.to_integer(successor(d3))))
+        by calc Integer.multiply(
+                    Integer.multiply(n1,
+                        Natural.to_integer(successor(d3))),
+                    Natural.to_integer(successor(d2)))
+              = Integer.multiply(n1,
+                    Integer.multiply(
+                        Natural.to_integer(successor(d3)),
+                        Natural.to_integer(successor(d2))))
+                    by Integer.multiply_associative(
+                           n1,
+                           Natural.to_integer(successor(d3)),
+                           Natural.to_integer(successor(d2)))
+              = Integer.multiply(n1,
+                    Integer.multiply(
+                        Natural.to_integer(successor(d2)),
+                        Natural.to_integer(successor(d3))))
                     by congruenceOf(
-                           function (term : Natural) =>
-                               term + (n2 * successor(d1))
-                                       * successor(d3),
-                           Natural.multiply_associative_right_swap_in_pair(
-                               p1, successor(d3), successor(d2)))
-              = (p1 * successor(d2) + n2 * successor(d1))
-                * successor(d3)
+                           function (innerProduct : Integer) =>
+                               Integer.multiply(n1, innerProduct),
+                           Integer.multiply_commutative(
+                               Natural.to_integer(successor(d3)),
+                               Natural.to_integer(successor(d2))))
+              = Integer.multiply(
+                    Integer.multiply(n1,
+                        Natural.to_integer(successor(d2))),
+                    Natural.to_integer(successor(d3)))
                     by Equality.symmetry(
-                           Natural.distributivity_right(
-                               p1 * successor(d2),
-                               n2 * successor(d1),
-                               successor(d3)))
-              = (n1 * successor(d2) + p2 * successor(d1))
-                * successor(d3)
+                           Integer.multiply_associative(
+                               n1,
+                               Natural.to_integer(successor(d2)),
+                               Natural.to_integer(successor(d3))))
+              = Integer.multiply(
+                    Integer.multiply(n2,
+                        Natural.to_integer(successor(d1))),
+                    Natural.to_integer(successor(d3)))
                     by congruenceOf(
-                           function (sum : Natural) =>
-                               sum * successor(d3),
-                           hyp1)
-              = (n1 * successor(d2)) * successor(d3)
-                + (p2 * successor(d1)) * successor(d3)
-                    by Natural.distributivity_right(
-                           n1 * successor(d2),
-                           p2 * successor(d1),
-                           successor(d3))
-              = (n1 * successor(d3)) * successor(d2)
-                + (p2 * successor(d1)) * successor(d3)
+                           function (leftFactor : Integer) =>
+                               Integer.multiply(leftFactor,
+                                   Natural.to_integer(successor(d3))),
+                           firstEquivalence);
+    -- Now reshape secondEquivalence the same way: multiply by
+    -- succ(d1) and shuffle so the answer ends with succ(d2) rightmost.
+    claim rightChainedToD1
+          : Equality.{0}(Integer,
+                Integer.multiply(
+                    Integer.multiply(n2,
+                        Natural.to_integer(successor(d1))),
+                    Natural.to_integer(successor(d3))),
+                Integer.multiply(
+                    Integer.multiply(n3,
+                        Natural.to_integer(successor(d1))),
+                    Natural.to_integer(successor(d2))))
+        by calc Integer.multiply(
+                    Integer.multiply(n2,
+                        Natural.to_integer(successor(d1))),
+                    Natural.to_integer(successor(d3)))
+              = Integer.multiply(n2,
+                    Integer.multiply(
+                        Natural.to_integer(successor(d1)),
+                        Natural.to_integer(successor(d3))))
+                    by Integer.multiply_associative(
+                           n2,
+                           Natural.to_integer(successor(d1)),
+                           Natural.to_integer(successor(d3)))
+              = Integer.multiply(n2,
+                    Integer.multiply(
+                        Natural.to_integer(successor(d3)),
+                        Natural.to_integer(successor(d1))))
                     by congruenceOf(
-                           function (term : Natural) =>
-                               term + (p2 * successor(d1))
-                                       * successor(d3),
-                           Natural.multiply_associative_right_swap_in_pair(
-                               n1, successor(d2), successor(d3)));
-    -- Step 2: scale hyp2 by succ(d1), distribute, and regroup so
-    -- the succ(d2) factor ends up rightmost.
-    claim hyp2Scaled
-          : (p2 * successor(d1)) * successor(d3)
-            + (n3 * successor(d1)) * successor(d2)
-            = (n2 * successor(d1)) * successor(d3)
-              + (p3 * successor(d1)) * successor(d2)
-        by calc (p2 * successor(d1)) * successor(d3)
-                + (n3 * successor(d1)) * successor(d2)
-              = (p2 * successor(d3)) * successor(d1)
-                + (n3 * successor(d1)) * successor(d2)
-                    by congruenceOf(
-                           function (term : Natural) =>
-                               term + (n3 * successor(d1))
-                                       * successor(d2),
-                           Natural.multiply_associative_right_swap_in_pair(
-                               p2, successor(d1), successor(d3)))
-              = (p2 * successor(d3)) * successor(d1)
-                + (n3 * successor(d2)) * successor(d1)
-                    by congruenceOf(
-                           function (term : Natural) =>
-                               (p2 * successor(d3)) * successor(d1)
-                               + term,
-                           Natural.multiply_associative_right_swap_in_pair(
-                               n3, successor(d1), successor(d2)))
-              = (p2 * successor(d3) + n3 * successor(d2))
-                * successor(d1)
+                           function (innerProduct : Integer) =>
+                               Integer.multiply(n2, innerProduct),
+                           Integer.multiply_commutative(
+                               Natural.to_integer(successor(d1)),
+                               Natural.to_integer(successor(d3))))
+              = Integer.multiply(
+                    Integer.multiply(n2,
+                        Natural.to_integer(successor(d3))),
+                    Natural.to_integer(successor(d1)))
                     by Equality.symmetry(
-                           Natural.distributivity_right(
-                               p2 * successor(d3),
-                               n3 * successor(d2),
-                               successor(d1)))
-              = (n2 * successor(d3) + p3 * successor(d2))
-                * successor(d1)
+                           Integer.multiply_associative(
+                               n2,
+                               Natural.to_integer(successor(d3)),
+                               Natural.to_integer(successor(d1))))
+              = Integer.multiply(
+                    Integer.multiply(n3,
+                        Natural.to_integer(successor(d2))),
+                    Natural.to_integer(successor(d1)))
                     by congruenceOf(
-                           function (sum : Natural) =>
-                               sum * successor(d1),
-                           hyp2)
-              = (n2 * successor(d3)) * successor(d1)
-                + (p3 * successor(d2)) * successor(d1)
-                    by Natural.distributivity_right(
-                           n2 * successor(d3),
-                           p3 * successor(d2),
-                           successor(d1))
-              = (n2 * successor(d1)) * successor(d3)
-                + (p3 * successor(d2)) * successor(d1)
+                           function (leftFactor : Integer) =>
+                               Integer.multiply(leftFactor,
+                                   Natural.to_integer(successor(d1))),
+                           secondEquivalence)
+              = Integer.multiply(n3,
+                    Integer.multiply(
+                        Natural.to_integer(successor(d2)),
+                        Natural.to_integer(successor(d1))))
+                    by Integer.multiply_associative(
+                           n3,
+                           Natural.to_integer(successor(d2)),
+                           Natural.to_integer(successor(d1)))
+              = Integer.multiply(n3,
+                    Integer.multiply(
+                        Natural.to_integer(successor(d1)),
+                        Natural.to_integer(successor(d2))))
                     by congruenceOf(
-                           function (term : Natural) =>
-                               term + (p3 * successor(d2))
-                                       * successor(d1),
-                           Natural.multiply_associative_right_swap_in_pair(
-                               n2, successor(d3), successor(d1)))
-              = (n2 * successor(d1)) * successor(d3)
-                + (p3 * successor(d1)) * successor(d2)
-                    by congruenceOf(
-                           function (term : Natural) =>
-                               (n2 * successor(d1)) * successor(d3)
-                               + term,
-                           Natural.multiply_associative_right_swap_in_pair(
-                               p3, successor(d2), successor(d1)));
-    -- Step 3: add the two scaled hypotheses. Group the term
-    -- (p2·succ(d1))·succ(d3) on both sides, and (n2·succ(d1))·succ(d3)
-    -- ditto, so they cancel by add_cancel_left.
-    claim sumOfScaled
-          : ((p1 * successor(d3)) * successor(d2)
-             + (p2 * successor(d1)) * successor(d3))
-            + ((n2 * successor(d1)) * successor(d3)
-               + (n3 * successor(d1)) * successor(d2))
-            = ((n1 * successor(d3)) * successor(d2)
-               + (n2 * successor(d1)) * successor(d3))
-              + ((p2 * successor(d1)) * successor(d3)
-                 + (p3 * successor(d1)) * successor(d2))
-        by calc ((p1 * successor(d3)) * successor(d2)
-                 + (p2 * successor(d1)) * successor(d3))
-                + ((n2 * successor(d1)) * successor(d3)
-                   + (n3 * successor(d1)) * successor(d2))
-              = ((p1 * successor(d3)) * successor(d2)
-                 + (n2 * successor(d1)) * successor(d3))
-                + ((p2 * successor(d1)) * successor(d3)
-                   + (n3 * successor(d1)) * successor(d2))
-                    by Natural.add_two_two_swap(
-                           (p1 * successor(d3)) * successor(d2),
-                           (p2 * successor(d1)) * successor(d3),
-                           (n2 * successor(d1)) * successor(d3),
-                           (n3 * successor(d1)) * successor(d2))
-              = ((n1 * successor(d3)) * successor(d2)
-                 + (p2 * successor(d1)) * successor(d3))
-                + ((p2 * successor(d1)) * successor(d3)
-                   + (n3 * successor(d1)) * successor(d2))
-                    by congruenceOf(
-                           function (firstHalf : Natural) =>
-                               firstHalf
-                               + ((p2 * successor(d1)) * successor(d3)
-                                  + (n3 * successor(d1)) * successor(d2)),
-                           hyp1Scaled)
-              = ((n1 * successor(d3)) * successor(d2)
-                 + (p2 * successor(d1)) * successor(d3))
-                + ((n2 * successor(d1)) * successor(d3)
-                   + (p3 * successor(d1)) * successor(d2))
-                    by congruenceOf(
-                           function (secondHalf : Natural) =>
-                               ((n1 * successor(d3)) * successor(d2)
-                                + (p2 * successor(d1)) * successor(d3))
-                               + secondHalf,
-                           hyp2Scaled)
-              = ((n1 * successor(d3)) * successor(d2)
-                 + (n2 * successor(d1)) * successor(d3))
-                + ((p2 * successor(d1)) * successor(d3)
-                   + (p3 * successor(d1)) * successor(d2))
-                    by Natural.add_two_two_swap(
-                           (n1 * successor(d3)) * successor(d2),
-                           (p2 * successor(d1)) * successor(d3),
-                           (n2 * successor(d1)) * successor(d3),
-                           (p3 * successor(d1)) * successor(d2));
-    -- Step 4: cancel the shared (p2·succ(d1))·succ(d3) and
-    -- (n2·succ(d1))·succ(d3) terms via reshuffling and add_cancel_left.
-    -- What survives is
-    --     (p1·succ(d3))·succ(d2) + (n3·succ(d1))·succ(d2)
-    --       = (n1·succ(d3))·succ(d2) + (p3·succ(d1))·succ(d2).
-    claim afterCancel
-          : (p1 * successor(d3)) * successor(d2)
-            + (n3 * successor(d1)) * successor(d2)
-            = (n1 * successor(d3)) * successor(d2)
-              + (p3 * successor(d1)) * successor(d2)
-        by Natural.add_cancel_left(
-               (p2 * successor(d1)) * successor(d3)
-               + (n2 * successor(d1)) * successor(d3),
-               (p1 * successor(d3)) * successor(d2)
-               + (n3 * successor(d1)) * successor(d2),
-               (n1 * successor(d3)) * successor(d2)
-               + (p3 * successor(d1)) * successor(d2),
-               calc ((p2 * successor(d1)) * successor(d3)
-                     + (n2 * successor(d1)) * successor(d3))
-                    + ((p1 * successor(d3)) * successor(d2)
-                       + (n3 * successor(d1)) * successor(d2))
-                  = ((p1 * successor(d3)) * successor(d2)
-                     + (p2 * successor(d1)) * successor(d3))
-                    + ((n2 * successor(d1)) * successor(d3)
-                       + (n3 * successor(d1)) * successor(d2))
-                        by Natural.add_two_two_swap_first(
-                               (p2 * successor(d1)) * successor(d3),
-                               (n2 * successor(d1)) * successor(d3),
-                               (p1 * successor(d3)) * successor(d2),
-                               (n3 * successor(d1)) * successor(d2))
-                  = ((n1 * successor(d3)) * successor(d2)
-                     + (n2 * successor(d1)) * successor(d3))
-                    + ((p2 * successor(d1)) * successor(d3)
-                       + (p3 * successor(d1)) * successor(d2))
-                        by sumOfScaled
-                  = ((p2 * successor(d1)) * successor(d3)
-                     + (n2 * successor(d1)) * successor(d3))
-                    + ((n1 * successor(d3)) * successor(d2)
-                       + (p3 * successor(d1)) * successor(d2))
-                        by Natural.add_two_two_swap_outer_firsts(
-                               (n1 * successor(d3)) * successor(d2),
-                               (n2 * successor(d1)) * successor(d3),
-                               (p2 * successor(d1)) * successor(d3),
-                               (p3 * successor(d1)) * successor(d2)));
-    -- Step 5: factor succ(d2) out of both sides, then cancel.
-    claim factored
-          : (p1 * successor(d3) + n3 * successor(d1)) * successor(d2)
-            = (n1 * successor(d3) + p3 * successor(d1)) * successor(d2)
-        by Equality.transitivity(
-               Natural.distributivity_right(
-                   p1 * successor(d3),
-                   n3 * successor(d1),
-                   successor(d2)),
-               Equality.transitivity(
-                   afterCancel,
-                   Equality.symmetry(
-                       Natural.distributivity_right(
-                           n1 * successor(d3),
-                           p3 * successor(d1),
-                           successor(d2)))));
-    claim divisorPositive : 1 ≤ successor(d2)
-        by Natural.successor_less_or_equal_successor(
-               zero, d2, Natural.zero_least(d2));
-    Natural.multiply_cancel_right(
-        p1 * successor(d3) + n3 * successor(d1),
-        n1 * successor(d3) + p3 * successor(d1),
-        successor(d2),
-        divisorPositive,
-        factored)
+                           function (innerProduct : Integer) =>
+                               Integer.multiply(n3, innerProduct),
+                           Integer.multiply_commutative(
+                               Natural.to_integer(successor(d2)),
+                               Natural.to_integer(successor(d1))))
+              = Integer.multiply(
+                    Integer.multiply(n3,
+                        Natural.to_integer(successor(d1))),
+                    Natural.to_integer(successor(d2)))
+                    by Equality.symmetry(
+                           Integer.multiply_associative(
+                               n3,
+                               Natural.to_integer(successor(d1)),
+                               Natural.to_integer(successor(d2))));
+    -- Chain: (n1·succ(d3))·succ(d2) = (n3·succ(d1))·succ(d2).
+    claim cancellableEquation
+          : Equality.{0}(Integer,
+                Integer.multiply(
+                    Integer.multiply(n1,
+                        Natural.to_integer(successor(d3))),
+                    Natural.to_integer(successor(d2))),
+                Integer.multiply(
+                    Integer.multiply(n3,
+                        Natural.to_integer(successor(d1))),
+                    Natural.to_integer(successor(d2))))
+        by Equality.transitivity(leftChainedToD3, rightChainedToD1);
+    -- Cancel succ(d2).
+    Integer.multiply_cancel_right_by_natural_successor(
+        Integer.multiply(n1, Natural.to_integer(successor(d3))),
+        Integer.multiply(n3, Natural.to_integer(successor(d1))),
+        d2,
+        cancellableEquation)
 }
 
--- Threaded transitivity follows the same destructure-chain pattern as
--- the existing IntegerEquivalent.transitive.
+-- Destructure chain for transitivity, matching the
+-- `IntegerEquivalent.transitive` pattern.
+
 theorem RationalEquivalent.transitive_after_xy
-        (p1 n1 d1 p2 n2 d2 : Natural)
+        (n1 : Integer) (d1 : Natural)
+        (n2 : Integer) (d2 : Natural)
         : (z : RationalRepresentative)
           → RationalEquivalent(
-                RationalRepresentative.make(p1, n1, d1),
-                RationalRepresentative.make(p2, n2, d2))
+                RationalRepresentative.make(n1, d1),
+                RationalRepresentative.make(n2, d2))
           → RationalEquivalent(
-                RationalRepresentative.make(p2, n2, d2), z)
+                RationalRepresentative.make(n2, d2), z)
           → RationalEquivalent(
-                RationalRepresentative.make(p1, n1, d1), z)
-  | RationalRepresentative.make(p3, n3, d3), hyp1, hyp2 =>
+                RationalRepresentative.make(n1, d1), z)
+  | RationalRepresentative.make(n3, d3),
+    firstHypothesis,
+    secondHypothesis =>
       RationalEquivalent.transitive_natural(
-          p1, n1, d1, p2, n2, d2, p3, n3, d3, hyp1, hyp2)
+          n1, d1, n2, d2, n3, d3,
+          firstHypothesis, secondHypothesis)
 
 theorem RationalEquivalent.transitive_after_x
-        (p1 n1 d1 : Natural)
+        (n1 : Integer) (d1 : Natural)
         : (y z : RationalRepresentative)
           → RationalEquivalent(
-                RationalRepresentative.make(p1, n1, d1), y)
+                RationalRepresentative.make(n1, d1), y)
           → RationalEquivalent(y, z)
           → RationalEquivalent(
-                RationalRepresentative.make(p1, n1, d1), z)
-  | RationalRepresentative.make(p2, n2, d2), z, hyp1, hyp2 =>
+                RationalRepresentative.make(n1, d1), z)
+  | RationalRepresentative.make(n2, d2),
+    z,
+    firstHypothesis,
+    secondHypothesis =>
       RationalEquivalent.transitive_after_xy(
-          p1, n1, d1, p2, n2, d2, z, hyp1, hyp2)
+          n1, d1, n2, d2, z, firstHypothesis, secondHypothesis)
 
 theorem RationalEquivalent.transitive
         : (x y z : RationalRepresentative)
           → RationalEquivalent(x, y)
           → RationalEquivalent(y, z)
           → RationalEquivalent(x, z)
-  | RationalRepresentative.make(p1, n1, d1), y, z, hyp1, hyp2 =>
+  | RationalRepresentative.make(n1, d1),
+    y, z,
+    firstHypothesis, secondHypothesis =>
       RationalEquivalent.transitive_after_x(
-          p1, n1, d1, y, z, hyp1, hyp2)
+          n1, d1, y, z, firstHypothesis, secondHypothesis)
 
 -- ----------------------------------------------------------------------
--- The Rational type and a few canonical constants.
+-- The Rational type and canonical constants.
 
 definition Rational : Type(0) :=
   Quotient.{0}(RationalRepresentative, RationalEquivalent)
@@ -430,9 +313,9 @@ definition Rational : Type(0) :=
 definition Rational.zero : Rational :=
   Quotient.mk.{0}(
       RationalRepresentative, RationalEquivalent,
-      RationalRepresentative.make(zero, zero, zero))
+      RationalRepresentative.make(Integer.zero, zero))
 
 definition Rational.one : Rational :=
   Quotient.mk.{0}(
       RationalRepresentative, RationalEquivalent,
-      RationalRepresentative.make(successor(zero), zero, zero))
+      RationalRepresentative.make(Integer.one, zero))

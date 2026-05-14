@@ -2,21 +2,17 @@
 --
 -- Addition on Rational, lifted from the textbook formula on
 -- representatives:
---     p1/(d1+1) + p2/(d2+1) = (p1·(d2+1) + p2·(d1+1)) / ((d1+1)·(d2+1))
--- where each numerator pi = (positivePart_i − negativePart_i) is
--- encoded as a Natural pair (see Rational/basics.math for why we
--- inline the integer rather than going through `Integer`).
---
--- This file currently contains only `add_representatives` — the
--- componentwise formula on representative triples. The respect
--- proofs (for both first and second argument) plus the two nested
--- Quotient.lift calls are next session's work; the kernel for
--- respect-in-the-first-argument is sketched and structurally clear
--- (factor out `succ(d2)`, cancel the p2/n2 cross-terms by
--- commutativity, reduce the remainder to the hypothesis times
--- `succ(d2)`), it's just a long calc chain that I've left to a
--- focused future session rather than committing a half-written
--- proof here.
+--     n1/(d1+1) + n2/(d2+1)
+--       = (n1·(d2+1) + n2·(d1+1)) / ((d1+1)·(d2+1))
+-- where both numerators are Integers and both denominators are
+-- positive Naturals. With our representative
+-- `make(n : Integer, denominatorMinusOne : Natural)`, the formula
+-- becomes:
+--     positivePart    = n1·succ(d2) + n2·succ(d1)
+--     denominatorMinusOne = d2 + d1·succ(d2)
+-- The latter identity uses succ(d1)·succ(d2) = succ(d2 +
+-- d1·succ(d2)), which is the kernel reduction of Natural.multiply
+-- on its first argument.
 
 module Rational.addition
 
@@ -28,22 +24,22 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
-import Natural.cancellation
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.ring
 import Rational.basics
 
 -- ----------------------------------------------------------------------
--- Componentwise addition on representatives. The new denominator
--- minus one is `d2 + d1·succ(d2)`, which has successor
--- `succ(d2) + d1·succ(d2) = succ(d1)·succ(d2)` — exactly the
--- expected `(d1+1)·(d2+1)`. The kernel computes the successor
--- automatically from Natural.multiply pattern-matching on its first
--- argument.
+-- Addition on representatives.
 definition Rational.add_representatives
         : RationalRepresentative → RationalRepresentative
           → RationalRepresentative
-  | RationalRepresentative.make(p1, n1, d1),
-    RationalRepresentative.make(p2, n2, d2) =>
+  | RationalRepresentative.make(n1, d1),
+    RationalRepresentative.make(n2, d2) =>
       RationalRepresentative.make(
-          p1 * successor(d2) + p2 * successor(d1),
-          n1 * successor(d2) + n2 * successor(d1),
+          Integer.add(
+              Integer.multiply(n1, Natural.to_integer(successor(d2))),
+              Integer.multiply(n2, Natural.to_integer(successor(d1)))),
           d2 + d1 * successor(d2))
