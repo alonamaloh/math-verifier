@@ -1,0 +1,143 @@
+-- Rational/embedding.math
+--
+-- Embed Integer into Rational as the equivalence class of `(n, 0)` —
+-- the representative with denominator-minus-one = 0, so the
+-- denominator is 1. The embedding preserves zero, one, addition,
+-- multiplication, and negation. Each preservation lemma is the
+-- corresponding `Rational.add_representatives(make(a, 0), make(b, 0))
+-- = make(_, _)` reducing to a representative with `0 + 0·succ(0) = 0`
+-- in the denominator slot — i.e. always denominator-minus-one = 0.
+
+module Rational.embedding
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.ring
+import Integer.negation
+import Integer.algebra
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+
+-- Embed an Integer as the equivalence class of `(n, 0)`.
+definition Integer.to_rational (n : Integer) : Rational :=
+  Quotient.mk.{0}(
+      RationalRepresentative, RationalEquivalent,
+      RationalRepresentative.make(n, zero))
+
+-- Embedding preserves zero (definitionally — both sides are the same
+-- `Quotient.mk` of `make(Integer.zero, zero)`).
+theorem Integer.to_rational.zero_preserves
+        : Equality.{0}(Rational,
+                       Integer.to_rational(Integer.zero),
+                       Rational.zero) :=
+  reflexivity.{0}(Rational, Rational.zero)
+
+-- Embedding preserves one (definitionally).
+theorem Integer.to_rational.one_preserves
+        : Equality.{0}(Rational,
+                       Integer.to_rational(Integer.one),
+                       Rational.one) :=
+  reflexivity.{0}(Rational, Rational.one)
+
+-- Embedding preserves addition.
+-- `Rational.add(mk(make(a, 0)), mk(make(b, 0)))`
+--   reduces to `mk(make(a·1 + b·1, 0 + 0·succ(0)))`. We need to show
+--   equivalence to `mk(make(a + b, 0))` — both sides have
+--   denominator-minus-one whose successor is 1 (definitionally for the
+--   RHS; for the LHS via `0·succ(0) = 0`), so the equivalence reduces
+--   to an Integer-level numerator equation.
+theorem Integer.to_rational.add_preserves (a b : Integer)
+        : Equality.{0}(Rational,
+                       Integer.to_rational(Integer.add(a, b)),
+                       Rational.add(Integer.to_rational(a),
+                                     Integer.to_rational(b))) :=
+  -- The two reps are
+  --   LHS-rep: make(a + b, 0)
+  --   RHS-rep: make(a·1 + b·1, 0 + 0·succ(0))
+  -- Both sides have denominator-minus-one whose successor is 1
+  -- (left: succ(0)=1; right: succ(0+0·succ(0))=succ(0·1)=succ(0)·1 —
+  -- the kernel collapses both to succ(0) via Natural.add zero pattern
+  -- and then Natural.multiply zero pattern), so the equivalence
+  -- proposition reduces to
+  --   (a+b)·to_int(succ(0+0·succ(0))) = (a·1 + b·1)·to_int(succ(0)).
+  -- We rebuild this via Quotient.sound and an Integer-level calc.
+  Equality.symmetry(
+      Quotient.sound.{0}(
+          RationalRepresentative, RationalEquivalent,
+          Rational.add_representatives(
+              RationalRepresentative.make(a, zero),
+              RationalRepresentative.make(b, zero)),
+          RationalRepresentative.make(Integer.add(a, b), zero),
+          calc Integer.multiply(
+                   Integer.add(
+                       Integer.multiply(a,
+                           Natural.to_integer(successor(zero))),
+                       Integer.multiply(b,
+                           Natural.to_integer(successor(zero)))),
+                   Natural.to_integer(successor(zero)))
+             = Integer.add(
+                   Integer.multiply(a,
+                       Natural.to_integer(successor(zero))),
+                   Integer.multiply(b,
+                       Natural.to_integer(successor(zero))))
+                    by Integer.multiply_identity_right(
+                           Integer.add(
+                               Integer.multiply(a,
+                                   Natural.to_integer(successor(zero))),
+                               Integer.multiply(b,
+                                   Natural.to_integer(successor(zero)))))
+             = Integer.add(a,
+                   Integer.multiply(b,
+                       Natural.to_integer(successor(zero))))
+                    by congruenceOf(
+                           function (firstSummand : Integer) =>
+                               Integer.add(firstSummand,
+                                   Integer.multiply(b,
+                                       Natural.to_integer(successor(zero)))),
+                           Integer.multiply_identity_right(a))
+             = Integer.add(a, b)
+                    by congruenceOf(
+                           function (secondSummand : Integer) =>
+                               Integer.add(a, secondSummand),
+                           Integer.multiply_identity_right(b))
+             = Integer.multiply(Integer.add(a, b),
+                   Natural.to_integer(successor(zero)))
+                    by Equality.symmetry(
+                           Integer.multiply_identity_right(
+                               Integer.add(a, b)))))
+
+-- Embedding preserves multiplication. At reps:
+--   LHS-rep: make(a · b, 0)
+--   RHS-rep: make(a · b, 0 + 0·succ(0))
+-- Both denominators have successor 1 (the RHS by Natural.add zero
+-- pattern + Natural.multiply zero pattern), so the equivalence
+-- reduces to `(a·b)·Integer.one = (a·b)·Integer.one` — just
+-- reflexivity.
+theorem Integer.to_rational.multiply_preserves (a b : Integer)
+        : Equality.{0}(Rational,
+                       Integer.to_rational(Integer.multiply(a, b)),
+                       Rational.multiply(Integer.to_rational(a),
+                                          Integer.to_rational(b))) :=
+  reflexivity.{0}(Rational,
+      Integer.to_rational(Integer.multiply(a, b)))
+
+-- Embedding preserves negation: negate the numerator, leave the
+-- denominator at 0.
+theorem Integer.to_rational.negate_preserves (a : Integer)
+        : Equality.{0}(Rational,
+                       Integer.to_rational(Integer.negate(a)),
+                       Rational.negate(Integer.to_rational(a))) :=
+  reflexivity.{0}(Rational,
+      Integer.to_rational(Integer.negate(a)))
