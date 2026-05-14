@@ -35,19 +35,20 @@ Status:
   `Integer.multiply_cancel_right_by_natural_successor` directly.
 - **DONE: Rational.add_representatives** (the new formula on
   Integer/Natural pairs).
+- **DONE: Rational.add, Rational.multiply, Rational.negate,
+  Rational.subtract.** All four operations lifted via Quotient.lift
+  with their respect proofs.
+- **DONE: Rational ring laws.** Both commutativities, both
+  identities, additive inverse, both associativities, both
+  distributivities (`Rational/ring.math` + `Rational/algebra.math`).
+- **DONE: Rational is a CommutativeRing.** Eight instance witnesses
+  in `Rational/instances.math`.
+- **DONE: Kernel perf.** Structural-equality fast path in
+  `isDefinitionallyEqual` — cold-rebuilding the whole library is
+  now ~0.3s with `make -j 16` (was ~40 minutes before).
 
 Next:
 
-- **Rational.add respect proofs + lift.** With the Integer-level
-  algebra available (Integer.distributivity, Integer.multiply_associative,
-  Integer.multiply_commutative) and Quotient.exact for any future
-  cancellation steps, the respect proofs should be substantially
-  shorter than the concrete-triple version (~150 lines each rather
-  than ~300). Plus two `Quotient.lift` calls for the actual operation.
-- **Rational.multiply, negate, subtract.** Same shape as `add`.
-- **Rational ring identities.** Commutativity / associativity /
-  identity / distributivity at Rational level. Lifted from Integer-
-  level analogues via `Quotient.induct` chains.
 - **Integer → Rational embedding.** `Integer.to_rational(n) :=
   mk(make(n, 0))`. Extends the cast registry: ascription
   `(x : Rational)` on an Integer auto-applies this.
@@ -55,6 +56,21 @@ Next:
   Rational is then a Field instance.
 - **Real** (Cauchy sequences over Rational, or Dedekind cuts).
 - More generic abelian-group / ring / field lemmas as needed.
+
+Pain points encountered while writing the Rational laws — these are
+the strongest motivators for the ergonomics work in items 2/3 below:
+
+- **No "rewrite at position".** Every intermediate-position rewrite
+  in a calc has to be wrapped in `congruenceOf(function (x) => ...
+  x ...,  ...)`, which doubles or triples the visible code volume.
+- **No ring/abelian-group automation.** Associativity / distributivity
+  proofs require manual rearrangement step-by-step. The Rational
+  3-arg laws have 6-11 step kernels each that would be `by ring` in
+  most systems.
+- **Triple-destructure boilerplate.** Each 3-arg representative-
+  level theorem needs `after_first_second / after_first / outer`
+  Quotient.induct wrappers totaling ~80 lines per law. Mechanical
+  but heavy.
 
 ### 2. Parallel verification
 Optimistic per-theorem parallelism with a thread pool: register
@@ -91,6 +107,24 @@ Smaller items to land when the motivating pain becomes acute:
 
 ## Completed
 
+- **2026-05-14: Rational as CommutativeRing.** Operations
+  (add/multiply/negate/subtract) + respect proofs + ring laws
+  (commutativity, identity, inverse, associativity, distributivity)
+  + IsCommutativeRing instance witness. Five new files
+  (`Rational/{addition,multiplication,negation,ring,algebra,instances}.math`,
+  plus updates to `Rational/basics.math`). Includes kernel perf
+  optimization — `isDefinitionallyEqual` now short-circuits on
+  structural equality before WHNF, turning the slowest file from a
+  38-minute build into a 80ms build. Commits `19d061b`, `8eea667`,
+  `0fe54a8`, `2ede0fa`, `9c008dd`, `790519c`.
+- **2026-05-14: Per-file .mathv caching + Makefile.** The kernel
+  binary now writes a serialized .mathv file per source and reads
+  back cached deps; `make -j N library` parallelizes verification
+  across the dependency DAG. Hash-based source validation; format-
+  versioned binary serialization. Files: `hash.{hpp,cpp}`,
+  `serialize.{hpp,cpp}`, `main.cpp` (new --source/--deps/--output
+  CLI form + `kernel deps` subcommand), `Makefile`. Warm rebuild
+  ~30ms; full cold rebuild ~300ms.
 - **2026-05-14: Rational rebuilt with Integer numerator.** Replace
   the concrete-triple workaround with `(Integer, Natural)` — exactly
   the construction a mathematician writes. Transitivity uses Integer
