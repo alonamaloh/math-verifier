@@ -1,5 +1,9 @@
 # Plan: hardening the kernel toward soundness
 
+**Status: complete.** All tiers landed; remaining items deferred with
+reasons recorded below. Kept as a historical record. For the current
+phase of work see `PLAN_F4_bezout.md`.
+
 Tracking document for the multi-tier hardening work. Update the status
 column as items land.
 
