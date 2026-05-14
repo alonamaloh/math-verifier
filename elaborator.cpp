@@ -4417,10 +4417,17 @@ private:
             }
         }
 
-        // The endpoints came out of the inferred type, which lives in
-        // the opened form with FreeVariables for our local binders.
-        // Close them back to BoundVariables so they make sense in the
-        // calling context.
+        // The endpoints and the domain/codomain came out of the
+        // inferred type, which lives in the opened form with
+        // FreeVariables for our local binders. Close them back to
+        // BoundVariables so they make sense in the calling context —
+        // otherwise a stray FreeVariable referring to e.g. a
+        // theorem-level binder leaks into the result term and the
+        // kernel rejects it as an unbound internal variable.
+        ExpressionPointer closedDomainType = closeOverLocalBinders(
+            domainType, localBinders, localBinders.size());
+        ExpressionPointer closedCodomainType = closeOverLocalBinders(
+            codomainType, localBinders, localBinders.size());
         ExpressionPointer closedLeftEndpoint = closeOverLocalBinders(
             leftEndpoint, localBinders, localBinders.size());
         ExpressionPointer closedRightEndpoint = closeOverLocalBinders(
@@ -4430,8 +4437,10 @@ private:
         ExpressionPointer call = makeConstant(
             "Equality.congruence",
             {domainUniverseLevel, codomainUniverseLevel});
-        call = makeApplication(std::move(call), std::move(domainType));
-        call = makeApplication(std::move(call), std::move(codomainType));
+        call = makeApplication(std::move(call),
+                                std::move(closedDomainType));
+        call = makeApplication(std::move(call),
+                                std::move(closedCodomainType));
         call = makeApplication(std::move(call), std::move(functionKernel));
         call = makeApplication(std::move(call),
                                 std::move(closedLeftEndpoint));

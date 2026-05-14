@@ -1,0 +1,73 @@
+-- Integer/instances.math
+--
+-- Witnesses that Integer satisfies the standard algebraic
+-- abstractions: an abelian group under (+, 0, −) and a commutative
+-- ring under (+, ·, 0, 1). Each instance is just a tuple of the
+-- already-proved identities — no new mathematical content, just
+-- packaging.
+
+module Integer.instances
+
+import Logic.basics
+import Equality.basics
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.ring
+import Integer.negation
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+
+-- Integer is a monoid under (+, 0).
+theorem Integer.add_is_monoid
+        : IsMonoid(Integer, Integer.add, Integer.zero) :=
+    ⟨Integer.add_associative,
+     Integer.add_identity_left,
+     Integer.add_identity_right⟩
+
+-- Integer is a commutative monoid under (+, 0).
+theorem Integer.add_is_commutative_monoid
+        : IsCommutativeMonoid(Integer, Integer.add, Integer.zero) :=
+    ⟨Integer.add_is_monoid, Integer.add_commutative⟩
+
+-- Integer is a group under (+, 0, −).
+theorem Integer.add_is_group
+        : IsGroup(Integer, Integer.add, Integer.zero, Integer.negate) :=
+    ⟨Integer.add_is_monoid,
+     Integer.add_negate_left,
+     Integer.add_negate_right⟩
+
+-- Integer is an abelian group under (+, 0, −).
+theorem Integer.add_is_abelian_group
+        : IsAbelianGroup(Integer, Integer.add, Integer.zero,
+                          Integer.negate) :=
+    ⟨Integer.add_is_group, Integer.add_commutative⟩
+
+-- Integer is a monoid under (·, 1).
+theorem Integer.multiply_is_monoid
+        : IsMonoid(Integer, Integer.multiply, Integer.one) :=
+    ⟨Integer.multiply_associative,
+     Integer.multiply_identity_left,
+     Integer.multiply_identity_right⟩
+
+-- Integer is a commutative monoid under (·, 1).
+theorem Integer.multiply_is_commutative_monoid
+        : IsCommutativeMonoid(Integer, Integer.multiply, Integer.one) :=
+    ⟨Integer.multiply_is_monoid, Integer.multiply_commutative⟩
+
+-- Integer is a ring under (+, 0, −, ·, 1).
+theorem Integer.is_ring
+        : IsRing(Integer, Integer.add, Integer.zero, Integer.negate,
+                  Integer.multiply, Integer.one) :=
+    ⟨Integer.add_is_abelian_group,
+     Integer.multiply_is_monoid,
+     Integer.distributivity_left,
+     Integer.distributivity_right⟩
+
+-- Integer is a commutative ring.
+theorem Integer.is_commutative_ring
+        : IsCommutativeRing(Integer, Integer.add, Integer.zero,
+                             Integer.negate, Integer.multiply,
+                             Integer.one) :=
+    ⟨Integer.is_ring, Integer.multiply_commutative⟩

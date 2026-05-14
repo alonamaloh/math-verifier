@@ -1,0 +1,49 @@
+-- Algebra/ring.math
+--
+-- A ring is an abelian group under addition + a monoid under
+-- multiplication + distributivity laws connecting the two
+-- operations. A commutative ring additionally has commutative
+-- multiplication.
+--
+-- These predicates take the additive and multiplicative structures
+-- as separate parameters (`add`, `zero`, `negate`, `multiply`,
+-- `one`) so that specific instances bind them to concrete
+-- functions (`Integer.add`, `Integer.zero`, `Integer.negate`, …).
+
+module Algebra.ring
+
+import Logic.basics
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+
+definition IsRing
+        (carrier : Type(0))
+        (add : carrier → carrier → carrier)
+        (zero : carrier)
+        (negate : carrier → carrier)
+        (multiply : carrier → carrier → carrier)
+        (one : carrier)
+        : Proposition :=
+    IsAbelianGroup(carrier, add, zero, negate)
+    ∧ IsMonoid(carrier, multiply, one)
+    ∧ ((x y z : carrier) →
+           Equality.{0}(carrier,
+               multiply(x, add(y, z)),
+               add(multiply(x, y), multiply(x, z))))
+    ∧ ((x y z : carrier) →
+           Equality.{0}(carrier,
+               multiply(add(x, y), z),
+               add(multiply(x, z), multiply(y, z))))
+
+definition IsCommutativeRing
+        (carrier : Type(0))
+        (add : carrier → carrier → carrier)
+        (zero : carrier)
+        (negate : carrier → carrier)
+        (multiply : carrier → carrier → carrier)
+        (one : carrier)
+        : Proposition :=
+    IsRing(carrier, add, zero, negate, multiply, one)
+    ∧ ((x y : carrier) →
+           Equality.{0}(carrier, multiply(x, y), multiply(y, x)))

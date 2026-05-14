@@ -1,0 +1,39 @@
+-- Algebra/group.math
+--
+-- A group is a monoid in which every element has a two-sided
+-- inverse. We separate the inverse function from the predicate
+-- (rather than asserting "there exists an inverse") so that
+-- constructive proofs can compute with the inverse directly — for
+-- Integer under addition this is `Integer.negate`.
+--
+-- The abelian-group predicate is just `IsGroup` plus
+-- commutativity of the operation; reuses the structure rather than
+-- duplicating it.
+
+module Algebra.group
+
+import Logic.basics
+import Equality.basics
+import Algebra.monoid
+
+definition IsGroup
+        (carrier : Type(0))
+        (operation : carrier → carrier → carrier)
+        (identity : carrier)
+        (inverse : carrier → carrier)
+        : Proposition :=
+    IsMonoid(carrier, operation, identity)
+    ∧ ((x : carrier) →
+           Equality.{0}(carrier, operation(inverse(x), x), identity))
+    ∧ ((x : carrier) →
+           Equality.{0}(carrier, operation(x, inverse(x)), identity))
+
+definition IsAbelianGroup
+        (carrier : Type(0))
+        (operation : carrier → carrier → carrier)
+        (identity : carrier)
+        (inverse : carrier → carrier)
+        : Proposition :=
+    IsGroup(carrier, operation, identity, inverse)
+    ∧ ((x y : carrier) →
+           Equality.{0}(carrier, operation(x, y), operation(y, x)))

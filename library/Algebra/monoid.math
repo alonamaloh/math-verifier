@@ -1,0 +1,42 @@
+-- Algebra/monoid.math
+--
+-- A monoid is a set with an associative binary operation and a
+-- two-sided identity. We package the axioms as a Proposition-valued
+-- predicate over a carrier type, a binary operation, and an identity
+-- element; constructing the predicate proves that the carrier with
+-- the chosen operation and identity is a monoid. Specific monoids
+-- (Natural under +, Integer under +, Integer under ·, …) then become
+-- one-line theorems pointing at the already-proved associativity
+-- and identity lemmas.
+--
+-- This is the simplest algebraic abstraction we have; group and ring
+-- build on the same predicate shape.
+
+module Algebra.monoid
+
+import Logic.basics
+import Equality.basics
+
+definition IsMonoid
+        (carrier : Type(0))
+        (operation : carrier → carrier → carrier)
+        (identity : carrier)
+        : Proposition :=
+    ((x y z : carrier) →
+        Equality.{0}(carrier,
+            operation(operation(x, y), z),
+            operation(x, operation(y, z))))
+    ∧ ((x : carrier) →
+           Equality.{0}(carrier, operation(identity, x), x))
+    ∧ ((x : carrier) →
+           Equality.{0}(carrier, operation(x, identity), x))
+
+-- A commutative monoid additionally satisfies `op(x, y) = op(y, x)`.
+definition IsCommutativeMonoid
+        (carrier : Type(0))
+        (operation : carrier → carrier → carrier)
+        (identity : carrier)
+        : Proposition :=
+    IsMonoid(carrier, operation, identity)
+    ∧ ((x y : carrier) →
+           Equality.{0}(carrier, operation(x, y), operation(y, x)))
