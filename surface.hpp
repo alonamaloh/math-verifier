@@ -169,6 +169,11 @@ struct SurfaceCases {
 // expected type from context.
 struct SurfaceHammer { };
 
+// `sorry` — placeholder for an unwritten proof. Desugars at elaboration
+// time to `Internal.sorry.{u}(<expectedType>)` and emits a warning at
+// the use site so the build log surfaces the gap.
+struct SurfaceSorry { };
+
 // `by_induction on scrutinee using inductionLemma with subjectName,
 // ihName { body }`. The elaborator constructs the motive by
 // abstracting the surrounding expected type over the scrutinee
@@ -207,7 +212,7 @@ struct SurfaceExpression {
         SurfaceApplication, SurfacePiType, SurfaceLambda,
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation,
-        SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer,
+        SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer, SurfaceSorry,
         SurfaceCalc, SurfaceByInductionUsing
     > node;
     int line = 0;
@@ -298,6 +303,10 @@ inline SurfaceExpressionPointer makeSurfaceAnonymousTuple(
 inline SurfaceExpressionPointer makeSurfaceHammer(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceHammer{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceSorry(int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceSorry{}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceCalc(
     SurfaceExpressionPointer initialExpression,

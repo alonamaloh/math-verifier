@@ -369,10 +369,15 @@ private:
         } catch (const TypeError& kernelError) {
             rethrowKernelError(kernelError);
         }
-        // Axioms are accepted without proof — flag every one so that
-        // verifying a file is never silent about its unproved assumptions.
-        std::cerr << "warning: axiom '" << declaration.name
-                  << "' admitted without proof\n";
+        // Axioms are accepted without proof. The foundational ones live
+        // in `library/axioms.math` (module name `axioms`) and are
+        // silently approved; an axiom declared in any other module is
+        // flagged so we never accidentally introduce a new unproved
+        // assumption.
+        if (moduleName_ != "axioms") {
+            std::cerr << "warning: axiom '" << declaration.name
+                      << "' admitted without proof\n";
+        }
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
@@ -2312,6 +2317,10 @@ private:
                                                 expression.line,
                                                 expression.column);
         }
+        if (std::get_if<SurfaceSorry>(&expression.node)) {
+            return elaborateSorry(localBinders, expectedType,
+                                   expression.line, expression.column);
+        }
         if (auto* calc = std::get_if<SurfaceCalc>(&expression.node)) {
             return elaborateCalc(*calc, localBinders, expectedType,
                                   expression.line, expression.column);
@@ -3160,6 +3169,90 @@ private:
             }
         }
         throwElaborate(message);
+    }
+
+    // `sorry` — desugars to either `Internal.sorry_proposition(<P>)`
+    // (when the expected type is a Proposition, i.e. lives in `Sort 0`)
+    // or `Internal.sorry.{u}(<T>)` (when the expected type lives in
+    // `Type(u) = Sort (u+1)` for some u). Either way emits a warning at
+    // the use site so the gap is visible in the build log.
+    ExpressionPointer elaborateSorry(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "sorry placeholder at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "`sorry` needs an expected type from context — wrap "
+                "with an ascription `(sorry : T)` or supply one via "
+                "context");
+        }
+        // Determine: is the expected type a Proposition (`Sort 0`) or
+        // a Type-universe value (`Sort (u+1)` for some u ≥ 0)?
+        bool isProposition = false;
+        LevelPointer universeLevel;
+        try {
+            Context openedContext;
+            for (size_t i = 0; i < localBinders.size(); ++i) {
+                ExpressionPointer openedType = openOverLocalBinders(
+                    localBinders[i].type, localBinders, i);
+                openedContext.push_back({localBinders[i].name,
+                                          openedType,
+                                          FreeVariableOrigin::Internal});
+            }
+            ExpressionPointer expectedTypeOpened = openOverLocalBinders(
+                expectedType, localBinders, localBinders.size());
+            ExpressionPointer typeOfType = inferType(
+                environment_, openedContext, expectedTypeOpened);
+            ExpressionPointer typeOfTypeReduced = weakHeadNormalForm(
+                environment_, typeOfType);
+            auto* sortNode = std::get_if<Sort>(&typeOfTypeReduced->node);
+            if (!sortNode) {
+                throwElaborate(
+                    "`sorry` cannot determine the universe of the "
+                    "expected type — its type is not a Sort");
+            }
+            LevelPointer sortLevel = sortNode->level;
+            if (auto* successor =
+                    std::get_if<LevelSuccessor>(&sortLevel->node)) {
+                universeLevel = successor->base;
+            } else if (auto* constant =
+                            std::get_if<LevelConst>(&sortLevel->node)) {
+                if (constant->value == 0) {
+                    isProposition = true;
+                } else {
+                    universeLevel = makeLevelConst(constant->value - 1);
+                }
+            } else {
+                throwElaborate(
+                    "`sorry`: expected type's universe is neither "
+                    "`Proposition` nor `Type(u)` for a known u");
+            }
+        } catch (const TypeError& kernelError) {
+            rethrowKernelError(kernelError);
+        }
+        std::string axiomName = isProposition
+            ? "Internal.sorry_proposition"
+            : "Internal.sorry";
+        if (environment_.lookup(axiomName) == nullptr) {
+            throwElaborate(
+                "`sorry` requires `" + axiomName + "` in scope "
+                "(import axioms)");
+        }
+        std::cerr << "warning: `sorry` used"
+                  << (currentDeclarationName_.empty()
+                          ? ""
+                          : (" in '" + currentDeclarationName_ + "'"))
+                  << " at line " << line << "\n";
+        ExpressionPointer call;
+        if (isProposition) {
+            call = makeConstant(axiomName);
+        } else {
+            call = makeConstant(axiomName, {universeLevel});
+        }
+        call = makeApplication(std::move(call), expectedType);
+        return call;
     }
 
     // `⟨a, b, ..., n⟩` at expected type `I(...)`: desugars to a call of

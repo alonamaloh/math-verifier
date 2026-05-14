@@ -1,0 +1,77 @@
+-- axioms.math
+--
+-- The system's logical and type-theoretic foundations. These are the
+-- *only* axioms that should appear in the library. The kernel suppresses
+-- "axiom admitted without proof" warnings for this file specifically;
+-- an axiom declared anywhere else is flagged so we never accidentally
+-- introduce new ones.
+--
+-- Two groups:
+--
+--   1. Propositional extensionality. If two propositions imply each
+--      other, they are equal as values of `Proposition`. Standard
+--      logical axiom (Lean adds the same one). Required to derive
+--      `Quotient.exact` from `Quotient.lift`.
+--
+--   2. The quotient type kernel: `Quotient`, `Quotient.mk`,
+--      `Quotient.sound`, `Quotient.lift`, `Quotient.induct`. These are
+--      the kernel's quotient infrastructure. Lean keeps `Quot` similarly
+--      axiomatic. The alternative (deriving quotients from inductive
+--      types) is significantly more setup for no practical gain since
+--      the axioms are well-understood and consistent.
+--
+-- Plus the unsound-by-design `Internal.sorry` axiom, which is the
+-- target of the `sorry` placeholder used in unfinished proofs.
+
+module axioms
+
+import Logic.basics
+import Equality.basics
+
+-- ----------------------------------------------------------------------
+-- Propositional extensionality.
+
+axiom Equality.propositional_extensionality
+    : (P Q : Proposition)
+      → (P → Q) → (Q → P)
+      → Equality.{0}(Proposition, P, Q)
+
+-- ----------------------------------------------------------------------
+-- The quotient type.
+
+axiom Quotient.{u} : (T : Type(u)) → (R : T → T → Proposition) → Type(u)
+
+axiom Quotient.mk.{u}
+    : (T : Type(u)) → (R : T → T → Proposition)
+      → T → Quotient.{u}(T, R)
+
+axiom Quotient.sound.{u}
+    : (T : Type(u)) → (R : T → T → Proposition)
+      → (x y : T) → R(x, y)
+      → Equality.{u}(Quotient.{u}(T, R),
+                       Quotient.mk.{u}(T, R, x),
+                       Quotient.mk.{u}(T, R, y))
+
+axiom Quotient.lift.{u, v}
+    : (T : Type(u)) → (R : T → T → Proposition) → (U : Type(v))
+      → (f : T → U)
+      → ((x y : T) → R(x, y) → Equality.{v}(U, f(x), f(y)))
+      → Quotient.{u}(T, R) → U
+
+axiom Quotient.induct.{u}
+    : (T : Type(u)) → (R : T → T → Proposition)
+      → (predicate : Quotient.{u}(T, R) → Proposition)
+      → ((x : T) → predicate(Quotient.mk.{u}(T, R, x)))
+      → (q : Quotient.{u}(T, R)) → predicate(q)
+
+-- ----------------------------------------------------------------------
+-- The `sorry` placeholder. The keyword desugars to a call of one of
+-- these axioms depending on the expected type's universe: a
+-- proposition picks `Internal.sorry_proposition`; a value of `Type(u)`
+-- picks `Internal.sorry.{u}`. Either way the elaborator emits a
+-- warning at the use site so the gap is visible in the build log.
+-- Unsound by design — use only as a temporary placeholder for proofs
+-- not yet written.
+
+axiom Internal.sorry.{u} : (T : Type(u)) → T
+axiom Internal.sorry_proposition : (P : Proposition) → P

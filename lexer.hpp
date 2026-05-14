@@ -39,6 +39,7 @@ enum class TokenKind {
     KeywordAssume,          // `assume h : P;` — introduce hypothesis as a step
     KeywordFrom,            // separator for `obtain ⟨…⟩ from E;`
     KeywordSet,             // `set n := E;` — transparent local definition
+    KeywordSorry,           // `sorry` — placeholder for an unwritten proof
 
     // Punctuation
     LeftParen, RightParen,

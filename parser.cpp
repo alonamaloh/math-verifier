@@ -29,6 +29,9 @@ bool isContextualKeyword(TokenKind kind) {
         case TokenKind::KeywordCase:
         case TokenKind::KeywordApply:
         case TokenKind::KeywordContradiction:
+        case TokenKind::KeywordSorry:
+        case TokenKind::KeywordOperator:
+        case TokenKind::KeywordOverload:
             return true;
         default:
             return false;
@@ -1183,6 +1186,15 @@ private:
 
     SurfaceExpressionPointer parseAtom() {
         const Token& current = peek();
+        // `sorry` must short-circuit before the identifier-like path
+        // because it is also a contextual keyword (so it can appear as
+        // a name segment inside `Internal.sorry`); in expression
+        // position the keyword form takes priority.
+        if (current.kind == TokenKind::KeywordSorry) {
+            Token sorryToken = consumeAny();
+            return makeSurfaceSorry(sorryToken.line,
+                                     sorryToken.column);
+        }
         if (isIdentifierLike(current.kind)) {
             return parseQualifiedIdentifier();
         }
@@ -1221,6 +1233,11 @@ private:
             Token questionToken = consumeAny();
             return makeSurfaceHammer(questionToken.line,
                                       questionToken.column);
+        }
+        if (current.kind == TokenKind::KeywordSorry) {
+            Token sorryToken = consumeAny();
+            return makeSurfaceSorry(sorryToken.line,
+                                     sorryToken.column);
         }
         if (current.kind == TokenKind::KeywordType) {
             Token token = consumeAny();
