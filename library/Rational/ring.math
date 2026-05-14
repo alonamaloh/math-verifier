@@ -1,0 +1,599 @@
+-- Rational/ring.math
+--
+-- Commutative-ring laws for Rational. Each law follows the standard
+-- quotient pattern:
+--   1. Prove an Integer-level "at_representatives" lemma stating
+--      `RationalEquivalent(operation_representatives(...), ...)`. The
+--      equivalence definitionally unfolds to an Integer
+--      cross-multiplication, which we close with the corresponding
+--      Integer law.
+--   2. Lift via `Quotient.sound` to an `mk(_) = mk(_)` equality on
+--      Rational.
+--   3. Wrap with the appropriate nested `Quotient.induct` chain so the
+--      conclusion is stated on arbitrary Rationals.
+
+module Rational.ring
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.ring
+import Integer.negation
+import Integer.algebra
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+
+-- ----------------------------------------------------------------------
+-- Helper used by every law that crosses the denominator: lift the
+-- `RationalEquivalent` cross-multiplication to a form using
+-- `to_integer(succ(d1)·succ(d2))`, which the kernel produces from
+-- `Rational.add_representatives` / `Rational.multiply_representatives`
+-- on a destructured representative pair.
+
+-- ======================================================================
+-- Addition: commutativity.
+
+theorem Rational.add_commutative_at_representatives
+        : (rep1 rep2 : RationalRepresentative)
+          → RationalEquivalent(
+                Rational.add_representatives(rep1, rep2),
+                Rational.add_representatives(rep2, rep1))
+  | RationalRepresentative.make(n1, d1),
+    RationalRepresentative.make(n2, d2) =>
+      -- Goal:
+      --   (n1·s_d2 + n2·s_d1) · t(succ(d1 + d2·succ(d1)))
+      -- = (n2·s_d1 + n1·s_d2) · t(succ(d2 + d1·succ(d2)))
+      -- where t = Natural.to_integer, s_X = t(succ(X)). The kernel
+      -- reduces `successor(d_a + d_b·succ(d_a))` to `succ(d_b)·succ(d_a)`
+      -- (multiply pattern picks the *first* factor's predecessor and
+      -- shoves it into the second's `Natural.add`). So the equality
+      -- denominators factor as `succ(d2)·succ(d1)` (LHS) and
+      -- `succ(d1)·succ(d2)` (RHS). The calc then commutes the numerator
+      -- and the lifted denominator.
+      calc Integer.multiply(
+               Integer.add(
+                   Integer.multiply(n1,
+                       Natural.to_integer(successor(d2))),
+                   Integer.multiply(n2,
+                       Natural.to_integer(successor(d1)))),
+               Natural.to_integer(successor(d2) * successor(d1)))
+         = Integer.multiply(
+               Integer.add(
+                   Integer.multiply(n2,
+                       Natural.to_integer(successor(d1))),
+                   Integer.multiply(n1,
+                       Natural.to_integer(successor(d2)))),
+               Natural.to_integer(successor(d2) * successor(d1)))
+                by congruenceOf(
+                       function (numerator : Integer) =>
+                           Integer.multiply(numerator,
+                               Natural.to_integer(
+                                   successor(d2) * successor(d1))),
+                       Integer.add_commutative(
+                           Integer.multiply(n1,
+                               Natural.to_integer(successor(d2))),
+                           Integer.multiply(n2,
+                               Natural.to_integer(successor(d1)))))
+         = Integer.multiply(
+               Integer.add(
+                   Integer.multiply(n2,
+                       Natural.to_integer(successor(d1))),
+                   Integer.multiply(n1,
+                       Natural.to_integer(successor(d2)))),
+               Integer.multiply(
+                   Natural.to_integer(successor(d2)),
+                   Natural.to_integer(successor(d1))))
+                by congruenceOf(
+                       function (liftedDenominator : Integer) =>
+                           Integer.multiply(
+                               Integer.add(
+                                   Integer.multiply(n2,
+                                       Natural.to_integer(successor(d1))),
+                                   Integer.multiply(n1,
+                                       Natural.to_integer(successor(d2)))),
+                               liftedDenominator),
+                       Rational.lifted_denominator_factors(d2, d1))
+         = Integer.multiply(
+               Integer.add(
+                   Integer.multiply(n2,
+                       Natural.to_integer(successor(d1))),
+                   Integer.multiply(n1,
+                       Natural.to_integer(successor(d2)))),
+               Integer.multiply(
+                   Natural.to_integer(successor(d1)),
+                   Natural.to_integer(successor(d2))))
+                by congruenceOf(
+                       function (liftedDenominator : Integer) =>
+                           Integer.multiply(
+                               Integer.add(
+                                   Integer.multiply(n2,
+                                       Natural.to_integer(successor(d1))),
+                                   Integer.multiply(n1,
+                                       Natural.to_integer(successor(d2)))),
+                               liftedDenominator),
+                       Integer.multiply_commutative(
+                           Natural.to_integer(successor(d2)),
+                           Natural.to_integer(successor(d1))))
+         = Integer.multiply(
+               Integer.add(
+                   Integer.multiply(n2,
+                       Natural.to_integer(successor(d1))),
+                   Integer.multiply(n1,
+                       Natural.to_integer(successor(d2)))),
+               Natural.to_integer(successor(d1) * successor(d2)))
+                by congruenceOf(
+                       function (liftedDenominator : Integer) =>
+                           Integer.multiply(
+                               Integer.add(
+                                   Integer.multiply(n2,
+                                       Natural.to_integer(successor(d1))),
+                                   Integer.multiply(n1,
+                                       Natural.to_integer(successor(d2)))),
+                               liftedDenominator),
+                       Equality.symmetry(
+                           Rational.lifted_denominator_factors(d1, d2)))
+
+theorem Rational.add_commutative_after_first
+        (rep1 : RationalRepresentative)
+        : (secondRational : Rational)
+          → Equality.{0}(Rational,
+                Rational.add(
+                    Quotient.mk.{0}(
+                        RationalRepresentative, RationalEquivalent, rep1),
+                    secondRational),
+                Rational.add(secondRational,
+                    Quotient.mk.{0}(
+                        RationalRepresentative, RationalEquivalent, rep1))) :=
+  Quotient.induct.{0}(
+      RationalRepresentative,
+      RationalEquivalent,
+      function (secondRational : Rational) =>
+          Equality.{0}(Rational,
+              Rational.add(
+                  Quotient.mk.{0}(
+                      RationalRepresentative, RationalEquivalent, rep1),
+                  secondRational),
+              Rational.add(secondRational,
+                  Quotient.mk.{0}(
+                      RationalRepresentative, RationalEquivalent, rep1))),
+      function (rep2 : RationalRepresentative) =>
+          Quotient.sound.{0}(
+              RationalRepresentative, RationalEquivalent,
+              Rational.add_representatives(rep1, rep2),
+              Rational.add_representatives(rep2, rep1),
+              Rational.add_commutative_at_representatives(rep1, rep2)))
+
+theorem Rational.add_commutative (x y : Rational)
+        : Equality.{0}(Rational,
+              Rational.add(x, y),
+              Rational.add(y, x)) :=
+  Quotient.induct.{0}(
+      RationalRepresentative,
+      RationalEquivalent,
+      function (x : Rational) =>
+          Equality.{0}(Rational,
+              Rational.add(x, y),
+              Rational.add(y, x)),
+      function (rep1 : RationalRepresentative) =>
+          Rational.add_commutative_after_first(rep1, y),
+      x)
+
+-- ======================================================================
+-- Multiplication: commutativity. Same shape as addition: commute the
+-- numerator with `Integer.multiply_commutative`, then commute the
+-- factored lifted denominator.
+
+theorem Rational.multiply_commutative_at_representatives
+        : (rep1 rep2 : RationalRepresentative)
+          → RationalEquivalent(
+                Rational.multiply_representatives(rep1, rep2),
+                Rational.multiply_representatives(rep2, rep1))
+  | RationalRepresentative.make(n1, d1),
+    RationalRepresentative.make(n2, d2) =>
+      calc Integer.multiply(
+               Integer.multiply(n1, n2),
+               Natural.to_integer(successor(d2) * successor(d1)))
+         = Integer.multiply(
+               Integer.multiply(n2, n1),
+               Natural.to_integer(successor(d2) * successor(d1)))
+                by congruenceOf(
+                       function (product : Integer) =>
+                           Integer.multiply(product,
+                               Natural.to_integer(
+                                   successor(d2) * successor(d1))),
+                       Integer.multiply_commutative(n1, n2))
+         = Integer.multiply(
+               Integer.multiply(n2, n1),
+               Integer.multiply(
+                   Natural.to_integer(successor(d2)),
+                   Natural.to_integer(successor(d1))))
+                by congruenceOf(
+                       function (liftedDenominator : Integer) =>
+                           Integer.multiply(
+                               Integer.multiply(n2, n1),
+                               liftedDenominator),
+                       Rational.lifted_denominator_factors(d2, d1))
+         = Integer.multiply(
+               Integer.multiply(n2, n1),
+               Integer.multiply(
+                   Natural.to_integer(successor(d1)),
+                   Natural.to_integer(successor(d2))))
+                by congruenceOf(
+                       function (liftedDenominator : Integer) =>
+                           Integer.multiply(
+                               Integer.multiply(n2, n1),
+                               liftedDenominator),
+                       Integer.multiply_commutative(
+                           Natural.to_integer(successor(d2)),
+                           Natural.to_integer(successor(d1))))
+         = Integer.multiply(
+               Integer.multiply(n2, n1),
+               Natural.to_integer(successor(d1) * successor(d2)))
+                by congruenceOf(
+                       function (liftedDenominator : Integer) =>
+                           Integer.multiply(
+                               Integer.multiply(n2, n1),
+                               liftedDenominator),
+                       Equality.symmetry(
+                           Rational.lifted_denominator_factors(d1, d2)))
+
+theorem Rational.multiply_commutative_after_first
+        (rep1 : RationalRepresentative)
+        : (secondRational : Rational)
+          → Equality.{0}(Rational,
+                Rational.multiply(
+                    Quotient.mk.{0}(
+                        RationalRepresentative, RationalEquivalent, rep1),
+                    secondRational),
+                Rational.multiply(secondRational,
+                    Quotient.mk.{0}(
+                        RationalRepresentative, RationalEquivalent, rep1))) :=
+  Quotient.induct.{0}(
+      RationalRepresentative,
+      RationalEquivalent,
+      function (secondRational : Rational) =>
+          Equality.{0}(Rational,
+              Rational.multiply(
+                  Quotient.mk.{0}(
+                      RationalRepresentative, RationalEquivalent, rep1),
+                  secondRational),
+              Rational.multiply(secondRational,
+                  Quotient.mk.{0}(
+                      RationalRepresentative, RationalEquivalent, rep1))),
+      function (rep2 : RationalRepresentative) =>
+          Quotient.sound.{0}(
+              RationalRepresentative, RationalEquivalent,
+              Rational.multiply_representatives(rep1, rep2),
+              Rational.multiply_representatives(rep2, rep1),
+              Rational.multiply_commutative_at_representatives(rep1, rep2)))
+
+theorem Rational.multiply_commutative (x y : Rational)
+        : Equality.{0}(Rational,
+              Rational.multiply(x, y),
+              Rational.multiply(y, x)) :=
+  Quotient.induct.{0}(
+      RationalRepresentative,
+      RationalEquivalent,
+      function (x : Rational) =>
+          Equality.{0}(Rational,
+              Rational.multiply(x, y),
+              Rational.multiply(y, x)),
+      function (rep1 : RationalRepresentative) =>
+          Rational.multiply_commutative_after_first(rep1, y),
+      x)
+
+-- ======================================================================
+-- Additive identity: `x + 0 = x` and `0 + x = x`.
+--
+-- At rep level the LHS reduces to
+--   mk(make(n·s_0 + 0·s_d, 0 + d·s_0))
+-- which we need to show equivalent to `make(n, d)`. The Integer
+-- cross-multiplication
+--   (n·s_0 + 0·s_d) · s_d  =  n · s_(0 + d·s_0)
+-- collapses by `Integer.multiply_zero_left`, `Integer.add_identity_right`,
+-- and the fact that `Natural.to_integer(successor(zero))` is
+-- `Integer.one` definitionally; the asymmetric denominator
+-- `0 + d·s_0` reduces (Natural.add on zero first arg) to `d·s_0` and
+-- then needs `Natural.multiply_one` to reach `d`. We assemble all of
+-- this in a single Integer-level calc.
+
+theorem Rational.add_zero_at_representatives_natural
+        (n : Integer) (d : Natural)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Integer.add(
+                      Integer.multiply(n,
+                          Natural.to_integer(successor(zero))),
+                      Integer.multiply(Integer.zero,
+                          Natural.to_integer(successor(d)))),
+                  Natural.to_integer(successor(d))),
+              Integer.multiply(n,
+                  Natural.to_integer(successor(zero + d * successor(zero))))) :=
+  calc Integer.multiply(
+           Integer.add(
+               Integer.multiply(n,
+                   Natural.to_integer(successor(zero))),
+               Integer.multiply(Integer.zero,
+                   Natural.to_integer(successor(d)))),
+           Natural.to_integer(successor(d)))
+     = Integer.multiply(
+           Integer.add(
+               Integer.multiply(n, Integer.one),
+               Integer.zero),
+           Natural.to_integer(successor(d)))
+            by congruenceOf(
+                   function (firstFactor : Integer) =>
+                       Integer.multiply(firstFactor,
+                           Natural.to_integer(successor(d))),
+                   congruenceOf(
+                       function (secondSummand : Integer) =>
+                           Integer.add(
+                               Integer.multiply(n, Integer.one),
+                               secondSummand),
+                       Integer.multiply_zero_left(
+                           Natural.to_integer(successor(d)))))
+     = Integer.multiply(
+           Integer.multiply(n, Integer.one),
+           Natural.to_integer(successor(d)))
+            by congruenceOf(
+                   function (firstFactor : Integer) =>
+                       Integer.multiply(firstFactor,
+                           Natural.to_integer(successor(d))),
+                   Integer.add_identity_right(
+                       Integer.multiply(n, Integer.one)))
+     = Integer.multiply(n, Natural.to_integer(successor(d)))
+            by congruenceOf(
+                   function (firstFactor : Integer) =>
+                       Integer.multiply(firstFactor,
+                           Natural.to_integer(successor(d))),
+                   Integer.multiply_identity_right(n))
+     = Integer.multiply(n,
+           Natural.to_integer(successor(d * successor(zero))))
+            by congruenceOf(
+                   function (denominator : Natural) =>
+                       Integer.multiply(n,
+                           Natural.to_integer(successor(denominator))),
+                   Equality.symmetry(Natural.multiply_one(d)))
+
+theorem Rational.add_zero_at_representative
+        : (rep : RationalRepresentative)
+          → Equality.{0}(Rational,
+                Rational.add(
+                    Quotient.mk.{0}(
+                        RationalRepresentative, RationalEquivalent, rep),
+                    Rational.zero),
+                Quotient.mk.{0}(
+                    RationalRepresentative, RationalEquivalent, rep))
+  | RationalRepresentative.make(n, d) =>
+      Quotient.sound.{0}(
+          RationalRepresentative, RationalEquivalent,
+          Rational.add_representatives(
+              RationalRepresentative.make(n, d),
+              RationalRepresentative.make(Integer.zero, zero)),
+          RationalRepresentative.make(n, d),
+          Rational.add_zero_at_representatives_natural(n, d))
+
+theorem Rational.add_zero (x : Rational)
+        : Equality.{0}(Rational,
+              Rational.add(x, Rational.zero),
+              x) :=
+  Quotient.induct.{0}(
+      RationalRepresentative,
+      RationalEquivalent,
+      function (x : Rational) =>
+          Equality.{0}(Rational,
+              Rational.add(x, Rational.zero),
+              x),
+      Rational.add_zero_at_representative,
+      x)
+
+-- Left identity follows from commutativity.
+theorem Rational.zero_add (x : Rational)
+        : Equality.{0}(Rational,
+              Rational.add(Rational.zero, x),
+              x) :=
+  Equality.transitivity.{0}(Rational,
+      Rational.add(Rational.zero, x),
+      Rational.add(x, Rational.zero),
+      x,
+      Rational.add_commutative(Rational.zero, x),
+      Rational.add_zero(x))
+
+-- ======================================================================
+-- Multiplicative identity: `x · 1 = x` and `1 · x = x`.
+--
+-- At rep level the LHS reduces to
+--   mk(make(n·Integer.one, d·s_0))
+-- (the `0 + ` in the denominator-minus-one drops by the Natural.add
+-- zero pattern). The Integer cross-multiplication
+--   (n·Integer.one) · s_d  =  n · s_(d·s_0)
+-- closes via `Integer.multiply_identity_right` on the LHS numerator and
+-- `Natural.multiply_one(d)` on the denominator.
+
+theorem Rational.multiply_one_at_representatives_natural
+        (n : Integer) (d : Natural)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Integer.multiply(n, Integer.one),
+                  Natural.to_integer(successor(d))),
+              Integer.multiply(n,
+                  Natural.to_integer(successor(d * successor(zero))))) :=
+  calc Integer.multiply(
+           Integer.multiply(n, Integer.one),
+           Natural.to_integer(successor(d)))
+     = Integer.multiply(n, Natural.to_integer(successor(d)))
+            by congruenceOf(
+                   function (firstFactor : Integer) =>
+                       Integer.multiply(firstFactor,
+                           Natural.to_integer(successor(d))),
+                   Integer.multiply_identity_right(n))
+     = Integer.multiply(n,
+           Natural.to_integer(successor(d * successor(zero))))
+            by congruenceOf(
+                   function (denominator : Natural) =>
+                       Integer.multiply(n,
+                           Natural.to_integer(successor(denominator))),
+                   Equality.symmetry(Natural.multiply_one(d)))
+
+theorem Rational.multiply_one_at_representative
+        : (rep : RationalRepresentative)
+          → Equality.{0}(Rational,
+                Rational.multiply(
+                    Quotient.mk.{0}(
+                        RationalRepresentative, RationalEquivalent, rep),
+                    Rational.one),
+                Quotient.mk.{0}(
+                    RationalRepresentative, RationalEquivalent, rep))
+  | RationalRepresentative.make(n, d) =>
+      Quotient.sound.{0}(
+          RationalRepresentative, RationalEquivalent,
+          Rational.multiply_representatives(
+              RationalRepresentative.make(n, d),
+              RationalRepresentative.make(Integer.one, zero)),
+          RationalRepresentative.make(n, d),
+          Rational.multiply_one_at_representatives_natural(n, d))
+
+theorem Rational.multiply_one (x : Rational)
+        : Equality.{0}(Rational,
+              Rational.multiply(x, Rational.one),
+              x) :=
+  Quotient.induct.{0}(
+      RationalRepresentative,
+      RationalEquivalent,
+      function (x : Rational) =>
+          Equality.{0}(Rational,
+              Rational.multiply(x, Rational.one),
+              x),
+      Rational.multiply_one_at_representative,
+      x)
+
+theorem Rational.one_multiply (x : Rational)
+        : Equality.{0}(Rational,
+              Rational.multiply(Rational.one, x),
+              x) :=
+  Equality.transitivity.{0}(Rational,
+      Rational.multiply(Rational.one, x),
+      Rational.multiply(x, Rational.one),
+      x,
+      Rational.multiply_commutative(Rational.one, x),
+      Rational.multiply_one(x))
+
+-- ======================================================================
+-- Additive inverse: `x + (−x) = 0` and `(−x) + x = 0`.
+--
+-- At rep level rep = make(n, d):
+--   add_reps(make(n, d), make(negate(n), d))
+--     = make(n·s_d + negate(n)·s_d, d + d·s_d)
+-- The Integer cross-multiplication
+--   (n·s_d + negate(n)·s_d) · to_int(succ(zero))  =  0 · to_int(succ(d + d·s_d))
+-- collapses on the RHS by `Integer.multiply_zero_left` and on the LHS
+-- by pulling out negate, `Integer.add_negate_right`, and the unit on the
+-- right.
+
+theorem Rational.add_negate_right_at_representatives_natural
+        (n : Integer) (d : Natural)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Integer.add(
+                      Integer.multiply(n,
+                          Natural.to_integer(successor(d))),
+                      Integer.multiply(Integer.negate(n),
+                          Natural.to_integer(successor(d)))),
+                  Natural.to_integer(successor(zero))),
+              Integer.multiply(Integer.zero,
+                  Natural.to_integer(successor(d + d * successor(d))))) :=
+  calc Integer.multiply(
+           Integer.add(
+               Integer.multiply(n,
+                   Natural.to_integer(successor(d))),
+               Integer.multiply(Integer.negate(n),
+                   Natural.to_integer(successor(d)))),
+           Natural.to_integer(successor(zero)))
+     = Integer.add(
+           Integer.multiply(n, Natural.to_integer(successor(d))),
+           Integer.multiply(Integer.negate(n),
+               Natural.to_integer(successor(d))))
+            by Integer.multiply_identity_right(
+                   Integer.add(
+                       Integer.multiply(n,
+                           Natural.to_integer(successor(d))),
+                       Integer.multiply(Integer.negate(n),
+                           Natural.to_integer(successor(d)))))
+     = Integer.add(
+           Integer.multiply(n, Natural.to_integer(successor(d))),
+           Integer.negate(
+               Integer.multiply(n,
+                   Natural.to_integer(successor(d)))))
+            by congruenceOf(
+                   function (secondSummand : Integer) =>
+                       Integer.add(
+                           Integer.multiply(n,
+                               Natural.to_integer(successor(d))),
+                           secondSummand),
+                   Integer.multiply_negate_left(n,
+                       Natural.to_integer(successor(d))))
+     = Integer.zero
+            by Integer.add_negate_right(
+                   Integer.multiply(n,
+                       Natural.to_integer(successor(d))))
+     = Integer.multiply(Integer.zero,
+           Natural.to_integer(successor(d + d * successor(d))))
+            by Equality.symmetry(
+                   Integer.multiply_zero_left(
+                       Natural.to_integer(
+                           successor(d + d * successor(d)))))
+
+theorem Rational.add_negate_right_at_representative
+        : (rep : RationalRepresentative)
+          → Equality.{0}(Rational,
+                Rational.add(
+                    Quotient.mk.{0}(
+                        RationalRepresentative, RationalEquivalent, rep),
+                    Rational.negate(
+                        Quotient.mk.{0}(
+                            RationalRepresentative, RationalEquivalent, rep))),
+                Rational.zero)
+  | RationalRepresentative.make(n, d) =>
+      Quotient.sound.{0}(
+          RationalRepresentative, RationalEquivalent,
+          Rational.add_representatives(
+              RationalRepresentative.make(n, d),
+              RationalRepresentative.make(Integer.negate(n), d)),
+          RationalRepresentative.make(Integer.zero, zero),
+          Rational.add_negate_right_at_representatives_natural(n, d))
+
+theorem Rational.add_negate_right (x : Rational)
+        : Equality.{0}(Rational,
+              Rational.add(x, Rational.negate(x)),
+              Rational.zero) :=
+  Quotient.induct.{0}(
+      RationalRepresentative,
+      RationalEquivalent,
+      function (x : Rational) =>
+          Equality.{0}(Rational,
+              Rational.add(x, Rational.negate(x)),
+              Rational.zero),
+      Rational.add_negate_right_at_representative,
+      x)
+
+theorem Rational.add_negate_left (x : Rational)
+        : Equality.{0}(Rational,
+              Rational.add(Rational.negate(x), x),
+              Rational.zero) :=
+  Equality.transitivity.{0}(Rational,
+      Rational.add(Rational.negate(x), x),
+      Rational.add(x, Rational.negate(x)),
+      Rational.zero,
+      Rational.add_commutative(Rational.negate(x), x),
+      Rational.add_negate_right(x))
