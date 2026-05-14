@@ -213,7 +213,143 @@ private:
             elaborateDefinition(*definition);
             return;
         }
+        if (auto* op = std::get_if<SurfaceOperatorDeclaration>(&statement)) {
+            elaborateOperatorDeclaration(*op);
+            return;
+        }
+        if (auto* ov = std::get_if<SurfaceOverloadDeclaration>(&statement)) {
+            elaborateOverloadDeclaration(*ov);
+            return;
+        }
         throw ElaborateError("unhandled top-level statement variant");
+    }
+
+    // Validate and register an `operator (sym) on (T1, T2) := F`
+    // declaration. The function `F` must exist in scope and have type
+    // `T1 → T2 → R` for some result type `R`. `T1` and `T2` must each
+    // be the head Constant of a known type (axiomatic or via inductive/
+    // definition).
+    void elaborateOperatorDeclaration(
+        const SurfaceOperatorDeclaration& declaration) {
+        Frame frame(*this,
+            "operator (" + declaration.operatorSymbol + ") on ("
+            + declaration.leftTypeName + ", "
+            + declaration.rightTypeName + ")");
+        const Declaration* functionDecl =
+            environment_.lookup(declaration.functionName);
+        if (!functionDecl) {
+            throwElaborate(
+                "operator dispatch function '"
+                + declaration.functionName + "' is not in scope");
+        }
+        // Pull the function's type and verify it's T1 → T2 → R.
+        ExpressionPointer functionType = declarationType(*functionDecl);
+        ExpressionPointer cursor = weakHeadNormalForm(
+            environment_, functionType);
+        auto* leftPi = std::get_if<Pi>(&cursor->node);
+        if (!leftPi) {
+            throwElaborate(
+                "operator dispatch function '"
+                + declaration.functionName
+                + "' must take at least two arguments");
+        }
+        if (!typeHasHeadName(leftPi->domain, declaration.leftTypeName)) {
+            throwElaborate(
+                "operator dispatch function '"
+                + declaration.functionName
+                + "' first parameter type does not have '"
+                + declaration.leftTypeName + "' as its head");
+        }
+        ExpressionPointer afterLeft = weakHeadNormalForm(
+            environment_, leftPi->codomain);
+        auto* rightPi = std::get_if<Pi>(&afterLeft->node);
+        if (!rightPi) {
+            throwElaborate(
+                "operator dispatch function '"
+                + declaration.functionName
+                + "' must take at least two arguments");
+        }
+        if (!typeHasHeadName(rightPi->domain, declaration.rightTypeName)) {
+            throwElaborate(
+                "operator dispatch function '"
+                + declaration.functionName
+                + "' second parameter type does not have '"
+                + declaration.rightTypeName + "' as its head");
+        }
+        auto key = std::make_tuple(declaration.operatorSymbol,
+                                     declaration.leftTypeName,
+                                     declaration.rightTypeName);
+        auto& slot = environment_.operatorRegistry[key];
+        if (!slot.empty() && slot != declaration.functionName) {
+            throwElaborate(
+                "operator '" + declaration.operatorSymbol + "' on ("
+                + declaration.leftTypeName + ", "
+                + declaration.rightTypeName
+                + ") is already registered to '" + slot + "'");
+        }
+        slot = declaration.functionName;
+    }
+
+    // Validate and register an `overload alias := F` declaration. The
+    // function `F` must exist; the alias accumulates a list of fully-
+    // qualified candidates that the elaborator picks among by argument-
+    // type matching at call sites.
+    void elaborateOverloadDeclaration(
+        const SurfaceOverloadDeclaration& declaration) {
+        Frame frame(*this,
+            "overload '" + declaration.aliasName + "' := '"
+            + declaration.functionName + "'");
+        const Declaration* functionDecl =
+            environment_.lookup(declaration.functionName);
+        if (!functionDecl) {
+            throwElaborate(
+                "overload target '" + declaration.functionName
+                + "' is not in scope");
+        }
+        // Disallow registering an alias whose name collides with an
+        // existing declaration — that would be ambiguous at name lookup.
+        if (environment_.lookup(declaration.aliasName) != nullptr) {
+            throwElaborate(
+                "overload alias '" + declaration.aliasName
+                + "' collides with an existing declaration of the same "
+                "name; pick a different alias");
+        }
+        auto& candidates =
+            environment_.overloadAliases[declaration.aliasName];
+        for (const auto& existing : candidates) {
+            if (existing == declaration.functionName) {
+                return;  // idempotent re-registration
+            }
+        }
+        candidates.push_back(declaration.functionName);
+    }
+
+    // Does `expressionType` have the given Constant name at its head?
+    // Checks the *raw* head first (so a parameter declared as
+    // `Rational` matches `Rational`, even though `Rational` δ-reduces
+    // to `Quotient(...)`). Falls back to WHNF if the raw head isn't a
+    // Constant. Used for validating operator-declaration signatures.
+    bool typeHasHeadName(ExpressionPointer expressionType,
+                           const std::string& expectedName) {
+        ExpressionPointer cursor = expressionType;
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            cursor = application->function;
+        }
+        if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+            if (constant->name == expectedName) return true;
+        }
+        // Fall back to WHNF — e.g., when the parameter type is itself a
+        // computation that reduces to a Constant head.
+        ExpressionPointer reduced = weakHeadNormalForm(
+            environment_, expressionType);
+        while (auto* application =
+                   std::get_if<Application>(&reduced->node)) {
+            reduced = weakHeadNormalForm(environment_,
+                                          application->function);
+        }
+        auto* constant = std::get_if<Constant>(&reduced->node);
+        return constant && constant->name == expectedName;
     }
 
     void elaborateAxiom(const SurfaceAxiomDeclaration& declaration) {
@@ -4268,23 +4404,42 @@ private:
                 leftTypeConstant ? leftTypeConstant->name : "<unknown>";
         }
         std::string targetFunction;
-        // For `<` we wrap the left operand in `successor`, since
-        // `a < b` is defined as `LessOrEqual(successor(a), b)`.
-        bool wrapLeftInSuccessor = false;
-        if (operandTypeName == "Natural") {
-            if (operatorSymbol == "+") targetFunction = "Natural.add";
-            else if (operatorSymbol == "*") targetFunction = "Natural.multiply";
-            else if (operatorSymbol == "≤") targetFunction = "LessOrEqual";
-            else if (operatorSymbol == "<") {
-                targetFunction = "LessOrEqual";
-                wrapLeftInSuccessor = true;
-            }
-            else if (operatorSymbol == "∣") targetFunction = "Natural.divides";
+        // First consult the user-declared registry: any
+        // `operator (sym) on (T1, T2) := F;` registration wins. This is
+        // the extensible path — Rational, Real, Complex, polynomial
+        // rings, etc. all hook in here.
+        std::string rightTypeName;
+        ExpressionPointer rightTypeRaw =
+            inferTypeInLocalContext(localBinders, rightKernel);
+        if (auto* rightTypeConstantRaw =
+                std::get_if<Constant>(&rightTypeRaw->node)) {
+            rightTypeName = rightTypeConstantRaw->name;
+        } else {
+            ExpressionPointer rightType =
+                weakHeadNormalForm(environment_, rightTypeRaw);
+            auto* rightTypeConstant =
+                std::get_if<Constant>(&rightType->node);
+            rightTypeName =
+                rightTypeConstant ? rightTypeConstant->name : "<unknown>";
         }
-        else if (operandTypeName == "Integer") {
-            if (operatorSymbol == "+") targetFunction = "Integer.add";
-            else if (operatorSymbol == "*") targetFunction = "Integer.multiply";
-            else if (operatorSymbol == "-") targetFunction = "Integer.subtract";
+        std::string registered = environment_.lookupOperator(
+            operatorSymbol, operandTypeName, rightTypeName);
+        if (!registered.empty()) {
+            targetFunction = registered;
+        }
+        // For `<` we wrap the left operand in `successor`, since
+        // `a < b` is defined as `LessOrEqual(successor(a), b)`. This is
+        // special enough that we leave it built-in.
+        bool wrapLeftInSuccessor = false;
+        if (targetFunction.empty()) {
+            if (operandTypeName == "Natural") {
+                if (operatorSymbol == "≤") targetFunction = "LessOrEqual";
+                else if (operatorSymbol == "<") {
+                    targetFunction = "LessOrEqual";
+                    wrapLeftInSuccessor = true;
+                }
+                else if (operatorSymbol == "∣") targetFunction = "Natural.divides";
+            }
         }
         if (targetFunction.empty()) {
             throw ElaborateError(

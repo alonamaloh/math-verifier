@@ -283,11 +283,77 @@ private:
             case TokenKind::KeywordAxiom:      return parseAxiomDeclaration();
             case TokenKind::KeywordDefinition: return parseDefinitionDeclaration(false);
             case TokenKind::KeywordTheorem:    return parseDefinitionDeclaration(true);
+            case TokenKind::KeywordOperator:   return parseOperatorDeclaration();
+            case TokenKind::KeywordOverload:   return parseOverloadDeclaration();
             default:
                 throwHere("expected top-level statement keyword "
                           "(import / using / inductive / axiom / "
-                          "definition / theorem)");
+                          "definition / theorem / operator / overload)");
         }
+    }
+
+    // `operator (<symbol>) on (<T1>, <T2>) := <Function>`
+    //
+    // The operator symbol can be any operator-shaped token sequence
+    // (`+`, `*`, `-`, `≤`, `<`, `∣`, …). We consume one operator token
+    // by its lexeme.
+    SurfaceOperatorDeclaration parseOperatorDeclaration() {
+        consumeAny();  // 'operator'
+        SurfaceOperatorDeclaration declaration;
+        expect(TokenKind::LeftParen,
+               "expected '(' before operator symbol in operator "
+               "declaration");
+        if (peek().kind == TokenKind::Identifier
+            || peek().kind == TokenKind::EndOfFile) {
+            throwHere("expected an operator symbol like '+', '*', "
+                      "'-', '≤', '<', '∣' inside the parentheses");
+        }
+        declaration.operatorSymbol = consumeAny().lexeme;
+        expect(TokenKind::RightParen,
+               "expected ')' after operator symbol");
+        expect(TokenKind::KeywordOn,
+               "expected 'on' after operator symbol in operator "
+               "declaration");
+        expect(TokenKind::LeftParen,
+               "expected '(<leftType>, <rightType>)' after 'on'");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a type name (left operand type)");
+        }
+        declaration.leftTypeName = consumeQualifiedNameString();
+        expect(TokenKind::Comma,
+               "expected ',' between operand-type names");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a type name (right operand type)");
+        }
+        declaration.rightTypeName = consumeQualifiedNameString();
+        expect(TokenKind::RightParen,
+               "expected ')' after operand-type pair");
+        expect(TokenKind::Assign,
+               "expected ':=' before the dispatch function name");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a function name as the operator "
+                      "dispatch target");
+        }
+        declaration.functionName = consumeQualifiedNameString();
+        return declaration;
+    }
+
+    // `overload <alias> := <Function>`
+    SurfaceOverloadDeclaration parseOverloadDeclaration() {
+        consumeAny();  // 'overload'
+        SurfaceOverloadDeclaration declaration;
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected an alias name after 'overload'");
+        }
+        declaration.aliasName = consumeQualifiedNameString();
+        expect(TokenKind::Assign,
+               "expected ':=' before the function name in overload "
+               "declaration");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a function name as the overload target");
+        }
+        declaration.functionName = consumeQualifiedNameString();
+        return declaration;
     }
 
     SurfaceImportDeclaration parseImportDeclaration() {

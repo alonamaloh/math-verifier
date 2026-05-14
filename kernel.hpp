@@ -5,6 +5,7 @@
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <variant>
 #include <vector>
 
@@ -82,6 +83,20 @@ struct Environment {
     // implicit binders to leading consecutive positions.
     std::map<std::string, int> implicitArgumentCounts;
 
+    // Operator-dispatch registry. Key: (operator symbol, left operand
+    // type head name, right operand type head name). Value: the fully-
+    // qualified function name to dispatch to. Populated by `operator
+    // (<sym>) on (<T1>, <T2>) := <F>;` declarations. The kernel itself
+    // never reads this — it's a surface-elaborator concern.
+    std::map<std::tuple<std::string, std::string, std::string>,
+              std::string> operatorRegistry;
+
+    // Function-name overload aliases. Key: the surface alias name (e.g.
+    // "add"). Value: a list of fully-qualified function names that the
+    // alias resolves to. The elaborator picks one by matching argument
+    // types at each call site. Populated by `overload <alias> := <F>;`.
+    std::map<std::string, std::vector<std::string>> overloadAliases;
+
     const Declaration* lookup(const std::string& name) const {
         auto iterator = declarations.find(name);
         return iterator == declarations.end() ? nullptr : &iterator->second;
@@ -91,6 +106,30 @@ struct Environment {
         auto iterator = implicitArgumentCounts.find(name);
         return iterator == implicitArgumentCounts.end()
             ? 0 : iterator->second;
+    }
+
+    // Look up a registered operator-dispatch target. Returns the
+    // function name on success, empty string if no registration exists
+    // for that (operator, leftType, rightType) triple.
+    std::string lookupOperator(
+        const std::string& operatorSymbol,
+        const std::string& leftTypeName,
+        const std::string& rightTypeName) const {
+        auto iterator = operatorRegistry.find(
+            std::make_tuple(operatorSymbol, leftTypeName, rightTypeName));
+        return iterator == operatorRegistry.end()
+            ? std::string{} : iterator->second;
+    }
+
+    // Look up the list of fully-qualified function names registered
+    // under `aliasName`. Returns an empty vector if the alias is
+    // unknown. Callers do overload resolution by matching argument
+    // types against each candidate's signature.
+    const std::vector<std::string>* lookupOverloads(
+        const std::string& aliasName) const {
+        auto iterator = overloadAliases.find(aliasName);
+        return iterator == overloadAliases.end()
+            ? nullptr : &iterator->second;
     }
 };
 

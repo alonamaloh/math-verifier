@@ -16,6 +16,8 @@ enum class TokenKind {
     KeywordModule, KeywordImport, KeywordUsing,
     KeywordInductive, KeywordDefinition, KeywordAxiom, KeywordTheorem,
     KeywordWhere,
+    KeywordOperator,        // `operator (+) on (T1, T2) := F;` — operator overload
+    KeywordOverload,        // `overload name := F;` — function-name overload alias
 
     // Expression keywords
     KeywordFunction, KeywordLet, KeywordIn,

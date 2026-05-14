@@ -46,6 +46,22 @@ struct CachedDependency {
     uint64_t sourceHash;
 };
 
+// Operator-registry entry added by this file: `operator (sym) on
+// (leftType, rightType) := function`.
+struct CachedOperatorRegistration {
+    std::string operatorSymbol;
+    std::string leftTypeName;
+    std::string rightTypeName;
+    std::string functionName;
+};
+
+// Overload-alias entry added by this file: `overload alias :=
+// function`.
+struct CachedOverloadRegistration {
+    std::string aliasName;
+    std::string functionName;
+};
+
 // The full contents of a .mathv file, prior to (de)serialization.
 struct CacheContents {
     std::string sourcePath;
@@ -56,6 +72,10 @@ struct CacheContents {
     std::vector<std::pair<std::string, Declaration>> declarations;
     // Implicit-argument-count entries added by this file.
     std::vector<std::pair<std::string, int>> implicitArgumentCounts;
+    // Operator-registry entries added by this file.
+    std::vector<CachedOperatorRegistration> operatorRegistrations;
+    // Overload-alias entries added by this file.
+    std::vector<CachedOverloadRegistration> overloadRegistrations;
 };
 
 // Write `contents` to `path`. Throws SerializationError on I/O failure.

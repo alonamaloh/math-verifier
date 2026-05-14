@@ -117,9 +117,7 @@ theorem Rational.multiply_associative_at_representatives_integer
                        successor(d3))))
 
 theorem Rational.multiply_associative (x y z : Rational)
-        : Equality.{0}(Rational,
-              Rational.multiply(Rational.multiply(x, y), z),
-              Rational.multiply(x, Rational.multiply(y, z))) := {
+        : (x * y) * z = x * (y * z) := {
   obtain Quotient.mk(rep_x) from x;
   obtain Quotient.mk(rep_y) from y;
   obtain Quotient.mk(rep_z) from z;
@@ -640,9 +638,7 @@ theorem Rational.add_associative_at_representatives_integer
                    Rational.three_denominator_associativity_swap(d1, d2, d3))
 
 theorem Rational.add_associative (x y z : Rational)
-        : Equality.{0}(Rational,
-              Rational.add(Rational.add(x, y), z),
-              Rational.add(x, Rational.add(y, z))) := {
+        : (x + y) + z = x + (y + z) := {
   obtain Quotient.mk(rep_x) from x;
   obtain Quotient.mk(rep_y) from y;
   obtain Quotient.mk(rep_z) from z;
@@ -1145,11 +1141,7 @@ theorem Rational.distributivity_left_at_representatives_integer
                        n1, n2, n3, d1, d2, d3))
 
 theorem Rational.distributivity_left (x y z : Rational)
-        : Equality.{0}(Rational,
-              Rational.multiply(x, Rational.add(y, z)),
-              Rational.add(
-                  Rational.multiply(x, y),
-                  Rational.multiply(x, z))) := {
+        : x * (y + z) = x * y + x * z := {
   obtain Quotient.mk(rep_x) from x;
   obtain Quotient.mk(rep_y) from y;
   obtain Quotient.mk(rep_z) from z;
@@ -1176,32 +1168,13 @@ theorem Rational.distributivity_left (x y z : Rational)
 
 -- Right distributivity: derived from left + multiply_commutative.
 theorem Rational.distributivity_right (x y z : Rational)
-        : Equality.{0}(Rational,
-              Rational.multiply(Rational.add(x, y), z),
-              Rational.add(
-                  Rational.multiply(x, z),
-                  Rational.multiply(y, z))) :=
-  calc Rational.multiply(Rational.add(x, y), z)
-     = Rational.multiply(z, Rational.add(x, y))
-            by Rational.multiply_commutative(Rational.add(x, y), z)
-     = Rational.add(
-           Rational.multiply(z, x),
-           Rational.multiply(z, y))
+        : (x + y) * z = x * z + y * z :=
+  calc (x + y) * z
+     = z * (x + y)
+            by Rational.multiply_commutative(x + y, z)
+     = z * x + z * y
             by Rational.distributivity_left(z, x, y)
-     = Rational.add(
-           Rational.multiply(x, z),
-           Rational.multiply(z, y))
-            by congruenceOf(
-                   function (firstSummand : Rational) =>
-                       Rational.add(firstSummand,
-                           Rational.multiply(z, y)),
-                   Rational.multiply_commutative(z, x))
-     = Rational.add(
-           Rational.multiply(x, z),
-           Rational.multiply(y, z))
-            by congruenceOf(
-                   function (secondSummand : Rational) =>
-                       Rational.add(
-                           Rational.multiply(x, z),
-                           secondSummand),
-                   Rational.multiply_commutative(z, y))
+     = x * z + z * y
+            by rewrite(Rational.multiply_commutative(z, x))
+     = x * z + y * z
+            by rewrite(Rational.multiply_commutative(z, y))

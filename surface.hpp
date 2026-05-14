@@ -447,9 +447,34 @@ struct SurfaceUsingDeclaration {
     std::vector<std::string> names;  // populated when target == "names"
 };
 
+// `operator (<symbol>) on (<leftTypeName>, <rightTypeName>) := <function>`
+// Registers a function as the dispatch target for an arithmetic /
+// comparison operator on the given pair of operand head-type names. The
+// types are referenced by their head Constant name only — so
+// `Rational` is fine, but a structural type expression like
+// `Quotient(...)` is not. Result type is whatever the function returns.
+struct SurfaceOperatorDeclaration {
+    std::string operatorSymbol;
+    std::string leftTypeName;
+    std::string rightTypeName;
+    std::string functionName;
+};
+
+// `overload <alias> := <function>` — registers `function` as a member of
+// the overload set named `alias`. Multiple `overload alias := F1;` and
+// `overload alias := F2;` declarations build up the set; the elaborator
+// resolves `alias(args…)` by matching argument types against each
+// member's parameter types and picking the unique match.
+struct SurfaceOverloadDeclaration {
+    std::string aliasName;
+    std::string functionName;
+};
+
 using SurfaceTopStatement = std::variant<
     SurfaceImportDeclaration, SurfaceUsingDeclaration,
-    SurfaceInductiveDeclaration, SurfaceAxiomDeclaration, SurfaceDefinitionDeclaration
+    SurfaceInductiveDeclaration, SurfaceAxiomDeclaration,
+    SurfaceDefinitionDeclaration,
+    SurfaceOperatorDeclaration, SurfaceOverloadDeclaration
 >;
 
 struct SurfaceModule {

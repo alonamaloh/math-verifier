@@ -5117,6 +5117,21 @@ void loadCacheRecursive(Environment& environment,
     for (const auto& [name, count] : contents.implicitArgumentCounts) {
         environment.implicitArgumentCounts[name] = count;
     }
+    for (const auto& entry : contents.operatorRegistrations) {
+        environment.operatorRegistry[std::make_tuple(
+            entry.operatorSymbol,
+            entry.leftTypeName,
+            entry.rightTypeName)] = entry.functionName;
+    }
+    for (const auto& entry : contents.overloadRegistrations) {
+        auto& candidates =
+            environment.overloadAliases[entry.aliasName];
+        bool seen = false;
+        for (const auto& existing : candidates) {
+            if (existing == entry.functionName) { seen = true; break; }
+        }
+        if (!seen) candidates.push_back(entry.functionName);
+    }
     alreadyLoaded.insert(cachePath);
 }
 
@@ -5156,6 +5171,19 @@ int verifyWithCache(const std::string& sourcePath,
     std::set<std::string> implicitsBefore;
     for (const auto& [name, _] : environment.implicitArgumentCounts) {
         implicitsBefore.insert(name);
+    }
+    std::set<std::tuple<std::string, std::string, std::string>>
+        operatorsBefore;
+    for (const auto& [key, _] : environment.operatorRegistry) {
+        operatorsBefore.insert(key);
+    }
+    // Snapshot overload aliases: for each alias, the set of candidates
+    // that were already registered before this file ran.
+    std::map<std::string, std::set<std::string>> overloadsBefore;
+    for (const auto& [alias, candidates] : environment.overloadAliases) {
+        for (const auto& candidate : candidates) {
+            overloadsBefore[alias].insert(candidate);
+        }
     }
 
     std::vector<std::string> importedModules;
@@ -5223,6 +5251,27 @@ int verifyWithCache(const std::string& sourcePath,
     for (const auto& [name, count] : environment.implicitArgumentCounts) {
         if (!implicitsBefore.count(name)) {
             cache.implicitArgumentCounts.emplace_back(name, count);
+        }
+    }
+    for (const auto& [key, functionName] : environment.operatorRegistry) {
+        if (!operatorsBefore.count(key)) {
+            CachedOperatorRegistration entry;
+            entry.operatorSymbol = std::get<0>(key);
+            entry.leftTypeName = std::get<1>(key);
+            entry.rightTypeName = std::get<2>(key);
+            entry.functionName = functionName;
+            cache.operatorRegistrations.push_back(std::move(entry));
+        }
+    }
+    for (const auto& [alias, candidates] : environment.overloadAliases) {
+        auto& seenBefore = overloadsBefore[alias];
+        for (const auto& candidate : candidates) {
+            if (!seenBefore.count(candidate)) {
+                CachedOverloadRegistration entry;
+                entry.aliasName = alias;
+                entry.functionName = candidate;
+                cache.overloadRegistrations.push_back(std::move(entry));
+            }
         }
     }
 

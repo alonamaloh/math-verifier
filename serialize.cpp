@@ -9,7 +9,10 @@
 namespace {
 
 constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
-constexpr uint32_t cacheVersion = 1;
+// Format version 2 adds the operator-registry and overload-alias
+// sections at the tail of the file. Files written by version 1 readers
+// are not accepted; on cache-version mismatch the kernel rebuilds.
+constexpr uint32_t cacheVersion = 2;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -378,6 +381,20 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
         writer.writeString(name);
         writer.writeI32(count);
     }
+    writer.writeU32(
+        static_cast<uint32_t>(contents.operatorRegistrations.size()));
+    for (const auto& entry : contents.operatorRegistrations) {
+        writer.writeString(entry.operatorSymbol);
+        writer.writeString(entry.leftTypeName);
+        writer.writeString(entry.rightTypeName);
+        writer.writeString(entry.functionName);
+    }
+    writer.writeU32(
+        static_cast<uint32_t>(contents.overloadRegistrations.size()));
+    for (const auto& entry : contents.overloadRegistrations) {
+        writer.writeString(entry.aliasName);
+        writer.writeString(entry.functionName);
+    }
     if (!output) {
         throw SerializationError("write failed (final flush): " + path);
     }
@@ -427,6 +444,24 @@ CacheContents readCacheFile(const std::string& path) {
         std::string name = reader.readString();
         int count = reader.readI32();
         contents.implicitArgumentCounts.emplace_back(std::move(name), count);
+    }
+    uint32_t operatorCount = reader.readU32();
+    contents.operatorRegistrations.reserve(operatorCount);
+    for (uint32_t i = 0; i < operatorCount; ++i) {
+        CachedOperatorRegistration entry;
+        entry.operatorSymbol = reader.readString();
+        entry.leftTypeName = reader.readString();
+        entry.rightTypeName = reader.readString();
+        entry.functionName = reader.readString();
+        contents.operatorRegistrations.push_back(std::move(entry));
+    }
+    uint32_t overloadCount = reader.readU32();
+    contents.overloadRegistrations.reserve(overloadCount);
+    for (uint32_t i = 0; i < overloadCount; ++i) {
+        CachedOverloadRegistration entry;
+        entry.aliasName = reader.readString();
+        entry.functionName = reader.readString();
+        contents.overloadRegistrations.push_back(std::move(entry));
     }
     return contents;
 }
