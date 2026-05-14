@@ -1,0 +1,239 @@
+-- Integer/cancellation.math
+--
+-- Multiplicative cancellation on Integer when the multiplier is a
+-- positive natural lifted to Integer:
+--     x · to_integer(succ(k)) = y · to_integer(succ(k))  →  x = y
+-- The proof descends through `Quotient.exact` (newly available from
+-- propositional extensionality) to recover the underlying
+-- `IntegerEquivalent` at the multiplied representatives, simplifies
+-- away the `_·0` and `0+_` noise that the kernel can't reduce
+-- structurally, factors out `succ(k)`, applies the Natural-level
+-- cancellation, and reassembles via `Quotient.sound`. This is the
+-- step that the original Rational plan needed and couldn't get.
+
+module Integer.cancellation
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.extensionality
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.cancellation
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+
+-- ----------------------------------------------------------------------
+-- Natural-level kernel of the cancellation argument. Given the
+-- equivalence relation between the two multiplied representatives,
+-- conclude the equivalence between the original representatives.
+-- The proof simplifies the multiplied-out equation to one factor of
+-- `succ(k)` on each side, then cancels.
+
+theorem Integer.cancellation_natural
+        (p1 q1 p2 q2 k : Natural)
+        (equivalenceAfterMultiply
+            : (p1 * successor(k) + q1 * zero)
+              + (p2 * zero + q2 * successor(k))
+              = (p1 * zero + q1 * successor(k))
+                + (p2 * successor(k) + q2 * zero))
+        : p1 + q2 = q1 + p2 := {
+    -- Simplify zeros on each side, then factor succ(k).
+    claim lhsSimplified
+          : (p1 * successor(k) + q1 * zero)
+            + (p2 * zero + q2 * successor(k))
+            = (p1 + q2) * successor(k)
+        by calc (p1 * successor(k) + q1 * zero)
+                + (p2 * zero + q2 * successor(k))
+              = (p1 * successor(k) + zero)
+                + (p2 * zero + q2 * successor(k))
+                    by congruenceOf(
+                           function (term : Natural) =>
+                               (p1 * successor(k) + term)
+                               + (p2 * zero + q2 * successor(k)),
+                           Natural.multiply_zero(q1))
+              = (p1 * successor(k) + zero)
+                + (zero + q2 * successor(k))
+                    by congruenceOf(
+                           function (term : Natural) =>
+                               (p1 * successor(k) + zero)
+                               + (term + q2 * successor(k)),
+                           Natural.multiply_zero(p2))
+              = p1 * successor(k) + (zero + q2 * successor(k))
+                    by congruenceOf(
+                           function (lhs : Natural) =>
+                               lhs + (zero + q2 * successor(k)),
+                           Natural.add_zero(p1 * successor(k)))
+              = p1 * successor(k) + q2 * successor(k)
+                    by reflexivity(p1 * successor(k) + q2 * successor(k))
+              = (p1 + q2) * successor(k)
+                    by Equality.symmetry(
+                           Natural.distributivity_right(p1, q2, successor(k)));
+    claim rhsSimplified
+          : (p1 * zero + q1 * successor(k))
+            + (p2 * successor(k) + q2 * zero)
+            = (q1 + p2) * successor(k)
+        by calc (p1 * zero + q1 * successor(k))
+                + (p2 * successor(k) + q2 * zero)
+              = (zero + q1 * successor(k))
+                + (p2 * successor(k) + q2 * zero)
+                    by congruenceOf(
+                           function (term : Natural) =>
+                               (term + q1 * successor(k))
+                               + (p2 * successor(k) + q2 * zero),
+                           Natural.multiply_zero(p1))
+              = (zero + q1 * successor(k))
+                + (p2 * successor(k) + zero)
+                    by congruenceOf(
+                           function (term : Natural) =>
+                               (zero + q1 * successor(k))
+                               + (p2 * successor(k) + term),
+                           Natural.multiply_zero(q2))
+              = q1 * successor(k) + (p2 * successor(k) + zero)
+                    by reflexivity(
+                           q1 * successor(k)
+                           + (p2 * successor(k) + zero))
+              = q1 * successor(k) + p2 * successor(k)
+                    by congruenceOf(
+                           function (rhs : Natural) =>
+                               q1 * successor(k) + rhs,
+                           Natural.add_zero(p2 * successor(k)))
+              = (q1 + p2) * successor(k)
+                    by Equality.symmetry(
+                           Natural.distributivity_right(q1, p2, successor(k)));
+    claim factoredEquation
+          : (p1 + q2) * successor(k) = (q1 + p2) * successor(k)
+        by Equality.transitivity(
+               Equality.symmetry(lhsSimplified),
+               Equality.transitivity(
+                   equivalenceAfterMultiply, rhsSimplified));
+    claim divisorPositive : 1 ≤ successor(k)
+        by Natural.successor_less_or_equal_successor(
+               zero, k, Natural.zero_least(k));
+    Natural.multiply_cancel_right(
+        p1 + q2, q1 + p2, successor(k),
+        divisorPositive, factoredEquation)
+}
+
+-- ----------------------------------------------------------------------
+-- At representatives, with the first one already destructured. (The
+-- elaborator's pattern-match desugaring refines only the outermost
+-- scrutinee's bindings, so multi-rep destructures go via a helper
+-- chain — same pattern as Integer/basics.math.)
+
+theorem Integer.multiply_cancel_right_at_representatives_after_first
+        (k : Natural) (p1 q1 : Natural)
+        : (representativeY : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.multiply(
+                    Quotient.mk.{0}(IntegerRepresentative,
+                                     IntegerEquivalent,
+                                     IntegerRepresentative.make(p1, q1)),
+                    Natural.to_integer(successor(k))),
+                Integer.multiply(
+                    Quotient.mk.{0}(IntegerRepresentative,
+                                     IntegerEquivalent,
+                                     representativeY),
+                    Natural.to_integer(successor(k))))
+          → Equality.{0}(Integer,
+                Quotient.mk.{0}(IntegerRepresentative,
+                                 IntegerEquivalent,
+                                 IntegerRepresentative.make(p1, q1)),
+                Quotient.mk.{0}(IntegerRepresentative,
+                                 IntegerEquivalent, representativeY))
+  | IntegerRepresentative.make(p2, q2), multipliedEquality => {
+      -- The hypothesis's type reduces (via the lift compute rule +
+      -- multiply_representatives pattern match) to the equality of
+      -- two specific mk(make(...)) values. Use Quotient.exact to
+      -- recover the equivalence at those representatives.
+      claim equivalenceAfterMultiply
+            : IntegerEquivalent(
+                  IntegerRepresentative.make(
+                      p1 * successor(k) + q1 * zero,
+                      p1 * zero + q1 * successor(k)),
+                  IntegerRepresentative.make(
+                      p2 * successor(k) + q2 * zero,
+                      p2 * zero + q2 * successor(k)))
+        by Quotient.exact.{0}(
+               IntegerRepresentative, IntegerEquivalent,
+               IntegerEquivalent.reflexive,
+               IntegerEquivalent.symmetric,
+               IntegerEquivalent.transitive,
+               IntegerRepresentative.make(
+                   p1 * successor(k) + q1 * zero,
+                   p1 * zero + q1 * successor(k)),
+               IntegerRepresentative.make(
+                   p2 * successor(k) + q2 * zero,
+                   p2 * zero + q2 * successor(k)),
+               multipliedEquality);
+      -- The kernel has reduced `IntegerEquivalent(make(...), make(...))`
+      -- to the Natural-level equation. Hand it to the cancellation
+      -- kernel to extract `p1 + q2 = q1 + p2`.
+      claim originalEquivalence
+            : p1 + q2 = q1 + p2
+        by Integer.cancellation_natural(
+               p1, q1, p2, q2, k, equivalenceAfterMultiply);
+      Quotient.sound.{0}(
+          IntegerRepresentative, IntegerEquivalent,
+          IntegerRepresentative.make(p1, q1),
+          IntegerRepresentative.make(p2, q2),
+          originalEquivalence)
+  }
+
+-- At representatives: destructure the first one, then delegate to
+-- the after_first helper.
+theorem Integer.multiply_cancel_right_at_representatives
+        (k : Natural)
+        : (representativeX representativeY : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.multiply(
+                    Quotient.mk.{0}(IntegerRepresentative,
+                                     IntegerEquivalent,
+                                     representativeX),
+                    Natural.to_integer(successor(k))),
+                Integer.multiply(
+                    Quotient.mk.{0}(IntegerRepresentative,
+                                     IntegerEquivalent,
+                                     representativeY),
+                    Natural.to_integer(successor(k))))
+          → Equality.{0}(Integer,
+                Quotient.mk.{0}(IntegerRepresentative,
+                                 IntegerEquivalent, representativeX),
+                Quotient.mk.{0}(IntegerRepresentative,
+                                 IntegerEquivalent, representativeY))
+  | IntegerRepresentative.make(p1, q1),
+    representativeY,
+    multipliedEquality =>
+      Integer.multiply_cancel_right_at_representatives_after_first(
+          k, p1, q1, representativeY, multipliedEquality)
+
+-- ----------------------------------------------------------------------
+-- Main theorem: lift the at-representatives version through
+-- Quotient.induct_two so it applies to any Integer x and y.
+
+theorem Integer.multiply_cancel_right_by_natural_successor
+        (x y : Integer) (k : Natural)
+        (productEquality
+            : Equality.{0}(Integer,
+                Integer.multiply(x, Natural.to_integer(successor(k))),
+                Integer.multiply(y, Natural.to_integer(successor(k)))))
+        : Equality.{0}(Integer, x, y) :=
+  Quotient.induct_two.{0, 0}(
+      IntegerRepresentative, IntegerEquivalent,
+      IntegerRepresentative, IntegerEquivalent,
+      function (xArgument yArgument : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(xArgument,
+                                Natural.to_integer(successor(k))),
+              Integer.multiply(yArgument,
+                                Natural.to_integer(successor(k))))
+          → Equality.{0}(Integer, xArgument, yArgument),
+      function (representativeX representativeY : IntegerRepresentative) =>
+          Integer.multiply_cancel_right_at_representatives(
+              k, representativeX, representativeY),
+      x, y)(productEquality)

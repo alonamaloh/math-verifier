@@ -22,6 +22,7 @@ module Logic.quotient
 
 import Logic.basics
 import Equality.basics
+import Logic.extensionality
 
 -- The quotient type itself. T lives in Type(u); the quotient lives in
 -- the same universe.
@@ -120,3 +121,71 @@ definition Quotient.induct_two.{u, v}
 -- Integer.multiply. Revisit when the elaborator's level handling
 -- is more robust or when there's clear evidence the manual pattern
 -- is unbearable.)
+
+-- ----------------------------------------------------------------------
+-- Quotient.exact: the converse of Quotient.sound. From a proof that
+-- two `mk`'s are equal, recover the underlying equivalence.
+--
+-- Derived from propositional extensionality + the existing
+-- Quotient.lift (with target type `Proposition`, allowed because
+-- Proposition is itself a value of Type(0)). The plan:
+--
+--   1. Construct `isRelatedToX : Quotient(T, R) → Proposition` by
+--      lifting `λz. R(x, z)`. The respect proof for the lift goes
+--      through propext: if `R(y1, y2)`, then `R(x, y1)` and
+--      `R(x, y2)` are mutually implied (by transitivity + symmetry),
+--      hence equal as Propositions.
+--   2. `isRelatedToX(mk(x))` reduces definitionally (via the kernel's
+--      Quotient.lift compute rule on mk) to `R(x, x)`, which is the
+--      assumed reflexivity.
+--   3. Transport along the input equality `mk(x) = mk(y)` to obtain
+--      `isRelatedToX(mk(y))`, which reduces to `R(x, y)`.
+--
+-- Reflexivity / symmetry / transitivity of R are passed in explicitly;
+-- typically R is the equivalence relation of a quotient construction
+-- and these are already proved.
+theorem Quotient.exact.{u}
+        (T : Type(u))
+        (R : T → T → Proposition)
+        (reflexivityOfR : (x : T) → R(x, x))
+        (symmetryOfR : (x y : T) → R(x, y) → R(y, x))
+        (transitivityOfR : (x y z : T) → R(x, y) → R(y, z) → R(x, z))
+        (x y : T)
+        (mkEqualityHypothesis
+            : Equality.{u}(Quotient.{u}(T, R),
+                            Quotient.mk.{u}(T, R, x),
+                            Quotient.mk.{u}(T, R, y)))
+        : R(x, y) := {
+    -- Step 1: build the lifted "related to x by R" predicate. Its
+    -- respect-of-R obligation reduces, via propext, to the
+    -- equivalence of `R(x, y1)` and `R(x, y2)` whenever `R(y1, y2)`.
+    let isRelatedToX
+            : Quotient.{u}(T, R) → Proposition
+      := Quotient.lift.{u, 0}(
+             T, R, Proposition,
+             function (z : T) => R(x, z),
+             function (y1 y2 : T) (relation_y1_y2 : R(y1, y2)) =>
+                 Equality.propositional_extensionality(
+                     R(x, y1), R(x, y2),
+                     function (relation_x_y1 : R(x, y1)) =>
+                         transitivityOfR(x, y1, y2,
+                             relation_x_y1, relation_y1_y2),
+                     function (relation_x_y2 : R(x, y2)) =>
+                         transitivityOfR(x, y2, y1,
+                             relation_x_y2,
+                             symmetryOfR(y1, y2, relation_y1_y2))));
+    -- Step 2: `isRelatedToX(mk(x))` reduces definitionally to
+    -- `R(x, x)`. The assumed reflexivity discharges it.
+    let reflexivityAtX : isRelatedToX(Quotient.mk.{u}(T, R, x))
+      := reflexivityOfR(x);
+    -- Step 3: transport along the input equality. After the lift's
+    -- compute rule fires on `mk(y)`, the transported proof has type
+    -- `R(x, y)`.
+    Equality.transport_proposition(
+        Quotient.{u}(T, R),
+        isRelatedToX,
+        Quotient.mk.{u}(T, R, x),
+        Quotient.mk.{u}(T, R, y),
+        mkEqualityHypothesis,
+        reflexivityAtX)
+}
