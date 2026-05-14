@@ -1,6 +1,6 @@
 CXX = clang++
 CXXFLAGS = -std=c++20 -Wall -Wextra -Werror -O3 -g
-OBJS = level.o kernel.o printer.o lexer.o parser.o elaborator.o main.o
+OBJS = level.o kernel.o printer.o lexer.o parser.o elaborator.o hash.o serialize.o main.o
 
 kernel: $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS)
@@ -23,10 +23,57 @@ parser.o: parser.cpp parser.hpp surface.hpp lexer.hpp
 elaborator.o: elaborator.cpp elaborator.hpp surface.hpp kernel.hpp expression.hpp level.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-main.o: main.cpp expression.hpp kernel.hpp printer.hpp level.hpp lexer.hpp surface.hpp parser.hpp elaborator.hpp
+hash.o: hash.cpp hash.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+serialize.o: serialize.cpp serialize.hpp expression.hpp kernel.hpp level.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+main.o: main.cpp expression.hpp kernel.hpp printer.hpp level.hpp lexer.hpp surface.hpp parser.hpp elaborator.hpp hash.hpp serialize.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	rm -f kernel $(OBJS)
 
 .PHONY: clean
+
+# ----------------------------------------------------------------------
+# Library verification.
+#
+# Each .math file under library/ becomes a .mathv cache under
+# build/library/. `make library` (re)verifies the whole library, but
+# uses the per-file caches so that only files that have actually
+# changed (or whose dependencies have changed) get re-verified.
+# `make -j N library` parallelises across files at the granularity of
+# the dependency DAG.
+#
+# The .mathv targets are wired together by a dependency file generated
+# from `kernel deps`. That file is itself a target, regenerated when
+# any .math source changes.
+
+BUILD_DIR := build
+MATH_FILES := $(shell find library -name '*.math' | sort)
+MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(MATH_FILES))
+
+.PHONY: library library-clean
+
+library: $(MATHV_FILES)
+
+# Recipe for a .mathv. The pattern rule provides the .math prerequisite;
+# explicit .mathv prerequisites come from the included dependency file
+# (built from `kernel deps`). The kernel binary is an order-only prereq —
+# we want it present, but bumping it shouldn't invalidate every cache
+# (the cache file format is versioned; format bumps will fail to load
+# old caches and force a rebuild explicitly).
+$(BUILD_DIR)/%.mathv: %.math | kernel
+	@mkdir -p $(dir $@)
+	./kernel verify --source $< --output $@ --deps $(filter %.mathv,$^)
+
+-include $(BUILD_DIR)/library-depends.mk
+
+$(BUILD_DIR)/library-depends.mk: $(MATH_FILES) | kernel
+	@mkdir -p $(BUILD_DIR)
+	./kernel deps --cache-root $(BUILD_DIR) $(MATH_FILES) > $@
+
+library-clean:
+	rm -rf $(BUILD_DIR)

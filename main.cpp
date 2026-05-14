@@ -1,14 +1,19 @@
 #include "elaborator.hpp"
 #include "expression.hpp"
+#include "hash.hpp"
 #include "kernel.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
 #include "printer.hpp"
+#include "serialize.hpp"
 #include "surface.hpp"
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <random>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -5056,6 +5061,282 @@ void runIntegrationTests() {
     }
 }
 
+// ----------------------------------------------------------------------
+// Cache-aware verification.
+//
+// The Makefile-driven build verifies one .math file at a time, given a
+// list of already-built .mathv caches for its dependencies. Each call
+// loads the dep caches (with transitive expansion) into a fresh
+// Environment, verifies the new source against that environment, and
+// writes a .mathv for just the new file's delta.
+
+// Read the entire content of `path` into a string. Returns std::nullopt
+// on I/O error rather than throwing — callers map this to a CLI error.
+std::optional<std::string> readWholeFile(const std::string& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) return std::nullopt;
+    std::stringstream buffer;
+    buffer << input.rdbuf();
+    return buffer.str();
+}
+
+// Convenience: extract the import statements from a parsed module.
+std::vector<std::string> importedModulesOf(const SurfaceModule& module) {
+    std::vector<std::string> result;
+    for (const auto& statement : module.statements) {
+        if (auto* importDecl =
+                std::get_if<SurfaceImportDeclaration>(&statement)) {
+            result.push_back(importDecl->moduleName);
+        }
+    }
+    return result;
+}
+
+// Recursively load a cache and its transitive dependencies into the
+// environment. Skips caches already loaded (tracked by absolute path).
+// Throws SerializationError if a referenced cache file can't be read
+// or has a malformed header.
+void loadCacheRecursive(Environment& environment,
+                        const std::string& cachePath,
+                        std::set<std::string>& alreadyLoaded) {
+    if (alreadyLoaded.count(cachePath)) return;
+    CacheContents contents = readCacheFile(cachePath);
+    // Load deps first (post-order: deps' declarations available before
+    // this cache's declarations are added).
+    for (const auto& dependency : contents.dependencies) {
+        loadCacheRecursive(environment, dependency.cachePath, alreadyLoaded);
+    }
+    // Register this file's delta. We bypass the typecheck-on-add API
+    // (addAxiom, addDefinition, ...) because the cache encodes a
+    // previously type-checked declaration; the cache's source-hash
+    // chain is what justifies trusting it. The build driver (make)
+    // ensures the chain is fresh.
+    for (const auto& [name, declaration] : contents.declarations) {
+        environment.declarations[name] = declaration;
+    }
+    for (const auto& [name, count] : contents.implicitArgumentCounts) {
+        environment.implicitArgumentCounts[name] = count;
+    }
+    alreadyLoaded.insert(cachePath);
+}
+
+// Verify a single source file with cache support. Optional output
+// cache path (empty means "don't write"). Returns 0 on success.
+int verifyWithCache(const std::string& sourcePath,
+                    const std::vector<std::string>& dependencyCachePaths,
+                    const std::string& outputCachePath) {
+    Environment environment;
+    std::set<std::string> alreadyLoaded;
+
+    // Load dependency caches (with transitive expansion).
+    for (const auto& dependency : dependencyCachePaths) {
+        try {
+            loadCacheRecursive(environment, dependency, alreadyLoaded);
+        } catch (const SerializationError& error) {
+            std::cerr << "cache load failure for " << dependency << ": "
+                      << error.what() << "\n";
+            return 1;
+        }
+    }
+
+    auto sourceOpt = readWholeFile(sourcePath);
+    if (!sourceOpt) {
+        std::cerr << "cannot open source: " << sourcePath << "\n";
+        return 1;
+    }
+    const std::string& source = *sourceOpt;
+    uint64_t sourceHash = fnv1aHash(source);
+
+    // Snapshot the environment's declaration / implicit-count names so
+    // we can identify which entries this file added.
+    std::set<std::string> declarationsBefore;
+    for (const auto& [name, _] : environment.declarations) {
+        declarationsBefore.insert(name);
+    }
+    std::set<std::string> implicitsBefore;
+    for (const auto& [name, _] : environment.implicitArgumentCounts) {
+        implicitsBefore.insert(name);
+    }
+
+    std::vector<std::string> importedModules;
+    std::string moduleName;
+    try {
+        auto tokens = lex(source);
+        auto module = parseModule(tokens);
+        moduleName = module.moduleName;
+        elaborateModule(module, environment, importedModules);
+    } catch (const LexError& error) {
+        std::cerr << "lex error in " << sourcePath << ": "
+                  << error.what() << "\n";
+        return 1;
+    } catch (const ParseError& error) {
+        std::cerr << "parse error in " << sourcePath << ": "
+                  << error.what() << "\n";
+        return 1;
+    } catch (const ElaborateError& error) {
+        std::cerr << "elaborate error in " << sourcePath << ": "
+                  << error.what() << "\n";
+        return 1;
+    } catch (const TypeError& error) {
+        std::cerr << "type error in " << sourcePath << ": "
+                  << error.what() << "\n";
+        return 1;
+    } catch (const std::exception& error) {
+        std::cerr << "error in " << sourcePath << ": "
+                  << error.what() << "\n";
+        return 1;
+    }
+
+    // Build the delta and metadata for the output cache.
+    CacheContents cache;
+    cache.sourcePath = sourcePath;
+    cache.sourceHash = sourceHash;
+    cache.moduleName = moduleName;
+    // For each direct import, find the corresponding top-level dep
+    // cache (by module name) and record (cachePath, sourceHash).
+    std::map<std::string, std::pair<std::string, uint64_t>> moduleToDepInfo;
+    for (const auto& dependencyPath : dependencyCachePaths) {
+        try {
+            CacheContents depContents = readCacheFile(dependencyPath);
+            moduleToDepInfo[depContents.moduleName] =
+                {dependencyPath, depContents.sourceHash};
+        } catch (const SerializationError&) {
+            // Already validated above; shouldn't happen.
+        }
+    }
+    for (const auto& importedName : importedModules) {
+        auto iterator = moduleToDepInfo.find(importedName);
+        if (iterator != moduleToDepInfo.end()) {
+            CachedDependency dep;
+            dep.moduleName = importedName;
+            dep.cachePath = iterator->second.first;
+            dep.sourceHash = iterator->second.second;
+            cache.dependencies.push_back(std::move(dep));
+        }
+    }
+    // Extract delta declarations (sorted by name from the map).
+    for (const auto& [name, declaration] : environment.declarations) {
+        if (!declarationsBefore.count(name)) {
+            cache.declarations.emplace_back(name, declaration);
+        }
+    }
+    for (const auto& [name, count] : environment.implicitArgumentCounts) {
+        if (!implicitsBefore.count(name)) {
+            cache.implicitArgumentCounts.emplace_back(name, count);
+        }
+    }
+
+    if (!outputCachePath.empty()) {
+        try {
+            // Make sure the output directory exists.
+            std::filesystem::path output(outputCachePath);
+            if (output.has_parent_path()) {
+                std::filesystem::create_directories(output.parent_path());
+            }
+            writeCacheFile(outputCachePath, cache);
+        } catch (const SerializationError& error) {
+            std::cerr << "cache write failure for " << outputCachePath
+                      << ": " << error.what() << "\n";
+            return 1;
+        } catch (const std::filesystem::filesystem_error& error) {
+            std::cerr << "cache write failure for " << outputCachePath
+                      << ": " << error.what() << "\n";
+            return 1;
+        }
+    }
+
+    std::cout << "verified " << sourcePath << " (module " << moduleName
+              << ", " << cache.declarations.size()
+              << " new declarations)\n";
+    return 0;
+}
+
+// ----------------------------------------------------------------------
+// `kernel deps` subcommand. Emit Makefile dependency lines so that
+// `make` can drive incremental verification.
+//
+// For each source file we accept, parse its module name and import
+// list. Then for each (sourcePath, moduleName) pair, output a line
+//     <cache path>: <prereq cache paths>
+// where `<cache path>` is the same source path under `<cacheRoot>/`
+// with `.math` replaced by `.mathv`. Prereqs are the cache paths of
+// each imported module that's also in the input set.
+//
+// The source-file prerequisite is left to a pattern rule in the
+// top-level Makefile (which knows how to invoke `kernel verify ...`
+// to produce a .mathv from a .math).
+
+std::string makeCachePath(const std::string& sourcePath,
+                          const std::string& cacheRoot) {
+    std::string result = cacheRoot.empty()
+        ? sourcePath
+        : cacheRoot + "/" + sourcePath;
+    if (result.size() >= 5
+        && result.compare(result.size() - 5, 5, ".math") == 0) {
+        result.replace(result.size() - 5, 5, ".mathv");
+    }
+    return result;
+}
+
+int emitDeps(const std::vector<std::string>& sourcePaths,
+             const std::string& cacheRoot) {
+    // First pass: collect module name + imports for each source. Skip
+    // files that fail to parse (they'll surface their errors later when
+    // the build itself runs).
+    struct SourceInfo {
+        std::string sourcePath;
+        std::string moduleName;
+        std::vector<std::string> imports;
+    };
+    std::vector<SourceInfo> infos;
+    std::map<std::string, std::string> moduleToSource;
+    for (const auto& sourcePath : sourcePaths) {
+        auto sourceOpt = readWholeFile(sourcePath);
+        if (!sourceOpt) {
+            std::cerr << "kernel deps: cannot open " << sourcePath << "\n";
+            continue;
+        }
+        try {
+            auto tokens = lex(*sourceOpt);
+            auto module = parseModule(tokens);
+            SourceInfo info;
+            info.sourcePath = sourcePath;
+            info.moduleName = module.moduleName;
+            info.imports = importedModulesOf(module);
+            moduleToSource[info.moduleName] = sourcePath;
+            infos.push_back(std::move(info));
+        } catch (const LexError& error) {
+            std::cerr << "kernel deps: lex error in " << sourcePath
+                      << ": " << error.what() << "\n";
+        } catch (const ParseError& error) {
+            std::cerr << "kernel deps: parse error in " << sourcePath
+                      << ": " << error.what() << "\n";
+        }
+    }
+    // Second pass: emit Makefile dependency lines.
+    for (const auto& info : infos) {
+        std::string cachePath = makeCachePath(info.sourcePath, cacheRoot);
+        // Emit dep line. Source-file prerequisite handled by pattern rule.
+        // Only emit if there are .mathv prerequisites (otherwise the
+        // pattern rule alone suffices and we save a line).
+        std::vector<std::string> depCachePaths;
+        for (const auto& importName : info.imports) {
+            auto iterator = moduleToSource.find(importName);
+            if (iterator != moduleToSource.end()) {
+                depCachePaths.push_back(
+                    makeCachePath(iterator->second, cacheRoot));
+            }
+        }
+        if (depCachePaths.empty()) continue;
+        std::cout << cachePath << ":";
+        for (const auto& dep : depCachePaths) {
+            std::cout << " " << dep;
+        }
+        std::cout << "\n";
+    }
+    return 0;
+}
+
 int verifyFiles(const std::vector<std::string>& filenames) {
     Environment environment;
     std::vector<std::string> importedModules;
@@ -5108,9 +5389,61 @@ int verifyFiles(const std::vector<std::string>& filenames) {
 
 int main(int argc, char* argv[]) {
     if (argc >= 3 && std::string(argv[1]) == "verify") {
-        std::vector<std::string> filenames;
-        for (int i = 2; i < argc; ++i) filenames.push_back(argv[i]);
-        return verifyFiles(filenames);
+        // Two forms:
+        //   kernel verify FILE.math FILE.math ...                  (legacy)
+        //   kernel verify --source SRC --output OUT.mathv \        (cache form)
+        //                  [--deps DEP.mathv DEP.mathv ...]
+        bool useFlags = false;
+        for (int i = 2; i < argc; ++i) {
+            std::string argument = argv[i];
+            if (argument.size() >= 2 && argument[0] == '-' && argument[1] == '-') {
+                useFlags = true;
+                break;
+            }
+        }
+        if (!useFlags) {
+            std::vector<std::string> filenames;
+            for (int i = 2; i < argc; ++i) filenames.push_back(argv[i]);
+            return verifyFiles(filenames);
+        }
+        std::string sourcePath;
+        std::string outputCachePath;
+        std::vector<std::string> dependencyCachePaths;
+        enum class State { None, Source, Output, Deps } state = State::None;
+        for (int i = 2; i < argc; ++i) {
+            std::string argument = argv[i];
+            if (argument == "--source")      { state = State::Source; continue; }
+            if (argument == "--output")      { state = State::Output; continue; }
+            if (argument == "--deps")        { state = State::Deps;   continue; }
+            switch (state) {
+                case State::Source: sourcePath = argument; state = State::None; break;
+                case State::Output: outputCachePath = argument; state = State::None; break;
+                case State::Deps:   dependencyCachePaths.push_back(argument); break;
+                case State::None:
+                    std::cerr << "verify: unexpected argument " << argument << "\n";
+                    return 1;
+            }
+        }
+        if (sourcePath.empty()) {
+            std::cerr << "verify: --source is required\n";
+            return 1;
+        }
+        return verifyWithCache(sourcePath, dependencyCachePaths,
+                               outputCachePath);
+    }
+    if (argc >= 3 && std::string(argv[1]) == "deps") {
+        // kernel deps [--cache-root DIR] SOURCE.math [SOURCE.math ...]
+        std::string cacheRoot;
+        std::vector<std::string> sourcePaths;
+        for (int i = 2; i < argc; ++i) {
+            std::string argument = argv[i];
+            if (argument == "--cache-root" && i + 1 < argc) {
+                cacheRoot = argv[++i];
+                continue;
+            }
+            sourcePaths.push_back(argument);
+        }
+        return emitDeps(sourcePaths, cacheRoot);
     }
     if (argc >= 2 && (std::string(argv[1]) == "-h"
                       || std::string(argv[1]) == "--help")) {
@@ -5118,7 +5451,14 @@ int main(int argc, char* argv[]) {
                   << "  kernel              run the test suite\n"
                   << "  kernel verify FILE [FILE ...]\n"
                   << "                      verify one or more .math files\n"
-                  << "                      (provide dependencies first)\n";
+                  << "                      (legacy form, no caching)\n"
+                  << "  kernel verify --source FILE.math --output FILE.mathv\n"
+                  << "                  [--deps DEP.mathv DEP.mathv ...]\n"
+                  << "                      verify one file, writing a binary\n"
+                  << "                      cache. Deps must already be cached.\n"
+                  << "  kernel deps [--cache-root DIR] FILE.math [FILE.math ...]\n"
+                  << "                      emit Makefile dependency lines\n"
+                  << "                      (target .mathv -> imported .mathv).\n";
         return 0;
     }
     std::cout << "=== worked examples (empty environment) ===\n\n";
