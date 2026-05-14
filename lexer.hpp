@@ -23,12 +23,10 @@ enum class TokenKind {
     KeywordMax, KeywordImax,
 
     // Proof keywords
-    KeywordProof, KeywordQed,
-    KeywordHave, KeywordShow, KeywordCalc, KeywordBy,
-    KeywordInduction, KeywordOn,
-    KeywordCase, KeywordCases, KeywordOf, KeywordWith, KeywordHypothesis,
-    KeywordApply, KeywordReduction,
-    KeywordMotive, KeywordTarget,
+    KeywordCalc, KeywordBy,
+    KeywordOn,
+    KeywordCase, KeywordCases, KeywordWith,
+    KeywordApply,
     KeywordClaim,
     KeywordWitness,
     KeywordSuffices,

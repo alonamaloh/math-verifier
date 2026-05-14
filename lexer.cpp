@@ -24,23 +24,13 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"Proposition",   TokenKind::KeywordProposition},
         {"max",           TokenKind::KeywordMax},
         {"imax",          TokenKind::KeywordImax},
-        {"proof",         TokenKind::KeywordProof},
-        {"qed",           TokenKind::KeywordQed},
-        {"have",          TokenKind::KeywordHave},
-        {"show",          TokenKind::KeywordShow},
         {"calc",          TokenKind::KeywordCalc},
         {"by",            TokenKind::KeywordBy},
-        {"induction",     TokenKind::KeywordInduction},
         {"on",            TokenKind::KeywordOn},
         {"case",          TokenKind::KeywordCase},
         {"cases",         TokenKind::KeywordCases},
-        {"of",            TokenKind::KeywordOf},
         {"with",          TokenKind::KeywordWith},
-        {"hypothesis",    TokenKind::KeywordHypothesis},
         {"apply",         TokenKind::KeywordApply},
-        {"reduction",     TokenKind::KeywordReduction},
-        {"motive",        TokenKind::KeywordMotive},
-        {"target",        TokenKind::KeywordTarget},
         {"claim",         TokenKind::KeywordClaim},
         {"witness",       TokenKind::KeywordWitness},
         {"suffices",      TokenKind::KeywordSuffices},
@@ -292,23 +282,13 @@ bool isKeyword(TokenKind kind) {
         case TokenKind::KeywordProposition:
         case TokenKind::KeywordMax:
         case TokenKind::KeywordImax:
-        case TokenKind::KeywordProof:
-        case TokenKind::KeywordQed:
-        case TokenKind::KeywordHave:
-        case TokenKind::KeywordShow:
         case TokenKind::KeywordCalc:
         case TokenKind::KeywordBy:
-        case TokenKind::KeywordInduction:
         case TokenKind::KeywordOn:
         case TokenKind::KeywordCase:
         case TokenKind::KeywordCases:
-        case TokenKind::KeywordOf:
         case TokenKind::KeywordWith:
-        case TokenKind::KeywordHypothesis:
         case TokenKind::KeywordApply:
-        case TokenKind::KeywordReduction:
-        case TokenKind::KeywordMotive:
-        case TokenKind::KeywordTarget:
         case TokenKind::KeywordClaim:
         case TokenKind::KeywordWitness:
         case TokenKind::KeywordSuffices:
@@ -344,23 +324,13 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::KeywordProposition:   return "'Proposition'";
         case TokenKind::KeywordMax:           return "'max'";
         case TokenKind::KeywordImax:          return "'imax'";
-        case TokenKind::KeywordProof:         return "'proof'";
-        case TokenKind::KeywordQed:           return "'qed'";
-        case TokenKind::KeywordHave:          return "'have'";
-        case TokenKind::KeywordShow:          return "'show'";
         case TokenKind::KeywordCalc:          return "'calc'";
         case TokenKind::KeywordBy:            return "'by'";
-        case TokenKind::KeywordInduction:     return "'induction'";
         case TokenKind::KeywordOn:            return "'on'";
         case TokenKind::KeywordCase:          return "'case'";
         case TokenKind::KeywordCases:         return "'cases'";
-        case TokenKind::KeywordOf:            return "'of'";
         case TokenKind::KeywordWith:          return "'with'";
-        case TokenKind::KeywordHypothesis:    return "'hypothesis'";
         case TokenKind::KeywordApply:         return "'apply'";
-        case TokenKind::KeywordReduction:     return "'reduction'";
-        case TokenKind::KeywordMotive:        return "'motive'";
-        case TokenKind::KeywordTarget:        return "'target'";
         case TokenKind::KeywordClaim:         return "'claim'";
         case TokenKind::KeywordWitness:       return "'witness'";
         case TokenKind::KeywordSuffices:      return "'suffices'";
