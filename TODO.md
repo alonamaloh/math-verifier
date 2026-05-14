@@ -60,17 +60,24 @@ Next:
 Pain points encountered while writing the Rational laws — these are
 the strongest motivators for the ergonomics work in items 2/3 below:
 
-- **No "rewrite at position".** Every intermediate-position rewrite
-  in a calc has to be wrapped in `congruenceOf(function (x) => ...
-  x ...,  ...)`, which doubles or triples the visible code volume.
+- ~~**No "rewrite at position".**~~ **DONE: `rewrite(lemma)` tactic.**
+  Finds the unique structural occurrence of the lemma's LHS in the
+  goal's LHS and builds the `congruenceOf` wrapper automatically. Works
+  when the LHS is unique; otherwise the user must still write explicit
+  `congruenceOf(function (x) => …, lemma)`. Bulk conversion of existing
+  calls is opportunistic.
 - **No ring/abelian-group automation.** Associativity / distributivity
   proofs require manual rearrangement step-by-step. The Rational
   3-arg laws have 6-11 step kernels each that would be `by ring` in
-  most systems.
-- **Triple-destructure boilerplate.** Each 3-arg representative-
-  level theorem needs `after_first_second / after_first / outer`
-  Quotient.induct wrappers totaling ~80 lines per law. Mechanical
-  but heavy.
+  most systems. **Status:** Deferred — a proper `by ring` is a 1-2
+  day project (polynomial normalization + proof emission, or
+  reflection infrastructure). The narrower `rewrite` tactic captures
+  most of the per-step boilerplate today, so the marginal payoff of
+  `by ring` is lower than it was before `rewrite` landed.
+- ~~**Triple-destructure boilerplate.**~~ **DONE:
+  `obtain Quotient.mk(rep) from x;` WLOG sugar.** Single line per
+  representative pulled. Removed ~426 lines (~20%) of pure plumbing
+  across `Rational/{ring,algebra}.math`.
 
 ### 2. Parallel verification
 Optimistic per-theorem parallelism with a thread pool: register

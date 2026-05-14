@@ -590,6 +590,8 @@ std::string makeOpeningName(const Context& context) {
     return "v" + std::to_string(context.size());
 }
 
+} // namespace
+
 // Cheap, allocation-free structural equality (alpha-equivalent since
 // we use de Bruijn indices). Returns true only on truly identical
 // terms — does not perform any reductions. Used as a fast path at the
@@ -654,8 +656,6 @@ bool structurallyEqual(ExpressionPointer left, ExpressionPointer right) {
     }
     return false;
 }
-
-} // namespace
 
 bool isDefinitionallyEqual(const Environment& environment,
                            const Context& context,

@@ -175,6 +175,14 @@ inline void addInductive(Environment& environment, std::string inductiveName,
 // Used to keep indices coherent when a term crosses additional binders.
 ExpressionPointer shift(ExpressionPointer expression, int amount, int cutoff = 0);
 
+// Cheap allocation-free structural equality (alpha-equivalent via
+// de Bruijn). Returns true only on truly identical terms — does not
+// perform any reductions. Pointer-identity short-circuits at every
+// level. Used by `isDefinitionallyEqual` as a fast path and by the
+// elaborator's `rewrite` tactic to locate the unique occurrence of
+// the lemma's left endpoint inside the goal's left side.
+bool structurallyEqual(ExpressionPointer left, ExpressionPointer right);
+
 // Walks `expression` and replaces every LevelParam appearing in any Sort
 // or Constant universe-argument list, mapping each name in `parameterNames`
 // to the corresponding entry in `replacements`. Used to instantiate a

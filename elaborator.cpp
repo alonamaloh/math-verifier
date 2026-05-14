@@ -1734,6 +1734,12 @@ private:
                         localBinders,
                         expression.line, expression.column);
                 }
+                if (name == "rewrite" && argumentCount == 1) {
+                    return desugarRewrite(
+                        application->arguments[0],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
                 // Constructor parameter inference: if the head is a
                 // constructor of a parameterised inductive and the user
                 // supplied only the non-parameter arguments, infer the
@@ -4476,6 +4482,152 @@ private:
     // `Equality.congruence.{u, v}(A, B, f, x, y, h)` by inferring the
     // type arguments and universes from the kernel types of f and h.
     // Requires `Equality.congruence` to be in the environment.
+    // Walks `expression` looking for subterms structurally equal to
+    // `target`. Each match is replaced by `BoundVariable(currentDepth)`,
+    // and every other BoundVariable referring to outer scope is shifted
+    // up by 1 — preparing the result to be the body of a new outer
+    // Lambda binder. Counts matches so the caller can require exactly
+    // one. `target` is shifted as we descend into binders so structural
+    // comparison stays correct.
+    ExpressionPointer abstractStructuralOccurrence(
+        ExpressionPointer expression,
+        ExpressionPointer target,
+        int currentDepth,
+        int& occurrenceCount) {
+        ExpressionPointer shiftedTarget =
+            currentDepth == 0 ? target : shift(target, currentDepth);
+        if (structurallyEqual(expression, shiftedTarget)) {
+            occurrenceCount++;
+            return makeBoundVariable(currentDepth);
+        }
+        if (auto* boundVariable =
+                std::get_if<BoundVariable>(&expression->node)) {
+            int index = boundVariable->deBruijnIndex;
+            if (index >= currentDepth) {
+                return makeBoundVariable(index + 1);
+            }
+            return expression;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return makePi(pi->displayHint,
+                abstractStructuralOccurrence(pi->domain, target,
+                                              currentDepth, occurrenceCount),
+                abstractStructuralOccurrence(pi->codomain, target,
+                                              currentDepth + 1,
+                                              occurrenceCount));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return makeLambda(lambda->displayHint,
+                abstractStructuralOccurrence(lambda->domain, target,
+                                              currentDepth, occurrenceCount),
+                abstractStructuralOccurrence(lambda->body, target,
+                                              currentDepth + 1,
+                                              occurrenceCount));
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return makeApplication(
+                abstractStructuralOccurrence(application->function, target,
+                                              currentDepth, occurrenceCount),
+                abstractStructuralOccurrence(application->argument, target,
+                                              currentDepth, occurrenceCount));
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            return makeLet(let->displayHint,
+                abstractStructuralOccurrence(let->type, target,
+                                              currentDepth, occurrenceCount),
+                abstractStructuralOccurrence(let->value, target,
+                                              currentDepth, occurrenceCount),
+                abstractStructuralOccurrence(let->body, target,
+                                              currentDepth + 1,
+                                              occurrenceCount));
+        }
+        // Sort, FreeVariable, Constant — no children, return as-is.
+        return expression;
+    }
+
+    // `rewrite(lemma)` where `lemma : Equality.{u}(T', x, y)` and the
+    // current goal is `Equality.{v}(T, A, B)`: builds the proof
+    //   `Equality.congruence.{u, v}(T', T, λ z ⇒ A[z/x], x, y, lemma)`
+    // — locating the unique structural occurrence of `x` inside `A` and
+    // replacing it with the binder of an inserted Lambda. Errors if `x`
+    // doesn't appear or appears more than once (the user would have to
+    // disambiguate via explicit `congruenceOf`).
+    ExpressionPointer desugarRewrite(
+        SurfaceExpressionPointer lemmaSurface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "rewrite at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "rewrite needs an expected type from context — use it "
+                "in a calc step, where the step's `previous = next` "
+                "equality provides the target");
+        }
+        EqualityComponents goalComponents =
+            extractEqualityComponents(expectedType, "rewrite (goal)", line);
+
+        // Elaborate the lemma; close its inferred type's components back
+        // to BoundVariables so they live in the same scope as
+        // `expectedType` (which arrived in closed form).
+        ExpressionPointer lemmaKernel =
+            elaborateExpression(*lemmaSurface, localBinders);
+        ExpressionPointer lemmaTypeOpened = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, lemmaKernel));
+        EqualityComponents lemmaComponentsOpened =
+            extractEqualityComponents(lemmaTypeOpened, "rewrite (lemma)",
+                                       line);
+        ExpressionPointer lemmaCarrier = closeOverLocalBinders(
+            lemmaComponentsOpened.carrierType,
+            localBinders, localBinders.size());
+        ExpressionPointer lemmaLeft = closeOverLocalBinders(
+            lemmaComponentsOpened.leftEndpoint,
+            localBinders, localBinders.size());
+        ExpressionPointer lemmaRight = closeOverLocalBinders(
+            lemmaComponentsOpened.rightEndpoint,
+            localBinders, localBinders.size());
+
+        // Locate the unique occurrence of `lemmaLeft` inside the goal's
+        // left endpoint, replacing it with BoundVariable(0) and shifting
+        // outer references up by 1.
+        int occurrenceCount = 0;
+        ExpressionPointer abstractedBody = abstractStructuralOccurrence(
+            goalComponents.leftEndpoint, lemmaLeft,
+            /*currentDepth=*/0, occurrenceCount);
+        if (occurrenceCount == 0) {
+            throwElaborate(
+                "rewrite: the lemma's left endpoint does not appear "
+                "(structurally) in the goal's left side");
+        }
+        if (occurrenceCount > 1) {
+            throwElaborate(
+                "rewrite: the lemma's left endpoint appears "
+                + std::to_string(occurrenceCount)
+                + " times in the goal's left side — use explicit "
+                "`congruenceOf(function (z) => …, lemma)` to "
+                "disambiguate the position");
+        }
+        ExpressionPointer abstractionLambda = makeLambda(
+            "_rewriteHole", lemmaCarrier, abstractedBody);
+
+        // Build `Equality.congruence.{u, v}(lemmaT, goalT, λ,
+        //                                    lemmaLeft, lemmaRight,
+        //                                    lemma)`.
+        ExpressionPointer call = makeConstant(
+            "Equality.congruence",
+            {lemmaComponentsOpened.carrierUniverseLevel,
+             goalComponents.carrierUniverseLevel});
+        call = makeApplication(std::move(call), lemmaCarrier);
+        call = makeApplication(std::move(call), goalComponents.carrierType);
+        call = makeApplication(std::move(call), std::move(abstractionLambda));
+        call = makeApplication(std::move(call), lemmaLeft);
+        call = makeApplication(std::move(call), lemmaRight);
+        call = makeApplication(std::move(call), std::move(lemmaKernel));
+        return call;
+    }
+
     ExpressionPointer desugarCongruenceOf(
         SurfaceExpressionPointer functionSurface,
         SurfaceExpressionPointer equalityProofSurface,
