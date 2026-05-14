@@ -7,22 +7,14 @@ pain becomes acute.
 
 ## Active
 
-### 1. Operator overloading for Integer (and beyond) — start here
-Currently `+ / * / -` desugar only to `Natural.add` / `Natural.multiply`.
-Make the elaborator dispatch on operand type — initially via a
-hardcoded map (`Natural → Natural.add`, `Integer → Integer.add`,
-…); move to an instance/registry system later. Combined with (1),
-this is the biggest readability win on existing-style code.
-
-### 2. More math content
-Once operator overloading is in, build the abstract algebra layer:
-`Group`,
+### 1. More math content — start here
+Build the abstract algebra layer: `Group`,
 `Ring`, `Field`, `CommutativeRing` as Proposition records;
 `Integer` as a `CommutativeRing` instance; then `Rational :=
 (Integer × Natural⁺) / ~`, then `Real` (Cauchy sequences or Dedekind
 cuts), then vector spaces / linear algebra.
 
-### 3. Parallel verification
+### 2. Parallel verification
 Optimistic per-theorem parallelism with a thread pool: register
 signatures eagerly, parallelize body verification, collect all errors
 at end, fail if any worker fails. **Defer until the operator-
@@ -33,7 +25,7 @@ Subtleties: per-worker universe-meta naming; thread-safe kernel
 caches; deterministic error-ordering at the end; slow theorems set
 the floor (consider splitting long proofs into lemmas).
 
-### 4. `by ring` (and `by group`, `by abelian_group`, …)
+### 3. `by ring` (and `by group`, `by abelian_group`, …)
 Term-normalization tactic for ring identities. Highest payoff,
 highest effort. **Wait until we have enough algebra content (item
 3) to design the procedure against real use cases** — premature
@@ -55,6 +47,11 @@ Smaller items to land when the motivating pain becomes acute:
 
 ## Completed
 
+- **2026-05-14: Operator overloading for Integer.** `+`, `*`, `-` now
+  dispatch on operand type, routing Integer operands to `Integer.add`,
+  `Integer.multiply`, `Integer.subtract`. Lookup uses the raw inferred
+  type so definitions like `Integer` retain their name. Commit
+  `4dd4042`.
 - **2026-05-14: Ascription as coercion.** `(x : T)` now auto-inserts a
   canonical embedding chain when `x`'s type doesn't match `T` but a
   registered chain exists. Initial registry: `Natural → Integer` via
