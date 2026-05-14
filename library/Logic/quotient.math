@@ -32,13 +32,13 @@ import axioms
 theorem Quotient.compute.{u, v}
         (T : Type(u)) (R : T → T → Proposition) (U : Type(v))
         (f : T → U)
-        (h : (x y : T) → R(x, y) → Equality.{v}(U, f(x), f(y)))
+        (h : (x y : T) → R(x, y) → Equality(U, f(x), f(y)))
         (x : T)
-        : Equality.{v}(U,
-                       Quotient.lift.{u, v}(
-                           T, R, U, f, h, Quotient.mk.{u}(T, R, x)),
+        : Equality(U,
+                       Quotient.lift(
+                           T, R, U, f, h, Quotient.mk(T, R, x)),
                        f(x)) :=
-  reflexivity.{v}(U, f(x))
+  reflexivity(U, f(x))
 
 -- ----------------------------------------------------------------------
 -- Quotient.induct_two: induction on two quotients simultaneously.
@@ -55,24 +55,24 @@ definition Quotient.induct_two.{u, v}
         (T1 : Type(u)) (R1 : T1 → T1 → Proposition)
         (T2 : Type(v)) (R2 : T2 → T2 → Proposition)
         (predicate
-            : Quotient.{u}(T1, R1)
-              → Quotient.{v}(T2, R2)
+            : Quotient(T1, R1)
+              → Quotient(T2, R2)
               → Proposition)
         (atRepresentatives
             : (x1 : T1) → (x2 : T2)
-              → predicate(Quotient.mk.{u}(T1, R1, x1),
-                          Quotient.mk.{v}(T2, R2, x2)))
-        (q1 : Quotient.{u}(T1, R1))
-        (q2 : Quotient.{v}(T2, R2))
+              → predicate(Quotient.mk(T1, R1, x1),
+                          Quotient.mk(T2, R2, x2)))
+        (q1 : Quotient(T1, R1))
+        (q2 : Quotient(T2, R2))
         : predicate(q1, q2) :=
-  Quotient.induct.{u}(
+  Quotient.induct(
       T1, R1,
-      function (q : Quotient.{u}(T1, R1)) => predicate(q, q2),
+      function (q : Quotient(T1, R1)) => predicate(q, q2),
       function (x1 : T1) =>
-          Quotient.induct.{v}(
+          Quotient.induct(
               T2, R2,
-              function (q : Quotient.{v}(T2, R2)) =>
-                  predicate(Quotient.mk.{u}(T1, R1, x1), q),
+              function (q : Quotient(T2, R2)) =>
+                  predicate(Quotient.mk(T1, R1, x1), q),
               function (x2 : T2) => atRepresentatives(x1, x2),
               q2),
       q1)
@@ -115,16 +115,16 @@ theorem Quotient.exact.{u}
         (transitivityOfR : (x y z : T) → R(x, y) → R(y, z) → R(x, z))
         (x y : T)
         (mkEqualityHypothesis
-            : Equality.{u}(Quotient.{u}(T, R),
-                            Quotient.mk.{u}(T, R, x),
-                            Quotient.mk.{u}(T, R, y)))
+            : Equality(Quotient(T, R),
+                            Quotient.mk(T, R, x),
+                            Quotient.mk(T, R, y)))
         : R(x, y) := {
     -- Step 1: build the lifted "related to x by R" predicate. Its
     -- respect-of-R obligation reduces, via propext, to the
     -- equivalence of `R(x, y1)` and `R(x, y2)` whenever `R(y1, y2)`.
     let isRelatedToX
-            : Quotient.{u}(T, R) → Proposition
-      := Quotient.lift.{u, 0}(
+            : Quotient(T, R) → Proposition
+      := Quotient.lift(
              T, R, Proposition,
              function (z : T) => R(x, z),
              function (y1 y2 : T) (relation_y1_y2 : R(y1, y2)) =>
@@ -139,16 +139,16 @@ theorem Quotient.exact.{u}
                              symmetryOfR(y1, y2, relation_y1_y2))));
     -- Step 2: `isRelatedToX(mk(x))` reduces definitionally to
     -- `R(x, x)`. The assumed reflexivity discharges it.
-    let reflexivityAtX : isRelatedToX(Quotient.mk.{u}(T, R, x))
+    let reflexivityAtX : isRelatedToX(Quotient.mk(T, R, x))
       := reflexivityOfR(x);
     -- Step 3: transport along the input equality. After the lift's
     -- compute rule fires on `mk(y)`, the transported proof has type
     -- `R(x, y)`.
     Equality.transport_proposition(
-        Quotient.{u}(T, R),
+        Quotient(T, R),
         isRelatedToX,
-        Quotient.mk.{u}(T, R, x),
-        Quotient.mk.{u}(T, R, y),
+        Quotient.mk(T, R, x),
+        Quotient.mk(T, R, y),
         mkEqualityHypothesis,
         reflexivityAtX)
 }
