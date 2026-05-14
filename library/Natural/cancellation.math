@@ -1,0 +1,147 @@
+-- Natural/cancellation.math
+--
+-- Cancellation lemmas for Natural multiplication. The headline result
+-- is `Natural.multiply_cancel_right`:
+--     a · c = b · c, c ≥ 1  →  a = b
+-- which closes the transitivity step for any equivalence based on
+-- cross-multiplication — Rational's `(n1, d1) ~ (n2, d2) iff n1 · d2 =
+-- n2 · d1` is the immediate motivating use case.
+--
+-- One helper goes here too: `Natural.add_equals_zero_left` (the
+-- mirror of `add_equals_zero_right` in `divides_subtract.math`),
+-- which the zero-witness branch needs.
+
+module Natural.cancellation
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.divides_subtract
+
+-- a + b = 0 implies a = 0. Mirror of add_equals_zero_right.
+theorem Natural.add_equals_zero_left
+        : (a b : Natural) → a + b = zero → a = zero
+  | zero, _, _ =>
+      reflexivity(zero)
+  | successor(predA), b, equation =>
+      -- successor(predA) + b reduces to successor(predA + b);
+      -- that successor cannot equal zero.
+      False.eliminate_proposition(
+          successor(predA) = zero,
+          Natural.successor_not_zero(predA + b, equation))
+
+-- If b · c = 0 and c ≥ 1, then b = 0. Case-split on b: the zero case
+-- is trivial; the successor case reduces (via multiply_successor) to
+-- `c + predB · c = 0`, forcing c = 0 — contradicting c ≥ 1.
+theorem Natural.multiply_equals_zero_with_positive_right
+        : (b c : Natural)
+          → 1 ≤ c
+          → b * c = zero
+          → b = zero
+  | zero, _, _, _ =>
+      reflexivity(zero)
+  | successor(predB), c, positivity, productZero => {
+      -- successor(predB) · c reduces definitionally to c + predB · c
+      -- (Natural.multiply pattern-matches on its first argument), so
+      -- the hypothesis productZero already has the reduced form.
+      claim cAdjusted
+            : c + predB * c = zero
+        by productZero;
+      claim cEqualsZero : c = zero
+        by Natural.add_equals_zero_left(c, predB * c, cAdjusted);
+      False.eliminate_proposition(
+          successor(predB) = zero,
+          Natural.not_less_or_equal_successor_zero(
+              zero,
+              Equality.transport_proposition(
+                  Natural,
+                  function (rightEnd : Natural) => 1 ≤ rightEnd,
+                  c, zero, cEqualsZero, positivity)))
+  }
+
+-- The main cancellation lemma: a · c = b · c with c ≥ 1 forces a = b.
+-- Induction on a; sub-case-split on b inside the successor case.
+theorem Natural.multiply_cancel_right
+        : (a b c : Natural)
+          → 1 ≤ c
+          → a * c = b * c
+          → a = b
+  | zero, b, c, positivity, equation => {
+      -- 0 · c = 0, so b · c = 0 too. Then b = 0 by the zero-product
+      -- helper. Symmetrically we want zero = b; symmetrise.
+      claim productZero : b * c = zero
+        by Equality.symmetry(equation);
+      claim bEqualsZero : b = zero
+        by Natural.multiply_equals_zero_with_positive_right(
+               b, c, positivity, productZero);
+      Equality.symmetry(bEqualsZero)
+  }
+  | successor(predA), b, c, positivity, equation =>
+      (cases b {
+        | zero =>
+            function (caseEquation
+                        : successor(predA) * c = zero * c) => {
+              -- successor(predA) · c = 0. By the helper, successor(predA) = 0.
+              -- But that's absurd.
+              claim productZero
+                    : successor(predA) * c = zero
+                by Equality.transitivity(
+                       caseEquation,
+                       Natural.zero_multiply(c));
+              claim successorEqualsZero
+                    : successor(predA) = zero
+                by Natural.multiply_equals_zero_with_positive_right(
+                       successor(predA), c, positivity, productZero);
+              False.eliminate_proposition(
+                  successor(predA) = zero,
+                  Natural.successor_not_zero(predA, successorEqualsZero))
+            }
+        | successor(predB) =>
+            function (caseEquation
+                        : successor(predA) * c
+                          = successor(predB) * c) => {
+              -- successor(predA) · c = c + predA · c.
+              -- successor(predB) · c = c + predB · c.
+              -- After add_cancel_left: predA · c = predB · c. Recurse.
+              claim lhsExpanded
+                    : successor(predA) * c = c + predA * c
+                by reflexivity(c + predA * c);
+              claim rhsExpanded
+                    : successor(predB) * c = c + predB * c
+                by reflexivity(c + predB * c);
+              claim cancelable
+                    : c + predA * c = c + predB * c
+                by Equality.transitivity(
+                       Equality.symmetry(lhsExpanded),
+                       Equality.transitivity(
+                           caseEquation, rhsExpanded));
+              claim reduced
+                    : predA * c = predB * c
+                by Natural.add_cancel_left(
+                       c, predA * c, predB * c, cancelable);
+              claim predsEqual
+                    : predA = predB
+                by Natural.multiply_cancel_right(
+                       predA, predB, c, positivity, reduced);
+              congruenceOf(successor, predsEqual)
+            }
+      } : successor(predA) * c = b * c → successor(predA) = b)(equation)
+
+-- Mirror cancellation on the left: c · a = c · b with c ≥ 1 forces a
+-- = b. Derived from the right version by multiply_commutative.
+theorem Natural.multiply_cancel_left
+        (c a b : Natural)
+        (positivity : 1 ≤ c)
+        (equation : c * a = c * b)
+        : a = b :=
+  Natural.multiply_cancel_right(
+      a, b, c, positivity,
+      Equality.transitivity(
+          Natural.multiply_commutative(a, c),
+          Equality.transitivity(
+              equation,
+              Natural.multiply_commutative(c, b))))
