@@ -7,10 +7,10 @@
 --      equivalence definitionally unfolds to an Integer
 --      cross-multiplication, which we close with the corresponding
 --      Integer law.
---   2. Lift via `Quotient.sound` to an `mk(_) = mk(_)` equality on
---      Rational.
---   3. Wrap with the appropriate nested `Quotient.induct` chain so the
---      conclusion is stated on arbitrary Rationals.
+--   2. State the user-facing law over arbitrary Rationals. Pull
+--      representatives via the `obtain Quotient.mk(rep) from x;` sugar
+--      (WLOG-style), then lift the Integer-level kernel through
+--      `Quotient.sound` to an `mk(_) = mk(_)` equality.
 
 module Rational.ring
 
@@ -144,50 +144,18 @@ theorem Rational.add_commutative_at_representatives
                        Equality.symmetry(
                            Rational.lifted_denominator_factors(d1, d2)))
 
-theorem Rational.add_commutative_after_first
-        (rep1 : RationalRepresentative)
-        : (secondRational : Rational)
-          → Equality.{0}(Rational,
-                Rational.add(
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep1),
-                    secondRational),
-                Rational.add(secondRational,
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep1))) :=
-  Quotient.induct.{0}(
-      RationalRepresentative,
-      RationalEquivalent,
-      function (secondRational : Rational) =>
-          Equality.{0}(Rational,
-              Rational.add(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  secondRational),
-              Rational.add(secondRational,
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1))),
-      function (rep2 : RationalRepresentative) =>
-          Quotient.sound.{0}(
-              RationalRepresentative, RationalEquivalent,
-              Rational.add_representatives(rep1, rep2),
-              Rational.add_representatives(rep2, rep1),
-              Rational.add_commutative_at_representatives(rep1, rep2)))
-
 theorem Rational.add_commutative (x y : Rational)
         : Equality.{0}(Rational,
               Rational.add(x, y),
-              Rational.add(y, x)) :=
-  Quotient.induct.{0}(
-      RationalRepresentative,
-      RationalEquivalent,
-      function (x : Rational) =>
-          Equality.{0}(Rational,
-              Rational.add(x, y),
-              Rational.add(y, x)),
-      function (rep1 : RationalRepresentative) =>
-          Rational.add_commutative_after_first(rep1, y),
-      x)
+              Rational.add(y, x)) := {
+  obtain Quotient.mk(rep_x) from x;
+  obtain Quotient.mk(rep_y) from y;
+  Quotient.sound.{0}(
+      RationalRepresentative, RationalEquivalent,
+      Rational.add_representatives(rep_x, rep_y),
+      Rational.add_representatives(rep_y, rep_x),
+      Rational.add_commutative_at_representatives(rep_x, rep_y))
+}
 
 -- ======================================================================
 -- Multiplication: commutativity. Same shape as addition: commute the
@@ -248,50 +216,18 @@ theorem Rational.multiply_commutative_at_representatives
                        Equality.symmetry(
                            Rational.lifted_denominator_factors(d1, d2)))
 
-theorem Rational.multiply_commutative_after_first
-        (rep1 : RationalRepresentative)
-        : (secondRational : Rational)
-          → Equality.{0}(Rational,
-                Rational.multiply(
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep1),
-                    secondRational),
-                Rational.multiply(secondRational,
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep1))) :=
-  Quotient.induct.{0}(
-      RationalRepresentative,
-      RationalEquivalent,
-      function (secondRational : Rational) =>
-          Equality.{0}(Rational,
-              Rational.multiply(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  secondRational),
-              Rational.multiply(secondRational,
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1))),
-      function (rep2 : RationalRepresentative) =>
-          Quotient.sound.{0}(
-              RationalRepresentative, RationalEquivalent,
-              Rational.multiply_representatives(rep1, rep2),
-              Rational.multiply_representatives(rep2, rep1),
-              Rational.multiply_commutative_at_representatives(rep1, rep2)))
-
 theorem Rational.multiply_commutative (x y : Rational)
         : Equality.{0}(Rational,
               Rational.multiply(x, y),
-              Rational.multiply(y, x)) :=
-  Quotient.induct.{0}(
-      RationalRepresentative,
-      RationalEquivalent,
-      function (x : Rational) =>
-          Equality.{0}(Rational,
-              Rational.multiply(x, y),
-              Rational.multiply(y, x)),
-      function (rep1 : RationalRepresentative) =>
-          Rational.multiply_commutative_after_first(rep1, y),
-      x)
+              Rational.multiply(y, x)) := {
+  obtain Quotient.mk(rep_x) from x;
+  obtain Quotient.mk(rep_y) from y;
+  Quotient.sound.{0}(
+      RationalRepresentative, RationalEquivalent,
+      Rational.multiply_representatives(rep_x, rep_y),
+      Rational.multiply_representatives(rep_y, rep_x),
+      Rational.multiply_commutative_at_representatives(rep_x, rep_y))
+}
 
 -- ======================================================================
 -- Additive identity: `x + 0 = x` and `0 + x = x`.
@@ -366,37 +302,20 @@ theorem Rational.add_zero_at_representatives_natural
                            Natural.to_integer(successor(denominator))),
                    Equality.symmetry(Natural.multiply_one(d)))
 
-theorem Rational.add_zero_at_representative
-        : (rep : RationalRepresentative)
-          → Equality.{0}(Rational,
-                Rational.add(
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep),
-                    Rational.zero),
-                Quotient.mk.{0}(
-                    RationalRepresentative, RationalEquivalent, rep))
-  | RationalRepresentative.make(n, d) =>
-      Quotient.sound.{0}(
-          RationalRepresentative, RationalEquivalent,
-          Rational.add_representatives(
-              RationalRepresentative.make(n, d),
-              RationalRepresentative.make(Integer.zero, zero)),
-          RationalRepresentative.make(n, d),
-          Rational.add_zero_at_representatives_natural(n, d))
-
 theorem Rational.add_zero (x : Rational)
         : Equality.{0}(Rational,
               Rational.add(x, Rational.zero),
-              x) :=
-  Quotient.induct.{0}(
-      RationalRepresentative,
-      RationalEquivalent,
-      function (x : Rational) =>
-          Equality.{0}(Rational,
-              Rational.add(x, Rational.zero),
-              x),
-      Rational.add_zero_at_representative,
-      x)
+              x) := {
+  obtain Quotient.mk(rep) from x;
+  obtain RationalRepresentative.make(n, d) from rep;
+  Quotient.sound.{0}(
+      RationalRepresentative, RationalEquivalent,
+      Rational.add_representatives(
+          RationalRepresentative.make(n, d),
+          RationalRepresentative.make(Integer.zero, zero)),
+      RationalRepresentative.make(n, d),
+      Rational.add_zero_at_representatives_natural(n, d))
+}
 
 -- Left identity follows from commutativity.
 theorem Rational.zero_add (x : Rational)
@@ -446,37 +365,20 @@ theorem Rational.multiply_one_at_representatives_natural
                            Natural.to_integer(successor(denominator))),
                    Equality.symmetry(Natural.multiply_one(d)))
 
-theorem Rational.multiply_one_at_representative
-        : (rep : RationalRepresentative)
-          → Equality.{0}(Rational,
-                Rational.multiply(
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep),
-                    Rational.one),
-                Quotient.mk.{0}(
-                    RationalRepresentative, RationalEquivalent, rep))
-  | RationalRepresentative.make(n, d) =>
-      Quotient.sound.{0}(
-          RationalRepresentative, RationalEquivalent,
-          Rational.multiply_representatives(
-              RationalRepresentative.make(n, d),
-              RationalRepresentative.make(Integer.one, zero)),
-          RationalRepresentative.make(n, d),
-          Rational.multiply_one_at_representatives_natural(n, d))
-
 theorem Rational.multiply_one (x : Rational)
         : Equality.{0}(Rational,
               Rational.multiply(x, Rational.one),
-              x) :=
-  Quotient.induct.{0}(
-      RationalRepresentative,
-      RationalEquivalent,
-      function (x : Rational) =>
-          Equality.{0}(Rational,
-              Rational.multiply(x, Rational.one),
-              x),
-      Rational.multiply_one_at_representative,
-      x)
+              x) := {
+  obtain Quotient.mk(rep) from x;
+  obtain RationalRepresentative.make(n, d) from rep;
+  Quotient.sound.{0}(
+      RationalRepresentative, RationalEquivalent,
+      Rational.multiply_representatives(
+          RationalRepresentative.make(n, d),
+          RationalRepresentative.make(Integer.one, zero)),
+      RationalRepresentative.make(n, d),
+      Rational.multiply_one_at_representatives_natural(n, d))
+}
 
 theorem Rational.one_multiply (x : Rational)
         : Equality.{0}(Rational,
@@ -554,38 +456,20 @@ theorem Rational.add_negate_right_at_representatives_natural
                        Natural.to_integer(
                            successor(d + d * successor(d)))))
 
-theorem Rational.add_negate_right_at_representative
-        : (rep : RationalRepresentative)
-          → Equality.{0}(Rational,
-                Rational.add(
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep),
-                    Rational.negate(
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep))),
-                Rational.zero)
-  | RationalRepresentative.make(n, d) =>
-      Quotient.sound.{0}(
-          RationalRepresentative, RationalEquivalent,
-          Rational.add_representatives(
-              RationalRepresentative.make(n, d),
-              RationalRepresentative.make(Integer.negate(n), d)),
-          RationalRepresentative.make(Integer.zero, zero),
-          Rational.add_negate_right_at_representatives_natural(n, d))
-
 theorem Rational.add_negate_right (x : Rational)
         : Equality.{0}(Rational,
               Rational.add(x, Rational.negate(x)),
-              Rational.zero) :=
-  Quotient.induct.{0}(
-      RationalRepresentative,
-      RationalEquivalent,
-      function (x : Rational) =>
-          Equality.{0}(Rational,
-              Rational.add(x, Rational.negate(x)),
-              Rational.zero),
-      Rational.add_negate_right_at_representative,
-      x)
+              Rational.zero) := {
+  obtain Quotient.mk(rep) from x;
+  obtain RationalRepresentative.make(n, d) from rep;
+  Quotient.sound.{0}(
+      RationalRepresentative, RationalEquivalent,
+      Rational.add_representatives(
+          RationalRepresentative.make(n, d),
+          RationalRepresentative.make(Integer.negate(n), d)),
+      RationalRepresentative.make(Integer.zero, zero),
+      Rational.add_negate_right_at_representatives_natural(n, d))
+}
 
 theorem Rational.add_negate_left (x : Rational)
         : Equality.{0}(Rational,

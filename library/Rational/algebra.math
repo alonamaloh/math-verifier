@@ -1,14 +1,14 @@
 -- Rational/algebra.math
 --
 -- Three-argument ring laws for Rational: associativity of `+` and `·`,
--- and distributivity of `·` over `+`. These rest on the same
--- quotient-lift pattern as `Rational/ring.math` but with three reps
--- (and so a triple-nested destructure chain + triple `Quotient.induct`).
--- The Integer-level kernels are the heavy lifters; we drive them by
--- repeated use of `Integer.multiply_associative`, `multiply_commutative`,
--- `Integer.distributivity_left` / `_right`, and
--- `Natural.to_integer.multiply_preserves` to flatten and rearrange the
--- triple products that arise from the lifted denominators.
+-- and distributivity of `·` over `+`. The user-facing theorems pull
+-- three representatives via the `obtain Quotient.mk(rep) from x;` sugar
+-- and apply `Quotient.sound` over the corresponding Integer-level
+-- kernel. The Integer-level kernels are the heavy lifters; we drive
+-- them by repeated use of `Integer.multiply_associative`,
+-- `multiply_commutative`, `Integer.distributivity_left` / `_right`,
+-- and `Natural.to_integer.multiply_preserves` to flatten and rearrange
+-- the triple products that arise from the lifted denominators.
 
 module Rational.algebra
 
@@ -151,130 +151,31 @@ theorem Rational.multiply_associative_at_representatives_integer
                            successor(d1) * successor(d2),
                            successor(d3))))
 
-theorem Rational.multiply_associative_at_representatives
-        : (rep1 rep2 rep3 : RationalRepresentative)
-          → Equality.{0}(Rational,
-                Rational.multiply(
-                    Rational.multiply(
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep1),
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep2)),
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep3)),
-                Rational.multiply(
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep1),
-                    Rational.multiply(
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep2),
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep3))))
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2),
-    RationalRepresentative.make(n3, d3) =>
-      Quotient.sound.{0}(
-          RationalRepresentative, RationalEquivalent,
-          Rational.multiply_representatives(
-              Rational.multiply_representatives(
-                  RationalRepresentative.make(n1, d1),
-                  RationalRepresentative.make(n2, d2)),
-              RationalRepresentative.make(n3, d3)),
-          Rational.multiply_representatives(
-              RationalRepresentative.make(n1, d1),
-              Rational.multiply_representatives(
-                  RationalRepresentative.make(n2, d2),
-                  RationalRepresentative.make(n3, d3))),
-          Rational.multiply_associative_at_representatives_integer(
-              n1, n2, n3, d1, d2, d3))
-
--- Triple destructure chain.
-
-theorem Rational.multiply_associative_after_first_second
-        (rep1 rep2 : RationalRepresentative)
-        (z : Rational)
-        : Equality.{0}(Rational,
-              Rational.multiply(
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2)),
-                  z),
-              Rational.multiply(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2),
-                      z))) :=
-  Quotient.induct.{0}(
-      RationalRepresentative, RationalEquivalent,
-      function (z : Rational) =>
-          Equality.{0}(Rational,
-              Rational.multiply(
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2)),
-                  z),
-              Rational.multiply(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2),
-                      z))),
-      function (rep3 : RationalRepresentative) =>
-          Rational.multiply_associative_at_representatives(rep1, rep2, rep3),
-      z)
-
-theorem Rational.multiply_associative_after_first
-        (rep1 : RationalRepresentative)
-        (y z : Rational)
-        : Equality.{0}(Rational,
-              Rational.multiply(
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      y),
-                  z),
-              Rational.multiply(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.multiply(y, z))) :=
-  Quotient.induct.{0}(
-      RationalRepresentative, RationalEquivalent,
-      function (y : Rational) =>
-          Equality.{0}(Rational,
-              Rational.multiply(
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      y),
-                  z),
-              Rational.multiply(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.multiply(y, z))),
-      function (rep2 : RationalRepresentative) =>
-          Rational.multiply_associative_after_first_second(rep1, rep2, z),
-      y)
-
 theorem Rational.multiply_associative (x y z : Rational)
         : Equality.{0}(Rational,
               Rational.multiply(Rational.multiply(x, y), z),
-              Rational.multiply(x, Rational.multiply(y, z))) :=
-  Quotient.induct.{0}(
+              Rational.multiply(x, Rational.multiply(y, z))) := {
+  obtain Quotient.mk(rep_x) from x;
+  obtain Quotient.mk(rep_y) from y;
+  obtain Quotient.mk(rep_z) from z;
+  obtain RationalRepresentative.make(n1, d1) from rep_x;
+  obtain RationalRepresentative.make(n2, d2) from rep_y;
+  obtain RationalRepresentative.make(n3, d3) from rep_z;
+  Quotient.sound.{0}(
       RationalRepresentative, RationalEquivalent,
-      function (x : Rational) =>
-          Equality.{0}(Rational,
-              Rational.multiply(Rational.multiply(x, y), z),
-              Rational.multiply(x, Rational.multiply(y, z))),
-      function (rep1 : RationalRepresentative) =>
-          Rational.multiply_associative_after_first(rep1, y, z),
-      x)
+      Rational.multiply_representatives(
+          Rational.multiply_representatives(
+              RationalRepresentative.make(n1, d1),
+              RationalRepresentative.make(n2, d2)),
+          RationalRepresentative.make(n3, d3)),
+      Rational.multiply_representatives(
+          RationalRepresentative.make(n1, d1),
+          Rational.multiply_representatives(
+              RationalRepresentative.make(n2, d2),
+              RationalRepresentative.make(n3, d3))),
+      Rational.multiply_associative_at_representatives_integer(
+          n1, n2, n3, d1, d2, d3))
+}
 
 -- ======================================================================
 -- Reusable helper: bridge between the right-associated and
@@ -782,128 +683,31 @@ theorem Rational.add_associative_at_representatives_integer
                            liftedDenominator),
                    Rational.three_denominator_associativity_swap(d1, d2, d3))
 
-theorem Rational.add_associative_at_representatives
-        : (rep1 rep2 rep3 : RationalRepresentative)
-          → Equality.{0}(Rational,
-                Rational.add(
-                    Rational.add(
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep1),
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep2)),
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep3)),
-                Rational.add(
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep1),
-                    Rational.add(
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep2),
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep3))))
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2),
-    RationalRepresentative.make(n3, d3) =>
-      Quotient.sound.{0}(
-          RationalRepresentative, RationalEquivalent,
-          Rational.add_representatives(
-              Rational.add_representatives(
-                  RationalRepresentative.make(n1, d1),
-                  RationalRepresentative.make(n2, d2)),
-              RationalRepresentative.make(n3, d3)),
-          Rational.add_representatives(
-              RationalRepresentative.make(n1, d1),
-              Rational.add_representatives(
-                  RationalRepresentative.make(n2, d2),
-                  RationalRepresentative.make(n3, d3))),
-          Rational.add_associative_at_representatives_integer(
-              n1, n2, n3, d1, d2, d3))
-
-theorem Rational.add_associative_after_first_second
-        (rep1 rep2 : RationalRepresentative)
-        (z : Rational)
-        : Equality.{0}(Rational,
-              Rational.add(
-                  Rational.add(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2)),
-                  z),
-              Rational.add(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.add(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2),
-                      z))) :=
-  Quotient.induct.{0}(
-      RationalRepresentative, RationalEquivalent,
-      function (z : Rational) =>
-          Equality.{0}(Rational,
-              Rational.add(
-                  Rational.add(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2)),
-                  z),
-              Rational.add(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.add(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2),
-                      z))),
-      function (rep3 : RationalRepresentative) =>
-          Rational.add_associative_at_representatives(rep1, rep2, rep3),
-      z)
-
-theorem Rational.add_associative_after_first
-        (rep1 : RationalRepresentative)
-        (y z : Rational)
-        : Equality.{0}(Rational,
-              Rational.add(
-                  Rational.add(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      y),
-                  z),
-              Rational.add(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.add(y, z))) :=
-  Quotient.induct.{0}(
-      RationalRepresentative, RationalEquivalent,
-      function (y : Rational) =>
-          Equality.{0}(Rational,
-              Rational.add(
-                  Rational.add(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      y),
-                  z),
-              Rational.add(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.add(y, z))),
-      function (rep2 : RationalRepresentative) =>
-          Rational.add_associative_after_first_second(rep1, rep2, z),
-      y)
-
 theorem Rational.add_associative (x y z : Rational)
         : Equality.{0}(Rational,
               Rational.add(Rational.add(x, y), z),
-              Rational.add(x, Rational.add(y, z))) :=
-  Quotient.induct.{0}(
+              Rational.add(x, Rational.add(y, z))) := {
+  obtain Quotient.mk(rep_x) from x;
+  obtain Quotient.mk(rep_y) from y;
+  obtain Quotient.mk(rep_z) from z;
+  obtain RationalRepresentative.make(n1, d1) from rep_x;
+  obtain RationalRepresentative.make(n2, d2) from rep_y;
+  obtain RationalRepresentative.make(n3, d3) from rep_z;
+  Quotient.sound.{0}(
       RationalRepresentative, RationalEquivalent,
-      function (x : Rational) =>
-          Equality.{0}(Rational,
-              Rational.add(Rational.add(x, y), z),
-              Rational.add(x, Rational.add(y, z))),
-      function (rep1 : RationalRepresentative) =>
-          Rational.add_associative_after_first(rep1, y, z),
-      x)
+      Rational.add_representatives(
+          Rational.add_representatives(
+              RationalRepresentative.make(n1, d1),
+              RationalRepresentative.make(n2, d2)),
+          RationalRepresentative.make(n3, d3)),
+      Rational.add_representatives(
+          RationalRepresentative.make(n1, d1),
+          Rational.add_representatives(
+              RationalRepresentative.make(n2, d2),
+              RationalRepresentative.make(n3, d3))),
+      Rational.add_associative_at_representatives_integer(
+          n1, n2, n3, d1, d2, d3))
+}
 
 -- ======================================================================
 -- Left distributivity: `x · (y + z) = x · y + x · z`.
@@ -1384,149 +1188,35 @@ theorem Rational.distributivity_left_at_representatives_integer
                    Rational.distributivity_left_numerator_factoring(
                        n1, n2, n3, d1, d2, d3))
 
-theorem Rational.distributivity_left_at_representatives
-        : (rep1 rep2 rep3 : RationalRepresentative)
-          → Equality.{0}(Rational,
-                Rational.multiply(
-                    Quotient.mk.{0}(
-                        RationalRepresentative, RationalEquivalent, rep1),
-                    Rational.add(
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep2),
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep3))),
-                Rational.add(
-                    Rational.multiply(
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep1),
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep2)),
-                    Rational.multiply(
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep1),
-                        Quotient.mk.{0}(
-                            RationalRepresentative, RationalEquivalent, rep3))))
-  | RationalRepresentative.make(n1, d1),
-    RationalRepresentative.make(n2, d2),
-    RationalRepresentative.make(n3, d3) =>
-      Quotient.sound.{0}(
-          RationalRepresentative, RationalEquivalent,
-          Rational.multiply_representatives(
-              RationalRepresentative.make(n1, d1),
-              Rational.add_representatives(
-                  RationalRepresentative.make(n2, d2),
-                  RationalRepresentative.make(n3, d3))),
-          Rational.add_representatives(
-              Rational.multiply_representatives(
-                  RationalRepresentative.make(n1, d1),
-                  RationalRepresentative.make(n2, d2)),
-              Rational.multiply_representatives(
-                  RationalRepresentative.make(n1, d1),
-                  RationalRepresentative.make(n3, d3))),
-          Rational.distributivity_left_at_representatives_integer(
-              n1, n2, n3, d1, d2, d3))
-
-theorem Rational.distributivity_left_after_first_second
-        (rep1 rep2 : RationalRepresentative)
-        (z : Rational)
-        : Equality.{0}(Rational,
-              Rational.multiply(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.add(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2),
-                      z)),
-              Rational.add(
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2)),
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      z))) :=
-  Quotient.induct.{0}(
-      RationalRepresentative, RationalEquivalent,
-      function (z : Rational) =>
-          Equality.{0}(Rational,
-              Rational.multiply(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.add(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2),
-                      z)),
-              Rational.add(
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep2)),
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      z))),
-      function (rep3 : RationalRepresentative) =>
-          Rational.distributivity_left_at_representatives(rep1, rep2, rep3),
-      z)
-
-theorem Rational.distributivity_left_after_first
-        (rep1 : RationalRepresentative)
-        (y z : Rational)
-        : Equality.{0}(Rational,
-              Rational.multiply(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.add(y, z)),
-              Rational.add(
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      y),
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      z))) :=
-  Quotient.induct.{0}(
-      RationalRepresentative, RationalEquivalent,
-      function (y : Rational) =>
-          Equality.{0}(Rational,
-              Rational.multiply(
-                  Quotient.mk.{0}(
-                      RationalRepresentative, RationalEquivalent, rep1),
-                  Rational.add(y, z)),
-              Rational.add(
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      y),
-                  Rational.multiply(
-                      Quotient.mk.{0}(
-                          RationalRepresentative, RationalEquivalent, rep1),
-                      z))),
-      function (rep2 : RationalRepresentative) =>
-          Rational.distributivity_left_after_first_second(rep1, rep2, z),
-      y)
-
 theorem Rational.distributivity_left (x y z : Rational)
         : Equality.{0}(Rational,
               Rational.multiply(x, Rational.add(y, z)),
               Rational.add(
                   Rational.multiply(x, y),
-                  Rational.multiply(x, z))) :=
-  Quotient.induct.{0}(
+                  Rational.multiply(x, z))) := {
+  obtain Quotient.mk(rep_x) from x;
+  obtain Quotient.mk(rep_y) from y;
+  obtain Quotient.mk(rep_z) from z;
+  obtain RationalRepresentative.make(n1, d1) from rep_x;
+  obtain RationalRepresentative.make(n2, d2) from rep_y;
+  obtain RationalRepresentative.make(n3, d3) from rep_z;
+  Quotient.sound.{0}(
       RationalRepresentative, RationalEquivalent,
-      function (x : Rational) =>
-          Equality.{0}(Rational,
-              Rational.multiply(x, Rational.add(y, z)),
-              Rational.add(
-                  Rational.multiply(x, y),
-                  Rational.multiply(x, z))),
-      function (rep1 : RationalRepresentative) =>
-          Rational.distributivity_left_after_first(rep1, y, z),
-      x)
+      Rational.multiply_representatives(
+          RationalRepresentative.make(n1, d1),
+          Rational.add_representatives(
+              RationalRepresentative.make(n2, d2),
+              RationalRepresentative.make(n3, d3))),
+      Rational.add_representatives(
+          Rational.multiply_representatives(
+              RationalRepresentative.make(n1, d1),
+              RationalRepresentative.make(n2, d2)),
+          Rational.multiply_representatives(
+              RationalRepresentative.make(n1, d1),
+              RationalRepresentative.make(n3, d3))),
+      Rational.distributivity_left_at_representatives_integer(
+          n1, n2, n3, d1, d2, d3))
+}
 
 -- Right distributivity: derived from left + multiply_commutative.
 theorem Rational.distributivity_right (x y z : Rational)

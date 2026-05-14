@@ -3109,6 +3109,158 @@ private:
                                     expectedType);
     }
 
+    // Handle a `cases` / `obtain` expression whose scrutinee is a
+    // `Quotient.{u}(T, R)` value. Quotient is an axiomatic primitive,
+    // not an inductive, so the standard recursor path doesn't apply.
+    // We build a `Quotient.induct.{u}(T, R, motive, λ rep ⇒ body,
+    // scrutinee)` term directly.
+    //
+    // Restrictions: exactly one clause; pattern shape
+    // `Quotient.mk(rep)` with a single bare-name argument; scrutinee is
+    // a local-binder variable (so we can abstract it from the goal).
+    // Expected type must reduce to a Proposition since `Quotient.induct`
+    // requires a Proposition-valued motive.
+    ExpressionPointer elaborateQuotientCases(
+        const SurfaceCases& cases,
+        ExpressionPointer scrutinee,
+        ExpressionPointer scrutineeTypeOpened,
+        const std::vector<ExpressionPointer>& inductiveArguments,
+        const Constant& quotientConstant,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "quotient-cases at line " + std::to_string(line));
+
+        // Verify scrutinee is a local-binder variable so we can
+        // abstract it from the goal.
+        auto* scrutineeBoundVariable =
+            std::get_if<BoundVariable>(&scrutinee->node);
+        if (!scrutineeBoundVariable
+            || scrutineeBoundVariable->deBruijnIndex < 0
+            || scrutineeBoundVariable->deBruijnIndex
+                   >= static_cast<int>(localBinders.size())) {
+            throwElaborate(
+                "quotient-cases scrutinee must be a local-binder "
+                "variable (a parameter or let-binding name)");
+        }
+        int scrutineeDeBruijn = scrutineeBoundVariable->deBruijnIndex;
+
+        // Quotient takes 2 args: T and R. The kernel's universe-arg
+        // count is always 1 for Quotient.
+        if (inductiveArguments.size() != 2) {
+            throwElaborate(
+                "internal: Quotient applied to "
+                + std::to_string(inductiveArguments.size())
+                + " arguments, expected 2 (T, R)");
+        }
+        if (quotientConstant.universeArguments.size() != 1) {
+            throwElaborate(
+                "internal: Quotient should have exactly one universe "
+                "argument");
+        }
+        LevelPointer quotientUniverse =
+            quotientConstant.universeArguments[0];
+        ExpressionPointer carrierTypeOpened = inductiveArguments[0];
+        ExpressionPointer relationOpened = inductiveArguments[1];
+        ExpressionPointer carrierType = closeOverLocalBinders(
+            carrierTypeOpened, localBinders, localBinders.size());
+        ExpressionPointer relation = closeOverLocalBinders(
+            relationOpened, localBinders, localBinders.size());
+        ExpressionPointer scrutineeType = closeOverLocalBinders(
+            scrutineeTypeOpened, localBinders, localBinders.size());
+
+        if (cases.clauses.size() != 1) {
+            throwElaborate(
+                "quotient-cases takes exactly one clause "
+                "(`Quotient.mk(rep) => …`), got "
+                + std::to_string(cases.clauses.size()));
+        }
+        const SurfaceCasesClause& clause = cases.clauses[0];
+
+        // Pattern must be `Quotient.mk(rep_name)` — a constructor
+        // pattern with name "Quotient.mk" and exactly one bare-name
+        // argument (the representative binder).
+        auto* constructorPattern = std::get_if<SurfacePatternConstructor>(
+            &clause.pattern->node);
+        if (!constructorPattern
+            || constructorPattern->constructorName != "Quotient.mk") {
+            throwElaborate(
+                "quotient-cases pattern must be `Quotient.mk(rep_name)`");
+        }
+        if (constructorPattern->arguments.size() != 1) {
+            throwElaborate(
+                "quotient-cases: `Quotient.mk` pattern takes one "
+                "argument (the representative-binder name), got "
+                + std::to_string(
+                    constructorPattern->arguments.size()));
+        }
+        auto* bareNamePattern = std::get_if<SurfacePatternBareName>(
+            &constructorPattern->arguments[0]->node);
+        if (!bareNamePattern) {
+            throwElaborate(
+                "quotient-cases: the argument inside `Quotient.mk(…)` "
+                "must be a bare identifier that names the "
+                "representative");
+        }
+        std::string representativeName = bareNamePattern->name;
+
+        // Build the motive: `λ q : Quotient.{u}(T, R) ⇒
+        // expectedType[scrutinee := q]`. We abstract the scrutinee's
+        // local index out of expectedType; the resulting body's
+        // BoundVariable(0) refers to the new motive binder.
+        ExpressionPointer motiveBody =
+            abstractOverBoundVariables(expectedType, {scrutineeDeBruijn});
+        ExpressionPointer motive = makeLambda(
+            "_quotient_target", scrutineeType, motiveBody);
+
+        // Set up the inner local-binder context with the representative
+        // binder on top.
+        std::vector<LocalBinder> innerBinders = localBinders;
+        innerBinders.push_back({representativeName, carrierType});
+
+        // Build the body's expected type as `motive(Quotient.mk(T, R, rep))`
+        // in inner context. Shift outer terms up by 1 to account for the
+        // new binder; rep is BoundVariable(0). The kernel's WHNF will
+        // beta-reduce when needed.
+        ExpressionPointer carrierTypeInner = shift(carrierType, 1);
+        ExpressionPointer relationInner = shift(relation, 1);
+        ExpressionPointer motiveInner = shift(motive, 1);
+        ExpressionPointer mkAppliedToRep =
+            makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeConstant("Quotient.mk", {quotientUniverse}),
+                        carrierTypeInner),
+                    relationInner),
+                makeBoundVariable(0));
+        ExpressionPointer bodyExpectedType =
+            makeApplication(motiveInner, mkAppliedToRep);
+
+        // Elaborate the body in the extended local context.
+        ExpressionPointer bodyKernel =
+            elaborateExpression(*clause.body, innerBinders,
+                                 bodyExpectedType);
+
+        // Wrap the body in the representative-case lambda.
+        ExpressionPointer representativeCaseLambda = makeLambda(
+            representativeName, carrierType, bodyKernel);
+
+        // Final application: Quotient.induct(T, R, motive,
+        //                                     λ rep ⇒ body, scrutinee).
+        ExpressionPointer quotientInductHead =
+            makeConstant("Quotient.induct", {quotientUniverse});
+        return makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeApplication(
+                        makeApplication(quotientInductHead, carrierType),
+                        relation),
+                    motive),
+                representativeCaseLambda),
+            scrutinee);
+    }
+
     // `cases scrutinee { | pattern => body | ... }`. Phase 1 covers
     // non-indexed inductives only. Re-uses the existing
     // `buildCaseLambda` helper by synthesizing a minimal pattern-match
@@ -3152,6 +3304,19 @@ private:
                 "cases scrutinee at line " + std::to_string(line)
                 + ": type's head is not an inductive constant after "
                 "normalisation");
+        }
+        // Quotient is not an inductive — it's an axiomatic kernel
+        // primitive eliminated via `Quotient.induct`. When the scrutinee
+        // is a value of `Quotient.{u}(T, R)` and the user supplied a
+        // single clause `Quotient.mk(rep) => body`, dispatch to a
+        // dedicated handler that builds the induct application directly.
+        // This is the "WLOG pick a representative" sugar — the
+        // mathematician's natural reading of a quotient elimination.
+        if (constant->name == "Quotient") {
+            return elaborateQuotientCases(
+                cases, scrutinee, scrutineeTypeOpened,
+                inductiveArguments, *constant,
+                localBinders, expectedType, line, column);
         }
         const Declaration* inductiveDecl =
             environment_.lookup(constant->name);
