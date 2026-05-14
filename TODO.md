@@ -7,48 +7,33 @@ pain becomes acute.
 
 ## Active
 
-### 1. Cast via ascription `(x : T)` — start here
-Generalize the existing type-ascription form so that when `x`'s
-inferred type doesn't match `T` but a canonical embedding chain
-exists, the chain is composed and inserted automatically.
-
-**Decision (2026-05-14):** use the ascription form `(x : T)` rather
-than introducing a `cast` keyword. The current `SurfaceAscription`
-already means "I claim this has this type"; extending it to insert
-canonical embeddings is the natural generalization. No new keyword,
-no parser change — pure elaborator work.
-
-**Initial registry:** just `Natural.to_integer : Natural → Integer`.
-Grows to `Integer → Rational`, `Rational → Real`, `Real → Complex`
-as those types land. Single canonical linear chain — reject
-ambiguity at elaboration time if multiple paths ever exist.
-
-### 2. Operator overloading for Integer (and beyond)
+### 1. Operator overloading for Integer (and beyond) — start here
 Currently `+ / * / -` desugar only to `Natural.add` / `Natural.multiply`.
 Make the elaborator dispatch on operand type — initially via a
 hardcoded map (`Natural → Natural.add`, `Integer → Integer.add`,
 …); move to an instance/registry system later. Combined with (1),
 this is the biggest readability win on existing-style code.
 
-### 3. More math content
-Once (1) and (2) are in, build the abstract algebra layer: `Group`,
+### 2. More math content
+Once operator overloading is in, build the abstract algebra layer:
+`Group`,
 `Ring`, `Field`, `CommutativeRing` as Proposition records;
 `Integer` as a `CommutativeRing` instance; then `Rational :=
 (Integer × Natural⁺) / ~`, then `Real` (Cauchy sequences or Dedekind
 cuts), then vector spaces / linear algebra.
 
-### 4. Parallel verification
+### 3. Parallel verification
 Optimistic per-theorem parallelism with a thread pool: register
 signatures eagerly, parallelize body verification, collect all errors
-at end, fail if any worker fails. **Defer until elaborator changes
-from (1)–(2) settle** — parallelizing over a fast-changing kernel
-means doing the work twice.
+at end, fail if any worker fails. **Defer until the operator-
+overloading change settles** — parallelizing over a fast-changing
+elaborator means doing the work twice.
 
 Subtleties: per-worker universe-meta naming; thread-safe kernel
 caches; deterministic error-ordering at the end; slow theorems set
 the floor (consider splitting long proofs into lemmas).
 
-### 5. `by ring` (and `by group`, `by abelian_group`, …)
+### 4. `by ring` (and `by group`, `by abelian_group`, …)
 Term-normalization tactic for ring identities. Highest payoff,
 highest effort. **Wait until we have enough algebra content (item
 3) to design the procedure against real use cases** — premature
@@ -70,6 +55,11 @@ Smaller items to land when the motivating pain becomes acute:
 
 ## Completed
 
+- **2026-05-14: Ascription as coercion.** `(x : T)` now auto-inserts a
+  canonical embedding chain when `x`'s type doesn't match `T` but a
+  registered chain exists. Initial registry: `Natural → Integer` via
+  `Natural.to_integer`. Grows as new number systems land. Commit
+  `8efd117`.
 - **2026-05-14: Make narrow tactic keywords contextual.** `claim`,
   `obtain`, `assume`, `set`, `suffices`, `from`, `on`, `with`,
   `case`, `apply`, `contradiction` now parse as identifiers in name
