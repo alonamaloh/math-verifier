@@ -1,0 +1,948 @@
+-- Integer/ring.math
+--
+-- Commutative-semiring identities on Integer: add and multiply each are
+-- commutative, associative, with identity element; distributivity
+-- holds on both sides. Together these say Integer is a commutative
+-- semiring (the additional negation in Integer/negation.math makes it a
+-- commutative ring).
+--
+-- Each lemma factors through a representative-level kernel theorem
+-- (the algebraic identity on `IntegerRepresentative`'s components, in
+-- Natural) plus one or more `Quotient.induct` calls that walk every
+-- Integer argument down to its `mk(make(_, _))` form. At the leaf the
+-- equivalence is closed by `Quotient.sound`; symmetric companions
+-- (e.g. add_identity_right, distributivity_right) are derived from
+-- their primal partner plus commutativity.
+
+module Integer.ring
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+
+-- ----------------------------------------------------------------------
+-- A small helper: two representatives with componentwise equal
+-- components are equivalent. Used at every leaf where the natural-
+-- level kernel proves the two components separately rather than the
+-- raw `x1 + y2 = x2 + y1` form.
+theorem IntegerEquivalent.from_components_equal
+        (a b c d : Natural)
+        (firstComponentEquality : a = c)
+        (secondComponentEquality : b = d)
+        : IntegerEquivalent(IntegerRepresentative.make(a, b),
+                            IntegerRepresentative.make(c, d)) :=
+  -- goal reduces to `a + d = b + c`.
+  calc a + d
+     = a + b   by congruenceOf(
+                       function (rhs : Natural) => a + rhs,
+                       Equality.symmetry(secondComponentEquality))
+     = b + a   by Natural.add_commutative(a, b)
+     = b + c   by congruenceOf(
+                       function (rhs : Natural) => b + rhs,
+                       firstComponentEquality)
+
+-- ======================================================================
+-- Addition
+-- ======================================================================
+
+-- ----------------------------------------------------------------------
+-- Integer.add_commutative
+
+-- Natural-level kernel: (a+c, b+d) ~ (c+a, d+b) reduces to
+-- (a+c) + (d+b) = (b+d) + (c+a), which just shuffles via commutativity.
+theorem Integer.add_commutative_natural (a b c d : Natural)
+        : (a + c) + (d + b) = (b + d) + (c + a) :=
+  calc (a + c) + (d + b)
+     = (a + c) + (b + d)
+            by congruenceOf(
+                   function (rhs : Natural) => (a + c) + rhs,
+                   Natural.add_commutative(d, b))
+     = (b + d) + (a + c)
+            by Natural.add_commutative(a + c, b + d)
+     = (b + d) + (c + a)
+            by congruenceOf(
+                   function (rhs : Natural) => (b + d) + rhs,
+                   Natural.add_commutative(a, c))
+
+theorem Integer.add_commutative_at_representatives
+        : (rep1 rep2 : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.add(
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep1),
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep2)),
+                Integer.add(
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep2),
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep1)))
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d) =>
+      Quotient.sound.{0}(
+          IntegerRepresentative, IntegerEquivalent,
+          IntegerRepresentative.make(a + c, b + d),
+          IntegerRepresentative.make(c + a, d + b),
+          Integer.add_commutative_natural(a, b, c, d))
+
+theorem Integer.add_commutative_after_first
+        (rep1 : IntegerRepresentative) (y : Integer)
+        : Equality.{0}(Integer,
+              Integer.add(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  y),
+              Integer.add(
+                  y,
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (y : Integer) =>
+          Equality.{0}(Integer,
+              Integer.add(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  y),
+              Integer.add(
+                  y,
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1))),
+      function (rep2 : IntegerRepresentative) =>
+          Integer.add_commutative_at_representatives(rep1, rep2),
+      y)
+
+theorem Integer.add_commutative (x y : Integer)
+        : Equality.{0}(Integer, Integer.add(x, y), Integer.add(y, x)) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (x : Integer) =>
+          Equality.{0}(Integer, Integer.add(x, y), Integer.add(y, x)),
+      function (rep1 : IntegerRepresentative) =>
+          Integer.add_commutative_after_first(rep1, y),
+      x)
+
+-- ----------------------------------------------------------------------
+-- Integer.add_associative
+
+-- Natural-level kernel for associativity. After reduction LHS rep has
+-- first component (a+c)+e, second (b+d)+f; RHS rep has first a+(c+e),
+-- second b+(d+f). The equivalence is
+--   ((a+c)+e) + (b + (d+f)) = ((b+d)+f) + (a + (c+e)).
+-- Reassociate both sides into the (a + (c+e)) + ((b+d)+f) shape, then
+-- swap the outer order via commutativity.
+theorem Integer.add_associative_natural (a b c d e f : Natural)
+        : ((a + c) + e) + (b + (d + f)) = ((b + d) + f) + (a + (c + e)) :=
+  calc ((a + c) + e) + (b + (d + f))
+     = (a + (c + e)) + (b + (d + f))
+            by congruenceOf(
+                   function (lhs : Natural) => lhs + (b + (d + f)),
+                   Natural.add_associative(a, c, e))
+     = (a + (c + e)) + ((b + d) + f)
+            by congruenceOf(
+                   function (rhs : Natural) => (a + (c + e)) + rhs,
+                   Equality.symmetry(Natural.add_associative(b, d, f)))
+     = ((b + d) + f) + (a + (c + e))
+            by Natural.add_commutative(a + (c + e), (b + d) + f)
+
+theorem Integer.add_associative_at_representatives
+        : (rep1 rep2 rep3 : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.add(
+                    Integer.add(
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep1),
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep2)),
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep3)),
+                Integer.add(
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep1),
+                    Integer.add(
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep2),
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep3))))
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d),
+    IntegerRepresentative.make(e, f) =>
+      Quotient.sound.{0}(
+          IntegerRepresentative, IntegerEquivalent,
+          IntegerRepresentative.make((a + c) + e, (b + d) + f),
+          IntegerRepresentative.make(a + (c + e), b + (d + f)),
+          Integer.add_associative_natural(a, b, c, d, e, f))
+
+theorem Integer.add_associative_after_first_second
+        (rep1 rep2 : IntegerRepresentative) (z : Integer)
+        : Equality.{0}(Integer,
+              Integer.add(
+                  Integer.add(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2)),
+                  z),
+              Integer.add(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.add(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2),
+                      z))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (z : Integer) =>
+          Equality.{0}(Integer,
+              Integer.add(
+                  Integer.add(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2)),
+                  z),
+              Integer.add(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.add(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2),
+                      z))),
+      function (rep3 : IntegerRepresentative) =>
+          Integer.add_associative_at_representatives(rep1, rep2, rep3),
+      z)
+
+theorem Integer.add_associative_after_first
+        (rep1 : IntegerRepresentative) (y z : Integer)
+        : Equality.{0}(Integer,
+              Integer.add(
+                  Integer.add(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      y),
+                  z),
+              Integer.add(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.add(y, z))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (y : Integer) =>
+          Equality.{0}(Integer,
+              Integer.add(
+                  Integer.add(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      y),
+                  z),
+              Integer.add(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.add(y, z))),
+      function (rep2 : IntegerRepresentative) =>
+          Integer.add_associative_after_first_second(rep1, rep2, z),
+      y)
+
+theorem Integer.add_associative (x y z : Integer)
+        : Equality.{0}(Integer,
+              Integer.add(Integer.add(x, y), z),
+              Integer.add(x, Integer.add(y, z))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (x : Integer) =>
+          Equality.{0}(Integer,
+              Integer.add(Integer.add(x, y), z),
+              Integer.add(x, Integer.add(y, z))),
+      function (rep1 : IntegerRepresentative) =>
+          Integer.add_associative_after_first(rep1, y, z),
+      x)
+
+-- ----------------------------------------------------------------------
+-- Integer.add_identity_left
+
+-- At a representative make(a, b), Integer.add(zero, mk(make(a, b)))
+-- reduces definitionally to mk(make(zero + a, zero + b)) = mk(make(a,
+-- b)) — the `zero + _` reductions fire because add recurses on the
+-- first argument. So the leaf is `reflexivity`.
+theorem Integer.add_identity_left_at_representative
+        : (rep : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.add(Integer.zero,
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep)),
+                Quotient.mk.{0}(
+                    IntegerRepresentative, IntegerEquivalent, rep))
+  | IntegerRepresentative.make(a, b) =>
+      reflexivity.{0}(Integer,
+          Quotient.mk.{0}(
+              IntegerRepresentative, IntegerEquivalent,
+              IntegerRepresentative.make(a, b)))
+
+theorem Integer.add_identity_left (x : Integer)
+        : Equality.{0}(Integer, Integer.add(Integer.zero, x), x) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative, IntegerEquivalent,
+      function (x : Integer) =>
+          Equality.{0}(Integer, Integer.add(Integer.zero, x), x),
+      Integer.add_identity_left_at_representative,
+      x)
+
+-- ----------------------------------------------------------------------
+-- Integer.add_identity_right — derived via commutativity + identity_left.
+theorem Integer.add_identity_right (x : Integer)
+        : Equality.{0}(Integer, Integer.add(x, Integer.zero), x) :=
+  Equality.transitivity.{0}(
+      Integer,
+      Integer.add(x, Integer.zero),
+      Integer.add(Integer.zero, x),
+      x,
+      Integer.add_commutative(x, Integer.zero),
+      Integer.add_identity_left(x))
+
+-- ======================================================================
+-- Multiplication
+-- ======================================================================
+
+-- ----------------------------------------------------------------------
+-- Integer.multiply_commutative
+
+-- Natural-level kernel: at the leaf both reps have multiplied
+-- components, and we need
+--   (a*c + b*d) + (c*b + d*a) = (a*d + b*c) + (c*a + d*b).
+-- Each term reshuffles to the form on the other side via
+-- multiply_commutative; the outer pair-arrangement uses add_commutative.
+theorem Integer.multiply_commutative_natural (a b c d : Natural)
+        : (a * c + b * d) + (c * b + d * a)
+          = (a * d + b * c) + (c * a + d * b) :=
+  calc (a * c + b * d) + (c * b + d * a)
+     = (a * c + b * d) + (b * c + d * a)
+            by congruenceOf(
+                   function (term : Natural) =>
+                       (a * c + b * d) + (term + d * a),
+                   Natural.multiply_commutative(c, b))
+     = (a * c + b * d) + (b * c + a * d)
+            by congruenceOf(
+                   function (term : Natural) =>
+                       (a * c + b * d) + (b * c + term),
+                   Natural.multiply_commutative(d, a))
+     = (b * c + a * d) + (a * c + b * d)
+            by Natural.add_commutative(a * c + b * d, b * c + a * d)
+     = (a * d + b * c) + (a * c + b * d)
+            by congruenceOf(
+                   function (lhs : Natural) => lhs + (a * c + b * d),
+                   Natural.add_commutative(b * c, a * d))
+     = (a * d + b * c) + (c * a + b * d)
+            by congruenceOf(
+                   function (term : Natural) =>
+                       (a * d + b * c) + (term + b * d),
+                   Natural.multiply_commutative(a, c))
+     = (a * d + b * c) + (c * a + d * b)
+            by congruenceOf(
+                   function (term : Natural) =>
+                       (a * d + b * c) + (c * a + term),
+                   Natural.multiply_commutative(b, d))
+
+theorem Integer.multiply_commutative_at_representatives
+        : (rep1 rep2 : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.multiply(
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep1),
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep2)),
+                Integer.multiply(
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep2),
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep1)))
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d) =>
+      Quotient.sound.{0}(
+          IntegerRepresentative, IntegerEquivalent,
+          IntegerRepresentative.make(a * c + b * d, a * d + b * c),
+          IntegerRepresentative.make(c * a + d * b, c * b + d * a),
+          Integer.multiply_commutative_natural(a, b, c, d))
+
+theorem Integer.multiply_commutative_after_first
+        (rep1 : IntegerRepresentative) (y : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  y),
+              Integer.multiply(
+                  y,
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (y : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  y),
+              Integer.multiply(
+                  y,
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1))),
+      function (rep2 : IntegerRepresentative) =>
+          Integer.multiply_commutative_at_representatives(rep1, rep2),
+      y)
+
+theorem Integer.multiply_commutative (x y : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(x, y),
+              Integer.multiply(y, x)) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (x : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(x, y),
+              Integer.multiply(y, x)),
+      function (rep1 : IntegerRepresentative) =>
+          Integer.multiply_commutative_after_first(rep1, y),
+      x)
+
+-- ----------------------------------------------------------------------
+-- Integer.multiply_identity_left
+
+-- Natural-level: prove componentwise that
+--   1 * a + zero * b = a   and   1 * b + zero * a = b
+-- After both reductions the first is `(a + zero) + zero` and the second
+-- is `(b + zero) + zero`. We use one_multiply + zero_multiply +
+-- add_zero to close each.
+theorem Integer.multiply_identity_left_first_component (a b : Natural)
+        : 1 * a + zero * b = a :=
+  calc 1 * a + zero * b
+     = a + zero * b
+            by congruenceOf(
+                   function (factor : Natural) => factor + zero * b,
+                   Natural.one_multiply(a))
+     = a + zero
+            by congruenceOf(
+                   function (factor : Natural) => a + factor,
+                   Natural.zero_multiply(b))
+     = a    by Natural.add_zero(a)
+
+theorem Integer.multiply_identity_left_second_component (a b : Natural)
+        : 1 * b + zero * a = b :=
+  calc 1 * b + zero * a
+     = b + zero * a
+            by congruenceOf(
+                   function (factor : Natural) => factor + zero * a,
+                   Natural.one_multiply(b))
+     = b + zero
+            by congruenceOf(
+                   function (factor : Natural) => b + factor,
+                   Natural.zero_multiply(a))
+     = b    by Natural.add_zero(b)
+
+theorem Integer.multiply_identity_left_at_representative
+        : (rep : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.multiply(Integer.one,
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep)),
+                Quotient.mk.{0}(
+                    IntegerRepresentative, IntegerEquivalent, rep))
+  | IntegerRepresentative.make(a, b) =>
+      Quotient.sound.{0}(
+          IntegerRepresentative, IntegerEquivalent,
+          IntegerRepresentative.make(1 * a + zero * b, 1 * b + zero * a),
+          IntegerRepresentative.make(a, b),
+          IntegerEquivalent.from_components_equal(
+              1 * a + zero * b, 1 * b + zero * a,
+              a, b,
+              Integer.multiply_identity_left_first_component(a, b),
+              Integer.multiply_identity_left_second_component(a, b)))
+
+theorem Integer.multiply_identity_left (x : Integer)
+        : Equality.{0}(Integer, Integer.multiply(Integer.one, x), x) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative, IntegerEquivalent,
+      function (x : Integer) =>
+          Equality.{0}(Integer, Integer.multiply(Integer.one, x), x),
+      Integer.multiply_identity_left_at_representative,
+      x)
+
+-- ----------------------------------------------------------------------
+-- Integer.multiply_identity_right — derived via commutativity.
+theorem Integer.multiply_identity_right (x : Integer)
+        : Equality.{0}(Integer, Integer.multiply(x, Integer.one), x) :=
+  Equality.transitivity.{0}(
+      Integer,
+      Integer.multiply(x, Integer.one),
+      Integer.multiply(Integer.one, x),
+      x,
+      Integer.multiply_commutative(x, Integer.one),
+      Integer.multiply_identity_left(x))
+
+-- ======================================================================
+-- Distributivity
+-- ======================================================================
+
+-- ----------------------------------------------------------------------
+-- Integer.distributivity_left: x * (y + z) = x * y + x * z.
+--
+-- At reps make(a, b), make(c, d), make(e, f):
+--   LHS rep first component  = a*(c+e) + b*(d+f)
+--   LHS rep second component = a*(d+f) + b*(c+e)
+--   RHS rep first component  = (a*c + b*d) + (a*e + b*f)
+--   RHS rep second component = (a*d + b*c) + (a*f + b*e)
+-- We show each component of LHS rep equals the corresponding component
+-- of RHS rep, then close via IntegerEquivalent.from_components_equal.
+
+theorem Integer.distributivity_left_first_component (a b c d e f : Natural)
+        : a * (c + e) + b * (d + f) = (a * c + b * d) + (a * e + b * f) :=
+  calc a * (c + e) + b * (d + f)
+     = (a * c + a * e) + b * (d + f)
+            by congruenceOf(
+                   function (lhs : Natural) => lhs + b * (d + f),
+                   Natural.multiply_distributes_left_over_add(a, c, e))
+     = (a * c + a * e) + (b * d + b * f)
+            by congruenceOf(
+                   function (rhs : Natural) => (a * c + a * e) + rhs,
+                   Natural.multiply_distributes_left_over_add(b, d, f))
+     = (a * c + b * d) + (a * e + b * f)
+            by Natural.add_two_two_swap(a * c, a * e, b * d, b * f)
+
+theorem Integer.distributivity_left_second_component (a b c d e f : Natural)
+        : a * (d + f) + b * (c + e) = (a * d + b * c) + (a * f + b * e) :=
+  calc a * (d + f) + b * (c + e)
+     = (a * d + a * f) + b * (c + e)
+            by congruenceOf(
+                   function (lhs : Natural) => lhs + b * (c + e),
+                   Natural.multiply_distributes_left_over_add(a, d, f))
+     = (a * d + a * f) + (b * c + b * e)
+            by congruenceOf(
+                   function (rhs : Natural) => (a * d + a * f) + rhs,
+                   Natural.multiply_distributes_left_over_add(b, c, e))
+     = (a * d + b * c) + (a * f + b * e)
+            by Natural.add_two_two_swap(a * d, a * f, b * c, b * e)
+
+theorem Integer.distributivity_left_at_representatives
+        : (rep1 rep2 rep3 : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.multiply(
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep1),
+                    Integer.add(
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep2),
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep3))),
+                Integer.add(
+                    Integer.multiply(
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep1),
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep2)),
+                    Integer.multiply(
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep1),
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep3))))
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d),
+    IntegerRepresentative.make(e, f) =>
+      Quotient.sound.{0}(
+          IntegerRepresentative, IntegerEquivalent,
+          IntegerRepresentative.make(
+              a * (c + e) + b * (d + f),
+              a * (d + f) + b * (c + e)),
+          IntegerRepresentative.make(
+              (a * c + b * d) + (a * e + b * f),
+              (a * d + b * c) + (a * f + b * e)),
+          IntegerEquivalent.from_components_equal(
+              a * (c + e) + b * (d + f),
+              a * (d + f) + b * (c + e),
+              (a * c + b * d) + (a * e + b * f),
+              (a * d + b * c) + (a * f + b * e),
+              Integer.distributivity_left_first_component(a, b, c, d, e, f),
+              Integer.distributivity_left_second_component(a, b, c, d, e, f)))
+
+theorem Integer.distributivity_left_after_first_second
+        (rep1 rep2 : IntegerRepresentative) (z : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.add(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2),
+                      z)),
+              Integer.add(
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2)),
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      z))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (z : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.add(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2),
+                      z)),
+              Integer.add(
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2)),
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      z))),
+      function (rep3 : IntegerRepresentative) =>
+          Integer.distributivity_left_at_representatives(rep1, rep2, rep3),
+      z)
+
+theorem Integer.distributivity_left_after_first
+        (rep1 : IntegerRepresentative) (y z : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.add(y, z)),
+              Integer.add(
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      y),
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      z))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (y : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.add(y, z)),
+              Integer.add(
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      y),
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      z))),
+      function (rep2 : IntegerRepresentative) =>
+          Integer.distributivity_left_after_first_second(rep1, rep2, z),
+      y)
+
+theorem Integer.distributivity_left (x y z : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(x, Integer.add(y, z)),
+              Integer.add(Integer.multiply(x, y), Integer.multiply(x, z))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (x : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(x, Integer.add(y, z)),
+              Integer.add(Integer.multiply(x, y), Integer.multiply(x, z))),
+      function (rep1 : IntegerRepresentative) =>
+          Integer.distributivity_left_after_first(rep1, y, z),
+      x)
+
+-- ----------------------------------------------------------------------
+-- Integer.distributivity_right: (x + y) * z = x * z + y * z. Derived
+-- from distributivity_left + multiply_commutative.
+theorem Integer.distributivity_right (x y z : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(Integer.add(x, y), z),
+              Integer.add(Integer.multiply(x, z),
+                          Integer.multiply(y, z))) := {
+  claim swapOuter
+        : Integer.multiply(Integer.add(x, y), z)
+          = Integer.multiply(z, Integer.add(x, y))
+    by Integer.multiply_commutative(Integer.add(x, y), z);
+  claim applyLeft
+        : Integer.multiply(z, Integer.add(x, y))
+          = Integer.add(Integer.multiply(z, x), Integer.multiply(z, y))
+    by Integer.distributivity_left(z, x, y);
+  claim swapFirstSummand
+        : Integer.add(Integer.multiply(z, x), Integer.multiply(z, y))
+          = Integer.add(Integer.multiply(x, z), Integer.multiply(z, y))
+    by congruenceOf(
+           function (firstSummand : Integer) =>
+               Integer.add(firstSummand, Integer.multiply(z, y)),
+           Integer.multiply_commutative(z, x));
+  claim swapSecondSummand
+        : Integer.add(Integer.multiply(x, z), Integer.multiply(z, y))
+          = Integer.add(Integer.multiply(x, z), Integer.multiply(y, z))
+    by congruenceOf(
+           function (secondSummand : Integer) =>
+               Integer.add(Integer.multiply(x, z), secondSummand),
+           Integer.multiply_commutative(z, y));
+  Equality.transitivity.{0}(
+      Integer,
+      Integer.multiply(Integer.add(x, y), z),
+      Integer.add(Integer.multiply(z, x), Integer.multiply(z, y)),
+      Integer.add(Integer.multiply(x, z), Integer.multiply(y, z)),
+      Equality.transitivity(swapOuter, applyLeft),
+      Equality.transitivity(swapFirstSummand, swapSecondSummand))
+}
+
+-- ======================================================================
+-- Multiplication associativity
+-- ======================================================================
+
+-- At reps make(a, b), make(c, d), make(e, f):
+--   LHS rep first component  = (a*c + b*d) * e + (a*d + b*c) * f
+--   LHS rep second component = (a*c + b*d) * f + (a*d + b*c) * e
+--   RHS rep first component  = a * (c*e + d*f) + b * (c*f + d*e)
+--   RHS rep second component = a * (c*f + d*e) + b * (c*e + d*f)
+-- Expand each LHS component via right-distributivity and multiply-
+-- associativity, then group via add_two_two_swap to match the RHS
+-- expansion. The two component-equality lemmas share the same shape.
+
+-- Internal helper: expand (a*c + b*d)*p + (a*d + b*c)*q where p, q play
+-- the "outer" role. After full expansion the result is a sum of four
+-- triple-products. We capture the canonical form so distributivity_left
+-- on a-times-(c*p + d*q) and b-times-(d*p + c*q) lands exactly.
+theorem Integer.multiply_associative_expand (a b c d p q : Natural)
+        : (a * c + b * d) * p + (a * d + b * c) * q
+          = a * (c * p + d * q) + b * (d * p + c * q) :=
+  calc (a * c + b * d) * p + (a * d + b * c) * q
+     = (a * c * p + b * d * p) + (a * d + b * c) * q
+            by congruenceOf(
+                   function (lhs : Natural) => lhs + (a * d + b * c) * q,
+                   Natural.distributivity_right(a * c, b * d, p))
+     = (a * c * p + b * d * p) + (a * d * q + b * c * q)
+            by congruenceOf(
+                   function (rhs : Natural) =>
+                       (a * c * p + b * d * p) + rhs,
+                   Natural.distributivity_right(a * d, b * c, q))
+     = (a * c * p + a * d * q) + (b * d * p + b * c * q)
+            by Natural.add_two_two_swap(
+                   a * c * p, b * d * p, a * d * q, b * c * q)
+     = (a * (c * p) + a * d * q) + (b * d * p + b * c * q)
+            by congruenceOf(
+                   function (firstFactor : Natural) =>
+                       (firstFactor + a * d * q)
+                       + (b * d * p + b * c * q),
+                   Natural.multiply_associative(a, c, p))
+     = (a * (c * p) + a * (d * q)) + (b * d * p + b * c * q)
+            by congruenceOf(
+                   function (secondFactor : Natural) =>
+                       (a * (c * p) + secondFactor)
+                       + (b * d * p + b * c * q),
+                   Natural.multiply_associative(a, d, q))
+     = a * (c * p + d * q) + (b * d * p + b * c * q)
+            by congruenceOf(
+                   function (lhs : Natural) =>
+                       lhs + (b * d * p + b * c * q),
+                   Equality.symmetry(
+                       Natural.multiply_distributes_left_over_add(
+                           a, c * p, d * q)))
+     = a * (c * p + d * q) + (b * (d * p) + b * c * q)
+            by congruenceOf(
+                   function (firstFactor : Natural) =>
+                       a * (c * p + d * q)
+                       + (firstFactor + b * c * q),
+                   Natural.multiply_associative(b, d, p))
+     = a * (c * p + d * q) + (b * (d * p) + b * (c * q))
+            by congruenceOf(
+                   function (secondFactor : Natural) =>
+                       a * (c * p + d * q)
+                       + (b * (d * p) + secondFactor),
+                   Natural.multiply_associative(b, c, q))
+     = a * (c * p + d * q) + b * (d * p + c * q)
+            by congruenceOf(
+                   function (rhs : Natural) =>
+                       a * (c * p + d * q) + rhs,
+                   Equality.symmetry(
+                       Natural.multiply_distributes_left_over_add(
+                           b, d * p, c * q)))
+
+theorem Integer.multiply_associative_first_component (a b c d e f : Natural)
+        : (a * c + b * d) * e + (a * d + b * c) * f
+          = a * (c * e + d * f) + b * (c * f + d * e) := {
+  claim expanded
+        : (a * c + b * d) * e + (a * d + b * c) * f
+          = a * (c * e + d * f) + b * (d * e + c * f)
+    by Integer.multiply_associative_expand(a, b, c, d, e, f);
+  -- Reshuffle the b-clause: d*e + c*f → c*f + d*e via add_commutative.
+  claim reshuffleB
+        : a * (c * e + d * f) + b * (d * e + c * f)
+          = a * (c * e + d * f) + b * (c * f + d * e)
+    by congruenceOf(
+           function (clause : Natural) =>
+               a * (c * e + d * f) + b * clause,
+           Natural.add_commutative(d * e, c * f));
+  Equality.transitivity(expanded, reshuffleB)
+}
+
+theorem Integer.multiply_associative_second_component
+        (a b c d e f : Natural)
+        : (a * c + b * d) * f + (a * d + b * c) * e
+          = a * (c * f + d * e) + b * (c * e + d * f) := {
+  claim expanded
+        : (a * c + b * d) * f + (a * d + b * c) * e
+          = a * (c * f + d * e) + b * (d * f + c * e)
+    by Integer.multiply_associative_expand(a, b, c, d, f, e);
+  claim reshuffleB
+        : a * (c * f + d * e) + b * (d * f + c * e)
+          = a * (c * f + d * e) + b * (c * e + d * f)
+    by congruenceOf(
+           function (clause : Natural) =>
+               a * (c * f + d * e) + b * clause,
+           Natural.add_commutative(d * f, c * e));
+  Equality.transitivity(expanded, reshuffleB)
+}
+
+theorem Integer.multiply_associative_at_representatives
+        : (rep1 rep2 rep3 : IntegerRepresentative)
+          → Equality.{0}(Integer,
+                Integer.multiply(
+                    Integer.multiply(
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep1),
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep2)),
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep3)),
+                Integer.multiply(
+                    Quotient.mk.{0}(
+                        IntegerRepresentative, IntegerEquivalent, rep1),
+                    Integer.multiply(
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep2),
+                        Quotient.mk.{0}(
+                            IntegerRepresentative, IntegerEquivalent, rep3))))
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d),
+    IntegerRepresentative.make(e, f) =>
+      Quotient.sound.{0}(
+          IntegerRepresentative, IntegerEquivalent,
+          IntegerRepresentative.make(
+              (a * c + b * d) * e + (a * d + b * c) * f,
+              (a * c + b * d) * f + (a * d + b * c) * e),
+          IntegerRepresentative.make(
+              a * (c * e + d * f) + b * (c * f + d * e),
+              a * (c * f + d * e) + b * (c * e + d * f)),
+          IntegerEquivalent.from_components_equal(
+              (a * c + b * d) * e + (a * d + b * c) * f,
+              (a * c + b * d) * f + (a * d + b * c) * e,
+              a * (c * e + d * f) + b * (c * f + d * e),
+              a * (c * f + d * e) + b * (c * e + d * f),
+              Integer.multiply_associative_first_component(a, b, c, d, e, f),
+              Integer.multiply_associative_second_component(a, b, c, d, e, f)))
+
+theorem Integer.multiply_associative_after_first_second
+        (rep1 rep2 : IntegerRepresentative) (z : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2)),
+                  z),
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2),
+                      z))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (z : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2)),
+                  z),
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep2),
+                      z))),
+      function (rep3 : IntegerRepresentative) =>
+          Integer.multiply_associative_at_representatives(rep1, rep2, rep3),
+      z)
+
+theorem Integer.multiply_associative_after_first
+        (rep1 : IntegerRepresentative) (y z : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      y),
+                  z),
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.multiply(y, z))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (y : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(
+                  Integer.multiply(
+                      Quotient.mk.{0}(
+                          IntegerRepresentative, IntegerEquivalent, rep1),
+                      y),
+                  z),
+              Integer.multiply(
+                  Quotient.mk.{0}(
+                      IntegerRepresentative, IntegerEquivalent, rep1),
+                  Integer.multiply(y, z))),
+      function (rep2 : IntegerRepresentative) =>
+          Integer.multiply_associative_after_first_second(rep1, rep2, z),
+      y)
+
+theorem Integer.multiply_associative (x y z : Integer)
+        : Equality.{0}(Integer,
+              Integer.multiply(Integer.multiply(x, y), z),
+              Integer.multiply(x, Integer.multiply(y, z))) :=
+  Quotient.induct.{0}(
+      IntegerRepresentative,
+      IntegerEquivalent,
+      function (x : Integer) =>
+          Equality.{0}(Integer,
+              Integer.multiply(Integer.multiply(x, y), z),
+              Integer.multiply(x, Integer.multiply(y, z))),
+      function (rep1 : IntegerRepresentative) =>
+          Integer.multiply_associative_after_first(rep1, y, z),
+      x)
