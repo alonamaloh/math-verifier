@@ -11,11 +11,36 @@ pain becomes acute.
 Abstract algebra layer landed (Monoid, Group, AbelianGroup, Ring,
 CommutativeRing as Proposition predicates; Integer is a
 CommutativeRing; Natural is a commutative monoid under both ops; a
-few generic group lemmas demonstrated). Next:
+few generic group lemmas demonstrated). Supporting infrastructure
+also landed: Quotient.induct_two (binary induction helper) and
+Natural multiplication cancellation. Next:
+
+- **Integer cancellation lemma.** For the Rational equivalence
+  transitivity proof we need:
+  `x · Natural.to_integer(successor(k)) = y · Natural.to_integer(successor(k)) → x = y`.
+  Proof: induct both x and y down to representatives `make(p1, q1)`,
+  `make(p2, q2)`; the product reduces to `make(p·succ(k), q·succ(k))`;
+  the equivalence factors out `succ(k)` via distributivity_right;
+  apply Natural.multiply_cancel_right; reassemble via Quotient.sound.
+  Probably ~80–120 lines.
+- **Rational basics.** Representative `(numerator : Integer,
+  denominatorMinusOne : Natural)`, equivalence `(n1, d1) ~ (n2, d2)
+  iff n1 · succ(d2) = n2 · succ(d1)`, reflexivity / symmetry /
+  transitivity (transitivity uses the cancellation lemma above),
+  `Rational := Quotient(RationalRepresentative, RationalEquivalent)`.
+  Probably ~150–200 lines.
+- **Rational arithmetic.** `Rational.add`, `Rational.multiply`,
+  `Rational.negate`, `Rational.subtract`, `Rational.zero`,
+  `Rational.one`, plus the field axioms (commutativity, associativity,
+  distributivity, multiplicative inverse for non-zero). Two-step
+  Quotient.lift pattern; the binary-lift boilerplate is the same as
+  Integer.add/multiply (Quotient.lift_two is sketched in
+  Logic/quotient.math but currently fails the elaborator — revisit
+  later). Probably ~600–800 lines.
+- **Integer → Rational embedding.** `Integer.to_rational(n) := mk(make(n, 0))`.
+  Extends the cast registry: ascription `(x : Rational)` on an
+  Integer auto-applies this.
 - **Field** predicate, with a non-zero-implies-invertible witness.
-- **Rational := (Integer × Natural⁺) / ~** as a quotient. Will exercise
-  `Quotient.lift₂` / `Quotient.induct₂` boilerplate — a likely
-  trigger for the opportunistic library helper.
 - **Real** (Cauchy sequences over Rational, or Dedekind cuts).
 - More generic abelian-group / ring / field lemmas as they're needed.
 
@@ -40,9 +65,11 @@ normalization is hard to redo.
 
 Smaller items to land when the motivating pain becomes acute:
 
-- **`Quotient.induct₂` / `Quotient.lift₂` library helpers.** Halve
-  the boilerplate for binary lemmas on quotient types. Slot in when
-  we hit Rationals.
+- **`Quotient.lift_two`.** Sketched in `Logic/quotient.math` but
+  currently rejected by the elaborator with a universe-argument
+  mismatch through the nested polymorphic lifts. Manual two-step
+  lifts (Integer.add pattern) work fine. Revisit when the universe-
+  handling code in the elaborator is more robust.
 - **Multi-pattern fix.** Relocate function-argument bindings inside
   inner cases so the helper chains in `Integer/basics.math`,
   `Integer/addition.math`, etc. collapse. See commit 9e022a6 message
@@ -52,6 +79,17 @@ Smaller items to land when the motivating pain becomes acute:
 
 ## Completed
 
+- **2026-05-14: Natural multiplication cancellation.** `a · c = b · c`
+  with `c ≥ 1` forces `a = b`. Three supporting helpers
+  (`add_equals_zero_left`, `multiply_equals_zero_with_positive_right`,
+  `multiply_cancel_left`). Unblocks Rational transitivity. Commit
+  `8e63b9b`.
+- **2026-05-14: `Quotient.induct_two`.** Binary induction helper:
+  one call replaces a nested-induct + at-representatives chain. The
+  twin `Quotient.lift_two` was attempted but currently fails the
+  elaborator's universe-arg handling; the manual two-step lift in
+  Integer.add etc. remains the path of least resistance. Commit
+  `fcfb34a`.
 - **2026-05-14: Abstract algebra layer.** Monoid, CommutativeMonoid,
   Group, AbelianGroup, Ring, CommutativeRing as Proposition
   predicates; Integer is a commutative ring (8 instance witnesses);
