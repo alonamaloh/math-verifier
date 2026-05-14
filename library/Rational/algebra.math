@@ -904,3 +904,658 @@ theorem Rational.add_associative (x y z : Rational)
       function (rep1 : RationalRepresentative) =>
           Rational.add_associative_after_first(rep1, y, z),
       x)
+
+-- ======================================================================
+-- Left distributivity: `x · (y + z) = x · y + x · z`.
+--
+-- After Quotient.lift β-reduction, the cross-multiplication is
+--   M_L · to_int((succ(d1)·succ(d2)) · (succ(d1)·succ(d3)))
+--   = M_R · to_int(succ(d1)·(succ(d2)·succ(d3)))
+-- where
+--   M_L = n1·(n2·s_d3 + n3·s_d2)
+--   M_R = (n1·n2)·to_int(succ(d1)·succ(d3)) + (n1·n3)·to_int(succ(d1)·succ(d2))
+-- and (importantly) the RHS denominator has an *extra* `succ(d1)`
+-- factor compared to the LHS — `(succ(d1)·succ(d2))·(succ(d1)·succ(d3))`
+-- vs `succ(d1)·(succ(d2)·succ(d3))`. So we factor the extra `s_d1` out
+-- of `M_R` and out of the denominator, and the two sides match.
+
+-- Denominator bridge: `to_int((succ(d1)·succ(d2)) · (succ(d1)·succ(d3))) =
+-- s_d1 · to_int(succ(d1)·(succ(d2)·succ(d3)))`.
+theorem Rational.distributivity_left_denominator_bridge
+        (d1 d2 d3 : Natural)
+        : Equality.{0}(Integer,
+              Natural.to_integer(
+                  (successor(d1) * successor(d2)) *
+                  (successor(d1) * successor(d3))),
+              Integer.multiply(
+                  Natural.to_integer(successor(d1)),
+                  Natural.to_integer(
+                      successor(d1) * (successor(d2) * successor(d3))))) :=
+  calc Natural.to_integer(
+           (successor(d1) * successor(d2)) *
+           (successor(d1) * successor(d3)))
+     = Integer.multiply(
+           Natural.to_integer(successor(d1) * successor(d2)),
+           Natural.to_integer(successor(d1) * successor(d3)))
+            by Natural.to_integer.multiply_preserves(
+                   successor(d1) * successor(d2),
+                   successor(d1) * successor(d3))
+     = Integer.multiply(
+           Integer.multiply(
+               Natural.to_integer(successor(d1)),
+               Natural.to_integer(successor(d2))),
+           Natural.to_integer(successor(d1) * successor(d3)))
+            by congruenceOf(
+                   function (firstFactor : Integer) =>
+                       Integer.multiply(firstFactor,
+                           Natural.to_integer(
+                               successor(d1) * successor(d3))),
+                   Natural.to_integer.multiply_preserves(
+                       successor(d1), successor(d2)))
+     = Integer.multiply(
+           Integer.multiply(
+               Natural.to_integer(successor(d1)),
+               Natural.to_integer(successor(d2))),
+           Integer.multiply(
+               Natural.to_integer(successor(d1)),
+               Natural.to_integer(successor(d3))))
+            by congruenceOf(
+                   function (secondFactor : Integer) =>
+                       Integer.multiply(
+                           Integer.multiply(
+                               Natural.to_integer(successor(d1)),
+                               Natural.to_integer(successor(d2))),
+                           secondFactor),
+                   Natural.to_integer.multiply_preserves(
+                       successor(d1), successor(d3)))
+     -- (s_d1·s_d2)·(s_d1·s_d3) = (s_d1·s_d1)·(s_d2·s_d3) by
+     -- `multiply_swap_inner_positions` on the inner (s_d2, s_d1) pair.
+     = Integer.multiply(
+           Integer.multiply(
+               Natural.to_integer(successor(d1)),
+               Natural.to_integer(successor(d1))),
+           Integer.multiply(
+               Natural.to_integer(successor(d2)),
+               Natural.to_integer(successor(d3))))
+            by Integer.multiply_swap_inner_positions(
+                   Natural.to_integer(successor(d1)),
+                   Natural.to_integer(successor(d2)),
+                   Natural.to_integer(successor(d1)),
+                   Natural.to_integer(successor(d3)))
+     -- (s_d1·s_d1)·(s_d2·s_d3) = s_d1·(s_d1·(s_d2·s_d3))
+     = Integer.multiply(
+           Natural.to_integer(successor(d1)),
+           Integer.multiply(
+               Natural.to_integer(successor(d1)),
+               Integer.multiply(
+                   Natural.to_integer(successor(d2)),
+                   Natural.to_integer(successor(d3)))))
+            by Integer.multiply_associative(
+                   Natural.to_integer(successor(d1)),
+                   Natural.to_integer(successor(d1)),
+                   Integer.multiply(
+                       Natural.to_integer(successor(d2)),
+                       Natural.to_integer(successor(d3))))
+     -- Contract s_d1·(s_d2·s_d3) back into to_int(succ(d2)·succ(d3)).
+     = Integer.multiply(
+           Natural.to_integer(successor(d1)),
+           Integer.multiply(
+               Natural.to_integer(successor(d1)),
+               Natural.to_integer(successor(d2) * successor(d3))))
+            by congruenceOf(
+                   function (innerProduct : Integer) =>
+                       Integer.multiply(
+                           Natural.to_integer(successor(d1)),
+                           Integer.multiply(
+                               Natural.to_integer(successor(d1)),
+                               innerProduct)),
+                   Equality.symmetry(
+                       Natural.to_integer.multiply_preserves(
+                           successor(d2), successor(d3))))
+     -- Contract s_d1·to_int(succ(d2)·succ(d3)) into
+     -- to_int(succ(d1)·(succ(d2)·succ(d3))).
+     = Integer.multiply(
+           Natural.to_integer(successor(d1)),
+           Natural.to_integer(
+               successor(d1) * (successor(d2) * successor(d3))))
+            by congruenceOf(
+                   function (innerLifted : Integer) =>
+                       Integer.multiply(
+                           Natural.to_integer(successor(d1)),
+                           innerLifted),
+                   Equality.symmetry(
+                       Natural.to_integer.multiply_preserves(
+                           successor(d1),
+                           successor(d2) * successor(d3))))
+
+-- Numerator factoring: `M_L · s_d1 = M_R` at the Integer level.
+theorem Rational.distributivity_left_numerator_factoring
+        (n1 n2 n3 : Integer) (d1 d2 d3 : Natural)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Integer.multiply(n1,
+                      Integer.add(
+                          Integer.multiply(n2,
+                              Natural.to_integer(successor(d3))),
+                          Integer.multiply(n3,
+                              Natural.to_integer(successor(d2))))),
+                  Natural.to_integer(successor(d1))),
+              Integer.add(
+                  Integer.multiply(
+                      Integer.multiply(n1, n2),
+                      Natural.to_integer(successor(d1) * successor(d3))),
+                  Integer.multiply(
+                      Integer.multiply(n1, n3),
+                      Natural.to_integer(successor(d1) * successor(d2))))) :=
+  calc Integer.multiply(
+           Integer.multiply(n1,
+               Integer.add(
+                   Integer.multiply(n2,
+                       Natural.to_integer(successor(d3))),
+                   Integer.multiply(n3,
+                       Natural.to_integer(successor(d2))))),
+           Natural.to_integer(successor(d1)))
+     -- Distribute n1 inside: n1·(n2·s3 + n3·s2) = n1·(n2·s3) + n1·(n3·s2)
+     = Integer.multiply(
+           Integer.add(
+               Integer.multiply(n1,
+                   Integer.multiply(n2,
+                       Natural.to_integer(successor(d3)))),
+               Integer.multiply(n1,
+                   Integer.multiply(n3,
+                       Natural.to_integer(successor(d2))))),
+           Natural.to_integer(successor(d1)))
+            by congruenceOf(
+                   function (innerSum : Integer) =>
+                       Integer.multiply(innerSum,
+                           Natural.to_integer(successor(d1))),
+                   Integer.distributivity_left(n1,
+                       Integer.multiply(n2,
+                           Natural.to_integer(successor(d3))),
+                       Integer.multiply(n3,
+                           Natural.to_integer(successor(d2)))))
+     -- Distribute s_d1 over the outer +.
+     = Integer.add(
+           Integer.multiply(
+               Integer.multiply(n1,
+                   Integer.multiply(n2,
+                       Natural.to_integer(successor(d3)))),
+               Natural.to_integer(successor(d1))),
+           Integer.multiply(
+               Integer.multiply(n1,
+                   Integer.multiply(n3,
+                       Natural.to_integer(successor(d2)))),
+               Natural.to_integer(successor(d1))))
+            by Integer.distributivity_right(
+                   Integer.multiply(n1,
+                       Integer.multiply(n2,
+                           Natural.to_integer(successor(d3)))),
+                   Integer.multiply(n1,
+                       Integer.multiply(n3,
+                           Natural.to_integer(successor(d2)))),
+                   Natural.to_integer(successor(d1)))
+     -- Reassociate first summand: `(n1·(n2·s3))·s1 = ((n1·n2)·s3)·s1`.
+     = Integer.add(
+           Integer.multiply(
+               Integer.multiply(
+                   Integer.multiply(n1, n2),
+                   Natural.to_integer(successor(d3))),
+               Natural.to_integer(successor(d1))),
+           Integer.multiply(
+               Integer.multiply(n1,
+                   Integer.multiply(n3,
+                       Natural.to_integer(successor(d2)))),
+               Natural.to_integer(successor(d1))))
+            by congruenceOf(
+                   function (firstSummand : Integer) =>
+                       Integer.add(firstSummand,
+                           Integer.multiply(
+                               Integer.multiply(n1,
+                                   Integer.multiply(n3,
+                                       Natural.to_integer(successor(d2)))),
+                               Natural.to_integer(successor(d1)))),
+                   congruenceOf(
+                       function (innerProduct : Integer) =>
+                           Integer.multiply(innerProduct,
+                               Natural.to_integer(successor(d1))),
+                       Equality.symmetry(
+                           Integer.multiply_associative(n1, n2,
+                               Natural.to_integer(successor(d3))))))
+     -- Now reassociate: `((n1·n2)·s3)·s1 = (n1·n2)·(s3·s1)`.
+     = Integer.add(
+           Integer.multiply(
+               Integer.multiply(n1, n2),
+               Integer.multiply(
+                   Natural.to_integer(successor(d3)),
+                   Natural.to_integer(successor(d1)))),
+           Integer.multiply(
+               Integer.multiply(n1,
+                   Integer.multiply(n3,
+                       Natural.to_integer(successor(d2)))),
+               Natural.to_integer(successor(d1))))
+            by congruenceOf(
+                   function (firstSummand : Integer) =>
+                       Integer.add(firstSummand,
+                           Integer.multiply(
+                               Integer.multiply(n1,
+                                   Integer.multiply(n3,
+                                       Natural.to_integer(successor(d2)))),
+                               Natural.to_integer(successor(d1)))),
+                   Integer.multiply_associative(
+                       Integer.multiply(n1, n2),
+                       Natural.to_integer(successor(d3)),
+                       Natural.to_integer(successor(d1))))
+     = Integer.add(
+           Integer.multiply(
+               Integer.multiply(n1, n2),
+               Integer.multiply(
+                   Natural.to_integer(successor(d1)),
+                   Natural.to_integer(successor(d3)))),
+           Integer.multiply(
+               Integer.multiply(n1,
+                   Integer.multiply(n3,
+                       Natural.to_integer(successor(d2)))),
+               Natural.to_integer(successor(d1))))
+            by congruenceOf(
+                   function (innerProduct : Integer) =>
+                       Integer.add(
+                           Integer.multiply(
+                               Integer.multiply(n1, n2),
+                               innerProduct),
+                           Integer.multiply(
+                               Integer.multiply(n1,
+                                   Integer.multiply(n3,
+                                       Natural.to_integer(successor(d2)))),
+                               Natural.to_integer(successor(d1)))),
+                   Integer.multiply_commutative(
+                       Natural.to_integer(successor(d3)),
+                       Natural.to_integer(successor(d1))))
+     = Integer.add(
+           Integer.multiply(
+               Integer.multiply(n1, n2),
+               Natural.to_integer(successor(d1) * successor(d3))),
+           Integer.multiply(
+               Integer.multiply(n1,
+                   Integer.multiply(n3,
+                       Natural.to_integer(successor(d2)))),
+               Natural.to_integer(successor(d1))))
+            by congruenceOf(
+                   function (innerLifted : Integer) =>
+                       Integer.add(
+                           Integer.multiply(
+                               Integer.multiply(n1, n2),
+                               innerLifted),
+                           Integer.multiply(
+                               Integer.multiply(n1,
+                                   Integer.multiply(n3,
+                                       Natural.to_integer(successor(d2)))),
+                               Natural.to_integer(successor(d1)))),
+                   Equality.symmetry(
+                       Natural.to_integer.multiply_preserves(
+                           successor(d1), successor(d3))))
+     -- Same reshape on the second summand: split into two assoc steps.
+     = Integer.add(
+           Integer.multiply(
+               Integer.multiply(n1, n2),
+               Natural.to_integer(successor(d1) * successor(d3))),
+           Integer.multiply(
+               Integer.multiply(
+                   Integer.multiply(n1, n3),
+                   Natural.to_integer(successor(d2))),
+               Natural.to_integer(successor(d1))))
+            by congruenceOf(
+                   function (secondSummand : Integer) =>
+                       Integer.add(
+                           Integer.multiply(
+                               Integer.multiply(n1, n2),
+                               Natural.to_integer(
+                                   successor(d1) * successor(d3))),
+                           secondSummand),
+                   congruenceOf(
+                       function (innerProduct : Integer) =>
+                           Integer.multiply(innerProduct,
+                               Natural.to_integer(successor(d1))),
+                       Equality.symmetry(
+                           Integer.multiply_associative(n1, n3,
+                               Natural.to_integer(successor(d2))))))
+     = Integer.add(
+           Integer.multiply(
+               Integer.multiply(n1, n2),
+               Natural.to_integer(successor(d1) * successor(d3))),
+           Integer.multiply(
+               Integer.multiply(n1, n3),
+               Integer.multiply(
+                   Natural.to_integer(successor(d2)),
+                   Natural.to_integer(successor(d1)))))
+            by congruenceOf(
+                   function (secondSummand : Integer) =>
+                       Integer.add(
+                           Integer.multiply(
+                               Integer.multiply(n1, n2),
+                               Natural.to_integer(
+                                   successor(d1) * successor(d3))),
+                           secondSummand),
+                   Integer.multiply_associative(
+                       Integer.multiply(n1, n3),
+                       Natural.to_integer(successor(d2)),
+                       Natural.to_integer(successor(d1))))
+     = Integer.add(
+           Integer.multiply(
+               Integer.multiply(n1, n2),
+               Natural.to_integer(successor(d1) * successor(d3))),
+           Integer.multiply(
+               Integer.multiply(n1, n3),
+               Integer.multiply(
+                   Natural.to_integer(successor(d1)),
+                   Natural.to_integer(successor(d2)))))
+            by congruenceOf(
+                   function (innerProduct : Integer) =>
+                       Integer.add(
+                           Integer.multiply(
+                               Integer.multiply(n1, n2),
+                               Natural.to_integer(
+                                   successor(d1) * successor(d3))),
+                           Integer.multiply(
+                               Integer.multiply(n1, n3),
+                               innerProduct)),
+                   Integer.multiply_commutative(
+                       Natural.to_integer(successor(d2)),
+                       Natural.to_integer(successor(d1))))
+     = Integer.add(
+           Integer.multiply(
+               Integer.multiply(n1, n2),
+               Natural.to_integer(successor(d1) * successor(d3))),
+           Integer.multiply(
+               Integer.multiply(n1, n3),
+               Natural.to_integer(successor(d1) * successor(d2))))
+            by congruenceOf(
+                   function (innerLifted : Integer) =>
+                       Integer.add(
+                           Integer.multiply(
+                               Integer.multiply(n1, n2),
+                               Natural.to_integer(
+                                   successor(d1) * successor(d3))),
+                           Integer.multiply(
+                               Integer.multiply(n1, n3),
+                               innerLifted)),
+                   Equality.symmetry(
+                       Natural.to_integer.multiply_preserves(
+                           successor(d1), successor(d2))))
+
+-- Assemble: `M_L · denom_R = (M_L · s_d1) · denom_L = M_R · denom_L`.
+theorem Rational.distributivity_left_at_representatives_integer
+        (n1 n2 n3 : Integer) (d1 d2 d3 : Natural)
+        : Equality.{0}(Integer,
+              Integer.multiply(
+                  Integer.multiply(n1,
+                      Integer.add(
+                          Integer.multiply(n2,
+                              Natural.to_integer(successor(d3))),
+                          Integer.multiply(n3,
+                              Natural.to_integer(successor(d2))))),
+                  Natural.to_integer(
+                      (successor(d1) * successor(d2)) *
+                      (successor(d1) * successor(d3)))),
+              Integer.multiply(
+                  Integer.add(
+                      Integer.multiply(
+                          Integer.multiply(n1, n2),
+                          Natural.to_integer(
+                              successor(d1) * successor(d3))),
+                      Integer.multiply(
+                          Integer.multiply(n1, n3),
+                          Natural.to_integer(
+                              successor(d1) * successor(d2)))),
+                  Natural.to_integer(
+                      successor(d1) * (successor(d2) * successor(d3))))) :=
+  calc Integer.multiply(
+           Integer.multiply(n1,
+               Integer.add(
+                   Integer.multiply(n2,
+                       Natural.to_integer(successor(d3))),
+                   Integer.multiply(n3,
+                       Natural.to_integer(successor(d2))))),
+           Natural.to_integer(
+               (successor(d1) * successor(d2)) *
+               (successor(d1) * successor(d3))))
+     -- Rewrite denom_R = s_d1 · denom_L.
+     = Integer.multiply(
+           Integer.multiply(n1,
+               Integer.add(
+                   Integer.multiply(n2,
+                       Natural.to_integer(successor(d3))),
+                   Integer.multiply(n3,
+                       Natural.to_integer(successor(d2))))),
+           Integer.multiply(
+               Natural.to_integer(successor(d1)),
+               Natural.to_integer(
+                   successor(d1) * (successor(d2) * successor(d3)))))
+            by congruenceOf(
+                   function (liftedDenominator : Integer) =>
+                       Integer.multiply(
+                           Integer.multiply(n1,
+                               Integer.add(
+                                   Integer.multiply(n2,
+                                       Natural.to_integer(successor(d3))),
+                                   Integer.multiply(n3,
+                                       Natural.to_integer(successor(d2))))),
+                           liftedDenominator),
+                   Rational.distributivity_left_denominator_bridge(d1, d2, d3))
+     -- Reassociate: M_L · (s_d1 · denom_L) → (M_L · s_d1) · denom_L.
+     = Integer.multiply(
+           Integer.multiply(
+               Integer.multiply(n1,
+                   Integer.add(
+                       Integer.multiply(n2,
+                           Natural.to_integer(successor(d3))),
+                       Integer.multiply(n3,
+                           Natural.to_integer(successor(d2))))),
+               Natural.to_integer(successor(d1))),
+           Natural.to_integer(
+               successor(d1) * (successor(d2) * successor(d3))))
+            by Equality.symmetry(
+                   Integer.multiply_associative(
+                       Integer.multiply(n1,
+                           Integer.add(
+                               Integer.multiply(n2,
+                                   Natural.to_integer(successor(d3))),
+                               Integer.multiply(n3,
+                                   Natural.to_integer(successor(d2))))),
+                       Natural.to_integer(successor(d1)),
+                       Natural.to_integer(
+                           successor(d1) * (successor(d2) * successor(d3)))))
+     -- Replace `M_L · s_d1` with `M_R`.
+     = Integer.multiply(
+           Integer.add(
+               Integer.multiply(
+                   Integer.multiply(n1, n2),
+                   Natural.to_integer(successor(d1) * successor(d3))),
+               Integer.multiply(
+                   Integer.multiply(n1, n3),
+                   Natural.to_integer(successor(d1) * successor(d2)))),
+           Natural.to_integer(
+               successor(d1) * (successor(d2) * successor(d3))))
+            by congruenceOf(
+                   function (numerator : Integer) =>
+                       Integer.multiply(numerator,
+                           Natural.to_integer(
+                               successor(d1) *
+                               (successor(d2) * successor(d3)))),
+                   Rational.distributivity_left_numerator_factoring(
+                       n1, n2, n3, d1, d2, d3))
+
+theorem Rational.distributivity_left_at_representatives
+        : (rep1 rep2 rep3 : RationalRepresentative)
+          → Equality.{0}(Rational,
+                Rational.multiply(
+                    Quotient.mk.{0}(
+                        RationalRepresentative, RationalEquivalent, rep1),
+                    Rational.add(
+                        Quotient.mk.{0}(
+                            RationalRepresentative, RationalEquivalent, rep2),
+                        Quotient.mk.{0}(
+                            RationalRepresentative, RationalEquivalent, rep3))),
+                Rational.add(
+                    Rational.multiply(
+                        Quotient.mk.{0}(
+                            RationalRepresentative, RationalEquivalent, rep1),
+                        Quotient.mk.{0}(
+                            RationalRepresentative, RationalEquivalent, rep2)),
+                    Rational.multiply(
+                        Quotient.mk.{0}(
+                            RationalRepresentative, RationalEquivalent, rep1),
+                        Quotient.mk.{0}(
+                            RationalRepresentative, RationalEquivalent, rep3))))
+  | RationalRepresentative.make(n1, d1),
+    RationalRepresentative.make(n2, d2),
+    RationalRepresentative.make(n3, d3) =>
+      Quotient.sound.{0}(
+          RationalRepresentative, RationalEquivalent,
+          Rational.multiply_representatives(
+              RationalRepresentative.make(n1, d1),
+              Rational.add_representatives(
+                  RationalRepresentative.make(n2, d2),
+                  RationalRepresentative.make(n3, d3))),
+          Rational.add_representatives(
+              Rational.multiply_representatives(
+                  RationalRepresentative.make(n1, d1),
+                  RationalRepresentative.make(n2, d2)),
+              Rational.multiply_representatives(
+                  RationalRepresentative.make(n1, d1),
+                  RationalRepresentative.make(n3, d3))),
+          Rational.distributivity_left_at_representatives_integer(
+              n1, n2, n3, d1, d2, d3))
+
+theorem Rational.distributivity_left_after_first_second
+        (rep1 rep2 : RationalRepresentative)
+        (z : Rational)
+        : Equality.{0}(Rational,
+              Rational.multiply(
+                  Quotient.mk.{0}(
+                      RationalRepresentative, RationalEquivalent, rep1),
+                  Rational.add(
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep2),
+                      z)),
+              Rational.add(
+                  Rational.multiply(
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep1),
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep2)),
+                  Rational.multiply(
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep1),
+                      z))) :=
+  Quotient.induct.{0}(
+      RationalRepresentative, RationalEquivalent,
+      function (z : Rational) =>
+          Equality.{0}(Rational,
+              Rational.multiply(
+                  Quotient.mk.{0}(
+                      RationalRepresentative, RationalEquivalent, rep1),
+                  Rational.add(
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep2),
+                      z)),
+              Rational.add(
+                  Rational.multiply(
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep1),
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep2)),
+                  Rational.multiply(
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep1),
+                      z))),
+      function (rep3 : RationalRepresentative) =>
+          Rational.distributivity_left_at_representatives(rep1, rep2, rep3),
+      z)
+
+theorem Rational.distributivity_left_after_first
+        (rep1 : RationalRepresentative)
+        (y z : Rational)
+        : Equality.{0}(Rational,
+              Rational.multiply(
+                  Quotient.mk.{0}(
+                      RationalRepresentative, RationalEquivalent, rep1),
+                  Rational.add(y, z)),
+              Rational.add(
+                  Rational.multiply(
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep1),
+                      y),
+                  Rational.multiply(
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep1),
+                      z))) :=
+  Quotient.induct.{0}(
+      RationalRepresentative, RationalEquivalent,
+      function (y : Rational) =>
+          Equality.{0}(Rational,
+              Rational.multiply(
+                  Quotient.mk.{0}(
+                      RationalRepresentative, RationalEquivalent, rep1),
+                  Rational.add(y, z)),
+              Rational.add(
+                  Rational.multiply(
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep1),
+                      y),
+                  Rational.multiply(
+                      Quotient.mk.{0}(
+                          RationalRepresentative, RationalEquivalent, rep1),
+                      z))),
+      function (rep2 : RationalRepresentative) =>
+          Rational.distributivity_left_after_first_second(rep1, rep2, z),
+      y)
+
+theorem Rational.distributivity_left (x y z : Rational)
+        : Equality.{0}(Rational,
+              Rational.multiply(x, Rational.add(y, z)),
+              Rational.add(
+                  Rational.multiply(x, y),
+                  Rational.multiply(x, z))) :=
+  Quotient.induct.{0}(
+      RationalRepresentative, RationalEquivalent,
+      function (x : Rational) =>
+          Equality.{0}(Rational,
+              Rational.multiply(x, Rational.add(y, z)),
+              Rational.add(
+                  Rational.multiply(x, y),
+                  Rational.multiply(x, z))),
+      function (rep1 : RationalRepresentative) =>
+          Rational.distributivity_left_after_first(rep1, y, z),
+      x)
+
+-- Right distributivity: derived from left + multiply_commutative.
+theorem Rational.distributivity_right (x y z : Rational)
+        : Equality.{0}(Rational,
+              Rational.multiply(Rational.add(x, y), z),
+              Rational.add(
+                  Rational.multiply(x, z),
+                  Rational.multiply(y, z))) :=
+  calc Rational.multiply(Rational.add(x, y), z)
+     = Rational.multiply(z, Rational.add(x, y))
+            by Rational.multiply_commutative(Rational.add(x, y), z)
+     = Rational.add(
+           Rational.multiply(z, x),
+           Rational.multiply(z, y))
+            by Rational.distributivity_left(z, x, y)
+     = Rational.add(
+           Rational.multiply(x, z),
+           Rational.multiply(z, y))
+            by congruenceOf(
+                   function (firstSummand : Rational) =>
+                       Rational.add(firstSummand,
+                           Rational.multiply(z, y)),
+                   Rational.multiply_commutative(z, x))
+     = Rational.add(
+           Rational.multiply(x, z),
+           Rational.multiply(y, z))
+            by congruenceOf(
+                   function (secondSummand : Rational) =>
+                       Rational.add(
+                           Rational.multiply(x, z),
+                           secondSummand),
+                   Rational.multiply_commutative(z, y))
