@@ -1,0 +1,76 @@
+-- Rational/instances.math
+--
+-- Witnesses that Rational satisfies the standard algebraic
+-- abstractions: an abelian group under (+, 0, −) and a commutative
+-- ring under (+, ·, 0, 1). Each instance is just a tuple of the
+-- already-proved identities — no new mathematical content, just
+-- packaging. (Rational additionally has multiplicative inverses for
+-- non-zero elements, but that takes a side-condition on the input
+-- and is handled separately.)
+
+module Rational.instances
+
+import Logic.basics
+import Equality.basics
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+
+-- Rational is a monoid under (+, 0).
+theorem Rational.add_is_monoid
+        : IsMonoid(Rational, Rational.add, Rational.zero) :=
+    ⟨Rational.add_associative,
+     Rational.zero_add,
+     Rational.add_zero⟩
+
+-- Rational is a commutative monoid under (+, 0).
+theorem Rational.add_is_commutative_monoid
+        : IsCommutativeMonoid(Rational, Rational.add, Rational.zero) :=
+    ⟨Rational.add_is_monoid, Rational.add_commutative⟩
+
+-- Rational is a group under (+, 0, −).
+theorem Rational.add_is_group
+        : IsGroup(Rational, Rational.add, Rational.zero, Rational.negate) :=
+    ⟨Rational.add_is_monoid,
+     Rational.add_negate_left,
+     Rational.add_negate_right⟩
+
+-- Rational is an abelian group under (+, 0, −).
+theorem Rational.add_is_abelian_group
+        : IsAbelianGroup(Rational, Rational.add, Rational.zero,
+                          Rational.negate) :=
+    ⟨Rational.add_is_group, Rational.add_commutative⟩
+
+-- Rational is a monoid under (·, 1).
+theorem Rational.multiply_is_monoid
+        : IsMonoid(Rational, Rational.multiply, Rational.one) :=
+    ⟨Rational.multiply_associative,
+     Rational.one_multiply,
+     Rational.multiply_one⟩
+
+-- Rational is a commutative monoid under (·, 1).
+theorem Rational.multiply_is_commutative_monoid
+        : IsCommutativeMonoid(Rational, Rational.multiply, Rational.one) :=
+    ⟨Rational.multiply_is_monoid, Rational.multiply_commutative⟩
+
+-- Rational is a ring under (+, 0, −, ·, 1).
+theorem Rational.is_ring
+        : IsRing(Rational, Rational.add, Rational.zero, Rational.negate,
+                  Rational.multiply, Rational.one) :=
+    ⟨Rational.add_is_abelian_group,
+     Rational.multiply_is_monoid,
+     Rational.distributivity_left,
+     Rational.distributivity_right⟩
+
+-- Rational is a commutative ring.
+theorem Rational.is_commutative_ring
+        : IsCommutativeRing(Rational, Rational.add, Rational.zero,
+                             Rational.negate, Rational.multiply,
+                             Rational.one) :=
+    ⟨Rational.is_ring, Rational.multiply_commutative⟩
