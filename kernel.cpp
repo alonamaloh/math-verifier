@@ -590,6 +590,71 @@ std::string makeOpeningName(const Context& context) {
     return "v" + std::to_string(context.size());
 }
 
+// Cheap, allocation-free structural equality (alpha-equivalent since
+// we use de Bruijn indices). Returns true only on truly identical
+// terms — does not perform any reductions. Used as a fast path at the
+// top of isDefinitionallyEqual: if two terms are structurally equal
+// they are definitionally equal, and we save the WHNF + recurse cost.
+// Bounded by expression depth; pointer-identity short-circuit at every
+// level prunes aggressively once we hit shared subtrees.
+bool structurallyEqual(ExpressionPointer left, ExpressionPointer right) {
+    if (left.get() == right.get()) return true;
+    if (left->node.index() != right->node.index()) return false;
+    if (auto* leftBound = std::get_if<BoundVariable>(&left->node)) {
+        auto* rightBound = std::get_if<BoundVariable>(&right->node);
+        return leftBound->deBruijnIndex == rightBound->deBruijnIndex;
+    }
+    if (auto* leftFree = std::get_if<FreeVariable>(&left->node)) {
+        auto* rightFree = std::get_if<FreeVariable>(&right->node);
+        return leftFree->name == rightFree->name
+            && leftFree->origin == rightFree->origin;
+    }
+    if (auto* leftSort = std::get_if<Sort>(&left->node)) {
+        auto* rightSort = std::get_if<Sort>(&right->node);
+        return levelsDefinitionallyEqual(leftSort->level, rightSort->level);
+    }
+    if (auto* leftPi = std::get_if<Pi>(&left->node)) {
+        auto* rightPi = std::get_if<Pi>(&right->node);
+        return structurallyEqual(leftPi->domain, rightPi->domain)
+            && structurallyEqual(leftPi->codomain, rightPi->codomain);
+    }
+    if (auto* leftLambda = std::get_if<Lambda>(&left->node)) {
+        auto* rightLambda = std::get_if<Lambda>(&right->node);
+        return structurallyEqual(leftLambda->domain, rightLambda->domain)
+            && structurallyEqual(leftLambda->body,    rightLambda->body);
+    }
+    if (auto* leftApplication = std::get_if<Application>(&left->node)) {
+        auto* rightApplication = std::get_if<Application>(&right->node);
+        return structurallyEqual(leftApplication->function,
+                                  rightApplication->function)
+            && structurallyEqual(leftApplication->argument,
+                                  rightApplication->argument);
+    }
+    if (auto* leftConstant = std::get_if<Constant>(&left->node)) {
+        auto* rightConstant = std::get_if<Constant>(&right->node);
+        if (leftConstant->name != rightConstant->name) return false;
+        if (leftConstant->universeArguments.size()
+                != rightConstant->universeArguments.size()) {
+            return false;
+        }
+        for (size_t i = 0; i < leftConstant->universeArguments.size(); ++i) {
+            if (!levelsDefinitionallyEqual(
+                    leftConstant->universeArguments[i],
+                    rightConstant->universeArguments[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (auto* leftLet = std::get_if<Let>(&left->node)) {
+        auto* rightLet = std::get_if<Let>(&right->node);
+        return structurallyEqual(leftLet->type,  rightLet->type)
+            && structurallyEqual(leftLet->value, rightLet->value)
+            && structurallyEqual(leftLet->body,  rightLet->body);
+    }
+    return false;
+}
+
 } // namespace
 
 bool isDefinitionallyEqual(const Environment& environment,
@@ -610,11 +675,22 @@ bool isDefinitionallyEqual(const Environment& environment,
     if (left.get() == right.get()) {
         return true;
     }
+    // Cheap allocation-free structural check before reducing. Bounded by
+    // expression depth and prunes whenever we hit a shared subtree, so
+    // it's never more work than the post-WHNF structural recurse below
+    // — and on already-equal terms it lets us skip the WHNF allocations
+    // entirely.
+    if (structurallyEqual(left, right)) {
+        return true;
+    }
     auto leftReduced  = weakHeadNormalForm(environment, std::move(left),  fuel);
     auto rightReduced = weakHeadNormalForm(environment, std::move(right), fuel);
-    // Same fast-path after WHNF — reductions often produce the same
+    // Same fast-paths after WHNF — reductions often produce the same
     // shared term when both inputs go through the same path.
     if (leftReduced.get() == rightReduced.get()) {
+        return true;
+    }
+    if (structurallyEqual(leftReduced, rightReduced)) {
         return true;
     }
 
