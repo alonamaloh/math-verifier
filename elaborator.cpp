@@ -1876,6 +1876,23 @@ private:
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
+                // Function-name overload resolution. When the head is
+                // registered as an overload alias (via `overload alias
+                // := F;`) and is not itself a regular declaration,
+                // elaborate the arguments to infer their types, then
+                // pick the unique candidate whose parameter-type
+                // sequence matches.
+                if (environment_.lookup(name) == nullptr) {
+                    const std::vector<std::string>* candidates =
+                        environment_.lookupOverloads(name);
+                    if (candidates) {
+                        return resolveOverloadedCall(
+                            name, *candidates,
+                            application->arguments,
+                            localBinders, expectedType,
+                            expression.line, expression.column);
+                    }
+                }
                 // Constructor parameter inference: if the head is a
                 // constructor of a parameterised inductive and the user
                 // supplied only the non-parameter arguments, infer the
@@ -4781,6 +4798,136 @@ private:
         call = makeApplication(std::move(call), lemmaRight);
         call = makeApplication(std::move(call), std::move(lemmaKernel));
         return call;
+    }
+
+    // Pick the unique overload candidate that matches the user-supplied
+    // argument types. Errors if zero or multiple candidates match.
+    // Matching is by Constant-head name of each parameter type (raw,
+    // not WHNF'd — so a parameter declared as `Rational` matches an
+    // argument of type `Rational` even though Rational δ-reduces to
+    // `Quotient(...)`. WHNF is used as a fallback when the raw form
+    // isn't a Constant.) Partial application of an overloaded name is
+    // not supported: if `f` has only 2-ary overloads, `f(p)` is an
+    // error — wrap in `function (q) => f(p, q)` instead.
+    ExpressionPointer resolveOverloadedCall(
+        const std::string& aliasName,
+        const std::vector<std::string>& candidateNames,
+        const std::vector<SurfaceExpressionPointer>& argumentSurfaces,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "overload '" + aliasName + "' resolution at line "
+            + std::to_string(line));
+        // Elaborate arguments and infer their head-type names.
+        std::vector<ExpressionPointer> argumentKernels;
+        std::vector<std::string> argumentTypeNames;
+        for (const auto& argumentSurface : argumentSurfaces) {
+            ExpressionPointer argumentKernel =
+                elaborateExpression(*argumentSurface, localBinders);
+            argumentKernels.push_back(argumentKernel);
+            ExpressionPointer argumentTypeRaw =
+                inferTypeInLocalContext(localBinders, argumentKernel);
+            std::string typeName = headConstantName(argumentTypeRaw);
+            argumentTypeNames.push_back(std::move(typeName));
+        }
+        // Find candidates whose first N parameter-type names match.
+        std::vector<std::string> matches;
+        for (const auto& candidateName : candidateNames) {
+            const Declaration* declaration =
+                environment_.lookup(candidateName);
+            if (!declaration) continue;
+            ExpressionPointer signature = declarationType(*declaration);
+            if (!signatureAcceptsArgumentTypes(signature,
+                                                  argumentTypeNames)) {
+                continue;
+            }
+            matches.push_back(candidateName);
+        }
+        if (matches.empty()) {
+            std::string message =
+                "no overload of '" + aliasName + "' matches arguments "
+                "of types (";
+            for (size_t i = 0; i < argumentTypeNames.size(); ++i) {
+                if (i > 0) message += ", ";
+                message += argumentTypeNames[i];
+            }
+            message += "); candidates:";
+            for (const auto& candidate : candidateNames) {
+                message += "\n  " + candidate;
+            }
+            throwElaborate(message);
+        }
+        if (matches.size() > 1) {
+            std::string message =
+                "ambiguous overload of '" + aliasName
+                + "' on argument types (";
+            for (size_t i = 0; i < argumentTypeNames.size(); ++i) {
+                if (i > 0) message += ", ";
+                message += argumentTypeNames[i];
+            }
+            message += "); multiple candidates match:";
+            for (const auto& match : matches) {
+                message += "\n  " + match;
+            }
+            message += "\nuse the fully-qualified name to disambiguate";
+            throwElaborate(message);
+        }
+        // Build a SurfaceApplication of the chosen candidate and
+        // re-elaborate it — that reuses universe-inference, leading-
+        // argument inference, etc.
+        SurfaceExpressionPointer resolvedHead = makeSurfaceIdentifier(
+            matches[0], /*universeArgs=*/{}, line, column);
+        SurfaceExpressionPointer resolvedCall = makeSurfaceApplication(
+            std::move(resolvedHead),
+            argumentSurfaces,
+            line, column);
+        return elaborateExpression(*resolvedCall, localBinders,
+                                     expectedType);
+    }
+
+    // Extract a Constant head name from a type expression. Tries the
+    // raw form first (so user-declared type aliases like `Rational`
+    // don't get unfolded), falls back to WHNF.
+    std::string headConstantName(ExpressionPointer typeExpression) {
+        ExpressionPointer cursor = typeExpression;
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            cursor = application->function;
+        }
+        if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+            return constant->name;
+        }
+        ExpressionPointer reduced = weakHeadNormalForm(
+            environment_, typeExpression);
+        while (auto* application =
+                   std::get_if<Application>(&reduced->node)) {
+            reduced = weakHeadNormalForm(environment_,
+                                          application->function);
+        }
+        if (auto* constant = std::get_if<Constant>(&reduced->node)) {
+            return constant->name;
+        }
+        return "<unknown>";
+    }
+
+    // Walk `signature`'s Pi chain; check that the first N domains have
+    // the head-name listed in `argumentTypeNames`. Requires the chain
+    // to have AT LEAST N Pis — partial application of an overloaded
+    // name is not allowed (we want exact-arity calls).
+    bool signatureAcceptsArgumentTypes(
+        ExpressionPointer signature,
+        const std::vector<std::string>& argumentTypeNames) {
+        ExpressionPointer cursor = signature;
+        for (const auto& expectedName : argumentTypeNames) {
+            cursor = weakHeadNormalForm(environment_, cursor);
+            auto* pi = std::get_if<Pi>(&cursor->node);
+            if (!pi) return false;
+            std::string actualName = headConstantName(pi->domain);
+            if (actualName != expectedName) return false;
+            cursor = pi->codomain;
+        }
+        return true;
     }
 
     ExpressionPointer desugarCongruenceOf(
