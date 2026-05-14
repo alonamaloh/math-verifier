@@ -1995,13 +1995,64 @@ private:
                 std::get_if<SurfaceAscription>(&expression.node)) {
             // Pass the ascribed type as the expected type so bidirectional
             // elaborators (cases, anonymous tuples, hammer, calc) can
-            // use it. The kernel still type-checks the resulting term,
-            // so a wrong ascription will surface as a regular type
-            // error downstream.
+            // use it.
             ExpressionPointer ascribedType =
                 elaborateExpression(*ascription->type, localBinders);
-            return elaborateExpression(*ascription->expression,
-                                        localBinders, ascribedType);
+            ExpressionPointer inner =
+                elaborateExpression(*ascription->expression,
+                                     localBinders, ascribedType);
+
+            // Ascription doubles as a coercion: if `inner`'s inferred
+            // type doesn't match the ascribed type but a canonical
+            // embedding chain between them exists, compose the chain
+            // and apply it. Currently a single hardcoded link —
+            //     Natural → Integer  (via `Natural.to_integer`)
+            // — which grows as Rational / Real / Complex land. The
+            // lookup uses definitional equality, so type-level
+            // aliases and δ-reducible definitions are matched
+            // transparently.
+            //
+            // When no coercion fires, fall through to returning
+            // `inner` directly; any type mismatch surfaces at the
+            // eventual use site, exactly as it did before.
+            if (environment_.lookup("Natural.to_integer") != nullptr) {
+                try {
+                    ExpressionPointer innerTypeOpened =
+                        inferTypeInLocalContext(localBinders, inner);
+                    ExpressionPointer ascribedTypeOpened =
+                        openOverLocalBinders(ascribedType, localBinders,
+                                              localBinders.size());
+                    Context coercionContext;
+                    for (size_t i = 0; i < localBinders.size(); ++i) {
+                        ExpressionPointer openedBinderType =
+                            openOverLocalBinders(localBinders[i].type,
+                                                  localBinders, i);
+                        coercionContext.push_back(
+                            {localBinders[i].name, openedBinderType,
+                             FreeVariableOrigin::Internal});
+                    }
+                    if (isDefinitionallyEqual(environment_, coercionContext,
+                                                innerTypeOpened,
+                                                ascribedTypeOpened)) {
+                        return inner;
+                    }
+                    ExpressionPointer naturalType = makeConstant("Natural");
+                    ExpressionPointer integerType = makeConstant("Integer");
+                    if (isDefinitionallyEqual(environment_, coercionContext,
+                                                innerTypeOpened, naturalType)
+                        && isDefinitionallyEqual(environment_, coercionContext,
+                                                   ascribedTypeOpened,
+                                                   integerType)) {
+                        return makeApplication(
+                            makeConstant("Natural.to_integer"),
+                            std::move(inner));
+                    }
+                } catch (const TypeError&) {
+                    // Inner expression's type couldn't be inferred —
+                    // fall back to the no-coercion path.
+                }
+            }
+            return inner;
         }
         if (auto* typeExpression =
                 std::get_if<SurfaceType>(&expression.node)) {
