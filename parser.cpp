@@ -6,6 +6,43 @@
 
 namespace {
 
+// Tactic-block keywords that are contextual: they have meaning only at
+// specific positions inside `{ ... }` block bodies, `by_cases` / `by_
+// induction` constructs, or `obtain ... from ...` statements. Outside
+// those contexts they have no syntactic role at all, so the parser
+// accepts them as ordinary identifiers — letting mathematicians use
+// `claim`, `case`, `with`, etc. as binder or variable names. (The
+// "wide" tactic keywords `cases`, `calc`, `witness`, `by_cases`, and
+// `by_induction` still dispatch to special parsers from `parseAtom`,
+// so they remain reserved everywhere; freeing them would require
+// expression-position backtracking.)
+bool isContextualKeyword(TokenKind kind) {
+    switch (kind) {
+        case TokenKind::KeywordClaim:
+        case TokenKind::KeywordObtain:
+        case TokenKind::KeywordAssume:
+        case TokenKind::KeywordSet:
+        case TokenKind::KeywordSuffices:
+        case TokenKind::KeywordFrom:
+        case TokenKind::KeywordOn:
+        case TokenKind::KeywordWith:
+        case TokenKind::KeywordCase:
+        case TokenKind::KeywordApply:
+        case TokenKind::KeywordContradiction:
+            return true;
+        default:
+            return false;
+    }
+}
+
+// True for tokens accepted in identifier-name positions (binder names,
+// pattern names, qualified-name parts, variable references). The lexer
+// preserves the source text in `lexeme`, so consuming a contextual
+// keyword as a name just uses its spelling.
+bool isIdentifierLike(TokenKind kind) {
+    return kind == TokenKind::Identifier || isContextualKeyword(kind);
+}
+
 // Returns true if `pattern` binds `targetName` somewhere in its tree.
 // A bare-name pattern binds `targetName` iff that's its name (except
 // for "_", which is a wildcard). Constructor / tuple patterns bind
@@ -265,7 +302,7 @@ private:
         SurfaceUsingDeclaration declaration;
         declaration.namespacePath = consumeQualifiedNameString();
         expect(TokenKind::Dot, "in using directive");
-        if (peek().kind == TokenKind::Identifier) {
+        if (isIdentifierLike(peek().kind)) {
             // either "operators" or "literals" — we accept them by spelling
             std::string target = consumeAny().lexeme;
             if (target != "operators" && target != "literals") {
@@ -277,13 +314,13 @@ private:
             consumeAny();
             declaration.target = "names";
             if (peek().kind != TokenKind::RightBrace) {
-                if (peek().kind != TokenKind::Identifier) {
+                if (!isIdentifierLike(peek().kind)) {
                     throwHere("expected name in using list");
                 }
                 declaration.names.push_back(consumeAny().lexeme);
                 while (peek().kind == TokenKind::Comma) {
                     consumeAny();
-                    if (peek().kind != TokenKind::Identifier) {
+                    if (!isIdentifierLike(peek().kind)) {
                         throwHere("expected name in using list");
                     }
                     declaration.names.push_back(consumeAny().lexeme);
@@ -312,7 +349,7 @@ private:
         while (peek().kind == TokenKind::Pipe) {
             consumeAny();  // '|'
             SurfaceConstructorSpec constructorSpec;
-            if (peek().kind != TokenKind::Identifier) {
+            if (!isIdentifierLike(peek().kind)) {
                 throwHere("expected constructor name after '|'");
             }
             constructorSpec.name = consumeQualifiedNameString();
@@ -426,7 +463,7 @@ private:
             wrapper.line = statementToken.line;
             wrapper.column = statementToken.column;
             if (isSet) {
-                if (peek().kind != TokenKind::Identifier) {
+                if (!isIdentifierLike(peek().kind)) {
                     throwHere("expected identifier after 'set'");
                 }
                 Token nameToken = consumeAny();
@@ -436,7 +473,7 @@ private:
                        "after set name (set n := E;)");
                 wrapper.value = parseExpression();
             } else if (isAssume) {
-                if (peek().kind != TokenKind::Identifier) {
+                if (!isIdentifierLike(peek().kind)) {
                     throwHere("expected identifier after 'assume'");
                 }
                 Token nameToken = consumeAny();
@@ -457,7 +494,7 @@ private:
                 expect(TokenKind::Assign,
                        "after let-pattern in block body");
                 wrapper.value = parseExpression();
-            } else if (peek().kind == TokenKind::Identifier) {
+            } else if (isIdentifierLike(peek().kind)) {
                 Token nameToken = consumeAny();
                 wrapper.kind = BlockWrapper::TypedLet;
                 wrapper.name = nameToken.lexeme;
@@ -652,14 +689,14 @@ private:
             return makeSurfacePatternTuple(std::move(components),
                                             openAngle.line, openAngle.column);
         }
-        if (peek().kind != TokenKind::Identifier) {
+        if (!isIdentifierLike(peek().kind)) {
             throwHere("expected pattern");
         }
         Token nameToken = consumeAny();
         std::string fullName = nameToken.lexeme;
         while (peek().kind == TokenKind::Dot) {
             consumeAny();
-            if (peek().kind != TokenKind::Identifier) {
+            if (!isIdentifierLike(peek().kind)) {
                 throwHere("expected identifier after '.' in pattern");
             }
             fullName += ".";
@@ -694,13 +731,13 @@ private:
     // (which builds an expression node) — declarations need only the
     // name itself.
     std::string consumeQualifiedNameString() {
-        if (peek().kind != TokenKind::Identifier) {
+        if (!isIdentifierLike(peek().kind)) {
             throwHere("expected identifier");
         }
         std::string name = consumeAny().lexeme;
         while (peek().kind == TokenKind::Dot) {
             consumeAny();
-            if (peek().kind != TokenKind::Identifier) {
+            if (!isIdentifierLike(peek().kind)) {
                 throwHere("expected identifier after '.'");
             }
             name += ".";
@@ -717,13 +754,13 @@ private:
         if (peek().kind != TokenKind::DotLeftBrace) return parameters;
         consumeAny();
         if (peek().kind != TokenKind::RightBrace) {
-            if (peek().kind != TokenKind::Identifier) {
+            if (!isIdentifierLike(peek().kind)) {
                 throwHere("expected universe parameter name");
             }
             parameters.push_back(consumeAny().lexeme);
             while (peek().kind == TokenKind::Comma) {
                 consumeAny();
-                if (peek().kind != TokenKind::Identifier) {
+                if (!isIdentifierLike(peek().kind)) {
                     throwHere("expected universe parameter name");
                 }
                 parameters.push_back(consumeAny().lexeme);
@@ -745,7 +782,7 @@ private:
         std::vector<SurfaceBinder> binders;
         while (peek().kind == TokenKind::LeftParen
                || peek().kind == TokenKind::LeftBrace
-               || peek().kind == TokenKind::Identifier) {
+               || isIdentifierLike(peek().kind)) {
             if (peek().kind == TokenKind::LeftParen
                 || peek().kind == TokenKind::LeftBrace) {
                 binders.push_back(parseExplicitBinder());
@@ -794,7 +831,7 @@ private:
             return makeSurfaceCases(std::move(value), std::move(clauses),
                                      start.line, start.column);
         }
-        if (peek().kind != TokenKind::Identifier) {
+        if (!isIdentifierLike(peek().kind)) {
             throwHere("expected identifier or anonymous tuple pattern "
                       "after 'let'");
         }
@@ -824,7 +861,7 @@ private:
             expect(TokenKind::LeftParen, "starting binder");
         }
         std::vector<std::string> names;
-        while (peek().kind == TokenKind::Identifier) {
+        while (isIdentifierLike(peek().kind)) {
             names.push_back(consumeAny().lexeme);
         }
         if (names.empty()) {
@@ -857,7 +894,7 @@ private:
             return std::nullopt;
         }
         std::vector<std::string> names;
-        while (peek().kind == TokenKind::Identifier) {
+        while (isIdentifierLike(peek().kind)) {
             names.push_back(consumeAny().lexeme);
         }
         if (names.empty() || peek().kind != TokenKind::Colon) {
@@ -1080,7 +1117,7 @@ private:
 
     SurfaceExpressionPointer parseAtom() {
         const Token& current = peek();
-        if (current.kind == TokenKind::Identifier) {
+        if (isIdentifierLike(current.kind)) {
             return parseQualifiedIdentifier();
         }
         if (current.kind == TokenKind::NumericLiteral) {
@@ -1325,14 +1362,14 @@ private:
             auto inductionLemma = parseExpression();
             expect(TokenKind::KeywordWith,
                    "after 'by_induction on <expr> using <lemma>'");
-            if (peek().kind != TokenKind::Identifier) {
+            if (!isIdentifierLike(peek().kind)) {
                 throwHere("expected an identifier (the subject "
                           "name) after 'with'");
             }
             std::string subjectName = consumeAny().lexeme;
             expect(TokenKind::Comma,
                    "between subject name and ih name");
-            if (peek().kind != TokenKind::Identifier) {
+            if (!isIdentifierLike(peek().kind)) {
                 throwHere("expected an identifier (the ih name) "
                           "after ','");
             }
@@ -1354,7 +1391,7 @@ private:
         if (isInduction) {
             expect(TokenKind::KeywordWith,
                    "after 'by_induction on <expr>'");
-            if (peek().kind != TokenKind::Identifier) {
+            if (!isIdentifierLike(peek().kind)) {
                 throwHere("expected an identifier (the "
                           "induction hypothesis name) after "
                           "'with'");
@@ -1465,7 +1502,7 @@ private:
         std::string name = first.lexeme;
         while (peek().kind == TokenKind::Dot) {
             consumeAny();
-            if (peek().kind != TokenKind::Identifier) {
+            if (!isIdentifierLike(peek().kind)) {
                 throwHere("expected identifier after '.'");
             }
             name += ".";
@@ -1511,7 +1548,7 @@ private:
             return makeSurfaceLevelNumeric(std::stoi(token.lexeme),
                                             token.line, token.column);
         }
-        if (current.kind == TokenKind::Identifier) {
+        if (isIdentifierLike(current.kind)) {
             Token token = consumeAny();
             return makeSurfaceLevelName(token.lexeme, token.line, token.column);
         }
