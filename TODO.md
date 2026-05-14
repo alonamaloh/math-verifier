@@ -8,41 +8,53 @@ pain becomes acute.
 ## Active
 
 ### 1. More math content — in progress
-Abstract algebra layer landed (Monoid, Group, AbelianGroup, Ring,
-CommutativeRing as Proposition predicates; Integer is a
-CommutativeRing; Natural is a commutative monoid under both ops; a
-few generic group lemmas demonstrated). Supporting infrastructure
-also landed: Quotient.induct_two (binary induction helper) and
-Natural multiplication cancellation. Next:
+Plan revision (2026-05-14): the original "Integer cancellation lemma"
+is unworkable. It would require Quotient.exact (the inverse of
+Quotient.sound) or propositional extensionality, neither of which the
+kernel has — the kernel has *proof* irrelevance but not *propositional*
+extensionality, so we can't lift the equivalence relation back through
+a Quotient equality. Switched to a concrete-triple representation for
+Rational (numerator-as-pair inlined inside the Rational triple),
+keeping the equivalence purely Natural-level and reducing transitivity
+to the existing `Natural.multiply_cancel_right`.
 
-- **Integer cancellation lemma.** For the Rational equivalence
-  transitivity proof we need:
-  `x · Natural.to_integer(successor(k)) = y · Natural.to_integer(successor(k)) → x = y`.
-  Proof: induct both x and y down to representatives `make(p1, q1)`,
-  `make(p2, q2)`; the product reduces to `make(p·succ(k), q·succ(k))`;
-  the equivalence factors out `succ(k)` via distributivity_right;
-  apply Natural.multiply_cancel_right; reassemble via Quotient.sound.
-  Probably ~80–120 lines.
-- **Rational basics.** Representative `(numerator : Integer,
-  denominatorMinusOne : Natural)`, equivalence `(n1, d1) ~ (n2, d2)
-  iff n1 · succ(d2) = n2 · succ(d1)`, reflexivity / symmetry /
-  transitivity (transitivity uses the cancellation lemma above),
-  `Rational := Quotient(RationalRepresentative, RationalEquivalent)`.
-  Probably ~150–200 lines.
-- **Rational arithmetic.** `Rational.add`, `Rational.multiply`,
-  `Rational.negate`, `Rational.subtract`, `Rational.zero`,
-  `Rational.one`, plus the field axioms (commutativity, associativity,
-  distributivity, multiplicative inverse for non-zero). Two-step
-  Quotient.lift pattern; the binary-lift boilerplate is the same as
-  Integer.add/multiply (Quotient.lift_two is sketched in
-  Logic/quotient.math but currently fails the elaborator — revisit
-  later). Probably ~600–800 lines.
-- **Integer → Rational embedding.** `Integer.to_rational(n) := mk(make(n, 0))`.
-  Extends the cast registry: ascription `(x : Rational)` on an
-  Integer auto-applies this.
+Status:
+- **DONE: Abstract algebra layer.** Monoid, Group, Ring, CommutativeRing
+  predicates; Integer and Natural instances; a few generic group
+  lemmas (`right_inverse_unique`, etc.).
+- **DONE: Quotient.induct_two** for binary lemmas on quotient types.
+- **DONE: Natural multiplication cancellation** + helpers.
+- **DONE: Rational basics** (`RationalRepresentative`,
+  `RationalEquivalent`, reflexivity / symmetry / transitivity,
+  `Rational := Quotient(...)`, `Rational.zero`, `Rational.one`).
+- **DONE: Rational.add_representatives** (the componentwise formula on
+  representative triples).
+
+Next:
+
+- **Rational.add respect proofs + lift.** Two respect proofs (one
+  per argument position) factor `succ(d2)` out of the equation,
+  cancel the p2/n2 cross-terms via commutativity inside the
+  triple-product factors, and reduce the remainder to the
+  equivalence hypothesis times `succ(d2)`. Each is roughly a
+  100-line calc chain; the structure mirrors
+  `Integer.add_respects_first_natural`. Then two Quotient.lifts
+  build `Rational.add`. Probably ~400 lines.
+- **Rational.multiply.** Similar shape. Probably ~400 lines.
+- **Rational.negate, Rational.subtract.** Simpler — negate swaps
+  positive and negative parts of the triple. ~150 lines.
+- **Rational ring identities.** Commutativity / associativity /
+  identity / distributivity on Rational, all lifted from the
+  representative-level Natural proofs. ~600 lines.
+- **Integer → Rational embedding.** `Integer.to_rational` defined by
+  Quotient.lift on the Integer side: a representative `make(p, q) :
+  IntegerRepresentative` maps to `make(p, q, 0) :
+  RationalRepresentative`. Extends the cast registry: ascription
+  `(x : Rational)` on an Integer auto-applies this.
 - **Field** predicate, with a non-zero-implies-invertible witness.
+  Rational is then a Field instance.
 - **Real** (Cauchy sequences over Rational, or Dedekind cuts).
-- More generic abelian-group / ring / field lemmas as they're needed.
+- More generic abelian-group / ring / field lemmas as needed.
 
 ### 2. Parallel verification
 Optimistic per-theorem parallelism with a thread pool: register
@@ -79,6 +91,15 @@ Smaller items to land when the motivating pain becomes acute:
 
 ## Completed
 
+- **2026-05-14: Rational basics + add_representatives.** Concrete-
+  triple representation `make(positivePart, negativePart,
+  denominatorMinusOne)` with Natural-level equivalence. Refl /sym /
+  trans verified; transitivity reduces to Natural.multiply_cancel via
+  the standard cross-multiply argument. Plus three Natural helper
+  lemmas in the file (`multiply_associative_right_swap_in_pair`, two
+  add-reshape variants). `Rational.add_representatives` defined. The
+  respect proofs + Quotient.lift remain. Commits `680fb3b`,
+  `15ecebe`.
 - **2026-05-14: Natural multiplication cancellation.** `a · c = b · c`
   with `c ≥ 1` forces `a = b`. Three supporting helpers
   (`add_equals_zero_left`, `multiply_equals_zero_with_positive_right`,
