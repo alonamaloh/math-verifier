@@ -601,8 +601,22 @@ bool isDefinitionallyEqual(const Environment& environment,
         // Conservative on exhaustion: don't claim equality we can't prove.
         return false;
     }
+    // Pointer-identity short-circuit. Subexpressions show up repeatedly
+    // in calc chains and `congruenceOf` lambdas; every time we compare
+    // a function applied at two different arguments we end up recursing
+    // into the *same* function expression on both sides, which is the
+    // same shared_ptr. Skipping the WHNF + structural recurse for those
+    // is the single biggest savings on heavy quotient proofs.
+    if (left.get() == right.get()) {
+        return true;
+    }
     auto leftReduced  = weakHeadNormalForm(environment, std::move(left),  fuel);
     auto rightReduced = weakHeadNormalForm(environment, std::move(right), fuel);
+    // Same fast-path after WHNF — reductions often produce the same
+    // shared term when both inputs go through the same path.
+    if (leftReduced.get() == rightReduced.get()) {
+        return true;
+    }
 
     // Structural cases. When recursing into a Pi or Lambda body/codomain,
     // we *open* the binder with a fresh free variable and extend the
