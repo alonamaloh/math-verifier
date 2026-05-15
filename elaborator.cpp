@@ -3676,23 +3676,25 @@ private:
     // product over the given carrier (e.g., contains a `<T>.add`).
     bool flattenRingProduct(
         ExpressionPointer term,
-        const std::string& carrierMultiplyName,
+        const std::string& carrierOpName,
         std::vector<ExpressionPointer>& factorsOut) {
-        // Walk: if `term = Application(Application(Constant(<carrier>.multiply, ...), a), b)`,
+        // Walk: if `term = Application(Application(Constant(<carrier>.<op>, ...), a), b)`,
         // recursively flatten a and b. Otherwise treat as atom.
+        // `<op>` is "multiply" or "add" depending on which axiom-set
+        // the ring tactic is using for this goal.
         if (auto* outer = std::get_if<Application>(&term->node)) {
             if (auto* inner =
                     std::get_if<Application>(&outer->function->node)) {
                 if (auto* op =
                         std::get_if<Constant>(&inner->function->node)) {
-                    if (op->name == carrierMultiplyName) {
+                    if (op->name == carrierOpName) {
                         if (!flattenRingProduct(inner->argument,
-                                                  carrierMultiplyName,
+                                                  carrierOpName,
                                                   factorsOut)) {
                             return false;
                         }
                         if (!flattenRingProduct(outer->argument,
-                                                  carrierMultiplyName,
+                                                  carrierOpName,
                                                   factorsOut)) {
                             return false;
                         }
@@ -3787,29 +3789,63 @@ private:
         EqualityComponents goal =
             extractEqualityComponents(expectedType, "ring", line);
         std::string carrierName = headConstantName(goal.carrierType);
-        std::string multiplyName = carrierName + ".multiply";
-        std::string commutativeName = carrierName + ".multiply_commutative";
-        std::string associativeName = carrierName + ".multiply_associative";
-        if (environment_.lookup(multiplyName) == nullptr
-            || environment_.lookup(commutativeName) == nullptr
-            || environment_.lookup(associativeName) == nullptr) {
-            throwElaborate(
-                "`ring`: carrier `" + carrierName
-                + "` does not look like a commutative ring — expected `"
-                + multiplyName + "`, `" + commutativeName + "`, and `"
-                + associativeName + "` in scope");
-        }
-        // Reify both sides as pure products. v1 errors on anything
-        // non-trivial (sums, distributivity).
+        // Try the multiplicative axioms first; if the goal isn't a
+        // pure product, try the additive axioms. Either is acceptable
+        // — both reduce to the same insertion-sort + reassociate
+        // proof emitter parameterised by a RingAxiomNames triple.
+        auto buildAxioms =
+            [&](const std::string& opSuffix) -> RingAxiomNames {
+            return RingAxiomNames{
+                carrierName + "." + opSuffix,
+                carrierName + "." + opSuffix + "_associative",
+                carrierName + "." + opSuffix + "_commutative"};
+        };
+        auto axiomsAvailable =
+            [&](const RingAxiomNames& a) -> bool {
+            return environment_.lookup(a.op) != nullptr
+                && environment_.lookup(a.associative) != nullptr
+                && environment_.lookup(a.commutative) != nullptr;
+        };
         std::vector<ExpressionPointer> leftFactors, rightFactors;
-        if (!flattenRingProduct(goal.leftEndpoint, multiplyName,
-                                  leftFactors)
-            || !flattenRingProduct(goal.rightEndpoint, multiplyName,
-                                     rightFactors)) {
+        RingAxiomNames axioms;
+        // Helper: try one axiom set; succeed if the factor multisets
+        // match (after sort).
+        auto try_axioms =
+            [&](const RingAxiomNames& candidate) -> bool {
+            if (!axiomsAvailable(candidate)) return false;
+            std::vector<ExpressionPointer> lf, rf;
+            if (!flattenRingProduct(goal.leftEndpoint, candidate.op, lf)
+                || !flattenRingProduct(goal.rightEndpoint,
+                                           candidate.op, rf)) {
+                return false;
+            }
+            if (lf.size() != rf.size()) return false;
+            std::vector<ExpressionPointer> ls = lf;
+            std::vector<ExpressionPointer> rs = rf;
+            auto cmp = [this](ExpressionPointer a,
+                                ExpressionPointer b) {
+                return compareExpressionStructure(a, b) < 0;
+            };
+            std::sort(ls.begin(), ls.end(), cmp);
+            std::sort(rs.begin(), rs.end(), cmp);
+            for (size_t i = 0; i < ls.size(); ++i) {
+                if (!structurallyEqual(ls[i], rs[i])) return false;
+            }
+            leftFactors = std::move(lf);
+            rightFactors = std::move(rf);
+            return true;
+        };
+        if (try_axioms(buildAxioms("multiply"))) {
+            axioms = buildAxioms("multiply");
+        } else if (try_axioms(buildAxioms("add"))) {
+            axioms = buildAxioms("add");
+        } else {
             throwElaborate(
-                "`ring`: v1 only handles pure-multiplication "
-                "rearrangement (no sums, distributivity, or "
-                "identities)");
+                "`ring`: could not solve the goal with either `"
+                + carrierName + ".multiply`-axioms or `"
+                + carrierName + ".add`-axioms; v1 handles pure-product "
+                "or pure-sum rearrangement only (no distributivity / "
+                "mixed forms)");
         }
         if (leftFactors.size() != rightFactors.size()) {
             throwElaborate(
@@ -3840,15 +3876,15 @@ private:
         // Build a kernel proof: LHS = canonical = RHS.
         // canonical = left-associated product of leftSorted.
         ExpressionPointer canonicalKernel =
-            assembleLeftAssociatedProduct(multiplyName, leftSorted);
+            assembleLeftAssociatedProduct(axioms.op, leftSorted);
         ExpressionPointer leftProof =
             proveProductEqualsSorted(goal.leftEndpoint, leftFactors,
-                                      leftSorted, carrierName,
+                                      leftSorted, axioms,
                                       goal.carrierType,
                                       goal.carrierUniverseLevel, line);
         ExpressionPointer rightProof =
             proveProductEqualsSorted(goal.rightEndpoint, rightFactors,
-                                      rightSorted, carrierName,
+                                      rightSorted, axioms,
                                       goal.carrierType,
                                       goal.carrierUniverseLevel, line);
         // rightProof: RHS = canonical. We need canonical = RHS via
@@ -3930,15 +3966,34 @@ private:
         return expression;
     }
 
-    // Build `<Carrier>.multiply(left, right)`.
-    ExpressionPointer buildRingMultiply(
-        const std::string& carrierName,
+    // Names of the ring axioms for one binary operation on a carrier.
+    // For multiplicative use: ("Integer.multiply",
+    // "Integer.multiply_associative", "Integer.multiply_commutative").
+    // For additive use: same shape with `.add` instead of `.multiply`.
+    struct RingAxiomNames {
+        std::string op;            // e.g. "Integer.multiply"
+        std::string associative;   // e.g. "Integer.multiply_associative"
+        std::string commutative;   // e.g. "Integer.multiply_commutative"
+    };
+
+    // Build `<op>(left, right)`.
+    ExpressionPointer buildRingOp(
+        const std::string& opName,
         ExpressionPointer left, ExpressionPointer right) {
-        ExpressionPointer call =
-            makeConstant(carrierName + ".multiply");
+        ExpressionPointer call = makeConstant(opName);
         call = makeApplication(std::move(call), std::move(left));
         call = makeApplication(std::move(call), std::move(right));
         return call;
+    }
+
+    // Build `<op>(left, right)` — alias kept for the old call sites in
+    // case they're still around. (Should be replaced as call sites
+    // migrate to the generalised form.)
+    ExpressionPointer buildRingMultiply(
+        const std::string& carrierName,
+        ExpressionPointer left, ExpressionPointer right) {
+        return buildRingOp(carrierName + ".multiply",
+                            std::move(left), std::move(right));
     }
 
     // Build `Equality.transitivity.{u}(T, A, B, C, p1, p2)`.
@@ -3995,25 +4050,25 @@ private:
         return call;
     }
 
-    // Build `<Carrier>.multiply_associative(P, a, b) : (P*a)*b =
-    // P*(a*b)`.
+    // Build `<axioms.associative>(P, a, b) : (P op a) op b =
+    // P op (a op b)`.
     ExpressionPointer buildRingAssoc(
-        const std::string& carrierName,
+        const RingAxiomNames& axioms,
         ExpressionPointer P, ExpressionPointer a, ExpressionPointer b) {
-        ExpressionPointer call = makeConstant(
-            carrierName + ".multiply_associative");
+        ExpressionPointer call =
+            makeConstant(axioms.associative);
         call = makeApplication(std::move(call), std::move(P));
         call = makeApplication(std::move(call), std::move(a));
         call = makeApplication(std::move(call), std::move(b));
         return call;
     }
 
-    // Build `<Carrier>.multiply_commutative(a, b) : a*b = b*a`.
+    // Build `<axioms.commutative>(a, b) : a op b = b op a`.
     ExpressionPointer buildRingCommute(
-        const std::string& carrierName,
+        const RingAxiomNames& axioms,
         ExpressionPointer a, ExpressionPointer b) {
-        ExpressionPointer call = makeConstant(
-            carrierName + ".multiply_commutative");
+        ExpressionPointer call =
+            makeConstant(axioms.commutative);
         call = makeApplication(std::move(call), std::move(a));
         call = makeApplication(std::move(call), std::move(b));
         return call;
@@ -4045,7 +4100,7 @@ private:
     // Returns proof : left_assoc(factors) =
     //                 left_assoc(factors_after_swap)
     ExpressionPointer buildAdjacentSwapProof(
-        const std::string& carrierName,
+        const RingAxiomNames& axioms,
         LevelPointer universeLevel,
         ExpressionPointer carrierType,
         const std::vector<ExpressionPointer>& factors,
@@ -4062,54 +4117,53 @@ private:
         ExpressionPointer baseLHS;  // left-assoc of factors[0..k]
         ExpressionPointer baseRHS;  // left-assoc with k-1 and k swapped
         if (k == 1) {
-            // No prefix; the level-1 subtree is just `a * b`.
-            // Proof: commutative(a, b) : a*b = b*a.
-            baseProof = buildRingCommute(carrierName, a, b);
-            baseLHS = buildRingMultiply(carrierName, a, b);
-            baseRHS = buildRingMultiply(carrierName, b, a);
+            // No prefix; the level-1 subtree is just `a op b`.
+            // Proof: commutative(a, b) : a op b = b op a.
+            baseProof = buildRingCommute(axioms, a, b);
+            baseLHS = buildRingOp(axioms.op, a, b);
+            baseRHS = buildRingOp(axioms.op, b, a);
         } else {
             // Prefix P = left-assoc of factors[0..k-1] (positions 0
-            // through k-2). Then base subtree = (P * a) * b.
+            // through k-2). Then base subtree = (P op a) op b.
             std::vector<ExpressionPointer> prefixFactors(
                 factors.begin(),
                 factors.begin() + static_cast<long>(k - 1));
             ExpressionPointer P = assembleLeftAssociatedProduct(
-                carrierName + ".multiply", prefixFactors);
-            // Step 1: (P*a)*b = P*(a*b) by multiply_associative(P, a, b)
+                axioms.op, prefixFactors);
+            // Step 1: (P op a) op b = P op (a op b) by associative
             ExpressionPointer pTimesAB =
-                buildRingMultiply(carrierName, P,
-                    buildRingMultiply(carrierName, a, b));
+                buildRingOp(axioms.op, P,
+                    buildRingOp(axioms.op, a, b));
             ExpressionPointer pTimesA_TimesB =
-                buildRingMultiply(carrierName,
-                    buildRingMultiply(carrierName, P, a), b);
+                buildRingOp(axioms.op,
+                    buildRingOp(axioms.op, P, a), b);
             ExpressionPointer step1 =
-                buildRingAssoc(carrierName, P, a, b);
-            // Step 2: P*(a*b) = P*(b*a) via congruence with λz. P*z.
-            // Build the lambda: factor P is lifted (no bound-var
-            // shifting needed at top-level reads, but be safe).
+                buildRingAssoc(axioms, P, a, b);
+            // Step 2: P op (a op b) = P op (b op a) via congruence with
+            // λz. P op z. Lift P's bound-vars into the new lambda scope.
             ExpressionPointer plift = liftBoundVariables(P, 1, 0);
-            ExpressionPointer lambdaBody = buildRingMultiply(
-                carrierName, plift, makeBoundVariable(0));
+            ExpressionPointer lambdaBody = buildRingOp(
+                axioms.op, plift, makeBoundVariable(0));
             ExpressionPointer lambdaPTimesZ = makeLambda(
                 "_ring_swap_z", carrierType, lambdaBody);
             ExpressionPointer commutProof =
-                buildRingCommute(carrierName, a, b);
+                buildRingCommute(axioms, a, b);
             ExpressionPointer aTimesB =
-                buildRingMultiply(carrierName, a, b);
+                buildRingOp(axioms.op, a, b);
             ExpressionPointer bTimesA =
-                buildRingMultiply(carrierName, b, a);
+                buildRingOp(axioms.op, b, a);
             ExpressionPointer step2 = buildEqualityCongruenceSameCarrier(
                 universeLevel, carrierType, lambdaPTimesZ,
                 aTimesB, bTimesA, commutProof);
-            // Step 3: P*(b*a) = (P*b)*a via sym multiply_associative(P, b, a)
+            // Step 3: P op (b op a) = (P op b) op a via sym associative
             ExpressionPointer pTimesBA =
-                buildRingMultiply(carrierName, P,
-                    buildRingMultiply(carrierName, b, a));
+                buildRingOp(axioms.op, P,
+                    buildRingOp(axioms.op, b, a));
             ExpressionPointer pTimesB_TimesA =
-                buildRingMultiply(carrierName,
-                    buildRingMultiply(carrierName, P, b), a);
+                buildRingOp(axioms.op,
+                    buildRingOp(axioms.op, P, b), a);
             ExpressionPointer assocPBA =
-                buildRingAssoc(carrierName, P, b, a);
+                buildRingAssoc(axioms, P, b, a);
             ExpressionPointer step3 = buildEqualitySymmetry(
                 universeLevel, carrierType,
                 pTimesB_TimesA, pTimesBA, assocPBA);
@@ -4125,22 +4179,21 @@ private:
             baseRHS = pTimesB_TimesA;
         }
         // Step B: lift through factors[k+1..n-1] via congruences
-        // λz. z * factors[j] for each j > k.
+        // λz. z op factors[j] for each j > k.
         ExpressionPointer currentProof = baseProof;
         ExpressionPointer currentLHS = baseLHS;
         ExpressionPointer currentRHS = baseRHS;
         for (size_t j = k + 1; j < factors.size(); ++j) {
-            // Build lambda: λ z. z * factors[j].
             ExpressionPointer fjLifted =
                 liftBoundVariables(factors[j], 1, 0);
-            ExpressionPointer lambdaBody = buildRingMultiply(
-                carrierName, makeBoundVariable(0), fjLifted);
+            ExpressionPointer lambdaBody = buildRingOp(
+                axioms.op, makeBoundVariable(0), fjLifted);
             ExpressionPointer lambda = makeLambda(
                 "_ring_lift_z", carrierType, lambdaBody);
-            ExpressionPointer newLHS = buildRingMultiply(
-                carrierName, currentLHS, factors[j]);
-            ExpressionPointer newRHS = buildRingMultiply(
-                carrierName, currentRHS, factors[j]);
+            ExpressionPointer newLHS = buildRingOp(
+                axioms.op, currentLHS, factors[j]);
+            ExpressionPointer newRHS = buildRingOp(
+                axioms.op, currentRHS, factors[j]);
             currentProof = buildEqualityCongruenceSameCarrier(
                 universeLevel, carrierType, lambda,
                 currentLHS, currentRHS, currentProof);
@@ -4157,18 +4210,18 @@ private:
     // For the special case where the expression is already
     // left-associated, returns reflexivity.
     ExpressionPointer buildLeftAssocReassocProof(
-        const std::string& carrierName,
+        const RingAxiomNames& axioms,
         LevelPointer universeLevel,
         ExpressionPointer carrierType,
         ExpressionPointer expression) {
-        std::string multiplyName = carrierName + ".multiply";
+        const std::string& opName = axioms.op;
         std::vector<ExpressionPointer> factors;
-        if (!flattenRingProduct(expression, multiplyName, factors)) {
+        if (!flattenRingProduct(expression, opName, factors)) {
             // Shouldn't happen — caller already flattened.
             throwElaborate("ring: internal reassociate failure");
         }
         ExpressionPointer canonical =
-            assembleLeftAssociatedProduct(multiplyName, factors);
+            assembleLeftAssociatedProduct(opName, factors);
         if (structurallyEqual(expression, canonical)) {
             return buildReflexivity(universeLevel, carrierType,
                                       expression);
@@ -4196,11 +4249,11 @@ private:
         auto innerApp =
             std::get_if<Application>(&outerApp->function->node);
         if (!innerApp) {
-            throwElaborate("ring: unexpected non-multiply head");
+            throwElaborate("ring: unexpected non-op head");
         }
         ExpressionPointer leftSubExpr = innerApp->argument;
         ExpressionPointer rightSubExpr = outerApp->argument;
-        // Check if rightSubExpr is itself `<carrier>.multiply(X, Y)`.
+        // Check if rightSubExpr is itself `<op>(X, Y)`.
         auto rightOuterApp =
             std::get_if<Application>(&rightSubExpr->node);
         if (rightOuterApp) {
@@ -4211,30 +4264,29 @@ private:
                 auto rightHead = std::get_if<Constant>(
                     &rightInnerApp->function->node);
                 if (rightHead
-                    && rightHead->name == multiplyName) {
-                    // expression = L * (X * Y).
+                    && rightHead->name == opName) {
+                    // expression = L op (X op Y).
                     ExpressionPointer X = rightInnerApp->argument;
                     ExpressionPointer Y = rightOuterApp->argument;
-                    // Step: L*(X*Y) = (L*X)*Y by sym assoc(L, X, Y).
+                    // Step: L op (X op Y) = (L op X) op Y
+                    // by sym associative(L, X, Y).
                     ExpressionPointer assocProof = buildRingAssoc(
-                        carrierName, leftSubExpr, X, Y);
-                    ExpressionPointer LXTimesY = buildRingMultiply(
-                        carrierName,
-                        buildRingMultiply(
-                            carrierName, leftSubExpr, X),
+                        axioms, leftSubExpr, X, Y);
+                    ExpressionPointer LXTimesY = buildRingOp(
+                        axioms.op,
+                        buildRingOp(
+                            axioms.op, leftSubExpr, X),
                         Y);
-                    ExpressionPointer LTimesXY = buildRingMultiply(
-                        carrierName, leftSubExpr,
-                        buildRingMultiply(carrierName, X, Y));
+                    ExpressionPointer LTimesXY = buildRingOp(
+                        axioms.op, leftSubExpr,
+                        buildRingOp(axioms.op, X, Y));
                     ExpressionPointer symAssoc = buildEqualitySymmetry(
                         universeLevel, carrierType,
                         LXTimesY, LTimesXY, assocProof);
-                    // Recursively re-associate the new form.
                     ExpressionPointer recProof =
                         buildLeftAssocReassocProof(
-                            carrierName, universeLevel, carrierType,
+                            axioms, universeLevel, carrierType,
                             LXTimesY);
-                    // Chain: L*(X*Y) = (L*X)*Y = canonical.
                     return buildEqualityTransitivity(
                         universeLevel, carrierType,
                         expression, LXTimesY, canonical,
@@ -4246,21 +4298,21 @@ private:
         ExpressionPointer leftCanonical;
         {
             std::vector<ExpressionPointer> leftFactors;
-            if (!flattenRingProduct(leftSubExpr, multiplyName,
+            if (!flattenRingProduct(leftSubExpr, opName,
                                       leftFactors)) {
                 throwElaborate(
                     "ring: internal flatten failure (left)");
             }
             leftCanonical = assembleLeftAssociatedProduct(
-                multiplyName, leftFactors);
+                opName, leftFactors);
         }
         ExpressionPointer leftProof = buildLeftAssocReassocProof(
-            carrierName, universeLevel, carrierType, leftSubExpr);
-        // Build lambda: λ z. z * rightSubExpr.
+            axioms, universeLevel, carrierType, leftSubExpr);
+        // Build lambda: λ z. z op rightSubExpr.
         ExpressionPointer rightLifted =
             liftBoundVariables(rightSubExpr, 1, 0);
-        ExpressionPointer lambdaBody = buildRingMultiply(
-            carrierName, makeBoundVariable(0), rightLifted);
+        ExpressionPointer lambdaBody = buildRingOp(
+            axioms.op, makeBoundVariable(0), rightLifted);
         ExpressionPointer lambda = makeLambda(
             "_ring_assoc_z", carrierType, lambdaBody);
         return buildEqualityCongruenceSameCarrier(
@@ -4272,15 +4324,14 @@ private:
         ExpressionPointer original,
         const std::vector<ExpressionPointer>& originalFactors,
         const std::vector<ExpressionPointer>& sortedFactors,
-        const std::string& carrierName,
+        const RingAxiomNames& axioms,
         ExpressionPointer carrierType,
         LevelPointer carrierUniverseLevel,
         int line) {
         (void)line;
-        std::string multiplyName = carrierName + ".multiply";
+        const std::string& opName = axioms.op;
         ExpressionPointer canonical =
-            assembleLeftAssociatedProduct(multiplyName, sortedFactors);
-        // Special case: single factor.
+            assembleLeftAssociatedProduct(opName, sortedFactors);
         if (sortedFactors.size() <= 1) {
             if (structurallyEqual(original, canonical)) {
                 return buildReflexivity(carrierUniverseLevel,
@@ -4289,21 +4340,15 @@ private:
             throwElaborate(
                 "ring: single-factor case but factors don't match");
         }
-        // Step 1: reassociate the original to left-assoc form.
         ExpressionPointer reassocProof = buildLeftAssocReassocProof(
-            carrierName, carrierUniverseLevel, carrierType, original);
-        // Result type of reassocProof: original = left_assoc(originalFactors).
+            axioms, carrierUniverseLevel, carrierType, original);
         ExpressionPointer leftAssocOriginal =
-            assembleLeftAssociatedProduct(multiplyName, originalFactors);
-        // Step 2: insertion sort. Track currentFactors and accumulate
-        // a proof of left_assoc(originalFactors) = left_assoc(current).
+            assembleLeftAssociatedProduct(opName, originalFactors);
         std::vector<ExpressionPointer> current = originalFactors;
         ExpressionPointer sortProof = buildReflexivity(
             carrierUniverseLevel, carrierType, leftAssocOriginal);
         ExpressionPointer currentExpr = leftAssocOriginal;
         for (size_t i = 0; i < sortedFactors.size(); ++i) {
-            // Find position j >= i in `current` where
-            // current[j] == sortedFactors[i].
             size_t j = i;
             while (j < current.size()
                    && !structurallyEqual(current[j],
@@ -4315,19 +4360,15 @@ private:
                     "ring: factor multiset matched but element not "
                     "found during sort — internal error");
             }
-            // Bubble j down to i via adjacent swaps.
             while (j > i) {
                 ExpressionPointer swapProof = buildAdjacentSwapProof(
-                    carrierName, carrierUniverseLevel, carrierType,
+                    axioms, carrierUniverseLevel, carrierType,
                     current, j);
-                // After the swap, the new left-assoc is the same factor
-                // list with j-1 and j exchanged.
                 std::vector<ExpressionPointer> newCurrent = current;
                 std::swap(newCurrent[j - 1], newCurrent[j]);
                 ExpressionPointer newExpr =
                     assembleLeftAssociatedProduct(
-                        multiplyName, newCurrent);
-                // Chain sortProof with swapProof.
+                        opName, newCurrent);
                 sortProof = buildEqualityTransitivity(
                     carrierUniverseLevel, carrierType,
                     leftAssocOriginal, currentExpr, newExpr,
@@ -4337,7 +4378,6 @@ private:
                 --j;
             }
         }
-        // Final proof: original = left_assoc(original) = canonical.
         if (!structurallyEqual(currentExpr, canonical)) {
             throwElaborate(
                 "ring: insertion sort ended with mismatched form — "
