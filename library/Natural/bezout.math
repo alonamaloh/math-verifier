@@ -50,7 +50,7 @@ definition Natural.has_bezout
     ∃ (gcdValue : Natural).
       ∃ (firstCoefficient : Integer).
         ∃ (secondCoefficient : Integer).
-          Natural.to_integer(firstOperand) * firstCoefficient + Natural.to_integer(secondOperand) * secondCoefficient = Natural.to_integer(gcdValue)
+          (firstOperand : Integer) * firstCoefficient + (secondOperand : Integer) * secondCoefficient = (gcdValue : Integer)
           ∧ Natural.is_gcd(gcdValue, firstOperand, secondOperand)
 
 -- ----------------------------------------------------------------------
@@ -64,27 +64,27 @@ definition Natural.has_bezout
 theorem Natural.has_bezout_zero_right (a : Natural)
         : Natural.has_bezout(a, zero) := {
     claim multiplyByOne
-          : Natural.to_integer(a) * Integer.one
-            = Natural.to_integer(a)
-        by Integer.multiply_identity_right(Natural.to_integer(a));
+          : (a : Integer) * Integer.one
+            = (a : Integer)
+        by Integer.multiply_identity_right((a : Integer));
     claim zeroTimesZero
-          : Natural.to_integer(zero) * Integer.zero
+          : (zero : Integer) * Integer.zero
             = Integer.zero
         by reflexivity(Integer, Integer.zero);
     claim combined
-          : Natural.to_integer(a) * Integer.one + Natural.to_integer(zero) * Integer.zero
-            = Natural.to_integer(a)
+          : (a : Integer) * Integer.one + (zero : Integer) * Integer.zero
+            = (a : Integer)
         by Equality.transitivity(
                congruenceOf(
                    function (firstSummand : Integer) =>
-                       firstSummand + Natural.to_integer(zero) * Integer.zero,
+                       firstSummand + (zero : Integer) * Integer.zero,
                    multiplyByOne),
                Equality.transitivity(
                    congruenceOf(
                        function (secondSummand : Integer) =>
-                           Natural.to_integer(a) + secondSummand,
+                           (a : Integer) + secondSummand,
                        zeroTimesZero),
-                   Integer.add_identity_right(Natural.to_integer(a))));
+                   Integer.add_identity_right((a : Integer))));
     ⟨a, Integer.one, Integer.zero, combined, Natural.is_gcd_zero_right(a)⟩
 }
 
@@ -94,13 +94,13 @@ theorem Natural.has_bezout_zero_right (a : Natural)
 theorem Integer.lift_decomposition
         (a q b r : Natural)
         (naturalDecomposition : a = q * b + r)
-        : Natural.to_integer(a) = Natural.to_integer(q) * Natural.to_integer(b) + Natural.to_integer(r) :=
-  calc Natural.to_integer(a)
-     = Natural.to_integer(q * b + r)
+        : (a : Integer) = (q : Integer) * (b : Integer) + (r : Integer) :=
+  calc (a : Integer)
+     = (q * b + r : Integer)
             by rewrite(naturalDecomposition)
-     = Natural.to_integer(q * b) + Natural.to_integer(r)
+     = (q * b : Integer) + (r : Integer)
             by Natural.to_integer.add_preserves(q * b, r)
-     = Natural.to_integer(q) * Natural.to_integer(b) + Natural.to_integer(r)
+     = (q : Integer) * (b : Integer) + (r : Integer)
             by rewrite(Natural.to_integer.multiply_preserves(q, b))
 
 -- ----------------------------------------------------------------------
@@ -267,22 +267,22 @@ theorem Natural.has_bezout_successor_step
     -- Lift the natural decomposition `a = q · successor(predB) + r`
     -- to the integer level.
     claim integerDecomposition
-          : Natural.to_integer(a) = Natural.to_integer(q) * Natural.to_integer(successor(predB)) + Natural.to_integer(r)
+          : (a : Integer) = (q : Integer) * (successor(predB) : Integer) + (r : Integer)
         by Integer.lift_decomposition(
                a, q, successor(predB), r, decomposition);
     -- Plug into the substitution lemma to get the new linear-
     -- combination identity for (a, successor(predB)).
     claim newLinearCombinationIdentity
-          : Natural.to_integer(a) * yPrime + Natural.to_integer(successor(predB)) * Integer.subtract(
+          : (a : Integer) * yPrime + (successor(predB) : Integer) * Integer.subtract(
                             xPrime,
-                            Natural.to_integer(q) * yPrime) = Natural.to_integer(gcdValue)
+                            (q : Integer) * yPrime) = (gcdValue : Integer)
         by Integer.bezout_substitute(
-               Natural.to_integer(a),
-               Natural.to_integer(successor(predB)),
-               Natural.to_integer(q),
-               Natural.to_integer(r),
+               (a : Integer),
+               (successor(predB) : Integer),
+               (q : Integer),
+               (r : Integer),
                xPrime, yPrime,
-               Natural.to_integer(gcdValue),
+               (gcdValue : Integer),
                integerDecomposition,
                recursedEquation);
     -- Lift the gcd from (successor(predB), r) to (a, successor(predB))
@@ -294,7 +294,7 @@ theorem Natural.has_bezout_successor_step
     ⟨gcdValue,
      yPrime,
      Integer.subtract(xPrime,
-         Natural.to_integer(q) * yPrime),
+         (q : Integer) * yPrime),
      newLinearCombinationIdentity,
      isGcdForAB⟩
 }
