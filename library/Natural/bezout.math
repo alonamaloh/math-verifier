@@ -50,13 +50,11 @@ definition Natural.has_bezout
     ∃ (gcdValue : Natural).
       ∃ (firstCoefficient : Integer).
         ∃ (secondCoefficient : Integer).
-          Equality(Integer,
-              Integer.add(
+          Integer.add(
                   Integer.multiply(
                       Natural.to_integer(firstOperand), firstCoefficient),
                   Integer.multiply(
-                      Natural.to_integer(secondOperand), secondCoefficient)),
-              Natural.to_integer(gcdValue))
+                      Natural.to_integer(secondOperand), secondCoefficient)) = Natural.to_integer(gcdValue)
           ∧ Natural.is_gcd(gcdValue, firstOperand, secondOperand)
 
 -- ----------------------------------------------------------------------
@@ -104,12 +102,10 @@ theorem Natural.has_bezout_zero_right (a : Natural)
 theorem Integer.lift_decomposition
         (a q b r : Natural)
         (naturalDecomposition : a = q * b + r)
-        : Equality(Integer,
-              Natural.to_integer(a),
-              Integer.add(
+        : Natural.to_integer(a) = Integer.add(
                   Integer.multiply(Natural.to_integer(q),
                                    Natural.to_integer(b)),
-                  Natural.to_integer(r))) :=
+                  Natural.to_integer(r)) :=
   calc Natural.to_integer(a)
      = Natural.to_integer(q * b + r)
             by congruenceOf(Natural.to_integer, naturalDecomposition)
@@ -139,22 +135,16 @@ theorem Integer.lift_decomposition
 theorem Integer.bezout_substitute
         (aInt bInt qInt rInt xPrime yPrime gcdInt : Integer)
         (decomposition
-            : Equality(Integer,
-                  aInt,
-                  Integer.add(Integer.multiply(qInt, bInt), rInt)))
+            : aInt = Integer.add(Integer.multiply(qInt, bInt), rInt))
         (recursedEquation
-            : Equality(Integer,
-                  Integer.add(
+            : Integer.add(
                       Integer.multiply(bInt, xPrime),
-                      Integer.multiply(rInt, yPrime)),
-                  gcdInt))
-        : Equality(Integer,
-              Integer.add(
+                      Integer.multiply(rInt, yPrime)) = gcdInt)
+        : Integer.add(
                   Integer.multiply(aInt, yPrime),
                   Integer.multiply(bInt,
                       Integer.subtract(xPrime,
-                          Integer.multiply(qInt, yPrime)))),
-              gcdInt) := {
+                          Integer.multiply(qInt, yPrime)))) = gcdInt := {
     -- Step 1: distributivity of bInt over (xPrime − qInt · yPrime).
     claim distributeBInt
           : Integer.multiply(bInt,
@@ -359,28 +349,24 @@ theorem Natural.has_bezout_successor_step
     -- Lift the natural decomposition `a = q · successor(predB) + r`
     -- to the integer level.
     claim integerDecomposition
-          : Equality(Integer,
-                Natural.to_integer(a),
-                Integer.add(
+          : Natural.to_integer(a) = Integer.add(
                     Integer.multiply(
                         Natural.to_integer(q),
                         Natural.to_integer(successor(predB))),
-                    Natural.to_integer(r)))
+                    Natural.to_integer(r))
         by Integer.lift_decomposition(
                a, q, successor(predB), r, decomposition);
     -- Plug into the substitution lemma to get the new linear-
     -- combination identity for (a, successor(predB)).
     claim newLinearCombinationIdentity
-          : Equality(Integer,
-                Integer.add(
+          : Integer.add(
                     Integer.multiply(Natural.to_integer(a), yPrime),
                     Integer.multiply(
                         Natural.to_integer(successor(predB)),
                         Integer.subtract(
                             xPrime,
                             Integer.multiply(
-                                Natural.to_integer(q), yPrime)))),
-                Natural.to_integer(gcdValue))
+                                Natural.to_integer(q), yPrime)))) = Natural.to_integer(gcdValue)
         by Integer.bezout_substitute(
                Natural.to_integer(a),
                Natural.to_integer(successor(predB)),
