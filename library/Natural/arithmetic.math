@@ -8,6 +8,7 @@
 --   a * b                                desugars to  Natural.multiply(a, b)
 --   a = b                                desugars to  a = b
 --   reflexivity(x)                       desugars to  reflexivity(typeOfX, x)
+--   rewrite(equalityProof)               replaces lemma's LHS with RHS in the goal
 --   congruenceOf(f, equalityProof)       desugars to  Equality.congruence
 --   Equality.symmetry(equalityProof)     desugars to  Equality.symmetry(A, x, y, h)
 --   Equality.transitivity(firstEquality, secondEquality)
@@ -64,8 +65,7 @@ theorem Natural.add_commutative : (a b : Natural) → a + b = b + a
       -- so the calc chain starts with the reduced form.
       calc successor(Natural.add(predecessor, b))
          = successor(Natural.add(b, predecessor))
-                by congruenceOf(successor,
-                                 Natural.add_commutative(predecessor, b))
+                by rewrite(Natural.add_commutative(predecessor, b))
          = Natural.add(b, successor(predecessor))
                 by Equality.symmetry(
                        Natural.add_successor(b, predecessor))
@@ -224,18 +224,12 @@ theorem Natural.add_two_two_swap (p q r s : Natural)
      = p + (q + (r + s))
             by Natural.add_associative(p, q, r + s)
      = p + ((q + r) + s)
-            by congruenceOf(
-                   function (innerSum : Natural) => p + innerSum,
-                   Equality.symmetry(
+            by rewrite(Equality.symmetry(
                        Natural.add_associative(q, r, s)))
      = p + ((r + q) + s)
-            by congruenceOf(
-                   function (innerSum : Natural) => p + (innerSum + s),
-                   Natural.add_commutative(q, r))
+            by rewrite(Natural.add_commutative(q, r))
      = p + (r + (q + s))
-            by congruenceOf(
-                   function (innerSum : Natural) => p + innerSum,
-                   Natural.add_associative(r, q, s))
+            by rewrite(Natural.add_associative(r, q, s))
      = (p + r) + (q + s)
             by Equality.symmetry(
                    Natural.add_associative(p, r, q + s))
@@ -248,28 +242,18 @@ theorem Natural.add_four_swap (a b c d : Natural)
         : (a + b) + (c + d) = (a + d) + (c + b) :=
   calc (a + b) + (c + d)
      = (a + b) + (d + c)
-            by congruenceOf(
-                   function (rhs : Natural) => (a + b) + rhs,
-                   Natural.add_commutative(c, d))
+            by rewrite(Natural.add_commutative(c, d))
      = ((a + b) + d) + c
             by Equality.symmetry(
                    Natural.add_associative(a + b, d, c))
      = (a + (b + d)) + c
-            by congruenceOf(
-                   function (lhs : Natural) => lhs + c,
-                   Natural.add_associative(a, b, d))
+            by rewrite(Natural.add_associative(a, b, d))
      = (a + (d + b)) + c
-            by congruenceOf(
-                   function (lhs : Natural) => (a + lhs) + c,
-                   Natural.add_commutative(b, d))
+            by rewrite(Natural.add_commutative(b, d))
      = ((a + d) + b) + c
-            by congruenceOf(
-                   function (lhs : Natural) => lhs + c,
-                   Equality.symmetry(
+            by rewrite(Equality.symmetry(
                        Natural.add_associative(a, d, b)))
      = (a + d) + (b + c)
             by Natural.add_associative(a + d, b, c)
      = (a + d) + (c + b)
-            by congruenceOf(
-                   function (rhs : Natural) => (a + d) + rhs,
-                   Natural.add_commutative(b, c))
+            by rewrite(Natural.add_commutative(b, c))
