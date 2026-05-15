@@ -228,6 +228,7 @@ private:
             {"∃", TokenKind::Exists},
             {"⟨", TokenKind::LeftAngle},
             {"⟩", TokenKind::RightAngle},
+            {"·", TokenKind::CenterDot},
         };
         for (const auto& entry : table) {
             if (matchPrefix(entry.text)) {
@@ -369,6 +370,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::Star:                 return "'*'";
         case TokenKind::Slash:                return "'/'";
         case TokenKind::Caret:                return "'^'";
+        case TokenKind::CenterDot:            return "'·'";
         case TokenKind::Less:                 return "'<'";
         case TokenKind::Greater:              return "'>'";
         case TokenKind::LessOrEqual:          return "'<=' or '≤'";

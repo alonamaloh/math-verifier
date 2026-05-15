@@ -5026,6 +5026,29 @@ private:
         const SurfaceExpression& rightSurface,
         const std::vector<LocalBinder>& localBinders,
         int line) {
+        // First: if a local binder has the operator symbol as its
+        // name (introduced via `((·) : G → G → G)`-style binders),
+        // treat the operator as an application of that binder. This
+        // lets group/ring theorems use `x · y` for the bound
+        // operation without having to plumb it through the global
+        // operator registry.
+        for (size_t i = localBinders.size(); i > 0; --i) {
+            if (localBinders[i - 1].name == operatorSymbol) {
+                ExpressionPointer leftLocal =
+                    elaborateExpression(leftSurface, localBinders);
+                ExpressionPointer rightLocal =
+                    elaborateExpression(rightSurface, localBinders);
+                ExpressionPointer functionExpression =
+                    elaborateIdentifier(
+                        SurfaceIdentifier{operatorSymbol, {}},
+                        localBinders, line, /*column=*/0);
+                ExpressionPointer call = makeApplication(
+                    std::move(functionExpression), std::move(leftLocal));
+                call = makeApplication(std::move(call),
+                                        std::move(rightLocal));
+                return call;
+            }
+        }
         // Logical operators are dispatched first because their operand
         // type is a Proposition (a `Sort`, not a `Constant`), so the
         // numeric-operator dispatch below — which looks for a Constant

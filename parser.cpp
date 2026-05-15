@@ -47,6 +47,35 @@ bool isIdentifierLike(TokenKind kind) {
     return kind == TokenKind::Identifier || isContextualKeyword(kind);
 }
 
+// Tokens that can appear inside `(<op>)` to denote that operator's symbol
+// as an identifier (used in binder positions and in expression position
+// to refer to a binder bound under an operator name).
+bool isOperatorSymbolToken(TokenKind kind) {
+    switch (kind) {
+        case TokenKind::Plus:
+        case TokenKind::Minus:
+        case TokenKind::Star:
+        case TokenKind::Slash:
+        case TokenKind::Caret:
+        case TokenKind::CenterDot:
+        case TokenKind::Less:
+        case TokenKind::Greater:
+        case TokenKind::LessOrEqual:
+        case TokenKind::GreaterOrEqual:
+        case TokenKind::Equal:
+        case TokenKind::NotEqual:
+        case TokenKind::LogicalAnd:
+        case TokenKind::LogicalOr:
+        case TokenKind::LogicalNot:
+        case TokenKind::Divides:
+        case TokenKind::NotDivides:
+        case TokenKind::NotLessOrEqual:
+            return true;
+        default:
+            return false;
+    }
+}
+
 // Returns true if `pattern` binds `targetName` somewhere in its tree.
 // A bare-name pattern binds `targetName` iff that's its name (except
 // for "_", which is a wildcard). Constructor / tuple patterns bind
@@ -934,8 +963,24 @@ private:
             expect(TokenKind::LeftParen, "starting binder");
         }
         std::vector<std::string> names;
-        while (isIdentifierLike(peek().kind)) {
-            names.push_back(consumeAny().lexeme);
+        for (;;) {
+            if (isIdentifierLike(peek().kind)) {
+                names.push_back(consumeAny().lexeme);
+                continue;
+            }
+            // `(<op>)` introduces an operator-symbol-named parameter
+            // (e.g. `((·) : G → G → G)`).
+            if (peek().kind == TokenKind::LeftParen
+                && position_ + 2 < tokens_.size()
+                && isOperatorSymbolToken(tokens_[position_ + 1].kind)
+                && tokens_[position_ + 2].kind ==
+                       TokenKind::RightParen) {
+                consumeAny();  // '('
+                names.push_back(consumeAny().lexeme);
+                consumeAny();  // ')'
+                continue;
+            }
+            break;
         }
         if (names.empty()) {
             throwHere("expected at least one name in binder");
@@ -967,8 +1012,22 @@ private:
             return std::nullopt;
         }
         std::vector<std::string> names;
-        while (isIdentifierLike(peek().kind)) {
-            names.push_back(consumeAny().lexeme);
+        for (;;) {
+            if (isIdentifierLike(peek().kind)) {
+                names.push_back(consumeAny().lexeme);
+                continue;
+            }
+            if (peek().kind == TokenKind::LeftParen
+                && position_ + 2 < tokens_.size()
+                && isOperatorSymbolToken(tokens_[position_ + 1].kind)
+                && tokens_[position_ + 2].kind ==
+                       TokenKind::RightParen) {
+                consumeAny();  // '('
+                names.push_back(consumeAny().lexeme);
+                consumeAny();  // ')'
+                continue;
+            }
+            break;
         }
         if (names.empty() || peek().kind != TokenKind::Colon) {
             position_ = save;
@@ -1124,10 +1183,17 @@ private:
     SurfaceExpressionPointer parseMultiplicative() {
         auto left = parsePower();
         while (peek().kind == TokenKind::Star
-               || peek().kind == TokenKind::Slash) {
+               || peek().kind == TokenKind::Slash
+               || peek().kind == TokenKind::CenterDot) {
             Token op = consumeAny();
+            const char* sym = nullptr;
+            switch (op.kind) {
+                case TokenKind::Star:      sym = "*"; break;
+                case TokenKind::Slash:     sym = "/"; break;
+                case TokenKind::CenterDot: sym = "·"; break;
+                default: break;
+            }
             auto right = parsePower();
-            const char* sym = (op.kind == TokenKind::Star) ? "*" : "/";
             left = makeSurfaceBinaryOperation(sym, std::move(left),
                                                std::move(right),
                                                op.line, op.column);
@@ -1294,6 +1360,19 @@ private:
             return makeSurfaceProposition(token.line, token.column);
         }
         if (current.kind == TokenKind::LeftParen) {
+            // `(<op>)` — refer to an operator-symbol-named binder
+            // (e.g. `((·) : G → G → G)` bound earlier; in expression
+            // position, `(·)` is an identifier referring to it).
+            if (position_ + 2 < tokens_.size()
+                && isOperatorSymbolToken(tokens_[position_ + 1].kind)
+                && tokens_[position_ + 2].kind ==
+                       TokenKind::RightParen) {
+                Token openParen = consumeAny();
+                Token opToken = consumeAny();
+                consumeAny();  // ')'
+                return makeSurfaceIdentifier(
+                    opToken.lexeme, {}, openParen.line, openParen.column);
+            }
             Token openParen = consumeAny();
             auto inner = parseExpression();
             if (peek().kind == TokenKind::Colon) {

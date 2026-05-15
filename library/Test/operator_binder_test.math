@@ -1,0 +1,45 @@
+-- Operator-symbol binders: a parameter can be named with a paren-
+-- wrapped operator symbol, and that symbol can then be used as a
+-- binary operator inside the theorem.
+--
+-- This is the foundation for group/ring theorems written in the
+-- familiar `x · y · z` / `x + y` notation without having to register
+-- a global operator dispatch.
+
+module Test.operator_binder_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+
+-- Generic identity using a bound `·` operator. The body uses
+-- the bound operation in standard infix form.
+theorem operator_binder_dot_uses_argument
+        (carrier : Type(0)) ((·) : carrier → carrier → carrier)
+        (associativity
+            : (a b c : carrier) → (a · b) · c = a · (b · c))
+        (x y z : carrier)
+        : (x · y) · z = x · (y · z) :=
+  associativity(x, y, z)
+
+-- The same mechanism works for `+` — a locally bound `+` shadows
+-- the global `+` registration. Useful when writing generic
+-- additive-group lemmas.
+theorem operator_binder_plus_uses_argument
+        (carrier : Type(0)) ((+) : carrier → carrier → carrier)
+        (commutativity : (a b : carrier) → a + b = b + a)
+        (x y : carrier)
+        : x + y = y + x :=
+  commutativity(x, y)
+
+-- Multiple operator binders side-by-side: bind both `·` and `+`,
+-- write a distributivity-shaped theorem.
+theorem operator_binder_multiple
+        (carrier : Type(0))
+        ((·) : carrier → carrier → carrier)
+        ((+) : carrier → carrier → carrier)
+        (distributes
+            : (a b c : carrier) → a · (b + c) = (a · b) + (a · c))
+        (x y z : carrier)
+        : x · (y + z) = (x · y) + (x · z) :=
+  distributes(x, y, z)
