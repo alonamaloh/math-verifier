@@ -1,0 +1,64 @@
+-- Rational/order.math
+--
+-- Order and sign on Rational. Lift `Integer.IsNonneg` over the
+-- Rational quotient (via `Quotient.lift` to Proposition), then derive
+-- `LessOrEqual` and the operator overloads.
+
+module Rational.order
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.distance
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+
+-- Representative-level "is non-negative": just IsNonneg on the numerator.
+definition Rational.IsNonneg_at_representative
+        : RationalRepresentative → Proposition
+  | RationalRepresentative.make(n, _) => Integer.IsNonneg(n)
+
+-- Respect: if (n1, d1) ~ (n2, d2), i.e., n1 · succ(d2) = n2 · succ(d1),
+-- then IsNonneg(n1) ↔ IsNonneg(n2) (both denominators are strictly
+-- positive). Via propositional extensionality. Stubbed for now —
+-- the witness extraction requires Integer-sign preservation under
+-- strictly-positive Integer multiplication, which is itself a lemma
+-- we'll formalize in the order-lemma follow-up pass.
+theorem Rational.IsNonneg_respect
+        (rep1 rep2 : RationalRepresentative)
+        (equivalenceHypothesis : RationalEquivalent(rep1, rep2))
+        : Rational.IsNonneg_at_representative(rep1)
+          = Rational.IsNonneg_at_representative(rep2) := sorry
+
+-- IsNonneg on Rational.
+definition Rational.IsNonneg (x : Rational) : Proposition :=
+  Quotient.lift(
+      Rational.IsNonneg_at_representative,
+      Rational.IsNonneg_respect,
+      x)
+
+-- ≤ on Rational.
+definition Rational.LessOrEqual (x y : Rational) : Proposition :=
+  Rational.IsNonneg(y - x)
+
+-- Strict < on Rational. We use `x < y := x ≤ y ∧ x ≠ y` rather than
+-- `x + ε ≤ y` because ε on Rational isn't a single canonical choice.
+definition Rational.LessThan (x y : Rational) : Proposition :=
+  And(Rational.LessOrEqual(x, y), Not(x = y))
+
+operator (≤) on (Rational, Rational) := Rational.LessOrEqual
+operator (<) on (Rational, Rational) := Rational.LessThan
