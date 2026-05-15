@@ -3897,6 +3897,377 @@ private:
     // element-wise (the goal is already canonical), emit reflexivity.
     // Otherwise (factors differ in order), defer to a fuller proof
     // generator — but emit an honest "not yet implemented" error.
+    // Shift every BoundVariable in `expression` whose de-Bruijn index
+    // is >= threshold up by `increment`. Used when embedding a kernel
+    // term inside a new lambda binder.
+    ExpressionPointer liftBoundVariables(
+        ExpressionPointer expression, int increment, int threshold) {
+        if (auto* bv =
+                std::get_if<BoundVariable>(&expression->node)) {
+            if (bv->deBruijnIndex >= threshold) {
+                return makeBoundVariable(
+                    bv->deBruijnIndex + increment);
+            }
+            return expression;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return makePi(pi->displayHint,
+                liftBoundVariables(pi->domain, increment, threshold),
+                liftBoundVariables(pi->codomain, increment,
+                                     threshold + 1));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return makeLambda(lambda->displayHint,
+                liftBoundVariables(lambda->domain, increment, threshold),
+                liftBoundVariables(lambda->body, increment,
+                                     threshold + 1));
+        }
+        if (auto* app = std::get_if<Application>(&expression->node)) {
+            return makeApplication(
+                liftBoundVariables(app->function, increment, threshold),
+                liftBoundVariables(app->argument, increment, threshold));
+        }
+        return expression;
+    }
+
+    // Build `<Carrier>.multiply(left, right)`.
+    ExpressionPointer buildRingMultiply(
+        const std::string& carrierName,
+        ExpressionPointer left, ExpressionPointer right) {
+        ExpressionPointer call =
+            makeConstant(carrierName + ".multiply");
+        call = makeApplication(std::move(call), std::move(left));
+        call = makeApplication(std::move(call), std::move(right));
+        return call;
+    }
+
+    // Build `Equality.transitivity.{u}(T, A, B, C, p1, p2)`.
+    ExpressionPointer buildEqualityTransitivity(
+        LevelPointer universeLevel,
+        ExpressionPointer carrierType,
+        ExpressionPointer A, ExpressionPointer B, ExpressionPointer C,
+        ExpressionPointer p1, ExpressionPointer p2) {
+        ExpressionPointer call = makeConstant(
+            "Equality.transitivity", {universeLevel});
+        call = makeApplication(std::move(call), std::move(carrierType));
+        call = makeApplication(std::move(call), std::move(A));
+        call = makeApplication(std::move(call), std::move(B));
+        call = makeApplication(std::move(call), std::move(C));
+        call = makeApplication(std::move(call), std::move(p1));
+        call = makeApplication(std::move(call), std::move(p2));
+        return call;
+    }
+
+    // Build `Equality.symmetry.{u}(T, A, B, p)` where p : A = B.
+    ExpressionPointer buildEqualitySymmetry(
+        LevelPointer universeLevel,
+        ExpressionPointer carrierType,
+        ExpressionPointer A, ExpressionPointer B,
+        ExpressionPointer p) {
+        ExpressionPointer call = makeConstant(
+            "Equality.symmetry", {universeLevel});
+        call = makeApplication(std::move(call), std::move(carrierType));
+        call = makeApplication(std::move(call), std::move(A));
+        call = makeApplication(std::move(call), std::move(B));
+        call = makeApplication(std::move(call), std::move(p));
+        return call;
+    }
+
+    // Build `Equality.congruence.{u, u}(T, T, λ : T → T, x, y, p)`
+    // where p : x = y; returns proof of λ(x) = λ(y). Carrier and
+    // codomain types are the same here (we only use it for ring-level
+    // congruence).
+    ExpressionPointer buildEqualityCongruenceSameCarrier(
+        LevelPointer universeLevel,
+        ExpressionPointer carrierType,
+        ExpressionPointer lambda,
+        ExpressionPointer x, ExpressionPointer y,
+        ExpressionPointer p) {
+        ExpressionPointer call = makeConstant(
+            "Equality.congruence",
+            {universeLevel, universeLevel});
+        call = makeApplication(std::move(call), carrierType);
+        call = makeApplication(std::move(call), carrierType);
+        call = makeApplication(std::move(call), std::move(lambda));
+        call = makeApplication(std::move(call), std::move(x));
+        call = makeApplication(std::move(call), std::move(y));
+        call = makeApplication(std::move(call), std::move(p));
+        return call;
+    }
+
+    // Build `<Carrier>.multiply_associative(P, a, b) : (P*a)*b =
+    // P*(a*b)`.
+    ExpressionPointer buildRingAssoc(
+        const std::string& carrierName,
+        ExpressionPointer P, ExpressionPointer a, ExpressionPointer b) {
+        ExpressionPointer call = makeConstant(
+            carrierName + ".multiply_associative");
+        call = makeApplication(std::move(call), std::move(P));
+        call = makeApplication(std::move(call), std::move(a));
+        call = makeApplication(std::move(call), std::move(b));
+        return call;
+    }
+
+    // Build `<Carrier>.multiply_commutative(a, b) : a*b = b*a`.
+    ExpressionPointer buildRingCommute(
+        const std::string& carrierName,
+        ExpressionPointer a, ExpressionPointer b) {
+        ExpressionPointer call = makeConstant(
+            carrierName + ".multiply_commutative");
+        call = makeApplication(std::move(call), std::move(a));
+        call = makeApplication(std::move(call), std::move(b));
+        return call;
+    }
+
+    // Build `reflexivity.{u}(T, x) : x = x`.
+    ExpressionPointer buildReflexivity(
+        LevelPointer universeLevel,
+        ExpressionPointer carrierType,
+        ExpressionPointer x) {
+        ExpressionPointer call = makeConstant(
+            "reflexivity", {universeLevel});
+        call = makeApplication(std::move(call), std::move(carrierType));
+        call = makeApplication(std::move(call), std::move(x));
+        return call;
+    }
+
+    // Build a proof : left_assoc(factors_with_swap) = left_assoc(factors).
+    // Reading direction matches insertion-sort's chained proof: each
+    // step's RHS is the freshly-rearranged form. `swapPosition` swaps
+    // factors[swapPosition - 1] and factors[swapPosition]; result is
+    // the proof of the new full product being equal to the previous.
+    //
+    // For positions just to the LEFT of swap, factors[0..swapPosition-2]
+    // become the "prefix" P inside the proof; for positions just to
+    // the RIGHT (swapPosition+1..n-1), each adds a congruenceOf-wrap
+    // around the inner proof.
+    //
+    // Returns proof : left_assoc(factors) =
+    //                 left_assoc(factors_after_swap)
+    ExpressionPointer buildAdjacentSwapProof(
+        const std::string& carrierName,
+        LevelPointer universeLevel,
+        ExpressionPointer carrierType,
+        const std::vector<ExpressionPointer>& factors,
+        size_t swapPosition) {
+        // swapPosition is the index of the SECOND of the two factors
+        // being swapped (so factors[swapPosition - 1] and
+        // factors[swapPosition] get exchanged). 1 <= swapPosition < n.
+        size_t k = swapPosition;
+        const ExpressionPointer& a = factors[k - 1];
+        const ExpressionPointer& b = factors[k];
+        // Step A: build the base swap proof at the level just enclosing
+        // factors a and b.
+        ExpressionPointer baseProof;
+        ExpressionPointer baseLHS;  // left-assoc of factors[0..k]
+        ExpressionPointer baseRHS;  // left-assoc with k-1 and k swapped
+        if (k == 1) {
+            // No prefix; the level-1 subtree is just `a * b`.
+            // Proof: commutative(a, b) : a*b = b*a.
+            baseProof = buildRingCommute(carrierName, a, b);
+            baseLHS = buildRingMultiply(carrierName, a, b);
+            baseRHS = buildRingMultiply(carrierName, b, a);
+        } else {
+            // Prefix P = left-assoc of factors[0..k-1] (positions 0
+            // through k-2). Then base subtree = (P * a) * b.
+            std::vector<ExpressionPointer> prefixFactors(
+                factors.begin(),
+                factors.begin() + static_cast<long>(k - 1));
+            ExpressionPointer P = assembleLeftAssociatedProduct(
+                carrierName + ".multiply", prefixFactors);
+            // Step 1: (P*a)*b = P*(a*b) by multiply_associative(P, a, b)
+            ExpressionPointer pTimesAB =
+                buildRingMultiply(carrierName, P,
+                    buildRingMultiply(carrierName, a, b));
+            ExpressionPointer pTimesA_TimesB =
+                buildRingMultiply(carrierName,
+                    buildRingMultiply(carrierName, P, a), b);
+            ExpressionPointer step1 =
+                buildRingAssoc(carrierName, P, a, b);
+            // Step 2: P*(a*b) = P*(b*a) via congruence with λz. P*z.
+            // Build the lambda: factor P is lifted (no bound-var
+            // shifting needed at top-level reads, but be safe).
+            ExpressionPointer plift = liftBoundVariables(P, 1, 0);
+            ExpressionPointer lambdaBody = buildRingMultiply(
+                carrierName, plift, makeBoundVariable(0));
+            ExpressionPointer lambdaPTimesZ = makeLambda(
+                "_ring_swap_z", carrierType, lambdaBody);
+            ExpressionPointer commutProof =
+                buildRingCommute(carrierName, a, b);
+            ExpressionPointer aTimesB =
+                buildRingMultiply(carrierName, a, b);
+            ExpressionPointer bTimesA =
+                buildRingMultiply(carrierName, b, a);
+            ExpressionPointer step2 = buildEqualityCongruenceSameCarrier(
+                universeLevel, carrierType, lambdaPTimesZ,
+                aTimesB, bTimesA, commutProof);
+            // Step 3: P*(b*a) = (P*b)*a via sym multiply_associative(P, b, a)
+            ExpressionPointer pTimesBA =
+                buildRingMultiply(carrierName, P,
+                    buildRingMultiply(carrierName, b, a));
+            ExpressionPointer pTimesB_TimesA =
+                buildRingMultiply(carrierName,
+                    buildRingMultiply(carrierName, P, b), a);
+            ExpressionPointer assocPBA =
+                buildRingAssoc(carrierName, P, b, a);
+            ExpressionPointer step3 = buildEqualitySymmetry(
+                universeLevel, carrierType,
+                pTimesB_TimesA, pTimesBA, assocPBA);
+            // Chain: transitivity(step1, transitivity(step2, step3))
+            ExpressionPointer step23 = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                pTimesAB, pTimesBA, pTimesB_TimesA, step2, step3);
+            baseProof = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                pTimesA_TimesB, pTimesAB, pTimesB_TimesA,
+                step1, step23);
+            baseLHS = pTimesA_TimesB;
+            baseRHS = pTimesB_TimesA;
+        }
+        // Step B: lift through factors[k+1..n-1] via congruences
+        // λz. z * factors[j] for each j > k.
+        ExpressionPointer currentProof = baseProof;
+        ExpressionPointer currentLHS = baseLHS;
+        ExpressionPointer currentRHS = baseRHS;
+        for (size_t j = k + 1; j < factors.size(); ++j) {
+            // Build lambda: λ z. z * factors[j].
+            ExpressionPointer fjLifted =
+                liftBoundVariables(factors[j], 1, 0);
+            ExpressionPointer lambdaBody = buildRingMultiply(
+                carrierName, makeBoundVariable(0), fjLifted);
+            ExpressionPointer lambda = makeLambda(
+                "_ring_lift_z", carrierType, lambdaBody);
+            ExpressionPointer newLHS = buildRingMultiply(
+                carrierName, currentLHS, factors[j]);
+            ExpressionPointer newRHS = buildRingMultiply(
+                carrierName, currentRHS, factors[j]);
+            currentProof = buildEqualityCongruenceSameCarrier(
+                universeLevel, carrierType, lambda,
+                currentLHS, currentRHS, currentProof);
+            currentLHS = std::move(newLHS);
+            currentRHS = std::move(newRHS);
+        }
+        return currentProof;
+    }
+
+    // Re-associate `expression` (an expression of `<Carrier>.multiply`s
+    // and atoms) into left-associated form. Returns a proof of
+    // `expression = left_assoc(flatten(expression))`.
+    //
+    // For the special case where the expression is already
+    // left-associated, returns reflexivity.
+    ExpressionPointer buildLeftAssocReassocProof(
+        const std::string& carrierName,
+        LevelPointer universeLevel,
+        ExpressionPointer carrierType,
+        ExpressionPointer expression) {
+        std::string multiplyName = carrierName + ".multiply";
+        std::vector<ExpressionPointer> factors;
+        if (!flattenRingProduct(expression, multiplyName, factors)) {
+            // Shouldn't happen — caller already flattened.
+            throwElaborate("ring: internal reassociate failure");
+        }
+        ExpressionPointer canonical =
+            assembleLeftAssociatedProduct(multiplyName, factors);
+        if (structurallyEqual(expression, canonical)) {
+            return buildReflexivity(universeLevel, carrierType,
+                                      expression);
+        }
+        // Recursive case: expression = A * B where B is itself a
+        // product. We re-associate: A * B = ... we want (left part of
+        // A's factors plus the first factor of B) * (rest of B). The
+        // cleanest path: structurally process.
+        //
+        // Walk expression: if it's leftFactor * rightFactor where
+        // rightFactor is `X * Y` (a product), then:
+        //   leftFactor * (X * Y) = (leftFactor * X) * Y  by sym assoc.
+        //   recurse on the new form, prefix with that one assoc step.
+        // Else if leftFactor is itself a product, recurse on leftFactor:
+        //   leftFactor * rightFactor: combine leftFactor's reassoc
+        //   proof with congruenceOf(λx. x * rightFactor, ...).
+        // Else (both atoms): we'd be at single-element case, handled
+        // by the equality check above.
+        auto outerApp =
+            std::get_if<Application>(&expression->node);
+        if (!outerApp) {
+            throwElaborate("ring: unexpected non-application in "
+                            "reassociate");
+        }
+        auto innerApp =
+            std::get_if<Application>(&outerApp->function->node);
+        if (!innerApp) {
+            throwElaborate("ring: unexpected non-multiply head");
+        }
+        ExpressionPointer leftSubExpr = innerApp->argument;
+        ExpressionPointer rightSubExpr = outerApp->argument;
+        // Check if rightSubExpr is itself `<carrier>.multiply(X, Y)`.
+        auto rightOuterApp =
+            std::get_if<Application>(&rightSubExpr->node);
+        if (rightOuterApp) {
+            auto rightInnerApp =
+                std::get_if<Application>(
+                    &rightOuterApp->function->node);
+            if (rightInnerApp) {
+                auto rightHead = std::get_if<Constant>(
+                    &rightInnerApp->function->node);
+                if (rightHead
+                    && rightHead->name == multiplyName) {
+                    // expression = L * (X * Y).
+                    ExpressionPointer X = rightInnerApp->argument;
+                    ExpressionPointer Y = rightOuterApp->argument;
+                    // Step: L*(X*Y) = (L*X)*Y by sym assoc(L, X, Y).
+                    ExpressionPointer assocProof = buildRingAssoc(
+                        carrierName, leftSubExpr, X, Y);
+                    ExpressionPointer LXTimesY = buildRingMultiply(
+                        carrierName,
+                        buildRingMultiply(
+                            carrierName, leftSubExpr, X),
+                        Y);
+                    ExpressionPointer LTimesXY = buildRingMultiply(
+                        carrierName, leftSubExpr,
+                        buildRingMultiply(carrierName, X, Y));
+                    ExpressionPointer symAssoc = buildEqualitySymmetry(
+                        universeLevel, carrierType,
+                        LXTimesY, LTimesXY, assocProof);
+                    // Recursively re-associate the new form.
+                    ExpressionPointer recProof =
+                        buildLeftAssocReassocProof(
+                            carrierName, universeLevel, carrierType,
+                            LXTimesY);
+                    // Chain: L*(X*Y) = (L*X)*Y = canonical.
+                    return buildEqualityTransitivity(
+                        universeLevel, carrierType,
+                        expression, LXTimesY, canonical,
+                        symAssoc, recProof);
+                }
+            }
+        }
+        // Right is atomic. Recurse on the left subexpression.
+        ExpressionPointer leftCanonical;
+        {
+            std::vector<ExpressionPointer> leftFactors;
+            if (!flattenRingProduct(leftSubExpr, multiplyName,
+                                      leftFactors)) {
+                throwElaborate(
+                    "ring: internal flatten failure (left)");
+            }
+            leftCanonical = assembleLeftAssociatedProduct(
+                multiplyName, leftFactors);
+        }
+        ExpressionPointer leftProof = buildLeftAssocReassocProof(
+            carrierName, universeLevel, carrierType, leftSubExpr);
+        // Build lambda: λ z. z * rightSubExpr.
+        ExpressionPointer rightLifted =
+            liftBoundVariables(rightSubExpr, 1, 0);
+        ExpressionPointer lambdaBody = buildRingMultiply(
+            carrierName, makeBoundVariable(0), rightLifted);
+        ExpressionPointer lambda = makeLambda(
+            "_ring_assoc_z", carrierType, lambdaBody);
+        return buildEqualityCongruenceSameCarrier(
+            universeLevel, carrierType, lambda,
+            leftSubExpr, leftCanonical, leftProof);
+    }
+
     ExpressionPointer proveProductEqualsSorted(
         ExpressionPointer original,
         const std::vector<ExpressionPointer>& originalFactors,
@@ -3905,44 +4276,77 @@ private:
         ExpressionPointer carrierType,
         LevelPointer carrierUniverseLevel,
         int line) {
-        // If the original factor sequence already matches the sorted
-        // sequence AND the original is already left-associated, we
-        // emit reflexivity. Detecting "left-associated" is structural.
-        bool factorsAlreadyMatch =
-            originalFactors.size() == sortedFactors.size();
-        if (factorsAlreadyMatch) {
-            for (size_t i = 0; i < originalFactors.size(); ++i) {
-                if (!structurallyEqual(originalFactors[i],
-                                          sortedFactors[i])) {
-                    factorsAlreadyMatch = false;
-                    break;
-                }
-            }
-        }
+        (void)line;
         std::string multiplyName = carrierName + ".multiply";
         ExpressionPointer canonical =
             assembleLeftAssociatedProduct(multiplyName, sortedFactors);
-        if (factorsAlreadyMatch
-            && structurallyEqual(original, canonical)) {
-            ExpressionPointer refl = makeConstant(
-                "reflexivity", {carrierUniverseLevel});
-            refl = makeApplication(std::move(refl), carrierType);
-            refl = makeApplication(std::move(refl), original);
-            return refl;
+        // Special case: single factor.
+        if (sortedFactors.size() <= 1) {
+            if (structurallyEqual(original, canonical)) {
+                return buildReflexivity(carrierUniverseLevel,
+                                          carrierType, original);
+            }
+            throwElaborate(
+                "ring: single-factor case but factors don't match");
         }
-        (void)line;
-        // Fallback: emit a "trust me" reflexivity over the canonical
-        // — the kernel will detect the structural mismatch and reject
-        // it, so the user gets a kernel error instead of our error.
-        // This isn't ideal, but for v1 it's an honest signal that the
-        // canonical form differs and the user needs to rearrange
-        // manually. A proper proof emitter is future work.
-        throwElaborate(
-            "`ring`: factor multiset matches but order differs — v1 "
-            "does not yet emit the rearrangement proof; use explicit "
-            "multiply_associative + multiply_commutative chains for "
-            "now");
-        return nullptr;  // unreachable
+        // Step 1: reassociate the original to left-assoc form.
+        ExpressionPointer reassocProof = buildLeftAssocReassocProof(
+            carrierName, carrierUniverseLevel, carrierType, original);
+        // Result type of reassocProof: original = left_assoc(originalFactors).
+        ExpressionPointer leftAssocOriginal =
+            assembleLeftAssociatedProduct(multiplyName, originalFactors);
+        // Step 2: insertion sort. Track currentFactors and accumulate
+        // a proof of left_assoc(originalFactors) = left_assoc(current).
+        std::vector<ExpressionPointer> current = originalFactors;
+        ExpressionPointer sortProof = buildReflexivity(
+            carrierUniverseLevel, carrierType, leftAssocOriginal);
+        ExpressionPointer currentExpr = leftAssocOriginal;
+        for (size_t i = 0; i < sortedFactors.size(); ++i) {
+            // Find position j >= i in `current` where
+            // current[j] == sortedFactors[i].
+            size_t j = i;
+            while (j < current.size()
+                   && !structurallyEqual(current[j],
+                                            sortedFactors[i])) {
+                ++j;
+            }
+            if (j >= current.size()) {
+                throwElaborate(
+                    "ring: factor multiset matched but element not "
+                    "found during sort — internal error");
+            }
+            // Bubble j down to i via adjacent swaps.
+            while (j > i) {
+                ExpressionPointer swapProof = buildAdjacentSwapProof(
+                    carrierName, carrierUniverseLevel, carrierType,
+                    current, j);
+                // After the swap, the new left-assoc is the same factor
+                // list with j-1 and j exchanged.
+                std::vector<ExpressionPointer> newCurrent = current;
+                std::swap(newCurrent[j - 1], newCurrent[j]);
+                ExpressionPointer newExpr =
+                    assembleLeftAssociatedProduct(
+                        multiplyName, newCurrent);
+                // Chain sortProof with swapProof.
+                sortProof = buildEqualityTransitivity(
+                    carrierUniverseLevel, carrierType,
+                    leftAssocOriginal, currentExpr, newExpr,
+                    sortProof, swapProof);
+                current = std::move(newCurrent);
+                currentExpr = std::move(newExpr);
+                --j;
+            }
+        }
+        // Final proof: original = left_assoc(original) = canonical.
+        if (!structurallyEqual(currentExpr, canonical)) {
+            throwElaborate(
+                "ring: insertion sort ended with mismatched form — "
+                "internal error");
+        }
+        return buildEqualityTransitivity(
+            carrierUniverseLevel, carrierType,
+            original, leftAssocOriginal, canonical,
+            reassocProof, sortProof);
     }
 
     // `sorry` — desugars to either `Internal.sorry_proposition(<P>)`
