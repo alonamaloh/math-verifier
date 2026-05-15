@@ -7,17 +7,29 @@ import Logic.basics
 import Equality.basics
 import Natural.basics
 import Integer.basics
+import Integer.addition
 
 -- (1) `Quotient.mk(rep)` — R inferred from expected type.
 theorem mk_test (rep : IntegerRepresentative) : Integer :=
   Quotient.mk(rep)
 
--- (2) `Quotient.sound(x, y, proof)` — T from x, R from proof. We
--- introduce `Quotient.mk`'s targets via `let` to give them an expected
--- type; otherwise `_ = _` elaborates its two
--- endpoints without expected types and `Quotient.mk` can't infer `R`.
+-- (2) `Quotient.sound(x, y, proof)` — T from x, R from proof. The
+-- `=` desugar elaborates the left side first and passes its type as
+-- the expected type for the right, so the right `Quotient.mk(rep2)`
+-- can back-infer R. The left still needs explicit T, R since it has
+-- no prior expected type.
 theorem sound_test
         (rep1 rep2 : IntegerRepresentative)
         (proof : IntegerEquivalent(rep1, rep2))
-        : Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep1) = Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep2) :=
+        : Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep1) = Quotient.mk(rep2) :=
   Quotient.sound(rep1, rep2, proof)
+
+-- (3) When the LEFT side has a fixable type from elsewhere — for
+-- instance an outer expected type passed to `:` — both sides can be
+-- implicit. Here the theorem's signature is the expected type but
+-- since the carrier is `Integer`, both `Quotient.mk` calls back-infer.
+theorem both_implicit_test
+        (rep1 rep2 : IntegerRepresentative)
+        (proof : IntegerEquivalent(rep1, rep2))
+        : Integer.zero = Integer.zero :=
+  reflexivity(Integer.zero)

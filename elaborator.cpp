@@ -2498,12 +2498,16 @@ private:
                 // resulting term is valid in the original context.
                 ExpressionPointer leftKernel =
                     elaborateExpression(*binary->left, localBinders);
-                ExpressionPointer rightKernel =
-                    elaborateExpression(*binary->right, localBinders);
                 ExpressionPointer leftTypeOpen =
                     inferTypeInLocalContext(localBinders, leftKernel);
                 ExpressionPointer leftType = closeOverLocalBinders(
                     leftTypeOpen, localBinders, localBinders.size());
+                // Pass leftType as expected type for the right side.
+                // This lets `Quotient.mk(rep2)` (implicit T, R) back-
+                // infer R from the carrier when the left side fixes it.
+                ExpressionPointer rightKernel =
+                    elaborateExpression(*binary->right, localBinders,
+                                          leftType);
                 LevelPointer universeLevel =
                     typeUniverseOf(localBinders, leftKernel);
                 ExpressionPointer equalityReference =
