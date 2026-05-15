@@ -5097,6 +5097,42 @@ private:
         if (!registered.empty()) {
             targetFunction = registered;
         }
+        // Fallback: if the raw head Constant didn't match anything,
+        // try operand-type names from the registry whose definition
+        // δ-reduces to the operand's actual type. This catches
+        // `Quotient.mk(IntegerRepresentative, IntegerEquivalent, _)`
+        // (raw type head: `Quotient`) being treated as `Integer`
+        // (whose definition body is exactly that `Quotient(...)`).
+        if (targetFunction.empty()) {
+            ExpressionPointer operandLeftWHNF = weakHeadNormalForm(
+                environment_, leftTypeRaw);
+            ExpressionPointer operandRightWHNF = weakHeadNormalForm(
+                environment_, rightTypeRaw);
+            for (const auto& [key, funcName]
+                 : environment_.operatorRegistry) {
+                const auto& [opSym, leftReg, rightReg] = key;
+                if (opSym != operatorSymbol) continue;
+                const Declaration* leftDecl =
+                    environment_.lookup(leftReg);
+                const Declaration* rightDecl =
+                    environment_.lookup(rightReg);
+                auto* leftDef = leftDecl
+                    ? std::get_if<Definition>(leftDecl) : nullptr;
+                auto* rightDef = rightDecl
+                    ? std::get_if<Definition>(rightDecl) : nullptr;
+                if (!leftDef || !rightDef) continue;
+                ExpressionPointer leftRegBodyWHNF = weakHeadNormalForm(
+                    environment_, leftDef->body);
+                ExpressionPointer rightRegBodyWHNF = weakHeadNormalForm(
+                    environment_, rightDef->body);
+                if (structurallyEqual(leftRegBodyWHNF, operandLeftWHNF)
+                    && structurallyEqual(rightRegBodyWHNF,
+                                            operandRightWHNF)) {
+                    targetFunction = funcName;
+                    break;
+                }
+            }
+        }
         // For `<` we wrap the left operand in `successor`, since
         // `a < b` is defined as `LessOrEqual(successor(a), b)`. This is
         // special enough that we leave it built-in.

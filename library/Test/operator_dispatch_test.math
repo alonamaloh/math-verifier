@@ -1,0 +1,34 @@
+-- Operator-dispatch with δ-reduction fallback.
+--
+-- The `+` operator is registered for (Integer, Integer). An expression
+-- like `Quotient.mk(IntegerRepresentative, IntegerEquivalent, …)`
+-- has raw head type `Quotient` — not `Integer`. The operator-dispatch
+-- δ-reduce fallback notices that `Integer`'s definition body is
+-- exactly that `Quotient(…)`, so the call routes to `Integer.add`.
+
+module Test.operator_dispatch_test
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.addition
+
+-- Direct: operands typed as Integer. No δ-reduction needed.
+theorem direct_integer_add (a b : Integer) : a + b = Integer.add(a, b) :=
+  reflexivity(Integer.add(a, b))
+
+-- Operand types are `Quotient(IntegerRepresentative, IntegerEquivalent)`
+-- (the raw `Quotient.mk` constructor type). The δ-reduce fallback
+-- recognises this as `Integer` and dispatches to `Integer.add`.
+theorem quotient_mk_add (rep1 rep2 : IntegerRepresentative)
+        : Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep1)
+          + Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep2)
+          = Integer.add(
+                Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep1),
+                Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep2)) :=
+  reflexivity(
+      Integer.add(
+          Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep1),
+          Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep2)))
