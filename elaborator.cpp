@@ -5635,15 +5635,29 @@ private:
 
         // Locate the unique occurrence of `lemmaLeft` inside the goal's
         // left endpoint, replacing it with BoundVariable(0) and shifting
-        // outer references up by 1.
+        // outer references up by 1. If the forward direction doesn't
+        // find a match, automatically try the reverse direction (as if
+        // the user wrote `rewrite(Equality.symmetry(lemma))`).
         int occurrenceCount = 0;
         ExpressionPointer abstractedBody = abstractStructuralOccurrence(
             goalComponents.leftEndpoint, lemmaLeft,
             /*currentDepth=*/0, occurrenceCount);
+        bool reversed = false;
         if (occurrenceCount == 0) {
-            throwElaborate(
-                "rewrite: the lemma's left endpoint does not appear "
-                "(structurally) in the goal's left side");
+            int reverseOccurrenceCount = 0;
+            ExpressionPointer reverseAbstractedBody =
+                abstractStructuralOccurrence(
+                    goalComponents.leftEndpoint, lemmaRight,
+                    /*currentDepth=*/0, reverseOccurrenceCount);
+            if (reverseOccurrenceCount > 0) {
+                occurrenceCount = reverseOccurrenceCount;
+                abstractedBody = std::move(reverseAbstractedBody);
+                reversed = true;
+            } else {
+                throwElaborate(
+                    "rewrite: neither endpoint of the lemma appears "
+                    "(structurally) in the goal's left side");
+            }
         }
         if (occurrenceCount > 1) {
             throwElaborate(
@@ -5659,6 +5673,26 @@ private:
         // Build `Equality.congruence.{u, v}(lemmaT, goalT, λ,
         //                                    lemmaLeft, lemmaRight,
         //                                    lemma)`.
+        // When reversed, swap the endpoints and wrap the lemma in
+        // Equality.symmetry so the resulting term still type-checks.
+        ExpressionPointer effectiveLemma = lemmaKernel;
+        ExpressionPointer effectiveLeft = lemmaLeft;
+        ExpressionPointer effectiveRight = lemmaRight;
+        if (reversed) {
+            ExpressionPointer symmetryCall = makeConstant(
+                "Equality.symmetry",
+                {lemmaComponentsOpened.carrierUniverseLevel});
+            symmetryCall = makeApplication(
+                std::move(symmetryCall), lemmaCarrier);
+            symmetryCall = makeApplication(
+                std::move(symmetryCall), lemmaLeft);
+            symmetryCall = makeApplication(
+                std::move(symmetryCall), lemmaRight);
+            symmetryCall = makeApplication(
+                std::move(symmetryCall), std::move(effectiveLemma));
+            effectiveLemma = std::move(symmetryCall);
+            std::swap(effectiveLeft, effectiveRight);
+        }
         ExpressionPointer call = makeConstant(
             "Equality.congruence",
             {lemmaComponentsOpened.carrierUniverseLevel,
@@ -5666,9 +5700,9 @@ private:
         call = makeApplication(std::move(call), lemmaCarrier);
         call = makeApplication(std::move(call), goalComponents.carrierType);
         call = makeApplication(std::move(call), std::move(abstractionLambda));
-        call = makeApplication(std::move(call), lemmaLeft);
-        call = makeApplication(std::move(call), lemmaRight);
-        call = makeApplication(std::move(call), std::move(lemmaKernel));
+        call = makeApplication(std::move(call), std::move(effectiveLeft));
+        call = makeApplication(std::move(call), std::move(effectiveRight));
+        call = makeApplication(std::move(call), std::move(effectiveLemma));
         return call;
     }
 
