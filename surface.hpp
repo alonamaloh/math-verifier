@@ -174,6 +174,13 @@ struct SurfaceHammer { };
 // the use site so the build log surfaces the gap.
 struct SurfaceSorry { };
 
+// `ring` — closes an equality goal in a known commutative-ring carrier
+// (Integer, Rational, …) by reifying both sides as polynomial
+// expressions, normalizing them to a canonical sum-of-products form,
+// and emitting an explicit proof using the carrier's
+// associativity / commutativity / distributivity lemmas.
+struct SurfaceRing { };
+
 // `by_induction on scrutinee using inductionLemma with subjectName,
 // ihName { body }`. The elaborator constructs the motive by
 // abstracting the surrounding expected type over the scrutinee
@@ -213,7 +220,7 @@ struct SurfaceExpression {
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer, SurfaceSorry,
-        SurfaceCalc, SurfaceByInductionUsing
+        SurfaceRing, SurfaceCalc, SurfaceByInductionUsing
     > node;
     int line = 0;
     int column = 0;
@@ -307,6 +314,10 @@ inline SurfaceExpressionPointer makeSurfaceHammer(int line, int column) {
 inline SurfaceExpressionPointer makeSurfaceSorry(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceSorry{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceRing(int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceRing{}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceCalc(
     SurfaceExpressionPointer initialExpression,

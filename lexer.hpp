@@ -40,6 +40,7 @@ enum class TokenKind {
     KeywordFrom,            // separator for `obtain ⟨…⟩ from E;`
     KeywordSet,             // `set n := E;` — transparent local definition
     KeywordSorry,           // `sorry` — placeholder for an unwritten proof
+    KeywordRing,            // `ring` — commutative-ring decision tactic
 
     // Punctuation
     LeftParen, RightParen,

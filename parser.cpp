@@ -30,6 +30,7 @@ bool isContextualKeyword(TokenKind kind) {
         case TokenKind::KeywordApply:
         case TokenKind::KeywordContradiction:
         case TokenKind::KeywordSorry:
+        case TokenKind::KeywordRing:
         case TokenKind::KeywordOperator:
         case TokenKind::KeywordOverload:
             return true;
@@ -1186,14 +1187,20 @@ private:
 
     SurfaceExpressionPointer parseAtom() {
         const Token& current = peek();
-        // `sorry` must short-circuit before the identifier-like path
-        // because it is also a contextual keyword (so it can appear as
-        // a name segment inside `Internal.sorry`); in expression
-        // position the keyword form takes priority.
+        // `sorry` and `ring` must short-circuit before the
+        // identifier-like path because they're also contextual
+        // keywords (so they can appear as name segments inside
+        // qualified identifiers like `Internal.sorry` or
+        // `Integer.ring`); in expression position the keyword form
+        // takes priority.
         if (current.kind == TokenKind::KeywordSorry) {
             Token sorryToken = consumeAny();
             return makeSurfaceSorry(sorryToken.line,
                                      sorryToken.column);
+        }
+        if (current.kind == TokenKind::KeywordRing) {
+            Token ringToken = consumeAny();
+            return makeSurfaceRing(ringToken.line, ringToken.column);
         }
         if (isIdentifierLike(current.kind)) {
             return parseQualifiedIdentifier();
