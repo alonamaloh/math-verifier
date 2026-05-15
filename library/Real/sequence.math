@@ -1,0 +1,74 @@
+-- Real/sequence.math
+--
+-- Sequences of Rationals and the standard convergence / Cauchy /
+-- bounded predicates. The Real-number construction is a quotient of
+-- (Cauchy) rational sequences, so all the analytic vocabulary starts
+-- here.
+
+module Real.sequence
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.absolute_value
+
+-- A sequence of Rationals: a function ℕ → ℚ.
+definition Rational.sequence.Sequence : Type(0) :=
+  Natural → Rational
+
+-- `s` converges to `limit`: for every positive ε there is an N such
+-- that beyond N, every term is within ε of the limit.
+definition Rational.sequence.ConvergesTo
+        (s : Rational.sequence.Sequence) (limit : Rational)
+        : Proposition :=
+  (epsilon : Rational) → Rational.zero < epsilon →
+    ∃ (N : Natural).
+      (m : Natural) → N ≤ m →
+        Rational.absolute_value(s(m) - limit) < epsilon
+
+-- `s` is Cauchy: terms get arbitrarily close to each other beyond
+-- some index.
+definition Rational.sequence.IsCauchy
+        (s : Rational.sequence.Sequence) : Proposition :=
+  (epsilon : Rational) → Rational.zero < epsilon →
+    ∃ (N : Natural).
+      (m : Natural) → N ≤ m →
+        (n : Natural) → N ≤ n →
+          Rational.absolute_value(s(m) - s(n)) < epsilon
+
+-- `s` is bounded: there is a single M (Rational) bounding every
+-- |s(n)|. Required to prove products of Cauchy sequences are Cauchy.
+definition Rational.sequence.Bounded
+        (s : Rational.sequence.Sequence) : Proposition :=
+  ∃ (boundValue : Rational).
+    (n : Natural) →
+      Rational.absolute_value(s(n)) ≤ boundValue
+
+-- Constant sequence is Cauchy: every two terms are equal, so |s(m) -
+-- s(n)| = 0 < ε for any positive ε. Stubbed for now — fills in with
+-- `Rational.subtract_self : x - x = 0` and `Rational.absolute_value_zero
+-- = 0` plus the assumption `0 < ε`.
+theorem Rational.sequence.constant_is_cauchy (q : Rational)
+        : Rational.sequence.IsCauchy(function (n : Natural) => q) := sorry
+
+-- Constant sequence converges to its constant value. Same shape.
+theorem Rational.sequence.constant_converges_to_itself (q : Rational)
+        : Rational.sequence.ConvergesTo(
+              function (n : Natural) => q, q) := sorry

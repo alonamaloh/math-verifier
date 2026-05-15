@@ -1,0 +1,43 @@
+-- Real/embedding.math
+--
+-- Rational → Real embedding: the constant Cauchy sequence λ _. q.
+-- Registers as a coercion, which the registry transitively-closes
+-- with the existing Natural → Integer → Rational chain to give
+-- `(n : Real)` for any Natural / Integer / Rational `n`.
+
+module Real.embedding
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.absolute_value
+import Real.sequence
+import Real.basics
+
+-- Constant Cauchy sequence: λ _. q.
+definition Rational.to_cauchy_constant (q : Rational)
+        : CauchyRationalSequence :=
+  CauchyRationalSequence.make(
+      function (_ : Natural) => q,
+      Rational.sequence.constant_is_cauchy(q))
+
+-- Embed Rational into Real.
+definition Rational.to_real (q : Rational) : Real :=
+  Quotient.mk(Rational.to_cauchy_constant(q))
+
+-- Register the embedding as a coercion (Rational, Real).
+coercion (Rational, Real) := Rational.to_real
+
+-- Canonical real constants.
+definition Real.zero : Real := Rational.to_real(Rational.zero)
+definition Real.one  : Real := Rational.to_real(Rational.one)

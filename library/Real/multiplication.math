@@ -1,0 +1,85 @@
+-- Real/multiplication.math
+--
+-- Pointwise product of Cauchy sequences, lifted to a binary operation
+-- on Real. Same structure as Real.addition. Cauchy-of-product uses
+-- boundedness (cauchy_is_bounded) and is the most analytically
+-- substantial of the basic Real operations; stubbed here.
+
+module Real.multiplication
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.absolute_value
+import Real.sequence
+import Real.basics
+import Real.embedding
+
+-- Pointwise product of two Cauchy sequences is Cauchy. Stub.
+theorem Rational.sequence.product_is_cauchy
+        (s t : Rational.sequence.Sequence)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        (tIsCauchy : Rational.sequence.IsCauchy(t))
+        : Rational.sequence.IsCauchy(
+              function (n : Natural) => s(n) * t(n)) := sorry
+
+definition CauchyRationalSequence.multiply
+        : CauchyRationalSequence → CauchyRationalSequence
+          → CauchyRationalSequence
+  | CauchyRationalSequence.make(s, sCauchy),
+    CauchyRationalSequence.make(t, tCauchy) =>
+      CauchyRationalSequence.make(
+          function (n : Natural) => s(n) * t(n),
+          Rational.sequence.product_is_cauchy(s, t, sCauchy, tCauchy))
+
+theorem Real.multiply_after_first_respects
+        (rep_x rep_y rep_yPrime : CauchyRationalSequence)
+        (yEquiv : CauchyEquivalent(rep_y, rep_yPrime))
+        : Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.multiply(rep_x, rep_y))
+          = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                         CauchyRationalSequence.multiply(rep_x, rep_yPrime)) := sorry
+
+theorem Real.multiply_respects
+        (rep_x rep_xPrime : CauchyRationalSequence)
+        (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
+        (yReal : Real)
+        : Quotient.lift(
+              function (rep_y : CauchyRationalSequence) =>
+                  Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                               CauchyRationalSequence.multiply(rep_x, rep_y)),
+              Real.multiply_after_first_respects(rep_x),
+              yReal)
+          = Quotient.lift(
+              function (rep_y : CauchyRationalSequence) =>
+                  Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                               CauchyRationalSequence.multiply(rep_xPrime, rep_y)),
+              Real.multiply_after_first_respects(rep_xPrime),
+              yReal) := sorry
+
+definition Real.multiply_after_first
+        (rep_x : CauchyRationalSequence) (yReal : Real) : Real :=
+  Quotient.lift(
+      function (rep_y : CauchyRationalSequence) =>
+          Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.multiply(rep_x, rep_y)),
+      Real.multiply_after_first_respects(rep_x),
+      yReal)
+
+definition Real.multiply (x y : Real) : Real :=
+  Quotient.lift(
+      function (rep_x : CauchyRationalSequence) =>
+          Real.multiply_after_first(rep_x, y),
+      function (rep_x rep_xPrime : CauchyRationalSequence)
+               (xEquiv : CauchyEquivalent(rep_x, rep_xPrime)) =>
+          Real.multiply_respects(rep_x, rep_xPrime, xEquiv, y),
+      x)
+
+operator (*) on (Real, Real) := Real.multiply

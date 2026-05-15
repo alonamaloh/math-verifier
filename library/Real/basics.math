@@ -1,0 +1,69 @@
+-- Real/basics.math
+--
+-- Real numbers as equivalence classes of Cauchy sequences of
+-- Rationals. The equivalence relation: two Cauchy sequences are
+-- equivalent iff their pointwise difference converges to zero.
+
+module Real.basics
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.absolute_value
+import Real.sequence
+
+-- A Cauchy sequence packaged with its Cauchy-witness proof.
+inductive CauchyRationalSequence : Type(0) where
+  | CauchyRationalSequence.make
+      : (sequenceFunction : Rational.sequence.Sequence)
+        → Rational.sequence.IsCauchy(sequenceFunction)
+        → CauchyRationalSequence
+
+-- Extract the underlying sequence from a packaged CauchyRationalSequence.
+definition CauchyRationalSequence.sequenceFunction
+        : CauchyRationalSequence → Rational.sequence.Sequence
+  | CauchyRationalSequence.make(s, _) => s
+
+-- Two Cauchy sequences are equivalent when their pointwise difference
+-- converges to zero: for every positive ε there exists N such that
+-- beyond N, |s(m) - t(m)| < ε.
+definition CauchyEquivalent
+        (a b : CauchyRationalSequence) : Proposition :=
+  (epsilon : Rational) → Rational.zero < epsilon →
+    ∃ (N : Natural).
+      (m : Natural) → N ≤ m →
+        Rational.absolute_value(
+            CauchyRationalSequence.sequenceFunction(a, m)
+            - CauchyRationalSequence.sequenceFunction(b, m))
+          < epsilon
+
+-- The Real numbers: equivalence classes of Cauchy rational sequences.
+definition Real : Type(0) :=
+  Quotient(CauchyRationalSequence, CauchyEquivalent)
+
+-- CauchyEquivalent is reflexive. Stubbed: every pointwise difference
+-- is zero, so |0| = 0 < ε.
+theorem CauchyEquivalent.reflexive
+        : (a : CauchyRationalSequence) → CauchyEquivalent(a, a) := sorry
+
+-- CauchyEquivalent is symmetric. Stubbed: |x - y| = |y - x|.
+theorem CauchyEquivalent.symmetric
+        : (a b : CauchyRationalSequence)
+          → CauchyEquivalent(a, b) → CauchyEquivalent(b, a) := sorry
+
+-- CauchyEquivalent is transitive. Stubbed: triangle inequality on
+-- the pointwise differences, with ε/2 + ε/2 = ε threshold split.
+theorem CauchyEquivalent.transitive
+        : (a b c : CauchyRationalSequence)
+          → CauchyEquivalent(a, b) → CauchyEquivalent(b, c)
+          → CauchyEquivalent(a, c) := sorry

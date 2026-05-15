@@ -1,0 +1,59 @@
+-- Real/negation.math
+--
+-- Pointwise negation of Cauchy sequences. Negation preserves the
+-- Cauchy property because `|−s(m) − −s(n)| = |s(n) − s(m)| = |s(m)
+-- − s(n)|`.
+
+module Real.negation
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.absolute_value
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+
+-- Pointwise negation of a Cauchy sequence is Cauchy. Stub.
+theorem Rational.sequence.negate_is_cauchy
+        (s : Rational.sequence.Sequence)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        : Rational.sequence.IsCauchy(
+              function (n : Natural) => -s(n)) := sorry
+
+definition CauchyRationalSequence.negate
+        : CauchyRationalSequence → CauchyRationalSequence
+  | CauchyRationalSequence.make(s, sCauchy) =>
+      CauchyRationalSequence.make(
+          function (n : Natural) => -s(n),
+          Rational.sequence.negate_is_cauchy(s, sCauchy))
+
+theorem Real.negate_respects
+        (rep1 rep1Prime : CauchyRationalSequence)
+        (equivalenceHypothesis : CauchyEquivalent(rep1, rep1Prime))
+        : Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.negate(rep1))
+          = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                         CauchyRationalSequence.negate(rep1Prime)) := sorry
+
+definition Real.negate (x : Real) : Real :=
+  Quotient.lift(
+      function (rep : CauchyRationalSequence) =>
+          Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.negate(rep)),
+      Real.negate_respects,
+      x)
+
+-- Subtraction.
+definition Real.subtract (x y : Real) : Real :=
+  x + Real.negate(y)
+
+operator (-) on (Real, Real) := Real.subtract

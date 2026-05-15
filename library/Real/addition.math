@@ -1,0 +1,96 @@
+-- Real/addition.math
+--
+-- Pointwise sum of Cauchy sequences, lifted to a binary operation on
+-- Real. The respect proofs are stubbed for now (each is a triangle-
+-- inequality + ε/2 split); the API surface and reduction behaviour
+-- are exposed so downstream proofs can be written against them.
+
+module Real.addition
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.absolute_value
+import Real.sequence
+import Real.basics
+import Real.embedding
+
+-- The pointwise sum of two sequences is Cauchy when both are.
+-- Stub: standard ε/2 split.
+theorem Rational.sequence.sum_is_cauchy
+        (s t : Rational.sequence.Sequence)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        (tIsCauchy : Rational.sequence.IsCauchy(t))
+        : Rational.sequence.IsCauchy(
+              function (n : Natural) => s(n) + t(n)) := sorry
+
+-- Sum of two packaged Cauchy sequences.
+definition CauchyRationalSequence.add
+        : CauchyRationalSequence → CauchyRationalSequence
+          → CauchyRationalSequence
+  | CauchyRationalSequence.make(s, sCauchy),
+    CauchyRationalSequence.make(t, tCauchy) =>
+      CauchyRationalSequence.make(
+          function (n : Natural) => s(n) + t(n),
+          Rational.sequence.sum_is_cauchy(s, t, sCauchy, tCauchy))
+
+-- Inner respect proof: with x fixed, the function `λ y. mk(add(x, y))`
+-- respects CauchyEquivalent in its argument. Stub.
+theorem Real.add_after_first_respects
+        (rep_x rep_y rep_yPrime : CauchyRationalSequence)
+        (yEquiv : CauchyEquivalent(rep_y, rep_yPrime))
+        : Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.add(rep_x, rep_y))
+          = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                         CauchyRationalSequence.add(rep_x, rep_yPrime)) := sorry
+
+-- Outer respect: lift over x. Stub.
+theorem Real.add_respects
+        (rep_x rep_xPrime : CauchyRationalSequence)
+        (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
+        (yReal : Real)
+        : Quotient.lift(
+              function (rep_y : CauchyRationalSequence) =>
+                  Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.add(rep_x, rep_y)),
+              Real.add_after_first_respects(rep_x),
+              yReal)
+          = Quotient.lift(
+              function (rep_y : CauchyRationalSequence) =>
+                  Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.add(rep_xPrime, rep_y)),
+              Real.add_after_first_respects(rep_xPrime),
+              yReal) := sorry
+
+-- Inner "add-with-fixed-first": Real → Real, lifts y over the inner
+-- respect.
+definition Real.add_after_first
+        (rep_x : CauchyRationalSequence) (yReal : Real) : Real :=
+  Quotient.lift(
+      function (rep_y : CauchyRationalSequence) =>
+          Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.add(rep_x, rep_y)),
+      Real.add_after_first_respects(rep_x),
+      yReal)
+
+-- Real.add itself: lift over x.
+definition Real.add (x y : Real) : Real :=
+  Quotient.lift(
+      function (rep_x : CauchyRationalSequence) =>
+          Real.add_after_first(rep_x, y),
+      function (rep_x rep_xPrime : CauchyRationalSequence)
+               (xEquiv : CauchyEquivalent(rep_x, rep_xPrime)) =>
+          Real.add_respects(rep_x, rep_xPrime, xEquiv, y),
+      x)
+
+operator (+) on (Real, Real) := Real.add
