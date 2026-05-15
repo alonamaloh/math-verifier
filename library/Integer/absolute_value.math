@@ -116,3 +116,46 @@ theorem Integer.negate_negate (x : Integer) : -(-x) = x :=
                   Quotient.mk(IntegerRepresentative, IntegerEquivalent, r),
               Integer.negate_negate_at_representative(rep)),
       x)
+
+-- -(p + q) = -p + -q at the representative level. Both sides reduce
+-- to make(β + δ, α + γ) when p = mk(make(α, β)), q = mk(make(γ, δ)).
+theorem Integer.negate_add_at_representatives
+        : (rep_p rep_q : IntegerRepresentative)
+          → Integer.negate_representatives(
+                Integer.add_representatives(rep_p, rep_q))
+            = Integer.add_representatives(
+                Integer.negate_representatives(rep_p),
+                Integer.negate_representatives(rep_q))
+  | IntegerRepresentative.make(alpha, beta),
+    IntegerRepresentative.make(gamma, delta) =>
+      reflexivity(IntegerRepresentative,
+          IntegerRepresentative.make(beta + delta, alpha + gamma))
+
+-- -(p + q) = -p + -q on Integer. Quotient.induct_two to handle both
+-- arguments.
+theorem Integer.negate_add (p q : Integer) : -(p + q) = -p + -q :=
+  Quotient.induct_two(
+      IntegerRepresentative, IntegerEquivalent,
+      IntegerRepresentative, IntegerEquivalent,
+      function (a b : Integer) => -(a + b) = -a + -b,
+      function (rep_p rep_q : IntegerRepresentative) =>
+          congruenceOf(
+              function (r : IntegerRepresentative) =>
+                  Quotient.mk(IntegerRepresentative, IntegerEquivalent, r),
+              Integer.negate_add_at_representatives(rep_p, rep_q)),
+      p, q)
+
+-- x - y = -(y - x). Chained via subtract = add+negate, add_commutative,
+-- negate_add, and negate_negate.
+theorem Integer.subtract_swap (x y : Integer) : x - y = -(y - x) :=
+  calc x - y
+     = x + -y
+            by reflexivity(Integer, x + -y)
+     = -y + x
+            by Integer.add_commutative(x, -y)
+     = -y + -(-x)
+            by rewrite(Equality.symmetry(Integer.negate_negate(x)))
+     = -(y + -x)
+            by Equality.symmetry(Integer.negate_add(y, -x))
+     = -(y - x)
+            by reflexivity(Integer, -(y - x))

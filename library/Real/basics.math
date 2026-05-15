@@ -75,11 +75,62 @@ theorem CauchyEquivalent.reflexive
                       Rational.absolute_value_subtract_self(s(m))),
                   epsilonPositive))
 
--- CauchyEquivalent is symmetric. Stubbed: needs `|x - y| = |y - x|`
--- on Rational, which is itself a small but new lemma.
+-- CauchyEquivalent is symmetric. Use the abstract
+-- `sequenceFunction(...)` projector everywhere rather than
+-- destructuring (multi-arg constructor pattern doesn't refine
+-- through nested cases). Transport via |x - y| = |y - x|.
 theorem CauchyEquivalent.symmetric
-        : (a b : CauchyRationalSequence)
-          → CauchyEquivalent(a, b) → CauchyEquivalent(b, a) := sorry
+        (a b : CauchyRationalSequence)
+        (aEquivb : CauchyEquivalent(a, b))
+        : CauchyEquivalent(b, a) :=
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) =>
+    Exists.eliminate(
+        Natural,
+        function (N : Natural) =>
+          (m : Natural) → N ≤ m →
+            Rational.absolute_value(
+                CauchyRationalSequence.sequenceFunction(a, m)
+                - CauchyRationalSequence.sequenceFunction(b, m))
+              < epsilon,
+        ∃ (N : Natural).
+          (m : Natural) → N ≤ m →
+            Rational.absolute_value(
+                CauchyRationalSequence.sequenceFunction(b, m)
+                - CauchyRationalSequence.sequenceFunction(a, m))
+              < epsilon,
+        function (N : Natural)
+                 (aEquivb_at_N
+                     : (m : Natural) → N ≤ m →
+                       Rational.absolute_value(
+                           CauchyRationalSequence.sequenceFunction(a, m)
+                           - CauchyRationalSequence.sequenceFunction(b, m))
+                         < epsilon) =>
+          Exists.introduce(
+              Natural,
+              function (N' : Natural) =>
+                (m : Natural) → N' ≤ m →
+                  Rational.absolute_value(
+                      CauchyRationalSequence.sequenceFunction(b, m)
+                      - CauchyRationalSequence.sequenceFunction(a, m))
+                    < epsilon,
+              N,
+              function (m : Natural) (N_leq_m : N ≤ m) =>
+                Equality.transport_proposition(
+                    Rational,
+                    function (x : Rational) =>
+                        Rational.LessThan(x, epsilon),
+                    Rational.absolute_value(
+                        CauchyRationalSequence.sequenceFunction(a, m)
+                        - CauchyRationalSequence.sequenceFunction(b, m)),
+                    Rational.absolute_value(
+                        CauchyRationalSequence.sequenceFunction(b, m)
+                        - CauchyRationalSequence.sequenceFunction(a, m)),
+                    Rational.absolute_value_subtract_swap(
+                        CauchyRationalSequence.sequenceFunction(a, m),
+                        CauchyRationalSequence.sequenceFunction(b, m)),
+                    aEquivb_at_N(m, N_leq_m))),
+        aEquivb(epsilon, epsilonPositive))
 
 -- CauchyEquivalent is transitive. Stubbed: triangle inequality on
 -- the pointwise differences, with ε/2 + ε/2 = ε threshold split.

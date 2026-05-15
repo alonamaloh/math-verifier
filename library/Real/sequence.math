@@ -68,6 +68,52 @@ theorem Rational.absolute_value_subtract_self (q : Rational)
         : Rational.absolute_value(q - q) = Rational.zero :=
   congruenceOf(Rational.absolute_value, Rational.add_negate_right(q))
 
+-- Pointwise negation of a Cauchy sequence is Cauchy: |-s(m) - -s(n)|
+-- = |s(m) - s(n)| (via subtract_of_negates + absolute_value_negate),
+-- so the same N witness works.
+theorem Rational.sequence.negate_is_cauchy
+        (s : Rational.sequence.Sequence)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        : Rational.sequence.IsCauchy(
+              function (n : Natural) => -s(n)) :=
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) =>
+    Exists.eliminate(
+        Natural,
+        function (N : Natural) =>
+          (m : Natural) → N ≤ m →
+            (n : Natural) → N ≤ n →
+              Rational.absolute_value(s(m) - s(n)) < epsilon,
+        ∃ (N : Natural).
+          (m : Natural) → N ≤ m →
+            (n : Natural) → N ≤ n →
+              Rational.absolute_value(-s(m) - -s(n)) < epsilon,
+        function (N : Natural)
+                 (sCauchy_at_N
+                     : (m : Natural) → N ≤ m →
+                       (n : Natural) → N ≤ n →
+                       Rational.absolute_value(s(m) - s(n)) < epsilon) =>
+          Exists.introduce(
+              Natural,
+              function (N' : Natural) =>
+                (m : Natural) → N' ≤ m →
+                  (n : Natural) → N' ≤ n →
+                    Rational.absolute_value(-s(m) - -s(n)) < epsilon,
+              N,
+              function (m : Natural) (N_leq_m : N ≤ m)
+                       (n : Natural) (N_leq_n : N ≤ n) =>
+                Equality.transport_proposition(
+                    Rational,
+                    function (x : Rational) =>
+                        Rational.LessThan(x, epsilon),
+                    Rational.absolute_value(s(m) - s(n)),
+                    Rational.absolute_value(-s(m) - -s(n)),
+                    Equality.symmetry(
+                        Rational.absolute_value_of_subtract_of_negates(
+                            s(m), s(n))),
+                    sCauchy_at_N(m, N_leq_m, n, N_leq_n))),
+        sIsCauchy(epsilon, epsilonPositive))
+
 -- Constant sequence is Cauchy: |q - q| = 0 < ε.
 theorem Rational.sequence.constant_is_cauchy (q : Rational)
         : Rational.sequence.IsCauchy(function (n : Natural) => q) :=
