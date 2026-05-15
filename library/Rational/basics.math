@@ -48,7 +48,7 @@ definition RationalEquivalent
         : RationalRepresentative → RationalRepresentative → Proposition
   | RationalRepresentative.make(n1, d1),
     RationalRepresentative.make(n2, d2) =>
-      Integer.multiply(n1, Natural.to_integer(successor(d2))) = Integer.multiply(n2, Natural.to_integer(successor(d1)))
+      n1 * Natural.to_integer(successor(d2)) = n2 * Natural.to_integer(successor(d1))
 
 -- ----------------------------------------------------------------------
 -- Reflexivity is just reflexivity of Integer equality.
@@ -58,7 +58,7 @@ theorem RationalEquivalent.reflexive
           → RationalEquivalent(representative, representative)
   | RationalRepresentative.make(n, d) =>
       reflexivity(Integer,
-          Integer.multiply(n, Natural.to_integer(successor(d))))
+          n * Natural.to_integer(successor(d)))
 
 -- ----------------------------------------------------------------------
 -- Symmetry is just symmetry of Integer equality. The destructure
@@ -92,117 +92,65 @@ theorem RationalEquivalent.transitive_natural
         (n2 : Integer) (d2 : Natural)
         (n3 : Integer) (d3 : Natural)
         (firstEquivalence
-            : Integer.multiply(n1, Natural.to_integer(successor(d2))) = Integer.multiply(n2, Natural.to_integer(successor(d1))))
+            : n1 * Natural.to_integer(successor(d2)) = n2 * Natural.to_integer(successor(d1)))
         (secondEquivalence
-            : Integer.multiply(n2, Natural.to_integer(successor(d3))) = Integer.multiply(n3, Natural.to_integer(successor(d2))))
-        : Integer.multiply(n1, Natural.to_integer(successor(d3))) = Integer.multiply(n3,
-                                Natural.to_integer(successor(d1))) := {
+            : n2 * Natural.to_integer(successor(d3)) = n3 * Natural.to_integer(successor(d2)))
+        : n1 * Natural.to_integer(successor(d3)) = n3 * Natural.to_integer(successor(d1)) := {
     -- Multiply firstEquivalence on the right by succ(d3), then
     -- shuffle (succ(d2) succ(d3)) → (succ(d3) succ(d2)) on the LHS
     -- so the chained-cancellation factor succ(d2) is rightmost.
     claim leftChainedToD3
-          : Integer.multiply(
-                    Integer.multiply(n1,
-                        Natural.to_integer(successor(d3))),
-                    Natural.to_integer(successor(d2))) = Integer.multiply(
-                    Integer.multiply(n2,
-                        Natural.to_integer(successor(d1))),
-                    Natural.to_integer(successor(d3)))
-        by calc Integer.multiply(
-                    Integer.multiply(n1,
-                        Natural.to_integer(successor(d3))),
-                    Natural.to_integer(successor(d2)))
-              = Integer.multiply(n1,
-                    Integer.multiply(
-                        Natural.to_integer(successor(d3)),
-                        Natural.to_integer(successor(d2))))
+          : n1 * Natural.to_integer(successor(d3)) * Natural.to_integer(successor(d2)) = n2 * Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d3))
+        by calc n1 * Natural.to_integer(successor(d3)) * Natural.to_integer(successor(d2))
+              = n1 * (Natural.to_integer(successor(d3)) * Natural.to_integer(successor(d2)))
                     by Integer.multiply_associative(
                            n1,
                            Natural.to_integer(successor(d3)),
                            Natural.to_integer(successor(d2)))
-              = Integer.multiply(n1,
-                    Integer.multiply(
-                        Natural.to_integer(successor(d2)),
-                        Natural.to_integer(successor(d3))))
+              = n1 * (Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d3)))
                     by rewrite(Integer.multiply_commutative(
                            Natural.to_integer(successor(d3)),
                            Natural.to_integer(successor(d2))))
-              = Integer.multiply(
-                    Integer.multiply(n1,
-                        Natural.to_integer(successor(d2))),
-                    Natural.to_integer(successor(d3)))
+              = n1 * Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d3))
                     by Equality.symmetry(
                            Integer.multiply_associative(
                                n1,
                                Natural.to_integer(successor(d2)),
                                Natural.to_integer(successor(d3))))
-              = Integer.multiply(
-                    Integer.multiply(n2,
-                        Natural.to_integer(successor(d1))),
-                    Natural.to_integer(successor(d3)))
+              = n2 * Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d3))
                     by rewrite(firstEquivalence);
     -- Now reshape secondEquivalence the same way: multiply by
     -- succ(d1) and shuffle so the answer ends with succ(d2) rightmost.
     claim rightChainedToD1
-          : Integer.multiply(
-                    Integer.multiply(n2,
-                        Natural.to_integer(successor(d1))),
-                    Natural.to_integer(successor(d3))) = Integer.multiply(
-                    Integer.multiply(n3,
-                        Natural.to_integer(successor(d1))),
-                    Natural.to_integer(successor(d2)))
-        by calc Integer.multiply(
-                    Integer.multiply(n2,
-                        Natural.to_integer(successor(d1))),
-                    Natural.to_integer(successor(d3)))
-              = Integer.multiply(n2,
-                    Integer.multiply(
-                        Natural.to_integer(successor(d1)),
-                        Natural.to_integer(successor(d3))))
+          : n2 * Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d3)) = n3 * Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))
+        by calc n2 * Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d3))
+              = n2 * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d3)))
                     by Integer.multiply_associative(
                            n2,
                            Natural.to_integer(successor(d1)),
                            Natural.to_integer(successor(d3)))
-              = Integer.multiply(n2,
-                    Integer.multiply(
-                        Natural.to_integer(successor(d3)),
-                        Natural.to_integer(successor(d1))))
+              = n2 * (Natural.to_integer(successor(d3)) * Natural.to_integer(successor(d1)))
                     by rewrite(Integer.multiply_commutative(
                            Natural.to_integer(successor(d1)),
                            Natural.to_integer(successor(d3))))
-              = Integer.multiply(
-                    Integer.multiply(n2,
-                        Natural.to_integer(successor(d3))),
-                    Natural.to_integer(successor(d1)))
+              = n2 * Natural.to_integer(successor(d3)) * Natural.to_integer(successor(d1))
                     by Equality.symmetry(
                            Integer.multiply_associative(
                                n2,
                                Natural.to_integer(successor(d3)),
                                Natural.to_integer(successor(d1))))
-              = Integer.multiply(
-                    Integer.multiply(n3,
-                        Natural.to_integer(successor(d2))),
-                    Natural.to_integer(successor(d1)))
+              = n3 * Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d1))
                     by rewrite(secondEquivalence)
-              = Integer.multiply(n3,
-                    Integer.multiply(
-                        Natural.to_integer(successor(d2)),
-                        Natural.to_integer(successor(d1))))
+              = n3 * (Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d1)))
                     by Integer.multiply_associative(
                            n3,
                            Natural.to_integer(successor(d2)),
                            Natural.to_integer(successor(d1)))
-              = Integer.multiply(n3,
-                    Integer.multiply(
-                        Natural.to_integer(successor(d1)),
-                        Natural.to_integer(successor(d2))))
+              = n3 * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2)))
                     by rewrite(Integer.multiply_commutative(
                            Natural.to_integer(successor(d2)),
                            Natural.to_integer(successor(d1))))
-              = Integer.multiply(
-                    Integer.multiply(n3,
-                        Natural.to_integer(successor(d1))),
-                    Natural.to_integer(successor(d2)))
+              = n3 * Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))
                     by Equality.symmetry(
                            Integer.multiply_associative(
                                n3,
@@ -210,18 +158,12 @@ theorem RationalEquivalent.transitive_natural
                                Natural.to_integer(successor(d2))));
     -- Chain: (n1·succ(d3))·succ(d2) = (n3·succ(d1))·succ(d2).
     claim cancellableEquation
-          : Integer.multiply(
-                    Integer.multiply(n1,
-                        Natural.to_integer(successor(d3))),
-                    Natural.to_integer(successor(d2))) = Integer.multiply(
-                    Integer.multiply(n3,
-                        Natural.to_integer(successor(d1))),
-                    Natural.to_integer(successor(d2)))
+          : n1 * Natural.to_integer(successor(d3)) * Natural.to_integer(successor(d2)) = n3 * Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))
         by Equality.transitivity(leftChainedToD3, rightChainedToD1);
     -- Cancel succ(d2).
     Integer.multiply_cancel_right_by_natural_successor(
-        Integer.multiply(n1, Natural.to_integer(successor(d3))),
-        Integer.multiply(n3, Natural.to_integer(successor(d1))),
+        n1 * Natural.to_integer(successor(d3)),
+        n3 * Natural.to_integer(successor(d1)),
         d2,
         cancellableEquation)
 }

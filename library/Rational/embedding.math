@@ -55,8 +55,7 @@ theorem Integer.to_rational.one_preserves
 --   RHS; for the LHS via `0·succ(0) = 0`), so the equivalence reduces
 --   to an Integer-level numerator equation.
 theorem Integer.to_rational.add_preserves (a b : Integer)
-        : Integer.to_rational(Integer.add(a, b)) = Rational.add(Integer.to_rational(a),
-                                     Integer.to_rational(b)) :=
+        : Integer.to_rational(a + b) = Integer.to_rational(a) + Integer.to_rational(b) :=
   -- The two reps are
   --   LHS-rep: make(a + b, 0)
   --   RHS-rep: make(a·1 + b·1, 0 + 0·succ(0))
@@ -73,44 +72,25 @@ theorem Integer.to_rational.add_preserves (a b : Integer)
           Rational.add_representatives(
               RationalRepresentative.make(a, zero),
               RationalRepresentative.make(b, zero)),
-          RationalRepresentative.make(Integer.add(a, b), zero),
-          calc Integer.multiply(
-                   Integer.add(
-                       Integer.multiply(a,
-                           Natural.to_integer(successor(zero))),
-                       Integer.multiply(b,
-                           Natural.to_integer(successor(zero)))),
-                   Natural.to_integer(successor(zero)))
-             = Integer.add(
-                   Integer.multiply(a,
-                       Natural.to_integer(successor(zero))),
-                   Integer.multiply(b,
-                       Natural.to_integer(successor(zero))))
+          RationalRepresentative.make(a + b, zero),
+          calc (a * Natural.to_integer(successor(zero)) + b * Natural.to_integer(successor(zero))) * Natural.to_integer(successor(zero))
+             = a * Natural.to_integer(successor(zero)) + b * Natural.to_integer(successor(zero))
                     by Integer.multiply_identity_right(
-                           Integer.add(
-                               Integer.multiply(a,
-                                   Natural.to_integer(successor(zero))),
-                               Integer.multiply(b,
-                                   Natural.to_integer(successor(zero)))))
-             = Integer.add(a,
-                   Integer.multiply(b,
-                       Natural.to_integer(successor(zero))))
+                           a * Natural.to_integer(successor(zero)) + b * Natural.to_integer(successor(zero)))
+             = a + b * Natural.to_integer(successor(zero))
                     by congruenceOf(
                            function (firstSummand : Integer) =>
-                               Integer.add(firstSummand,
-                                   Integer.multiply(b,
-                                       Natural.to_integer(successor(zero)))),
+                               firstSummand + b * Natural.to_integer(successor(zero)),
                            Integer.multiply_identity_right(a))
-             = Integer.add(a, b)
+             = a + b
                     by congruenceOf(
                            function (secondSummand : Integer) =>
-                               Integer.add(a, secondSummand),
+                               a + secondSummand,
                            Integer.multiply_identity_right(b))
-             = Integer.multiply(Integer.add(a, b),
-                   Natural.to_integer(successor(zero)))
+             = (a + b) * Natural.to_integer(successor(zero))
                     by Equality.symmetry(
                            Integer.multiply_identity_right(
-                               Integer.add(a, b)))))
+                               a + b))))
 
 -- Embedding preserves multiplication. At reps:
 --   LHS-rep: make(a · b, 0)
@@ -120,10 +100,9 @@ theorem Integer.to_rational.add_preserves (a b : Integer)
 -- reduces to `(a·b)·Integer.one = (a·b)·Integer.one` — just
 -- reflexivity.
 theorem Integer.to_rational.multiply_preserves (a b : Integer)
-        : Integer.to_rational(Integer.multiply(a, b)) = Rational.multiply(Integer.to_rational(a),
-                                          Integer.to_rational(b)) :=
+        : Integer.to_rational(a * b) = Integer.to_rational(a) * Integer.to_rational(b) :=
   reflexivity(Rational,
-      Integer.to_rational(Integer.multiply(a, b)))
+      Integer.to_rational(a * b))
 
 -- Embedding preserves negation: negate the numerator, leave the
 -- denominator at 0.

@@ -68,7 +68,7 @@ definition Integer.negate (x : Integer) : Integer :=
 -- ----------------------------------------------------------------------
 -- Subtraction: x − y = x + (−y).
 definition Integer.subtract (x y : Integer) : Integer :=
-  Integer.add(x, Integer.negate(y))
+  x + Integer.negate(y)
 
 -- ----------------------------------------------------------------------
 -- Inverse identities: x + (−x) = 0 and (−x) + x = 0.
@@ -87,12 +87,10 @@ theorem Integer.add_negate_left_natural (a b : Natural)
 
 theorem Integer.add_negate_left_at_representative
         : (rep : IntegerRepresentative)
-          → Integer.add(
-                    Integer.negate(
+          → Integer.negate(
                         Quotient.mk(
-                            IntegerRepresentative, IntegerEquivalent, rep)),
-                    Quotient.mk(
-                        IntegerRepresentative, IntegerEquivalent, rep)) = Integer.zero
+                            IntegerRepresentative, IntegerEquivalent, rep)) + Quotient.mk(
+                        IntegerRepresentative, IntegerEquivalent, rep) = Integer.zero
   | IntegerRepresentative.make(a, b) =>
       Quotient.sound(
           IntegerRepresentative.make(b + a, a + b),
@@ -100,20 +98,20 @@ theorem Integer.add_negate_left_at_representative
           Integer.add_negate_left_natural(a, b))
 
 theorem Integer.add_negate_left (x : Integer)
-        : Integer.add(Integer.negate(x), x) = Integer.zero :=
+        : Integer.negate(x) + x = Integer.zero :=
   Quotient.induct(
       function (x : Integer) =>
-          Integer.add(Integer.negate(x), x) = Integer.zero,
+          Integer.negate(x) + x = Integer.zero,
       Integer.add_negate_left_at_representative,
       x)
 
 -- Right inverse: derived via commutativity.
 theorem Integer.add_negate_right (x : Integer)
-        : Integer.add(x, Integer.negate(x)) = Integer.zero :=
+        : x + Integer.negate(x) = Integer.zero :=
   Equality.transitivity(
       Integer,
-      Integer.add(x, Integer.negate(x)),
-      Integer.add(Integer.negate(x), x),
+      x + Integer.negate(x),
+      Integer.negate(x) + x,
       Integer.zero,
       Integer.add_commutative(x, Integer.negate(x)),
       Integer.add_negate_left(x))

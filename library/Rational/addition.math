@@ -34,9 +34,7 @@ definition Rational.add_representatives
   | RationalRepresentative.make(n1, d1),
     RationalRepresentative.make(n2, d2) =>
       RationalRepresentative.make(
-          Integer.add(
-              Integer.multiply(n1, Natural.to_integer(successor(d2))),
-              Integer.multiply(n2, Natural.to_integer(successor(d1)))),
+          n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1)),
           d2 + d1 * successor(d2))
 
 -- ----------------------------------------------------------------------
@@ -48,8 +46,7 @@ definition Rational.add_representatives
 -- combined denominator factors as a product of the individual
 -- lifted denominators.
 theorem Rational.lifted_denominator_factors (d1 d2 : Natural)
-        : Natural.to_integer(successor(d1) * successor(d2)) = Integer.multiply(Natural.to_integer(successor(d1)),
-                                Natural.to_integer(successor(d2))) :=
+        : Natural.to_integer(successor(d1) * successor(d2)) = Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2)) :=
   Natural.to_integer.multiply_preserves(successor(d1), successor(d2))
 
 -- A four-factor rearrangement: `(n·X)·(Y·Z) = (n·Y)·(X·Z)`. Swaps
@@ -57,30 +54,22 @@ theorem Rational.lifted_denominator_factors (d1 d2 : Natural)
 -- proofs use this twice each (and the symmetric version once).
 theorem Integer.multiply_swap_inner_positions
         (n X Y Z : Integer)
-        : Integer.multiply(Integer.multiply(n, X),
-                                Integer.multiply(Y, Z)) = Integer.multiply(Integer.multiply(n, Y),
-                                Integer.multiply(X, Z)) :=
-  calc Integer.multiply(Integer.multiply(n, X),
-                         Integer.multiply(Y, Z))
-     = Integer.multiply(n,
-           Integer.multiply(X, Integer.multiply(Y, Z)))
+        : n * X * (Y * Z) = n * Y * (X * Z) :=
+  calc n * X * (Y * Z)
+     = n * (X * (Y * Z))
             by Integer.multiply_associative(n, X,
-                                              Integer.multiply(Y, Z))
-     = Integer.multiply(n,
-           Integer.multiply(Integer.multiply(X, Y), Z))
+                                              Y * Z)
+     = n * (X * Y * Z)
             by rewrite(Equality.symmetry(
                        Integer.multiply_associative(X, Y, Z)))
-     = Integer.multiply(n,
-           Integer.multiply(Integer.multiply(Y, X), Z))
+     = n * (Y * X * Z)
             by rewrite(Integer.multiply_commutative(X, Y))
-     = Integer.multiply(n,
-           Integer.multiply(Y, Integer.multiply(X, Z)))
+     = n * (Y * (X * Z))
             by rewrite(Integer.multiply_associative(Y, X, Z))
-     = Integer.multiply(Integer.multiply(n, Y),
-           Integer.multiply(X, Z))
+     = n * Y * (X * Z)
             by Equality.symmetry(
                    Integer.multiply_associative(n, Y,
-                       Integer.multiply(X, Z)))
+                       X * Z))
 
 -- ----------------------------------------------------------------------
 -- The first-argument respect kernel, with all multiplications already
@@ -99,143 +88,41 @@ theorem Integer.multiply_swap_inner_positions
 theorem Rational.add_respects_first_integer_factored
         (n1 n1Prime n2 : Integer) (d1 d1Prime d2 : Natural)
         (equivalenceHypothesis
-            : Integer.multiply(n1,
-                    Natural.to_integer(successor(d1Prime))) = Integer.multiply(n1Prime,
-                    Natural.to_integer(successor(d1))))
-        : Integer.multiply(
-                  Integer.add(
-                      Integer.multiply(n1,
-                          Natural.to_integer(successor(d2))),
-                      Integer.multiply(n2,
-                          Natural.to_integer(successor(d1)))),
-                  Integer.multiply(
-                      Natural.to_integer(successor(d1Prime)),
-                      Natural.to_integer(successor(d2)))) = Integer.multiply(
-                  Integer.add(
-                      Integer.multiply(n1Prime,
-                          Natural.to_integer(successor(d2))),
-                      Integer.multiply(n2,
-                          Natural.to_integer(successor(d1Prime)))),
-                  Integer.multiply(
-                      Natural.to_integer(successor(d1)),
-                      Natural.to_integer(successor(d2)))) :=
-  calc Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1)))),
-           Integer.multiply(
-               Natural.to_integer(successor(d1Prime)),
-               Natural.to_integer(successor(d2))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1Prime)),
-                   Natural.to_integer(successor(d2)))),
-           Integer.multiply(
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1Prime)),
-                   Natural.to_integer(successor(d2)))))
+            : n1 * Natural.to_integer(successor(d1Prime)) = n1Prime * Natural.to_integer(successor(d1)))
+        : (n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1))) * (Natural.to_integer(successor(d1Prime)) * Natural.to_integer(successor(d2))) = (n1Prime * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1Prime))) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))) :=
+  calc (n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1))) * (Natural.to_integer(successor(d1Prime)) * Natural.to_integer(successor(d2)))
+     = n1 * Natural.to_integer(successor(d2)) * (Natural.to_integer(successor(d1Prime)) * Natural.to_integer(successor(d2))) + n2 * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d1Prime)) * Natural.to_integer(successor(d2)))
             by Integer.distributivity_right(
-                   Integer.multiply(n1,
-                       Natural.to_integer(successor(d2))),
-                   Integer.multiply(n2,
-                       Natural.to_integer(successor(d1))),
-                   Integer.multiply(
-                       Natural.to_integer(successor(d1Prime)),
-                       Natural.to_integer(successor(d2))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d1Prime))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d2)),
-                   Natural.to_integer(successor(d2)))),
-           Integer.multiply(
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1Prime)),
-                   Natural.to_integer(successor(d2)))))
+                   n1 * Natural.to_integer(successor(d2)),
+                   n2 * Natural.to_integer(successor(d1)),
+                   Natural.to_integer(successor(d1Prime)) * Natural.to_integer(successor(d2)))
+     = n1 * Natural.to_integer(successor(d1Prime)) * (Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d2))) + n2 * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d1Prime)) * Natural.to_integer(successor(d2)))
             by rewrite(Integer.multiply_swap_inner_positions(
                        n1,
                        Natural.to_integer(successor(d2)),
                        Natural.to_integer(successor(d1Prime)),
                        Natural.to_integer(successor(d2))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d1Prime))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d2)),
-                   Natural.to_integer(successor(d2)))),
-           Integer.multiply(
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1Prime))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2)))))
+     = n1 * Natural.to_integer(successor(d1Prime)) * (Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d2))) + n2 * Natural.to_integer(successor(d1Prime)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2)))
             by rewrite(Integer.multiply_swap_inner_positions(
                        n2,
                        Natural.to_integer(successor(d1)),
                        Natural.to_integer(successor(d1Prime)),
                        Natural.to_integer(successor(d2))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1Prime,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d2)),
-                   Natural.to_integer(successor(d2)))),
-           Integer.multiply(
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1Prime))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2)))))
+     = n1Prime * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d2))) + n2 * Natural.to_integer(successor(d1Prime)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2)))
             by rewrite(equivalenceHypothesis)
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1Prime,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2)))),
-           Integer.multiply(
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1Prime))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2)))))
+     = n1Prime * Natural.to_integer(successor(d2)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))) + n2 * Natural.to_integer(successor(d1Prime)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2)))
             by rewrite(Equality.symmetry(
                        Integer.multiply_swap_inner_positions(
                            n1Prime,
                            Natural.to_integer(successor(d2)),
                            Natural.to_integer(successor(d1)),
                            Natural.to_integer(successor(d2)))))
-     = Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1Prime,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1Prime)))),
-           Integer.multiply(
-               Natural.to_integer(successor(d1)),
-               Natural.to_integer(successor(d2))))
+     = (n1Prime * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1Prime))) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2)))
             by Equality.symmetry(
                    Integer.distributivity_right(
-                       Integer.multiply(n1Prime,
-                           Natural.to_integer(successor(d2))),
-                       Integer.multiply(n2,
-                           Natural.to_integer(successor(d1Prime))),
-                       Integer.multiply(
-                           Natural.to_integer(successor(d1)),
-                           Natural.to_integer(successor(d2)))))
+                       n1Prime * Natural.to_integer(successor(d2)),
+                       n2 * Natural.to_integer(successor(d1Prime)),
+                       Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))))
 
 -- ----------------------------------------------------------------------
 -- Wrap the factored kernel with `lifted_denominator_factors` so the
@@ -246,60 +133,18 @@ theorem Rational.add_respects_first_integer_factored
 theorem Rational.add_respects_first_integer
         (n1 n1Prime n2 : Integer) (d1 d1Prime d2 : Natural)
         (equivalenceHypothesis
-            : Integer.multiply(n1,
-                    Natural.to_integer(successor(d1Prime))) = Integer.multiply(n1Prime,
-                    Natural.to_integer(successor(d1))))
-        : Integer.multiply(
-                  Integer.add(
-                      Integer.multiply(n1,
-                          Natural.to_integer(successor(d2))),
-                      Integer.multiply(n2,
-                          Natural.to_integer(successor(d1)))),
-                  Natural.to_integer(
-                      successor(d1Prime) * successor(d2))) = Integer.multiply(
-                  Integer.add(
-                      Integer.multiply(n1Prime,
-                          Natural.to_integer(successor(d2))),
-                      Integer.multiply(n2,
-                          Natural.to_integer(successor(d1Prime)))),
-                  Natural.to_integer(
-                      successor(d1) * successor(d2))) :=
-  calc Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1)))),
-           Natural.to_integer(successor(d1Prime) * successor(d2)))
-     = Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1)))),
-           Integer.multiply(
-               Natural.to_integer(successor(d1Prime)),
-               Natural.to_integer(successor(d2))))
+            : n1 * Natural.to_integer(successor(d1Prime)) = n1Prime * Natural.to_integer(successor(d1)))
+        : (n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1))) * Natural.to_integer(
+                      successor(d1Prime) * successor(d2)) = (n1Prime * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1Prime))) * Natural.to_integer(
+                      successor(d1) * successor(d2)) :=
+  calc (n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1))) * Natural.to_integer(successor(d1Prime) * successor(d2))
+     = (n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1))) * (Natural.to_integer(successor(d1Prime)) * Natural.to_integer(successor(d2)))
             by rewrite(Rational.lifted_denominator_factors(d1Prime, d2))
-     = Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1Prime,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1Prime)))),
-           Integer.multiply(
-               Natural.to_integer(successor(d1)),
-               Natural.to_integer(successor(d2))))
+     = (n1Prime * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1Prime))) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2)))
             by Rational.add_respects_first_integer_factored(
                    n1, n1Prime, n2, d1, d1Prime, d2,
                    equivalenceHypothesis)
-     = Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1Prime,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1Prime)))),
-           Natural.to_integer(successor(d1) * successor(d2)))
+     = (n1Prime * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1Prime))) * Natural.to_integer(successor(d1) * successor(d2))
             by rewrite(Equality.symmetry(
                        Rational.lifted_denominator_factors(d1, d2)))
 
@@ -345,209 +190,59 @@ theorem Rational.add_respects_first
 theorem Rational.add_respects_second_integer_factored
         (n1 n2 n2Prime : Integer) (d1 d2 d2Prime : Natural)
         (equivalenceHypothesis
-            : Integer.multiply(n2,
-                    Natural.to_integer(successor(d2Prime))) = Integer.multiply(n2Prime,
-                    Natural.to_integer(successor(d2))))
-        : Integer.multiply(
-                  Integer.add(
-                      Integer.multiply(n1,
-                          Natural.to_integer(successor(d2))),
-                      Integer.multiply(n2,
-                          Natural.to_integer(successor(d1)))),
-                  Integer.multiply(
-                      Natural.to_integer(successor(d1)),
-                      Natural.to_integer(successor(d2Prime)))) = Integer.multiply(
-                  Integer.add(
-                      Integer.multiply(n1,
-                          Natural.to_integer(successor(d2Prime))),
-                      Integer.multiply(n2Prime,
-                          Natural.to_integer(successor(d1)))),
-                  Integer.multiply(
-                      Natural.to_integer(successor(d1)),
-                      Natural.to_integer(successor(d2)))) :=
-  calc Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1)))),
-           Integer.multiply(
-               Natural.to_integer(successor(d1)),
-               Natural.to_integer(successor(d2Prime))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2Prime)))),
-           Integer.multiply(
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2Prime)))))
+            : n2 * Natural.to_integer(successor(d2Prime)) = n2Prime * Natural.to_integer(successor(d2)))
+        : (n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1))) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2Prime))) = (n1 * Natural.to_integer(successor(d2Prime)) + n2Prime * Natural.to_integer(successor(d1))) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))) :=
+  calc (n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1))) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2Prime)))
+     = n1 * Natural.to_integer(successor(d2)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2Prime))) + n2 * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2Prime)))
             by Integer.distributivity_right(
-                   Integer.multiply(n1,
-                       Natural.to_integer(successor(d2))),
-                   Integer.multiply(n2,
-                       Natural.to_integer(successor(d1))),
-                   Integer.multiply(
-                       Natural.to_integer(successor(d1)),
-                       Natural.to_integer(successor(d2Prime))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d2)),
-                   Natural.to_integer(successor(d2Prime)))),
-           Integer.multiply(
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2Prime)))))
+                   n1 * Natural.to_integer(successor(d2)),
+                   n2 * Natural.to_integer(successor(d1)),
+                   Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2Prime)))
+     = n1 * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d2Prime))) + n2 * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2Prime)))
             by rewrite(Integer.multiply_swap_inner_positions(
                        n1,
                        Natural.to_integer(successor(d2)),
                        Natural.to_integer(successor(d1)),
                        Natural.to_integer(successor(d2Prime))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d2)),
-                   Natural.to_integer(successor(d2Prime)))),
-           Integer.multiply(
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d2Prime)),
-                   Natural.to_integer(successor(d1)))))
+     = n1 * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d2Prime))) + n2 * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d2Prime)) * Natural.to_integer(successor(d1)))
             by rewrite(Integer.multiply_commutative(
                        Natural.to_integer(successor(d1)),
                        Natural.to_integer(successor(d2Prime))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d2)),
-                   Natural.to_integer(successor(d2Prime)))),
-           Integer.multiply(
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d2Prime))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d1)))))
+     = n1 * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d2Prime))) + n2 * Natural.to_integer(successor(d2Prime)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d1)))
             by rewrite(Integer.multiply_swap_inner_positions(
                        n2,
                        Natural.to_integer(successor(d1)),
                        Natural.to_integer(successor(d2Prime)),
                        Natural.to_integer(successor(d1))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d2)),
-                   Natural.to_integer(successor(d2Prime)))),
-           Integer.multiply(
-               Integer.multiply(n2Prime,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d1)))))
+     = n1 * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d2Prime))) + n2Prime * Natural.to_integer(successor(d2)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d1)))
             by rewrite(equivalenceHypothesis)
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d2Prime)),
-                   Natural.to_integer(successor(d2)))),
-           Integer.multiply(
-               Integer.multiply(n2Prime,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d1)))))
+     = n1 * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d2Prime)) * Natural.to_integer(successor(d2))) + n2Prime * Natural.to_integer(successor(d2)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d1)))
             by rewrite(Integer.multiply_commutative(
                        Natural.to_integer(successor(d2)),
                        Natural.to_integer(successor(d2Prime))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2Prime))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2)))),
-           Integer.multiply(
-               Integer.multiply(n2Prime,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d1)))))
+     = n1 * Natural.to_integer(successor(d2Prime)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))) + n2Prime * Natural.to_integer(successor(d2)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d1)))
             by rewrite(Equality.symmetry(
                        Integer.multiply_swap_inner_positions(
                            n1,
                            Natural.to_integer(successor(d2Prime)),
                            Natural.to_integer(successor(d1)),
                            Natural.to_integer(successor(d2)))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2Prime))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2)))),
-           Integer.multiply(
-               Integer.multiply(n2Prime,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d2)),
-                   Natural.to_integer(successor(d1)))))
+     = n1 * Natural.to_integer(successor(d2Prime)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))) + n2Prime * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d2)) * Natural.to_integer(successor(d1)))
             by rewrite(Integer.multiply_swap_inner_positions(
                        n2Prime,
                        Natural.to_integer(successor(d2)),
                        Natural.to_integer(successor(d1)),
                        Natural.to_integer(successor(d1))))
-     = Integer.add(
-           Integer.multiply(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2Prime))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2)))),
-           Integer.multiply(
-               Integer.multiply(n2Prime,
-                   Natural.to_integer(successor(d1))),
-               Integer.multiply(
-                   Natural.to_integer(successor(d1)),
-                   Natural.to_integer(successor(d2)))))
+     = n1 * Natural.to_integer(successor(d2Prime)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))) + n2Prime * Natural.to_integer(successor(d1)) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2)))
             by rewrite(Integer.multiply_commutative(
                        Natural.to_integer(successor(d2)),
                        Natural.to_integer(successor(d1))))
-     = Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2Prime))),
-               Integer.multiply(n2Prime,
-                   Natural.to_integer(successor(d1)))),
-           Integer.multiply(
-               Natural.to_integer(successor(d1)),
-               Natural.to_integer(successor(d2))))
+     = (n1 * Natural.to_integer(successor(d2Prime)) + n2Prime * Natural.to_integer(successor(d1))) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2)))
             by Equality.symmetry(
                    Integer.distributivity_right(
-                       Integer.multiply(n1,
-                           Natural.to_integer(successor(d2Prime))),
-                       Integer.multiply(n2Prime,
-                           Natural.to_integer(successor(d1))),
-                       Integer.multiply(
-                           Natural.to_integer(successor(d1)),
-                           Natural.to_integer(successor(d2)))))
+                       n1 * Natural.to_integer(successor(d2Prime)),
+                       n2Prime * Natural.to_integer(successor(d1)),
+                       Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2))))
 
 -- Wrap the factored kernel with `lifted_denominator_factors`, exposing
 -- the conclusion in the `to_integer(succ(_) · succ(_))` form the
@@ -557,60 +252,18 @@ theorem Rational.add_respects_second_integer_factored
 theorem Rational.add_respects_second_integer
         (n1 n2 n2Prime : Integer) (d1 d2 d2Prime : Natural)
         (equivalenceHypothesis
-            : Integer.multiply(n2,
-                    Natural.to_integer(successor(d2Prime))) = Integer.multiply(n2Prime,
-                    Natural.to_integer(successor(d2))))
-        : Integer.multiply(
-                  Integer.add(
-                      Integer.multiply(n1,
-                          Natural.to_integer(successor(d2))),
-                      Integer.multiply(n2,
-                          Natural.to_integer(successor(d1)))),
-                  Natural.to_integer(
-                      successor(d1) * successor(d2Prime))) = Integer.multiply(
-                  Integer.add(
-                      Integer.multiply(n1,
-                          Natural.to_integer(successor(d2Prime))),
-                      Integer.multiply(n2Prime,
-                          Natural.to_integer(successor(d1)))),
-                  Natural.to_integer(
-                      successor(d1) * successor(d2))) :=
-  calc Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1)))),
-           Natural.to_integer(successor(d1) * successor(d2Prime)))
-     = Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2))),
-               Integer.multiply(n2,
-                   Natural.to_integer(successor(d1)))),
-           Integer.multiply(
-               Natural.to_integer(successor(d1)),
-               Natural.to_integer(successor(d2Prime))))
+            : n2 * Natural.to_integer(successor(d2Prime)) = n2Prime * Natural.to_integer(successor(d2)))
+        : (n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1))) * Natural.to_integer(
+                      successor(d1) * successor(d2Prime)) = (n1 * Natural.to_integer(successor(d2Prime)) + n2Prime * Natural.to_integer(successor(d1))) * Natural.to_integer(
+                      successor(d1) * successor(d2)) :=
+  calc (n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1))) * Natural.to_integer(successor(d1) * successor(d2Prime))
+     = (n1 * Natural.to_integer(successor(d2)) + n2 * Natural.to_integer(successor(d1))) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2Prime)))
             by rewrite(Rational.lifted_denominator_factors(d1, d2Prime))
-     = Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2Prime))),
-               Integer.multiply(n2Prime,
-                   Natural.to_integer(successor(d1)))),
-           Integer.multiply(
-               Natural.to_integer(successor(d1)),
-               Natural.to_integer(successor(d2))))
+     = (n1 * Natural.to_integer(successor(d2Prime)) + n2Prime * Natural.to_integer(successor(d1))) * (Natural.to_integer(successor(d1)) * Natural.to_integer(successor(d2)))
             by Rational.add_respects_second_integer_factored(
                    n1, n2, n2Prime, d1, d2, d2Prime,
                    equivalenceHypothesis)
-     = Integer.multiply(
-           Integer.add(
-               Integer.multiply(n1,
-                   Natural.to_integer(successor(d2Prime))),
-               Integer.multiply(n2Prime,
-                   Natural.to_integer(successor(d1)))),
-           Natural.to_integer(successor(d1) * successor(d2)))
+     = (n1 * Natural.to_integer(successor(d2Prime)) + n2Prime * Natural.to_integer(successor(d1))) * Natural.to_integer(successor(d1) * successor(d2))
             by rewrite(Equality.symmetry(
                        Rational.lifted_denominator_factors(d1, d2)))
 
