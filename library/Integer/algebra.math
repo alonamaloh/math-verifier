@@ -68,10 +68,8 @@ theorem Integer.multiply_zero_right (x : Integer)
 theorem Integer.multiply_negate_right_at_representatives
         : (rep1 rep2 : IntegerRepresentative)
           → Quotient.mk(
-                        IntegerRepresentative, IntegerEquivalent, rep1) * Integer.negate(
-                        Quotient.mk(
-                            IntegerRepresentative, IntegerEquivalent, rep2)) = Integer.negate(
-                    Quotient.mk(
+                        IntegerRepresentative, IntegerEquivalent, rep1) * -Quotient.mk(
+                            IntegerRepresentative, IntegerEquivalent, rep2) = -(Quotient.mk(
                             IntegerRepresentative, IntegerEquivalent, rep1) * Quotient.mk(
                             IntegerRepresentative, IntegerEquivalent, rep2))
   | IntegerRepresentative.make(a, b),
@@ -84,42 +82,40 @@ theorem Integer.multiply_negate_right_at_representatives
 theorem Integer.multiply_negate_right_after_first
         (rep1 : IntegerRepresentative) (y : Integer)
         : Quotient.mk(
-                      IntegerRepresentative, IntegerEquivalent, rep1) * Integer.negate(y) = Integer.negate(
-                  Quotient.mk(
+                      IntegerRepresentative, IntegerEquivalent, rep1) * -y = -(Quotient.mk(
                           IntegerRepresentative, IntegerEquivalent, rep1) * y) :=
   Quotient.induct(
       function (y : Integer) =>
           Quotient.mk(
-                      IntegerRepresentative, IntegerEquivalent, rep1) * Integer.negate(y) = Integer.negate(
-                  Quotient.mk(
+                      IntegerRepresentative, IntegerEquivalent, rep1) * -y = -(Quotient.mk(
                           IntegerRepresentative, IntegerEquivalent, rep1) * y),
       function (rep2 : IntegerRepresentative) =>
           Integer.multiply_negate_right_at_representatives(rep1, rep2),
       y)
 
 theorem Integer.multiply_negate_right (x y : Integer)
-        : x * Integer.negate(y) = Integer.negate(x * y) :=
+        : x * -y = -(x * y) :=
   Quotient.induct(
       function (x : Integer) =>
-          x * Integer.negate(y) = Integer.negate(x * y),
+          x * -y = -(x * y),
       function (rep1 : IntegerRepresentative) =>
           Integer.multiply_negate_right_after_first(rep1, y),
       x)
 
 -- Left companion via commutativity.
 theorem Integer.multiply_negate_left (x y : Integer)
-        : Integer.negate(x) * y = Integer.negate(x * y) := {
+        : -x * y = -(x * y) := {
     claim swapOuter
-          : Integer.negate(x) * y
-            = y * Integer.negate(x)
-        by Integer.multiply_commutative(Integer.negate(x), y);
+          : -x * y
+            = y * -x
+        by Integer.multiply_commutative(-x, y);
     claim moveOut
-          : y * Integer.negate(x)
-            = Integer.negate(y * x)
+          : y * -x
+            = -(y * x)
         by Integer.multiply_negate_right(y, x);
     claim swapInner
-          : Integer.negate(y * x)
-            = Integer.negate(x * y)
+          : -(y * x)
+            = -(x * y)
         by congruenceOf(
                Integer.negate,
                Integer.multiply_commutative(y, x));
@@ -136,29 +132,27 @@ theorem Integer.multiply_negate_left (x y : Integer)
 --             = a · b − a · c             [definitional: subtract = add+negate, reversed]
 
 theorem Integer.distributivity_left_over_subtract (x y z : Integer)
-        : x * Integer.subtract(y, z) = Integer.subtract(x * y,
-                               x * z) := {
+        : x * (y - z) = x * y - x * z := {
     claim distributeLeft
-          : x * (y + Integer.negate(z))
-            = x * y + x * Integer.negate(z)
-        by Integer.distributivity_left(x, y, Integer.negate(z));
+          : x * (y + -z)
+            = x * y + x * -z
+        by Integer.distributivity_left(x, y, -z);
     claim moveNegateOut
-          : x * y + x * Integer.negate(z)
-            = x * y + Integer.negate(x * z)
+          : x * y + x * -z
+            = x * y + -(x * z)
         by rewrite(Integer.multiply_negate_right(x, z));
     Equality.transitivity(distributeLeft, moveNegateOut)
 }
 
 theorem Integer.distributivity_right_over_subtract (x y z : Integer)
-        : Integer.subtract(x, y) * z = Integer.subtract(x * z,
-                               y * z) := {
+        : (x - y) * z = x * z - y * z := {
     claim distributeRight
-          : (x + Integer.negate(y)) * z
-            = x * z + Integer.negate(y) * z
-        by Integer.distributivity_right(x, Integer.negate(y), z);
+          : (x + -y) * z
+            = x * z + -y * z
+        by Integer.distributivity_right(x, -y, z);
     claim moveNegateOut
-          : x * z + Integer.negate(y) * z
-            = x * z + Integer.negate(y * z)
+          : x * z + -y * z
+            = x * z + -(y * z)
         by rewrite(Integer.multiply_negate_left(y, z));
     Equality.transitivity(distributeRight, moveNegateOut)
 }
@@ -170,21 +164,21 @@ theorem Integer.distributivity_right_over_subtract (x y z : Integer)
 
 theorem Integer.subtract_left_add (a b c : Integer)
         (decomposition : a = b + c)
-        : Integer.subtract(a, b) = c := {
+        : a - b = c := {
     claim rewriteSubtrahend
-          : a + Integer.negate(b)
-            = b + c + Integer.negate(b)
+          : a + -b
+            = b + c + -b
         by rewrite(decomposition);
     claim swapInner
-          : b + c + Integer.negate(b)
-            = c + b + Integer.negate(b)
+          : b + c + -b
+            = c + b + -b
         by rewrite(Integer.add_commutative(b, c));
     claim reassociate
-          : c + b + Integer.negate(b)
-            = c + (b + Integer.negate(b))
-        by Integer.add_associative(c, b, Integer.negate(b));
+          : c + b + -b
+            = c + (b + -b)
+        by Integer.add_associative(c, b, -b);
     claim cancelInverse
-          : c + (b + Integer.negate(b))
+          : c + (b + -b)
             = c + Integer.zero
         by rewrite(Integer.add_negate_right(b));
     claim removeZero

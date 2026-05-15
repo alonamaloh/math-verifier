@@ -2721,6 +2721,60 @@ private:
                 return makeApplication(std::move(call),
                                         std::move(operandKernel));
             }
+            if (unary->opSymbol == "-") {
+                // Dispatch unary `-` based on the operand's head type:
+                // Integer.negate / Rational.negate / etc. If the raw
+                // head type doesn't have a `.negate`, try operand-type
+                // names from the binary `-` registry whose definition
+                // δ-reduces to the operand's actual type — same fallback
+                // as the binary operator dispatch.
+                ExpressionPointer operandKernel =
+                    elaborateExpression(*unary->operand, localBinders);
+                ExpressionPointer operandType =
+                    inferTypeInLocalContext(localBinders, operandKernel);
+                std::string operandTypeName =
+                    headConstantName(operandType);
+                std::string negateFunction;
+                if (!operandTypeName.empty()
+                    && environment_.lookup(operandTypeName + ".negate")
+                       != nullptr) {
+                    negateFunction = operandTypeName + ".negate";
+                } else {
+                    // Fallback: search definitions whose body δ-reduces
+                    // to the operand's WHNF. For each such T, check if
+                    // `<T>.negate` exists; if so, dispatch there. Catches
+                    // operands whose raw head is `Quotient(...)` but
+                    // whose intended type alias (e.g. `Integer`) has a
+                    // `.negate`.
+                    ExpressionPointer operandWHNF = weakHeadNormalForm(
+                        environment_, operandType);
+                    for (const auto& [name, declaration]
+                         : environment_.declarations) {
+                        auto* def =
+                            std::get_if<Definition>(&declaration);
+                        if (!def) continue;
+                        ExpressionPointer bodyWHNF = weakHeadNormalForm(
+                            environment_, def->body);
+                        if (structurallyEqual(bodyWHNF, operandWHNF)) {
+                            if (environment_.lookup(name + ".negate")
+                                != nullptr) {
+                                negateFunction = name + ".negate";
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (negateFunction.empty()) {
+                    throw ElaborateError(
+                        "unary operator '-' on type '"
+                        + operandTypeName
+                        + "': no `<T>.negate` in scope (line "
+                        + std::to_string(expression.line) + ")");
+                }
+                ExpressionPointer call = makeConstant(negateFunction);
+                return makeApplication(std::move(call),
+                                        std::move(operandKernel));
+            }
             throw ElaborateError(
                 "unary operator '" + unary->opSymbol + "' is not yet "
                 "supported by the elaborator");

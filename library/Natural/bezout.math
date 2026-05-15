@@ -119,14 +119,11 @@ theorem Integer.bezout_substitute
             : aInt = qInt * bInt + rInt)
         (recursedEquation
             : bInt * xPrime + rInt * yPrime = gcdInt)
-        : aInt * yPrime + bInt * Integer.subtract(xPrime,
-                          qInt * yPrime) = gcdInt := {
+        : aInt * yPrime + bInt * (xPrime - qInt * yPrime) = gcdInt := {
     -- Step 1: distributivity of bInt over (xPrime − qInt · yPrime).
     claim distributeBInt
-          : bInt * Integer.subtract(xPrime, qInt * yPrime)
-            = Integer.subtract(
-                  bInt * xPrime,
-                  bInt * (qInt * yPrime))
+          : bInt * (xPrime - qInt * yPrime)
+            = (bInt * xPrime - bInt * (qInt * yPrime))
         by Integer.distributivity_left_over_subtract(
                bInt, xPrime, qInt * yPrime);
     -- Step 2: reassociate bInt · (qInt · yPrime) into (qInt · bInt) · yPrime.
@@ -141,25 +138,18 @@ theorem Integer.bezout_substitute
                        factor * yPrime,
                    Integer.multiply_commutative(bInt, qInt)));
     claim bIntDistributed
-          : bInt * Integer.subtract(xPrime, qInt * yPrime)
-            = Integer.subtract(
-                  bInt * xPrime,
-                  qInt * bInt * yPrime)
+          : bInt * (xPrime - qInt * yPrime)
+            = (bInt * xPrime - qInt * bInt * yPrime)
         by Equality.transitivity(
                distributeBInt,
                congruenceOf(
                    function (subtrahend : Integer) =>
-                       Integer.subtract(
-                           bInt * xPrime,
-                           subtrahend),
+                       (bInt * xPrime - subtrahend),
                    reassociateProduct));
     -- Step 3: rewrite the outer expression.
     claim outerRewritten
-          : aInt * yPrime + bInt * Integer.subtract(xPrime,
-                        qInt * yPrime)
-            = aInt * yPrime + Integer.subtract(
-                      bInt * xPrime,
-                      qInt * bInt * yPrime)
+          : aInt * yPrime + bInt * (xPrime - qInt * yPrime)
+            = aInt * yPrime + (bInt * xPrime - qInt * bInt * yPrime)
         by rewrite(bIntDistributed);
     -- Step 4: rearrange so the yPrime-factored pair groups together.
     -- aInt·y + (bInt·x − qbInt·y)
@@ -169,53 +159,40 @@ theorem Integer.bezout_substitute
     --  = bInt·x + (aInt·y + negate(qbInt·y))     [add_associative]
     --  = bInt·x + (aInt·y − qbInt·y)              [definitional]
     claim reassociateOuter
-          : aInt * yPrime + Integer.subtract(
-                    bInt * xPrime,
-                    qInt * bInt * yPrime)
-            = aInt * yPrime + bInt * xPrime + Integer.negate(
-                      qInt * bInt * yPrime)
+          : aInt * yPrime + (bInt * xPrime - qInt * bInt * yPrime)
+            = aInt * yPrime + bInt * xPrime + -(qInt * bInt * yPrime)
         by Equality.symmetry(
                Integer.add_associative(
                    aInt * yPrime,
                    bInt * xPrime,
-                   Integer.negate(
-                       qInt * bInt * yPrime)));
+                   -(qInt * bInt * yPrime)));
     claim swapOuter
-          : aInt * yPrime + bInt * xPrime + Integer.negate(
-                    qInt * bInt * yPrime)
-            = bInt * xPrime + aInt * yPrime + Integer.negate(
-                      qInt * bInt * yPrime)
+          : aInt * yPrime + bInt * xPrime + -(qInt * bInt * yPrime)
+            = bInt * xPrime + aInt * yPrime + -(qInt * bInt * yPrime)
         by rewrite(Integer.add_commutative(
                    aInt * yPrime,
                    bInt * xPrime));
     claim reassociateForward
-          : bInt * xPrime + aInt * yPrime + Integer.negate(
-                    qInt * bInt * yPrime)
-            = bInt * xPrime + (aInt * yPrime + Integer.negate(
-                          qInt * bInt * yPrime))
+          : bInt * xPrime + aInt * yPrime + -(qInt * bInt * yPrime)
+            = bInt * xPrime + (aInt * yPrime + -(qInt * bInt * yPrime))
         by Integer.add_associative(
                bInt * xPrime,
                aInt * yPrime,
-               Integer.negate(
-                   qInt * bInt * yPrime));
+               -(qInt * bInt * yPrime));
     -- Step 5: factor yPrime in (aInt·y − qbInt·y) → (aInt − qInt·bInt)·y.
     claim factorYPrime
-          : Integer.subtract(
-                aInt * yPrime,
-                qInt * bInt * yPrime)
-            = Integer.subtract(aInt, qInt * bInt) * yPrime
+          : (aInt * yPrime - qInt * bInt * yPrime)
+            = (aInt - qInt * bInt) * yPrime
         by Equality.symmetry(
                Integer.distributivity_right_over_subtract(
                    aInt, qInt * bInt, yPrime));
     -- Step 6: substitute (aInt − qInt·bInt) = rInt via subtract_left_add.
     claim subtractToRemainder
-          : Integer.subtract(aInt, qInt * bInt) = rInt
+          : (aInt - qInt * bInt) = rInt
         by Integer.subtract_left_add(
                aInt, qInt * bInt, rInt, decomposition);
     claim factoredEqualsRYPrime
-          : Integer.subtract(
-                aInt * yPrime,
-                qInt * bInt * yPrime)
+          : (aInt * yPrime - qInt * bInt * yPrime)
             = rInt * yPrime
         by Equality.transitivity(
                factorYPrime,
@@ -225,8 +202,7 @@ theorem Integer.bezout_substitute
                    subtractToRemainder));
     -- Combine all reshufflings.
     claim assembledLeft
-          : aInt * yPrime + bInt * Integer.subtract(xPrime,
-                        qInt * yPrime)
+          : aInt * yPrime + bInt * (xPrime - qInt * yPrime)
             = bInt * xPrime + rInt * yPrime
         by Equality.transitivity(
                outerRewritten,
@@ -273,9 +249,7 @@ theorem Natural.has_bezout_successor_step
     -- Plug into the substitution lemma to get the new linear-
     -- combination identity for (a, successor(predB)).
     claim newLinearCombinationIdentity
-          : (a : Integer) * yPrime + (successor(predB) : Integer) * Integer.subtract(
-                            xPrime,
-                            (q : Integer) * yPrime) = (gcdValue : Integer)
+          : (a : Integer) * yPrime + (successor(predB) : Integer) * (xPrime - (q : Integer) * yPrime) = (gcdValue : Integer)
         by Integer.bezout_substitute(
                (a : Integer),
                (successor(predB) : Integer),
@@ -293,8 +267,7 @@ theorem Natural.has_bezout_successor_step
                decomposition, isGcdForBR);
     ⟨gcdValue,
      yPrime,
-     Integer.subtract(xPrime,
-         (q : Integer) * yPrime),
+     (xPrime - (q : Integer) * yPrime),
      newLinearCombinationIdentity,
      isGcdForAB⟩
 }
