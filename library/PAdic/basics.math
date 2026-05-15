@@ -1,0 +1,59 @@
+-- PAdic/basics.math
+--
+-- The p-adic numbers as the completion of Rational under the p-adic
+-- absolute value. Same construction as Real (Cauchy sequences mod
+-- "difference converges to zero"), but with the p-adic norm in
+-- place of the standard Rational absolute value.
+
+module PAdic.basics
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import PAdic.absolute_value
+
+-- A p-adic-Cauchy sequence: terms get arbitrarily p-adic-close.
+definition Rational.sequence.IsPAdicCauchy (p : Natural)
+        (s : Natural → Rational) : Proposition :=
+  (epsilon : Rational) → Rational.zero < epsilon →
+    ∃ (N : Natural).
+      (m : Natural) → N ≤ m →
+        (n : Natural) → N ≤ n →
+          Rational.padic_absolute_value(p, s(m) - s(n)) < epsilon
+
+-- Packaged Cauchy sequence.
+inductive PAdicCauchySequence (p : Natural) : Type(0) where
+  | PAdicCauchySequence.make
+      : (sequenceFunction : Natural → Rational)
+        → Rational.sequence.IsPAdicCauchy(p, sequenceFunction)
+        → PAdicCauchySequence(p)
+
+definition PAdicCauchySequence.sequenceFunction (p : Natural)
+        : PAdicCauchySequence(p) → (Natural → Rational)
+  | PAdicCauchySequence.make(s, _) => s
+
+-- Two p-adic Cauchy sequences are equivalent when their pointwise
+-- difference converges to zero in the p-adic norm.
+definition PAdicEquivalent (p : Natural)
+        (a b : PAdicCauchySequence(p)) : Proposition :=
+  (epsilon : Rational) → Rational.zero < epsilon →
+    ∃ (N : Natural).
+      (m : Natural) → N ≤ m →
+        Rational.padic_absolute_value(p,
+            PAdicCauchySequence.sequenceFunction(p, a, m)
+            - PAdicCauchySequence.sequenceFunction(p, b, m))
+          < epsilon
+
+-- The p-adic numbers ℚ_p.
+definition PAdic (p : Natural) : Type(0) :=
+  Quotient(PAdicCauchySequence(p), PAdicEquivalent(p))

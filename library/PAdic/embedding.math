@@ -1,0 +1,41 @@
+-- PAdic/embedding.math
+--
+-- Embed Rational into PAdic(p) for a fixed prime p, via the constant
+-- Cauchy sequence λ _. q. No global coercion registered (the registry
+-- doesn't carry a parameter); use Rational.to_padic(p, q) explicitly.
+
+module PAdic.embedding
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import PAdic.absolute_value
+import PAdic.basics
+
+-- The constant Cauchy sequence is p-adic-Cauchy. Stub.
+theorem Rational.sequence.constant_is_padic_cauchy
+        (p : Natural) (q : Rational)
+        : Rational.sequence.IsPAdicCauchy(p,
+              function (_ : Natural) => q) := sorry
+
+definition Rational.to_padic_constant_sequence (p : Natural) (q : Rational)
+        : PAdicCauchySequence(p) :=
+  PAdicCauchySequence.make(
+      function (_ : Natural) => q,
+      Rational.sequence.constant_is_padic_cauchy(p, q))
+
+definition Rational.to_padic (p : Natural) (q : Rational) : PAdic(p) :=
+  Quotient.mk(PAdicCauchySequence(p), PAdicEquivalent(p),
+               Rational.to_padic_constant_sequence(p, q))
+
+-- Canonical constants.
+definition PAdic.zero (p : Natural) : PAdic(p) :=
+  Rational.to_padic(p, Rational.zero)
+
+definition PAdic.one (p : Natural) : PAdic(p) :=
+  Rational.to_padic(p, Rational.one)
