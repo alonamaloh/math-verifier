@@ -3007,7 +3007,11 @@ std::string surfaceToDebugString(const SurfaceExpression& expression) {
         result += "(";
         for (size_t i = 0; i < application->arguments.size(); ++i) {
             if (i) result += ", ";
-            result += surfaceToDebugString(*application->arguments[i]);
+            const auto& arg = application->arguments[i];
+            if (!arg.name.empty()) {
+                result += arg.name + " := ";
+            }
+            result += surfaceToDebugString(*arg.value);
         }
         result += ")";
         return result;

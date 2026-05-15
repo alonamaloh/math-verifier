@@ -108,9 +108,19 @@ struct SurfaceIdentifier {
     std::vector<SurfaceLevelPointer> universeArgs;   // empty if no .{...}
 };
 struct SurfaceNumericLiteral { std::string digits; };
+// An argument in a function call. `name` is empty for positional
+// arguments and holds the parameter name for `name := value` named
+// arguments. The elaborator uses the function's Pi-binder displayHints
+// to reorder named arguments into positional order before the rest of
+// the application-dispatch logic fires.
+struct SurfaceArgument {
+    std::string name;                       // empty = positional
+    SurfaceExpressionPointer value;
+};
+
 struct SurfaceApplication {
     SurfaceExpressionPointer function;
-    std::vector<SurfaceExpressionPointer> arguments;
+    std::vector<SurfaceArgument> arguments;
 };
 struct SurfacePiType {
     SurfaceBinder binder;
@@ -243,11 +253,26 @@ inline SurfaceExpressionPointer makeSurfaceNumericLiteral(
 }
 inline SurfaceExpressionPointer makeSurfaceApplication(
     SurfaceExpressionPointer function,
-    std::vector<SurfaceExpressionPointer> arguments,
+    std::vector<SurfaceArgument> arguments,
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceApplication{std::move(function), std::move(arguments)},
         line, column});
+}
+
+// Backward-compat overload: accepts a positional-only argument list
+// (wraps each value in a `SurfaceArgument` with an empty name).
+inline SurfaceExpressionPointer makeSurfaceApplication(
+    SurfaceExpressionPointer function,
+    std::vector<SurfaceExpressionPointer> positionalArguments,
+    int line, int column) {
+    std::vector<SurfaceArgument> arguments;
+    arguments.reserve(positionalArguments.size());
+    for (auto& value : positionalArguments) {
+        arguments.push_back({"", std::move(value)});
+    }
+    return makeSurfaceApplication(
+        std::move(function), std::move(arguments), line, column);
 }
 inline SurfaceExpressionPointer makeSurfacePiType(
     SurfaceBinder binder, SurfaceExpressionPointer codomain,

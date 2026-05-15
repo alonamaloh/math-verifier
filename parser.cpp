@@ -106,10 +106,13 @@ SurfaceExpressionPointer substituteSurfaceName(
     if (auto* application = std::get_if<SurfaceApplication>(&node.node)) {
         auto newFunction = substituteSurfaceName(
             application->function, targetName, replacement);
-        std::vector<SurfaceExpressionPointer> newArguments;
+        std::vector<SurfaceArgument> newArguments;
         for (const auto& argument : application->arguments) {
-            newArguments.push_back(substituteSurfaceName(
-                argument, targetName, replacement));
+            SurfaceArgument rewritten;
+            rewritten.name = argument.name;
+            rewritten.value = substituteSurfaceName(
+                argument.value, targetName, replacement);
+            newArguments.push_back(std::move(rewritten));
         }
         return makeSurfaceApplication(std::move(newFunction),
                                        std::move(newArguments),
@@ -1171,11 +1174,11 @@ private:
             if (peek().kind == TokenKind::RightParen) {
                 throwHere("empty argument list 'f()' is not allowed");
             }
-            std::vector<SurfaceExpressionPointer> arguments;
-            arguments.push_back(parseExpression());
+            std::vector<SurfaceArgument> arguments;
+            arguments.push_back(parseArgument());
             while (peek().kind == TokenKind::Comma) {
                 consumeAny();
-                arguments.push_back(parseExpression());
+                arguments.push_back(parseArgument());
             }
             expect(TokenKind::RightParen, "ending argument list");
             head = makeSurfaceApplication(std::move(head),
@@ -1183,6 +1186,30 @@ private:
                                            openParen.line, openParen.column);
         }
         return head;
+    }
+
+    // A single argument: either `<identifier> := <expr>` (named) or
+    // just `<expr>` (positional). Named args use `:=` because `=` is
+    // the equality operator. The leading-identifier lookahead is
+    // restoring (an expression starting with an identifier that
+    // *isn't* followed by `:=` falls back to expression parsing).
+    SurfaceArgument parseArgument() {
+        size_t save = position_;
+        if (isIdentifierLike(peek().kind)) {
+            Token nameToken = consumeAny();
+            if (peek().kind == TokenKind::Assign) {
+                consumeAny();  // ':='
+                SurfaceArgument argument;
+                argument.name = nameToken.lexeme;
+                argument.value = parseExpression();
+                return argument;
+            }
+            position_ = save;
+        }
+        SurfaceArgument argument;
+        argument.name = "";
+        argument.value = parseExpression();
+        return argument;
     }
 
     SurfaceExpressionPointer parseAtom() {

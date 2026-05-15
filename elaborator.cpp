@@ -1613,11 +1613,14 @@ private:
             auto rewrittenFunction = rewriteRecursiveCalls(
                 application->function, thisDeclName,
                 recursiveArgToHypothesis, outerBinderCount);
-            std::vector<SurfaceExpressionPointer> rewrittenArguments;
+            std::vector<SurfaceArgument> rewrittenArguments;
             for (const auto& argument : application->arguments) {
-                rewrittenArguments.push_back(rewriteRecursiveCalls(
-                    argument, thisDeclName, recursiveArgToHypothesis,
-                    outerBinderCount));
+                SurfaceArgument rewritten;
+                rewritten.name = argument.name;
+                rewritten.value = rewriteRecursiveCalls(
+                    argument.value, thisDeclName,
+                    recursiveArgToHypothesis, outerBinderCount);
+                rewrittenArguments.push_back(std::move(rewritten));
             }
             // Check if this is a recursive call we should rewrite.
             // The scrutinee sits at index `outerBinderCount` (after
@@ -1631,7 +1634,7 @@ private:
                        > outerBinderCount) {
                 auto* scrutineeArgumentIdentifier =
                     std::get_if<SurfaceIdentifier>(
-                        &rewrittenArguments[outerBinderCount]->node);
+                        &rewrittenArguments[outerBinderCount].value->node);
                 if (scrutineeArgumentIdentifier
                     && scrutineeArgumentIdentifier->universeArgs.empty()) {
                     auto iterator = recursiveArgToHypothesis.find(
@@ -1643,7 +1646,7 @@ private:
                         auto hypothesisIdentifier =
                             makeSurfaceIdentifier(iterator->second, {},
                                                    node.line, node.column);
-                        std::vector<SurfaceExpressionPointer>
+                        std::vector<SurfaceArgument>
                             remainingArguments(
                                 rewrittenArguments.begin()
                                     + outerBinderCount + 1,
@@ -1852,6 +1855,180 @@ private:
 
     // -------- expression elaboration --------
 
+    // Convert a list of SurfaceArguments (possibly with names) into a
+    // positional list of SurfaceExpressionPointers, reordering named
+    // arguments against the function's parameter-binder names. The
+    // result is what the rest of the application-dispatch logic
+    // expects (a positional vector).
+    //
+    // Rules:
+    //   * If no argument has a name, return the values unchanged.
+    //   * If any argument has a name, look up the function head's
+    //     declaration in the environment and walk its kernel-Pi-chain
+    //     `displayHint`s. The displayHints — minus the implicit-arg
+    //     prefix the user's positional count implies — are the
+    //     parameter names users can reference.
+    //   * Positional arguments and named arguments may be mixed:
+    //     positional arguments fill slots in order, named arguments
+    //     take their named slot. Duplicate assignments are an error.
+    //
+    // On any inability to find the parameter names (head isn't a
+    // direct identifier, declaration not in env, anonymous binders),
+    // mixed positional+named falls back to positional-only by
+    // requiring all arguments to be positional.
+    std::vector<SurfaceExpressionPointer> reorderArgumentsForCall(
+        const std::vector<SurfaceArgument>& arguments,
+        SurfaceExpressionPointer functionSurface,
+        int line) {
+        // Fast path: all positional. Just unwrap.
+        bool anyNamed = false;
+        for (const auto& a : arguments) {
+            if (!a.name.empty()) { anyNamed = true; break; }
+        }
+        if (!anyNamed) {
+            std::vector<SurfaceExpressionPointer> result;
+            result.reserve(arguments.size());
+            for (const auto& a : arguments) result.push_back(a.value);
+            return result;
+        }
+        // Named-argument resolution. Look up the function's parameter
+        // names by walking the kernel type's Pi chain.
+        auto* headIdentifier = std::get_if<SurfaceIdentifier>(
+            &functionSurface->node);
+        if (!headIdentifier) {
+            throwElaborate(
+                "named arguments require a direct identifier as the "
+                "function head (got a more complex expression at line "
+                + std::to_string(line) + ")");
+        }
+        const Declaration* declaration =
+            environment_.lookup(headIdentifier->qualifiedName);
+        if (!declaration) {
+            throwElaborate(
+                "named arguments: function '"
+                + headIdentifier->qualifiedName
+                + "' is not in scope");
+        }
+        ExpressionPointer kernelType = declarationType(*declaration);
+        std::vector<std::string> parameterNames;
+        {
+            ExpressionPointer cursor = kernelType;
+            while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+                parameterNames.push_back(pi->displayHint);
+                cursor = pi->codomain;
+            }
+        }
+        // Determine the "user-facing" parameter window. If the
+        // function has registered implicit-argument count K, skip the
+        // first K parameters. The remaining parameters' names are what
+        // the user can reference.
+        int implicitCount = environment_.implicitArgumentCount(
+            headIdentifier->qualifiedName);
+        if (implicitCount > static_cast<int>(parameterNames.size())) {
+            implicitCount =
+                static_cast<int>(parameterNames.size());
+        }
+        std::vector<std::string> userParamNames(
+            parameterNames.begin() + implicitCount,
+            parameterNames.end());
+        size_t argCount = arguments.size();
+        if (argCount > userParamNames.size()) {
+            throwElaborate(
+                "named arguments: function '"
+                + headIdentifier->qualifiedName
+                + "' has "
+                + std::to_string(userParamNames.size())
+                + " user-facing parameters but call supplies "
+                + std::to_string(argCount));
+        }
+        // Two windows to try: the PREFIX [0..argCount) and the SUFFIX
+        // [size-argCount..size). Prefix wins for fully-applied calls
+        // and for explicit-parameter calls; suffix wins for desugared
+        // calls (Quotient.sound, Quotient.mk, etc.) where the user
+        // supplies only the trailing explicit parameters. Pick the
+        // window that accepts every named argument; if both, prefix
+        // wins as the more general default.
+        std::vector<std::string> namesSupplied;
+        for (const auto& a : arguments) {
+            if (!a.name.empty()) namesSupplied.push_back(a.name);
+        }
+        auto windowAccepts =
+            [&](size_t windowStart) -> bool {
+                for (const auto& name : namesSupplied) {
+                    bool found = false;
+                    for (size_t i = 0; i < argCount; ++i) {
+                        if (userParamNames[windowStart + i] == name) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) return false;
+                }
+                return true;
+            };
+        size_t windowStart = 0;
+        bool prefixAccepts = windowAccepts(0);
+        size_t suffixStart = userParamNames.size() - argCount;
+        bool suffixAccepts =
+            (suffixStart != 0) && windowAccepts(suffixStart);
+        if (prefixAccepts) {
+            windowStart = 0;
+        } else if (suffixAccepts) {
+            windowStart = suffixStart;
+        } else {
+            throwElaborate(
+                "named arguments: no window of '"
+                + headIdentifier->qualifiedName
+                + "'s parameters matches the supplied names");
+        }
+        std::vector<SurfaceExpressionPointer> slots(
+            argCount, SurfaceExpressionPointer{});
+        std::vector<bool> slotFilled(argCount, false);
+        // First pass: place named arguments.
+        for (const auto& a : arguments) {
+            if (a.name.empty()) continue;
+            int paramIndex = -1;
+            for (size_t i = 0; i < argCount; ++i) {
+                if (userParamNames[windowStart + i] == a.name) {
+                    paramIndex = static_cast<int>(i);
+                    break;
+                }
+            }
+            if (paramIndex < 0) {
+                throwElaborate(
+                    "named arguments: '"
+                    + headIdentifier->qualifiedName
+                    + "' has no parameter named '"
+                    + a.name + "' in the resolved window");
+            }
+            if (slotFilled[paramIndex]) {
+                throwElaborate(
+                    "named arguments: parameter '"
+                    + a.name + "' assigned twice");
+            }
+            slots[paramIndex] = a.value;
+            slotFilled[paramIndex] = true;
+        }
+        // Second pass: positional arguments into the next unfilled
+        // slot, in source order.
+        size_t nextSlot = 0;
+        for (const auto& a : arguments) {
+            if (!a.name.empty()) continue;
+            while (nextSlot < argCount && slotFilled[nextSlot]) {
+                ++nextSlot;
+            }
+            if (nextSlot >= argCount) {
+                throwElaborate(
+                    "named arguments: too many positional arguments "
+                    "after named-argument assignments");
+            }
+            slots[nextSlot] = a.value;
+            slotFilled[nextSlot] = true;
+            ++nextSlot;
+        }
+        return slots;
+    }
+
     ExpressionPointer elaborateExpression(
         const SurfaceExpression& expression,
         const std::vector<LocalBinder>& localBinders,
@@ -1875,39 +2052,49 @@ private:
             // supplied positional arguments.
             auto* headIdentifier = std::get_if<SurfaceIdentifier>(
                 &application->function->node);
+            // Reorder named arguments into positional order. If no
+            // named arguments are present, the result is just the
+            // positional values in their original order. After this
+            // point, all downstream dispatch logic sees a uniform
+            // positional argument list (`positionalArguments`).
+            std::vector<SurfaceExpressionPointer> positionalArguments =
+                reorderArgumentsForCall(
+                    application->arguments,
+                    application->function,
+                    expression.line);
             if (headIdentifier && headIdentifier->universeArgs.empty()) {
                 const std::string& name = headIdentifier->qualifiedName;
-                size_t argumentCount = application->arguments.size();
+                size_t argumentCount = positionalArguments.size();
                 if (name == "congruenceOf" && argumentCount == 2) {
                     return desugarCongruenceOf(
-                        application->arguments[0],
-                        application->arguments[1],
+                        positionalArguments[0],
+                        positionalArguments[1],
                         localBinders,
                         expression.line, expression.column);
                 }
                 if (name == "reflexivity" && argumentCount == 1) {
                     return desugarReflexivity(
-                        application->arguments[0],
+                        positionalArguments[0],
                         localBinders,
                         expression.line, expression.column);
                 }
                 if (name == "Equality.symmetry" && argumentCount == 1) {
                     return desugarEqualitySymmetry(
-                        application->arguments[0],
+                        positionalArguments[0],
                         localBinders,
                         expression.line, expression.column);
                 }
                 if (name == "Equality.transitivity"
                     && argumentCount == 2) {
                     return desugarEqualityTransitivity(
-                        application->arguments[0],
-                        application->arguments[1],
+                        positionalArguments[0],
+                        positionalArguments[1],
                         localBinders,
                         expression.line, expression.column);
                 }
                 if (name == "rewrite" && argumentCount == 1) {
                     return desugarRewrite(
-                        application->arguments[0],
+                        positionalArguments[0],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
@@ -1920,40 +2107,40 @@ private:
                 // implicit-binder case for axioms).
                 if (name == "Quotient.mk" && argumentCount == 1) {
                     return desugarQuotientMk(
-                        application->arguments[0],
+                        positionalArguments[0],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
                 if (name == "Quotient.sound" && argumentCount == 3) {
                     return desugarQuotientSound(
-                        application->arguments[0],
-                        application->arguments[1],
-                        application->arguments[2],
+                        positionalArguments[0],
+                        positionalArguments[1],
+                        positionalArguments[2],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
                 if (name == "Quotient.lift" && argumentCount == 3) {
                     return desugarQuotientLift(
-                        application->arguments[0],
-                        application->arguments[1],
-                        application->arguments[2],
+                        positionalArguments[0],
+                        positionalArguments[1],
+                        positionalArguments[2],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
                 if (name == "Quotient.induct" && argumentCount == 3) {
                     return desugarQuotientInduct(
-                        application->arguments[0],
-                        application->arguments[1],
-                        application->arguments[2],
+                        positionalArguments[0],
+                        positionalArguments[1],
+                        positionalArguments[2],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
                 if (name == "Quotient.induct_two" && argumentCount == 4) {
                     return desugarQuotientInductTwo(
-                        application->arguments[0],
-                        application->arguments[1],
-                        application->arguments[2],
-                        application->arguments[3],
+                        positionalArguments[0],
+                        positionalArguments[1],
+                        positionalArguments[2],
+                        positionalArguments[3],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
@@ -1969,7 +2156,7 @@ private:
                     if (candidates) {
                         return resolveOverloadedCall(
                             name, *candidates,
-                            application->arguments,
+                            positionalArguments,
                             localBinders, expectedType,
                             expression.line, expression.column);
                     }
@@ -2006,7 +2193,7 @@ private:
                                         expectedType);
                                 return elaborateConstructorCallInferringParameters(
                                     *constructor, *inductive,
-                                    application->arguments,
+                                    positionalArguments,
                                     universeArguments, localBinders,
                                     expectedType, expression.line);
                             }
@@ -2107,7 +2294,7 @@ private:
                                     inferLeadingArguments(
                                         name, instantiated,
                                         numLeadingToInfer,
-                                        application->arguments,
+                                        positionalArguments,
                                         localBinders, expectedType,
                                         "_callLeadingArgument_",
                                         expression.line);
@@ -2149,7 +2336,7 @@ private:
                     && universeParameterCount(*environmentDeclaration) > 0) {
                     std::vector<ExpressionPointer> valueArguments;
                     for (const auto& argumentSurface :
-                         application->arguments) {
+                         positionalArguments) {
                         valueArguments.push_back(elaborateExpression(
                             *argumentSurface, localBinders));
                     }
@@ -2180,7 +2367,7 @@ private:
             } catch (...) {
                 headType = nullptr;
             }
-            for (const auto& argument : application->arguments) {
+            for (const auto& argument : positionalArguments) {
                 ExpressionPointer argumentExpectedType;
                 if (headType) {
                     if (auto* pi =
