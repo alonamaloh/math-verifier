@@ -369,6 +369,19 @@ private:
         } catch (const TypeError& kernelError) {
             rethrowKernelError(kernelError);
         }
+        // Axiom types are written as `(x : T) → U` or
+        // `{x : T} → U` arrow chains in the surface syntax. Count the
+        // leading implicit `{…}` binders in the SURFACE type and
+        // register them so call-site implicit-argument inference can
+        // fire — without this the kernel would see a fully-applied Pi
+        // chain and there'd be nowhere to record which leading
+        // arguments are meant to be inferred.
+        int implicitCount =
+            countLeadingImplicitArgumentNamesInType(declaration.type);
+        if (implicitCount > 0) {
+            environment_.implicitArgumentCounts[declaration.name] =
+                implicitCount;
+        }
         // Axioms are accepted without proof. The foundational ones live
         // in `library/axioms.math` (module name `axioms`) and are
         // silently approved; an axiom declared in any other module is
@@ -382,6 +395,23 @@ private:
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
         resetAutoBoundState();
+    }
+
+    // Walk a surface type expression's leading Pi-binders and count
+    // names across the consecutive prefix of implicit binders. Stops
+    // at the first explicit binder, the first non-Pi node, or end of
+    // chain. Used by `elaborateAxiom` to register implicit-argument
+    // counts so call-site inference can fire.
+    int countLeadingImplicitArgumentNamesInType(
+        SurfaceExpressionPointer typeExpression) {
+        int count = 0;
+        SurfaceExpressionPointer cursor = typeExpression;
+        while (auto* pi = std::get_if<SurfacePiType>(&cursor->node)) {
+            if (!pi->binder.isImplicit) break;
+            count += static_cast<int>(pi->binder.names.size());
+            cursor = pi->codomain;
+        }
+        return count;
     }
 
     // Like `referencesBoundBelowThreshold` but allows the abstraction
@@ -1878,6 +1908,52 @@ private:
                 if (name == "rewrite" && argumentCount == 1) {
                     return desugarRewrite(
                         application->arguments[0],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
+                // Quotient operations with implicit `T, R` inference.
+                // Each user-facing form takes the explicit value args
+                // only; the carrier and equivalence are recovered from
+                // those args' types via a small custom desugar (the
+                // standard implicit-argument machinery doesn't play
+                // well with the combined universe-polymorphism +
+                // implicit-binder case for axioms).
+                if (name == "Quotient.mk" && argumentCount == 1) {
+                    return desugarQuotientMk(
+                        application->arguments[0],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
+                if (name == "Quotient.sound" && argumentCount == 3) {
+                    return desugarQuotientSound(
+                        application->arguments[0],
+                        application->arguments[1],
+                        application->arguments[2],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
+                if (name == "Quotient.lift" && argumentCount == 3) {
+                    return desugarQuotientLift(
+                        application->arguments[0],
+                        application->arguments[1],
+                        application->arguments[2],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
+                if (name == "Quotient.induct" && argumentCount == 3) {
+                    return desugarQuotientInduct(
+                        application->arguments[0],
+                        application->arguments[1],
+                        application->arguments[2],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
+                if (name == "Quotient.induct_two" && argumentCount == 4) {
+                    return desugarQuotientInductTwo(
+                        application->arguments[0],
+                        application->arguments[1],
+                        application->arguments[2],
+                        application->arguments[3],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
@@ -5021,6 +5097,374 @@ private:
             cursor = pi->codomain;
         }
         return true;
+    }
+
+    // Helper: decompose `expectedType` (or any type expression) as
+    // `Quotient(T, R)` and return T, R, and the universe level u such
+    // that T : Type(u). Returns nullopt if the expression isn't a
+    // Quotient application.
+    struct QuotientDecomposition {
+        ExpressionPointer carrierType;
+        ExpressionPointer relation;
+        LevelPointer universeLevel;
+    };
+    bool tryDecomposeQuotient(
+        ExpressionPointer typeExpression,
+        QuotientDecomposition& result) {
+        ExpressionPointer cursor = weakHeadNormalForm(
+            environment_, typeExpression);
+        auto* outerApp = std::get_if<Application>(&cursor->node);
+        if (!outerApp) return false;
+        auto* innerApp =
+            std::get_if<Application>(&outerApp->function->node);
+        if (!innerApp) return false;
+        auto* quotientConstant =
+            std::get_if<Constant>(&innerApp->function->node);
+        if (!quotientConstant || quotientConstant->name != "Quotient")
+            return false;
+        if (quotientConstant->universeArguments.size() != 1)
+            return false;
+        result.carrierType = innerApp->argument;
+        result.relation = outerApp->argument;
+        result.universeLevel = quotientConstant->universeArguments[0];
+        return true;
+    }
+
+    // `Quotient.mk(rep)` — desugars to `Quotient.mk.{u}(T, R, rep)`,
+    // recovering `T` from `rep`'s inferred type and `R` (plus
+    // confirming `T`) from the expected type when available.
+    ExpressionPointer desugarQuotientMk(
+        SurfaceExpressionPointer representativeSurface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "Quotient.mk(rep) at line " + std::to_string(line));
+        ExpressionPointer representativeKernel =
+            elaborateExpression(*representativeSurface, localBinders);
+        ExpressionPointer representativeTypeOpened =
+            inferTypeInLocalContext(localBinders, representativeKernel);
+        ExpressionPointer representativeType = closeOverLocalBinders(
+            representativeTypeOpened, localBinders, localBinders.size());
+        LevelPointer universeLevel =
+            typeUniverseOf(localBinders, representativeKernel);
+
+        ExpressionPointer relation;
+        if (expectedType) {
+            QuotientDecomposition decomp;
+            if (tryDecomposeQuotient(expectedType, decomp)) {
+                relation = decomp.relation;
+            }
+        }
+        if (!relation) {
+            throwElaborate(
+                "Quotient.mk(rep): cannot infer the equivalence "
+                "relation `R` without an expected type of the form "
+                "`Quotient(T, R)` in context");
+        }
+        ExpressionPointer call = makeConstant(
+            "Quotient.mk", {universeLevel});
+        call = makeApplication(std::move(call), representativeType);
+        call = makeApplication(std::move(call), relation);
+        call = makeApplication(std::move(call),
+                                std::move(representativeKernel));
+        return call;
+    }
+
+    // `Quotient.sound(x, y, proof)` — desugars to
+    // `Quotient.sound.{u}(T, R, x, y, proof)`. Recovers `T` from `x`'s
+    // type and `R` by walking `proof`'s type as `R(x, y)` to extract
+    // the head `R`.
+    ExpressionPointer desugarQuotientSound(
+        SurfaceExpressionPointer xSurface,
+        SurfaceExpressionPointer ySurface,
+        SurfaceExpressionPointer proofSurface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "Quotient.sound at line " + std::to_string(line));
+        // Prefer pulling `T` and `R` from the expected type. Its
+        // shape (after WHNF/δ-reduction) is
+        // `Equality(Quotient(T, R), mk(T, R, x), mk(T, R, y))`, which
+        // pins down `R` as the user wrote it — important when `R`
+        // δ-reduces (`IntegerEquivalent → λ rep1 rep2. (...)`) and we'd
+        // otherwise infer the reduced form from the proof's type.
+        ExpressionPointer carrierType;
+        ExpressionPointer relation;
+        LevelPointer universeLevel;
+        if (expectedType) {
+            ExpressionPointer expectedOpened = weakHeadNormalForm(
+                environment_, expectedType);
+            // Expect Equality(Q, ..., ...) → extract Q.
+            if (auto* eqOuter =
+                    std::get_if<Application>(&expectedOpened->node)) {
+                if (auto* eqMid =
+                        std::get_if<Application>(
+                            &eqOuter->function->node)) {
+                    if (auto* eqInner =
+                            std::get_if<Application>(
+                                &eqMid->function->node)) {
+                        QuotientDecomposition decomp;
+                        if (tryDecomposeQuotient(eqInner->argument, decomp)) {
+                            carrierType = closeOverLocalBinders(
+                                decomp.carrierType, localBinders,
+                                localBinders.size());
+                            relation = closeOverLocalBinders(
+                                decomp.relation, localBinders,
+                                localBinders.size());
+                            universeLevel = decomp.universeLevel;
+                        }
+                    }
+                }
+            }
+        }
+
+        ExpressionPointer xKernel = elaborateExpression(
+            *xSurface, localBinders);
+        ExpressionPointer yKernel = elaborateExpression(
+            *ySurface, localBinders);
+        ExpressionPointer proofKernel = elaborateExpression(
+            *proofSurface, localBinders);
+
+        if (!carrierType) {
+            ExpressionPointer xTypeOpened =
+                inferTypeInLocalContext(localBinders, xKernel);
+            carrierType = closeOverLocalBinders(
+                xTypeOpened, localBinders, localBinders.size());
+            universeLevel = typeUniverseOf(localBinders, xKernel);
+        }
+        if (!relation) {
+            // Fallback: pull `R` from proof's type as `R(x, y)`.
+            ExpressionPointer proofTypeOpened = weakHeadNormalForm(
+                environment_,
+                inferTypeInLocalContext(localBinders, proofKernel));
+            if (auto* outer = std::get_if<Application>(
+                    &proofTypeOpened->node)) {
+                if (auto* inner = std::get_if<Application>(
+                        &outer->function->node)) {
+                    relation = closeOverLocalBinders(
+                        inner->function, localBinders,
+                        localBinders.size());
+                }
+            }
+        }
+        if (!relation) {
+            throwElaborate(
+                "Quotient.sound(x, y, proof): cannot infer the "
+                "equivalence relation `R` — provide an expected type "
+                "of the form `Equality(Quotient(T, R), …, …)` or use "
+                "the explicit `Quotient.sound(T, R, x, y, proof)` form");
+        }
+        ExpressionPointer call = makeConstant(
+            "Quotient.sound", {universeLevel});
+        call = makeApplication(std::move(call), carrierType);
+        call = makeApplication(std::move(call), relation);
+        call = makeApplication(std::move(call), std::move(xKernel));
+        call = makeApplication(std::move(call), std::move(yKernel));
+        call = makeApplication(std::move(call), std::move(proofKernel));
+        return call;
+    }
+
+    // `Quotient.lift(f, h, q)` — desugars to
+    // `Quotient.lift.{u, v}(T, R, U, f, h, q)`. Recovers everything
+    // from the argument types: `T → U` is `f`'s Pi signature; `R`
+    // appears in `q`'s type as `Quotient(T, R)`.
+    ExpressionPointer desugarQuotientLift(
+        SurfaceExpressionPointer fSurface,
+        SurfaceExpressionPointer hSurface,
+        SurfaceExpressionPointer qSurface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer /*expectedType*/,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "Quotient.lift at line " + std::to_string(line));
+        ExpressionPointer fKernel = elaborateExpression(
+            *fSurface, localBinders);
+        ExpressionPointer qKernel = elaborateExpression(
+            *qSurface, localBinders);
+        ExpressionPointer fTypeOpened = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, fKernel));
+        auto* fPi = std::get_if<Pi>(&fTypeOpened->node);
+        if (!fPi) {
+            throwElaborate(
+                "Quotient.lift(f, h, q): first argument must be a "
+                "function `T → U`");
+        }
+        ExpressionPointer carrierType = closeOverLocalBinders(
+            fPi->domain, localBinders, localBinders.size());
+        ExpressionPointer targetType = closeOverLocalBinders(
+            fPi->codomain, localBinders, localBinders.size());
+        // Compute the carrier and target universe levels.
+        LevelPointer uLevel;
+        LevelPointer vLevel;
+        {
+            ExpressionPointer carrierTypeOfType = weakHeadNormalForm(
+                environment_,
+                inferTypeInLocalContext(localBinders, carrierType));
+            auto* sortNode =
+                std::get_if<Sort>(&carrierTypeOfType->node);
+            if (!sortNode) {
+                throwElaborate(
+                    "Quotient.lift: cannot determine carrier universe");
+            }
+            uLevel = predecessorOfSortLevel(sortNode->level);
+            ExpressionPointer targetTypeOfType = weakHeadNormalForm(
+                environment_,
+                inferTypeInLocalContext(localBinders, targetType));
+            auto* targetSortNode =
+                std::get_if<Sort>(&targetTypeOfType->node);
+            if (!targetSortNode) {
+                throwElaborate(
+                    "Quotient.lift: cannot determine target universe");
+            }
+            vLevel = predecessorOfSortLevel(targetSortNode->level);
+        }
+        // Get `R` from `q`'s type: `Quotient(T, R)`.
+        ExpressionPointer qTypeOpened = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, qKernel));
+        QuotientDecomposition decomp;
+        if (!tryDecomposeQuotient(qTypeOpened, decomp)) {
+            throwElaborate(
+                "Quotient.lift(f, h, q): third argument's type must "
+                "be `Quotient(T, R)`");
+        }
+        ExpressionPointer relation = closeOverLocalBinders(
+            decomp.relation, localBinders, localBinders.size());
+        // Elaborate `h` after we know all the pieces.
+        ExpressionPointer hKernel = elaborateExpression(
+            *hSurface, localBinders);
+        ExpressionPointer call = makeConstant(
+            "Quotient.lift", {uLevel, vLevel});
+        call = makeApplication(std::move(call), carrierType);
+        call = makeApplication(std::move(call), relation);
+        call = makeApplication(std::move(call), targetType);
+        call = makeApplication(std::move(call), std::move(fKernel));
+        call = makeApplication(std::move(call), std::move(hKernel));
+        call = makeApplication(std::move(call), std::move(qKernel));
+        return call;
+    }
+
+    // `Quotient.induct(motive, f, q)` — desugars to
+    // `Quotient.induct.{u}(T, R, motive, f, q)`. Recovers T, R from
+    // `motive`'s domain `Quotient(T, R)`.
+    ExpressionPointer desugarQuotientInduct(
+        SurfaceExpressionPointer motiveSurface,
+        SurfaceExpressionPointer fSurface,
+        SurfaceExpressionPointer qSurface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer /*expectedType*/,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "Quotient.induct at line " + std::to_string(line));
+        ExpressionPointer motiveKernel = elaborateExpression(
+            *motiveSurface, localBinders);
+        ExpressionPointer motiveTypeOpened = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, motiveKernel));
+        auto* motivePi = std::get_if<Pi>(&motiveTypeOpened->node);
+        if (!motivePi) {
+            throwElaborate(
+                "Quotient.induct(motive, f, q): motive must be a "
+                "function `Quotient(T, R) → Proposition`");
+        }
+        QuotientDecomposition decomp;
+        if (!tryDecomposeQuotient(motivePi->domain, decomp)) {
+            throwElaborate(
+                "Quotient.induct(motive, f, q): motive's domain must "
+                "be a `Quotient(T, R)` type");
+        }
+        ExpressionPointer carrierType = closeOverLocalBinders(
+            decomp.carrierType, localBinders, localBinders.size());
+        ExpressionPointer relation = closeOverLocalBinders(
+            decomp.relation, localBinders, localBinders.size());
+        LevelPointer uLevel = decomp.universeLevel;
+        ExpressionPointer fKernel = elaborateExpression(
+            *fSurface, localBinders);
+        ExpressionPointer qKernel = elaborateExpression(
+            *qSurface, localBinders);
+        ExpressionPointer call = makeConstant(
+            "Quotient.induct", {uLevel});
+        call = makeApplication(std::move(call), carrierType);
+        call = makeApplication(std::move(call), relation);
+        call = makeApplication(std::move(call), std::move(motiveKernel));
+        call = makeApplication(std::move(call), std::move(fKernel));
+        call = makeApplication(std::move(call), std::move(qKernel));
+        return call;
+    }
+
+    // `Quotient.induct_two(motive, f, q1, q2)` — recovers T1, R1, T2,
+    // R2 from `q1` and `q2`'s types (each of the form `Quotient(Ti, Ri)`)
+    // and emits `Quotient.induct_two.{u, v}(T1, R1, T2, R2, motive, f,
+    // q1, q2)`.
+    ExpressionPointer desugarQuotientInductTwo(
+        SurfaceExpressionPointer motiveSurface,
+        SurfaceExpressionPointer fSurface,
+        SurfaceExpressionPointer q1Surface,
+        SurfaceExpressionPointer q2Surface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer /*expectedType*/,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "Quotient.induct_two at line " + std::to_string(line));
+        ExpressionPointer q1Kernel = elaborateExpression(
+            *q1Surface, localBinders);
+        ExpressionPointer q2Kernel = elaborateExpression(
+            *q2Surface, localBinders);
+        ExpressionPointer q1TypeOpened = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, q1Kernel));
+        ExpressionPointer q2TypeOpened = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, q2Kernel));
+        QuotientDecomposition d1, d2;
+        if (!tryDecomposeQuotient(q1TypeOpened, d1)) {
+            throwElaborate(
+                "Quotient.induct_two: q1's type must be `Quotient(T, R)`");
+        }
+        if (!tryDecomposeQuotient(q2TypeOpened, d2)) {
+            throwElaborate(
+                "Quotient.induct_two: q2's type must be `Quotient(T, R)`");
+        }
+        ExpressionPointer carrierType1 = closeOverLocalBinders(
+            d1.carrierType, localBinders, localBinders.size());
+        ExpressionPointer relation1 = closeOverLocalBinders(
+            d1.relation, localBinders, localBinders.size());
+        ExpressionPointer carrierType2 = closeOverLocalBinders(
+            d2.carrierType, localBinders, localBinders.size());
+        ExpressionPointer relation2 = closeOverLocalBinders(
+            d2.relation, localBinders, localBinders.size());
+        ExpressionPointer motiveKernel = elaborateExpression(
+            *motiveSurface, localBinders);
+        ExpressionPointer fKernel = elaborateExpression(
+            *fSurface, localBinders);
+        ExpressionPointer call = makeConstant(
+            "Quotient.induct_two", {d1.universeLevel, d2.universeLevel});
+        call = makeApplication(std::move(call), carrierType1);
+        call = makeApplication(std::move(call), relation1);
+        call = makeApplication(std::move(call), carrierType2);
+        call = makeApplication(std::move(call), relation2);
+        call = makeApplication(std::move(call), std::move(motiveKernel));
+        call = makeApplication(std::move(call), std::move(fKernel));
+        call = makeApplication(std::move(call), std::move(q1Kernel));
+        call = makeApplication(std::move(call), std::move(q2Kernel));
+        return call;
+    }
+
+    // Given a `Sort u`-shape level, return the predecessor `u-1`. Used
+    // by the quotient desugars to back out the universe parameter from
+    // a type's type.
+    LevelPointer predecessorOfSortLevel(LevelPointer sortLevel) {
+        if (auto* successor =
+                std::get_if<LevelSuccessor>(&sortLevel->node)) {
+            return successor->base;
+        }
+        if (auto* constant =
+                std::get_if<LevelConst>(&sortLevel->node)) {
+            if (constant->value >= 1) {
+                return makeLevelConst(constant->value - 1);
+            }
+        }
+        throwElaborate(
+            "internal: cannot derive universe predecessor from sort level");
+        return nullptr;  // unreachable
     }
 
     ExpressionPointer desugarCongruenceOf(
