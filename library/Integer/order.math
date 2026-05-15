@@ -1,0 +1,137 @@
+-- Integer/order.math
+--
+-- The ≤ relation on Integer. Defined directly: `x ≤ y` iff there is
+-- a natural `n` such that `y = x + (n : Integer)`. This shape makes
+-- reflexivity and transitivity straightforward, and integrates cleanly
+-- with the additive ring laws (no need to drop down to representatives).
+
+module Integer.order
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+
+-- `x` is non-negative iff it equals some Natural's image.
+definition Integer.IsNonneg (x : Integer) : Proposition :=
+  ∃ (n : Natural). x = (n : Integer)
+
+-- ≤ on Integer: `x ≤ y` iff there's a Natural `n` with y = x + n.
+definition Integer.LessOrEqual (x y : Integer) : Proposition :=
+  ∃ (n : Natural). y = x + (n : Integer)
+
+-- Strict <: `x + 1 ≤ y`.
+definition Integer.LessThan (x y : Integer) : Proposition :=
+  Integer.LessOrEqual(x + Integer.one, y)
+
+operator (≤) on (Integer, Integer) := Integer.LessOrEqual
+operator (<) on (Integer, Integer) := Integer.LessThan
+
+-- ----------------------------------------------------------------------
+-- IsNonneg basics.
+
+-- 0 is non-negative.
+theorem Integer.zero_is_nonneg : Integer.IsNonneg(Integer.zero) :=
+  Exists.introduce(
+      Natural,
+      function (n : Natural) => Integer.zero = (n : Integer),
+      zero,
+      reflexivity(Integer, Integer.zero))
+
+-- Every embedded Natural is non-negative.
+theorem Integer.from_natural_is_nonneg (n : Natural)
+        : Integer.IsNonneg((n : Integer)) :=
+  Exists.introduce(
+      Natural,
+      function (k : Natural) => (n : Integer) = (k : Integer),
+      n,
+      reflexivity(Integer, (n : Integer)))
+
+-- ----------------------------------------------------------------------
+-- ≤ basic properties.
+
+-- Reflexivity: x ≤ x. Witness: 0, since x = x + 0.
+theorem Integer.LessOrEqual.reflexive (x : Integer) : x ≤ x :=
+  Exists.introduce(
+      Natural,
+      function (n : Natural) => x = x + (n : Integer),
+      zero,
+      Equality.symmetry(Integer.add_identity_right(x)))
+
+-- Transitivity: x ≤ y and y ≤ z give x ≤ z.
+-- With y = x + a and z = y + b:  z = (x + a) + b = x + (a + b).
+theorem Integer.LessOrEqual.transitive (x y z : Integer)
+        (xLessOrEqualY : x ≤ y) (yLessOrEqualZ : y ≤ z)
+        : x ≤ z :=
+  Exists.eliminate(
+      Natural,
+      function (a : Natural) => y = x + (a : Integer),
+      x ≤ z,
+      function (a : Natural) (yEqualsXPlusA : y = x + (a : Integer)) =>
+          Exists.eliminate(
+              Natural,
+              function (b : Natural) => z = y + (b : Integer),
+              x ≤ z,
+              function (b : Natural)
+                       (zEqualsYPlusB : z = y + (b : Integer)) =>
+                  Exists.introduce(
+                      Natural,
+                      function (k : Natural) => z = x + (k : Integer),
+                      a + b,
+                      calc z
+                         = y + (b : Integer)
+                                by zEqualsYPlusB
+                         = (x + (a : Integer)) + (b : Integer)
+                                by rewrite(yEqualsXPlusA)
+                         = x + ((a : Integer) + (b : Integer))
+                                by Integer.add_associative(
+                                       x, (a : Integer), (b : Integer))
+                         = x + (a + b : Integer)
+                                by rewrite(Equality.symmetry(
+                                       Natural.to_integer.add_preserves(a, b)))),
+              yLessOrEqualZ),
+      xLessOrEqualY)
+
+-- ----------------------------------------------------------------------
+-- Order vs. addition.
+
+-- ≤ is preserved by adding the same value: x ≤ y implies x + z ≤ y + z.
+-- With y = x + n, we have y + z = (x + z) + n by associativity +
+-- commutativity. Witness: same n.
+theorem Integer.add_preserves_less_or_equal (x y z : Integer)
+        (xLessOrEqualY : x ≤ y)
+        : x + z ≤ y + z :=
+  Exists.eliminate(
+      Natural,
+      function (n : Natural) => y = x + (n : Integer),
+      x + z ≤ y + z,
+      function (n : Natural) (yEqualsXPlusN : y = x + (n : Integer)) =>
+          Exists.introduce(
+              Natural,
+              function (k : Natural) =>
+                  y + z = (x + z) + (k : Integer),
+              n,
+              calc y + z
+                 = (x + (n : Integer)) + z
+                        by rewrite(yEqualsXPlusN)
+                 = (x + z) + (n : Integer)
+                        by ring),
+      xLessOrEqualY)
+
+-- Every Natural's image is ≥ 0.
+theorem Integer.zero_less_or_equal_from_natural (n : Natural)
+        : Integer.zero ≤ (n : Integer) :=
+  Exists.introduce(
+      Natural,
+      function (k : Natural) => (n : Integer) = Integer.zero + (k : Integer),
+      n,
+      Equality.symmetry(Integer.add_identity_left((n : Integer))))

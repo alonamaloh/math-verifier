@@ -1,0 +1,110 @@
+-- Natural/distance.math
+--
+-- Symmetric difference (≈ "absolute value of a - b") on Naturals.
+-- Defined recursively, decrementing both arguments simultaneously
+-- until one side hits zero. Used to define Integer.absolute_value:
+-- the absolute value of the representative `(a, b)` is
+-- `distance(a, b)`.
+--
+-- Implementation note: written as a single pattern on the first
+-- argument with an explicit `cases` on the second — the kernel only
+-- reduces multi-constructor patterns when the inner case is explicit,
+-- so a `| s(k), s(m) => ...` clause would not fire reduction at
+-- definition use sites.
+
+module Natural.distance
+
+import axioms
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Equality.basics
+
+definition Natural.distance : Natural → Natural → Natural
+  | zero,         b => b
+  | successor(k), b =>
+      cases b {
+        | zero         => successor(k)
+        | successor(m) => Natural.distance(k, m)
+      }
+
+-- distance(0, b) = b.
+theorem Natural.distance_zero_left (b : Natural)
+        : Natural.distance(zero, b) = b :=
+  reflexivity(b)
+
+-- distance(a, 0) = a.
+theorem Natural.distance_zero_right : (a : Natural) → Natural.distance(a, zero) = a
+  | zero         => reflexivity(zero)
+  | successor(k) => reflexivity(successor(k))
+
+-- distance(a, a) = 0.
+theorem Natural.distance_self : (a : Natural) → Natural.distance(a, a) = zero
+  | zero                   => reflexivity(zero)
+  | successor(predecessor) => Natural.distance_self(predecessor)
+
+-- distance is symmetric. Induction on the first argument, with the
+-- second case-analyzed explicitly so the kernel reduces the recursive
+-- call's expected type.
+theorem Natural.distance_symmetric : (a b : Natural)
+        → Natural.distance(a, b) = Natural.distance(b, a)
+  | zero, b =>
+      Equality.symmetry(Natural.distance_zero_right(b))
+  | successor(k), b =>
+      (cases b {
+         | zero =>
+             reflexivity(successor(k))
+         | successor(m) =>
+             Natural.distance_symmetric(k, m)
+       } : Natural.distance(successor(k), b)
+           = Natural.distance(b, successor(k)))
+
+-- Helper: distance(a + b, b) = a. Walking off the rightmost `b`
+-- decrements both sides by 1, leaving `(a, 0)` whose distance is `a`.
+-- Induction on b (a is a free parameter).
+theorem Natural.distance_add_self_right (a : Natural)
+        : (b : Natural) → Natural.distance(a + b, b) = a
+  | zero =>
+      Equality.transitivity(
+          rewrite(Natural.add_zero(a)),
+          Natural.distance_zero_right(a))
+  | successor(predecessor) =>
+      calc Natural.distance(a + successor(predecessor),
+                            successor(predecessor))
+         = Natural.distance(successor(a + predecessor),
+                            successor(predecessor))
+                by rewrite(Natural.add_successor(a, predecessor))
+         = Natural.distance(a + predecessor, predecessor)
+                by reflexivity(Natural,
+                       Natural.distance(a + predecessor, predecessor))
+         = a
+                by Natural.distance_add_self_right(a, predecessor)
+
+-- And the symmetric companion: distance(b, a + b) = a.
+theorem Natural.distance_self_add_right (a b : Natural)
+        : Natural.distance(b, a + b) = a :=
+  Equality.transitivity(
+      Natural.distance_symmetric(b, a + b),
+      Natural.distance_add_self_right(a, b))
+
+-- Respect lemma: if `a + d = b + c` (Integer equivalence of (a, b)
+-- and (c, d)), then distance(a, b) = distance(c, d). Used as the
+-- respect proof for the Integer.absolute_value lift.
+--
+-- Proof outline: induction on a.
+--   a = 0: d = b + c, so distance(0, b) = b = distance(c, b + c) by
+--     distance_self_add_right.
+--   a = s(k): s(k) + d = b + c. Case-split b.
+--     b = 0: c = s(k) + d. distance(s(k), 0) = s(k). distance(c, d) =
+--       distance(s(k) + d, d) = s(k) by distance_add_self_right.
+--     b = s(b'): k + d = b' + c (by Natural.add_cancel_left after
+--       reshuffling). distance(s(k), s(b')) = distance(k, b'). By IH
+--       on k, b', c, d with hypothesis k + d = b' + c, this equals
+--       distance(c, d).
+--
+-- Stubbed for now to unblock downstream development; will be filled
+-- in during the order/abs-value follow-up pass.
+theorem Natural.distance_respects_integer_equivalent
+        (a b c d : Natural)
+        (aPlusDEqualsBPlusC : a + d = b + c)
+        : Natural.distance(a, b) = Natural.distance(c, d) := sorry

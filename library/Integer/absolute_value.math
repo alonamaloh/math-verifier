@@ -1,0 +1,78 @@
+-- Integer/absolute_value.math
+--
+-- Absolute value on Integer. On representatives `(a, b)` (where the
+-- intuitive value is `a - b`), the absolute value is the symmetric
+-- difference `Natural.distance(a, b)` lifted back to Integer. The
+-- respect proof reduces to `Natural.distance_respects_integer_equivalent`.
+
+module Integer.absolute_value
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.distance
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+
+-- The function on representatives: |make(a, b)| := (distance(a, b) : Integer).
+definition Integer.absolute_value_at_representative
+        : IntegerRepresentative → Integer
+  | IntegerRepresentative.make(a, b) =>
+      (Natural.distance(a, b) : Integer)
+
+-- Respect kernel: given `a + d = b + c`, the two representatives'
+-- absolute-value-at-representative agree as Integers. Direct from
+-- `Natural.distance_respects_integer_equivalent`.
+theorem Integer.absolute_value_respect_natural
+        (a b c d : Natural)
+        (aPlusDEqualsBPlusC : a + d = b + c)
+        : (Natural.distance(a, b) : Integer)
+          = (Natural.distance(c, d) : Integer) :=
+  congruenceOf(Natural.to_integer,
+      Natural.distance_respects_integer_equivalent(
+          a, b, c, d, aPlusDEqualsBPlusC))
+
+-- Two-rep destructure helper for the respect proof (after rep1's
+-- destructure has fixed `a, b`).
+theorem Integer.absolute_value_respect_after_first (a b : Natural)
+        : (rep1Prime : IntegerRepresentative)
+          → IntegerEquivalent(IntegerRepresentative.make(a, b), rep1Prime)
+          → Integer.absolute_value_at_representative(
+                IntegerRepresentative.make(a, b))
+            = Integer.absolute_value_at_representative(rep1Prime)
+  | IntegerRepresentative.make(c, d), aPlusDEqualsBPlusC =>
+      Integer.absolute_value_respect_natural(
+          a, b, c, d, aPlusDEqualsBPlusC)
+
+theorem Integer.absolute_value_respect
+        : (rep1 rep1Prime : IntegerRepresentative)
+          → IntegerEquivalent(rep1, rep1Prime)
+          → Integer.absolute_value_at_representative(rep1)
+            = Integer.absolute_value_at_representative(rep1Prime)
+  | IntegerRepresentative.make(a, b), rep1Prime, equivalenceHypothesis =>
+      Integer.absolute_value_respect_after_first(
+          a, b, rep1Prime, equivalenceHypothesis)
+
+-- Absolute value as a function on Integer.
+definition Integer.absolute_value (x : Integer) : Integer :=
+  Quotient.lift(
+      Integer.absolute_value_at_representative,
+      Integer.absolute_value_respect,
+      x)
+
+-- |0| = 0. Direct from the lift's β-reduction and
+-- distance(0, 0) = 0.
+theorem Integer.absolute_value_zero
+        : Integer.absolute_value(Integer.zero) = Integer.zero :=
+  reflexivity(Integer, Integer.zero)
