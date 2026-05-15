@@ -5799,14 +5799,32 @@ private:
         SurfaceExpressionPointer hSurface,
         SurfaceExpressionPointer qSurface,
         const std::vector<LocalBinder>& localBinders,
-        ExpressionPointer /*expectedType*/,
+        ExpressionPointer expectedType,
         int line, int /*column*/) {
         Frame frame(*this,
             "Quotient.lift at line " + std::to_string(line));
-        ExpressionPointer fKernel = elaborateExpression(
-            *fSurface, localBinders);
+        // Elaborate `q` first to get T from its `Quotient(T, R)` type;
+        // then we can build `T → U` as the expected type for `f`, which
+        // lets the lambda body's `Quotient.mk` etc. back-infer when
+        // they appear in a position whose carrier matches U.
         ExpressionPointer qKernel = elaborateExpression(
             *qSurface, localBinders);
+        ExpressionPointer qTypeForT = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, qKernel));
+        QuotientDecomposition decompForT;
+        if (!tryDecomposeQuotient(qTypeForT, decompForT)) {
+            throwElaborate(
+                "Quotient.lift(f, h, q): third argument's type must "
+                "be `Quotient(T, R)`");
+        }
+        ExpressionPointer fExpected = nullptr;
+        if (expectedType) {
+            // Build `T → U` (with U = expectedType) as f's expected
+            // type — provided expectedType is a closed expression.
+            fExpected = makePi("_", decompForT.carrierType, expectedType);
+        }
+        ExpressionPointer fKernel = elaborateExpression(
+            *fSurface, localBinders, fExpected);
         ExpressionPointer fTypeOpened = weakHeadNormalForm(environment_,
             inferTypeInLocalContext(localBinders, fKernel));
         auto* fPi = std::get_if<Pi>(&fTypeOpened->node);
@@ -5844,17 +5862,9 @@ private:
             }
             vLevel = predecessorOfSortLevel(targetSortNode->level);
         }
-        // Get `R` from `q`'s type: `Quotient(T, R)`.
-        ExpressionPointer qTypeOpened = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, qKernel));
-        QuotientDecomposition decomp;
-        if (!tryDecomposeQuotient(qTypeOpened, decomp)) {
-            throwElaborate(
-                "Quotient.lift(f, h, q): third argument's type must "
-                "be `Quotient(T, R)`");
-        }
+        // R from `q`'s type (already decomposed above).
         ExpressionPointer relation = closeOverLocalBinders(
-            decomp.relation, localBinders, localBinders.size());
+            decompForT.relation, localBinders, localBinders.size());
         // Elaborate `h` after we know all the pieces.
         ExpressionPointer hKernel = elaborateExpression(
             *hSurface, localBinders);
