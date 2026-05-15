@@ -5136,6 +5136,11 @@ void loadCacheRecursive(Environment& environment,
         }
         if (!seen) candidates.push_back(entry.functionName);
     }
+    for (const auto& entry : contents.coercionRegistrations) {
+        auto key = std::make_tuple(entry.sourceTypeName,
+                                     entry.targetTypeName);
+        environment.coercionRegistry[key] = entry.chain;
+    }
     alreadyLoaded.insert(cachePath);
 }
 
@@ -5188,6 +5193,10 @@ int verifyWithCache(const std::string& sourcePath,
         for (const auto& candidate : candidates) {
             overloadsBefore[alias].insert(candidate);
         }
+    }
+    std::set<std::tuple<std::string, std::string>> coercionsBefore;
+    for (const auto& [key, _] : environment.coercionRegistry) {
+        coercionsBefore.insert(key);
     }
 
     std::vector<std::string> importedModules;
@@ -5276,6 +5285,15 @@ int verifyWithCache(const std::string& sourcePath,
                 entry.functionName = candidate;
                 cache.overloadRegistrations.push_back(std::move(entry));
             }
+        }
+    }
+    for (const auto& [key, chain] : environment.coercionRegistry) {
+        if (!coercionsBefore.count(key)) {
+            CachedCoercionRegistration entry;
+            entry.sourceTypeName = std::get<0>(key);
+            entry.targetTypeName = std::get<1>(key);
+            entry.chain = chain;
+            cache.coercionRegistrations.push_back(std::move(entry));
         }
     }
 

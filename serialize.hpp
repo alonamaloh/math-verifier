@@ -62,6 +62,16 @@ struct CachedOverloadRegistration {
     std::string functionName;
 };
 
+// Coercion-registry entry added by this file. May be a direct
+// `coercion (S, T) := F` registration or a transitive entry computed
+// from one. `chain` is the list of function names to compose; apply
+// chain[0] first, then chain[1], etc.
+struct CachedCoercionRegistration {
+    std::string sourceTypeName;
+    std::string targetTypeName;
+    std::vector<std::string> chain;
+};
+
 // The full contents of a .mathv file, prior to (de)serialization.
 struct CacheContents {
     std::string sourcePath;
@@ -76,6 +86,9 @@ struct CacheContents {
     std::vector<CachedOperatorRegistration> operatorRegistrations;
     // Overload-alias entries added by this file.
     std::vector<CachedOverloadRegistration> overloadRegistrations;
+    // Coercion-registry entries added by this file (direct and the
+    // transitive-closure entries that the direct one introduced).
+    std::vector<CachedCoercionRegistration> coercionRegistrations;
 };
 
 // Write `contents` to `path`. Throws SerializationError on I/O failure.

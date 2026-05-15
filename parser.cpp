@@ -33,6 +33,7 @@ bool isContextualKeyword(TokenKind kind) {
         case TokenKind::KeywordRing:
         case TokenKind::KeywordOperator:
         case TokenKind::KeywordOverload:
+        case TokenKind::KeywordCoercion:
             return true;
         default:
             return false;
@@ -321,6 +322,7 @@ private:
             case TokenKind::KeywordTheorem:    return parseDefinitionDeclaration(true);
             case TokenKind::KeywordOperator:   return parseOperatorDeclaration();
             case TokenKind::KeywordOverload:   return parseOverloadDeclaration();
+            case TokenKind::KeywordCoercion:   return parseCoercionDeclaration();
             default:
                 throwHere("expected top-level statement keyword "
                           "(import / using / inductive / axiom / "
@@ -369,6 +371,36 @@ private:
         if (!isIdentifierLike(peek().kind)) {
             throwHere("expected a function name as the operator "
                       "dispatch target");
+        }
+        declaration.functionName = consumeQualifiedNameString();
+        return declaration;
+    }
+
+    // `coercion (<sourceTypeName>, <targetTypeName>) := <function>`
+    //
+    // Registers `function` as the canonical embedding from `source`
+    // into `target`. Type names are head Constants (qualified names).
+    SurfaceCoercionDeclaration parseCoercionDeclaration() {
+        consumeAny();  // 'coercion'
+        SurfaceCoercionDeclaration declaration;
+        expect(TokenKind::LeftParen,
+               "expected '(<sourceType>, <targetType>)' after 'coercion'");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a type name (coercion source)");
+        }
+        declaration.sourceTypeName = consumeQualifiedNameString();
+        expect(TokenKind::Comma,
+               "expected ',' between source and target type names");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a type name (coercion target)");
+        }
+        declaration.targetTypeName = consumeQualifiedNameString();
+        expect(TokenKind::RightParen,
+               "expected ')' after target type name");
+        expect(TokenKind::Assign,
+               "expected ':=' before the coercion function name");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a function name as the coercion target");
         }
         declaration.functionName = consumeQualifiedNameString();
         return declaration;

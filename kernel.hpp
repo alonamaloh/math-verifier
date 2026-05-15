@@ -97,6 +97,16 @@ struct Environment {
     // types at each call site. Populated by `overload <alias> := <F>;`.
     std::map<std::string, std::vector<std::string>> overloadAliases;
 
+    // Coercion registry. Key: (sourceTypeName, targetTypeName). Value:
+    // the chain of fully-qualified function names to compose, in order
+    // (apply functionNames[0] first, then functionNames[1], etc.). A
+    // direct registration is a one-element chain; transitive entries
+    // computed at registration time have more. Used by the ascription
+    // path to insert coercion calls when `(expr : T)` has expr of a
+    // different source type with a registered embedding.
+    std::map<std::tuple<std::string, std::string>,
+              std::vector<std::string>> coercionRegistry;
+
     const Declaration* lookup(const std::string& name) const {
         auto iterator = declarations.find(name);
         return iterator == declarations.end() ? nullptr : &iterator->second;

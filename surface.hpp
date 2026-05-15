@@ -515,11 +515,26 @@ struct SurfaceOverloadDeclaration {
     std::string functionName;
 };
 
+// `coercion (<sourceTypeName>, <targetTypeName>) := <function>` —
+// registers `function` (which must have type `source → target`) as the
+// canonical embedding from `source` into `target`. Triggered by
+// `(expr : target)` ascription when `expr` has type `source`. The
+// elaborator computes the transitive closure at registration time, so a
+// chain `Natural → Integer → Rational` exposes `(n : Rational)` as one
+// step; a registration that would create a diamond (two distinct paths
+// from the same source to the same target) is rejected.
+struct SurfaceCoercionDeclaration {
+    std::string sourceTypeName;
+    std::string targetTypeName;
+    std::string functionName;
+};
+
 using SurfaceTopStatement = std::variant<
     SurfaceImportDeclaration, SurfaceUsingDeclaration,
     SurfaceInductiveDeclaration, SurfaceAxiomDeclaration,
     SurfaceDefinitionDeclaration,
-    SurfaceOperatorDeclaration, SurfaceOverloadDeclaration
+    SurfaceOperatorDeclaration, SurfaceOverloadDeclaration,
+    SurfaceCoercionDeclaration
 >;
 
 struct SurfaceModule {

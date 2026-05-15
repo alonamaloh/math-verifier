@@ -18,6 +18,7 @@ enum class TokenKind {
     KeywordWhere,
     KeywordOperator,        // `operator (+) on (T1, T2) := F;` — operator overload
     KeywordOverload,        // `overload name := F;` — function-name overload alias
+    KeywordCoercion,        // `coercion (S, T) := F;` — explicit type coercion
 
     // Expression keywords
     KeywordFunction, KeywordLet, KeywordIn,

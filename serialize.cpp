@@ -12,7 +12,7 @@ constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
 // Format version 2 adds the operator-registry and overload-alias
 // sections at the tail of the file. Files written by version 1 readers
 // are not accepted; on cache-version mismatch the kernel rebuilds.
-constexpr uint32_t cacheVersion = 2;
+constexpr uint32_t cacheVersion = 3;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -395,6 +395,16 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
         writer.writeString(entry.aliasName);
         writer.writeString(entry.functionName);
     }
+    writer.writeU32(
+        static_cast<uint32_t>(contents.coercionRegistrations.size()));
+    for (const auto& entry : contents.coercionRegistrations) {
+        writer.writeString(entry.sourceTypeName);
+        writer.writeString(entry.targetTypeName);
+        writer.writeU32(static_cast<uint32_t>(entry.chain.size()));
+        for (const auto& funcName : entry.chain) {
+            writer.writeString(funcName);
+        }
+    }
     if (!output) {
         throw SerializationError("write failed (final flush): " + path);
     }
@@ -462,6 +472,19 @@ CacheContents readCacheFile(const std::string& path) {
         entry.aliasName = reader.readString();
         entry.functionName = reader.readString();
         contents.overloadRegistrations.push_back(std::move(entry));
+    }
+    uint32_t coercionCount = reader.readU32();
+    contents.coercionRegistrations.reserve(coercionCount);
+    for (uint32_t i = 0; i < coercionCount; ++i) {
+        CachedCoercionRegistration entry;
+        entry.sourceTypeName = reader.readString();
+        entry.targetTypeName = reader.readString();
+        uint32_t chainLength = reader.readU32();
+        entry.chain.reserve(chainLength);
+        for (uint32_t j = 0; j < chainLength; ++j) {
+            entry.chain.push_back(reader.readString());
+        }
+        contents.coercionRegistrations.push_back(std::move(entry));
     }
     return contents;
 }

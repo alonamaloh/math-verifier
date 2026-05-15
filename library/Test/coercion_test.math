@@ -1,0 +1,41 @@
+-- `coercion (S, T) := F` registers F as the canonical embedding from
+-- S into T. `(expr : T)` ascription then triggers it automatically
+-- when `expr`'s inferred type is S.
+--
+-- Transitive closure runs at registration time: with
+--     coercion (Natural, Integer) := Natural.to_integer
+--     coercion (Integer, Rational) := Integer.to_rational
+-- the registry also contains a `(Natural, Rational)` entry that
+-- composes both functions, so `(n : Rational)` for a Natural `n`
+-- works in one ascription.
+
+module Test.coercion_test
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.addition
+import Integer.embedding
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.embedding
+
+-- (1) Direct coercion Natural → Integer.
+theorem natural_to_integer_via_ascription (n : Natural)
+        : (n : Integer) = Natural.to_integer(n) :=
+  reflexivity(Integer, Natural.to_integer(n))
+
+-- (2) Direct coercion Integer → Rational.
+theorem integer_to_rational_via_ascription (n : Integer)
+        : (n : Rational) = Integer.to_rational(n) :=
+  reflexivity(Rational, Integer.to_rational(n))
+
+-- (3) Transitive coercion Natural → Rational, composed at
+-- registration time.
+theorem natural_to_rational_via_ascription (n : Natural)
+        : (n : Rational) = Integer.to_rational(Natural.to_integer(n)) :=
+  reflexivity(Rational, Integer.to_rational(Natural.to_integer(n)))

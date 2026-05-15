@@ -221,6 +221,11 @@ private:
             elaborateOverloadDeclaration(*ov);
             return;
         }
+        if (auto* coercion =
+                std::get_if<SurfaceCoercionDeclaration>(&statement)) {
+            elaborateCoercionDeclaration(*coercion);
+            return;
+        }
         throw ElaborateError("unhandled top-level statement variant");
     }
 
@@ -322,6 +327,130 @@ private:
             }
         }
         candidates.push_back(declaration.functionName);
+    }
+
+    // Validate and register a `coercion (S, T) := F` declaration.
+    //
+    // F must have type `S → T` (both head Constants). After validation
+    // we add the direct edge and compute the transitive closure with
+    // existing coercions; any registration whose closure step would
+    // overwrite a different existing chain is rejected (diamond).
+    void elaborateCoercionDeclaration(
+        const SurfaceCoercionDeclaration& declaration) {
+        Frame frame(*this,
+            "coercion (" + declaration.sourceTypeName + ", "
+            + declaration.targetTypeName + ")");
+        if (declaration.sourceTypeName == declaration.targetTypeName) {
+            throwElaborate(
+                "coercion source and target must differ (got '"
+                + declaration.sourceTypeName + "' on both sides)");
+        }
+        const Declaration* functionDecl =
+            environment_.lookup(declaration.functionName);
+        if (!functionDecl) {
+            throwElaborate(
+                "coercion function '" + declaration.functionName
+                + "' is not in scope");
+        }
+        // Verify F has type S → T (head Constants match).
+        ExpressionPointer functionType = declarationType(*functionDecl);
+        ExpressionPointer cursor = weakHeadNormalForm(
+            environment_, functionType);
+        auto* domainPi = std::get_if<Pi>(&cursor->node);
+        if (!domainPi) {
+            throwElaborate(
+                "coercion function '" + declaration.functionName
+                + "' must take exactly one argument of type '"
+                + declaration.sourceTypeName + "'");
+        }
+        if (!typeHasHeadName(domainPi->domain,
+                              declaration.sourceTypeName)) {
+            throwElaborate(
+                "coercion function '" + declaration.functionName
+                + "': parameter type does not have '"
+                + declaration.sourceTypeName + "' as its head");
+        }
+        if (!typeHasHeadName(domainPi->codomain,
+                              declaration.targetTypeName)) {
+            throwElaborate(
+                "coercion function '" + declaration.functionName
+                + "': result type does not have '"
+                + declaration.targetTypeName + "' as its head");
+        }
+        // Compute the transitive closure.
+        // For each existing (X, S), add (X, T) = chain_XS + [F].
+        // For each existing (T, Y), add (S, Y) = [F] + chain_TY.
+        // For each combination, add (X, Y) = chain_XS + [F] + chain_TY.
+        // Skip same-source-target entries; reject diamonds.
+        using Key = std::tuple<std::string, std::string>;
+        std::vector<std::pair<Key, std::vector<std::string>>> additions;
+        std::vector<std::string> directChain{declaration.functionName};
+        additions.push_back({Key{declaration.sourceTypeName,
+                                    declaration.targetTypeName},
+                              directChain});
+        // Snapshot the existing entries so iteration isn't disturbed.
+        std::vector<std::pair<Key, std::vector<std::string>>> snapshot(
+            environment_.coercionRegistry.begin(),
+            environment_.coercionRegistry.end());
+        for (const auto& [key, chain] : snapshot) {
+            const auto& [src, tgt] = key;
+            // Extend the new direct edge with a suffix that starts at T.
+            if (src == declaration.targetTypeName
+                && tgt != declaration.sourceTypeName) {
+                std::vector<std::string> combined = directChain;
+                combined.insert(combined.end(),
+                                 chain.begin(), chain.end());
+                additions.push_back({Key{declaration.sourceTypeName, tgt},
+                                      std::move(combined)});
+            }
+            // Prefix the new direct edge with a chain that ends at S.
+            if (tgt == declaration.sourceTypeName
+                && src != declaration.targetTypeName) {
+                std::vector<std::string> combined = chain;
+                combined.push_back(declaration.functionName);
+                additions.push_back({Key{src, declaration.targetTypeName},
+                                      std::move(combined)});
+                // And the cross-combinations: (src → T → Y) for each
+                // existing (T, Y).
+                for (const auto& [key2, chain2] : snapshot) {
+                    const auto& [src2, tgt2] = key2;
+                    if (src2 != declaration.targetTypeName) continue;
+                    if (src == tgt2) continue;  // skip A → ... → A
+                    std::vector<std::string> three = chain;
+                    three.push_back(declaration.functionName);
+                    three.insert(three.end(),
+                                  chain2.begin(), chain2.end());
+                    additions.push_back({Key{src, tgt2},
+                                          std::move(three)});
+                }
+            }
+        }
+        // Diamond check: for each new key, ensure it's not already
+        // present (with any chain). If it is, the user has two distinct
+        // paths from the same source to the same target — reject.
+        for (const auto& [key, chain] : additions) {
+            const auto& [src, tgt] = key;
+            if (src == tgt) continue;
+            auto existing = environment_.coercionRegistry.find(key);
+            if (existing != environment_.coercionRegistry.end()) {
+                if (existing->second != chain) {
+                    throwElaborate(
+                        "coercion diamond: registering ("
+                        + declaration.sourceTypeName + ", "
+                        + declaration.targetTypeName
+                        + ") would create a second path from '"
+                        + src + "' to '" + tgt + "'; the existing "
+                        "chain is already in the registry");
+                }
+                // Same chain already there — skip.
+                continue;
+            }
+        }
+        for (auto& [key, chain] : additions) {
+            const auto& [src, tgt] = key;
+            if (src == tgt) continue;
+            environment_.coercionRegistry[key] = std::move(chain);
+        }
     }
 
     // Does `expressionType` have the given Constant name at its head?
@@ -2430,19 +2559,17 @@ private:
                                      localBinders, ascribedType);
 
             // Ascription doubles as a coercion: if `inner`'s inferred
-            // type doesn't match the ascribed type but a canonical
-            // embedding chain between them exists, compose the chain
-            // and apply it. Currently a single hardcoded link —
-            //     Natural → Integer  (via `Natural.to_integer`)
-            // — which grows as Rational / Real / Complex land. The
-            // lookup uses definitional equality, so type-level
-            // aliases and δ-reducible definitions are matched
-            // transparently.
+            // type doesn't match the ascribed type but a registered
+            // coercion chain bridges them, compose the chain and
+            // apply it. The registry is populated by `coercion (S, T)
+            // := F;` declarations and transitively closed at
+            // registration time, so direct and multi-hop coercions
+            // alike are a single lookup here.
             //
             // When no coercion fires, fall through to returning
             // `inner` directly; any type mismatch surfaces at the
             // eventual use site, exactly as it did before.
-            if (environment_.lookup("Natural.to_integer") != nullptr) {
+            if (!environment_.coercionRegistry.empty()) {
                 try {
                     ExpressionPointer innerTypeOpened =
                         inferTypeInLocalContext(localBinders, inner);
@@ -2463,16 +2590,45 @@ private:
                                                 ascribedTypeOpened)) {
                         return inner;
                     }
-                    ExpressionPointer naturalType = makeConstant("Natural");
-                    ExpressionPointer integerType = makeConstant("Integer");
-                    if (isDefinitionallyEqual(environment_, coercionContext,
-                                                innerTypeOpened, naturalType)
-                        && isDefinitionallyEqual(environment_, coercionContext,
-                                                   ascribedTypeOpened,
-                                                   integerType)) {
-                        return makeApplication(
-                            makeConstant("Natural.to_integer"),
-                            std::move(inner));
+                    // Search registry for a chain from inner's head
+                    // type to the ascribed head type. We match by raw
+                    // head Constant name (without delta-reducing the
+                    // type): the registry is keyed on the source-level
+                    // type name, e.g. `Integer`, not the unfolded
+                    // `Quotient(...)`.
+                    auto headName =
+                        [&](ExpressionPointer type) -> std::string {
+                            ExpressionPointer cursor = type;
+                            // Peel applications to find the head.
+                            while (true) {
+                                if (auto* app =
+                                        std::get_if<Application>(
+                                            &cursor->node)) {
+                                    cursor = app->function;
+                                    continue;
+                                }
+                                break;
+                            }
+                            if (auto* c =
+                                    std::get_if<Constant>(&cursor->node)) {
+                                return c->name;
+                            }
+                            return std::string{};
+                        };
+                    std::string innerHead = headName(innerTypeOpened);
+                    std::string ascribedHead = headName(ascribedTypeOpened);
+                    if (!innerHead.empty() && !ascribedHead.empty()) {
+                        auto entry = environment_.coercionRegistry.find(
+                            std::make_tuple(innerHead, ascribedHead));
+                        if (entry != environment_.coercionRegistry.end()) {
+                            ExpressionPointer call = std::move(inner);
+                            for (const auto& funcName : entry->second) {
+                                call = makeApplication(
+                                    makeConstant(funcName),
+                                    std::move(call));
+                            }
+                            return call;
+                        }
                     }
                 } catch (const TypeError&) {
                     // Inner expression's type couldn't be inferred —
