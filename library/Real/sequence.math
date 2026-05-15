@@ -26,6 +26,7 @@ import Rational.basics
 import Rational.addition
 import Rational.multiplication
 import Rational.negation
+import Rational.ring
 import Rational.order
 import Rational.absolute_value
 
@@ -61,14 +62,52 @@ definition Rational.sequence.Bounded
     (n : Natural) →
       Rational.absolute_value(s(n)) ≤ boundValue
 
--- Constant sequence is Cauchy: every two terms are equal, so |s(m) -
--- s(n)| = 0 < ε for any positive ε. Stubbed for now — fills in with
--- `Rational.subtract_self : x - x = 0` and `Rational.absolute_value_zero
--- = 0` plus the assumption `0 < ε`.
+-- Helper: |q - q| = 0 for any Rational q. By `q - q = q + -q =
+-- Rational.zero` and `|Rational.zero| = Rational.zero`.
+theorem Rational.absolute_value_subtract_self (q : Rational)
+        : Rational.absolute_value(q - q) = Rational.zero :=
+  congruenceOf(Rational.absolute_value, Rational.add_negate_right(q))
+
+-- Constant sequence is Cauchy: |q - q| = 0 < ε.
 theorem Rational.sequence.constant_is_cauchy (q : Rational)
-        : Rational.sequence.IsCauchy(function (n : Natural) => q) := sorry
+        : Rational.sequence.IsCauchy(function (n : Natural) => q) :=
+  function (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) =>
+    Exists.introduce(
+        Natural,
+        function (N : Natural) =>
+          (m : Natural) → N ≤ m → (n : Natural) → N ≤ n →
+            Rational.absolute_value(q - q) < epsilon,
+        zero,
+        function (m : Natural) (_ : zero ≤ m)
+                 (n : Natural) (_ : zero ≤ n) =>
+          Equality.transport_proposition(
+              Rational,
+              function (x : Rational) =>
+                  Rational.LessThan(x, epsilon),
+              Rational.zero,
+              Rational.absolute_value(q - q),
+              Equality.symmetry(
+                  Rational.absolute_value_subtract_self(q)),
+              epsilonPositive))
 
 -- Constant sequence converges to its constant value. Same shape.
 theorem Rational.sequence.constant_converges_to_itself (q : Rational)
         : Rational.sequence.ConvergesTo(
-              function (n : Natural) => q, q) := sorry
+              function (n : Natural) => q, q) :=
+  function (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) =>
+    Exists.introduce(
+        Natural,
+        function (N : Natural) =>
+          (m : Natural) → N ≤ m →
+            Rational.absolute_value(q - q) < epsilon,
+        zero,
+        function (m : Natural) (_ : zero ≤ m) =>
+          Equality.transport_proposition(
+              Rational,
+              function (x : Rational) =>
+                  Rational.LessThan(x, epsilon),
+              Rational.zero,
+              Rational.absolute_value(q - q),
+              Equality.symmetry(
+                  Rational.absolute_value_subtract_self(q)),
+              epsilonPositive))

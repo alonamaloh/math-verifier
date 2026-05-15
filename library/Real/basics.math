@@ -18,6 +18,7 @@ import Rational.basics
 import Rational.addition
 import Rational.multiplication
 import Rational.negation
+import Rational.ring
 import Rational.order
 import Rational.absolute_value
 import Real.sequence
@@ -51,18 +52,38 @@ definition CauchyEquivalent
 definition Real : Type(0) :=
   Quotient(CauchyRationalSequence, CauchyEquivalent)
 
--- CauchyEquivalent is reflexive. Stubbed: every pointwise difference
--- is zero, so |0| = 0 < ε.
+-- CauchyEquivalent is reflexive: |s(m) - s(m)| = 0 < ε.
 theorem CauchyEquivalent.reflexive
-        : (a : CauchyRationalSequence) → CauchyEquivalent(a, a) := sorry
+        : (a : CauchyRationalSequence) → CauchyEquivalent(a, a)
+  | CauchyRationalSequence.make(s, sCauchy) =>
+      function (epsilon : Rational)
+               (epsilonPositive : Rational.zero < epsilon) =>
+        Exists.introduce(
+            Natural,
+            function (N : Natural) =>
+              (m : Natural) → N ≤ m →
+                Rational.absolute_value(s(m) - s(m)) < epsilon,
+            zero,
+            function (m : Natural) (_ : zero ≤ m) =>
+              Equality.transport_proposition(
+                  Rational,
+                  function (x : Rational) =>
+                      Rational.LessThan(x, epsilon),
+                  Rational.zero,
+                  Rational.absolute_value(s(m) - s(m)),
+                  Equality.symmetry(
+                      Rational.absolute_value_subtract_self(s(m))),
+                  epsilonPositive))
 
--- CauchyEquivalent is symmetric. Stubbed: |x - y| = |y - x|.
+-- CauchyEquivalent is symmetric. Stubbed: needs `|x - y| = |y - x|`
+-- on Rational, which is itself a small but new lemma.
 theorem CauchyEquivalent.symmetric
         : (a b : CauchyRationalSequence)
           → CauchyEquivalent(a, b) → CauchyEquivalent(b, a) := sorry
 
 -- CauchyEquivalent is transitive. Stubbed: triangle inequality on
 -- the pointwise differences, with ε/2 + ε/2 = ε threshold split.
+-- Needs `Rational.halve` and `Rational.triangle_inequality`.
 theorem CauchyEquivalent.transitive
         : (a b c : CauchyRationalSequence)
           → CauchyEquivalent(a, b) → CauchyEquivalent(b, c)

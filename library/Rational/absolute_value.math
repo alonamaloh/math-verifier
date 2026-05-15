@@ -56,3 +56,56 @@ definition Rational.absolute_value (x : Rational) : Rational :=
       Rational.absolute_value_at_representative,
       Rational.absolute_value_respect,
       x)
+
+-- |0| = 0. By kernel reduction.
+theorem Rational.absolute_value_zero
+        : Rational.absolute_value(Rational.zero) = Rational.zero :=
+  reflexivity(Rational, Rational.zero)
+
+-- |-x| = |x| at the representative level: negate negates the
+-- numerator, and Integer.absolute_value_negate then reverses it.
+theorem Rational.absolute_value_negate_at_representative
+        : (rep : RationalRepresentative)
+          → Rational.absolute_value_at_representative(
+                Rational.negate_representatives(rep))
+            = Rational.absolute_value_at_representative(rep)
+  | RationalRepresentative.make(n, d) =>
+      -- LHS = mk(make(|-n|, d)). RHS = mk(make(|n|, d)).
+      -- |-n| = |n| by Integer.absolute_value_negate.
+      congruenceOf(
+          function (m : Integer) =>
+              Quotient.mk(RationalRepresentative,
+                          RationalEquivalent,
+                          RationalRepresentative.make(m, d)),
+          Integer.absolute_value_negate(n))
+
+-- |-x| = |x| on Rational.
+theorem Rational.absolute_value_negate (x : Rational)
+        : Rational.absolute_value(-x) = Rational.absolute_value(x) :=
+  Quotient.induct(
+      function (y : Rational) =>
+          Rational.absolute_value(-y) = Rational.absolute_value(y),
+      Rational.absolute_value_negate_at_representative,
+      x)
+
+-- -(-x) = x at the representative level.
+theorem Rational.negate_negate_at_representative
+        : (rep : RationalRepresentative)
+          → Rational.negate_representatives(
+                Rational.negate_representatives(rep)) = rep
+  | RationalRepresentative.make(n, d) =>
+      congruenceOf(
+          function (m : Integer) =>
+              RationalRepresentative.make(m, d),
+          Integer.negate_negate(n))
+
+-- -(-x) = x on Rational.
+theorem Rational.negate_negate (x : Rational) : -(-x) = x :=
+  Quotient.induct(
+      function (y : Rational) => -(-y) = y,
+      function (rep : RationalRepresentative) =>
+          congruenceOf(
+              function (r : RationalRepresentative) =>
+                  Quotient.mk(RationalRepresentative, RationalEquivalent, r),
+              Rational.negate_negate_at_representative(rep)),
+      x)

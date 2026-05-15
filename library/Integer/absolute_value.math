@@ -76,3 +76,43 @@ definition Integer.absolute_value (x : Integer) : Integer :=
 theorem Integer.absolute_value_zero
         : Integer.absolute_value(Integer.zero) = Integer.zero :=
   reflexivity(Integer, Integer.zero)
+
+-- |-x| = |x| at the representative level: negate swaps (a, b) to
+-- (b, a), and distance is symmetric.
+theorem Integer.absolute_value_negate_at_representative
+        : (rep : IntegerRepresentative)
+          → Integer.absolute_value_at_representative(
+                Integer.negate_representatives(rep))
+            = Integer.absolute_value_at_representative(rep)
+  | IntegerRepresentative.make(a, b) =>
+      congruenceOf(Natural.to_integer,
+          Natural.distance_symmetric(b, a))
+
+-- |-x| = |x| on Integer.
+theorem Integer.absolute_value_negate (x : Integer)
+        : Integer.absolute_value(-x) = Integer.absolute_value(x) :=
+  Quotient.induct(
+      function (y : Integer) =>
+          Integer.absolute_value(-y) = Integer.absolute_value(y),
+      Integer.absolute_value_negate_at_representative,
+      x)
+
+-- -(-x) = x at the representative level: double-negation cancels.
+theorem Integer.negate_negate_at_representative
+        : (rep : IntegerRepresentative)
+          → Integer.negate_representatives(
+                Integer.negate_representatives(rep)) = rep
+  | IntegerRepresentative.make(a, b) =>
+      reflexivity(IntegerRepresentative,
+          IntegerRepresentative.make(a, b))
+
+-- -(-x) = x on Integer.
+theorem Integer.negate_negate (x : Integer) : -(-x) = x :=
+  Quotient.induct(
+      function (y : Integer) => -(-y) = y,
+      function (rep : IntegerRepresentative) =>
+          congruenceOf(
+              function (r : IntegerRepresentative) =>
+                  Quotient.mk(IntegerRepresentative, IntegerEquivalent, r),
+              Integer.negate_negate_at_representative(rep)),
+      x)
