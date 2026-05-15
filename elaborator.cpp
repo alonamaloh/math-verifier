@@ -2218,7 +2218,7 @@ private:
                     return desugarEqualityTransitivity(
                         positionalArguments[0],
                         positionalArguments[1],
-                        localBinders,
+                        localBinders, expectedType,
                         expression.line, expression.column);
                 }
                 if (name == "rewrite" && argumentCount == 1) {
@@ -5529,22 +5529,79 @@ private:
         SurfaceExpressionPointer firstEqualitySurface,
         SurfaceExpressionPointer secondEqualitySurface,
         const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
         int line, int column) {
+        // If the surrounding context provided an expected type
+        // `Equality(carrier, A, C)`, synthesize `Equality(carrier, A, A)`
+        // as the expected type for the first argument so that desugars
+        // like rewrite (which need an expected type) can fire there too.
+        // Otherwise the first argument elaborates without an expected
+        // type, exactly as before.
+        ExpressionPointer expectedForFirst;
+        if (expectedType) {
+            ExpressionPointer expectedOpened = openOverLocalBinders(
+                expectedType, localBinders, localBinders.size());
+            ExpressionPointer expectedWhnf = weakHeadNormalForm(
+                environment_, expectedOpened);
+            EqualityComponents outerComponents;
+            try {
+                outerComponents = extractEqualityComponents(
+                    expectedWhnf,
+                    "Equality.transitivity (outer expected)", line);
+                ExpressionPointer outerCarrier = closeOverLocalBinders(
+                    outerComponents.carrierType,
+                    localBinders, localBinders.size());
+                ExpressionPointer outerLeft = closeOverLocalBinders(
+                    outerComponents.leftEndpoint,
+                    localBinders, localBinders.size());
+                expectedForFirst = makeConstant(
+                    "Equality",
+                    {outerComponents.carrierUniverseLevel});
+                expectedForFirst = makeApplication(
+                    std::move(expectedForFirst), outerCarrier);
+                expectedForFirst = makeApplication(
+                    std::move(expectedForFirst), outerLeft);
+                expectedForFirst = makeApplication(
+                    std::move(expectedForFirst), outerLeft);
+            } catch (const ElaborateError&) {
+                // Outer expected type isn't an Equality — proceed
+                // without synthesizing.
+            }
+        }
         ExpressionPointer firstEqualityKernel =
-            elaborateExpression(*firstEqualitySurface, localBinders);
-        ExpressionPointer secondEqualityKernel =
-            elaborateExpression(*secondEqualitySurface, localBinders);
+            elaborateExpression(*firstEqualitySurface, localBinders,
+                                  expectedForFirst);
         ExpressionPointer firstEqualityType =
             weakHeadNormalForm(environment_,
                 inferTypeInLocalContext(localBinders,
                                           firstEqualityKernel));
+        EqualityComponents firstComponents = extractEqualityComponents(
+            firstEqualityType,
+            "Equality.transitivity (first argument)", line);
+        // Build the closed-over endpoints early so we can compose a
+        // synthetic expected type for the second argument.
+        ExpressionPointer carrierTypeForExpected =
+            closeOverLocalBinders(firstComponents.carrierType,
+                                    localBinders, localBinders.size());
+        ExpressionPointer middleForExpected =
+            closeOverLocalBinders(firstComponents.rightEndpoint,
+                                    localBinders, localBinders.size());
+        ExpressionPointer expectedForSecond = makeConstant(
+            "Equality",
+            {firstComponents.carrierUniverseLevel});
+        expectedForSecond = makeApplication(
+            std::move(expectedForSecond), carrierTypeForExpected);
+        expectedForSecond = makeApplication(
+            std::move(expectedForSecond), middleForExpected);
+        expectedForSecond = makeApplication(
+            std::move(expectedForSecond), middleForExpected);
+        ExpressionPointer secondEqualityKernel =
+            elaborateExpression(*secondEqualitySurface, localBinders,
+                                  expectedForSecond);
         ExpressionPointer secondEqualityType =
             weakHeadNormalForm(environment_,
                 inferTypeInLocalContext(localBinders,
                                           secondEqualityKernel));
-        EqualityComponents firstComponents = extractEqualityComponents(
-            firstEqualityType,
-            "Equality.transitivity (first argument)", line);
         EqualityComponents secondComponents = extractEqualityComponents(
             secondEqualityType,
             "Equality.transitivity (second argument)", line);
