@@ -22,6 +22,7 @@ import Integer.negation
 import Integer.ring
 import Integer.algebra
 import Integer.order
+import Integer.sign
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -32,17 +33,99 @@ definition Rational.IsNonneg_at_representative
         : RationalRepresentative → Proposition
   | RationalRepresentative.make(n, _) => Integer.IsNonneg(n)
 
--- Respect: if (n1, d1) ~ (n2, d2), i.e., n1 · succ(d2) = n2 · succ(d1),
--- then IsNonneg(n1) ↔ IsNonneg(n2) (both denominators are strictly
--- positive). Via propositional extensionality. Stubbed for now —
--- the witness extraction requires Integer-sign preservation under
--- strictly-positive Integer multiplication, which is itself a lemma
--- we'll formalize in the order-lemma follow-up pass.
+-- Forward direction of the IsNonneg respect: if `n1 * succ(d2) =
+-- n2 * succ(d1)` (Integer equality) and IsNonneg(n1), then
+-- IsNonneg(n2). Case-splits n2 via sign_split; the negative case
+-- forces k = 0 via the cancellation lemma.
+theorem Rational.IsNonneg_forward_helper
+        (n1 n2 : Integer) (d1 d2 : Natural)
+        (equivalenceHypothesis
+            : n1 * (successor(d2) : Integer)
+              = n2 * (successor(d1) : Integer))
+        (n1IsNonneg : Integer.IsNonneg(n1))
+        : Integer.IsNonneg(n2) :=
+  Exists.eliminate(
+      Natural,
+      function (a : Natural) => n1 = (a : Integer),
+      Integer.IsNonneg(n2),
+      function (a : Natural) (n1IsImage : n1 = (a : Integer)) =>
+        Or.eliminate(
+            Integer.IsNonneg(n2),
+            ∃ (k : Natural). n2 = -(k : Integer),
+            Integer.IsNonneg(n2),
+            function (n2IsNonneg : Integer.IsNonneg(n2)) => n2IsNonneg,
+            function (n2NegEvidence
+                          : ∃ (k : Natural). n2 = -(k : Integer)) =>
+              Exists.eliminate(
+                  Natural,
+                  function (k : Natural) => n2 = -(k : Integer),
+                  Integer.IsNonneg(n2),
+                  function (k : Natural)
+                           (n2EqNegK : n2 = -(k : Integer)) => {
+                    claim mixedEquation
+                          : (a : Integer) * (successor(d2) : Integer)
+                            = -(k : Integer) * (successor(d1) : Integer)
+                      by calc (a : Integer) * (successor(d2) : Integer)
+                            = n1 * (successor(d2) : Integer)
+                                  by rewrite(n1IsImage)
+                            = n2 * (successor(d1) : Integer)
+                                  by equivalenceHypothesis
+                            = -(k : Integer) * (successor(d1) : Integer)
+                                  by rewrite(n2EqNegK);
+                    claim kIsZero : k = zero
+                      by Integer.natural_eq_negate_natural_implies_both_zero(
+                             a, k, d1, d2, mixedEquation);
+                    claim n2EqZero : n2 = Integer.zero
+                      by Equality.transitivity(
+                             n2EqNegK,
+                             congruenceOf(
+                                 function (x : Natural) =>
+                                     -(x : Integer),
+                                 kIsZero));
+                    Equality.transport_proposition(
+                        Integer,
+                        Integer.IsNonneg,
+                        Integer.zero,
+                        n2,
+                        Equality.symmetry(n2EqZero),
+                        Integer.zero_is_nonneg)
+                  },
+                  n2NegEvidence),
+            Integer.sign_split(n2)),
+      n1IsNonneg)
+
+-- Respect: via propositional extensionality, forward and backward.
+-- Backward is forward with sides swapped (symmetric equation).
 theorem Rational.IsNonneg_respect
         (rep1 rep2 : RationalRepresentative)
         (equivalenceHypothesis : RationalEquivalent(rep1, rep2))
         : Rational.IsNonneg_at_representative(rep1)
-          = Rational.IsNonneg_at_representative(rep2) := sorry
+          = Rational.IsNonneg_at_representative(rep2) :=
+  (cases rep1 {
+    | RationalRepresentative.make(n1, d1) =>
+        (cases rep2 {
+          | RationalRepresentative.make(n2, d2) =>
+              function (refinedEquivalence
+                            : n1 * (successor(d2) : Integer)
+                              = n2 * (successor(d1) : Integer)) =>
+                Equality.propositional_extensionality(
+                    Integer.IsNonneg(n1),
+                    Integer.IsNonneg(n2),
+                    Rational.IsNonneg_forward_helper(
+                        n1, n2, d1, d2, refinedEquivalence),
+                    Rational.IsNonneg_forward_helper(
+                        n2, n1, d2, d1,
+                        Equality.symmetry(refinedEquivalence)))
+        } : (refinedEquivalence : RationalEquivalent(
+                                      RationalRepresentative.make(n1, d1),
+                                      rep2))
+              → Rational.IsNonneg_at_representative(
+                    RationalRepresentative.make(n1, d1))
+                = Rational.IsNonneg_at_representative(rep2))
+  } : (refinedEquivalence : RationalEquivalent(rep1, rep2))
+        → Rational.IsNonneg_at_representative(rep1)
+          = Rational.IsNonneg_at_representative(rep2))(
+      equivalenceHypothesis)
 
 -- IsNonneg on Rational.
 definition Rational.IsNonneg (x : Rational) : Proposition :=

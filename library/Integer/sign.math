@@ -140,3 +140,125 @@ theorem Integer.sign_split (x : Integer) : Integer.SignSplitProp(x) :=
                   Quotient.mk(IntegerRepresentative,
                                IntegerEquivalent, rep))),
       x)
+
+-- ----------------------------------------------------------------------
+-- Helper lemmas for cancellation arguments.
+
+-- Natural-level: a + b = zero implies a = zero.
+theorem Natural.add_eq_zero_left_zero
+        : (a b : Natural) → a + b = zero → a = zero
+  | zero, _, _ =>
+      reflexivity(zero)
+  | successor(k), b, equation =>
+      False.eliminate_proposition(
+          successor(k) = zero,
+          Natural.successor_not_zero(
+              k + b, equation))
+
+-- And the right component.
+theorem Natural.add_eq_zero_right_zero
+        (a b : Natural) (equation : a + b = zero) : b = zero :=
+  Natural.add_eq_zero_left_zero(b, a,
+      Equality.transitivity(Natural.add_commutative(b, a), equation))
+
+-- a * succ(d) = zero implies a = zero.
+theorem Natural.multiply_successor_eq_zero_left_zero
+        : (a d : Natural) → a * successor(d) = zero → a = zero
+  | zero, _, _ =>
+      reflexivity(zero)
+  | successor(k), d, equation =>
+      -- successor(k) * successor(d) reduces (multiply on successor first
+      -- arg) to successor(d) + k * successor(d) = successor(d + k *
+      -- successor(d)). A successor is never zero.
+      False.eliminate_proposition(
+          successor(k) = zero,
+          Natural.successor_not_zero(
+              d + k * successor(d), equation))
+
+-- The Natural-to-Integer embedding is injective.
+theorem Natural.to_integer.injective (n m : Natural)
+        (embeddingEquality : (n : Integer) = (m : Integer))
+        : n = m :=
+  -- (n : Integer) = mk(make(n, zero)) and similarly for m.
+  -- Quotient.exact yields IntegerEquivalent(make(n, zero), make(m, zero)),
+  -- i.e., n + zero = zero + m, which reduces to n = m by add_zero on
+  -- the left.
+  Equality.transitivity(
+      Equality.symmetry(Natural.add_zero(n)),
+      Quotient.exact(
+          IntegerRepresentative, IntegerEquivalent,
+          IntegerEquivalent.reflexive,
+          IntegerEquivalent.symmetric,
+          IntegerEquivalent.transitive,
+          IntegerRepresentative.make(n, zero),
+          IntegerRepresentative.make(m, zero),
+          embeddingEquality))
+
+-- ----------------------------------------------------------------------
+-- The key cancellation/sign lemma for Rational.IsNonneg_respect:
+-- if `(a : Integer) * (succ(d2) : Integer) = -(k : Integer) *
+-- (succ(d1) : Integer)`, then k = zero.
+theorem Integer.natural_eq_negate_natural_implies_both_zero
+        (a k d1 d2 : Natural)
+        (mixedEquality
+            : (a : Integer) * (successor(d2) : Integer)
+              = -(k : Integer) * (successor(d1) : Integer))
+        : k = zero := {
+    -- Step 1: rewrite the LHS into `(a * succ(d2) : Integer)`.
+    claim lhsAsNatural
+          : (a : Integer) * (successor(d2) : Integer)
+            = (a * successor(d2) : Integer)
+        by Equality.symmetry(
+               Natural.to_integer.multiply_preserves(a, successor(d2)));
+    -- Step 2: rewrite the RHS into `-((k * succ(d1)) : Integer)`.
+    claim rhsMoveNegate
+          : -(k : Integer) * (successor(d1) : Integer)
+            = -((k : Integer) * (successor(d1) : Integer))
+        by Integer.multiply_negate_left((k : Integer),
+                                          (successor(d1) : Integer));
+    claim rhsAsNegateNatural
+          : -(k : Integer) * (successor(d1) : Integer)
+            = -(k * successor(d1) : Integer)
+        by Equality.transitivity(
+               rhsMoveNegate,
+               congruenceOf(Integer.negate,
+                   Equality.symmetry(
+                       Natural.to_integer.multiply_preserves(
+                           k, successor(d1)))));
+    -- Step 3: combine — `(a*succ(d2) : Integer) = -(k*succ(d1) : Integer)`.
+    claim combinedEquality
+          : (a * successor(d2) : Integer)
+            = -(k * successor(d1) : Integer)
+        by Equality.transitivity(
+               Equality.symmetry(lhsAsNatural),
+               Equality.transitivity(mixedEquality, rhsAsNegateNatural));
+    -- Step 4: add k * succ(d1) to both sides, getting
+    -- `(a * succ(d2) + k * succ(d1) : Integer) = 0`.
+    claim sumEqualsZero
+          : (a * successor(d2) + k * successor(d1) : Integer)
+            = Integer.zero
+        by calc (a * successor(d2) + k * successor(d1) : Integer)
+              = (a * successor(d2) : Integer)
+                + (k * successor(d1) : Integer)
+                     by Natural.to_integer.add_preserves(
+                            a * successor(d2), k * successor(d1))
+              = -(k * successor(d1) : Integer)
+                + (k * successor(d1) : Integer)
+                     by rewrite(combinedEquality)
+              = Integer.zero
+                     by Integer.add_negate_left(
+                            (k * successor(d1) : Integer));
+    -- Step 5: by Natural.to_integer.injective, the natural sum is zero.
+    claim naturalSumZero
+          : a * successor(d2) + k * successor(d1) = zero
+        by Natural.to_integer.injective(
+               a * successor(d2) + k * successor(d1), zero,
+               sumEqualsZero);
+    -- Step 6: the right addend is zero.
+    claim kProductZero
+          : k * successor(d1) = zero
+        by Natural.add_eq_zero_right_zero(
+               a * successor(d2), k * successor(d1), naturalSumZero);
+    -- Step 7: k itself is zero.
+    Natural.multiply_successor_eq_zero_left_zero(k, d1, kProductZero)
+}
