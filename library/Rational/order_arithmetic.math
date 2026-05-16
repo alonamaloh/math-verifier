@@ -1,0 +1,522 @@
+-- Rational/order_arithmetic.math
+--
+-- Order arithmetic on Rational: reflexive/transitive ≤, antisymmetry,
+-- strict transitivity (with antisymmetry), additive monotonicity,
+-- and the combined "a < b + b → a + c < b + b + c" form needed to
+-- close sum_is_cauchy and CauchyEquivalent.transitive.
+
+module Rational.order_arithmetic
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.sign
+import Integer.cancellation
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.absolute_value
+import Rational.halve
+import Rational.positive
+
+-- ----------------------------------------------------------------------
+-- Integer-level: IsNonneg(x) ∧ IsNonneg(-x) → x = Integer.zero.
+
+-- Helper: if (a : I) = -(k : I), then both a and k are zero. The
+-- proof descends through Quotient.exact: the equality of Integers
+-- forces a + k = 0 (Natural), hence both are zero.
+theorem Integer.image_eq_negate_image_implies_both_zero
+        (a k : Natural) (equation : (a : Integer) = -(k : Integer))
+        : And(a = zero, k = zero) := {
+  -- (a : I) = mk(make(a, 0)); -(k : I) = mk(make(0, k)). Quotient.exact
+  -- yields IntegerEquivalent(make(a, 0), make(0, k)), i.e., a + k = 0.
+  claim equivalence : IntegerEquivalent(
+        IntegerRepresentative.make(a, zero),
+        IntegerRepresentative.make(zero, k))
+    by Quotient.exact(
+           IntegerRepresentative, IntegerEquivalent,
+           IntegerEquivalent.reflexive,
+           IntegerEquivalent.symmetric,
+           IntegerEquivalent.transitive,
+           IntegerRepresentative.make(a, zero),
+           IntegerRepresentative.make(zero, k),
+           equation);
+  -- IntegerEquivalent.make(a, 0) and make(0, k): a + k = 0 + 0 = 0.
+  claim sumIsZero : a + k = zero
+    by calc a + k
+          = zero + zero
+                 by equivalence
+          = zero
+                 by reflexivity(Natural, zero);
+  And.introduction(
+      a = zero, k = zero,
+      Natural.add_eq_zero_left_zero(a, k, sumIsZero),
+      Natural.add_eq_zero_right_zero(a, k, sumIsZero))
+}
+
+-- IsNonneg(x) ∧ IsNonneg(-x) → x = Integer.zero. Two witnesses
+-- collapse via the helper above.
+theorem Integer.IsNonneg_and_negate_IsNonneg_implies_zero
+        (x : Integer)
+        (xIsNonneg : Integer.IsNonneg(x))
+        (negXIsNonneg : Integer.IsNonneg(-x))
+        : x = Integer.zero :=
+  Exists.eliminate(
+      Natural,
+      function (a : Natural) => x = (a : Integer),
+      x = Integer.zero,
+      function (a : Natural) (xIsImage : x = (a : Integer)) =>
+        Exists.eliminate(
+            Natural,
+            function (k : Natural) => -x = (k : Integer),
+            x = Integer.zero,
+            function (k : Natural) (negXIsImage : -x = (k : Integer)) =>
+              -- x = (a : I); -x = (k : I), so x = -(k : I). Hence
+              -- (a : I) = -(k : I), giving a = 0 ∧ k = 0, so x = 0.
+              And.eliminate(
+                  a = zero, k = zero,
+                  x = Integer.zero,
+                  function (aIsZero : a = zero) (_ : k = zero) =>
+                    calc x
+                       = (a : Integer)
+                              by xIsImage
+                       = (zero : Integer)
+                              by congruenceOf(Natural.to_integer, aIsZero)
+                       = Integer.zero
+                              by reflexivity(Integer, Integer.zero),
+                  Integer.image_eq_negate_image_implies_both_zero(
+                      a, k,
+                      calc (a : Integer)
+                         = x
+                                by Equality.symmetry(xIsImage)
+                         = -(-x)
+                                by Equality.symmetry(
+                                       Integer.negate_negate(x))
+                         = -((k : Integer))
+                                by congruenceOf(
+                                       Integer.negate,
+                                       negXIsImage))),
+            negXIsNonneg),
+      xIsNonneg)
+
+-- ----------------------------------------------------------------------
+-- Rational ≤ reflexivity and transitivity.
+
+-- IsNonneg(0). At rep, IsNonneg_at_representative(make(0, 0)) reduces
+-- to Integer.IsNonneg(Integer.zero), witnessed by Natural zero.
+theorem Rational.IsNonneg_zero : Rational.IsNonneg(Rational.zero) :=
+  Integer.zero_is_nonneg
+
+-- 0 ≤ q ↔ IsNonneg(q) was already in `Rational.positive`. We mirror
+-- as Rational.LessOrEqual.reflexive: x ≤ x.
+theorem Rational.LessOrEqual.reflexive (x : Rational) : x ≤ x :=
+  -- x ≤ x = IsNonneg(x - x) = IsNonneg(0).
+  Equality.transport_proposition(
+      Rational,
+      Rational.IsNonneg,
+      Rational.zero,
+      x - x,
+      Equality.symmetry(Rational.add_negate_right(x)),
+      Rational.IsNonneg_zero)
+
+-- IsNonneg(p) ∧ IsNonneg(q) → IsNonneg(p + q). At Integer level the
+-- sum of two non-negatives is non-negative; lift through reps.
+theorem Integer.IsNonneg.add
+        (x y : Integer)
+        (xIsNonneg : Integer.IsNonneg(x))
+        (yIsNonneg : Integer.IsNonneg(y))
+        : Integer.IsNonneg(x + y) :=
+  Exists.eliminate(
+      Natural,
+      function (a : Natural) => x = (a : Integer),
+      Integer.IsNonneg(x + y),
+      function (a : Natural) (xIsImage : x = (a : Integer)) =>
+        Exists.eliminate(
+            Natural,
+            function (b : Natural) => y = (b : Integer),
+            Integer.IsNonneg(x + y),
+            function (b : Natural) (yIsImage : y = (b : Integer)) =>
+              Exists.introduce(
+                  Natural,
+                  function (k : Natural) => x + y = (k : Integer),
+                  a + b,
+                  calc x + y
+                     = (a : Integer) + y
+                            by congruenceOf(
+                                   function (z : Integer) => z + y,
+                                   xIsImage)
+                     = (a : Integer) + (b : Integer)
+                            by congruenceOf(
+                                   function (z : Integer) =>
+                                       (a : Integer) + z,
+                                   yIsImage)
+                     = (a + b : Integer)
+                            by Equality.symmetry(
+                                   Natural.to_integer.add_preserves(a, b))),
+            yIsNonneg),
+      xIsNonneg)
+
+-- Rational IsNonneg.add via Quotient.induct_two.
+theorem Rational.IsNonneg.add (p q : Rational)
+        (pIsNonneg : Rational.IsNonneg(p))
+        (qIsNonneg : Rational.IsNonneg(q))
+        : Rational.IsNonneg(p + q) :=
+  Quotient.induct_two(
+      RationalRepresentative, RationalEquivalent,
+      RationalRepresentative, RationalEquivalent,
+      function (pArg qArg : Rational) =>
+          Rational.IsNonneg(pArg) → Rational.IsNonneg(qArg)
+          → Rational.IsNonneg(pArg + qArg),
+      function (rep_p rep_q : RationalRepresentative) =>
+          (cases rep_p {
+             | RationalRepresentative.make(n1, d1) =>
+                 (cases rep_q {
+                    | RationalRepresentative.make(n2, d2) =>
+                        function (pNonneg : Integer.IsNonneg(n1))
+                                 (qNonneg : Integer.IsNonneg(n2)) =>
+                          Integer.IsNonneg.add(
+                              n1 * (successor(d2) : Integer),
+                              n2 * (successor(d1) : Integer),
+                              Integer.IsNonneg.multiply(
+                                  n1, (successor(d2) : Integer),
+                                  pNonneg,
+                                  Integer.from_natural_is_nonneg(
+                                      successor(d2))),
+                              Integer.IsNonneg.multiply(
+                                  n2, (successor(d1) : Integer),
+                                  qNonneg,
+                                  Integer.from_natural_is_nonneg(
+                                      successor(d1))))
+                  } : Rational.IsNonneg(
+                          Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                      RationalRepresentative.make(n1, d1)))
+                      → Rational.IsNonneg(
+                            Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                        rep_q))
+                      → Rational.IsNonneg(
+                            Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                        RationalRepresentative.make(n1, d1))
+                            + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                          rep_q)))
+           } : Rational.IsNonneg(
+                   Quotient.mk(RationalRepresentative, RationalEquivalent, rep_p))
+               → Rational.IsNonneg(
+                     Quotient.mk(RationalRepresentative, RationalEquivalent, rep_q))
+               → Rational.IsNonneg(
+                     Quotient.mk(RationalRepresentative, RationalEquivalent, rep_p)
+                     + Quotient.mk(RationalRepresentative, RationalEquivalent, rep_q))),
+      p, q)(pIsNonneg)(qIsNonneg)
+
+-- Rational analog: IsNonneg(q) ∧ IsNonneg(-q) → q = 0. Lift via
+-- Quotient.induct from the Integer-level version.
+theorem Rational.IsNonneg_and_negate_IsNonneg_implies_zero
+        (q : Rational)
+        (qIsNonneg : Rational.IsNonneg(q))
+        (negQIsNonneg : Rational.IsNonneg(-q))
+        : q = Rational.zero :=
+  Quotient.induct(
+      function (qArg : Rational) =>
+          Rational.IsNonneg(qArg) → Rational.IsNonneg(-qArg)
+          → qArg = Rational.zero,
+      function (rep : RationalRepresentative) =>
+          (cases rep {
+             | RationalRepresentative.make(n, d) =>
+                 function (nIsNonneg : Integer.IsNonneg(n))
+                          (negNIsNonneg : Integer.IsNonneg(-n)) =>
+                   -- n = 0; then mk(make(0, d)) = Rational.zero via
+                   -- Quotient.sound (0 · succ(0) = 0 · succ(d), both = 0).
+                   Equality.transitivity(
+                       congruenceOf(
+                           function (m : Integer) =>
+                               Quotient.mk(RationalRepresentative,
+                                           RationalEquivalent,
+                                           RationalRepresentative.make(m, d)),
+                           Integer.IsNonneg_and_negate_IsNonneg_implies_zero(
+                               n, nIsNonneg, negNIsNonneg)),
+                       -- mk(make(Integer.zero, d)) = Rational.zero.
+                       Quotient.sound(
+                           RationalRepresentative, RationalEquivalent,
+                           RationalRepresentative.make(Integer.zero, d),
+                           RationalRepresentative.make(Integer.zero, zero),
+                           -- Integer.zero * succ(zero) = Integer.zero * succ(d).
+                           -- Both sides reduce to Integer.zero (multiply_zero_left).
+                           calc Integer.zero * (successor(zero) : Integer)
+                              = Integer.zero
+                                     by Integer.multiply_zero_left(
+                                            (successor(zero) : Integer))
+                              = Integer.zero * (successor(d) : Integer)
+                                     by Equality.symmetry(
+                                            Integer.multiply_zero_left(
+                                                (successor(d) : Integer)))))
+           } : Rational.IsNonneg(
+                   Quotient.mk(RationalRepresentative, RationalEquivalent, rep))
+               → Rational.IsNonneg(
+                     -Quotient.mk(RationalRepresentative,
+                                  RationalEquivalent, rep))
+               → Quotient.mk(RationalRepresentative,
+                             RationalEquivalent, rep) = Rational.zero),
+      q)(qIsNonneg)(negQIsNonneg)
+
+-- Antisymmetry: x ≤ y, y ≤ x → x = y. Use: y - x = -(x - y), then
+-- IsNonneg(y - x) ∧ IsNonneg(x - y) = IsNonneg(y - x) ∧ IsNonneg(-(y - x)),
+-- giving y - x = 0, so y = x.
+theorem Rational.LessOrEqual.antisymmetric
+        (x y : Rational)
+        (xLeqY : x ≤ y) (yLeqX : y ≤ x)
+        : x = y := {
+  -- y - x = 0.
+  claim diffIsZero : y - x = Rational.zero
+    by Rational.IsNonneg_and_negate_IsNonneg_implies_zero(
+           y - x,
+           xLeqY,
+           Equality.transport_proposition(
+               Rational,
+               Rational.IsNonneg,
+               x - y,
+               -(y - x),
+               Rational.subtract_swap(x, y),
+               yLeqX));
+  -- y = x from y - x = 0.
+  Equality.symmetry(
+      calc y
+         = y + Rational.zero
+                by Equality.symmetry(Rational.add_zero(y))
+         = y + (-x + x)
+                by congruenceOf(
+                       function (z : Rational) => y + z,
+                       Equality.symmetry(Rational.add_negate_left(x)))
+         = (y + -x) + x
+                by Equality.symmetry(
+                       Rational.add_associative(y, -x, x))
+         = (y - x) + x
+                by reflexivity(Rational, (y - x) + x)
+         = Rational.zero + x
+                by congruenceOf(
+                       function (z : Rational) => z + x,
+                       diffIsZero)
+         = x
+                by Rational.zero_add(x))
+}
+
+-- Transitivity: x ≤ y ∧ y ≤ z → x ≤ z. Algebra: (z - y) + (y - x)
+-- = z - x; IsNonneg of both summands gives IsNonneg of the sum.
+theorem Rational.LessOrEqual.transitive
+        (x y z : Rational)
+        (xLeqY : x ≤ y) (yLeqZ : y ≤ z)
+        : x ≤ z :=
+  Equality.transport_proposition(
+      Rational,
+      Rational.IsNonneg,
+      (z - y) + (y - x),
+      z - x,
+      -- (z - y) + (y - x) = z - x.
+      -- Strategy: (z + -y) + (y + -x) = z + ((-y + y) + -x)
+      --         = z + (0 + -x) = z + -x = z - x.
+      calc (z - y) + (y - x)
+         = (z + -y) + (y + -x)
+                by reflexivity(Rational, (z + -y) + (y + -x))
+         = z + (-y + (y + -x))
+                by Rational.add_associative(z, -y, y + -x)
+         = z + ((-y + y) + -x)
+                by congruenceOf(
+                       function (w : Rational) => z + w,
+                       Equality.symmetry(
+                           Rational.add_associative(-y, y, -x)))
+         = z + (Rational.zero + -x)
+                by congruenceOf(
+                       function (w : Rational) =>
+                           z + (w + -x),
+                       Rational.add_negate_left(y))
+         = z + -x
+                by congruenceOf(
+                       function (w : Rational) => z + w,
+                       Rational.zero_add(-x))
+         = z - x
+                by reflexivity(Rational, z - x),
+      Rational.IsNonneg.add(z - y, y - x, yLeqZ, xLeqY))
+
+-- ----------------------------------------------------------------------
+-- Strict transitivity and additive monotonicity.
+
+-- Weak-then-strict: x ≤ y ∧ y < z → x < z.
+theorem Rational.LessThan.transitive_left
+        (x y z : Rational)
+        (xLeqY : x ≤ y) (yLessThanZ : y < z)
+        : x < z := {
+  claim yLeqZ : y ≤ z
+    by And.left(Rational.LessOrEqual(y, z), Not(y = z), yLessThanZ);
+  claim yNotZ : Not(y = z)
+    by And.right(Rational.LessOrEqual(y, z), Not(y = z), yLessThanZ);
+  And.introduction(
+      Rational.LessOrEqual(x, z),
+      Not(x = z),
+      Rational.LessOrEqual.transitive(x, y, z, xLeqY, yLeqZ),
+      function (xEqualsZ : x = z) =>
+        -- y ≤ z = x, so y ≤ x. Combined with x ≤ y, antisymmetry gives
+        -- x = y, then x = z gives y = z — contradicts yNotZ.
+        yNotZ(
+            calc y
+               = x
+                      by Equality.symmetry(
+                             Rational.LessOrEqual.antisymmetric(x, y,
+                                 xLeqY,
+                                 Equality.transport_proposition(
+                                     Rational,
+                                     function (w : Rational) => y ≤ w,
+                                     z, x,
+                                     Equality.symmetry(xEqualsZ),
+                                     yLeqZ)))
+               = z
+                      by xEqualsZ))
+}
+
+-- Strict-then-weak: x < y ∧ y ≤ z → x < z. Symmetric to the above.
+theorem Rational.LessThan.transitive_right
+        (x y z : Rational)
+        (xLessThanY : x < y) (yLeqZ : y ≤ z)
+        : x < z := {
+  claim xLeqY : x ≤ y
+    by And.left(Rational.LessOrEqual(x, y), Not(x = y), xLessThanY);
+  claim xNotY : Not(x = y)
+    by And.right(Rational.LessOrEqual(x, y), Not(x = y), xLessThanY);
+  And.introduction(
+      Rational.LessOrEqual(x, z),
+      Not(x = z),
+      Rational.LessOrEqual.transitive(x, y, z, xLeqY, yLeqZ),
+      function (xEqualsZ : x = z) =>
+        -- x ≤ y AND y ≤ z = x, so x ≤ y ≤ x. Antisymmetry: x = y.
+        -- Contradicts xNotY.
+        xNotY(
+            Rational.LessOrEqual.antisymmetric(x, y,
+                xLeqY,
+                Equality.transport_proposition(
+                    Rational,
+                    function (w : Rational) => y ≤ w,
+                    z, x,
+                    Equality.symmetry(xEqualsZ),
+                    yLeqZ))))
+}
+
+-- Additive monotonicity (weak): x ≤ y → x + z ≤ y + z. Since
+-- (y + z) - (x + z) = y - x, the IsNonneg evidence carries over.
+theorem Rational.add_preserves_LessOrEqual
+        (x y z : Rational) (xLeqY : x ≤ y)
+        : x + z ≤ y + z :=
+  Equality.transport_proposition(
+      Rational,
+      Rational.IsNonneg,
+      y - x,
+      (y + z) - (x + z),
+      Equality.symmetry(
+          Rational.add_subtract_cancel_right(y, z, x)),
+      xLeqY)
+
+-- Add cancel right: x + z = y + z → x = y. Add -z to both sides.
+theorem Rational.add_cancel_right (x y z : Rational)
+        (sumEquality : x + z = y + z)
+        : x = y :=
+  calc x
+     = x + Rational.zero
+            by Equality.symmetry(Rational.add_zero(x))
+     = x + (z + -z)
+            by congruenceOf(
+                   function (w : Rational) => x + w,
+                   Equality.symmetry(Rational.add_negate_right(z)))
+     = (x + z) + -z
+            by Equality.symmetry(Rational.add_associative(x, z, -z))
+     = (y + z) + -z
+            by congruenceOf(
+                   function (w : Rational) => w + -z,
+                   sumEquality)
+     = y + (z + -z)
+            by Rational.add_associative(y, z, -z)
+     = y + Rational.zero
+            by congruenceOf(
+                   function (w : Rational) => y + w,
+                   Rational.add_negate_right(z))
+     = y
+            by Rational.add_zero(y)
+
+-- Additive monotonicity (strict): x < y → x + z < y + z.
+theorem Rational.add_preserves_LessThan
+        (x y z : Rational) (xLessY : x < y)
+        : x + z < y + z := {
+  claim xLeqY : x ≤ y
+    by And.left(Rational.LessOrEqual(x, y), Not(x = y), xLessY);
+  claim xNotY : Not(x = y)
+    by And.right(Rational.LessOrEqual(x, y), Not(x = y), xLessY);
+  And.introduction(
+      Rational.LessOrEqual(x + z, y + z),
+      Not(x + z = y + z),
+      Rational.add_preserves_LessOrEqual(x, y, z, xLeqY),
+      function (sumEqual : x + z = y + z) =>
+        xNotY(Rational.add_cancel_right(x, y, z, sumEqual)))
+}
+
+-- Left-additive strict: x < y → z + x < z + y. Via commutativity.
+theorem Rational.add_left_preserves_LessThan
+        (x y z : Rational) (xLessY : x < y)
+        : z + x < z + y :=
+  Equality.transport_proposition(
+      Rational,
+      function (w : Rational) =>
+          Rational.LessThan(z + x, w),
+      y + z, z + y,
+      Rational.add_commutative(y, z),
+      Equality.transport_proposition(
+          Rational,
+          function (w : Rational) =>
+              Rational.LessThan(w, y + z),
+          x + z, z + x,
+          Rational.add_commutative(x, z),
+          Rational.add_preserves_LessThan(x, y, z, xLessY)))
+
+-- Left additive monotonicity (weak): b ≤ h → h + b ≤ h + h. Via the
+-- right form and two applications of commutativity.
+theorem Rational.add_preserves_LessOrEqual_left
+        (b h : Rational) (bLeqH : b ≤ h)
+        : h + b ≤ h + h :=
+  Equality.transport_proposition(
+      Rational,
+      function (w : Rational) =>
+          Rational.LessOrEqual(w, h + h),
+      b + h, h + b,
+      Rational.add_commutative(b, h),
+      Equality.transport_proposition(
+          Rational,
+          function (w : Rational) =>
+              Rational.LessOrEqual(b + h, w),
+          h + h, h + h,
+          reflexivity(Rational, h + h),
+          Rational.add_preserves_LessOrEqual(b, h, h, bLeqH)))
+
+-- Combined strict sum: A < H ∧ B < H → A + B < H + H.
+theorem Rational.LessThan.add_strict_strict
+        (a b h : Rational)
+        (aLessH : a < h) (bLessH : b < h)
+        : a + b < h + h :=
+  Rational.LessThan.transitive_right(
+      a + b, h + b, h + h,
+      -- a + b < h + b from a < h.
+      Rational.add_preserves_LessThan(a, h, b, aLessH),
+      -- h + b ≤ h + h from b ≤ h.
+      Rational.add_preserves_LessOrEqual_left(b, h,
+          And.left(
+              Rational.LessOrEqual(b, h), Not(b = h),
+              bLessH)))
