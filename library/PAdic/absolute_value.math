@@ -744,3 +744,83 @@ theorem Rational.padic_absolute_value_nonneg
            } : Rational.zero
                ≤ Rational.padic_absolute_value_at_representative(p, rep)),
       q)
+
+-- ----------------------------------------------------------------------
+-- Helpers for the multiplicativity theorem.
+
+-- Integer absolute_value (Natural-valued) is multiplicative. Cast both
+-- sides to Integer, apply Integer.absolute_value_multiplicative, then
+-- drop back to Natural via injectivity.
+theorem Integer.absolute_value_natural_multiplicative (x y : Integer)
+        : Integer.absolute_value_natural(x * y)
+          = Integer.absolute_value_natural(x)
+              * Integer.absolute_value_natural(y) :=
+  Natural.to_integer.injective(
+      Integer.absolute_value_natural(x * y),
+      Integer.absolute_value_natural(x)
+          * Integer.absolute_value_natural(y),
+      calc (Integer.absolute_value_natural(x * y) : Integer)
+         = Integer.absolute_value(x * y)
+                by Equality.symmetry(
+                       Integer.absolute_value_natural_is_image(x * y))
+         = Integer.absolute_value(x) * Integer.absolute_value(y)
+                by Integer.absolute_value_multiplicative(x, y)
+         = (Integer.absolute_value_natural(x) : Integer)
+             * Integer.absolute_value(y)
+                by congruenceOf(
+                       function (m : Integer) =>
+                           m * Integer.absolute_value(y),
+                       Integer.absolute_value_natural_is_image(x))
+         = (Integer.absolute_value_natural(x) : Integer)
+             * (Integer.absolute_value_natural(y) : Integer)
+                by congruenceOf(
+                       function (m : Integer) =>
+                           (Integer.absolute_value_natural(x) : Integer) * m,
+                       Integer.absolute_value_natural_is_image(y))
+         = (Integer.absolute_value_natural(x)
+              * Integer.absolute_value_natural(y) : Integer)
+                by Equality.symmetry(
+                       Natural.to_integer.multiply_preserves(
+                           Integer.absolute_value_natural(x),
+                           Integer.absolute_value_natural(y))))
+
+-- Rational.zero is absorbing for multiplication. At representative
+-- level: Rational.zero * mk(make(n, d)) reduces (via two Quotient.lift
+-- kernel rules) to mk(make(Integer.zero * n, d + zero * succ(d))). The
+-- inner zero*succ(d) reduces (Natural.multiply left case) to zero,
+-- and Quotient.sound bridges the result to Rational.zero.
+theorem Rational.zero_multiply_at_representative
+        : (rep : RationalRepresentative)
+          → Rational.zero
+              * Quotient.mk(RationalRepresentative, RationalEquivalent, rep)
+            = Rational.zero
+  | RationalRepresentative.make(n, d) =>
+      Quotient.sound(
+          RationalRepresentative.make(Integer.zero * n, d + zero),
+          RationalRepresentative.make(Integer.zero, zero),
+          calc (Integer.zero * n) * (successor(zero) : Integer)
+             = Integer.zero * (successor(zero) : Integer)
+                    by congruenceOf(
+                           function (m : Integer) =>
+                               m * (successor(zero) : Integer),
+                           Integer.multiply_zero_left(n))
+             = Integer.zero
+                    by Integer.multiply_zero_left(
+                           (successor(zero) : Integer))
+             = Integer.zero * (successor(d + zero) : Integer)
+                    by Equality.symmetry(
+                           Integer.multiply_zero_left(
+                               (successor(d + zero) : Integer))))
+
+theorem Rational.zero_multiply (r : Rational)
+        : Rational.zero * r = Rational.zero :=
+  Quotient.induct(
+      function (r' : Rational) => Rational.zero * r' = Rational.zero,
+      Rational.zero_multiply_at_representative,
+      r)
+
+theorem Rational.multiply_zero (r : Rational)
+        : r * Rational.zero = Rational.zero :=
+  Equality.transitivity(
+      Rational.multiply_commutative(r, Rational.zero),
+      Rational.zero_multiply(r))
