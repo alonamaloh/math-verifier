@@ -1,0 +1,108 @@
+-- PAdic/instances.math
+--
+-- Witnesses that PAdic(p, primality) satisfies the standard algebraic
+-- abstractions: an abelian group under (+, 0, −) and a commutative
+-- ring under (+, ·, 0, 1). Each instance partially applies the
+-- already-proved PAdic operations and laws to (p, primality).
+
+module PAdic.instances
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.prime
+import PAdic.basics
+import PAdic.embedding
+import PAdic.addition
+import PAdic.negation
+import PAdic.multiplication
+import PAdic.ring
+import PAdic.algebra
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+
+-- PAdic is a monoid under (+, 0).
+theorem PAdic.add_is_monoid
+        (p : Natural) (primality : Natural.is_prime(p))
+        : IsMonoid(PAdic(p, primality),
+                    PAdic.add(p, primality),
+                    PAdic.zero(p, primality)) :=
+    ⟨PAdic.add_associative(p, primality),
+     PAdic.zero_add(p, primality),
+     PAdic.add_zero(p, primality)⟩
+
+-- PAdic is a commutative monoid under (+, 0).
+theorem PAdic.add_is_commutative_monoid
+        (p : Natural) (primality : Natural.is_prime(p))
+        : IsCommutativeMonoid(PAdic(p, primality),
+                               PAdic.add(p, primality),
+                               PAdic.zero(p, primality)) :=
+    ⟨PAdic.add_is_monoid(p, primality),
+     PAdic.add_commutative(p, primality)⟩
+
+-- PAdic is a group under (+, 0, −).
+theorem PAdic.add_is_group
+        (p : Natural) (primality : Natural.is_prime(p))
+        : IsGroup(PAdic(p, primality),
+                   PAdic.add(p, primality),
+                   PAdic.zero(p, primality),
+                   PAdic.negate(p, primality)) :=
+    ⟨PAdic.add_is_monoid(p, primality),
+     PAdic.add_negate_left(p, primality),
+     PAdic.add_negate_right(p, primality)⟩
+
+-- PAdic is an abelian group under (+, 0, −).
+theorem PAdic.add_is_abelian_group
+        (p : Natural) (primality : Natural.is_prime(p))
+        : IsAbelianGroup(PAdic(p, primality),
+                          PAdic.add(p, primality),
+                          PAdic.zero(p, primality),
+                          PAdic.negate(p, primality)) :=
+    ⟨PAdic.add_is_group(p, primality),
+     PAdic.add_commutative(p, primality)⟩
+
+-- PAdic is a monoid under (·, 1).
+theorem PAdic.multiply_is_monoid
+        (p : Natural) (primality : Natural.is_prime(p))
+        : IsMonoid(PAdic(p, primality),
+                    PAdic.multiply(p, primality),
+                    PAdic.one(p, primality)) :=
+    ⟨PAdic.multiply_associative(p, primality),
+     PAdic.one_multiply(p, primality),
+     PAdic.multiply_one(p, primality)⟩
+
+-- PAdic is a commutative monoid under (·, 1).
+theorem PAdic.multiply_is_commutative_monoid
+        (p : Natural) (primality : Natural.is_prime(p))
+        : IsCommutativeMonoid(PAdic(p, primality),
+                               PAdic.multiply(p, primality),
+                               PAdic.one(p, primality)) :=
+    ⟨PAdic.multiply_is_monoid(p, primality),
+     PAdic.multiply_commutative(p, primality)⟩
+
+-- PAdic is a ring.
+theorem PAdic.is_ring
+        (p : Natural) (primality : Natural.is_prime(p))
+        : IsRing(PAdic(p, primality),
+                  PAdic.add(p, primality),
+                  PAdic.zero(p, primality),
+                  PAdic.negate(p, primality),
+                  PAdic.multiply(p, primality),
+                  PAdic.one(p, primality)) :=
+    ⟨PAdic.add_is_abelian_group(p, primality),
+     PAdic.multiply_is_monoid(p, primality),
+     PAdic.distributivity_left(p, primality),
+     PAdic.distributivity_right(p, primality)⟩
+
+-- PAdic is a commutative ring.
+theorem PAdic.is_commutative_ring
+        (p : Natural) (primality : Natural.is_prime(p))
+        : IsCommutativeRing(PAdic(p, primality),
+                             PAdic.add(p, primality),
+                             PAdic.zero(p, primality),
+                             PAdic.negate(p, primality),
+                             PAdic.multiply(p, primality),
+                             PAdic.one(p, primality)) :=
+    ⟨PAdic.is_ring(p, primality),
+     PAdic.multiply_commutative(p, primality)⟩
