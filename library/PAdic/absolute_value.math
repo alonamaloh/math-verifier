@@ -2157,3 +2157,497 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_sum_zero
                                    RationalEquivalent,
                                    RationalRepresentative.make(ny, dy)))))))
 }
+
+-- WLOG sub-case for case D: |nx| ≥ 1, |ny| ≥ 1, |sum| ≥ 1, and the
+-- p-adic valuations satisfy v_p(|nx·succ(dy)|) ≤ v_p(|ny·succ(dx)|).
+-- Applies the Integer ultrametric to (A, B) = (nx·succ(dy), ny·succ(dx))
+-- to bound v_p(|sum|) from below, then Helper A turns the exponent
+-- inequality into |x+y|_p ≤ |x|_p, and le_add_right_of_nonneg lifts
+-- to |x+y|_p ≤ |x|_p + |y|_p.
+theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
+        (p : Natural) (primality : Natural.is_prime(p))
+        (nx ny : Integer) (dx dy : Natural)
+        (kx ky kSum : Natural)
+        (eqAbsNx : Integer.absolute_value_natural(nx) = successor(kx))
+        (eqAbsNy : Integer.absolute_value_natural(ny) = successor(ky))
+        (eqAbsSum
+            : Integer.absolute_value_natural(
+                  nx * (successor(dy) : Integer)
+                  + ny * (successor(dx) : Integer)) = successor(kSum))
+        (vALeqVB
+            : Natural.padic_valuation(p, successor(kx))
+                + Natural.padic_valuation(p, successor(dy))
+              ≤ Natural.padic_valuation(p, successor(ky))
+                  + Natural.padic_valuation(p, successor(dx)))
+        : Rational.padic_absolute_value(
+              p, primality,
+              Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(nx, dx))
+              + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(ny, dy)))
+          ≤ Rational.padic_absolute_value(
+                p, primality,
+                Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(nx, dx)))
+              + Rational.padic_absolute_value(
+                    p, primality,
+                    Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                RationalRepresentative.make(ny, dy))) := {
+  -- Primality components.
+  claim primeAtLeastTwo : successor(successor(zero)) ≤ p
+    by And.eliminate(
+           successor(successor(zero)) ≤ p,
+           (divisor : Natural) → divisor ∣ p
+               → divisor = successor(zero) ∨ divisor = p,
+           successor(successor(zero)) ≤ p,
+           function (twoLeP : successor(successor(zero)) ≤ p)
+                    (_ : (divisor : Natural) → divisor ∣ p
+                         → divisor = successor(zero) ∨ divisor = p) =>
+               twoLeP,
+           primality);
+  claim primePositive : successor(zero) ≤ p
+    by Natural.less_or_equal_predecessor_less_or_equal(
+           successor(zero), p, primeAtLeastTwo);
+  -- Successor positivity helpers.
+  claim succKxPos : successor(zero) ≤ successor(kx)
+    by Natural.successor_less_or_equal_successor(
+           zero, kx, Natural.zero_least(kx));
+  claim succKyPos : successor(zero) ≤ successor(ky)
+    by Natural.successor_less_or_equal_successor(
+           zero, ky, Natural.zero_least(ky));
+  claim succDxPos : successor(zero) ≤ successor(dx)
+    by Natural.successor_less_or_equal_successor(
+           zero, dx, Natural.zero_least(dx));
+  claim succDyPos : successor(zero) ≤ successor(dy)
+    by Natural.successor_less_or_equal_successor(
+           zero, dy, Natural.zero_least(dy));
+  claim succKSumPos : successor(zero) ≤ successor(kSum)
+    by Natural.successor_less_or_equal_successor(
+           zero, kSum, Natural.zero_least(kSum));
+  -- |nx · (succ(dy):Int)|_Nat = |nx|_Nat · succ(dy) = succ(kx) · succ(dy).
+  -- (|(succ(dy):Int)|_Nat = succ(dy) is definitional via distance(succ(dy), 0).)
+  claim absAEq
+        : Integer.absolute_value_natural(
+              nx * (successor(dy) : Integer))
+          = successor(kx) * successor(dy)
+    by Equality.transitivity(
+           Integer.absolute_value_natural_multiplicative(
+               nx, (successor(dy) : Integer)),
+           congruenceOf(
+               function (m : Natural) => m * successor(dy),
+               eqAbsNx));
+  claim absBEq
+        : Integer.absolute_value_natural(
+              ny * (successor(dx) : Integer))
+          = successor(ky) * successor(dx)
+    by Equality.transitivity(
+           Integer.absolute_value_natural_multiplicative(
+               ny, (successor(dx) : Integer)),
+           congruenceOf(
+               function (m : Natural) => m * successor(dx),
+               eqAbsNy));
+  -- |sum|_Nat ≥ 1.
+  claim sumAbsPositive
+        : successor(zero)
+            ≤ Integer.absolute_value_natural(
+                  nx * (successor(dy) : Integer)
+                  + ny * (successor(dx) : Integer))
+    by Equality.transport_proposition(
+           Natural,
+           function (m : Natural) => successor(zero) ≤ m,
+           successor(kSum),
+           Integer.absolute_value_natural(
+               nx * (successor(dy) : Integer)
+               + ny * (successor(dx) : Integer)),
+           Equality.symmetry(eqAbsSum),
+           succKSumPos);
+  -- v_p(|A|_Nat) = v_p(succ(kx)) + v_p(succ(dy)) (via mult on succ-form).
+  claim vAFormulaSucc
+        : Natural.padic_valuation(
+              p, Integer.absolute_value_natural(
+                     nx * (successor(dy) : Integer)))
+          = Natural.padic_valuation(p, successor(kx))
+              + Natural.padic_valuation(p, successor(dy))
+    by Equality.transitivity(
+           congruenceOf(
+               function (m : Natural) => Natural.padic_valuation(p, m),
+               absAEq),
+           Natural.padic_valuation_multiplicative(
+               p, successor(kx), successor(dy),
+               primality, succKxPos, succDyPos));
+  -- v_p(|B|_Nat) = v_p(succ(ky)) + v_p(succ(dx)).
+  claim vBFormulaSucc
+        : Natural.padic_valuation(
+              p, Integer.absolute_value_natural(
+                     ny * (successor(dx) : Integer)))
+          = Natural.padic_valuation(p, successor(ky))
+              + Natural.padic_valuation(p, successor(dx))
+    by Equality.transitivity(
+           congruenceOf(
+               function (m : Natural) => Natural.padic_valuation(p, m),
+               absBEq),
+           Natural.padic_valuation_multiplicative(
+               p, successor(ky), successor(dx),
+               primality, succKyPos, succDxPos));
+  -- v_p(|A|_Nat) ≤ v_p(|B|_Nat), from vALeqVB via the formula bridges.
+  claim valuationLe
+        : Natural.padic_valuation(
+              p, Integer.absolute_value_natural(
+                     nx * (successor(dy) : Integer)))
+          ≤ Natural.padic_valuation(
+                p, Integer.absolute_value_natural(
+                       ny * (successor(dx) : Integer)))
+    by Equality.transport_proposition(
+           Natural,
+           function (mRhs : Natural) =>
+               Natural.padic_valuation(
+                   p, Integer.absolute_value_natural(
+                          nx * (successor(dy) : Integer)))
+                 ≤ mRhs,
+           Natural.padic_valuation(p, successor(ky))
+               + Natural.padic_valuation(p, successor(dx)),
+           Natural.padic_valuation(
+               p, Integer.absolute_value_natural(
+                      ny * (successor(dx) : Integer))),
+           Equality.symmetry(vBFormulaSucc),
+           Equality.transport_proposition(
+               Natural,
+               function (mLhs : Natural) =>
+                   mLhs
+                     ≤ Natural.padic_valuation(p, successor(ky))
+                         + Natural.padic_valuation(p, successor(dx)),
+               Natural.padic_valuation(p, successor(kx))
+                   + Natural.padic_valuation(p, successor(dy)),
+               Natural.padic_valuation(
+                   p, Integer.absolute_value_natural(
+                          nx * (successor(dy) : Integer))),
+               Equality.symmetry(vAFormulaSucc),
+               vALeqVB));
+  -- Ultrametric: v_p(|A|) ≤ v_p(|A+B|).
+  claim ultraIneq
+        : Natural.padic_valuation(
+              p, Integer.absolute_value_natural(
+                     nx * (successor(dy) : Integer)))
+          ≤ Natural.padic_valuation(
+                p, Integer.absolute_value_natural(
+                       nx * (successor(dy) : Integer)
+                       + ny * (successor(dx) : Integer)))
+    by Integer.padic_valuation_absolute_value_natural_ultrametric_when_le(
+           p, primeAtLeastTwo,
+           nx * (successor(dy) : Integer),
+           ny * (successor(dx) : Integer),
+           sumAbsPositive, valuationLe);
+  -- v_p(|sum|_Nat) = v_p(succ(kSum)) via eqAbsSum + congruenceOf.
+  claim vSumIsVKSum
+        : Natural.padic_valuation(
+              p, Integer.absolute_value_natural(
+                     nx * (successor(dy) : Integer)
+                     + ny * (successor(dx) : Integer)))
+          = Natural.padic_valuation(p, successor(kSum))
+    by congruenceOf(
+           function (m : Natural) => Natural.padic_valuation(p, m),
+           eqAbsSum);
+  -- Combine: v_p(succ(kx)) + v_p(succ(dy)) ≤ v_p(succ(kSum)).
+  claim vASumLeVKSum
+        : Natural.padic_valuation(p, successor(kx))
+            + Natural.padic_valuation(p, successor(dy))
+          ≤ Natural.padic_valuation(p, successor(kSum))
+    by Equality.transport_proposition(
+           Natural,
+           function (mRhs : Natural) =>
+               Natural.padic_valuation(p, successor(kx))
+                   + Natural.padic_valuation(p, successor(dy))
+                 ≤ mRhs,
+           Natural.padic_valuation(
+               p, Integer.absolute_value_natural(
+                      nx * (successor(dy) : Integer)
+                      + ny * (successor(dx) : Integer))),
+           Natural.padic_valuation(p, successor(kSum)),
+           vSumIsVKSum,
+           Equality.transport_proposition(
+               Natural,
+               function (mLhs : Natural) =>
+                   mLhs
+                     ≤ Natural.padic_valuation(
+                           p, Integer.absolute_value_natural(
+                                  nx * (successor(dy) : Integer)
+                                  + ny * (successor(dx) : Integer))),
+               Natural.padic_valuation(
+                   p, Integer.absolute_value_natural(
+                          nx * (successor(dy) : Integer))),
+               Natural.padic_valuation(p, successor(kx))
+                   + Natural.padic_valuation(p, successor(dy)),
+               vAFormulaSucc,
+               ultraIneq));
+  -- v_p(succ(dy + dx · succ(dy))) = v_p(succ(dx)) + v_p(succ(dy)).
+  -- This uses padic_valuation_multiplicative on succ(dx) and succ(dy),
+  -- whose product is definitionally succ(dy + dx · succ(dy)).
+  claim vDFormulaMult
+        : Natural.padic_valuation(p, successor(dy + dx * successor(dy)))
+          = Natural.padic_valuation(p, successor(dx))
+              + Natural.padic_valuation(p, successor(dy))
+    by Natural.padic_valuation_multiplicative(
+           p, successor(dx), successor(dy),
+           primality, succDxPos, succDyPos);
+  -- The Helper A exponent inequality:
+  --   v_p(succ(dy + dx·succ(dy))) + v_p(succ(kx))
+  --   ≤ v_p(succ(dx)) + v_p(succ(kSum))
+  -- Chain: LHS = (v_p(succ(dx))+v_p(succ(dy))) + v_p(succ(kx))   [vDFormulaMult]
+  --            = v_p(succ(dx)) + (v_p(succ(dy)) + v_p(succ(kx))) [assoc]
+  --            = v_p(succ(dx)) + (v_p(succ(kx)) + v_p(succ(dy))) [comm]
+  --            ≤ v_p(succ(dx)) + v_p(succ(kSum))                 [vASumLeVKSum]
+  claim exponentLe
+        : Natural.padic_valuation(p, successor(dy + dx * successor(dy)))
+            + Natural.padic_valuation(p, successor(kx))
+          ≤ Natural.padic_valuation(p, successor(dx))
+              + Natural.padic_valuation(p, successor(kSum))
+    by Equality.transport_proposition(
+           Natural,
+           function (mLhs : Natural) =>
+               mLhs
+                 ≤ Natural.padic_valuation(p, successor(dx))
+                     + Natural.padic_valuation(p, successor(kSum)),
+           Natural.padic_valuation(p, successor(dx))
+               + (Natural.padic_valuation(p, successor(kx))
+                  + Natural.padic_valuation(p, successor(dy))),
+           Natural.padic_valuation(p, successor(dy + dx * successor(dy)))
+               + Natural.padic_valuation(p, successor(kx)),
+           -- Show LHS_form = (vp_dx + (vp_kx + vp_dy)) reversed.
+           Equality.transitivity(
+               Natural,
+               Natural.padic_valuation(p, successor(dx))
+                   + (Natural.padic_valuation(p, successor(kx))
+                      + Natural.padic_valuation(p, successor(dy))),
+               Natural.padic_valuation(p, successor(dx))
+                   + (Natural.padic_valuation(p, successor(dy))
+                      + Natural.padic_valuation(p, successor(kx))),
+               Natural.padic_valuation(p, successor(dy + dx * successor(dy)))
+                   + Natural.padic_valuation(p, successor(kx)),
+               -- (vp_dx + (vp_kx + vp_dy)) = (vp_dx + (vp_dy + vp_kx)) by comm.
+               congruenceOf(
+                   function (m : Natural) =>
+                       Natural.padic_valuation(p, successor(dx)) + m,
+                   Natural.add_commutative(
+                       Natural.padic_valuation(p, successor(kx)),
+                       Natural.padic_valuation(p, successor(dy)))),
+               -- vp_dx + (vp_dy + vp_kx) = (vp_dx + vp_dy) + vp_kx by assoc.
+               Equality.transitivity(
+                   Natural,
+                   Natural.padic_valuation(p, successor(dx))
+                       + (Natural.padic_valuation(p, successor(dy))
+                          + Natural.padic_valuation(p, successor(kx))),
+                   (Natural.padic_valuation(p, successor(dx))
+                        + Natural.padic_valuation(p, successor(dy)))
+                       + Natural.padic_valuation(p, successor(kx)),
+                   Natural.padic_valuation(p, successor(dy + dx * successor(dy)))
+                       + Natural.padic_valuation(p, successor(kx)),
+                   Equality.symmetry(
+                       Natural.add_associative(
+                           Natural.padic_valuation(p, successor(dx)),
+                           Natural.padic_valuation(p, successor(dy)),
+                           Natural.padic_valuation(p, successor(kx)))),
+                   -- (vp_dx + vp_dy) + vp_kx = vp_succ(D) + vp_kx via vDFormulaMult reversed.
+                   congruenceOf(
+                       function (m : Natural) =>
+                           m + Natural.padic_valuation(p, successor(kx)),
+                       Equality.symmetry(vDFormulaMult)))),
+           -- vp_succ(D) + vp_kx ≤ vp_dx + vp_kSum, via the chain (vp_dx + (vp_kx + vp_dy)) ≤ (vp_dx + vp_kSum).
+           Natural.le_add_preserves_right(
+               Natural.padic_valuation(p, successor(dx)),
+               Natural.padic_valuation(p, successor(kx))
+                   + Natural.padic_valuation(p, successor(dy)),
+               Natural.padic_valuation(p, successor(kSum)),
+               vASumLeVKSum));
+  -- Apply Helper A.
+  claim helperAResult
+        : Quotient.mk(
+              RationalRepresentative, RationalEquivalent,
+              RationalRepresentative.make(
+                  (Natural.power(
+                       Natural.padic_valuation(p, successor(dy + dx * successor(dy))), p)
+                       : Integer),
+                  Natural.monus(
+                      Natural.power(
+                          Natural.padic_valuation(p, successor(kSum)), p),
+                      successor(zero))))
+          ≤ Quotient.mk(
+                RationalRepresentative, RationalEquivalent,
+                RationalRepresentative.make(
+                    (Natural.power(
+                         Natural.padic_valuation(p, successor(dx)), p)
+                         : Integer),
+                    Natural.monus(
+                        Natural.power(
+                            Natural.padic_valuation(p, successor(kx)), p),
+                        successor(zero))))
+    by Rational.padic_av_form_le_when_exponent_le(
+           p, primePositive,
+           Natural.padic_valuation(p, successor(dy + dx * successor(dy))),
+           Natural.padic_valuation(p, successor(dx)),
+           Natural.padic_valuation(p, successor(kSum)),
+           Natural.padic_valuation(p, successor(kx)),
+           exponentLe);
+  -- Bridge LHS: padic_av(x+y) = mk(make((p^... : Int), ...)).
+  claim lhsForm
+        : Rational.padic_absolute_value(
+              p, primality,
+              Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(nx, dx))
+              + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(ny, dy)))
+          = Quotient.mk(
+                RationalRepresentative, RationalEquivalent,
+                RationalRepresentative.make(
+                    (Natural.power(
+                         Natural.padic_valuation(p, successor(dy + dx * successor(dy))), p)
+                         : Integer),
+                    Natural.monus(
+                        Natural.power(
+                            Natural.padic_valuation(p, successor(kSum)), p),
+                        successor(zero))))
+    by Rational.padic_absolute_value_at_succ(
+           p,
+           nx * (successor(dy) : Integer)
+             + ny * (successor(dx) : Integer),
+           dy + dx * successor(dy),
+           kSum, eqAbsSum);
+  -- Bridge RHS: |x|_p = mk(make((p^... : Int), ...)).
+  claim rhsXForm
+        : Rational.padic_absolute_value(
+              p, primality,
+              Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(nx, dx)))
+          = Quotient.mk(
+                RationalRepresentative, RationalEquivalent,
+                RationalRepresentative.make(
+                    (Natural.power(
+                         Natural.padic_valuation(p, successor(dx)), p)
+                         : Integer),
+                    Natural.monus(
+                        Natural.power(
+                            Natural.padic_valuation(p, successor(kx)), p),
+                        successor(zero))))
+    by Rational.padic_absolute_value_at_succ(p, nx, dx, kx, eqAbsNx);
+  -- Transport helperAResult to: padic_av(x+y) ≤ |x|_p.
+  claim padicAvSumLeX
+        : Rational.padic_absolute_value(
+              p, primality,
+              Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(nx, dx))
+              + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(ny, dy)))
+          ≤ Rational.padic_absolute_value(
+                p, primality,
+                Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(nx, dx)))
+    by Equality.transport_proposition(
+           Rational,
+           function (mLhs : Rational) =>
+               mLhs
+                 ≤ Rational.padic_absolute_value(
+                       p, primality,
+                       Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                   RationalRepresentative.make(nx, dx))),
+           Quotient.mk(
+               RationalRepresentative, RationalEquivalent,
+               RationalRepresentative.make(
+                   (Natural.power(
+                        Natural.padic_valuation(p, successor(dy + dx * successor(dy))), p)
+                        : Integer),
+                   Natural.monus(
+                       Natural.power(
+                           Natural.padic_valuation(p, successor(kSum)), p),
+                       successor(zero)))),
+           Rational.padic_absolute_value(
+               p, primality,
+               Quotient.mk(RationalRepresentative, RationalEquivalent,
+                           RationalRepresentative.make(nx, dx))
+               + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                             RationalRepresentative.make(ny, dy))),
+           Equality.symmetry(lhsForm),
+           Equality.transport_proposition(
+               Rational,
+               function (mRhs : Rational) =>
+                   Quotient.mk(
+                       RationalRepresentative, RationalEquivalent,
+                       RationalRepresentative.make(
+                           (Natural.power(
+                                Natural.padic_valuation(p, successor(dy + dx * successor(dy))), p)
+                                : Integer),
+                           Natural.monus(
+                               Natural.power(
+                                   Natural.padic_valuation(p, successor(kSum)), p),
+                               successor(zero))))
+                     ≤ mRhs,
+               Quotient.mk(
+                   RationalRepresentative, RationalEquivalent,
+                   RationalRepresentative.make(
+                       (Natural.power(
+                            Natural.padic_valuation(p, successor(dx)), p)
+                            : Integer),
+                       Natural.monus(
+                           Natural.power(
+                               Natural.padic_valuation(p, successor(kx)), p),
+                           successor(zero)))),
+               Rational.padic_absolute_value(
+                   p, primality,
+                   Quotient.mk(RationalRepresentative, RationalEquivalent,
+                               RationalRepresentative.make(nx, dx))),
+               Equality.symmetry(rhsXForm),
+               helperAResult));
+  -- |y|_p ≥ 0.
+  claim padicAvYNonneg
+        : Rational.zero
+            ≤ Rational.padic_absolute_value(
+                  p, primality,
+                  Quotient.mk(RationalRepresentative, RationalEquivalent,
+                              RationalRepresentative.make(ny, dy)))
+    by Rational.padic_absolute_value_nonneg(
+           p, primality,
+           Quotient.mk(RationalRepresentative, RationalEquivalent,
+                       RationalRepresentative.make(ny, dy)));
+  -- |x|_p ≤ |x|_p + |y|_p.
+  claim padicAvXLeXPlusY
+        : Rational.padic_absolute_value(
+              p, primality,
+              Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(nx, dx)))
+          ≤ Rational.padic_absolute_value(
+                p, primality,
+                Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(nx, dx)))
+              + Rational.padic_absolute_value(
+                    p, primality,
+                    Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                RationalRepresentative.make(ny, dy)))
+    by Rational.le_add_right_of_nonneg(
+           Rational.padic_absolute_value(
+               p, primality,
+               Quotient.mk(RationalRepresentative, RationalEquivalent,
+                           RationalRepresentative.make(nx, dx))),
+           Rational.padic_absolute_value(
+               p, primality,
+               Quotient.mk(RationalRepresentative, RationalEquivalent,
+                           RationalRepresentative.make(ny, dy))),
+           padicAvYNonneg);
+  Rational.LessOrEqual.transitive(
+      Rational.padic_absolute_value(
+          p, primality,
+          Quotient.mk(RationalRepresentative, RationalEquivalent,
+                      RationalRepresentative.make(nx, dx))
+          + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                        RationalRepresentative.make(ny, dy))),
+      Rational.padic_absolute_value(
+          p, primality,
+          Quotient.mk(RationalRepresentative, RationalEquivalent,
+                      RationalRepresentative.make(nx, dx))),
+      Rational.padic_absolute_value(
+          p, primality,
+          Quotient.mk(RationalRepresentative, RationalEquivalent,
+                      RationalRepresentative.make(nx, dx)))
+        + Rational.padic_absolute_value(
+              p, primality,
+              Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(ny, dy))),
+      padicAvSumLeX, padicAvXLeXPlusY)
+}
