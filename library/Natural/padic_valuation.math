@@ -1844,6 +1844,93 @@ theorem Integer.divides_absolute_value_natural_sum
                                       IntegerEquivalent, rep_B))),
       A, B, dDividesAbsA, dDividesAbsB)
 
+-- x ≤ p * x for p ≥ 1. From p = 1 + monus(p, 1): p * x = x + monus(p, 1)*x,
+-- then less_or_equal_add_right.
+theorem Natural.le_multiply_when_factor_at_least_one
+        (x p : Natural) (pPositive : successor(zero) ≤ p)
+        : x ≤ p * x := {
+  claim pDecompose : p = successor(zero) + Natural.monus(p, successor(zero))
+    by Natural.monus_zero_implies_decompose(
+           successor(zero), p,
+           Natural.le_implies_monus_zero(p, successor(zero), pPositive));
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) => x ≤ m * x,
+      successor(zero) + Natural.monus(p, successor(zero)),
+      p,
+      Equality.symmetry(pDecompose),
+      -- (1 + monus(p, 1)) * x = x + monus(p, 1) * x. Then x ≤ that.
+      Equality.transport_proposition(
+          Natural,
+          function (m : Natural) => x ≤ m,
+          x + Natural.monus(p, successor(zero)) * x,
+          (successor(zero) + Natural.monus(p, successor(zero))) * x,
+          calc x + Natural.monus(p, successor(zero)) * x
+             = successor(zero) * x + Natural.monus(p, successor(zero)) * x
+                    by congruenceOf(
+                           function (m : Natural) =>
+                               m + Natural.monus(p, successor(zero)) * x,
+                           Equality.symmetry(Natural.one_multiply(x)))
+             = (successor(zero) + Natural.monus(p, successor(zero))) * x
+                    by Equality.symmetry(
+                           Natural.distributivity_right(
+                               successor(zero),
+                               Natural.monus(p, successor(zero)),
+                               x)),
+          Natural.less_or_equal_add_right(
+              x, Natural.monus(p, successor(zero)) * x)))
+}
+
+-- Power is monotone in the exponent (when base p ≥ 1).
+-- Direct induction on r where b = a + r.
+theorem Natural.power_monotone_via_r
+        (a p : Natural) (pPositive : successor(zero) ≤ p)
+        : (r : Natural) → Natural.power(a, p) ≤ Natural.power(a + r, p)
+  | zero =>
+      Equality.transport_proposition(
+          Natural,
+          function (m : Natural) => Natural.power(a, p) ≤ Natural.power(m, p),
+          a, a + zero,
+          Equality.symmetry(Natural.add_zero(a)),
+          LessOrEqual.reflexivity(Natural.power(a, p)))
+  | successor(r') =>
+      -- power(a + succ(r'), p) = power(succ(a + r'), p) = p * power(a + r', p)
+      -- by definition.
+      -- IH: power(a, p) ≤ power(a + r', p).
+      -- power(a + r', p) ≤ p * power(a + r', p) by le_multiply_when_factor_at_least_one.
+      -- Combine.
+      Equality.transport_proposition(
+          Natural,
+          function (m : Natural) => Natural.power(a, p) ≤ Natural.power(m, p),
+          successor(a + r'), a + successor(r'),
+          Equality.symmetry(Natural.add_successor(a, r')),
+          LessOrEqual.transitive(
+              Natural.power(a, p),
+              Natural.power(a + r', p),
+              p * Natural.power(a + r', p),
+              Natural.le_multiply_when_factor_at_least_one(
+                  Natural.power(a + r', p), p, pPositive),
+              Natural.power_monotone_via_r(a, p, pPositive, r')))
+
+-- Power monotonicity: a ≤ b implies power(a, p) ≤ power(b, p).
+theorem Natural.power_monotone
+        (a b p : Natural) (aLeB : a ≤ b)
+        (pPositive : successor(zero) ≤ p)
+        : Natural.power(a, p) ≤ Natural.power(b, p) :=
+  Exists.eliminate(
+      Natural,
+      function (r : Natural) => b = a + r,
+      Natural.power(a, p) ≤ Natural.power(b, p),
+      function (r : Natural) (bEqAplusR : b = a + r) =>
+        Equality.transport_proposition(
+            Natural,
+            function (m : Natural) =>
+                Natural.power(a, p) ≤ Natural.power(m, p),
+            a + r, b,
+            Equality.symmetry(bEqAplusR),
+            Natural.power_monotone_via_r(a, p, pPositive, r)),
+      Natural.subtraction_witness(a, b, aLeB))
+
 -- Integer-level p-adic ultrametric: v_p(|A|_Nat) ≤ v_p(|B|_Nat) and
 -- |A + B|_Nat ≥ 1 implies v_p(|A|_Nat) ≤ v_p(|A + B|_Nat).
 -- Goes through divides_absolute_value_natural_sum and the bidirectional
