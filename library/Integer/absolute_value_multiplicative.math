@@ -1,0 +1,268 @@
+-- Integer/absolute_value_multiplicative.math
+--
+-- General multiplicativity of the Integer absolute value:
+-- |x * y| = |x| * |y|. Sign-split on both operands and dispatch to
+-- one of four single-sign cases. Separated from absolute_value.math
+-- because it imports sign.math (which itself imports absolute_value).
+
+module Integer.absolute_value_multiplicative
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.distance
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.absolute_value
+import Integer.sign
+
+-- ----------------------------------------------------------------------
+-- General multiplicativity: |x * y| = |x| * |y| at Integer.
+
+-- Helper at the IsNonneg level: x = (a : I), y = (b : I) gives
+-- |x * y| = (a * b : I) = |x| * |y|.
+theorem Integer.absolute_value_multiplicative_both_nonneg
+        (x y : Integer) (a b : Natural)
+        (xIsImage : x = (a : Integer)) (yIsImage : y = (b : Integer))
+        : Integer.absolute_value(x * y)
+          = Integer.absolute_value(x) * Integer.absolute_value(y) :=
+  calc Integer.absolute_value(x * y)
+     = Integer.absolute_value((a : Integer) * y)
+            by congruenceOf(
+                   function (z : Integer) => Integer.absolute_value(z * y),
+                   xIsImage)
+     = Integer.absolute_value((a : Integer) * (b : Integer))
+            by congruenceOf(
+                   function (z : Integer) =>
+                       Integer.absolute_value((a : Integer) * z),
+                   yIsImage)
+     = Integer.absolute_value((a * b : Integer))
+            by congruenceOf(
+                   Integer.absolute_value,
+                   Equality.symmetry(
+                       Natural.to_integer.multiply_preserves(a, b)))
+     = (a * b : Integer)
+            by Integer.absolute_value_of_natural(a * b)
+     = (a : Integer) * (b : Integer)
+            by Natural.to_integer.multiply_preserves(a, b)
+     = Integer.absolute_value(x) * (b : Integer)
+            by congruenceOf(
+                   function (z : Integer) =>
+                       z * (b : Integer),
+                   Equality.symmetry(
+                       calc Integer.absolute_value(x)
+                          = Integer.absolute_value((a : Integer))
+                                 by congruenceOf(
+                                        Integer.absolute_value,
+                                        xIsImage)
+                          = (a : Integer)
+                                 by Integer.absolute_value_of_natural(a)))
+     = Integer.absolute_value(x) * Integer.absolute_value(y)
+            by congruenceOf(
+                   function (z : Integer) =>
+                       Integer.absolute_value(x) * z,
+                   Equality.symmetry(
+                       calc Integer.absolute_value(y)
+                          = Integer.absolute_value((b : Integer))
+                                 by congruenceOf(
+                                        Integer.absolute_value,
+                                        yIsImage)
+                          = (b : Integer)
+                                 by Integer.absolute_value_of_natural(b)))
+
+-- Helper: x = -(a : I), y = (b : I) gives |x * y| = (a*b : I) = |x|*|y|.
+theorem Integer.absolute_value_multiplicative_neg_pos
+        (x y : Integer) (a b : Natural)
+        (xIsNegImage : x = -(a : Integer))
+        (yIsImage : y = (b : Integer))
+        : Integer.absolute_value(x * y)
+          = Integer.absolute_value(x) * Integer.absolute_value(y) :=
+  calc Integer.absolute_value(x * y)
+     = Integer.absolute_value(-(a : Integer) * y)
+            by congruenceOf(
+                   function (z : Integer) => Integer.absolute_value(z * y),
+                   xIsNegImage)
+     = Integer.absolute_value(-((a : Integer) * y))
+            by congruenceOf(
+                   Integer.absolute_value,
+                   Integer.multiply_negate_left((a : Integer), y))
+     = Integer.absolute_value((a : Integer) * y)
+            by Integer.absolute_value_negate((a : Integer) * y)
+     = Integer.absolute_value((a : Integer))
+           * Integer.absolute_value(y)
+            by Integer.absolute_value_multiplicative_both_nonneg(
+                   (a : Integer), y, a, b,
+                   reflexivity(Integer, (a : Integer)),
+                   yIsImage)
+     = Integer.absolute_value(x) * Integer.absolute_value(y)
+            by congruenceOf(
+                   function (z : Integer) =>
+                       z * Integer.absolute_value(y),
+                   Equality.symmetry(
+                       calc Integer.absolute_value(x)
+                          = Integer.absolute_value(-(a : Integer))
+                                 by congruenceOf(
+                                        Integer.absolute_value,
+                                        xIsNegImage)
+                          = Integer.absolute_value((a : Integer))
+                                 by Integer.absolute_value_negate(
+                                        (a : Integer))))
+
+-- Helper: x = (a:I), y = -(b:I). Use commutativity of multiplication
+-- to reduce to the (neg, pos) case.
+theorem Integer.absolute_value_multiplicative_pos_neg
+        (x y : Integer) (a b : Natural)
+        (xIsImage : x = (a : Integer))
+        (yIsNegImage : y = -(b : Integer))
+        : Integer.absolute_value(x * y)
+          = Integer.absolute_value(x) * Integer.absolute_value(y) :=
+  calc Integer.absolute_value(x * y)
+     = Integer.absolute_value(y * x)
+            by congruenceOf(
+                   Integer.absolute_value,
+                   Integer.multiply_commutative(x, y))
+     = Integer.absolute_value(y) * Integer.absolute_value(x)
+            by Integer.absolute_value_multiplicative_neg_pos(
+                   y, x, b, a, yIsNegImage, xIsImage)
+     = Integer.absolute_value(x) * Integer.absolute_value(y)
+            by Integer.multiply_commutative(
+                   Integer.absolute_value(y),
+                   Integer.absolute_value(x))
+
+-- Helper: x = -(a:I), y = -(b:I). Both negates cancel under multiply.
+theorem Integer.absolute_value_multiplicative_both_neg
+        (x y : Integer) (a b : Natural)
+        (xIsNegImage : x = -(a : Integer))
+        (yIsNegImage : y = -(b : Integer))
+        : Integer.absolute_value(x * y)
+          = Integer.absolute_value(x) * Integer.absolute_value(y) :=
+  calc Integer.absolute_value(x * y)
+     = Integer.absolute_value(-(a : Integer) * y)
+            by congruenceOf(
+                   function (z : Integer) => Integer.absolute_value(z * y),
+                   xIsNegImage)
+     = Integer.absolute_value(-((a : Integer) * y))
+            by congruenceOf(
+                   Integer.absolute_value,
+                   Integer.multiply_negate_left((a : Integer), y))
+     = Integer.absolute_value((a : Integer) * y)
+            by Integer.absolute_value_negate((a : Integer) * y)
+     = Integer.absolute_value((a : Integer))
+           * Integer.absolute_value(y)
+            by Integer.absolute_value_multiplicative_pos_neg(
+                   (a : Integer), y, a, b,
+                   reflexivity(Integer, (a : Integer)),
+                   yIsNegImage)
+     = Integer.absolute_value(x) * Integer.absolute_value(y)
+            by congruenceOf(
+                   function (z : Integer) =>
+                       z * Integer.absolute_value(y),
+                   Equality.symmetry(
+                       calc Integer.absolute_value(x)
+                          = Integer.absolute_value(-(a : Integer))
+                                 by congruenceOf(
+                                        Integer.absolute_value,
+                                        xIsNegImage)
+                          = Integer.absolute_value((a : Integer))
+                                 by Integer.absolute_value_negate(
+                                        (a : Integer))))
+
+-- General multiplicativity: |x * y| = |x| * |y|. Sign-split on both
+-- and dispatch to one of the four helpers.
+theorem Integer.absolute_value_multiplicative (x y : Integer)
+        : Integer.absolute_value(x * y)
+          = Integer.absolute_value(x) * Integer.absolute_value(y) :=
+  Or.eliminate(
+      Integer.IsNonneg(x),
+      ∃ (k : Natural). x = -(k : Integer),
+      Integer.absolute_value(x * y)
+        = Integer.absolute_value(x) * Integer.absolute_value(y),
+      function (xNonneg : Integer.IsNonneg(x)) =>
+        Exists.eliminate(
+            Natural,
+            function (a : Natural) => x = (a : Integer),
+            Integer.absolute_value(x * y)
+              = Integer.absolute_value(x) * Integer.absolute_value(y),
+            function (a : Natural) (xIsImage : x = (a : Integer)) =>
+              Or.eliminate(
+                  Integer.IsNonneg(y),
+                  ∃ (k : Natural). y = -(k : Integer),
+                  Integer.absolute_value(x * y)
+                    = Integer.absolute_value(x)
+                        * Integer.absolute_value(y),
+                  function (yNonneg : Integer.IsNonneg(y)) =>
+                    Exists.eliminate(
+                        Natural,
+                        function (b : Natural) => y = (b : Integer),
+                        Integer.absolute_value(x * y)
+                          = Integer.absolute_value(x)
+                              * Integer.absolute_value(y),
+                        function (b : Natural)
+                                 (yIsImage : y = (b : Integer)) =>
+                          Integer.absolute_value_multiplicative_both_nonneg(
+                              x, y, a, b, xIsImage, yIsImage),
+                        yNonneg),
+                  function (yNeg : ∃ (k : Natural). y = -(k : Integer)) =>
+                    Exists.eliminate(
+                        Natural,
+                        function (b : Natural) => y = -(b : Integer),
+                        Integer.absolute_value(x * y)
+                          = Integer.absolute_value(x)
+                              * Integer.absolute_value(y),
+                        function (b : Natural)
+                                 (yIsNegImage : y = -(b : Integer)) =>
+                          Integer.absolute_value_multiplicative_pos_neg(
+                              x, y, a, b, xIsImage, yIsNegImage),
+                        yNeg),
+                  Integer.sign_split(y)),
+            xNonneg),
+      function (xNeg : ∃ (k : Natural). x = -(k : Integer)) =>
+        Exists.eliminate(
+            Natural,
+            function (a : Natural) => x = -(a : Integer),
+            Integer.absolute_value(x * y)
+              = Integer.absolute_value(x) * Integer.absolute_value(y),
+            function (a : Natural) (xIsNegImage : x = -(a : Integer)) =>
+              Or.eliminate(
+                  Integer.IsNonneg(y),
+                  ∃ (k : Natural). y = -(k : Integer),
+                  Integer.absolute_value(x * y)
+                    = Integer.absolute_value(x)
+                        * Integer.absolute_value(y),
+                  function (yNonneg : Integer.IsNonneg(y)) =>
+                    Exists.eliminate(
+                        Natural,
+                        function (b : Natural) => y = (b : Integer),
+                        Integer.absolute_value(x * y)
+                          = Integer.absolute_value(x)
+                              * Integer.absolute_value(y),
+                        function (b : Natural)
+                                 (yIsImage : y = (b : Integer)) =>
+                          Integer.absolute_value_multiplicative_neg_pos(
+                              x, y, a, b, xIsNegImage, yIsImage),
+                        yNonneg),
+                  function (yNeg : ∃ (k : Natural). y = -(k : Integer)) =>
+                    Exists.eliminate(
+                        Natural,
+                        function (b : Natural) => y = -(b : Integer),
+                        Integer.absolute_value(x * y)
+                          = Integer.absolute_value(x)
+                              * Integer.absolute_value(y),
+                        function (b : Natural)
+                                 (yIsNegImage : y = -(b : Integer)) =>
+                          Integer.absolute_value_multiplicative_both_neg(
+                              x, y, a, b, xIsNegImage, yIsNegImage),
+                        yNeg),
+                  Integer.sign_split(y)),
+            xNeg),
+      Integer.sign_split(x))
