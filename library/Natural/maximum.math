@@ -1,0 +1,56 @@
+-- Natural/maximum.math
+--
+-- Maximum of two Naturals, defined by recursion on the first arg with
+-- an explicit `cases` on the second (the kernel only reduces multi-
+-- constructor patterns when the inner case is explicit). Provides the
+-- two key inequalities: a ≤ max(a, b) and b ≤ max(a, b).
+
+module Natural.maximum
+
+import axioms
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Equality.basics
+
+definition Natural.maximum : Natural → Natural → Natural
+  | zero,         b => b
+  | successor(k), b =>
+      cases b {
+        | zero         => successor(k)
+        | successor(m) => successor(Natural.maximum(k, m))
+      }
+
+-- a ≤ max(a, b). Induct on a, case-split b in the successor case.
+theorem Natural.left_le_max : (a b : Natural) → a ≤ Natural.maximum(a, b)
+  | zero, b =>
+      Natural.zero_least(b)
+  | successor(k), b =>
+      (cases b {
+         | zero =>
+             -- max(s(k), 0) = s(k); s(k) ≤ s(k).
+             LessOrEqual.reflexivity(successor(k))
+         | successor(m) =>
+             -- max(s(k), s(m)) = s(max(k, m)). s(k) ≤ s(max(k, m))
+             -- from IH on (k, m) via successor_less_or_equal_successor.
+             Natural.successor_less_or_equal_successor(
+                 k, Natural.maximum(k, m),
+                 Natural.left_le_max(k, m))
+       } : successor(k) ≤ Natural.maximum(successor(k), b))
+
+-- b ≤ max(a, b). Symmetric induction.
+theorem Natural.right_le_max : (a b : Natural) → b ≤ Natural.maximum(a, b)
+  | zero, b =>
+      -- max(0, b) = b.
+      LessOrEqual.reflexivity(b)
+  | successor(k), b =>
+      (cases b {
+         | zero =>
+             -- max(s(k), 0) = s(k); 0 ≤ s(k).
+             Natural.zero_least(successor(k))
+         | successor(m) =>
+             -- max(s(k), s(m)) = s(max(k, m)); want s(m) ≤ s(max(k, m)).
+             Natural.successor_less_or_equal_successor(
+                 m, Natural.maximum(k, m),
+                 Natural.right_le_max(k, m))
+       } : b ≤ Natural.maximum(successor(k), b))
