@@ -1,0 +1,305 @@
+-- Rational/order_multiplication.math
+--
+-- Multiplicative order arithmetic on Rational: ≤ is preserved when
+-- scaling by a non-negative; plus a handful of foundational helpers
+-- (`zero_less_one`, `halve_less_than_self`, `absolute_value_IsNonneg`,
+-- Archimedean bound). These feed into the Cauchy product / multiply
+-- respect proofs.
+
+module Rational.order_multiplication
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.distance
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.sign
+import Integer.absolute_value
+import Integer.absolute_value_natural
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.absolute_value
+import Rational.halve
+import Rational.positive
+import Rational.order_arithmetic
+import Rational.triangle
+
+-- ----------------------------------------------------------------------
+-- Multiplication and negation interaction at Rational.
+
+-- (-x) * y = -(x * y). At reps, both sides have the same denominator
+-- and the numerator equality reduces to Integer.multiply_negate_left.
+theorem Rational.multiply_negate_left_at_representatives
+        (n_x n_y : Integer) (d_x d_y : Natural)
+        : Quotient.mk(RationalRepresentative, RationalEquivalent,
+                      RationalRepresentative.make(-n_x, d_x))
+              * Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(n_y, d_y))
+          = -(Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(n_x, d_x))
+              * Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(n_y, d_y))) :=
+  congruenceOf(
+      function (m : Integer) =>
+          Quotient.mk(RationalRepresentative, RationalEquivalent,
+                      RationalRepresentative.make(
+                          m, d_y + d_x * successor(d_y))),
+      Integer.multiply_negate_left(n_x, n_y))
+
+theorem Rational.multiply_negate_left (x y : Rational)
+        : (-x) * y = -(x * y) :=
+  Quotient.induct_two(
+      RationalRepresentative, RationalEquivalent,
+      RationalRepresentative, RationalEquivalent,
+      function (xArg yArg : Rational) =>
+          (-xArg) * yArg = -(xArg * yArg),
+      function (rep_x rep_y : RationalRepresentative) =>
+          (cases rep_x {
+             | RationalRepresentative.make(n_x, d_x) =>
+                 (cases rep_y {
+                    | RationalRepresentative.make(n_y, d_y) =>
+                        Rational.multiply_negate_left_at_representatives(
+                            n_x, n_y, d_x, d_y)
+                  } : (-Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                    RationalRepresentative.make(n_x, d_x)))
+                      * Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                    rep_y)
+                      = -(Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                      RationalRepresentative.make(n_x, d_x))
+                          * Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                        rep_y)))
+           } : (-Quotient.mk(RationalRepresentative, RationalEquivalent, rep_x))
+               * Quotient.mk(RationalRepresentative, RationalEquivalent, rep_y)
+               = -(Quotient.mk(RationalRepresentative, RationalEquivalent, rep_x)
+                   * Quotient.mk(RationalRepresentative, RationalEquivalent, rep_y))),
+      x, y)
+
+-- Distribute multiplication over subtraction: (b - a) * c = b*c - a*c.
+theorem Rational.subtract_multiply_distribute (a b c : Rational)
+        : (b - a) * c = b * c - a * c :=
+  calc (b - a) * c
+     = (b + -a) * c
+            by reflexivity(Rational, (b + -a) * c)
+     = b * c + -a * c
+            by Rational.distributivity_right(b, -a, c)
+     = b * c + -(a * c)
+            by congruenceOf(
+                   function (z : Rational) => b * c + z,
+                   Rational.multiply_negate_left(a, c))
+     = b * c - a * c
+            by reflexivity(Rational, b * c - a * c)
+
+-- ----------------------------------------------------------------------
+-- Multiplicative monotonicity (weak).
+
+-- a ≤ b ∧ 0 ≤ c → a * c ≤ b * c.
+theorem Rational.LessOrEqual.multiply_by_nonneg_right
+        (a b c : Rational) (aLeqB : a ≤ b)
+        (cNonneg : Rational.LessOrEqual(Rational.zero, c))
+        : a * c ≤ b * c :=
+  Equality.transport_proposition(
+      Rational, Rational.IsNonneg,
+      (b - a) * c,
+      b * c - a * c,
+      Rational.subtract_multiply_distribute(a, b, c),
+      Rational.IsNonneg.multiply(
+          b - a, c,
+          aLeqB,
+          Rational.IsNonneg_of_LessOrEqual_zero(c, cNonneg)))
+
+-- a ≤ b ∧ 0 ≤ c → c * a ≤ c * b. By commutativity.
+theorem Rational.LessOrEqual.multiply_by_nonneg_left
+        (a b c : Rational) (aLeqB : a ≤ b)
+        (cNonneg : Rational.LessOrEqual(Rational.zero, c))
+        : c * a ≤ c * b :=
+  Equality.transport_proposition(
+      Rational,
+      function (w : Rational) =>
+          Rational.LessOrEqual(w, c * b),
+      a * c, c * a,
+      Rational.multiply_commutative(a, c),
+      Equality.transport_proposition(
+          Rational,
+          function (w : Rational) =>
+              Rational.LessOrEqual(a * c, w),
+          b * c, c * b,
+          Rational.multiply_commutative(b, c),
+          Rational.LessOrEqual.multiply_by_nonneg_right(a, b, c, aLeqB, cNonneg)))
+
+-- ----------------------------------------------------------------------
+-- Foundational positivity helpers.
+
+-- 0 ≠ 1 at Rational. Via Quotient.exact: equality of mks gives Integer
+-- equivalence, which forces 0 = 1 at Natural after reduction.
+theorem Rational.zero_not_equal_one : Not(Rational.zero = Rational.one) :=
+  function (zeroEqOne : Rational.zero = Rational.one) =>
+    -- zero = mk(make(Integer.zero, zero)), one = mk(make(Integer.one, zero)).
+    -- Quotient.exact gives RationalEquivalent of reps, i.e.,
+    -- Integer.zero * succ(zero) = Integer.one * succ(zero),
+    -- which reduces to Integer.zero = Integer.one.
+    -- Then Integer.zero = mk(make(0, 0)), Integer.one = mk(make(1, 0)).
+    -- Quotient.exact gives IntegerEquivalent, i.e., 0 + 0 = 0 + 1,
+    -- reducing to 0 = 1 (Natural), contradicting Natural.successor_not_zero.
+    Natural.successor_not_zero(
+        zero,
+        Equality.symmetry(
+            Quotient.exact(
+                IntegerRepresentative, IntegerEquivalent,
+                IntegerEquivalent.reflexive,
+                IntegerEquivalent.symmetric,
+                IntegerEquivalent.transitive,
+                IntegerRepresentative.make(zero, zero),
+                IntegerRepresentative.make(successor(zero), zero),
+                Quotient.exact(
+                    RationalRepresentative, RationalEquivalent,
+                    RationalEquivalent.reflexive,
+                    RationalEquivalent.symmetric,
+                    RationalEquivalent.transitive,
+                    RationalRepresentative.make(Integer.zero, zero),
+                    RationalRepresentative.make(Integer.one, zero),
+                    zeroEqOne))))
+
+-- 0 < 1 at Rational. And of (0 ≤ 1) and (0 ≠ 1).
+theorem Rational.zero_less_one : Rational.zero < Rational.one :=
+  And.introduction(
+      Rational.LessOrEqual(Rational.zero, Rational.one),
+      Not(Rational.zero = Rational.one),
+      Rational.LessOrEqual_zero_of_IsNonneg(
+          Rational.one,
+          -- IsNonneg(Rational.one) at rep reduces to Integer.IsNonneg(Integer.one).
+          -- Integer.one = (succ(zero) : I), which is IsNonneg.
+          Integer.from_natural_is_nonneg(successor(zero))),
+      Rational.zero_not_equal_one)
+
+-- halve(ε) < ε when 0 < ε.
+theorem Rational.halve_less_than_self
+        (epsilon : Rational) (epsilonPos : Rational.zero < epsilon)
+        : Rational.halve(epsilon) < epsilon := {
+  -- halve(ε) ≤ ε: IsNonneg(ε - halve(ε)). ε - halve(ε) = halve(ε)
+  -- by halve_doubled and ring algebra. halve_IsNonneg gives IsNonneg.
+  claim epsilonIsNonneg : Rational.IsNonneg(epsilon)
+    by Rational.IsNonneg_of_LessOrEqual_zero(
+           epsilon,
+           And.left(
+               Rational.LessOrEqual(Rational.zero, epsilon),
+               Not(Rational.zero = epsilon),
+               epsilonPos));
+  claim diffEqualsHalve : epsilon - Rational.halve(epsilon)
+                          = Rational.halve(epsilon)
+    by calc epsilon - Rational.halve(epsilon)
+          = (Rational.halve(epsilon) + Rational.halve(epsilon))
+              + -Rational.halve(epsilon)
+                 by congruenceOf(
+                        function (w : Rational) =>
+                            w + -Rational.halve(epsilon),
+                        Equality.symmetry(
+                            Rational.halve_doubled(epsilon)))
+          = Rational.halve(epsilon)
+              + (Rational.halve(epsilon) + -Rational.halve(epsilon))
+                 by Rational.add_associative(
+                        Rational.halve(epsilon),
+                        Rational.halve(epsilon),
+                        -Rational.halve(epsilon))
+          = Rational.halve(epsilon) + Rational.zero
+                 by congruenceOf(
+                        function (w : Rational) =>
+                            Rational.halve(epsilon) + w,
+                        Rational.add_negate_right(Rational.halve(epsilon)))
+          = Rational.halve(epsilon)
+                 by Rational.add_zero(Rational.halve(epsilon));
+  -- halve(ε) > 0 from halve_positive.
+  claim halvePositive : Rational.zero < Rational.halve(epsilon)
+    by Rational.halve_positive(epsilon, epsilonPos);
+  -- halve(ε) ≤ ε from IsNonneg(ε - halve(ε)) = IsNonneg(halve(ε)).
+  claim halveLeqEpsilon : Rational.halve(epsilon) ≤ epsilon
+    by Equality.transport_proposition(
+           Rational, Rational.IsNonneg,
+           Rational.halve(epsilon),
+           epsilon - Rational.halve(epsilon),
+           Equality.symmetry(diffEqualsHalve),
+           Rational.IsNonneg_of_LessOrEqual_zero(
+               Rational.halve(epsilon),
+               And.left(
+                   Rational.LessOrEqual(
+                       Rational.zero, Rational.halve(epsilon)),
+                   Not(Rational.zero = Rational.halve(epsilon)),
+                   halvePositive)));
+  -- halve(ε) ≠ ε. If halve(ε) = ε, then ε - halve(ε) = 0, but it = halve(ε).
+  -- So halve(ε) = 0. But halve_positive says ¬(0 = halve(ε)). Contradiction.
+  claim halveNeqEpsilon : Not(Rational.halve(epsilon) = epsilon)
+    by function (halveEqEps : Rational.halve(epsilon) = epsilon) =>
+         And.right(
+             Rational.LessOrEqual(Rational.zero, Rational.halve(epsilon)),
+             Not(Rational.zero = Rational.halve(epsilon)),
+             halvePositive)(
+             -- 0 = halve(ε) follows from halve(ε) = ε.
+             -- ε - halve(ε) = halve(ε) and ε - ε = 0; so halve(ε) = 0.
+             Equality.symmetry(
+                 calc Rational.halve(epsilon)
+                    = epsilon - Rational.halve(epsilon)
+                           by Equality.symmetry(diffEqualsHalve)
+                    = epsilon - epsilon
+                           by congruenceOf(
+                                  function (w : Rational) => epsilon - w,
+                                  halveEqEps)
+                    = Rational.zero
+                           by Rational.add_negate_right(epsilon)));
+  And.introduction(
+      Rational.LessOrEqual(Rational.halve(epsilon), epsilon),
+      Not(Rational.halve(epsilon) = epsilon),
+      halveLeqEpsilon,
+      halveNeqEpsilon)
+}
+
+-- ----------------------------------------------------------------------
+-- |q| is non-negative.
+
+-- |q|_at_rep = mk(make(|n|_int, d)) — its numerator is |n|, which is
+-- IsNonneg (image of a Natural). So |q| is IsNonneg.
+theorem Rational.absolute_value_IsNonneg (q : Rational)
+        : Rational.IsNonneg(Rational.absolute_value(q)) :=
+  Quotient.induct(
+      function (y : Rational) =>
+          Rational.IsNonneg(Rational.absolute_value(y)),
+      function (rep : RationalRepresentative) =>
+          (cases rep {
+             | RationalRepresentative.make(n, d) =>
+                 -- |q|_at_rep has numerator Integer.absolute_value(n).
+                 -- That's the image of a Natural (= distance(a, b) for n
+                 -- = mk(make(a, b))). So Integer.IsNonneg holds.
+                 Equality.transport_proposition(
+                     Integer, Integer.IsNonneg,
+                     (Integer.absolute_value_natural(n) : Integer),
+                     Integer.absolute_value(n),
+                     Equality.symmetry(
+                         Integer.absolute_value_natural_is_image(n)),
+                     Integer.from_natural_is_nonneg(
+                         Integer.absolute_value_natural(n)))
+           } : Rational.IsNonneg(
+                   Rational.absolute_value(
+                       Quotient.mk(RationalRepresentative,
+                                   RationalEquivalent, rep)))),
+      q)
+
+-- 0 ≤ |q|.
+theorem Rational.zero_le_absolute_value (q : Rational)
+        : Rational.LessOrEqual(Rational.zero, Rational.absolute_value(q)) :=
+  Rational.LessOrEqual_zero_of_IsNonneg(
+      Rational.absolute_value(q),
+      Rational.absolute_value_IsNonneg(q))

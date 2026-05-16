@@ -1,0 +1,84 @@
+-- Integer/absolute_value_natural.math
+--
+-- Natural-valued absolute value on Integer: `Integer.absolute_value_natural(x) : Natural`.
+-- The existing `Integer.absolute_value` returns an Integer that
+-- happens to be the image of a Natural; this version returns the
+-- underlying Natural directly, which is what consumers like the
+-- p-adic valuation need.
+--
+-- Lifted directly from `Natural.distance` at the representative
+-- level; respect follows from `distance_respects_integer_equivalent`.
+
+module Integer.absolute_value_natural
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.distance
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.absolute_value
+
+-- Representative-level: distance on the two Natural components.
+definition Integer.absolute_value_natural_at_representative
+        : IntegerRepresentative → Natural
+  | IntegerRepresentative.make(a, b) => Natural.distance(a, b)
+
+-- Respect: equivalent reps give equal distances. Reuses
+-- `Natural.distance_respects_integer_equivalent`. Single-pattern on
+-- rep1; inner `cases` on rep1Prime with a dependent motive so the
+-- equivalence hypothesis's type refines after both constructor matches.
+theorem Integer.absolute_value_natural_respect
+        : (rep1 rep1Prime : IntegerRepresentative)
+          → IntegerEquivalent(rep1, rep1Prime)
+          → Integer.absolute_value_natural_at_representative(rep1)
+            = Integer.absolute_value_natural_at_representative(rep1Prime)
+  | IntegerRepresentative.make(a, b), rep1Prime, equivalenceHypothesis =>
+      (cases rep1Prime {
+         | IntegerRepresentative.make(c, d) =>
+             function (refinedEquivalence : a + d = b + c) =>
+               Natural.distance_respects_integer_equivalent(
+                   a, b, c, d, refinedEquivalence)
+       } : (refinedEquivalence
+                : IntegerEquivalent(
+                      IntegerRepresentative.make(a, b), rep1Prime))
+           → Integer.absolute_value_natural_at_representative(
+                 IntegerRepresentative.make(a, b))
+             = Integer.absolute_value_natural_at_representative(
+                   rep1Prime))(equivalenceHypothesis)
+
+-- Lifted Natural-valued absolute value.
+definition Integer.absolute_value_natural (x : Integer) : Natural :=
+  Quotient.lift(
+      Integer.absolute_value_natural_at_representative,
+      Integer.absolute_value_natural_respect,
+      x)
+
+-- Bridge to the Integer-valued form: both definitions unfold to
+-- `(distance(a, b) : Integer)` at the representative level, so
+-- `Integer.absolute_value(x) = (Integer.absolute_value_natural(x) : Integer)`.
+theorem Integer.absolute_value_natural_is_image (x : Integer)
+        : Integer.absolute_value(x)
+          = (Integer.absolute_value_natural(x) : Integer) :=
+  Quotient.induct(
+      function (y : Integer) =>
+          Integer.absolute_value(y)
+            = (Integer.absolute_value_natural(y) : Integer),
+      function (rep : IntegerRepresentative) =>
+          (cases rep {
+             | IntegerRepresentative.make(a, b) =>
+                 reflexivity(Integer, (Natural.distance(a, b) : Integer))
+           } : Integer.absolute_value(
+                   Quotient.mk(IntegerRepresentative,
+                               IntegerEquivalent, rep))
+               = (Integer.absolute_value_natural(
+                       Quotient.mk(IntegerRepresentative,
+                                   IntegerEquivalent, rep))
+                  : Integer)),
+      x)
