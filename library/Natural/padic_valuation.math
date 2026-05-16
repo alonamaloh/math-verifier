@@ -1291,3 +1291,83 @@ theorem Natural.padic_valuation_ultrametric_when_ge
       Natural.add_commutative(b, a),
       Natural.padic_valuation_ultrametric_when_le(
           prime, primeAtLeastTwo, b, a, bPositive, valuationLe))
+
+-- Subtraction preserves divides: if d | a and d | b and b ≤ a, then
+-- d | monus(a, b). Uses monus_zero_implies_decompose to express
+-- a = b + monus(a, b), then divides_subtract_from_sum.
+theorem Natural.divides_monus
+        (d a b : Natural)
+        (bLeA : b ≤ a)
+        (dDividesA : d ∣ a)
+        (dDividesB : d ∣ b)
+        : d ∣ Natural.monus(a, b) := {
+  claim aEqBPlusMonus : a = b + Natural.monus(a, b)
+    by Natural.monus_zero_implies_decompose(
+           b, a, Natural.le_implies_monus_zero(a, b, bLeA));
+  -- Transport dDividesA along aEqBPlusMonus to get d | (b + monus(a, b)).
+  Natural.divides_subtract_from_sum(
+      d, b, Natural.monus(a, b),
+      Equality.transport_proposition(
+          Natural,
+          function (m : Natural) => d ∣ m,
+          a, b + Natural.monus(a, b),
+          aEqBPlusMonus, dDividesA),
+      dDividesB)
+}
+
+-- Ultrametric for monus: when v_p(b) ≤ v_p(a) and b ≤ a (so monus is
+-- a-b at the Natural level), v_p(monus(a, b)) ≥ v_p(b), provided
+-- monus(a, b) ≥ 1.
+theorem Natural.padic_valuation_monus_ultrametric_when_le
+        (prime : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (a b : Natural)
+        (bLeA : b ≤ a)
+        (monusPositive : successor(zero) ≤ Natural.monus(a, b))
+        (valuationLe :
+            Natural.padic_valuation(prime, b)
+              ≤ Natural.padic_valuation(prime, a))
+        : Natural.padic_valuation(prime, b)
+          ≤ Natural.padic_valuation(prime, Natural.monus(a, b)) := {
+  claim pPowerDividesA
+        : Natural.divides(
+              Natural.power(Natural.padic_valuation(prime, b), prime), a)
+    by Natural.padic_valuation_ge_implies_power_divides(
+           prime, primeAtLeastTwo,
+           Natural.padic_valuation(prime, b), a, valuationLe);
+  claim pPowerDividesB
+        : Natural.divides(
+              Natural.power(Natural.padic_valuation(prime, b), prime), b)
+    by Natural.padic_valuation_ge_implies_power_divides(
+           prime, primeAtLeastTwo,
+           Natural.padic_valuation(prime, b), b,
+           LessOrEqual.reflexivity(Natural.padic_valuation(prime, b)));
+  claim pPowerDividesMonus
+        : Natural.divides(
+              Natural.power(Natural.padic_valuation(prime, b), prime),
+              Natural.monus(a, b))
+    by Natural.divides_monus(
+           Natural.power(Natural.padic_valuation(prime, b), prime),
+           a, b, bLeA, pPowerDividesA, pPowerDividesB);
+  Natural.power_divides_implies_padic_valuation_ge(
+      prime, primeAtLeastTwo,
+      Natural.padic_valuation(prime, b),
+      Natural.monus(a, b), monusPositive, pPowerDividesMonus)
+}
+
+-- And the analogue when v_p(a) ≤ v_p(b): then v_p(a) ≤ v_p(monus(b, a))
+-- (assuming a ≤ b so monus is non-negative). Symmetric form via the
+-- _when_le above by swapping a, b.
+theorem Natural.padic_valuation_monus_ultrametric_when_ge
+        (prime : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (a b : Natural)
+        (aLeB : a ≤ b)
+        (monusPositive : successor(zero) ≤ Natural.monus(b, a))
+        (valuationLe :
+            Natural.padic_valuation(prime, a)
+              ≤ Natural.padic_valuation(prime, b))
+        : Natural.padic_valuation(prime, a)
+          ≤ Natural.padic_valuation(prime, Natural.monus(b, a)) :=
+  Natural.padic_valuation_monus_ultrametric_when_le(
+      prime, primeAtLeastTwo, b, a, aLeB, monusPositive, valuationLe)
