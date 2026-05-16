@@ -1,0 +1,233 @@
+-- Rational/positive.math
+--
+-- Positivity arithmetic on Rational, leading up to
+-- `Rational.halve_positive`: if `0 < q` then `0 < halve(q)`. The proof
+-- splits the strict inequality into IsNonneg + ≠ 0 parts; the nonzero
+-- part uses `halve_doubled` to convert `0 = halve(q)` to `0 = q`,
+-- contradicting the strict-positivity hypothesis.
+
+module Rational.positive
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.sign
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.halve
+
+-- ----------------------------------------------------------------------
+-- Integer-level multiplicative IsNonneg.
+
+-- Product of two non-negative Integers is non-negative. From the
+-- witnesses x = (n : I), y = (m : I): x * y = (n * m : I).
+theorem Integer.IsNonneg.multiply
+        (x y : Integer)
+        (xIsNonneg : Integer.IsNonneg(x))
+        (yIsNonneg : Integer.IsNonneg(y))
+        : Integer.IsNonneg(x * y) :=
+  Exists.eliminate(
+      Natural,
+      function (n : Natural) => x = (n : Integer),
+      Integer.IsNonneg(x * y),
+      function (n : Natural) (xIsImage : x = (n : Integer)) =>
+        Exists.eliminate(
+            Natural,
+            function (m : Natural) => y = (m : Integer),
+            Integer.IsNonneg(x * y),
+            function (m : Natural) (yIsImage : y = (m : Integer)) =>
+              Exists.introduce(
+                  Natural,
+                  function (k : Natural) => x * y = (k : Integer),
+                  n * m,
+                  calc x * y
+                     = (n : Integer) * y
+                            by congruenceOf(
+                                   function (z : Integer) => z * y,
+                                   xIsImage)
+                     = (n : Integer) * (m : Integer)
+                            by congruenceOf(
+                                   function (z : Integer) =>
+                                       (n : Integer) * z,
+                                   yIsImage)
+                     = (n * m : Integer)
+                            by Equality.symmetry(
+                                   Natural.to_integer.multiply_preserves(n, m))),
+            yIsNonneg),
+      xIsNonneg)
+
+-- ----------------------------------------------------------------------
+-- Rational IsNonneg as Rational.zero ≤ q.
+
+-- 0 ≤ q is equivalent to IsNonneg(q). The proof unfolds the
+-- definitions and shows q - 0 reduces back to q (via add identities).
+-- Direction: from 0 ≤ q, derive IsNonneg(q).
+theorem Rational.IsNonneg_of_LessOrEqual_zero
+        (q : Rational) (zeroLeqQ : Rational.LessOrEqual(Rational.zero, q))
+        : Rational.IsNonneg(q) :=
+  Equality.transport_proposition(
+      Rational,
+      Rational.IsNonneg,
+      q - Rational.zero,
+      q,
+      -- q - 0 = q.
+      calc q - Rational.zero
+         = q + -Rational.zero
+                by reflexivity(Rational, q + -Rational.zero)
+         = q + Rational.zero
+                by reflexivity(Rational, q + Rational.zero)
+         = q
+                by Rational.add_zero(q),
+      zeroLeqQ)
+
+-- Converse: IsNonneg(q) → 0 ≤ q. Same reduction in reverse.
+theorem Rational.LessOrEqual_zero_of_IsNonneg
+        (q : Rational) (qIsNonneg : Rational.IsNonneg(q))
+        : Rational.LessOrEqual(Rational.zero, q) :=
+  Equality.transport_proposition(
+      Rational,
+      Rational.IsNonneg,
+      q,
+      q - Rational.zero,
+      Equality.symmetry(
+          calc q - Rational.zero
+             = q + -Rational.zero
+                    by reflexivity(Rational, q + -Rational.zero)
+             = q + Rational.zero
+                    by reflexivity(Rational, q + Rational.zero)
+             = q
+                    by Rational.add_zero(q)),
+      qIsNonneg)
+
+-- ----------------------------------------------------------------------
+-- Rational-level IsNonneg arithmetic.
+
+-- IsNonneg(p) ∧ IsNonneg(q) → IsNonneg(p * q). Through the
+-- representative-level Integer.IsNonneg.multiply on numerators.
+theorem Rational.IsNonneg.multiply_at_representatives
+        (n1 n2 : Integer) (d1 d2 : Natural)
+        (n1IsNonneg : Integer.IsNonneg(n1))
+        (n2IsNonneg : Integer.IsNonneg(n2))
+        : Rational.IsNonneg(
+              Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(n1, d1))
+              * Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(n2, d2))) :=
+  -- The product's numerator is n1 * n2, which is IsNonneg.
+  Integer.IsNonneg.multiply(n1, n2, n1IsNonneg, n2IsNonneg)
+
+-- IsNonneg(p) ∧ IsNonneg(q) → IsNonneg(p * q) on Rational. Lift via
+-- Quotient.induct_two and destructure.
+theorem Rational.IsNonneg.multiply (p q : Rational)
+        (pIsNonneg : Rational.IsNonneg(p))
+        (qIsNonneg : Rational.IsNonneg(q))
+        : Rational.IsNonneg(p * q) :=
+  Quotient.induct_two(
+      RationalRepresentative, RationalEquivalent,
+      RationalRepresentative, RationalEquivalent,
+      function (pArg qArg : Rational) =>
+          Rational.IsNonneg(pArg) → Rational.IsNonneg(qArg)
+          → Rational.IsNonneg(pArg * qArg),
+      function (rep_p rep_q : RationalRepresentative) =>
+          (cases rep_p {
+             | RationalRepresentative.make(n1, d1) =>
+                 (cases rep_q {
+                    | RationalRepresentative.make(n2, d2) =>
+                        function (pNonneg : Integer.IsNonneg(n1))
+                                 (qNonneg : Integer.IsNonneg(n2)) =>
+                          Rational.IsNonneg.multiply_at_representatives(
+                              n1, n2, d1, d2, pNonneg, qNonneg)
+                  } : Rational.IsNonneg(
+                          Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                      RationalRepresentative.make(n1, d1)))
+                      → Rational.IsNonneg(
+                            Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                        rep_q))
+                      → Rational.IsNonneg(
+                            Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                        RationalRepresentative.make(n1, d1))
+                            * Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                          rep_q)))
+           } : Rational.IsNonneg(
+                   Quotient.mk(RationalRepresentative, RationalEquivalent, rep_p))
+               → Rational.IsNonneg(
+                     Quotient.mk(RationalRepresentative, RationalEquivalent, rep_q))
+               → Rational.IsNonneg(
+                     Quotient.mk(RationalRepresentative, RationalEquivalent, rep_p)
+                     * Quotient.mk(RationalRepresentative, RationalEquivalent, rep_q))),
+      p, q)(pIsNonneg)(qIsNonneg)
+
+-- 1/2 is IsNonneg: numerator is Integer.one, which is the image of 1 : Natural.
+theorem Rational.one_half_IsNonneg : Rational.IsNonneg(Rational.one_half) :=
+  Integer.from_natural_is_nonneg(successor(zero))
+
+-- halve(q) is IsNonneg given q is IsNonneg.
+theorem Rational.halve_IsNonneg (q : Rational)
+        (qIsNonneg : Rational.IsNonneg(q))
+        : Rational.IsNonneg(Rational.halve(q)) :=
+  Rational.IsNonneg.multiply(q, Rational.one_half,
+      qIsNonneg, Rational.one_half_IsNonneg)
+
+-- ----------------------------------------------------------------------
+-- halve_positive: 0 < q → 0 < halve(q).
+
+-- The key trick: 0 = halve(q) implies q = halve(q) + halve(q) = 0 + 0 = 0,
+-- contradicting q ≠ 0. So halve(q) ≠ 0.
+theorem Rational.halve_nonzero (q : Rational)
+        (qNonzero : Not(Rational.zero = q))
+        : Not(Rational.zero = Rational.halve(q)) :=
+  function (zeroEqHalve : Rational.zero = Rational.halve(q)) =>
+    qNonzero(
+        calc Rational.zero
+           = Rational.zero + Rational.zero
+                  by Equality.symmetry(
+                         Rational.zero_add(Rational.zero))
+           = Rational.halve(q) + Rational.zero
+                  by congruenceOf(
+                         function (z : Rational) => z + Rational.zero,
+                         zeroEqHalve)
+           = Rational.halve(q) + Rational.halve(q)
+                  by congruenceOf(
+                         function (z : Rational) =>
+                             Rational.halve(q) + z,
+                         zeroEqHalve)
+           = q
+                  by Rational.halve_doubled(q))
+
+-- The headline theorem.
+theorem Rational.halve_positive (q : Rational)
+        (qPositive : Rational.zero < q)
+        : Rational.zero < Rational.halve(q) :=
+  And.introduction(
+      Rational.LessOrEqual(Rational.zero, Rational.halve(q)),
+      Not(Rational.zero = Rational.halve(q)),
+      Rational.LessOrEqual_zero_of_IsNonneg(
+          Rational.halve(q),
+          Rational.halve_IsNonneg(q,
+              Rational.IsNonneg_of_LessOrEqual_zero(q,
+                  And.left(
+                      Rational.LessOrEqual(Rational.zero, q),
+                      Not(Rational.zero = q),
+                      qPositive)))),
+      Rational.halve_nonzero(q,
+          And.right(
+              Rational.LessOrEqual(Rational.zero, q),
+              Not(Rational.zero = q),
+              qPositive)))
