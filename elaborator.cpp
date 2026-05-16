@@ -2273,6 +2273,16 @@ private:
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
+                if (name == "Quotient.induct_three" && argumentCount == 5) {
+                    return desugarQuotientInductThree(
+                        positionalArguments[0],
+                        positionalArguments[1],
+                        positionalArguments[2],
+                        positionalArguments[3],
+                        positionalArguments[4],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
                 // Function-name overload resolution. When the head is
                 // registered as an overload alias (via `overload alias
                 // := F;`) and is not itself a regular declaration,
@@ -6747,6 +6757,79 @@ private:
         call = makeApplication(std::move(call), std::move(fKernel));
         call = makeApplication(std::move(call), std::move(q1Kernel));
         call = makeApplication(std::move(call), std::move(q2Kernel));
+        return call;
+    }
+
+    // `Quotient.induct_three(motive, f, q1, q2, q3)` — recovers T1, R1,
+    // T2, R2, T3, R3 from `q1`, `q2`, `q3`'s types and emits
+    // `Quotient.induct_three.{u, v, w}(T1, R1, T2, R2, T3, R3, motive,
+    //                                    f, q1, q2, q3)`.
+    ExpressionPointer desugarQuotientInductThree(
+        SurfaceExpressionPointer motiveSurface,
+        SurfaceExpressionPointer fSurface,
+        SurfaceExpressionPointer q1Surface,
+        SurfaceExpressionPointer q2Surface,
+        SurfaceExpressionPointer q3Surface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer /*expectedType*/,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "Quotient.induct_three at line " + std::to_string(line));
+        ExpressionPointer q1Kernel = elaborateExpression(
+            *q1Surface, localBinders);
+        ExpressionPointer q2Kernel = elaborateExpression(
+            *q2Surface, localBinders);
+        ExpressionPointer q3Kernel = elaborateExpression(
+            *q3Surface, localBinders);
+        ExpressionPointer q1TypeOpened = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, q1Kernel));
+        ExpressionPointer q2TypeOpened = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, q2Kernel));
+        ExpressionPointer q3TypeOpened = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, q3Kernel));
+        QuotientDecomposition d1, d2, d3;
+        if (!tryDecomposeQuotient(q1TypeOpened, d1)) {
+            throwElaborate(
+                "Quotient.induct_three: q1's type must be `Quotient(T, R)`");
+        }
+        if (!tryDecomposeQuotient(q2TypeOpened, d2)) {
+            throwElaborate(
+                "Quotient.induct_three: q2's type must be `Quotient(T, R)`");
+        }
+        if (!tryDecomposeQuotient(q3TypeOpened, d3)) {
+            throwElaborate(
+                "Quotient.induct_three: q3's type must be `Quotient(T, R)`");
+        }
+        ExpressionPointer carrierType1 = closeOverLocalBinders(
+            d1.carrierType, localBinders, localBinders.size());
+        ExpressionPointer relation1 = closeOverLocalBinders(
+            d1.relation, localBinders, localBinders.size());
+        ExpressionPointer carrierType2 = closeOverLocalBinders(
+            d2.carrierType, localBinders, localBinders.size());
+        ExpressionPointer relation2 = closeOverLocalBinders(
+            d2.relation, localBinders, localBinders.size());
+        ExpressionPointer carrierType3 = closeOverLocalBinders(
+            d3.carrierType, localBinders, localBinders.size());
+        ExpressionPointer relation3 = closeOverLocalBinders(
+            d3.relation, localBinders, localBinders.size());
+        ExpressionPointer motiveKernel = elaborateExpression(
+            *motiveSurface, localBinders);
+        ExpressionPointer fKernel = elaborateExpression(
+            *fSurface, localBinders);
+        ExpressionPointer call = makeConstant(
+            "Quotient.induct_three",
+            {d1.universeLevel, d2.universeLevel, d3.universeLevel});
+        call = makeApplication(std::move(call), carrierType1);
+        call = makeApplication(std::move(call), relation1);
+        call = makeApplication(std::move(call), carrierType2);
+        call = makeApplication(std::move(call), relation2);
+        call = makeApplication(std::move(call), carrierType3);
+        call = makeApplication(std::move(call), relation3);
+        call = makeApplication(std::move(call), std::move(motiveKernel));
+        call = makeApplication(std::move(call), std::move(fKernel));
+        call = makeApplication(std::move(call), std::move(q1Kernel));
+        call = makeApplication(std::move(call), std::move(q2Kernel));
+        call = makeApplication(std::move(call), std::move(q3Kernel));
         return call;
     }
 

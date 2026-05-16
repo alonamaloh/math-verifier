@@ -73,6 +73,52 @@ definition Quotient.induct_two.{u, v}
               q2),
       q1)
 
+-- Quotient.induct_three: induction on three quotients simultaneously.
+--
+-- Closes the "ternary ring law" pattern (associativity, distributivity)
+-- without the explicit `function (yArg) (zArg) => Quotient.induct_two(...)`
+-- lambda-wrap that 3-arg laws would otherwise require. Implementation
+-- nests an outer `Quotient.induct` on q1 with an inner
+-- `Quotient.induct_two` on (q2, q3); the elaborator's short-form
+-- desugaring at call sites can infer all six T/R parameters from the
+-- three quotient arguments.
+definition Quotient.induct_three.{u, v, w}
+        (T1 : Type(u)) (R1 : T1 → T1 → Proposition)
+        (T2 : Type(v)) (R2 : T2 → T2 → Proposition)
+        (T3 : Type(w)) (R3 : T3 → T3 → Proposition)
+        (predicate
+            : Quotient(T1, R1)
+              → Quotient(T2, R2)
+              → Quotient(T3, R3)
+              → Proposition)
+        (atRepresentatives
+            : (x1 : T1) → (x2 : T2) → (x3 : T3)
+              → predicate(Quotient.mk(T1, R1, x1),
+                          Quotient.mk(T2, R2, x2),
+                          Quotient.mk(T3, R3, x3)))
+        (q1 : Quotient(T1, R1))
+        (q2 : Quotient(T2, R2))
+        (q3 : Quotient(T3, R3))
+        : predicate(q1, q2, q3) :=
+  Quotient.induct(
+      function (q : Quotient(T1, R1)) => predicate(q, q2, q3),
+      function (x1 : T1) =>
+          Quotient.induct(
+              function (qa : Quotient(T2, R2)) =>
+                  predicate(Quotient.mk(T1, R1, x1), qa, q3),
+              function (x2 : T2) =>
+                  Quotient.induct(
+                      function (qb : Quotient(T3, R3)) =>
+                          predicate(
+                              Quotient.mk(T1, R1, x1),
+                              Quotient.mk(T2, R2, x2),
+                              qb),
+                      function (x3 : T3) =>
+                          atRepresentatives(x1, x2, x3),
+                      q3),
+              q2),
+      q1)
+
 -- (Quotient.lift_two — a binary lift helper — was sketched here but
 -- the elaborator chokes on the universe-argument plumbing through
 -- nested polymorphic Quotient.lift calls. Binary lifts in practice
