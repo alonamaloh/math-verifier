@@ -335,3 +335,51 @@ theorem Natural.padic_valuation_step_fuel_stable
                  = Natural.padic_valuation_step(f2, prime, n))(nLeF1),
       target,
       fuel1, fuel2, targetPositive, fuel1Sufficient, fuel2Sufficient)
+
+-- ----------------------------------------------------------------------
+-- Top-level recursive equations for `padic_valuation`.
+
+-- The valuation is zero when the prime does not divide the target.
+-- Two cases:
+--   * target = 0: divides_zero gives prime | 0, contradicting notDivides.
+--   * target ≥ 1: case on modulo(prime, target). modulo = 0 makes
+--     prime | target via modulo_zero_implies_divides (contradiction);
+--     modulo = succ(_) makes padic_valuation_step_zero_when_not_divides
+--     apply directly.
+theorem Natural.padic_valuation_when_not_divides
+        (prime target : Natural)
+        (notDivides : ¬ Natural.divides(prime, target))
+        : Natural.padic_valuation(prime, target) = zero :=
+  (cases target {
+     | zero =>
+         function (refinedNotDivides : ¬ Natural.divides(prime, zero)) =>
+           False.eliminate_proposition(
+               Natural.padic_valuation(prime, zero) = zero,
+               refinedNotDivides(Natural.divides_zero(prime)))
+     | successor(predT) =>
+         function (refinedNotDivides
+                     : ¬ Natural.divides(prime, successor(predT))) =>
+           (function (moduloValue : Natural)
+                     (moduloEq :
+                         Natural.modulo(prime, successor(predT)) = moduloValue) =>
+              (cases moduloValue {
+                 | zero =>
+                     function (refinedModuloEq
+                                 : Natural.modulo(prime, successor(predT)) = zero) =>
+                       False.eliminate_proposition(
+                           Natural.padic_valuation(prime, successor(predT)) = zero,
+                           refinedNotDivides(
+                               Natural.modulo_zero_implies_divides(
+                                   prime, successor(predT), refinedModuloEq)))
+                 | successor(predM) =>
+                     function (refinedModuloEq
+                                 : Natural.modulo(prime, successor(predT))
+                                   = successor(predM)) =>
+                       Natural.padic_valuation_step_zero_when_not_divides(
+                           predT, prime, successor(predT), predM, refinedModuloEq)
+               } : Natural.modulo(prime, successor(predT)) = moduloValue
+                   → Natural.padic_valuation(prime, successor(predT)) = zero)(moduloEq))(
+             Natural.modulo(prime, successor(predT)),
+             reflexivity(Natural, Natural.modulo(prime, successor(predT))))
+   } : ¬ Natural.divides(prime, target)
+       → Natural.padic_valuation(prime, target) = zero)(notDivides)
