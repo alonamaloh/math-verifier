@@ -2852,3 +2852,195 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_all_succ
               + Natural.padic_valuation(p, successor(dy)),
           Natural.padic_valuation(p, successor(ky))
               + Natural.padic_valuation(p, successor(dx))))
+
+-- Triangle inequality at the Rational representative level. Dispatches
+-- on |nx|, |ny|, and the sum's |·|_Nat via the function-then-cases pattern.
+theorem Rational.padic_absolute_value_triangle_at_representatives
+        (p : Natural) (primality : Natural.is_prime(p))
+        (nx ny : Integer) (dx dy : Natural)
+        : Rational.padic_absolute_value(
+              p, primality,
+              Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(nx, dx))
+              + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(ny, dy)))
+          ≤ Rational.padic_absolute_value(
+                p, primality,
+                Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(nx, dx)))
+              + Rational.padic_absolute_value(
+                    p, primality,
+                    Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                RationalRepresentative.make(ny, dy))) :=
+  (function (absNx : Natural)
+            (eqAbsNxOuter : Integer.absolute_value_natural(nx) = absNx) =>
+     (cases absNx {
+        | zero =>
+            function (eqAbsNxZero : Integer.absolute_value_natural(nx) = zero) =>
+              Rational.padic_absolute_value_triangle_at_reps_when_nx_zero(
+                  p, primality, nx, ny, dx, dy, eqAbsNxZero)
+        | successor(kx) =>
+            function (eqAbsNxSucc
+                          : Integer.absolute_value_natural(nx) = successor(kx)) =>
+              (function (absNy : Natural)
+                        (eqAbsNyOuter
+                            : Integer.absolute_value_natural(ny) = absNy) =>
+                 (cases absNy {
+                    | zero =>
+                        function (eqAbsNyZero
+                                      : Integer.absolute_value_natural(ny) = zero) =>
+                          Rational.padic_absolute_value_triangle_at_reps_when_ny_zero(
+                              p, primality, nx, ny, dx, dy, eqAbsNyZero)
+                    | successor(ky) =>
+                        function (eqAbsNySucc
+                                      : Integer.absolute_value_natural(ny)
+                                        = successor(ky)) =>
+                          (function (absSum : Natural)
+                                    (eqAbsSumOuter
+                                        : Integer.absolute_value_natural(
+                                              nx * (successor(dy) : Integer)
+                                              + ny * (successor(dx) : Integer))
+                                          = absSum) =>
+                             (cases absSum {
+                                | zero =>
+                                    function (eqAbsSumZero
+                                                  : Integer.absolute_value_natural(
+                                                        nx * (successor(dy) : Integer)
+                                                        + ny * (successor(dx) : Integer))
+                                                    = zero) =>
+                                      Rational.padic_absolute_value_triangle_at_reps_when_sum_zero(
+                                          p, primality, nx, ny, dx, dy, eqAbsSumZero)
+                                | successor(kSum) =>
+                                    function (eqAbsSumSucc
+                                                  : Integer.absolute_value_natural(
+                                                        nx * (successor(dy) : Integer)
+                                                        + ny * (successor(dx) : Integer))
+                                                    = successor(kSum)) =>
+                                      Rational.padic_absolute_value_triangle_at_reps_when_all_succ(
+                                          p, primality, nx, ny, dx, dy,
+                                          kx, ky, kSum,
+                                          eqAbsNxSucc, eqAbsNySucc, eqAbsSumSucc)
+                              } : Integer.absolute_value_natural(
+                                      nx * (successor(dy) : Integer)
+                                      + ny * (successor(dx) : Integer))
+                                    = absSum
+                                  → Rational.padic_absolute_value(
+                                        p, primality,
+                                        Quotient.mk(RationalRepresentative,
+                                                     RationalEquivalent,
+                                                     RationalRepresentative.make(nx, dx))
+                                        + Quotient.mk(RationalRepresentative,
+                                                       RationalEquivalent,
+                                                       RationalRepresentative.make(ny, dy)))
+                                      ≤ Rational.padic_absolute_value(
+                                            p, primality,
+                                            Quotient.mk(RationalRepresentative,
+                                                         RationalEquivalent,
+                                                         RationalRepresentative.make(nx, dx)))
+                                          + Rational.padic_absolute_value(
+                                                p, primality,
+                                                Quotient.mk(RationalRepresentative,
+                                                             RationalEquivalent,
+                                                             RationalRepresentative.make(ny, dy))))(
+                              eqAbsSumOuter))(
+                            Integer.absolute_value_natural(
+                                nx * (successor(dy) : Integer)
+                                + ny * (successor(dx) : Integer)),
+                            reflexivity(Natural,
+                                Integer.absolute_value_natural(
+                                    nx * (successor(dy) : Integer)
+                                    + ny * (successor(dx) : Integer))))
+                  } : Integer.absolute_value_natural(ny) = absNy
+                      → Rational.padic_absolute_value(
+                            p, primality,
+                            Quotient.mk(RationalRepresentative,
+                                         RationalEquivalent,
+                                         RationalRepresentative.make(nx, dx))
+                            + Quotient.mk(RationalRepresentative,
+                                           RationalEquivalent,
+                                           RationalRepresentative.make(ny, dy)))
+                          ≤ Rational.padic_absolute_value(
+                                p, primality,
+                                Quotient.mk(RationalRepresentative,
+                                             RationalEquivalent,
+                                             RationalRepresentative.make(nx, dx)))
+                              + Rational.padic_absolute_value(
+                                    p, primality,
+                                    Quotient.mk(RationalRepresentative,
+                                                 RationalEquivalent,
+                                                 RationalRepresentative.make(ny, dy))))(
+                  eqAbsNyOuter))(
+                Integer.absolute_value_natural(ny),
+                reflexivity(Natural, Integer.absolute_value_natural(ny)))
+      } : Integer.absolute_value_natural(nx) = absNx
+          → Rational.padic_absolute_value(
+                p, primality,
+                Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(nx, dx))
+                + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                              RationalRepresentative.make(ny, dy)))
+              ≤ Rational.padic_absolute_value(
+                    p, primality,
+                    Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                RationalRepresentative.make(nx, dx)))
+                  + Rational.padic_absolute_value(
+                        p, primality,
+                        Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                    RationalRepresentative.make(ny, dy))))(
+        eqAbsNxOuter))(
+      Integer.absolute_value_natural(nx),
+      reflexivity(Natural, Integer.absolute_value_natural(nx)))
+
+-- Top-level: |x+y|_p ≤ |x|_p + |y|_p for all Rationals x, y. Lift via
+-- Quotient.induct_two.
+theorem Rational.padic_absolute_value_triangle
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x y : Rational)
+        : Rational.padic_absolute_value(p, primality, x + y)
+          ≤ Rational.padic_absolute_value(p, primality, x)
+              + Rational.padic_absolute_value(p, primality, y) :=
+  Quotient.induct_two(
+      RationalRepresentative, RationalEquivalent,
+      RationalRepresentative, RationalEquivalent,
+      function (xArg yArg : Rational) =>
+          Rational.padic_absolute_value(p, primality, xArg + yArg)
+            ≤ Rational.padic_absolute_value(p, primality, xArg)
+                + Rational.padic_absolute_value(p, primality, yArg),
+      function (rep_x rep_y : RationalRepresentative) =>
+          (cases rep_x {
+             | RationalRepresentative.make(nx, dx) =>
+                 (cases rep_y {
+                    | RationalRepresentative.make(ny, dy) =>
+                        Rational.padic_absolute_value_triangle_at_representatives(
+                            p, primality, nx, ny, dx, dy)
+                  } : Rational.padic_absolute_value(
+                          p, primality,
+                          Quotient.mk(RationalRepresentative,
+                                       RationalEquivalent,
+                                       RationalRepresentative.make(nx, dx))
+                          + Quotient.mk(RationalRepresentative,
+                                         RationalEquivalent, rep_y))
+                      ≤ Rational.padic_absolute_value(
+                            p, primality,
+                            Quotient.mk(RationalRepresentative,
+                                         RationalEquivalent,
+                                         RationalRepresentative.make(nx, dx)))
+                          + Rational.padic_absolute_value(
+                                p, primality,
+                                Quotient.mk(RationalRepresentative,
+                                             RationalEquivalent, rep_y)))
+           } : Rational.padic_absolute_value(
+                   p, primality,
+                   Quotient.mk(RationalRepresentative, RationalEquivalent,
+                               rep_x)
+                   + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                 rep_y))
+               ≤ Rational.padic_absolute_value(
+                     p, primality,
+                     Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                 rep_x))
+                 + Rational.padic_absolute_value(
+                       p, primality,
+                       Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                   rep_y))),
+      x, y)
