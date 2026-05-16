@@ -15,6 +15,8 @@ import Natural.peano
 import Natural.arithmetic
 import Natural.order
 import Natural.monus
+import Natural.divisibility
+import Logic.exists
 
 -- divide_step(fuel, divisor, dividend): fuel-bounded floor division.
 -- Fuel first so the structural recursion is on it. The Pi-binder
@@ -346,3 +348,31 @@ theorem Natural.divide_modulo_decompose (divisor dividend : Natural)
               + Natural.modulo(divisor, dividend)
           = dividend :=
   Natural.divide_modulo_step_decompose(dividend, divisor, dividend)
+
+-- ----------------------------------------------------------------------
+-- Connection to Natural.divides.
+
+-- If modulo(d, n) = 0, then d divides n. The decomposition gives
+-- d * divide(d, n) + 0 = n, i.e., n = d * divide(d, n).
+theorem Natural.modulo_zero_implies_divides
+        (divisor dividend : Natural)
+        (moduloZero : Natural.modulo(divisor, dividend) = zero)
+        : Natural.divides(divisor, dividend) :=
+  Exists.introduce(
+      Natural,
+      function (q : Natural) => dividend = divisor * q,
+      Natural.divide(divisor, dividend),
+      Equality.symmetry(
+          calc divisor * Natural.divide(divisor, dividend)
+             = divisor * Natural.divide(divisor, dividend) + zero
+                    by Equality.symmetry(
+                           Natural.add_zero(
+                               divisor * Natural.divide(divisor, dividend)))
+             = divisor * Natural.divide(divisor, dividend)
+                   + Natural.modulo(divisor, dividend)
+                    by congruenceOf(
+                           function (z : Natural) =>
+                               divisor * Natural.divide(divisor, dividend) + z,
+                           Equality.symmetry(moduloZero))
+             = dividend
+                    by Natural.divide_modulo_decompose(divisor, dividend)))
