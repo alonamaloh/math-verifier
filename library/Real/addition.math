@@ -19,8 +19,11 @@ import Rational.basics
 import Rational.addition
 import Rational.multiplication
 import Rational.negation
+import Rational.ring
+import Rational.algebra
 import Rational.order
 import Rational.absolute_value
+import Rational.halve
 import Real.sequence
 import Real.basics
 import Real.embedding
@@ -44,17 +47,128 @@ definition CauchyRationalSequence.add
           function (n : Natural) => s(n) + t(n),
           Rational.sequence.sum_is_cauchy(s, t, sCauchy, tCauchy))
 
--- Inner respect proof: with x fixed, the function `λ y. mk(add(x, y))`
--- respects CauchyEquivalent in its argument. Stub.
+-- sf(add(rep_x, rep_y), m) = sf(rep_x, m) + sf(rep_y, m).
+-- Bridges the abstract sequenceFunction projector through the
+-- pattern-match definition of add.
+theorem CauchyRationalSequence.sequenceFunction_add
+        : (rep_x rep_y : CauchyRationalSequence) → (m : Natural)
+          → CauchyRationalSequence.sequenceFunction(
+                CauchyRationalSequence.add(rep_x, rep_y), m)
+            = CauchyRationalSequence.sequenceFunction(rep_x, m)
+              + CauchyRationalSequence.sequenceFunction(rep_y, m)
+  | CauchyRationalSequence.make(sa, _),
+    CauchyRationalSequence.make(sb, _),
+    m =>
+      reflexivity(Rational, sa(m) + sb(m))
+
+-- Inner respect: with x fixed, λ y. mk(add(x, y)) respects
+-- CauchyEquivalent. The proof uses the SAME ε (no halving) because
+-- the shared rep_x cancels: |(x_m + y_m) - (x_m + y'_m)| = |y_m - y'_m|.
 theorem Real.add_after_first_respects
         (rep_x rep_y rep_yPrime : CauchyRationalSequence)
         (yEquiv : CauchyEquivalent(rep_y, rep_yPrime))
         : Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
                        CauchyRationalSequence.add(rep_x, rep_y))
           = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                         CauchyRationalSequence.add(rep_x, rep_yPrime)) := sorry
+                         CauchyRationalSequence.add(rep_x, rep_yPrime)) :=
+  Quotient.sound(
+      CauchyRationalSequence.add(rep_x, rep_y),
+      CauchyRationalSequence.add(rep_x, rep_yPrime),
+      function (epsilon : Rational)
+               (epsilonPositive : Rational.zero < epsilon) =>
+        Exists.eliminate(
+            Natural,
+            function (N : Natural) =>
+              (m : Natural) → N ≤ m →
+                Rational.absolute_value(
+                    CauchyRationalSequence.sequenceFunction(rep_y, m)
+                    - CauchyRationalSequence.sequenceFunction(rep_yPrime, m))
+                  < epsilon,
+            ∃ (N : Natural).
+              (m : Natural) → N ≤ m →
+                Rational.absolute_value(
+                    CauchyRationalSequence.sequenceFunction(
+                        CauchyRationalSequence.add(rep_x, rep_y), m)
+                    - CauchyRationalSequence.sequenceFunction(
+                        CauchyRationalSequence.add(rep_x, rep_yPrime), m))
+                  < epsilon,
+            function (N : Natural)
+                     (yEquiv_at_N
+                         : (m : Natural) → N ≤ m →
+                           Rational.absolute_value(
+                               CauchyRationalSequence.sequenceFunction(rep_y, m)
+                               - CauchyRationalSequence.sequenceFunction(
+                                     rep_yPrime, m))
+                             < epsilon) =>
+              Exists.introduce(
+                  Natural,
+                  function (N' : Natural) =>
+                    (m : Natural) → N' ≤ m →
+                      Rational.absolute_value(
+                          CauchyRationalSequence.sequenceFunction(
+                              CauchyRationalSequence.add(rep_x, rep_y), m)
+                          - CauchyRationalSequence.sequenceFunction(
+                              CauchyRationalSequence.add(rep_x, rep_yPrime), m))
+                        < epsilon,
+                  N,
+                  function (m : Natural) (N_leq_m : N ≤ m) =>
+                    -- Transport via the bridge:
+                    -- |sf(add(rep_x, rep_y), m) - sf(add(rep_x, rep_y'), m)|
+                    -- = |sf(rep_x, m) + sf(rep_y, m) - (sf(rep_x, m) + sf(rep_y', m))|
+                    -- = |sf(rep_y, m) - sf(rep_y', m)|.
+                    Equality.transport_proposition(
+                        Rational,
+                        function (x : Rational) =>
+                            Rational.LessThan(x, epsilon),
+                        Rational.absolute_value(
+                            CauchyRationalSequence.sequenceFunction(rep_y, m)
+                            - CauchyRationalSequence.sequenceFunction(
+                                  rep_yPrime, m)),
+                        Rational.absolute_value(
+                            CauchyRationalSequence.sequenceFunction(
+                                CauchyRationalSequence.add(rep_x, rep_y), m)
+                            - CauchyRationalSequence.sequenceFunction(
+                                CauchyRationalSequence.add(rep_x, rep_yPrime), m)),
+                        Equality.symmetry(
+                            calc Rational.absolute_value(
+                                     CauchyRationalSequence.sequenceFunction(
+                                         CauchyRationalSequence.add(rep_x, rep_y), m)
+                                     - CauchyRationalSequence.sequenceFunction(
+                                         CauchyRationalSequence.add(rep_x, rep_yPrime), m))
+                               = Rational.absolute_value(
+                                     CauchyRationalSequence.sequenceFunction(rep_x, m)
+                                     + CauchyRationalSequence.sequenceFunction(rep_y, m)
+                                     - CauchyRationalSequence.sequenceFunction(
+                                         CauchyRationalSequence.add(rep_x, rep_yPrime), m))
+                                      by rewrite(
+                                          CauchyRationalSequence.sequenceFunction_add(
+                                              rep_x, rep_y, m))
+                               = Rational.absolute_value(
+                                     CauchyRationalSequence.sequenceFunction(rep_x, m)
+                                     + CauchyRationalSequence.sequenceFunction(rep_y, m)
+                                     - (CauchyRationalSequence.sequenceFunction(rep_x, m)
+                                        + CauchyRationalSequence.sequenceFunction(
+                                              rep_yPrime, m)))
+                                      by rewrite(
+                                          CauchyRationalSequence.sequenceFunction_add(
+                                              rep_x, rep_yPrime, m))
+                               = Rational.absolute_value(
+                                     CauchyRationalSequence.sequenceFunction(rep_y, m)
+                                     - CauchyRationalSequence.sequenceFunction(
+                                         rep_yPrime, m))
+                                      by congruenceOf(
+                                          Rational.absolute_value,
+                                          Rational.add_subtract_cancel_left(
+                                              CauchyRationalSequence.sequenceFunction(rep_x, m),
+                                              CauchyRationalSequence.sequenceFunction(rep_y, m),
+                                              CauchyRationalSequence.sequenceFunction(
+                                                  rep_yPrime, m)))),
+                        yEquiv_at_N(m, N_leq_m))),
+            yEquiv(epsilon, epsilonPositive)))
 
--- Outer respect: lift over x. Stub.
+-- Outer respect: lift over x. The same cancellation argument with
+-- (rep_x + rep_y) vs (rep_x' + rep_y) — here the SECOND component
+-- shares, so we use add_subtract_cancel_RIGHT instead.
 theorem Real.add_respects
         (rep_x rep_xPrime : CauchyRationalSequence)
         (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
@@ -70,7 +184,120 @@ theorem Real.add_respects
                   Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
                        CauchyRationalSequence.add(rep_xPrime, rep_y)),
               Real.add_after_first_respects(rep_xPrime),
-              yReal) := sorry
+              yReal) :=
+  Quotient.induct(
+      function (y : Real) =>
+          Quotient.lift(
+              function (rep_y : CauchyRationalSequence) =>
+                  Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.add(rep_x, rep_y)),
+              Real.add_after_first_respects(rep_x),
+              y)
+          = Quotient.lift(
+              function (rep_y : CauchyRationalSequence) =>
+                  Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.add(rep_xPrime, rep_y)),
+              Real.add_after_first_respects(rep_xPrime),
+              y),
+      function (rep_y : CauchyRationalSequence) =>
+        -- Goal: mk(add(rep_x, rep_y)) = mk(add(rep_xPrime, rep_y)).
+        -- By Quotient.sound, need CauchyEquivalent(add(rep_x, rep_y),
+        -- add(rep_xPrime, rep_y)).
+        -- Same N as xEquiv, transport via the right-cancel cancellation.
+        Quotient.sound(
+            CauchyRationalSequence, CauchyEquivalent,
+            CauchyRationalSequence.add(rep_x, rep_y),
+            CauchyRationalSequence.add(rep_xPrime, rep_y),
+            function (epsilon : Rational)
+                     (epsilonPositive : Rational.zero < epsilon) =>
+              Exists.eliminate(
+                  Natural,
+                  function (N : Natural) =>
+                    (m : Natural) → N ≤ m →
+                      Rational.absolute_value(
+                          CauchyRationalSequence.sequenceFunction(rep_x, m)
+                          - CauchyRationalSequence.sequenceFunction(
+                                rep_xPrime, m))
+                        < epsilon,
+                  ∃ (N : Natural).
+                    (m : Natural) → N ≤ m →
+                      Rational.absolute_value(
+                          CauchyRationalSequence.sequenceFunction(
+                              CauchyRationalSequence.add(rep_x, rep_y), m)
+                          - CauchyRationalSequence.sequenceFunction(
+                              CauchyRationalSequence.add(rep_xPrime, rep_y), m))
+                        < epsilon,
+                  function (N : Natural)
+                           (xEquiv_at_N
+                               : (m : Natural) → N ≤ m →
+                                 Rational.absolute_value(
+                                     CauchyRationalSequence.sequenceFunction(rep_x, m)
+                                     - CauchyRationalSequence.sequenceFunction(
+                                           rep_xPrime, m))
+                                   < epsilon) =>
+                    Exists.introduce(
+                        Natural,
+                        function (N' : Natural) =>
+                          (m : Natural) → N' ≤ m →
+                            Rational.absolute_value(
+                                CauchyRationalSequence.sequenceFunction(
+                                    CauchyRationalSequence.add(rep_x, rep_y), m)
+                                - CauchyRationalSequence.sequenceFunction(
+                                    CauchyRationalSequence.add(rep_xPrime, rep_y), m))
+                              < epsilon,
+                        N,
+                        function (m : Natural) (N_leq_m : N ≤ m) =>
+                          Equality.transport_proposition(
+                              Rational,
+                              function (z : Rational) =>
+                                  Rational.LessThan(z, epsilon),
+                              Rational.absolute_value(
+                                  CauchyRationalSequence.sequenceFunction(rep_x, m)
+                                  - CauchyRationalSequence.sequenceFunction(
+                                        rep_xPrime, m)),
+                              Rational.absolute_value(
+                                  CauchyRationalSequence.sequenceFunction(
+                                      CauchyRationalSequence.add(rep_x, rep_y), m)
+                                  - CauchyRationalSequence.sequenceFunction(
+                                      CauchyRationalSequence.add(rep_xPrime, rep_y), m)),
+                              Equality.symmetry(
+                                  calc Rational.absolute_value(
+                                           CauchyRationalSequence.sequenceFunction(
+                                               CauchyRationalSequence.add(rep_x, rep_y), m)
+                                           - CauchyRationalSequence.sequenceFunction(
+                                               CauchyRationalSequence.add(rep_xPrime, rep_y), m))
+                                     = Rational.absolute_value(
+                                           CauchyRationalSequence.sequenceFunction(rep_x, m)
+                                           + CauchyRationalSequence.sequenceFunction(rep_y, m)
+                                           - CauchyRationalSequence.sequenceFunction(
+                                               CauchyRationalSequence.add(rep_xPrime, rep_y), m))
+                                            by rewrite(
+                                                CauchyRationalSequence.sequenceFunction_add(
+                                                    rep_x, rep_y, m))
+                                     = Rational.absolute_value(
+                                           CauchyRationalSequence.sequenceFunction(rep_x, m)
+                                           + CauchyRationalSequence.sequenceFunction(rep_y, m)
+                                           - (CauchyRationalSequence.sequenceFunction(
+                                                  rep_xPrime, m)
+                                              + CauchyRationalSequence.sequenceFunction(
+                                                    rep_y, m)))
+                                            by rewrite(
+                                                CauchyRationalSequence.sequenceFunction_add(
+                                                    rep_xPrime, rep_y, m))
+                                     = Rational.absolute_value(
+                                           CauchyRationalSequence.sequenceFunction(rep_x, m)
+                                           - CauchyRationalSequence.sequenceFunction(
+                                                 rep_xPrime, m))
+                                            by congruenceOf(
+                                                Rational.absolute_value,
+                                                Rational.add_subtract_cancel_right(
+                                                    CauchyRationalSequence.sequenceFunction(rep_x, m),
+                                                    CauchyRationalSequence.sequenceFunction(rep_y, m),
+                                                    CauchyRationalSequence.sequenceFunction(
+                                                        rep_xPrime, m)))),
+                              xEquiv_at_N(m, N_leq_m))),
+                  xEquiv(epsilon, epsilonPositive))),
+      yReal)
 
 -- Inner "add-with-fixed-first": Real → Real, lifts y over the inner
 -- respect.
