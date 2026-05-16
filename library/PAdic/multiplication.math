@@ -1,0 +1,1136 @@
+-- PAdic/multiplication.math
+--
+-- p-adic multiplication via the pointwise product of representative
+-- p-adic Cauchy sequences. Mirrors `library/Real/multiplication.math`;
+-- the only differences are the absolute value used (padic vs standard)
+-- and the boundedness lemma. Reuses the pure-Rational helpers
+-- (`Rational.multiply_negate_right`, `Rational.product_difference_decomposition`,
+-- `Rational.factor_subtract_distribute`, `Rational.from_natural_le_preserves`)
+-- proved in Real.multiplication.
+
+module PAdic.multiplication
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.maximum
+import Natural.prime
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.absolute_value
+import Rational.halve
+import Rational.positive
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.triangle
+import Real.multiplication
+import PAdic.absolute_value
+import PAdic.basics
+import PAdic.addition
+import PAdic.cauchy_bounded
+
+-- ----------------------------------------------------------------------
+-- The bound chain extracted as a separate theorem to keep the
+-- existential-elimination chain in product_is_padic_cauchy readable. Given
+-- all bounds and Cauchy witnesses, conclude the product is bounded by
+-- ε at indices m, n ≥ max of all the witness indices.
+theorem Rational.sequence.product_is_padic_cauchy_bound
+        (p : Natural) (primality : Natural.is_prime(p))
+        (s t : Rational.sequence.Sequence) (epsilon : Rational)
+        (K_s K_t : Natural)
+        (delta_s delta_t : Rational)
+        (N_s_bound N_t_bound N_s N_t m n : Natural)
+        (m_ge : Natural.maximum(
+                    Natural.maximum(N_s_bound, N_t_bound),
+                    Natural.maximum(N_s, N_t)) ≤ m)
+        (n_ge : Natural.maximum(
+                    Natural.maximum(N_s_bound, N_t_bound),
+                    Natural.maximum(N_s, N_t)) ≤ n)
+        (sBound : (m_arg : Natural) → N_s_bound ≤ m_arg →
+                    Rational.padic_absolute_value(p, primality, s(m_arg))
+                      ≤ (successor(K_s) : Rational))
+        (tBound : (n_arg : Natural) → N_t_bound ≤ n_arg →
+                    Rational.padic_absolute_value(p, primality, t(n_arg))
+                      ≤ (successor(K_t) : Rational))
+        (sCauchyAt : (m_arg : Natural) → N_s ≤ m_arg →
+                       (n_arg : Natural) → N_s ≤ n_arg →
+                         Rational.padic_absolute_value(p, primality, s(m_arg) - s(n_arg))
+                           < delta_s)
+        (tCauchyAt : (m_arg : Natural) → N_t ≤ m_arg →
+                       (n_arg : Natural) → N_t ≤ n_arg →
+                         Rational.padic_absolute_value(p, primality, t(m_arg) - t(n_arg))
+                           < delta_t)
+        (delta_s_props : And(Rational.zero < delta_s,
+                             Rational.LessOrEqual(
+                                 (successor(K_t) : Rational) * delta_s,
+                                 Rational.halve(Rational.halve(epsilon)))))
+        (delta_t_props : And(Rational.zero < delta_t,
+                             Rational.LessOrEqual(
+                                 (successor(K_s) : Rational) * delta_t,
+                                 Rational.halve(Rational.halve(epsilon)))))
+        (epsilonPositive : Rational.zero < epsilon)
+        : Rational.padic_absolute_value(p, primality, s(m) * t(m) - s(n) * t(n)) < epsilon := {
+  -- m, n ≥ N_s_bound, N_t_bound, N_s, N_t via the nested max + transitivity.
+  claim m_ge_N_s_bound : N_s_bound ≤ m
+    by LessOrEqual.transitive(
+           N_s_bound,
+           Natural.maximum(N_s_bound, N_t_bound), m,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s_bound, N_t_bound),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               m,
+               m_ge,
+               Natural.left_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.left_le_max(N_s_bound, N_t_bound));
+  claim n_ge_N_t_bound : N_t_bound ≤ n
+    by LessOrEqual.transitive(
+           N_t_bound,
+           Natural.maximum(N_s_bound, N_t_bound), n,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s_bound, N_t_bound),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               n,
+               n_ge,
+               Natural.left_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.right_le_max(N_s_bound, N_t_bound));
+  claim m_ge_N_s : N_s ≤ m
+    by LessOrEqual.transitive(
+           N_s, Natural.maximum(N_s, N_t), m,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s, N_t),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               m,
+               m_ge,
+               Natural.right_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.left_le_max(N_s, N_t));
+  claim n_ge_N_s : N_s ≤ n
+    by LessOrEqual.transitive(
+           N_s, Natural.maximum(N_s, N_t), n,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s, N_t),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               n,
+               n_ge,
+               Natural.right_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.left_le_max(N_s, N_t));
+  claim m_ge_N_t : N_t ≤ m
+    by LessOrEqual.transitive(
+           N_t, Natural.maximum(N_s, N_t), m,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s, N_t),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               m,
+               m_ge,
+               Natural.right_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.right_le_max(N_s, N_t));
+  claim n_ge_N_t : N_t ≤ n
+    by LessOrEqual.transitive(
+           N_t, Natural.maximum(N_s, N_t), n,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s, N_t),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               n,
+               n_ge,
+               Natural.right_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.right_le_max(N_s, N_t));
+  -- Specific bounds at m, n.
+  claim s_at_m_bound : Rational.padic_absolute_value(p, primality, s(m)) ≤ (successor(K_s) : Rational)
+    by sBound(m, m_ge_N_s_bound);
+  claim t_at_n_bound : Rational.padic_absolute_value(p, primality, t(n)) ≤ (successor(K_t) : Rational)
+    by tBound(n, n_ge_N_t_bound);
+  claim s_diff_bound : Rational.padic_absolute_value(p, primality, s(m) - s(n)) < delta_s
+    by sCauchyAt(m, m_ge_N_s, n, n_ge_N_s);
+  claim t_diff_bound : Rational.padic_absolute_value(p, primality, t(m) - t(n)) < delta_t
+    by tCauchyAt(m, m_ge_N_t, n, n_ge_N_t);
+  claim s_diff_weak : Rational.padic_absolute_value(p, primality, s(m) - s(n)) ≤ delta_s
+    by And.left(
+           Rational.LessOrEqual(
+               Rational.padic_absolute_value(p, primality, s(m) - s(n)), delta_s),
+           Not(Rational.padic_absolute_value(p, primality, s(m) - s(n)) = delta_s),
+           s_diff_bound);
+  claim t_diff_weak : Rational.padic_absolute_value(p, primality, t(m) - t(n)) ≤ delta_t
+    by And.left(
+           Rational.LessOrEqual(
+               Rational.padic_absolute_value(p, primality, t(m) - t(n)), delta_t),
+           Not(Rational.padic_absolute_value(p, primality, t(m) - t(n)) = delta_t),
+           t_diff_bound);
+  claim succ_K_t_delta_s_bound
+      : (successor(K_t) : Rational) * delta_s
+          ≤ Rational.halve(Rational.halve(epsilon))
+    by And.right(
+           Rational.zero < delta_s,
+           Rational.LessOrEqual(
+               (successor(K_t) : Rational) * delta_s,
+               Rational.halve(Rational.halve(epsilon))),
+           delta_s_props);
+  claim succ_K_s_delta_t_bound
+      : (successor(K_s) : Rational) * delta_t
+          ≤ Rational.halve(Rational.halve(epsilon))
+    by And.right(
+           Rational.zero < delta_t,
+           Rational.LessOrEqual(
+               (successor(K_s) : Rational) * delta_t,
+               Rational.halve(Rational.halve(epsilon))),
+           delta_t_props);
+  claim decomposition_eq
+      : s(m) * t(m) - s(n) * t(n)
+        = s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n))
+    by Rational.product_difference_decomposition(s(m), t(m), s(n), t(n));
+  claim sum_abs_bound
+      : Rational.padic_absolute_value(p, primality,
+            s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
+          ≤ Rational.padic_absolute_value(p, primality, s(m) * (t(m) - t(n)))
+            + Rational.padic_absolute_value(p, primality, t(n) * (s(m) - s(n)))
+    by Rational.padic_absolute_value_triangle(p, primality,
+           s(m) * (t(m) - t(n)),
+           t(n) * (s(m) - s(n)));
+  claim abs_first_eq
+      : Rational.padic_absolute_value(p, primality, s(m) * (t(m) - t(n)))
+        = Rational.padic_absolute_value(p, primality, s(m))
+          * Rational.padic_absolute_value(p, primality, t(m) - t(n))
+    by Rational.padic_absolute_value_multiplicative(p, primality, s(m), t(m) - t(n));
+  claim abs_second_eq
+      : Rational.padic_absolute_value(p, primality, t(n) * (s(m) - s(n)))
+        = Rational.padic_absolute_value(p, primality, t(n))
+          * Rational.padic_absolute_value(p, primality, s(m) - s(n))
+    by Rational.padic_absolute_value_multiplicative(p, primality, t(n), s(m) - s(n));
+  claim first_factor_bound
+      : Rational.padic_absolute_value(p, primality, s(m))
+            * Rational.padic_absolute_value(p, primality, t(m) - t(n))
+          ≤ (successor(K_s) : Rational)
+            * Rational.padic_absolute_value(p, primality, t(m) - t(n))
+    by Rational.LessOrEqual.multiply_by_nonneg_right(
+           Rational.padic_absolute_value(p, primality, s(m)),
+           (successor(K_s) : Rational),
+           Rational.padic_absolute_value(p, primality, t(m) - t(n)),
+           s_at_m_bound,
+           Rational.padic_absolute_value_nonneg(p, primality, t(m) - t(n)));
+  claim first_factor_bound_2
+      : (successor(K_s) : Rational)
+            * Rational.padic_absolute_value(p, primality, t(m) - t(n))
+          ≤ (successor(K_s) : Rational) * delta_t
+    by Rational.LessOrEqual.multiply_by_nonneg_left(
+           Rational.padic_absolute_value(p, primality, t(m) - t(n)),
+           delta_t,
+           (successor(K_s) : Rational),
+           t_diff_weak,
+           Rational.LessOrEqual_zero_of_IsNonneg(
+               (successor(K_s) : Rational),
+               Integer.from_natural_is_nonneg(successor(K_s))));
+  claim second_factor_bound
+      : Rational.padic_absolute_value(p, primality, t(n))
+            * Rational.padic_absolute_value(p, primality, s(m) - s(n))
+          ≤ (successor(K_t) : Rational)
+            * Rational.padic_absolute_value(p, primality, s(m) - s(n))
+    by Rational.LessOrEqual.multiply_by_nonneg_right(
+           Rational.padic_absolute_value(p, primality, t(n)),
+           (successor(K_t) : Rational),
+           Rational.padic_absolute_value(p, primality, s(m) - s(n)),
+           t_at_n_bound,
+           Rational.padic_absolute_value_nonneg(p, primality, s(m) - s(n)));
+  claim second_factor_bound_2
+      : (successor(K_t) : Rational)
+            * Rational.padic_absolute_value(p, primality, s(m) - s(n))
+          ≤ (successor(K_t) : Rational) * delta_s
+    by Rational.LessOrEqual.multiply_by_nonneg_left(
+           Rational.padic_absolute_value(p, primality, s(m) - s(n)),
+           delta_s,
+           (successor(K_t) : Rational),
+           s_diff_weak,
+           Rational.LessOrEqual_zero_of_IsNonneg(
+               (successor(K_t) : Rational),
+               Integer.from_natural_is_nonneg(successor(K_t))));
+  claim first_total_bound
+      : Rational.padic_absolute_value(p, primality, s(m) * (t(m) - t(n)))
+          ≤ Rational.halve(Rational.halve(epsilon))
+    by Equality.transport_proposition(
+           Rational,
+           function (lhs : Rational) =>
+               Rational.LessOrEqual(
+                   lhs,
+                   Rational.halve(Rational.halve(epsilon))),
+           Rational.padic_absolute_value(p, primality, s(m))
+               * Rational.padic_absolute_value(p, primality, t(m) - t(n)),
+           Rational.padic_absolute_value(p, primality, s(m) * (t(m) - t(n))),
+           Equality.symmetry(abs_first_eq),
+           Rational.LessOrEqual.transitive(
+               Rational.padic_absolute_value(p, primality, s(m))
+                   * Rational.padic_absolute_value(p, primality, t(m) - t(n)),
+               (successor(K_s) : Rational) * delta_t,
+               Rational.halve(Rational.halve(epsilon)),
+               Rational.LessOrEqual.transitive(
+                   Rational.padic_absolute_value(p, primality, s(m))
+                       * Rational.padic_absolute_value(p, primality, t(m) - t(n)),
+                   (successor(K_s) : Rational)
+                       * Rational.padic_absolute_value(p, primality, t(m) - t(n)),
+                   (successor(K_s) : Rational) * delta_t,
+                   first_factor_bound,
+                   first_factor_bound_2),
+               succ_K_s_delta_t_bound));
+  claim second_total_bound
+      : Rational.padic_absolute_value(p, primality, t(n) * (s(m) - s(n)))
+          ≤ Rational.halve(Rational.halve(epsilon))
+    by Equality.transport_proposition(
+           Rational,
+           function (lhs : Rational) =>
+               Rational.LessOrEqual(
+                   lhs,
+                   Rational.halve(Rational.halve(epsilon))),
+           Rational.padic_absolute_value(p, primality, t(n))
+               * Rational.padic_absolute_value(p, primality, s(m) - s(n)),
+           Rational.padic_absolute_value(p, primality, t(n) * (s(m) - s(n))),
+           Equality.symmetry(abs_second_eq),
+           Rational.LessOrEqual.transitive(
+               Rational.padic_absolute_value(p, primality, t(n))
+                   * Rational.padic_absolute_value(p, primality, s(m) - s(n)),
+               (successor(K_t) : Rational) * delta_s,
+               Rational.halve(Rational.halve(epsilon)),
+               Rational.LessOrEqual.transitive(
+                   Rational.padic_absolute_value(p, primality, t(n))
+                       * Rational.padic_absolute_value(p, primality, s(m) - s(n)),
+                   (successor(K_t) : Rational)
+                       * Rational.padic_absolute_value(p, primality, s(m) - s(n)),
+                   (successor(K_t) : Rational) * delta_s,
+                   second_factor_bound,
+                   second_factor_bound_2),
+               succ_K_t_delta_s_bound));
+  claim sum_total_bound
+      : Rational.padic_absolute_value(p, primality, s(m) * (t(m) - t(n)))
+            + Rational.padic_absolute_value(p, primality, t(n) * (s(m) - s(n)))
+          ≤ Rational.halve(epsilon)
+    by Equality.transport_proposition(
+           Rational,
+           function (rhs : Rational) =>
+               Rational.LessOrEqual(
+                   Rational.padic_absolute_value(p, primality, s(m) * (t(m) - t(n)))
+                       + Rational.padic_absolute_value(p, primality, t(n) * (s(m) - s(n))),
+                   rhs),
+           Rational.halve(Rational.halve(epsilon))
+               + Rational.halve(Rational.halve(epsilon)),
+           Rational.halve(epsilon),
+           Rational.halve_doubled(Rational.halve(epsilon)),
+           Rational.LessOrEqual.sum(
+               Rational.padic_absolute_value(p, primality, s(m) * (t(m) - t(n))),
+               Rational.halve(Rational.halve(epsilon)),
+               Rational.padic_absolute_value(p, primality, t(n) * (s(m) - s(n))),
+               Rational.halve(Rational.halve(epsilon)),
+               first_total_bound,
+               second_total_bound));
+  claim triangle_combined_bound
+      : Rational.padic_absolute_value(p, primality,
+            s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
+          ≤ Rational.halve(epsilon)
+    by Rational.LessOrEqual.transitive(
+           Rational.padic_absolute_value(p, primality,
+               s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n))),
+           Rational.padic_absolute_value(p, primality, s(m) * (t(m) - t(n)))
+               + Rational.padic_absolute_value(p, primality, t(n) * (s(m) - s(n))),
+           Rational.halve(epsilon),
+           sum_abs_bound,
+           sum_total_bound);
+  claim final_weak_bound
+      : Rational.padic_absolute_value(p, primality, s(m) * t(m) - s(n) * t(n))
+          ≤ Rational.halve(epsilon)
+    by Equality.transport_proposition(
+           Rational,
+           function (lhs : Rational) =>
+               Rational.LessOrEqual(lhs, Rational.halve(epsilon)),
+           Rational.padic_absolute_value(p, primality,
+               s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n))),
+           Rational.padic_absolute_value(p, primality, s(m) * t(m) - s(n) * t(n)),
+           Equality.symmetry(
+               congruenceOf(
+                   function (r : Rational) =>
+                       Rational.padic_absolute_value(p, primality, r),
+                   decomposition_eq)),
+           triangle_combined_bound);
+  claim halve_strict_less
+      : Rational.halve(epsilon) < epsilon
+    by Rational.halve_less_than_self(epsilon, epsilonPositive);
+  Rational.LessThan.transitive_left(
+      Rational.padic_absolute_value(p, primality, s(m) * t(m) - s(n) * t(n)),
+      Rational.halve(epsilon),
+      epsilon,
+      final_weak_bound,
+      halve_strict_less)
+}
+
+-- ----------------------------------------------------------------------
+-- product_is_padic_cauchy: the load-bearing analytic proof.
+
+theorem Rational.sequence.product_is_padic_cauchy
+        (p : Natural) (primality : Natural.is_prime(p))
+        (s t : Rational.sequence.Sequence)
+        (sIsCauchy : Rational.sequence.IsPAdicCauchy(p, primality, s))
+        (tIsCauchy : Rational.sequence.IsPAdicCauchy(p, primality, t))
+        : Rational.sequence.IsPAdicCauchy(p, primality,
+              function (n : Natural) => s(n) * t(n)) :=
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) =>
+    -- Step 1: bound |s| eventually by (succ K_s : R) starting from N_s_bound.
+    Exists.eliminate(
+        Natural,
+        function (K_s : Natural) =>
+          ∃ (N_s_bound : Natural).
+            (m : Natural) → N_s_bound ≤ m →
+              Rational.padic_absolute_value(p, primality, s(m)) ≤ (successor(K_s) : Rational),
+        ∃ (N : Natural).
+          (m : Natural) → N ≤ m →
+            (n : Natural) → N ≤ n →
+              Rational.padic_absolute_value(p, primality, s(m) * t(m) - s(n) * t(n))
+                < epsilon,
+        function (K_s : Natural)
+                 (sBoundExists : ∃ (N_s_bound : Natural).
+                                   (m : Natural) → N_s_bound ≤ m →
+                                     Rational.padic_absolute_value(p, primality, s(m))
+                                       ≤ (successor(K_s) : Rational)) =>
+          Exists.eliminate(
+              Natural,
+              function (N_s_bound : Natural) =>
+                (m : Natural) → N_s_bound ≤ m →
+                  Rational.padic_absolute_value(p, primality, s(m)) ≤ (successor(K_s) : Rational),
+              ∃ (N : Natural).
+                (m : Natural) → N ≤ m →
+                  (n : Natural) → N ≤ n →
+                    Rational.padic_absolute_value(p, primality, s(m) * t(m) - s(n) * t(n))
+                      < epsilon,
+              function (N_s_bound : Natural)
+                       (sBound : (m : Natural) → N_s_bound ≤ m →
+                                   Rational.padic_absolute_value(p, primality, s(m))
+                                     ≤ (successor(K_s) : Rational)) =>
+                -- Step 2: similar for t.
+                Exists.eliminate(
+                    Natural,
+                    function (K_t : Natural) =>
+                      ∃ (N_t_bound : Natural).
+                        (m : Natural) → N_t_bound ≤ m →
+                          Rational.padic_absolute_value(p, primality, t(m))
+                            ≤ (successor(K_t) : Rational),
+                    ∃ (N : Natural).
+                      (m : Natural) → N ≤ m →
+                        (n : Natural) → N ≤ n →
+                          Rational.padic_absolute_value(p, primality, s(m) * t(m) - s(n) * t(n))
+                            < epsilon,
+                    function (K_t : Natural)
+                             (tBoundExists : ∃ (N_t_bound : Natural).
+                                               (m : Natural) → N_t_bound ≤ m →
+                                                 Rational.padic_absolute_value(p, primality, t(m))
+                                                   ≤ (successor(K_t) : Rational)) =>
+                      Exists.eliminate(
+                          Natural,
+                          function (N_t_bound : Natural) =>
+                            (m : Natural) → N_t_bound ≤ m →
+                              Rational.padic_absolute_value(p, primality, t(m))
+                                ≤ (successor(K_t) : Rational),
+                          ∃ (N : Natural).
+                            (m : Natural) → N ≤ m →
+                              (n : Natural) → N ≤ n →
+                                Rational.padic_absolute_value(p, primality, s(m) * t(m) - s(n) * t(n))
+                                  < epsilon,
+                          function (N_t_bound : Natural)
+                                   (tBound : (m : Natural) → N_t_bound ≤ m →
+                                               Rational.padic_absolute_value(p, primality, t(m))
+                                                 ≤ (successor(K_t) : Rational)) =>
+                            -- Step 3: get δ_s with (succ K_t) · δ_s ≤ ε/4.
+                            Exists.eliminate(
+                                Rational,
+                                function (delta_s : Rational) =>
+                                  And(Rational.zero < delta_s,
+                                      Rational.LessOrEqual(
+                                          (successor(K_t) : Rational) * delta_s,
+                                          Rational.halve(Rational.halve(epsilon)))),
+                                ∃ (N : Natural).
+                                  (m : Natural) → N ≤ m →
+                                    (n : Natural) → N ≤ n →
+                                      Rational.padic_absolute_value(p, primality, s(m) * t(m) - s(n) * t(n))
+                                        < epsilon,
+                                function (delta_s : Rational)
+                                         (delta_s_props
+                                            : And(Rational.zero < delta_s,
+                                                  Rational.LessOrEqual(
+                                                      (successor(K_t) : Rational)
+                                                          * delta_s,
+                                                      Rational.halve(
+                                                          Rational.halve(epsilon))))) =>
+                                  Exists.eliminate(
+                                      Rational,
+                                      function (delta_t : Rational) =>
+                                        And(Rational.zero < delta_t,
+                                            Rational.LessOrEqual(
+                                                (successor(K_s) : Rational)
+                                                    * delta_t,
+                                                Rational.halve(
+                                                    Rational.halve(epsilon)))),
+                                      ∃ (N : Natural).
+                                        (m : Natural) → N ≤ m →
+                                          (n : Natural) → N ≤ n →
+                                            Rational.padic_absolute_value(p, primality,
+                                                s(m) * t(m) - s(n) * t(n))
+                                              < epsilon,
+                                      function (delta_t : Rational)
+                                               (delta_t_props
+                                                  : And(Rational.zero < delta_t,
+                                                        Rational.LessOrEqual(
+                                                            (successor(K_s) : Rational)
+                                                                * delta_t,
+                                                            Rational.halve(
+                                                                Rational.halve(epsilon))))) =>
+                                        -- Step 5: apply sCauchy(δ_s) and tCauchy(δ_t).
+                                        Exists.eliminate(
+                                            Natural,
+                                            function (N_s : Natural) =>
+                                              (m : Natural) → N_s ≤ m →
+                                                (n : Natural) → N_s ≤ n →
+                                                  Rational.padic_absolute_value(p, primality, s(m) - s(n))
+                                                    < delta_s,
+                                            ∃ (N : Natural).
+                                              (m : Natural) → N ≤ m →
+                                                (n : Natural) → N ≤ n →
+                                                  Rational.padic_absolute_value(p, primality,
+                                                      s(m) * t(m) - s(n) * t(n))
+                                                    < epsilon,
+                                            function (N_s : Natural)
+                                                     (sCauchyAt
+                                                        : (m : Natural) → N_s ≤ m →
+                                                          (n : Natural) → N_s ≤ n →
+                                                            Rational.padic_absolute_value(p, primality,
+                                                                s(m) - s(n))
+                                                              < delta_s) =>
+                                              Exists.eliminate(
+                                                  Natural,
+                                                  function (N_t : Natural) =>
+                                                    (m : Natural) → N_t ≤ m →
+                                                      (n : Natural) → N_t ≤ n →
+                                                        Rational.padic_absolute_value(p, primality,
+                                                            t(m) - t(n))
+                                                          < delta_t,
+                                                  ∃ (N : Natural).
+                                                    (m : Natural) → N ≤ m →
+                                                      (n : Natural) → N ≤ n →
+                                                        Rational.padic_absolute_value(p, primality,
+                                                            s(m) * t(m) - s(n) * t(n))
+                                                          < epsilon,
+                                                  function (N_t : Natural)
+                                                           (tCauchyAt
+                                                              : (m : Natural) → N_t ≤ m →
+                                                                (n : Natural) → N_t ≤ n →
+                                                                  Rational.padic_absolute_value(p, primality,
+                                                                      t(m) - t(n))
+                                                                    < delta_t) =>
+                                                    -- Final N := max(N_s_bound, N_t_bound, N_s, N_t).
+                                                    Exists.introduce(
+                                                        Natural,
+                                                        function (N : Natural) =>
+                                                          (m : Natural) → N ≤ m →
+                                                            (n : Natural) → N ≤ n →
+                                                              Rational.padic_absolute_value(p, primality,
+                                                                  s(m) * t(m)
+                                                                  - s(n) * t(n))
+                                                                < epsilon,
+                                                        Natural.maximum(
+                                                            Natural.maximum(N_s_bound, N_t_bound),
+                                                            Natural.maximum(N_s, N_t)),
+                                                        function (m : Natural)
+                                                                 (m_ge : Natural.maximum(
+                                                                            Natural.maximum(N_s_bound, N_t_bound),
+                                                                            Natural.maximum(N_s, N_t)) ≤ m)
+                                                                 (n : Natural)
+                                                                 (n_ge : Natural.maximum(
+                                                                            Natural.maximum(N_s_bound, N_t_bound),
+                                                                            Natural.maximum(N_s, N_t)) ≤ n) =>
+                                                          -- Bound chain proof comes here.
+                                                          Rational.sequence.product_is_padic_cauchy_bound(
+                                                              p, primality,
+                                                              s, t, epsilon,
+                                                              K_s, K_t,
+                                                              delta_s, delta_t,
+                                                              N_s_bound, N_t_bound, N_s, N_t,
+                                                              m, n,
+                                                              m_ge, n_ge,
+                                                              sBound, tBound,
+                                                              sCauchyAt, tCauchyAt,
+                                                              delta_s_props, delta_t_props,
+                                                              epsilonPositive)),
+                                                  tIsCauchy(delta_t,
+                                                      And.left(
+                                                          Rational.zero < delta_t,
+                                                          Rational.LessOrEqual(
+                                                              (successor(K_s) : Rational)
+                                                                  * delta_t,
+                                                              Rational.halve(
+                                                                  Rational.halve(epsilon))),
+                                                          delta_t_props))),
+                                            sIsCauchy(delta_s,
+                                                And.left(
+                                                    Rational.zero < delta_s,
+                                                    Rational.LessOrEqual(
+                                                        (successor(K_t) : Rational)
+                                                            * delta_s,
+                                                        Rational.halve(
+                                                            Rational.halve(epsilon))),
+                                                    delta_s_props))),
+                                      Rational.divide_by_succ_positive(
+                                          Rational.halve(Rational.halve(epsilon)),
+                                          K_s,
+                                          Rational.halve_positive(
+                                              Rational.halve(epsilon),
+                                              Rational.halve_positive(epsilon, epsilonPositive)))),
+                                Rational.divide_by_succ_positive(
+                                    Rational.halve(Rational.halve(epsilon)),
+                                    K_t,
+                                    Rational.halve_positive(
+                                        Rational.halve(epsilon),
+                                        Rational.halve_positive(epsilon, epsilonPositive)))),
+                          tBoundExists),
+                      Rational.sequence.cauchy_is_padic_naturally_bounded(p, primality, t, tIsCauchy)),
+                sBoundExists),
+        Rational.sequence.cauchy_is_padic_naturally_bounded(p, primality, s, sIsCauchy))
+
+-- ----------------------------------------------------------------------
+-- Restore PAdicCauchySequence.multiply and the PAdic-level lifts.
+
+definition PAdicCauchySequence.multiply
+        (p : Natural) (primality : Natural.is_prime(p))
+        : PAdicCauchySequence(p, primality)
+          → PAdicCauchySequence(p, primality)
+          → PAdicCauchySequence(p, primality)
+  | PAdicCauchySequence.make(s, sCauchy),
+    PAdicCauchySequence.make(t, tCauchy) =>
+      PAdicCauchySequence.make(
+          function (n : Natural) => s(n) * t(n),
+          Rational.sequence.product_is_padic_cauchy(p, primality, s, t, sCauchy, tCauchy))
+
+-- sf(multiply(rep_x, rep_y), m) = sf(rep_x, m) * sf(rep_y, m).
+theorem PAdicCauchySequence.sequenceFunction_multiply
+        (p : Natural) (primality : Natural.is_prime(p))
+        : (rep_x rep_y : PAdicCauchySequence(p, primality)) → (m : Natural)
+          → PAdicCauchySequence.sequenceFunction(
+                p, primality,
+                PAdicCauchySequence.multiply(p, primality, rep_x, rep_y), m)
+            = PAdicCauchySequence.sequenceFunction(p, primality, rep_x, m)
+              * PAdicCauchySequence.sequenceFunction(p, primality, rep_y, m)
+  | PAdicCauchySequence.make(sa, _),
+    PAdicCauchySequence.make(sb, _),
+    m =>
+      reflexivity(Rational, sa(m) * sb(m))
+
+-- The respect-proof inner chain: given the bound |s_x(m)| ≤ (succ K : R)
+-- and the difference bound |s_y(m) - s_y'(m)| < δ, conclude
+-- |s_x(m)*s_y(m) - s_x(m)*s_y'(m)| < ε via the (succ K)*δ ≤ halve(ε)
+-- + halve_less_than_self chain.
+theorem PAdic.multiply_respect_bound_chain
+        (p : Natural) (primality : Natural.is_prime(p))
+        (s_x s_y s_yPrime : Rational.sequence.Sequence)
+        (epsilon : Rational) (K : Natural) (delta : Rational)
+        (m : Natural)
+        (s_x_at_m_bound : Rational.padic_absolute_value(p, primality, s_x(m))
+                            ≤ (successor(K) : Rational))
+        (s_y_diff_bound : Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m))
+                            < delta)
+        (delta_bound : Rational.LessOrEqual(
+                           (successor(K) : Rational) * delta,
+                           Rational.halve(epsilon)))
+        (epsilonPositive : Rational.zero < epsilon)
+        : Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+            < epsilon := {
+  claim s_y_diff_weak : Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)) ≤ delta
+    by And.left(
+           Rational.LessOrEqual(
+               Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)), delta),
+           Not(Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)) = delta),
+           s_y_diff_bound);
+  claim factor_eq
+      : s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)
+        = s_x(m) * (s_y(m) - s_yPrime(m))
+    by Rational.factor_subtract_distribute(s_x(m), s_y(m), s_yPrime(m));
+  claim abs_factor_eq
+      : Rational.padic_absolute_value(p, primality, s_x(m) * (s_y(m) - s_yPrime(m)))
+        = Rational.padic_absolute_value(p, primality, s_x(m))
+          * Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m))
+    by Rational.padic_absolute_value_multiplicative(p, primality,
+           s_x(m), s_y(m) - s_yPrime(m));
+  claim step1
+      : Rational.padic_absolute_value(p, primality, s_x(m))
+            * Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m))
+          ≤ (successor(K) : Rational)
+            * Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m))
+    by Rational.LessOrEqual.multiply_by_nonneg_right(
+           Rational.padic_absolute_value(p, primality, s_x(m)),
+           (successor(K) : Rational),
+           Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)),
+           s_x_at_m_bound,
+           Rational.padic_absolute_value_nonneg(p, primality, s_y(m) - s_yPrime(m)));
+  claim step2
+      : (successor(K) : Rational)
+            * Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m))
+          ≤ (successor(K) : Rational) * delta
+    by Rational.LessOrEqual.multiply_by_nonneg_left(
+           Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)),
+           delta,
+           (successor(K) : Rational),
+           s_y_diff_weak,
+           Rational.LessOrEqual_zero_of_IsNonneg(
+               (successor(K) : Rational),
+               Integer.from_natural_is_nonneg(successor(K))));
+  claim weak_bound
+      : Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+          ≤ Rational.halve(epsilon)
+    by Equality.transport_proposition(
+           Rational,
+           function (lhs : Rational) =>
+               Rational.LessOrEqual(lhs, Rational.halve(epsilon)),
+           Rational.padic_absolute_value(p, primality, s_x(m) * (s_y(m) - s_yPrime(m))),
+           Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)),
+           Equality.symmetry(
+               congruenceOf(
+                   function (r : Rational) =>
+                       Rational.padic_absolute_value(p, primality, r),
+                   factor_eq)),
+           Equality.transport_proposition(
+               Rational,
+               function (lhs : Rational) =>
+                   Rational.LessOrEqual(lhs, Rational.halve(epsilon)),
+               Rational.padic_absolute_value(p, primality, s_x(m))
+                   * Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)),
+               Rational.padic_absolute_value(p, primality, s_x(m) * (s_y(m) - s_yPrime(m))),
+               Equality.symmetry(abs_factor_eq),
+               Rational.LessOrEqual.transitive(
+                   Rational.padic_absolute_value(p, primality, s_x(m))
+                       * Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)),
+                   (successor(K) : Rational) * delta,
+                   Rational.halve(epsilon),
+                   Rational.LessOrEqual.transitive(
+                       Rational.padic_absolute_value(p, primality, s_x(m))
+                           * Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)),
+                       (successor(K) : Rational)
+                           * Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)),
+                       (successor(K) : Rational) * delta,
+                       step1, step2),
+                   delta_bound)));
+  Rational.LessThan.transitive_left(
+      Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)),
+      Rational.halve(epsilon),
+      epsilon,
+      weak_bound,
+      Rational.halve_less_than_self(epsilon, epsilonPositive))
+}
+
+-- Helper: produce the PAdicEquivalent proof body for the at-rep
+-- multiply respect. Given fixed s_x with a Natural bound, and yEquiv,
+-- show the product sequences are PAdicEquivalent.
+theorem PAdic.multiply_after_first_respects_at_rep_inner
+        (p : Natural) (primality : Natural.is_prime(p))
+        (s_x : Rational.sequence.Sequence)
+        (sCauchy_x : Rational.sequence.IsPAdicCauchy(p, primality, s_x))
+        (s_y s_yPrime : Rational.sequence.Sequence)
+        (sCauchy_y : Rational.sequence.IsPAdicCauchy(p, primality, s_y))
+        (sCauchy_yPrime : Rational.sequence.IsPAdicCauchy(p, primality, s_yPrime))
+        (refinedYEquiv : PAdicEquivalent(p, primality,
+                             PAdicCauchySequence.make(s_y, sCauchy_y),
+                             PAdicCauchySequence.make(s_yPrime, sCauchy_yPrime)))
+        (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon)
+        : ∃ (N : Natural).
+            (m : Natural) → N ≤ m →
+              Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+                < epsilon :=
+  Exists.eliminate(
+      Natural,
+      function (K : Natural) =>
+        ∃ (N_x_bound : Natural).
+          (m : Natural) → N_x_bound ≤ m →
+            Rational.padic_absolute_value(p, primality, s_x(m)) ≤ (successor(K) : Rational),
+      ∃ (N : Natural).
+        (m : Natural) → N ≤ m →
+          Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+            < epsilon,
+      function (K : Natural)
+               (xBoundExists : ∃ (N_x_bound : Natural).
+                                 (m : Natural) → N_x_bound ≤ m →
+                                   Rational.padic_absolute_value(p, primality, s_x(m))
+                                     ≤ (successor(K) : Rational)) =>
+        Exists.eliminate(
+            Natural,
+            function (N_x_bound : Natural) =>
+              (m : Natural) → N_x_bound ≤ m →
+                Rational.padic_absolute_value(p, primality, s_x(m)) ≤ (successor(K) : Rational),
+            ∃ (N : Natural).
+              (m : Natural) → N ≤ m →
+                Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+                  < epsilon,
+            function (N_x_bound : Natural)
+                     (xBound : (m : Natural) → N_x_bound ≤ m →
+                                 Rational.padic_absolute_value(p, primality, s_x(m))
+                                   ≤ (successor(K) : Rational)) =>
+              Exists.eliminate(
+                  Rational,
+                  function (delta : Rational) =>
+                    And(Rational.zero < delta,
+                        Rational.LessOrEqual(
+                            (successor(K) : Rational) * delta,
+                            Rational.halve(epsilon))),
+                  ∃ (N : Natural).
+                    (m : Natural) → N ≤ m →
+                      Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+                        < epsilon,
+                  function (delta : Rational)
+                           (delta_props : And(Rational.zero < delta,
+                                              Rational.LessOrEqual(
+                                                  (successor(K) : Rational) * delta,
+                                                  Rational.halve(epsilon)))) =>
+                    Exists.eliminate(
+                        Natural,
+                        function (N_y : Natural) =>
+                          (m : Natural) → N_y ≤ m →
+                            Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m))
+                              < delta,
+                        ∃ (N : Natural).
+                          (m : Natural) → N ≤ m →
+                            Rational.padic_absolute_value(p, primality,
+                                s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+                              < epsilon,
+                        function (N_y : Natural)
+                                 (yEquivAt : (m : Natural) → N_y ≤ m →
+                                               Rational.padic_absolute_value(p, primality,
+                                                   s_y(m) - s_yPrime(m))
+                                                 < delta) =>
+                          Exists.introduce(
+                              Natural,
+                              function (N : Natural) =>
+                                (m : Natural) → N ≤ m →
+                                  Rational.padic_absolute_value(p, primality,
+                                      s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+                                    < epsilon,
+                              Natural.maximum(N_x_bound, N_y),
+                              function (m : Natural)
+                                       (m_ge_max : Natural.maximum(N_x_bound, N_y) ≤ m) =>
+                                PAdic.multiply_respect_bound_chain(
+                                    p, primality,
+                                    s_x, s_y, s_yPrime,
+                                    epsilon, K, delta, m,
+                                    xBound(m,
+                                        LessOrEqual.transitive(
+                                            N_x_bound,
+                                            Natural.maximum(N_x_bound, N_y),
+                                            m,
+                                            m_ge_max,
+                                            Natural.left_le_max(N_x_bound, N_y))),
+                                    yEquivAt(m,
+                                        LessOrEqual.transitive(
+                                            N_y,
+                                            Natural.maximum(N_x_bound, N_y),
+                                            m,
+                                            m_ge_max,
+                                            Natural.right_le_max(N_x_bound, N_y))),
+                                    And.right(
+                                        Rational.zero < delta,
+                                        Rational.LessOrEqual(
+                                            (successor(K) : Rational) * delta,
+                                            Rational.halve(epsilon)),
+                                        delta_props),
+                                    epsilonPositive)),
+                        refinedYEquiv(delta,
+                            And.left(
+                                Rational.zero < delta,
+                                Rational.LessOrEqual(
+                                    (successor(K) : Rational) * delta,
+                                    Rational.halve(epsilon)),
+                                delta_props))),
+                  Rational.divide_by_succ_positive(
+                      Rational.halve(epsilon), K,
+                      Rational.halve_positive(epsilon, epsilonPositive))),
+            xBoundExists),
+      Rational.sequence.cauchy_is_padic_naturally_bounded(p, primality, s_x, sCauchy_x))
+
+-- multiply_after_first_respects: rep_x fixed, y varies.
+theorem PAdic.multiply_after_first_respects
+        (p : Natural) (primality : Natural.is_prime(p))
+        : (rep_x rep_y rep_yPrime : PAdicCauchySequence(p, primality))
+          → PAdicEquivalent(p, primality, rep_y, rep_yPrime)
+          → Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                         PAdicCauchySequence.multiply(p, primality, rep_x, rep_y))
+            = Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                           PAdicCauchySequence.multiply(p, primality, rep_x, rep_yPrime))
+  | PAdicCauchySequence.make(s_x, sCauchy_x), rep_y, rep_yPrime, yEquiv =>
+      (cases rep_y {
+         | PAdicCauchySequence.make(s_y, sCauchy_y) =>
+             function (outerRefinedYEquiv
+                         : PAdicEquivalent(p, primality,
+                               PAdicCauchySequence.make(s_y, sCauchy_y),
+                               rep_yPrime)) =>
+               (cases rep_yPrime {
+                  | PAdicCauchySequence.make(s_yPrime, sCauchy_yPrime) =>
+                      function (refinedYEquiv
+                                  : PAdicEquivalent(p, primality,
+                                        PAdicCauchySequence.make(s_y, sCauchy_y),
+                                        PAdicCauchySequence.make(
+                                            s_yPrime, sCauchy_yPrime))) =>
+                        Quotient.sound(
+                            PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                            PAdicCauchySequence.multiply(p, primality,
+                                PAdicCauchySequence.make(s_x, sCauchy_x),
+                                PAdicCauchySequence.make(s_y, sCauchy_y)),
+                            PAdicCauchySequence.multiply(p, primality,
+                                PAdicCauchySequence.make(s_x, sCauchy_x),
+                                PAdicCauchySequence.make(s_yPrime, sCauchy_yPrime)),
+                            function (epsilon : Rational)
+                                     (epsilonPositive : Rational.zero < epsilon) =>
+                              PAdic.multiply_after_first_respects_at_rep_inner(
+                                  p, primality,
+                                  s_x, sCauchy_x, s_y, s_yPrime,
+                                  sCauchy_y, sCauchy_yPrime,
+                                  refinedYEquiv,
+                                  epsilon, epsilonPositive))
+                } : (refinedYEquiv : PAdicEquivalent(p, primality,
+                                         PAdicCauchySequence.make(s_y, sCauchy_y),
+                                         rep_yPrime))
+                    → Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                                   PAdicCauchySequence.multiply(p, primality,
+                                       PAdicCauchySequence.make(s_x, sCauchy_x),
+                                       PAdicCauchySequence.make(s_y, sCauchy_y)))
+                      = Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                                     PAdicCauchySequence.multiply(p, primality,
+                                         PAdicCauchySequence.make(s_x, sCauchy_x),
+                                         rep_yPrime)))(outerRefinedYEquiv)
+       } : (refinedYEquiv : PAdicEquivalent(p, primality, rep_y, rep_yPrime))
+           → Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                          PAdicCauchySequence.multiply(p, primality,
+                              PAdicCauchySequence.make(s_x, sCauchy_x),
+                              rep_y))
+             = Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                            PAdicCauchySequence.multiply(p, primality,
+                                PAdicCauchySequence.make(s_x, sCauchy_x),
+                                rep_yPrime)))(yEquiv)
+
+-- Symmetric inner-chain helper for multiply_respects_at_rep_y: y is
+-- bounded, x varies via xEquiv.
+theorem PAdic.multiply_respects_at_rep_y_inner
+        (p : Natural) (primality : Natural.is_prime(p))
+        (s_x : Rational.sequence.Sequence)
+        (sCauchy_x : Rational.sequence.IsPAdicCauchy(p, primality, s_x))
+        (s_xPrime : Rational.sequence.Sequence)
+        (sCauchy_xPrime : Rational.sequence.IsPAdicCauchy(p, primality, s_xPrime))
+        (s_y : Rational.sequence.Sequence)
+        (sCauchy_y : Rational.sequence.IsPAdicCauchy(p, primality, s_y))
+        (refinedXEquiv : PAdicEquivalent(p, primality,
+                             PAdicCauchySequence.make(s_x, sCauchy_x),
+                             PAdicCauchySequence.make(s_xPrime, sCauchy_xPrime)))
+        (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon)
+        : ∃ (N : Natural).
+            (m : Natural) → N ≤ m →
+              Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
+                < epsilon :=
+  -- Reduce to multiply_after_first_respects_at_rep_inner with s_y as
+  -- the "fixed" sequence (bounded) and x varying.
+  Exists.eliminate(
+      Natural,
+      function (N : Natural) =>
+        (m : Natural) → N ≤ m →
+          Rational.padic_absolute_value(p, primality, s_y(m) * s_x(m) - s_y(m) * s_xPrime(m))
+            < epsilon,
+      ∃ (N : Natural).
+        (m : Natural) → N ≤ m →
+          Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
+            < epsilon,
+      function (N : Natural)
+               (boundedY : (m : Natural) → N ≤ m →
+                             Rational.padic_absolute_value(p, primality,
+                                 s_y(m) * s_x(m) - s_y(m) * s_xPrime(m))
+                               < epsilon) =>
+        Exists.introduce(
+            Natural,
+            function (NPrime : Natural) =>
+              (m : Natural) → NPrime ≤ m →
+                Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
+                  < epsilon,
+            N,
+            function (m : Natural) (N_leq_m : N ≤ m) =>
+              Equality.transport_proposition(
+                  Rational,
+                  function (w : Rational) =>
+                      Rational.LessThan(w, epsilon),
+                  Rational.padic_absolute_value(p, primality,
+                      s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)),
+                  Rational.padic_absolute_value(p, primality,
+                      s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)),
+                  congruenceOf(
+                      function (r : Rational) =>
+                          Rational.padic_absolute_value(p, primality, r),
+                      calc s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)
+                         = s_x(m) * s_y(m) - s_y(m) * s_xPrime(m)
+                                by congruenceOf(
+                                       function (z : Rational) =>
+                                           z - s_y(m) * s_xPrime(m),
+                                       Rational.multiply_commutative(
+                                           s_y(m), s_x(m)))
+                         = s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)
+                                by congruenceOf(
+                                       function (z : Rational) =>
+                                           s_x(m) * s_y(m) - z,
+                                       Rational.multiply_commutative(
+                                           s_y(m), s_xPrime(m)))),
+                  boundedY(m, N_leq_m))),
+      PAdic.multiply_after_first_respects_at_rep_inner(
+          p, primality,
+          s_y, sCauchy_y, s_x, s_xPrime, sCauchy_x, sCauchy_xPrime,
+          refinedXEquiv, epsilon, epsilonPositive))
+
+-- Helper for multiply_respects: shows the at-rep-y version of the
+-- product equivalence given xEquiv. The argument shape is symmetric to
+-- multiply_after_first_respects but with the bound on the y-side.
+theorem PAdic.multiply_respects_at_rep_y
+        (p : Natural) (primality : Natural.is_prime(p))
+        (rep_x rep_xPrime rep_y : PAdicCauchySequence(p, primality))
+        (xEquiv : PAdicEquivalent(p, primality, rep_x, rep_xPrime))
+        : Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                       PAdicCauchySequence.multiply(p, primality, rep_x, rep_y))
+          = Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                         PAdicCauchySequence.multiply(p, primality, rep_xPrime, rep_y)) :=
+  (cases rep_y {
+     | PAdicCauchySequence.make(s_y, sCauchy_y) =>
+         (cases rep_x {
+            | PAdicCauchySequence.make(s_x, sCauchy_x) =>
+                function (innerXEquiv
+                            : PAdicEquivalent(p, primality,
+                                  PAdicCauchySequence.make(s_x, sCauchy_x),
+                                  rep_xPrime)) =>
+                  (cases rep_xPrime {
+                     | PAdicCauchySequence.make(s_xPrime, sCauchy_xPrime) =>
+                         function (refinedXEquiv
+                                     : PAdicEquivalent(p, primality,
+                                           PAdicCauchySequence.make(s_x, sCauchy_x),
+                                           PAdicCauchySequence.make(
+                                               s_xPrime, sCauchy_xPrime))) =>
+                           Quotient.sound(
+                               PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                               PAdicCauchySequence.multiply(p, primality,
+                                   PAdicCauchySequence.make(s_x, sCauchy_x),
+                                   PAdicCauchySequence.make(s_y, sCauchy_y)),
+                               PAdicCauchySequence.multiply(p, primality,
+                                   PAdicCauchySequence.make(
+                                       s_xPrime, sCauchy_xPrime),
+                                   PAdicCauchySequence.make(s_y, sCauchy_y)),
+                               function (epsilon : Rational)
+                                        (epsilonPositive : Rational.zero < epsilon) =>
+                                 PAdic.multiply_respects_at_rep_y_inner(
+                                     p, primality,
+                                     s_x, sCauchy_x, s_xPrime, sCauchy_xPrime,
+                                     s_y, sCauchy_y,
+                                     refinedXEquiv,
+                                     epsilon, epsilonPositive))
+                   } : (refinedXEquiv : PAdicEquivalent(p, primality,
+                                            PAdicCauchySequence.make(s_x, sCauchy_x),
+                                            rep_xPrime))
+                       → Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                                      PAdicCauchySequence.multiply(p, primality,
+                                          PAdicCauchySequence.make(s_x, sCauchy_x),
+                                          PAdicCauchySequence.make(s_y, sCauchy_y)))
+                         = Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                                        PAdicCauchySequence.multiply(p, primality,
+                                            rep_xPrime,
+                                            PAdicCauchySequence.make(s_y, sCauchy_y))))(innerXEquiv)
+          } : (innerXEquiv : PAdicEquivalent(p, primality, rep_x, rep_xPrime))
+              → Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                             PAdicCauchySequence.multiply(p, primality,
+                                 rep_x,
+                                 PAdicCauchySequence.make(s_y, sCauchy_y)))
+                = Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                               PAdicCauchySequence.multiply(p, primality,
+                                   rep_xPrime,
+                                   PAdicCauchySequence.make(s_y, sCauchy_y))))(xEquiv)
+   } : Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                    PAdicCauchySequence.multiply(p, primality, rep_x, rep_y))
+       = Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                      PAdicCauchySequence.multiply(p, primality, rep_xPrime, rep_y)))
+
+-- The full multiply respect proof: lifts over y.
+theorem PAdic.multiply_respects
+        (p : Natural) (primality : Natural.is_prime(p))
+        (rep_x rep_xPrime : PAdicCauchySequence(p, primality))
+        (xEquiv : PAdicEquivalent(p, primality, rep_x, rep_xPrime))
+        (yPAdic : PAdic(p, primality))
+        : Quotient.lift(
+              function (rep_y : PAdicCauchySequence(p, primality)) =>
+                  Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                               PAdicCauchySequence.multiply(p, primality, rep_x, rep_y)),
+              PAdic.multiply_after_first_respects(p, primality, rep_x),
+              yPAdic)
+          = Quotient.lift(
+              function (rep_y : PAdicCauchySequence(p, primality)) =>
+                  Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                               PAdicCauchySequence.multiply(p, primality, rep_xPrime, rep_y)),
+              PAdic.multiply_after_first_respects(p, primality, rep_xPrime),
+              yPAdic) :=
+  Quotient.induct(
+      function (y : PAdic(p, primality)) =>
+          Quotient.lift(
+              function (rep_y : PAdicCauchySequence(p, primality)) =>
+                  Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                               PAdicCauchySequence.multiply(p, primality, rep_x, rep_y)),
+              PAdic.multiply_after_first_respects(p, primality, rep_x),
+              y)
+          = Quotient.lift(
+              function (rep_y : PAdicCauchySequence(p, primality)) =>
+                  Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                               PAdicCauchySequence.multiply(p, primality, rep_xPrime, rep_y)),
+              PAdic.multiply_after_first_respects(p, primality, rep_xPrime),
+              y),
+      function (rep_y : PAdicCauchySequence(p, primality)) =>
+          PAdic.multiply_respects_at_rep_y(p, primality, rep_x, rep_xPrime, rep_y, xEquiv),
+      yPAdic)
+
+definition PAdic.multiply_after_first
+        (p : Natural) (primality : Natural.is_prime(p))
+        (rep_x : PAdicCauchySequence(p, primality))
+        (yPAdic : PAdic(p, primality)) : PAdic(p, primality) :=
+  Quotient.lift(
+      function (rep_y : PAdicCauchySequence(p, primality)) =>
+          Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+                       PAdicCauchySequence.multiply(p, primality, rep_x, rep_y)),
+      PAdic.multiply_after_first_respects(p, primality, rep_x),
+      yPAdic)
+
+definition PAdic.multiply
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x y : PAdic(p, primality)) : PAdic(p, primality) :=
+  Quotient.lift(
+      function (rep_x : PAdicCauchySequence(p, primality)) =>
+          PAdic.multiply_after_first(p, primality, rep_x, y),
+      function (rep_x rep_xPrime : PAdicCauchySequence(p, primality))
+               (xEquiv : PAdicEquivalent(p, primality, rep_x, rep_xPrime)) =>
+          PAdic.multiply_respects(p, primality, rep_x, rep_xPrime, xEquiv, y),
+      x)
