@@ -15,6 +15,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
+import Natural.maximum
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -24,18 +25,168 @@ import Rational.algebra
 import Rational.order
 import Rational.absolute_value
 import Rational.halve
+import Rational.positive
+import Rational.triangle
+import Rational.order_arithmetic
 import Real.sequence
 import Real.basics
 import Real.embedding
 
+-- Sequence-arithmetic helper: at any index m, n,
+-- (s(m) + t(m)) - (s(n) + t(n)) = (s(m) - s(n)) + (t(m) - t(n)).
+-- Pure Rational algebra.
+theorem Rational.sequence.add_subtract_regroup
+        (a b c d : Rational)
+        : (a + b) - (c + d) = (a - c) + (b - d) :=
+  calc (a + b) - (c + d)
+     = (a + b) + -(c + d)
+            by reflexivity(Rational, (a + b) + -(c + d))
+     = (a + b) + (-c + -d)
+            by rewrite(Rational.negate_add(c, d))
+     = a + (b + (-c + -d))
+            by Rational.add_associative(a, b, -c + -d)
+     = a + ((b + -c) + -d)
+            by congruenceOf(
+                   function (w : Rational) => a + w,
+                   Equality.symmetry(
+                       Rational.add_associative(b, -c, -d)))
+     = a + ((-c + b) + -d)
+            by congruenceOf(
+                   function (w : Rational) => a + (w + -d),
+                   Rational.add_commutative(b, -c))
+     = a + (-c + (b + -d))
+            by congruenceOf(
+                   function (w : Rational) => a + w,
+                   Rational.add_associative(-c, b, -d))
+     = (a + -c) + (b + -d)
+            by Equality.symmetry(
+                   Rational.add_associative(a, -c, b + -d))
+     = (a - c) + (b - d)
+            by reflexivity(Rational, (a - c) + (b - d))
+
 -- The pointwise sum of two sequences is Cauchy when both are.
--- Stub: standard ε/2 split.
+-- Standard ε/2 split through triangle inequality + max of N's.
 theorem Rational.sequence.sum_is_cauchy
         (s t : Rational.sequence.Sequence)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
         (tIsCauchy : Rational.sequence.IsCauchy(t))
         : Rational.sequence.IsCauchy(
-              function (n : Natural) => s(n) + t(n)) := sorry
+              function (n : Natural) => s(n) + t(n)) :=
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) =>
+    Exists.eliminate(
+        Natural,
+        function (N_s : Natural) =>
+          (m : Natural) → N_s ≤ m →
+            (n : Natural) → N_s ≤ n →
+              Rational.absolute_value(s(m) - s(n))
+                < Rational.halve(epsilon),
+        ∃ (N : Natural).
+          (m : Natural) → N ≤ m →
+            (n : Natural) → N ≤ n →
+              Rational.absolute_value(s(m) + t(m) - (s(n) + t(n)))
+                < epsilon,
+        function (N_s : Natural)
+                 (sBound : (m : Natural) → N_s ≤ m →
+                           (n : Natural) → N_s ≤ n →
+                             Rational.absolute_value(s(m) - s(n))
+                               < Rational.halve(epsilon)) =>
+          Exists.eliminate(
+              Natural,
+              function (N_t : Natural) =>
+                (m : Natural) → N_t ≤ m →
+                  (n : Natural) → N_t ≤ n →
+                    Rational.absolute_value(t(m) - t(n))
+                      < Rational.halve(epsilon),
+              ∃ (N : Natural).
+                (m : Natural) → N ≤ m →
+                  (n : Natural) → N ≤ n →
+                    Rational.absolute_value(
+                        s(m) + t(m) - (s(n) + t(n)))
+                      < epsilon,
+              function (N_t : Natural)
+                       (tBound : (m : Natural) → N_t ≤ m →
+                                 (n : Natural) → N_t ≤ n →
+                                   Rational.absolute_value(t(m) - t(n))
+                                     < Rational.halve(epsilon)) =>
+                Exists.introduce(
+                    Natural,
+                    function (N : Natural) =>
+                      (m : Natural) → N ≤ m →
+                        (n : Natural) → N ≤ n →
+                          Rational.absolute_value(
+                              s(m) + t(m) - (s(n) + t(n)))
+                            < epsilon,
+                    Natural.maximum(N_s, N_t),
+                    function (m : Natural)
+                             (m_ge_max : Natural.maximum(N_s, N_t) ≤ m)
+                             (n : Natural)
+                             (n_ge_max : Natural.maximum(N_s, N_t) ≤ n) =>
+                      Rational.LessThan.transitive_left(
+                          Rational.absolute_value(
+                              s(m) + t(m) - (s(n) + t(n))),
+                          Rational.absolute_value(s(m) - s(n))
+                              + Rational.absolute_value(t(m) - t(n)),
+                          epsilon,
+                          -- Step 1: ≤ via triangle + algebra.
+                          Equality.transport_proposition(
+                              Rational,
+                              function (w : Rational) =>
+                                  Rational.LessOrEqual(
+                                      w,
+                                      Rational.absolute_value(s(m) - s(n))
+                                      + Rational.absolute_value(t(m) - t(n))),
+                              Rational.absolute_value(
+                                  (s(m) - s(n)) + (t(m) - t(n))),
+                              Rational.absolute_value(
+                                  s(m) + t(m) - (s(n) + t(n))),
+                              congruenceOf(
+                                  Rational.absolute_value,
+                                  Equality.symmetry(
+                                      Rational.sequence.add_subtract_regroup(
+                                          s(m), t(m), s(n), t(n)))),
+                              Rational.triangle_inequality(
+                                  s(m) - s(n), t(m) - t(n))),
+                          -- Step 2: < via add_strict_strict + halve_doubled.
+                          Equality.transport_proposition(
+                              Rational,
+                              function (w : Rational) =>
+                                  Rational.LessThan(
+                                      Rational.absolute_value(s(m) - s(n))
+                                      + Rational.absolute_value(t(m) - t(n)),
+                                      w),
+                              Rational.halve(epsilon)
+                                  + Rational.halve(epsilon),
+                              epsilon,
+                              Rational.halve_doubled(epsilon),
+                              Rational.LessThan.add_strict_strict(
+                                  Rational.absolute_value(s(m) - s(n)),
+                                  Rational.absolute_value(t(m) - t(n)),
+                                  Rational.halve(epsilon),
+                                  sBound(m,
+                                      LessOrEqual.transitive(
+                                          N_s, Natural.maximum(N_s, N_t), m,
+                                          m_ge_max,
+                                          Natural.left_le_max(N_s, N_t)),
+                                      n,
+                                      LessOrEqual.transitive(
+                                          N_s, Natural.maximum(N_s, N_t), n,
+                                          n_ge_max,
+                                          Natural.left_le_max(N_s, N_t))),
+                                  tBound(m,
+                                      LessOrEqual.transitive(
+                                          N_t, Natural.maximum(N_s, N_t), m,
+                                          m_ge_max,
+                                          Natural.right_le_max(N_s, N_t)),
+                                      n,
+                                      LessOrEqual.transitive(
+                                          N_t, Natural.maximum(N_s, N_t), n,
+                                          n_ge_max,
+                                          Natural.right_le_max(N_s, N_t))))))),
+              tIsCauchy(Rational.halve(epsilon),
+                  Rational.halve_positive(epsilon, epsilonPositive))),
+        sIsCauchy(Rational.halve(epsilon),
+            Rational.halve_positive(epsilon, epsilonPositive)))
 
 -- Sum of two packaged Cauchy sequences.
 definition CauchyRationalSequence.add
