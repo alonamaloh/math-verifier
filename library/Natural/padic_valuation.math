@@ -1931,6 +1931,58 @@ theorem Natural.power_monotone
             Natural.power_monotone_via_r(a, p, pPositive, r)),
       Natural.subtraction_witness(a, b, aLeB))
 
+-- distance(a, b) = 0 implies a = b. Useful for the |·|_Nat = 0 →
+-- Integer.zero bridge.
+theorem Natural.distance_zero_implies_equal
+        : (a b : Natural) → Natural.distance(a, b) = zero → a = b
+  | zero, b, eq =>
+      Equality.symmetry(eq)
+  | successor(k), b, eq =>
+      (cases b {
+         | zero =>
+             function (refinedEq
+                         : Natural.distance(successor(k), zero) = zero) =>
+               False.eliminate_proposition(
+                   successor(k) = zero,
+                   Natural.successor_not_zero(k, refinedEq))
+         | successor(m) =>
+             function (refinedEq
+                         : Natural.distance(successor(k), successor(m)) = zero) =>
+               congruenceOf(
+                   successor,
+                   Natural.distance_zero_implies_equal(k, m, refinedEq))
+       } : Natural.distance(successor(k), b) = zero → successor(k) = b)(eq)
+
+-- |x|_Nat = 0 implies x = Integer.zero. Quotient.induct on x; at rep
+-- distance(a, b) = 0 gives a = b, and Quotient.sound between
+-- make(a, a) and make(zero, zero) (using the trivial a + 0 = a + 0).
+theorem Integer.absolute_value_natural_zero_implies_zero
+        (x : Integer)
+        (eq : Integer.absolute_value_natural(x) = zero)
+        : x = Integer.zero :=
+  Quotient.induct(
+      function (x' : Integer) =>
+          Integer.absolute_value_natural(x') = zero → x' = Integer.zero,
+      function (rep : IntegerRepresentative) =>
+        (cases rep {
+           | IntegerRepresentative.make(a, b) =>
+               function (distanceEq : Natural.distance(a, b) = zero) =>
+                 Quotient.sound(
+                     IntegerRepresentative.make(a, b),
+                     IntegerRepresentative.make(zero, zero),
+                     Equality.transitivity(
+                         Natural.add_zero(a),
+                         Equality.transitivity(
+                             Natural.distance_zero_implies_equal(
+                                 a, b, distanceEq),
+                             Equality.symmetry(Natural.add_zero(b)))))
+         } : Integer.absolute_value_natural(
+                 Quotient.mk(IntegerRepresentative,
+                              IntegerEquivalent, rep)) = zero
+             → Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep)
+               = Integer.zero),
+      x)(eq)
+
 -- Integer-level p-adic ultrametric: v_p(|A|_Nat) ≤ v_p(|B|_Nat) and
 -- |A + B|_Nat ≥ 1 implies v_p(|A|_Nat) ≤ v_p(|A + B|_Nat).
 -- Goes through divides_absolute_value_natural_sum and the bidirectional
