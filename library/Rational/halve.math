@@ -1,0 +1,124 @@
+-- Rational/halve.math
+--
+-- The Rational `1/2` and `halve(q) := q * (1/2)`. Key properties:
+-- `halve(q) + halve(q) = q`, `0 < halve(positive)`. Used for the
+-- standard ε/2 split in analytic proofs.
+
+module Rational.halve
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.sign
+import Integer.absolute_value
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.absolute_value
+
+-- 1/2 : the Rational represented by `numerator = 1, denominator-1 = 1`
+-- (so the actual denominator is succ(1) = 2).
+definition Rational.one_half : Rational :=
+  Quotient.mk(RationalRepresentative,
+              RationalEquivalent,
+              RationalRepresentative.make(Integer.one, 1))
+
+-- The key identity: 1/2 + 1/2 = 1.
+-- mk(make(1, 1)) + mk(make(1, 1)) reduces (via Rational.add's lift β
+-- + add_representatives) to
+--   mk(make(1 * succ(1) + 1 * succ(1), 1 + 1 * succ(1)))
+-- = mk(make(2 + 2, 1 + 2)) = mk(make(4, 3)).
+-- Goal: mk(make(4, 3)) = mk(make(1, 0)) = Rational.one.
+-- Equivalence: 4 * succ(0) = 1 * succ(3) — i.e., (4 : Integer) =
+-- (4 : Integer), trivially via ring on integer products.
+theorem Rational.one_half_doubled
+        : Rational.one_half + Rational.one_half = Rational.one :=
+  Quotient.sound(
+      Rational.add_representatives(
+          RationalRepresentative.make(Integer.one, 1),
+          RationalRepresentative.make(Integer.one, 1)),
+      RationalRepresentative.make(Integer.one, zero),
+      -- Cross-multiplication equivalence at Integer level. Both sides
+      -- reduce to (4 : Integer) after Natural.to_integer.multiply_preserves
+      -- and Integer.multiply_identity.
+      reflexivity(Integer,
+          Integer.one * (successor(1) : Integer)
+          + Integer.one * (successor(1) : Integer)))
+
+-- Halve a rational: q * (1/2).
+definition Rational.halve (q : Rational) : Rational :=
+  q * Rational.one_half
+
+-- halve(q) + halve(q) = q. Distributivity + one_half_doubled +
+-- multiply_one.
+theorem Rational.halve_doubled (q : Rational)
+        : Rational.halve(q) + Rational.halve(q) = q :=
+  calc Rational.halve(q) + Rational.halve(q)
+     = q * Rational.one_half + q * Rational.one_half
+            by reflexivity(Rational,
+                   q * Rational.one_half + q * Rational.one_half)
+     = q * (Rational.one_half + Rational.one_half)
+            by Equality.symmetry(
+                   Rational.distributivity_left(
+                       q, Rational.one_half, Rational.one_half))
+     = q * Rational.one
+            by rewrite(Rational.one_half_doubled)
+     = q
+            by Rational.multiply_one(q)
+
+-- ----------------------------------------------------------------------
+-- Rational arithmetic helpers.
+
+-- (a + b) - (a + c) = b - c. Used in respect proofs where the
+-- shared left component cancels.
+theorem Rational.add_subtract_cancel_left (a b c : Rational)
+        : (a + b) - (a + c) = b - c :=
+  calc (a + b) - (a + c)
+     = (a + b) + -(a + c)
+            by reflexivity(Rational, (a + b) + -(a + c))
+     = (a + b) + (-a + -c)
+            by rewrite(Rational.negate_add(a, c))
+     = a + (b + (-a + -c))
+            by Rational.add_associative(a, b, -a + -c)
+     = a + ((-a + -c) + b)
+            by rewrite(Rational.add_commutative(b, -a + -c))
+     = a + (-a + (-c + b))
+            by rewrite(Rational.add_associative(-a, -c, b))
+     = (a + -a) + (-c + b)
+            by Equality.symmetry(
+                   Rational.add_associative(a, -a, -c + b))
+     = Rational.zero + (-c + b)
+            by rewrite(Rational.add_negate_right(a))
+     = -c + b
+            by Rational.zero_add(-c + b)
+     = b + -c
+            by Rational.add_commutative(-c, b)
+     = b - c
+            by reflexivity(Rational, b - c)
+
+-- (a + b) - (c + b) = a - c. The shared right component cancels.
+theorem Rational.add_subtract_cancel_right (a b c : Rational)
+        : (a + b) - (c + b) = a - c :=
+  calc (a + b) - (c + b)
+     = (b + a) - (c + b)
+            by rewrite(Rational.add_commutative(a, b))
+     = (b + a) - (b + c)
+            by rewrite(Rational.add_commutative(c, b))
+     = a - c
+            by Rational.add_subtract_cancel_left(b, a, c)

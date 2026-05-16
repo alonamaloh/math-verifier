@@ -18,6 +18,7 @@ import axioms
 import Natural.basics
 import Natural.peano
 import Natural.arithmetic
+import Natural.order
 import Equality.basics
 
 definition Natural.distance : Natural → Natural → Natural
@@ -86,6 +87,46 @@ theorem Natural.distance_self_add_right (a b : Natural)
   Equality.transitivity(
       Natural.distance_symmetric(b, a + b),
       Natural.distance_add_self_right(a, b))
+
+-- distance(a, b) ≤ a + b. The "triangle inequality" at Natural level.
+-- WLOG b ≤ a (otherwise swap): distance(a, b) = (a - b). And
+-- a + b = (a - b) + 2b, so distance(a, b) + 2b = a + b, hence ≤.
+theorem Natural.distance_le_add : (a b : Natural)
+        → Natural.distance(a, b) ≤ a + b
+  | zero, b =>
+      -- distance(0, b) = b ≤ 0 + b = b. Both sides reduce to `b`.
+      LessOrEqual.reflexivity(b)
+  | successor(k), b =>
+      -- distance(s(k), b) doesn't auto-reduce — kernel only reduces
+      -- multi-constructor patterns when the inner case is explicit.
+      -- Case-split b explicitly with a dependent motive.
+      (cases b {
+         | zero =>
+             -- distance(s(k), 0) = s(k); s(k) + 0 = s(k); reflexive.
+             Equality.transport_proposition(
+                 Natural,
+                 function (sum : Natural) => successor(k) ≤ sum,
+                 successor(k), successor(k) + zero,
+                 Equality.symmetry(Natural.add_zero(successor(k))),
+                 LessOrEqual.reflexivity(successor(k)))
+         | successor(m) =>
+             -- distance(s(k), s(m)) = distance(k, m). s(k) + s(m) =
+             -- s(s(k + m)) via add_successor. By IH: distance(k, m)
+             -- ≤ k + m. Step twice: ≤ s(s(k + m)).
+             Equality.transport_proposition(
+                 Natural,
+                 function (sum : Natural) => Natural.distance(k, m) ≤ sum,
+                 successor(successor(k + m)),
+                 successor(k) + successor(m),
+                 congruenceOf(
+                     successor,
+                     Equality.symmetry(Natural.add_successor(k, m))),
+                 LessOrEqual.step(
+                     Natural.distance(k, m), successor(k + m),
+                     LessOrEqual.step(
+                         Natural.distance(k, m), k + m,
+                         Natural.distance_le_add(k, m))))
+       } : Natural.distance(successor(k), b) ≤ successor(k) + b)
 
 -- Respect lemma: if `a + d = b + c`, then `distance(a, b) =
 -- distance(c, d)`. Load-bearing for Integer.absolute_value's lift.
