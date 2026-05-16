@@ -143,3 +143,206 @@ theorem Natural.modulo_step_succ_too_big
       successor(predM), Natural.monus(p, n),
       Equality.symmetry(pTooBig),
       reflexivity(Natural, n))
+
+-- ----------------------------------------------------------------------
+-- Divide/modulo correctness: divisor * divide + modulo = dividend.
+-- Holds unconditionally on fuel: when fuel is exhausted, divide=0 and
+-- modulo carries the unprocessed dividend, so 0*divisor + dividend = dividend.
+
+-- Helper: divisor ≤ dividend (i.e., monus(divisor, dividend) = 0)
+-- means dividend = divisor + (dividend - divisor) (using monus).
+-- Single-pattern on divisor; nested case on dividend with a dependent
+-- motive so the kernel reduces monus through both constructor matches.
+theorem Natural.monus_zero_implies_decompose
+        : (divisor dividend : Natural)
+          → Natural.monus(divisor, dividend) = zero
+          → dividend = divisor + Natural.monus(dividend, divisor)
+  | zero, dividend, _ =>
+      -- divisor = 0: dividend = 0 + dividend. monus(dividend, 0) = dividend.
+      calc dividend
+         = zero + dividend
+                by reflexivity(Natural, zero + dividend)
+         = zero + Natural.monus(dividend, zero)
+                by congruenceOf(
+                       function (z : Natural) => zero + z,
+                       Equality.symmetry(Natural.monus_zero(dividend)))
+  | successor(predDivisor), dividend, monusEqZero =>
+      (cases dividend {
+         | zero =>
+             function (refinedMonusEqZero
+                         : Natural.monus(successor(predDivisor), zero) = zero) =>
+               -- monus(succ predDivisor, zero) β-reduces to succ predDivisor.
+               -- refinedMonusEqZero's type after reduction: succ predDivisor = zero.
+               False.eliminate_proposition(
+                   zero
+                     = successor(predDivisor)
+                         + Natural.monus(zero, successor(predDivisor)),
+                   Natural.successor_not_zero(
+                       predDivisor, refinedMonusEqZero))
+         | successor(predDividend) =>
+             function (refinedMonusEqZero
+                         : Natural.monus(successor(predDivisor),
+                                         successor(predDividend))
+                           = zero) =>
+               -- Inner monus reduces to monus(predDivisor, predDividend).
+               -- IH on (predDivisor, predDividend).
+               calc successor(predDividend)
+                  = successor(predDivisor
+                              + Natural.monus(predDividend, predDivisor))
+                         by congruenceOf(successor,
+                                Natural.monus_zero_implies_decompose(
+                                    predDivisor, predDividend,
+                                    refinedMonusEqZero))
+                  = successor(predDivisor)
+                        + Natural.monus(predDividend, predDivisor)
+                         by reflexivity(Natural,
+                                successor(predDivisor)
+                                    + Natural.monus(predDividend, predDivisor))
+       } : (refinedMonusEqZero
+                : Natural.monus(successor(predDivisor), dividend) = zero)
+           → dividend
+             = successor(predDivisor)
+                 + Natural.monus(dividend, successor(predDivisor)))(monusEqZero)
+
+-- Main correctness: divisor * divide_step(fuel, divisor, dividend)
+-- + modulo_step(fuel, divisor, dividend) = dividend. Induct on fuel.
+theorem Natural.divide_modulo_step_decompose
+        : (fuel divisor dividend : Natural)
+          → divisor * Natural.divide_step(fuel, divisor, dividend)
+                + Natural.modulo_step(fuel, divisor, dividend)
+            = dividend
+  | zero, divisor, dividend =>
+      -- divide_step(0, ...) = 0, modulo_step(0, ...) = dividend.
+      -- divisor * 0 + dividend = 0 + dividend = dividend.
+      calc divisor * zero + dividend
+         = zero + dividend
+                by congruenceOf(
+                       function (z : Natural) => z + dividend,
+                       Natural.multiply_zero(divisor))
+         = dividend
+                by reflexivity(Natural, dividend)
+  | successor(fuel), divisor, dividend =>
+      -- "With" pattern: introduce monusValue as a fresh variable, then
+      -- case on it. The motive then substitutes monusValue with the
+      -- constructor in each branch.
+      (function (monusValue : Natural)
+                (monusEq : Natural.monus(divisor, dividend) = monusValue) =>
+         (cases monusValue {
+            | zero =>
+                function (monusEqZero : Natural.monus(divisor, dividend) = zero) =>
+                  calc divisor
+                           * Natural.divide_step(
+                                 successor(fuel), divisor, dividend)
+                       + Natural.modulo_step(
+                                 successor(fuel), divisor, dividend)
+                     = divisor
+                           * successor(Natural.divide_step(
+                                 fuel, divisor, Natural.monus(dividend, divisor)))
+                       + Natural.modulo_step(
+                                 fuel, divisor, Natural.monus(dividend, divisor))
+                             by Equality.transitivity(
+                                    congruenceOf(
+                                        function (z : Natural) =>
+                                            divisor * z
+                                            + Natural.modulo_step(
+                                                  successor(fuel),
+                                                  divisor, dividend),
+                                        Natural.divide_step_succ_fits(
+                                            fuel, divisor, dividend, monusEqZero)),
+                                    congruenceOf(
+                                        function (z : Natural) =>
+                                            divisor
+                                                * successor(Natural.divide_step(
+                                                      fuel, divisor,
+                                                      Natural.monus(dividend, divisor)))
+                                                + z,
+                                        Natural.modulo_step_succ_fits(
+                                            fuel, divisor, dividend, monusEqZero)))
+                     = (divisor
+                          + divisor
+                              * Natural.divide_step(
+                                    fuel, divisor, Natural.monus(dividend, divisor)))
+                       + Natural.modulo_step(
+                             fuel, divisor, Natural.monus(dividend, divisor))
+                             by congruenceOf(
+                                    function (z : Natural) =>
+                                        z
+                                        + Natural.modulo_step(
+                                              fuel, divisor,
+                                              Natural.monus(dividend, divisor)),
+                                    Natural.multiply_successor(
+                                        divisor,
+                                        Natural.divide_step(
+                                            fuel, divisor,
+                                            Natural.monus(dividend, divisor))))
+                     = divisor
+                       + (divisor
+                            * Natural.divide_step(
+                                  fuel, divisor, Natural.monus(dividend, divisor))
+                          + Natural.modulo_step(
+                                fuel, divisor, Natural.monus(dividend, divisor)))
+                             by Natural.add_associative(
+                                    divisor,
+                                    divisor
+                                        * Natural.divide_step(
+                                              fuel, divisor,
+                                              Natural.monus(dividend, divisor)),
+                                    Natural.modulo_step(
+                                        fuel, divisor,
+                                        Natural.monus(dividend, divisor)))
+                     = divisor + Natural.monus(dividend, divisor)
+                             by congruenceOf(
+                                    function (z : Natural) => divisor + z,
+                                    Natural.divide_modulo_step_decompose(
+                                        fuel, divisor,
+                                        Natural.monus(dividend, divisor)))
+                     = dividend
+                             by Equality.symmetry(
+                                    Natural.monus_zero_implies_decompose(
+                                        divisor, dividend, monusEqZero))
+            | successor(predM) =>
+                function (monusEqSucc : Natural.monus(divisor, dividend)
+                                        = successor(predM)) =>
+                  calc divisor
+                           * Natural.divide_step(
+                                 successor(fuel), divisor, dividend)
+                       + Natural.modulo_step(
+                                 successor(fuel), divisor, dividend)
+                     = divisor * zero + dividend
+                             by Equality.transitivity(
+                                    congruenceOf(
+                                        function (z : Natural) =>
+                                            divisor * z
+                                            + Natural.modulo_step(
+                                                  successor(fuel),
+                                                  divisor, dividend),
+                                        Natural.divide_step_succ_too_big(
+                                            fuel, divisor, dividend, predM,
+                                            monusEqSucc)),
+                                    congruenceOf(
+                                        function (z : Natural) =>
+                                            divisor * zero + z,
+                                        Natural.modulo_step_succ_too_big(
+                                            fuel, divisor, dividend, predM,
+                                            monusEqSucc)))
+                     = zero + dividend
+                             by congruenceOf(
+                                    function (z : Natural) => z + dividend,
+                                    Natural.multiply_zero(divisor))
+                     = dividend
+                             by reflexivity(Natural, dividend)
+          } : Natural.monus(divisor, dividend) = monusValue
+              → divisor * Natural.divide_step(
+                                  successor(fuel), divisor, dividend)
+                    + Natural.modulo_step(
+                                  successor(fuel), divisor, dividend)
+                = dividend)(monusEq))(
+        Natural.monus(divisor, dividend),
+        reflexivity(Natural, Natural.monus(divisor, dividend)))
+
+-- Top-level decomposition: divisor * divide(d, n) + modulo(d, n) = n.
+theorem Natural.divide_modulo_decompose (divisor dividend : Natural)
+        : divisor * Natural.divide(divisor, dividend)
+              + Natural.modulo(divisor, dividend)
+          = dividend :=
+  Natural.divide_modulo_step_decompose(dividend, divisor, dividend)
