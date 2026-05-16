@@ -842,19 +842,449 @@ theorem CauchyRationalSequence.sequenceFunction_multiply
     m =>
       reflexivity(Rational, sa(m) * sb(m))
 
--- Stubs for Real.multiply_after_first_respects and Real.multiply_respects.
--- These require the analytic proofs analogous to add_after_first_respects
--- and add_respects, using a bound on the fixed-side sequence and the
--- abs-multiplicative inequality. Restoring them is the next step;
--- placeholder for now is `sorry` to keep the surrounding API typeable.
+-- Helper: a*b - a*c = a*(b - c) via distributivity_left + multiply_negate_right.
+theorem Rational.factor_subtract_distribute (a b c : Rational)
+        : a * b - a * c = a * (b - c) :=
+  calc a * b - a * c
+     = a * b + -(a * c)
+            by reflexivity(Rational, a * b + -(a * c))
+     = a * b + a * -c
+            by congruenceOf(
+                   function (z : Rational) => a * b + z,
+                   Equality.symmetry(Rational.multiply_negate_right(a, c)))
+     = a * (b + -c)
+            by Equality.symmetry(Rational.distributivity_left(a, b, -c))
+     = a * (b - c)
+            by reflexivity(Rational, a * (b - c))
+
+-- The respect-proof inner chain: given the bound |s_x(m)| ≤ (succ K : R)
+-- and the difference bound |s_y(m) - s_y'(m)| < δ, conclude
+-- |s_x(m)*s_y(m) - s_x(m)*s_y'(m)| < ε via the (succ K)*δ ≤ halve(ε)
+-- + halve_less_than_self chain.
+theorem Real.multiply_respect_bound_chain
+        (s_x s_y s_yPrime : Rational.sequence.Sequence)
+        (epsilon : Rational) (K : Natural) (delta : Rational)
+        (m : Natural)
+        (s_x_at_m_bound : Rational.absolute_value(s_x(m))
+                            ≤ (successor(K) : Rational))
+        (s_y_diff_bound : Rational.absolute_value(s_y(m) - s_yPrime(m))
+                            < delta)
+        (delta_bound : Rational.LessOrEqual(
+                           (successor(K) : Rational) * delta,
+                           Rational.halve(epsilon)))
+        (epsilonPositive : Rational.zero < epsilon)
+        : Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+            < epsilon := {
+  claim s_y_diff_weak : Rational.absolute_value(s_y(m) - s_yPrime(m)) ≤ delta
+    by And.left(
+           Rational.LessOrEqual(
+               Rational.absolute_value(s_y(m) - s_yPrime(m)), delta),
+           Not(Rational.absolute_value(s_y(m) - s_yPrime(m)) = delta),
+           s_y_diff_bound);
+  claim factor_eq
+      : s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)
+        = s_x(m) * (s_y(m) - s_yPrime(m))
+    by Rational.factor_subtract_distribute(s_x(m), s_y(m), s_yPrime(m));
+  claim abs_factor_eq
+      : Rational.absolute_value(s_x(m) * (s_y(m) - s_yPrime(m)))
+        = Rational.absolute_value(s_x(m))
+          * Rational.absolute_value(s_y(m) - s_yPrime(m))
+    by Rational.absolute_value_multiplicative(
+           s_x(m), s_y(m) - s_yPrime(m));
+  claim step1
+      : Rational.absolute_value(s_x(m))
+            * Rational.absolute_value(s_y(m) - s_yPrime(m))
+          ≤ (successor(K) : Rational)
+            * Rational.absolute_value(s_y(m) - s_yPrime(m))
+    by Rational.LessOrEqual.multiply_by_nonneg_right(
+           Rational.absolute_value(s_x(m)),
+           (successor(K) : Rational),
+           Rational.absolute_value(s_y(m) - s_yPrime(m)),
+           s_x_at_m_bound,
+           Rational.zero_le_absolute_value(s_y(m) - s_yPrime(m)));
+  claim step2
+      : (successor(K) : Rational)
+            * Rational.absolute_value(s_y(m) - s_yPrime(m))
+          ≤ (successor(K) : Rational) * delta
+    by Rational.LessOrEqual.multiply_by_nonneg_left(
+           Rational.absolute_value(s_y(m) - s_yPrime(m)),
+           delta,
+           (successor(K) : Rational),
+           s_y_diff_weak,
+           Rational.LessOrEqual_zero_of_IsNonneg(
+               (successor(K) : Rational),
+               Integer.from_natural_is_nonneg(successor(K))));
+  claim weak_bound
+      : Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+          ≤ Rational.halve(epsilon)
+    by Equality.transport_proposition(
+           Rational,
+           function (lhs : Rational) =>
+               Rational.LessOrEqual(lhs, Rational.halve(epsilon)),
+           Rational.absolute_value(s_x(m) * (s_y(m) - s_yPrime(m))),
+           Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)),
+           Equality.symmetry(
+               congruenceOf(Rational.absolute_value, factor_eq)),
+           Equality.transport_proposition(
+               Rational,
+               function (lhs : Rational) =>
+                   Rational.LessOrEqual(lhs, Rational.halve(epsilon)),
+               Rational.absolute_value(s_x(m))
+                   * Rational.absolute_value(s_y(m) - s_yPrime(m)),
+               Rational.absolute_value(s_x(m) * (s_y(m) - s_yPrime(m))),
+               Equality.symmetry(abs_factor_eq),
+               Rational.LessOrEqual.transitive(
+                   Rational.absolute_value(s_x(m))
+                       * Rational.absolute_value(s_y(m) - s_yPrime(m)),
+                   (successor(K) : Rational) * delta,
+                   Rational.halve(epsilon),
+                   Rational.LessOrEqual.transitive(
+                       Rational.absolute_value(s_x(m))
+                           * Rational.absolute_value(s_y(m) - s_yPrime(m)),
+                       (successor(K) : Rational)
+                           * Rational.absolute_value(s_y(m) - s_yPrime(m)),
+                       (successor(K) : Rational) * delta,
+                       step1, step2),
+                   delta_bound)));
+  Rational.LessThan.transitive_left(
+      Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)),
+      Rational.halve(epsilon),
+      epsilon,
+      weak_bound,
+      Rational.halve_less_than_self(epsilon, epsilonPositive))
+}
+
+-- Helper: produce the CauchyEquivalent proof body for the at-rep
+-- multiply respect. Given fixed s_x with a Natural bound, and yEquiv,
+-- show the product sequences are CauchyEquivalent.
+theorem Real.multiply_after_first_respects_at_rep_inner
+        (s_x : Rational.sequence.Sequence)
+        (sCauchy_x : Rational.sequence.IsCauchy(s_x))
+        (s_y s_yPrime : Rational.sequence.Sequence)
+        (sCauchy_y : Rational.sequence.IsCauchy(s_y))
+        (sCauchy_yPrime : Rational.sequence.IsCauchy(s_yPrime))
+        (refinedYEquiv : CauchyEquivalent(
+                             CauchyRationalSequence.make(s_y, sCauchy_y),
+                             CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime)))
+        (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon)
+        : ∃ (N : Natural).
+            (m : Natural) → N ≤ m →
+              Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+                < epsilon :=
+  Exists.eliminate(
+      Natural,
+      function (K : Natural) =>
+        ∃ (N_x_bound : Natural).
+          (m : Natural) → N_x_bound ≤ m →
+            Rational.absolute_value(s_x(m)) ≤ (successor(K) : Rational),
+      ∃ (N : Natural).
+        (m : Natural) → N ≤ m →
+          Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+            < epsilon,
+      function (K : Natural)
+               (xBoundExists : ∃ (N_x_bound : Natural).
+                                 (m : Natural) → N_x_bound ≤ m →
+                                   Rational.absolute_value(s_x(m))
+                                     ≤ (successor(K) : Rational)) =>
+        Exists.eliminate(
+            Natural,
+            function (N_x_bound : Natural) =>
+              (m : Natural) → N_x_bound ≤ m →
+                Rational.absolute_value(s_x(m)) ≤ (successor(K) : Rational),
+            ∃ (N : Natural).
+              (m : Natural) → N ≤ m →
+                Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+                  < epsilon,
+            function (N_x_bound : Natural)
+                     (xBound : (m : Natural) → N_x_bound ≤ m →
+                                 Rational.absolute_value(s_x(m))
+                                   ≤ (successor(K) : Rational)) =>
+              Exists.eliminate(
+                  Rational,
+                  function (delta : Rational) =>
+                    And(Rational.zero < delta,
+                        Rational.LessOrEqual(
+                            (successor(K) : Rational) * delta,
+                            Rational.halve(epsilon))),
+                  ∃ (N : Natural).
+                    (m : Natural) → N ≤ m →
+                      Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+                        < epsilon,
+                  function (delta : Rational)
+                           (delta_props : And(Rational.zero < delta,
+                                              Rational.LessOrEqual(
+                                                  (successor(K) : Rational) * delta,
+                                                  Rational.halve(epsilon)))) =>
+                    Exists.eliminate(
+                        Natural,
+                        function (N_y : Natural) =>
+                          (m : Natural) → N_y ≤ m →
+                            Rational.absolute_value(s_y(m) - s_yPrime(m))
+                              < delta,
+                        ∃ (N : Natural).
+                          (m : Natural) → N ≤ m →
+                            Rational.absolute_value(
+                                s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+                              < epsilon,
+                        function (N_y : Natural)
+                                 (yEquivAt : (m : Natural) → N_y ≤ m →
+                                               Rational.absolute_value(
+                                                   s_y(m) - s_yPrime(m))
+                                                 < delta) =>
+                          Exists.introduce(
+                              Natural,
+                              function (N : Natural) =>
+                                (m : Natural) → N ≤ m →
+                                  Rational.absolute_value(
+                                      s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+                                    < epsilon,
+                              Natural.maximum(N_x_bound, N_y),
+                              function (m : Natural)
+                                       (m_ge_max : Natural.maximum(N_x_bound, N_y) ≤ m) =>
+                                Real.multiply_respect_bound_chain(
+                                    s_x, s_y, s_yPrime,
+                                    epsilon, K, delta, m,
+                                    xBound(m,
+                                        LessOrEqual.transitive(
+                                            N_x_bound,
+                                            Natural.maximum(N_x_bound, N_y),
+                                            m,
+                                            m_ge_max,
+                                            Natural.left_le_max(N_x_bound, N_y))),
+                                    yEquivAt(m,
+                                        LessOrEqual.transitive(
+                                            N_y,
+                                            Natural.maximum(N_x_bound, N_y),
+                                            m,
+                                            m_ge_max,
+                                            Natural.right_le_max(N_x_bound, N_y))),
+                                    And.right(
+                                        Rational.zero < delta,
+                                        Rational.LessOrEqual(
+                                            (successor(K) : Rational) * delta,
+                                            Rational.halve(epsilon)),
+                                        delta_props),
+                                    epsilonPositive)),
+                        refinedYEquiv(delta,
+                            And.left(
+                                Rational.zero < delta,
+                                Rational.LessOrEqual(
+                                    (successor(K) : Rational) * delta,
+                                    Rational.halve(epsilon)),
+                                delta_props))),
+                  Rational.divide_by_succ_positive(
+                      Rational.halve(epsilon), K,
+                      Rational.halve_positive(epsilon, epsilonPositive))),
+            xBoundExists),
+      Rational.sequence.cauchy_is_naturally_bounded(s_x, sCauchy_x))
+
+-- multiply_after_first_respects: rep_x fixed, y varies.
 theorem Real.multiply_after_first_respects
-        (rep_x rep_y rep_yPrime : CauchyRationalSequence)
-        (yEquiv : CauchyEquivalent(rep_y, rep_yPrime))
+        : (rep_x rep_y rep_yPrime : CauchyRationalSequence)
+          → CauchyEquivalent(rep_y, rep_yPrime)
+          → Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                         CauchyRationalSequence.multiply(rep_x, rep_y))
+            = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                           CauchyRationalSequence.multiply(rep_x, rep_yPrime))
+  | CauchyRationalSequence.make(s_x, sCauchy_x), rep_y, rep_yPrime, yEquiv =>
+      (cases rep_y {
+         | CauchyRationalSequence.make(s_y, sCauchy_y) =>
+             function (outerRefinedYEquiv
+                         : CauchyEquivalent(
+                               CauchyRationalSequence.make(s_y, sCauchy_y),
+                               rep_yPrime)) =>
+               (cases rep_yPrime {
+                  | CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime) =>
+                      function (refinedYEquiv
+                                  : CauchyEquivalent(
+                                        CauchyRationalSequence.make(s_y, sCauchy_y),
+                                        CauchyRationalSequence.make(
+                                            s_yPrime, sCauchy_yPrime))) =>
+                        Quotient.sound(
+                            CauchyRationalSequence, CauchyEquivalent,
+                            CauchyRationalSequence.multiply(
+                                CauchyRationalSequence.make(s_x, sCauchy_x),
+                                CauchyRationalSequence.make(s_y, sCauchy_y)),
+                            CauchyRationalSequence.multiply(
+                                CauchyRationalSequence.make(s_x, sCauchy_x),
+                                CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime)),
+                            function (epsilon : Rational)
+                                     (epsilonPositive : Rational.zero < epsilon) =>
+                              Real.multiply_after_first_respects_at_rep_inner(
+                                  s_x, sCauchy_x, s_y, s_yPrime,
+                                  sCauchy_y, sCauchy_yPrime,
+                                  refinedYEquiv,
+                                  epsilon, epsilonPositive))
+                } : (refinedYEquiv : CauchyEquivalent(
+                                         CauchyRationalSequence.make(s_y, sCauchy_y),
+                                         rep_yPrime))
+                    → Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                                   CauchyRationalSequence.multiply(
+                                       CauchyRationalSequence.make(s_x, sCauchy_x),
+                                       CauchyRationalSequence.make(s_y, sCauchy_y)))
+                      = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                                     CauchyRationalSequence.multiply(
+                                         CauchyRationalSequence.make(s_x, sCauchy_x),
+                                         rep_yPrime)))(outerRefinedYEquiv)
+       } : (refinedYEquiv : CauchyEquivalent(rep_y, rep_yPrime))
+           → Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                          CauchyRationalSequence.multiply(
+                              CauchyRationalSequence.make(s_x, sCauchy_x),
+                              rep_y))
+             = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                            CauchyRationalSequence.multiply(
+                                CauchyRationalSequence.make(s_x, sCauchy_x),
+                                rep_yPrime)))(yEquiv)
+
+-- Symmetric inner-chain helper for multiply_respects_at_rep_y: y is
+-- bounded, x varies via xEquiv.
+theorem Real.multiply_respects_at_rep_y_inner
+        (s_x : Rational.sequence.Sequence)
+        (sCauchy_x : Rational.sequence.IsCauchy(s_x))
+        (s_xPrime : Rational.sequence.Sequence)
+        (sCauchy_xPrime : Rational.sequence.IsCauchy(s_xPrime))
+        (s_y : Rational.sequence.Sequence)
+        (sCauchy_y : Rational.sequence.IsCauchy(s_y))
+        (refinedXEquiv : CauchyEquivalent(
+                             CauchyRationalSequence.make(s_x, sCauchy_x),
+                             CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime)))
+        (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon)
+        : ∃ (N : Natural).
+            (m : Natural) → N ≤ m →
+              Rational.absolute_value(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
+                < epsilon :=
+  -- Reduce to multiply_after_first_respects_at_rep_inner with s_y as
+  -- the "fixed" sequence (bounded) and x varying.
+  Exists.eliminate(
+      Natural,
+      function (N : Natural) =>
+        (m : Natural) → N ≤ m →
+          Rational.absolute_value(s_y(m) * s_x(m) - s_y(m) * s_xPrime(m))
+            < epsilon,
+      ∃ (N : Natural).
+        (m : Natural) → N ≤ m →
+          Rational.absolute_value(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
+            < epsilon,
+      function (N : Natural)
+               (boundedY : (m : Natural) → N ≤ m →
+                             Rational.absolute_value(
+                                 s_y(m) * s_x(m) - s_y(m) * s_xPrime(m))
+                               < epsilon) =>
+        Exists.introduce(
+            Natural,
+            function (N' : Natural) =>
+              (m : Natural) → N' ≤ m →
+                Rational.absolute_value(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
+                  < epsilon,
+            N,
+            function (m : Natural) (N_leq_m : N ≤ m) =>
+              Equality.transport_proposition(
+                  Rational,
+                  function (w : Rational) =>
+                      Rational.LessThan(w, epsilon),
+                  Rational.absolute_value(
+                      s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)),
+                  Rational.absolute_value(
+                      s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)),
+                  congruenceOf(
+                      Rational.absolute_value,
+                      calc s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)
+                         = s_x(m) * s_y(m) - s_y(m) * s_xPrime(m)
+                                by congruenceOf(
+                                       function (z : Rational) =>
+                                           z - s_y(m) * s_xPrime(m),
+                                       Rational.multiply_commutative(
+                                           s_y(m), s_x(m)))
+                         = s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)
+                                by congruenceOf(
+                                       function (z : Rational) =>
+                                           s_x(m) * s_y(m) - z,
+                                       Rational.multiply_commutative(
+                                           s_y(m), s_xPrime(m)))),
+                  boundedY(m, N_leq_m))),
+      Real.multiply_after_first_respects_at_rep_inner(
+          s_y, sCauchy_y, s_x, s_xPrime, sCauchy_x, sCauchy_xPrime,
+          refinedXEquiv, epsilon, epsilonPositive))
+
+-- Helper for multiply_respects: shows the at-rep-y version of the
+-- product equivalence given xEquiv. The argument shape is symmetric to
+-- multiply_after_first_respects but with the bound on the y-side.
+theorem Real.multiply_respects_at_rep_y
+        (rep_x rep_xPrime rep_y : CauchyRationalSequence)
+        (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
         : Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
                        CauchyRationalSequence.multiply(rep_x, rep_y))
           = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                         CauchyRationalSequence.multiply(rep_x, rep_yPrime)) := sorry
+                         CauchyRationalSequence.multiply(rep_xPrime, rep_y)) :=
+  -- The strategy: at the rep level, multiply(rep_x, rep_y)'s sequence
+  -- is λn. s_x(n) * s_y(n), and we need:
+  --   λn. s_x(n) * s_y(n)  ≡  λn. s_xPrime(n) * s_y(n).
+  -- Bound |s_y(n)| ≤ (succ K : R) eventually. Apply xEquiv with δ
+  -- such that (succ K) * δ ≤ halve(ε). Conclude
+  -- |s_x(n)*s_y(n) - s_xPrime(n)*s_y(n)| = |(s_x(n) - s_xPrime(n)) * s_y(n)|
+  --                                     = |s_x(n) - s_xPrime(n)| * |s_y(n)|
+  --                                     ≤ |s_x(n) - s_xPrime(n)| * (succ K)
+  --                                     ≤ δ * (succ K) ≤ halve(ε) < ε.
+  -- Pattern-match rep_y, rep_x, rep_xPrime. Each nested cases takes a
+  -- function that takes the refined xEquiv after refining rep_x/rep_xPrime.
+  (cases rep_y {
+     | CauchyRationalSequence.make(s_y, sCauchy_y) =>
+         (cases rep_x {
+            | CauchyRationalSequence.make(s_x, sCauchy_x) =>
+                function (innerXEquiv
+                            : CauchyEquivalent(
+                                  CauchyRationalSequence.make(s_x, sCauchy_x),
+                                  rep_xPrime)) =>
+                  (cases rep_xPrime {
+                     | CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime) =>
+                         function (refinedXEquiv
+                                     : CauchyEquivalent(
+                                           CauchyRationalSequence.make(s_x, sCauchy_x),
+                                           CauchyRationalSequence.make(
+                                               s_xPrime, sCauchy_xPrime))) =>
+                           Quotient.sound(
+                               CauchyRationalSequence, CauchyEquivalent,
+                               CauchyRationalSequence.multiply(
+                                   CauchyRationalSequence.make(s_x, sCauchy_x),
+                                   CauchyRationalSequence.make(s_y, sCauchy_y)),
+                               CauchyRationalSequence.multiply(
+                                   CauchyRationalSequence.make(
+                                       s_xPrime, sCauchy_xPrime),
+                                   CauchyRationalSequence.make(s_y, sCauchy_y)),
+                               function (epsilon : Rational)
+                                        (epsilonPositive : Rational.zero < epsilon) =>
+                                 Real.multiply_respects_at_rep_y_inner(
+                                     s_x, sCauchy_x, s_xPrime, sCauchy_xPrime,
+                                     s_y, sCauchy_y,
+                                     refinedXEquiv,
+                                     epsilon, epsilonPositive))
+                   } : (refinedXEquiv : CauchyEquivalent(
+                                            CauchyRationalSequence.make(s_x, sCauchy_x),
+                                            rep_xPrime))
+                       → Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                                      CauchyRationalSequence.multiply(
+                                          CauchyRationalSequence.make(s_x, sCauchy_x),
+                                          CauchyRationalSequence.make(s_y, sCauchy_y)))
+                         = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                                        CauchyRationalSequence.multiply(
+                                            rep_xPrime,
+                                            CauchyRationalSequence.make(s_y, sCauchy_y))))(innerXEquiv)
+          } : (innerXEquiv : CauchyEquivalent(rep_x, rep_xPrime))
+              → Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                             CauchyRationalSequence.multiply(
+                                 rep_x,
+                                 CauchyRationalSequence.make(s_y, sCauchy_y)))
+                = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                               CauchyRationalSequence.multiply(
+                                   rep_xPrime,
+                                   CauchyRationalSequence.make(s_y, sCauchy_y))))(xEquiv)
+   } : Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                    CauchyRationalSequence.multiply(rep_x, rep_y))
+       = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                      CauchyRationalSequence.multiply(rep_xPrime, rep_y)))
 
+-- Symmetric inner-chain helper for multiply_respects_at_rep_y: y is
+-- bounded, x varies via xEquiv.
 theorem Real.multiply_respects
         (rep_x rep_xPrime : CauchyRationalSequence)
         (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
@@ -870,7 +1300,24 @@ theorem Real.multiply_respects
                   Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
                                CauchyRationalSequence.multiply(rep_xPrime, rep_y)),
               Real.multiply_after_first_respects(rep_xPrime),
-              yReal) := sorry
+              yReal) :=
+  Quotient.induct(
+      function (y : Real) =>
+          Quotient.lift(
+              function (rep_y : CauchyRationalSequence) =>
+                  Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                               CauchyRationalSequence.multiply(rep_x, rep_y)),
+              Real.multiply_after_first_respects(rep_x),
+              y)
+          = Quotient.lift(
+              function (rep_y : CauchyRationalSequence) =>
+                  Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                               CauchyRationalSequence.multiply(rep_xPrime, rep_y)),
+              Real.multiply_after_first_respects(rep_xPrime),
+              y),
+      function (rep_y : CauchyRationalSequence) =>
+          Real.multiply_respects_at_rep_y(rep_x, rep_xPrime, rep_y, xEquiv),
+      yReal)
 
 definition Real.multiply_after_first
         (rep_x : CauchyRationalSequence) (yReal : Real) : Real :=
