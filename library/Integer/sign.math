@@ -24,6 +24,7 @@ import Integer.negation
 import Integer.ring
 import Integer.algebra
 import Integer.order
+import Integer.absolute_value
 
 -- Helper: subtracting at the representative level (when b ≤ a) gives
 -- a representative equivalent to the natural difference.
@@ -262,3 +263,103 @@ theorem Integer.natural_eq_negate_natural_implies_both_zero
     -- Step 7: k itself is zero.
     Natural.multiply_successor_eq_zero_left_zero(k, d1, kProductZero)
 }
+
+-- ----------------------------------------------------------------------
+-- Absolute-value multiplicativity restricted to a positive-natural
+-- second factor. Sufficient for Rational.absolute_value_respect; the
+-- fully general |x*y| = |x|*|y| can wait.
+
+theorem Integer.absolute_value_multiply_by_positive_natural
+        (x : Integer) (d : Natural)
+        : Integer.absolute_value(x * (successor(d) : Integer))
+          = Integer.absolute_value(x) * (successor(d) : Integer) :=
+  Or.eliminate(
+      Integer.IsNonneg(x),
+      ∃ (k : Natural). x = -(k : Integer),
+      Integer.absolute_value(x * (successor(d) : Integer))
+        = Integer.absolute_value(x) * (successor(d) : Integer),
+      function (xIsNonneg : Integer.IsNonneg(x)) =>
+        Exists.eliminate(
+            Natural,
+            function (a : Natural) => x = (a : Integer),
+            Integer.absolute_value(x * (successor(d) : Integer))
+              = Integer.absolute_value(x) * (successor(d) : Integer),
+            function (a : Natural) (xIsImage : x = (a : Integer)) =>
+              -- |x * succ(d)| = |(a : I) * (succ(d) : I)|
+              -- = |(a * succ(d) : I)| = (a * succ(d) : I)
+              -- = (a : I) * (succ(d) : I) = |x| * (succ(d) : I).
+              calc Integer.absolute_value(
+                       x * (successor(d) : Integer))
+                 = Integer.absolute_value(
+                       (a : Integer) * (successor(d) : Integer))
+                        by rewrite(xIsImage)
+                 = Integer.absolute_value(
+                       (a * successor(d) : Integer))
+                        by congruenceOf(
+                               Integer.absolute_value,
+                               Equality.symmetry(
+                                   Natural.to_integer.multiply_preserves(
+                                       a, successor(d))))
+                 = (a * successor(d) : Integer)
+                        by Integer.absolute_value_of_natural(
+                               a * successor(d))
+                 = (a : Integer) * (successor(d) : Integer)
+                        by Natural.to_integer.multiply_preserves(
+                               a, successor(d))
+                 = Integer.absolute_value((a : Integer))
+                   * (successor(d) : Integer)
+                        by rewrite(
+                               Integer.absolute_value_of_natural(a))
+                 = Integer.absolute_value(x) * (successor(d) : Integer)
+                        by rewrite(xIsImage),
+            xIsNonneg),
+      function (xNegEvidence : ∃ (k : Natural). x = -(k : Integer)) =>
+        Exists.eliminate(
+            Natural,
+            function (k : Natural) => x = -(k : Integer),
+            Integer.absolute_value(x * (successor(d) : Integer))
+              = Integer.absolute_value(x) * (successor(d) : Integer),
+            function (k : Natural) (xEqNegK : x = -(k : Integer)) =>
+              -- |x * succ(d)| = |-(k : I) * (succ(d) : I)|
+              -- = |-((k : I) * (succ(d) : I))| = |(k * succ(d) : I)|
+              -- = (k * succ(d) : I) = (k : I) * (succ(d) : I)
+              -- = |(k : I)| * (succ(d) : I) = |-(k : I)| * (succ(d) : I)
+              -- = |x| * (succ(d) : I).
+              calc Integer.absolute_value(
+                       x * (successor(d) : Integer))
+                 = Integer.absolute_value(
+                       -(k : Integer) * (successor(d) : Integer))
+                        by rewrite(xEqNegK)
+                 = Integer.absolute_value(
+                       -((k : Integer) * (successor(d) : Integer)))
+                        by congruenceOf(Integer.absolute_value,
+                               Integer.multiply_negate_left(
+                                   (k : Integer),
+                                   (successor(d) : Integer)))
+                 = Integer.absolute_value(
+                       (k : Integer) * (successor(d) : Integer))
+                        by Integer.absolute_value_negate(
+                               (k : Integer) * (successor(d) : Integer))
+                 = Integer.absolute_value((k * successor(d) : Integer))
+                        by congruenceOf(Integer.absolute_value,
+                               Equality.symmetry(
+                                   Natural.to_integer.multiply_preserves(
+                                       k, successor(d))))
+                 = (k * successor(d) : Integer)
+                        by Integer.absolute_value_of_natural(
+                               k * successor(d))
+                 = (k : Integer) * (successor(d) : Integer)
+                        by Natural.to_integer.multiply_preserves(
+                               k, successor(d))
+                 = Integer.absolute_value((k : Integer))
+                   * (successor(d) : Integer)
+                        by rewrite(
+                               Integer.absolute_value_of_natural(k))
+                 = Integer.absolute_value(-(k : Integer))
+                   * (successor(d) : Integer)
+                        by rewrite(Integer.absolute_value_negate(
+                                       (k : Integer)))
+                 = Integer.absolute_value(x) * (successor(d) : Integer)
+                        by rewrite(xEqNegK),
+            xNegEvidence),
+      Integer.sign_split(x))

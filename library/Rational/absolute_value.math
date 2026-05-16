@@ -24,6 +24,7 @@ import Integer.ring
 import Integer.algebra
 import Integer.order
 import Integer.absolute_value
+import Integer.sign
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -40,17 +41,54 @@ definition Rational.absolute_value_at_representative
           RationalRepresentative.make(
               Integer.absolute_value(n), d))
 
--- Respect: stubbed for now. The proof reduces to
---   (n1, d1) ~ (n2, d2)  i.e. n1·succ(d2) = n2·succ(d1)
---   ⇒  mk(make(|n1|, d1)) = mk(make(|n2|, d2))
--- which expands to a cross-multiplication on absolute values that
--- requires `Integer.absolute_value_multiply` and an order-aware case
--- split. Filled in during the order-lemma follow-up.
+-- Helper: at the (n1, d1) / (n2, d2) level, the cross-multiplication
+-- carries over to absolute values via Integer.absolute_value_multiply_
+-- by_positive_natural.
+theorem Rational.absolute_value_respect_at_representatives
+        (n1 n2 : Integer) (d1 d2 : Natural)
+        (cross : n1 * (successor(d2) : Integer)
+                 = n2 * (successor(d1) : Integer))
+        : Integer.absolute_value(n1) * (successor(d2) : Integer)
+          = Integer.absolute_value(n2) * (successor(d1) : Integer) :=
+  calc Integer.absolute_value(n1) * (successor(d2) : Integer)
+     = Integer.absolute_value(n1 * (successor(d2) : Integer))
+            by Equality.symmetry(
+                   Integer.absolute_value_multiply_by_positive_natural(
+                       n1, d2))
+     = Integer.absolute_value(n2 * (successor(d1) : Integer))
+            by congruenceOf(Integer.absolute_value, cross)
+     = Integer.absolute_value(n2) * (successor(d1) : Integer)
+            by Integer.absolute_value_multiply_by_positive_natural(
+                   n2, d1)
+
+-- Respect of Rational.absolute_value via the lift.
 theorem Rational.absolute_value_respect
         (rep1 rep2 : RationalRepresentative)
         (equivalenceHypothesis : RationalEquivalent(rep1, rep2))
         : Rational.absolute_value_at_representative(rep1)
-          = Rational.absolute_value_at_representative(rep2) := sorry
+          = Rational.absolute_value_at_representative(rep2) :=
+  (cases rep1 {
+    | RationalRepresentative.make(n1, d1) =>
+        (cases rep2 {
+          | RationalRepresentative.make(n2, d2) =>
+              function (cross : n1 * (successor(d2) : Integer)
+                                = n2 * (successor(d1) : Integer)) =>
+                Quotient.sound(
+                    RationalRepresentative.make(
+                        Integer.absolute_value(n1), d1),
+                    RationalRepresentative.make(
+                        Integer.absolute_value(n2), d2),
+                    Rational.absolute_value_respect_at_representatives(
+                        n1, n2, d1, d2, cross))
+        } : (cross : RationalEquivalent(
+                         RationalRepresentative.make(n1, d1), rep2))
+              → Rational.absolute_value_at_representative(
+                    RationalRepresentative.make(n1, d1))
+                = Rational.absolute_value_at_representative(rep2))
+  } : (cross : RationalEquivalent(rep1, rep2))
+        → Rational.absolute_value_at_representative(rep1)
+          = Rational.absolute_value_at_representative(rep2))(
+      equivalenceHypothesis)
 
 definition Rational.absolute_value (x : Rational) : Rational :=
   Quotient.lift(
