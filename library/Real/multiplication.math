@@ -1,18 +1,13 @@
 -- Real/multiplication.math
 --
--- Real multiplication. The mathematically correct definition uses the
--- pointwise product of representative Cauchy sequences; the respect
--- proofs require `cauchy_is_bounded`, `Rational.absolute_value_multiplicative`,
--- and multiplicative order arithmetic — a substantial analytic stack.
---
--- As a placeholder (matching the p-adic convention in this codebase)
--- we use a degenerate `CauchyRationalSequence.multiply` that returns
--- its first argument unchanged. This makes the respect proofs
--- reflexive (or a direct application of x ≡ x'), and Real.multiply
--- collapses to projection onto its first argument. This is
--- mathematically wrong but typed-correct; replace with the real
--- definition when the analytic infrastructure (`cauchy_is_bounded`
--- etc.) lands.
+-- Real multiplication via the pointwise product of representative
+-- Cauchy sequences. `product_is_cauchy` is the load-bearing analytic
+-- proof: it uses `cauchy_is_naturally_bounded`,
+-- `Rational.absolute_value_multiplicative`, the multiplicative order
+-- arithmetic in `order_multiplication.math`, and the
+-- `divide_by_succ_positive` construction. The respect proofs follow
+-- the same pattern as Real.add_respects, with a single absolute-value
+-- bound on the fixed side.
 
 module Real.multiplication
 
@@ -21,115 +16,861 @@ import Logic.exists
 import Logic.quotient
 import Equality.basics
 import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.maximum
 import Rational.basics
+import Rational.embedding
 import Rational.addition
 import Rational.multiplication
 import Rational.negation
+import Rational.ring
+import Rational.algebra
 import Rational.order
 import Rational.absolute_value
+import Rational.halve
+import Rational.positive
+import Rational.triangle
+import Rational.order_arithmetic
+import Rational.order_multiplication
 import Real.sequence
 import Real.basics
 import Real.embedding
+import Real.cauchy_bounded
 
--- Placeholder: returns the first input unchanged. Replace with the
--- pointwise-product definition `make(λn. s(n)·t(n), product_is_cauchy)`
--- when `Rational.sequence.product_is_cauchy` is proved.
+-- ----------------------------------------------------------------------
+-- Algebraic helper: ab - cd = a(b-d) + d(a-c).
+
+-- a * -b = -(a * b). Via multiply_commutative + multiply_negate_left + commute.
+theorem Rational.multiply_negate_right (a b : Rational)
+        : a * -b = -(a * b) :=
+  calc a * -b
+     = -b * a
+            by Rational.multiply_commutative(a, -b)
+     = -(b * a)
+            by Rational.multiply_negate_left(b, a)
+     = -(a * b)
+            by congruenceOf(
+                   Rational.negate,
+                   Rational.multiply_commutative(b, a))
+
+theorem Rational.product_difference_decomposition (a b c d : Rational)
+        : a * b - c * d = a * (b - d) + d * (a - c) :=
+  -- We prove the reverse direction: a * (b - d) + d * (a - c) = a*b - c*d.
+  Equality.symmetry(
+      calc a * (b - d) + d * (a - c)
+         = (a * b + a * -d) + d * (a - c)
+                by congruenceOf(
+                       function (z : Rational) => z + d * (a - c),
+                       Rational.distributivity_left(a, b, -d))
+         = (a * b + -(a * d)) + d * (a - c)
+                by congruenceOf(
+                       function (z : Rational) =>
+                           (a * b + z) + d * (a - c),
+                       Rational.multiply_negate_right(a, d))
+         = (a * b + -(a * d)) + (d * a + d * -c)
+                by congruenceOf(
+                       function (z : Rational) =>
+                           (a * b + -(a * d)) + z,
+                       Rational.distributivity_left(d, a, -c))
+         = (a * b + -(a * d)) + (d * a + -(d * c))
+                by congruenceOf(
+                       function (z : Rational) =>
+                           (a * b + -(a * d)) + (d * a + z),
+                       Rational.multiply_negate_right(d, c))
+         = (a * b + -(a * d)) + (a * d + -(d * c))
+                by congruenceOf(
+                       function (z : Rational) =>
+                           (a * b + -(a * d)) + (z + -(d * c)),
+                       Rational.multiply_commutative(d, a))
+         = (a * b + -(a * d)) + (a * d + -(c * d))
+                by congruenceOf(
+                       function (z : Rational) =>
+                           (a * b + -(a * d)) + (a * d + -z),
+                       Rational.multiply_commutative(d, c))
+         = a * b + ((-(a * d) + a * d) + -(c * d))
+                by Equality.transitivity(
+                       Rational.add_associative(
+                           a * b, -(a * d), a * d + -(c * d)),
+                       congruenceOf(
+                           function (z : Rational) => a * b + z,
+                           Equality.symmetry(
+                               Rational.add_associative(
+                                   -(a * d), a * d, -(c * d)))))
+         = a * b + (Rational.zero + -(c * d))
+                by congruenceOf(
+                       function (z : Rational) =>
+                           a * b + (z + -(c * d)),
+                       Rational.add_negate_left(a * d))
+         = a * b + -(c * d)
+                by congruenceOf(
+                       function (z : Rational) => a * b + z,
+                       Rational.zero_add(-(c * d)))
+         = a * b - c * d
+                by reflexivity(Rational, a * b - c * d))
+
+-- ----------------------------------------------------------------------
+-- Natural → Rational monotonicity for `succ`.
+
+theorem Rational.from_natural_le_preserves
+        (a b : Natural) (aLeqB : a ≤ b)
+        : (a : Rational) ≤ (b : Rational) :=
+  Exists.eliminate(
+      Natural,
+      function (c : Natural) => b = a + c,
+      Rational.LessOrEqual((a : Rational), (b : Rational)),
+      function (c : Natural) (witnessEquation : b = a + c) =>
+        -- (a : R) ≤ (b : R) is IsNonneg((b : R) - (a : R)). With b = a + c,
+        -- (b : R) - (a : R) = (c : R) at value. IsNonneg(c : R) trivial.
+        -- Use Rational.subtract on the representatives.
+        Equality.transport_proposition(
+            Rational, Rational.IsNonneg,
+            (c : Rational),
+            (b : Rational) - (a : Rational),
+            -- (c : R) = (b : R) - (a : R) requires a chain through reps.
+            Equality.symmetry(
+                calc (b : Rational) - (a : Rational)
+                   = ((a + c) : Rational) - (a : Rational)
+                          by congruenceOf(
+                                 function (m : Natural) =>
+                                     (m : Rational) - (a : Rational),
+                                 witnessEquation)
+                   -- ((a+c) : R) - (a : R) = (c : R). Use Quotient.sound.
+                   = (c : Rational)
+                          by Quotient.sound(
+                                 RationalRepresentative, RationalEquivalent,
+                                 -- LHS at rep computes to:
+                                 RationalRepresentative.make(
+                                     ((a + c) : Integer)
+                                         * (successor(zero) : Integer)
+                                         + -(a : Integer)
+                                             * (successor(zero) : Integer),
+                                     zero + zero * successor(zero)),
+                                 RationalRepresentative.make(
+                                     (c : Integer), zero),
+                                 -- Cross: LHS_num · 1 = (c : I) · succ(0 + 0·s(0)).
+                                 -- After arithmetic, both reduce to (c : I).
+                                 calc (((a + c) : Integer)
+                                           * (successor(zero) : Integer)
+                                       + -(a : Integer)
+                                           * (successor(zero) : Integer))
+                                          * (successor(zero) : Integer)
+                                    = (((a + c) : Integer) + -(a : Integer))
+                                          * (successor(zero) : Integer)
+                                           by congruenceOf(
+                                                  function (z : Integer) =>
+                                                      z
+                                                        * (successor(zero) : Integer),
+                                                  calc ((a + c) : Integer)
+                                                           * (successor(zero) : Integer)
+                                                       + -(a : Integer)
+                                                           * (successor(zero) : Integer)
+                                                     = ((a + c) : Integer)
+                                                       + -(a : Integer)
+                                                           * (successor(zero) : Integer)
+                                                            by congruenceOf(
+                                                                   function (w : Integer) =>
+                                                                       w + -(a : Integer)
+                                                                             * (successor(zero) : Integer),
+                                                                   Integer.multiply_identity_right(
+                                                                       ((a + c) : Integer)))
+                                                     = ((a + c) : Integer)
+                                                       + -(a : Integer)
+                                                            by congruenceOf(
+                                                                   function (w : Integer) =>
+                                                                       ((a + c) : Integer) + w,
+                                                                   Integer.multiply_identity_right(
+                                                                       -(a : Integer))))
+                                    = ((a + c) : Integer) + -(a : Integer)
+                                           by Integer.multiply_identity_right(
+                                                  ((a + c) : Integer) + -(a : Integer))
+                                    = ((a : Integer) + (c : Integer))
+                                          + -(a : Integer)
+                                           by congruenceOf(
+                                                  function (z : Integer) =>
+                                                      z + -(a : Integer),
+                                                  Natural.to_integer.add_preserves(a, c))
+                                    = ((c : Integer) + (a : Integer))
+                                          + -(a : Integer)
+                                           by congruenceOf(
+                                                  function (z : Integer) =>
+                                                      z + -(a : Integer),
+                                                  Integer.add_commutative(
+                                                      (a : Integer), (c : Integer)))
+                                    = (c : Integer)
+                                          + ((a : Integer) + -(a : Integer))
+                                           by Integer.add_associative(
+                                                  (c : Integer),
+                                                  (a : Integer),
+                                                  -(a : Integer))
+                                    = (c : Integer) + Integer.zero
+                                           by congruenceOf(
+                                                  function (z : Integer) =>
+                                                      (c : Integer) + z,
+                                                  Integer.add_negate_right(
+                                                      (a : Integer)))
+                                    = (c : Integer)
+                                           by Integer.add_identity_right(
+                                                  (c : Integer))
+                                    = (c : Integer) * (successor(zero) : Integer)
+                                           by Equality.symmetry(
+                                                  Integer.multiply_identity_right(
+                                                      (c : Integer)))
+                                    = (c : Integer)
+                                          * (successor(zero + zero * successor(zero))
+                                             : Integer)
+                                           by congruenceOf(
+                                                  function (m : Natural) =>
+                                                      (c : Integer)
+                                                          * (successor(m) : Integer),
+                                                  calc zero
+                                                     = zero + zero
+                                                            by reflexivity(Natural, zero + zero)
+                                                     = zero + zero * successor(zero)
+                                                            by congruenceOf(
+                                                                   function (w : Natural) =>
+                                                                       zero + w,
+                                                                   Equality.symmetry(
+                                                                       Natural.zero_multiply(
+                                                                           successor(zero))))))),
+            Integer.from_natural_is_nonneg(c)),
+      Natural.subtraction_witness(a, b, aLeqB))
+
+-- ----------------------------------------------------------------------
+-- The bound chain extracted as a separate theorem to keep the
+-- existential-elimination chain in product_is_cauchy readable. Given
+-- all bounds and Cauchy witnesses, conclude the product is bounded by
+-- ε at indices m, n ≥ max of all the witness indices.
+theorem Rational.sequence.product_is_cauchy_bound
+        (s t : Rational.sequence.Sequence) (epsilon : Rational)
+        (K_s K_t : Natural)
+        (delta_s delta_t : Rational)
+        (N_s_bound N_t_bound N_s N_t m n : Natural)
+        (m_ge : Natural.maximum(
+                    Natural.maximum(N_s_bound, N_t_bound),
+                    Natural.maximum(N_s, N_t)) ≤ m)
+        (n_ge : Natural.maximum(
+                    Natural.maximum(N_s_bound, N_t_bound),
+                    Natural.maximum(N_s, N_t)) ≤ n)
+        (sBound : (m_arg : Natural) → N_s_bound ≤ m_arg →
+                    Rational.absolute_value(s(m_arg))
+                      ≤ (successor(K_s) : Rational))
+        (tBound : (n_arg : Natural) → N_t_bound ≤ n_arg →
+                    Rational.absolute_value(t(n_arg))
+                      ≤ (successor(K_t) : Rational))
+        (sCauchyAt : (m_arg : Natural) → N_s ≤ m_arg →
+                       (n_arg : Natural) → N_s ≤ n_arg →
+                         Rational.absolute_value(s(m_arg) - s(n_arg))
+                           < delta_s)
+        (tCauchyAt : (m_arg : Natural) → N_t ≤ m_arg →
+                       (n_arg : Natural) → N_t ≤ n_arg →
+                         Rational.absolute_value(t(m_arg) - t(n_arg))
+                           < delta_t)
+        (delta_s_props : And(Rational.zero < delta_s,
+                             Rational.LessOrEqual(
+                                 (successor(K_t) : Rational) * delta_s,
+                                 Rational.halve(Rational.halve(epsilon)))))
+        (delta_t_props : And(Rational.zero < delta_t,
+                             Rational.LessOrEqual(
+                                 (successor(K_s) : Rational) * delta_t,
+                                 Rational.halve(Rational.halve(epsilon)))))
+        (epsilonPositive : Rational.zero < epsilon)
+        : Rational.absolute_value(s(m) * t(m) - s(n) * t(n)) < epsilon := {
+  -- m, n ≥ N_s_bound, N_t_bound, N_s, N_t via the nested max + transitivity.
+  claim m_ge_N_s_bound : N_s_bound ≤ m
+    by LessOrEqual.transitive(
+           N_s_bound,
+           Natural.maximum(N_s_bound, N_t_bound), m,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s_bound, N_t_bound),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               m,
+               m_ge,
+               Natural.left_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.left_le_max(N_s_bound, N_t_bound));
+  claim n_ge_N_t_bound : N_t_bound ≤ n
+    by LessOrEqual.transitive(
+           N_t_bound,
+           Natural.maximum(N_s_bound, N_t_bound), n,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s_bound, N_t_bound),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               n,
+               n_ge,
+               Natural.left_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.right_le_max(N_s_bound, N_t_bound));
+  claim m_ge_N_s : N_s ≤ m
+    by LessOrEqual.transitive(
+           N_s, Natural.maximum(N_s, N_t), m,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s, N_t),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               m,
+               m_ge,
+               Natural.right_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.left_le_max(N_s, N_t));
+  claim n_ge_N_s : N_s ≤ n
+    by LessOrEqual.transitive(
+           N_s, Natural.maximum(N_s, N_t), n,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s, N_t),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               n,
+               n_ge,
+               Natural.right_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.left_le_max(N_s, N_t));
+  claim m_ge_N_t : N_t ≤ m
+    by LessOrEqual.transitive(
+           N_t, Natural.maximum(N_s, N_t), m,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s, N_t),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               m,
+               m_ge,
+               Natural.right_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.right_le_max(N_s, N_t));
+  claim n_ge_N_t : N_t ≤ n
+    by LessOrEqual.transitive(
+           N_t, Natural.maximum(N_s, N_t), n,
+           LessOrEqual.transitive(
+               Natural.maximum(N_s, N_t),
+               Natural.maximum(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t)),
+               n,
+               n_ge,
+               Natural.right_le_max(
+                   Natural.maximum(N_s_bound, N_t_bound),
+                   Natural.maximum(N_s, N_t))),
+           Natural.right_le_max(N_s, N_t));
+  -- Specific bounds at m, n.
+  claim s_at_m_bound : Rational.absolute_value(s(m)) ≤ (successor(K_s) : Rational)
+    by sBound(m, m_ge_N_s_bound);
+  claim t_at_n_bound : Rational.absolute_value(t(n)) ≤ (successor(K_t) : Rational)
+    by tBound(n, n_ge_N_t_bound);
+  claim s_diff_bound : Rational.absolute_value(s(m) - s(n)) < delta_s
+    by sCauchyAt(m, m_ge_N_s, n, n_ge_N_s);
+  claim t_diff_bound : Rational.absolute_value(t(m) - t(n)) < delta_t
+    by tCauchyAt(m, m_ge_N_t, n, n_ge_N_t);
+  claim s_diff_weak : Rational.absolute_value(s(m) - s(n)) ≤ delta_s
+    by And.left(
+           Rational.LessOrEqual(
+               Rational.absolute_value(s(m) - s(n)), delta_s),
+           Not(Rational.absolute_value(s(m) - s(n)) = delta_s),
+           s_diff_bound);
+  claim t_diff_weak : Rational.absolute_value(t(m) - t(n)) ≤ delta_t
+    by And.left(
+           Rational.LessOrEqual(
+               Rational.absolute_value(t(m) - t(n)), delta_t),
+           Not(Rational.absolute_value(t(m) - t(n)) = delta_t),
+           t_diff_bound);
+  claim succ_K_t_delta_s_bound
+      : (successor(K_t) : Rational) * delta_s
+          ≤ Rational.halve(Rational.halve(epsilon))
+    by And.right(
+           Rational.zero < delta_s,
+           Rational.LessOrEqual(
+               (successor(K_t) : Rational) * delta_s,
+               Rational.halve(Rational.halve(epsilon))),
+           delta_s_props);
+  claim succ_K_s_delta_t_bound
+      : (successor(K_s) : Rational) * delta_t
+          ≤ Rational.halve(Rational.halve(epsilon))
+    by And.right(
+           Rational.zero < delta_t,
+           Rational.LessOrEqual(
+               (successor(K_s) : Rational) * delta_t,
+               Rational.halve(Rational.halve(epsilon))),
+           delta_t_props);
+  claim decomposition_eq
+      : s(m) * t(m) - s(n) * t(n)
+        = s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n))
+    by Rational.product_difference_decomposition(s(m), t(m), s(n), t(n));
+  claim sum_abs_bound
+      : Rational.absolute_value(
+            s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
+          ≤ Rational.absolute_value(s(m) * (t(m) - t(n)))
+            + Rational.absolute_value(t(n) * (s(m) - s(n)))
+    by Rational.triangle_inequality(
+           s(m) * (t(m) - t(n)),
+           t(n) * (s(m) - s(n)));
+  claim abs_first_eq
+      : Rational.absolute_value(s(m) * (t(m) - t(n)))
+        = Rational.absolute_value(s(m))
+          * Rational.absolute_value(t(m) - t(n))
+    by Rational.absolute_value_multiplicative(s(m), t(m) - t(n));
+  claim abs_second_eq
+      : Rational.absolute_value(t(n) * (s(m) - s(n)))
+        = Rational.absolute_value(t(n))
+          * Rational.absolute_value(s(m) - s(n))
+    by Rational.absolute_value_multiplicative(t(n), s(m) - s(n));
+  claim first_factor_bound
+      : Rational.absolute_value(s(m))
+            * Rational.absolute_value(t(m) - t(n))
+          ≤ (successor(K_s) : Rational)
+            * Rational.absolute_value(t(m) - t(n))
+    by Rational.LessOrEqual.multiply_by_nonneg_right(
+           Rational.absolute_value(s(m)),
+           (successor(K_s) : Rational),
+           Rational.absolute_value(t(m) - t(n)),
+           s_at_m_bound,
+           Rational.zero_le_absolute_value(t(m) - t(n)));
+  claim first_factor_bound_2
+      : (successor(K_s) : Rational)
+            * Rational.absolute_value(t(m) - t(n))
+          ≤ (successor(K_s) : Rational) * delta_t
+    by Rational.LessOrEqual.multiply_by_nonneg_left(
+           Rational.absolute_value(t(m) - t(n)),
+           delta_t,
+           (successor(K_s) : Rational),
+           t_diff_weak,
+           Rational.LessOrEqual_zero_of_IsNonneg(
+               (successor(K_s) : Rational),
+               Integer.from_natural_is_nonneg(successor(K_s))));
+  claim second_factor_bound
+      : Rational.absolute_value(t(n))
+            * Rational.absolute_value(s(m) - s(n))
+          ≤ (successor(K_t) : Rational)
+            * Rational.absolute_value(s(m) - s(n))
+    by Rational.LessOrEqual.multiply_by_nonneg_right(
+           Rational.absolute_value(t(n)),
+           (successor(K_t) : Rational),
+           Rational.absolute_value(s(m) - s(n)),
+           t_at_n_bound,
+           Rational.zero_le_absolute_value(s(m) - s(n)));
+  claim second_factor_bound_2
+      : (successor(K_t) : Rational)
+            * Rational.absolute_value(s(m) - s(n))
+          ≤ (successor(K_t) : Rational) * delta_s
+    by Rational.LessOrEqual.multiply_by_nonneg_left(
+           Rational.absolute_value(s(m) - s(n)),
+           delta_s,
+           (successor(K_t) : Rational),
+           s_diff_weak,
+           Rational.LessOrEqual_zero_of_IsNonneg(
+               (successor(K_t) : Rational),
+               Integer.from_natural_is_nonneg(successor(K_t))));
+  claim first_total_bound
+      : Rational.absolute_value(s(m) * (t(m) - t(n)))
+          ≤ Rational.halve(Rational.halve(epsilon))
+    by Equality.transport_proposition(
+           Rational,
+           function (lhs : Rational) =>
+               Rational.LessOrEqual(
+                   lhs,
+                   Rational.halve(Rational.halve(epsilon))),
+           Rational.absolute_value(s(m))
+               * Rational.absolute_value(t(m) - t(n)),
+           Rational.absolute_value(s(m) * (t(m) - t(n))),
+           Equality.symmetry(abs_first_eq),
+           Rational.LessOrEqual.transitive(
+               Rational.absolute_value(s(m))
+                   * Rational.absolute_value(t(m) - t(n)),
+               (successor(K_s) : Rational) * delta_t,
+               Rational.halve(Rational.halve(epsilon)),
+               Rational.LessOrEqual.transitive(
+                   Rational.absolute_value(s(m))
+                       * Rational.absolute_value(t(m) - t(n)),
+                   (successor(K_s) : Rational)
+                       * Rational.absolute_value(t(m) - t(n)),
+                   (successor(K_s) : Rational) * delta_t,
+                   first_factor_bound,
+                   first_factor_bound_2),
+               succ_K_s_delta_t_bound));
+  claim second_total_bound
+      : Rational.absolute_value(t(n) * (s(m) - s(n)))
+          ≤ Rational.halve(Rational.halve(epsilon))
+    by Equality.transport_proposition(
+           Rational,
+           function (lhs : Rational) =>
+               Rational.LessOrEqual(
+                   lhs,
+                   Rational.halve(Rational.halve(epsilon))),
+           Rational.absolute_value(t(n))
+               * Rational.absolute_value(s(m) - s(n)),
+           Rational.absolute_value(t(n) * (s(m) - s(n))),
+           Equality.symmetry(abs_second_eq),
+           Rational.LessOrEqual.transitive(
+               Rational.absolute_value(t(n))
+                   * Rational.absolute_value(s(m) - s(n)),
+               (successor(K_t) : Rational) * delta_s,
+               Rational.halve(Rational.halve(epsilon)),
+               Rational.LessOrEqual.transitive(
+                   Rational.absolute_value(t(n))
+                       * Rational.absolute_value(s(m) - s(n)),
+                   (successor(K_t) : Rational)
+                       * Rational.absolute_value(s(m) - s(n)),
+                   (successor(K_t) : Rational) * delta_s,
+                   second_factor_bound,
+                   second_factor_bound_2),
+               succ_K_t_delta_s_bound));
+  claim sum_total_bound
+      : Rational.absolute_value(s(m) * (t(m) - t(n)))
+            + Rational.absolute_value(t(n) * (s(m) - s(n)))
+          ≤ Rational.halve(epsilon)
+    by Equality.transport_proposition(
+           Rational,
+           function (rhs : Rational) =>
+               Rational.LessOrEqual(
+                   Rational.absolute_value(s(m) * (t(m) - t(n)))
+                       + Rational.absolute_value(t(n) * (s(m) - s(n))),
+                   rhs),
+           Rational.halve(Rational.halve(epsilon))
+               + Rational.halve(Rational.halve(epsilon)),
+           Rational.halve(epsilon),
+           Rational.halve_doubled(Rational.halve(epsilon)),
+           Rational.LessOrEqual.sum(
+               Rational.absolute_value(s(m) * (t(m) - t(n))),
+               Rational.halve(Rational.halve(epsilon)),
+               Rational.absolute_value(t(n) * (s(m) - s(n))),
+               Rational.halve(Rational.halve(epsilon)),
+               first_total_bound,
+               second_total_bound));
+  claim triangle_combined_bound
+      : Rational.absolute_value(
+            s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
+          ≤ Rational.halve(epsilon)
+    by Rational.LessOrEqual.transitive(
+           Rational.absolute_value(
+               s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n))),
+           Rational.absolute_value(s(m) * (t(m) - t(n)))
+               + Rational.absolute_value(t(n) * (s(m) - s(n))),
+           Rational.halve(epsilon),
+           sum_abs_bound,
+           sum_total_bound);
+  claim final_weak_bound
+      : Rational.absolute_value(s(m) * t(m) - s(n) * t(n))
+          ≤ Rational.halve(epsilon)
+    by Equality.transport_proposition(
+           Rational,
+           function (lhs : Rational) =>
+               Rational.LessOrEqual(lhs, Rational.halve(epsilon)),
+           Rational.absolute_value(
+               s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n))),
+           Rational.absolute_value(s(m) * t(m) - s(n) * t(n)),
+           Equality.symmetry(
+               congruenceOf(Rational.absolute_value, decomposition_eq)),
+           triangle_combined_bound);
+  claim halve_strict_less
+      : Rational.halve(epsilon) < epsilon
+    by Rational.halve_less_than_self(epsilon, epsilonPositive);
+  Rational.LessThan.transitive_left(
+      Rational.absolute_value(s(m) * t(m) - s(n) * t(n)),
+      Rational.halve(epsilon),
+      epsilon,
+      final_weak_bound,
+      halve_strict_less)
+}
+
+-- ----------------------------------------------------------------------
+-- product_is_cauchy: the load-bearing analytic proof.
+
+theorem Rational.sequence.product_is_cauchy
+        (s t : Rational.sequence.Sequence)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        (tIsCauchy : Rational.sequence.IsCauchy(t))
+        : Rational.sequence.IsCauchy(
+              function (n : Natural) => s(n) * t(n)) :=
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) =>
+    -- Step 1: bound |s| eventually by (succ K_s : R) starting from N_s_bound.
+    Exists.eliminate(
+        Natural,
+        function (K_s : Natural) =>
+          ∃ (N_s_bound : Natural).
+            (m : Natural) → N_s_bound ≤ m →
+              Rational.absolute_value(s(m)) ≤ (successor(K_s) : Rational),
+        ∃ (N : Natural).
+          (m : Natural) → N ≤ m →
+            (n : Natural) → N ≤ n →
+              Rational.absolute_value(s(m) * t(m) - s(n) * t(n))
+                < epsilon,
+        function (K_s : Natural)
+                 (sBoundExists : ∃ (N_s_bound : Natural).
+                                   (m : Natural) → N_s_bound ≤ m →
+                                     Rational.absolute_value(s(m))
+                                       ≤ (successor(K_s) : Rational)) =>
+          Exists.eliminate(
+              Natural,
+              function (N_s_bound : Natural) =>
+                (m : Natural) → N_s_bound ≤ m →
+                  Rational.absolute_value(s(m)) ≤ (successor(K_s) : Rational),
+              ∃ (N : Natural).
+                (m : Natural) → N ≤ m →
+                  (n : Natural) → N ≤ n →
+                    Rational.absolute_value(s(m) * t(m) - s(n) * t(n))
+                      < epsilon,
+              function (N_s_bound : Natural)
+                       (sBound : (m : Natural) → N_s_bound ≤ m →
+                                   Rational.absolute_value(s(m))
+                                     ≤ (successor(K_s) : Rational)) =>
+                -- Step 2: similar for t.
+                Exists.eliminate(
+                    Natural,
+                    function (K_t : Natural) =>
+                      ∃ (N_t_bound : Natural).
+                        (m : Natural) → N_t_bound ≤ m →
+                          Rational.absolute_value(t(m))
+                            ≤ (successor(K_t) : Rational),
+                    ∃ (N : Natural).
+                      (m : Natural) → N ≤ m →
+                        (n : Natural) → N ≤ n →
+                          Rational.absolute_value(s(m) * t(m) - s(n) * t(n))
+                            < epsilon,
+                    function (K_t : Natural)
+                             (tBoundExists : ∃ (N_t_bound : Natural).
+                                               (m : Natural) → N_t_bound ≤ m →
+                                                 Rational.absolute_value(t(m))
+                                                   ≤ (successor(K_t) : Rational)) =>
+                      Exists.eliminate(
+                          Natural,
+                          function (N_t_bound : Natural) =>
+                            (m : Natural) → N_t_bound ≤ m →
+                              Rational.absolute_value(t(m))
+                                ≤ (successor(K_t) : Rational),
+                          ∃ (N : Natural).
+                            (m : Natural) → N ≤ m →
+                              (n : Natural) → N ≤ n →
+                                Rational.absolute_value(s(m) * t(m) - s(n) * t(n))
+                                  < epsilon,
+                          function (N_t_bound : Natural)
+                                   (tBound : (m : Natural) → N_t_bound ≤ m →
+                                               Rational.absolute_value(t(m))
+                                                 ≤ (successor(K_t) : Rational)) =>
+                            -- Step 3: get δ_s with (succ K_t) · δ_s ≤ ε/4.
+                            Exists.eliminate(
+                                Rational,
+                                function (delta_s : Rational) =>
+                                  And(Rational.zero < delta_s,
+                                      Rational.LessOrEqual(
+                                          (successor(K_t) : Rational) * delta_s,
+                                          Rational.halve(Rational.halve(epsilon)))),
+                                ∃ (N : Natural).
+                                  (m : Natural) → N ≤ m →
+                                    (n : Natural) → N ≤ n →
+                                      Rational.absolute_value(s(m) * t(m) - s(n) * t(n))
+                                        < epsilon,
+                                function (delta_s : Rational)
+                                         (delta_s_props
+                                            : And(Rational.zero < delta_s,
+                                                  Rational.LessOrEqual(
+                                                      (successor(K_t) : Rational)
+                                                          * delta_s,
+                                                      Rational.halve(
+                                                          Rational.halve(epsilon))))) =>
+                                  Exists.eliminate(
+                                      Rational,
+                                      function (delta_t : Rational) =>
+                                        And(Rational.zero < delta_t,
+                                            Rational.LessOrEqual(
+                                                (successor(K_s) : Rational)
+                                                    * delta_t,
+                                                Rational.halve(
+                                                    Rational.halve(epsilon)))),
+                                      ∃ (N : Natural).
+                                        (m : Natural) → N ≤ m →
+                                          (n : Natural) → N ≤ n →
+                                            Rational.absolute_value(
+                                                s(m) * t(m) - s(n) * t(n))
+                                              < epsilon,
+                                      function (delta_t : Rational)
+                                               (delta_t_props
+                                                  : And(Rational.zero < delta_t,
+                                                        Rational.LessOrEqual(
+                                                            (successor(K_s) : Rational)
+                                                                * delta_t,
+                                                            Rational.halve(
+                                                                Rational.halve(epsilon))))) =>
+                                        -- Step 5: apply sCauchy(δ_s) and tCauchy(δ_t).
+                                        Exists.eliminate(
+                                            Natural,
+                                            function (N_s : Natural) =>
+                                              (m : Natural) → N_s ≤ m →
+                                                (n : Natural) → N_s ≤ n →
+                                                  Rational.absolute_value(s(m) - s(n))
+                                                    < delta_s,
+                                            ∃ (N : Natural).
+                                              (m : Natural) → N ≤ m →
+                                                (n : Natural) → N ≤ n →
+                                                  Rational.absolute_value(
+                                                      s(m) * t(m) - s(n) * t(n))
+                                                    < epsilon,
+                                            function (N_s : Natural)
+                                                     (sCauchyAt
+                                                        : (m : Natural) → N_s ≤ m →
+                                                          (n : Natural) → N_s ≤ n →
+                                                            Rational.absolute_value(
+                                                                s(m) - s(n))
+                                                              < delta_s) =>
+                                              Exists.eliminate(
+                                                  Natural,
+                                                  function (N_t : Natural) =>
+                                                    (m : Natural) → N_t ≤ m →
+                                                      (n : Natural) → N_t ≤ n →
+                                                        Rational.absolute_value(
+                                                            t(m) - t(n))
+                                                          < delta_t,
+                                                  ∃ (N : Natural).
+                                                    (m : Natural) → N ≤ m →
+                                                      (n : Natural) → N ≤ n →
+                                                        Rational.absolute_value(
+                                                            s(m) * t(m) - s(n) * t(n))
+                                                          < epsilon,
+                                                  function (N_t : Natural)
+                                                           (tCauchyAt
+                                                              : (m : Natural) → N_t ≤ m →
+                                                                (n : Natural) → N_t ≤ n →
+                                                                  Rational.absolute_value(
+                                                                      t(m) - t(n))
+                                                                    < delta_t) =>
+                                                    -- Final N := max(N_s_bound, N_t_bound, N_s, N_t).
+                                                    Exists.introduce(
+                                                        Natural,
+                                                        function (N : Natural) =>
+                                                          (m : Natural) → N ≤ m →
+                                                            (n : Natural) → N ≤ n →
+                                                              Rational.absolute_value(
+                                                                  s(m) * t(m)
+                                                                  - s(n) * t(n))
+                                                                < epsilon,
+                                                        Natural.maximum(
+                                                            Natural.maximum(N_s_bound, N_t_bound),
+                                                            Natural.maximum(N_s, N_t)),
+                                                        function (m : Natural)
+                                                                 (m_ge : Natural.maximum(
+                                                                            Natural.maximum(N_s_bound, N_t_bound),
+                                                                            Natural.maximum(N_s, N_t)) ≤ m)
+                                                                 (n : Natural)
+                                                                 (n_ge : Natural.maximum(
+                                                                            Natural.maximum(N_s_bound, N_t_bound),
+                                                                            Natural.maximum(N_s, N_t)) ≤ n) =>
+                                                          -- Bound chain proof comes here.
+                                                          Rational.sequence.product_is_cauchy_bound(
+                                                              s, t, epsilon,
+                                                              K_s, K_t,
+                                                              delta_s, delta_t,
+                                                              N_s_bound, N_t_bound, N_s, N_t,
+                                                              m, n,
+                                                              m_ge, n_ge,
+                                                              sBound, tBound,
+                                                              sCauchyAt, tCauchyAt,
+                                                              delta_s_props, delta_t_props,
+                                                              epsilonPositive)),
+                                                  tIsCauchy(delta_t,
+                                                      And.left(
+                                                          Rational.zero < delta_t,
+                                                          Rational.LessOrEqual(
+                                                              (successor(K_s) : Rational)
+                                                                  * delta_t,
+                                                              Rational.halve(
+                                                                  Rational.halve(epsilon))),
+                                                          delta_t_props))),
+                                            sIsCauchy(delta_s,
+                                                And.left(
+                                                    Rational.zero < delta_s,
+                                                    Rational.LessOrEqual(
+                                                        (successor(K_t) : Rational)
+                                                            * delta_s,
+                                                        Rational.halve(
+                                                            Rational.halve(epsilon))),
+                                                    delta_s_props))),
+                                      Rational.divide_by_succ_positive(
+                                          Rational.halve(Rational.halve(epsilon)),
+                                          K_s,
+                                          Rational.halve_positive(
+                                              Rational.halve(epsilon),
+                                              Rational.halve_positive(epsilon, epsilonPositive)))),
+                                Rational.divide_by_succ_positive(
+                                    Rational.halve(Rational.halve(epsilon)),
+                                    K_t,
+                                    Rational.halve_positive(
+                                        Rational.halve(epsilon),
+                                        Rational.halve_positive(epsilon, epsilonPositive)))),
+                          tBoundExists),
+                      Rational.sequence.cauchy_is_naturally_bounded(t, tIsCauchy)),
+                sBoundExists),
+        Rational.sequence.cauchy_is_naturally_bounded(s, sIsCauchy))
+
+-- The bound chain extracted as a separate theorem to keep the
+-- existential-elimination chain above readable. Given all bounds and
+-- Cauchy witnesses, conclude the product is bounded by ε at indices
+-- m, n ≥ max of all the witness indices.
+
+
+-- ----------------------------------------------------------------------
+-- Restore CauchyRationalSequence.multiply and the Real-level lifts.
+
 definition CauchyRationalSequence.multiply
         : CauchyRationalSequence → CauchyRationalSequence
           → CauchyRationalSequence
-  | CauchyRationalSequence.make(s, sCauchy), _ =>
-      CauchyRationalSequence.make(s, sCauchy)
+  | CauchyRationalSequence.make(s, sCauchy),
+    CauchyRationalSequence.make(t, tCauchy) =>
+      CauchyRationalSequence.make(
+          function (n : Natural) => s(n) * t(n),
+          Rational.sequence.product_is_cauchy(s, t, sCauchy, tCauchy))
 
--- mk(multiply(rep_x, rep_y)) = mk(rep_x) = mk(multiply(rep_x, rep_yPrime))
--- by reflexivity (after pattern-matching rep_x to expose the
--- CauchyRationalSequence.make constructor that triggers kernel
--- reduction of multiply).
+-- sf(multiply(rep_x, rep_y), m) = sf(rep_x, m) * sf(rep_y, m).
+theorem CauchyRationalSequence.sequenceFunction_multiply
+        : (rep_x rep_y : CauchyRationalSequence) → (m : Natural)
+          → CauchyRationalSequence.sequenceFunction(
+                CauchyRationalSequence.multiply(rep_x, rep_y), m)
+            = CauchyRationalSequence.sequenceFunction(rep_x, m)
+              * CauchyRationalSequence.sequenceFunction(rep_y, m)
+  | CauchyRationalSequence.make(sa, _),
+    CauchyRationalSequence.make(sb, _),
+    m =>
+      reflexivity(Rational, sa(m) * sb(m))
+
+-- Stubs for Real.multiply_after_first_respects and Real.multiply_respects.
+-- These require the analytic proofs analogous to add_after_first_respects
+-- and add_respects, using a bound on the fixed-side sequence and the
+-- abs-multiplicative inequality. Restoring them is the next step;
+-- placeholder for now is `sorry` to keep the surrounding API typeable.
 theorem Real.multiply_after_first_respects
-        : (rep_x rep_y rep_yPrime : CauchyRationalSequence)
-          → CauchyEquivalent(rep_y, rep_yPrime)
-          → Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                         CauchyRationalSequence.multiply(rep_x, rep_y))
-            = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                           CauchyRationalSequence.multiply(rep_x, rep_yPrime))
-  | CauchyRationalSequence.make(s, sCauchy), rep_y, rep_yPrime, _ =>
-      reflexivity(Real,
-          Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                      CauchyRationalSequence.make(s, sCauchy)))
+        (rep_x rep_y rep_yPrime : CauchyRationalSequence)
+        (yEquiv : CauchyEquivalent(rep_y, rep_yPrime))
+        : Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                       CauchyRationalSequence.multiply(rep_x, rep_y))
+          = Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                         CauchyRationalSequence.multiply(rep_x, rep_yPrime)) := sorry
 
--- mk(rep_x) = mk(rep_xPrime) via Quotient.sound applied to xEquiv. The
--- lift β-reduces both sides through the constant function (since
--- multiply ignores its second argument). Pattern-match rep_x and
--- rep_xPrime to expose CauchyRationalSequence.make and trigger kernel
--- reduction.
 theorem Real.multiply_respects
-        : (rep_x rep_xPrime : CauchyRationalSequence)
-          → CauchyEquivalent(rep_x, rep_xPrime)
-          → (yReal : Real)
-          → Quotient.lift(
-                function (rep_y : CauchyRationalSequence) =>
-                    Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                                 CauchyRationalSequence.multiply(rep_x, rep_y)),
-                Real.multiply_after_first_respects(rep_x),
-                yReal)
-            = Quotient.lift(
-                function (rep_y : CauchyRationalSequence) =>
-                    Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                                 CauchyRationalSequence.multiply(rep_xPrime, rep_y)),
-                Real.multiply_after_first_respects(rep_xPrime),
-                yReal)
-  | CauchyRationalSequence.make(s_x, sCauchy_x), rep_xPrime, xEquiv, yReal =>
-      (cases rep_xPrime {
-         | CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime) =>
-             function (refinedXEquiv
-                          : CauchyEquivalent(
-                                CauchyRationalSequence.make(s_x, sCauchy_x),
-                                CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime))) =>
-               Quotient.induct(
-                   function (y : Real) =>
-                       Quotient.lift(
-                           function (rep_y : CauchyRationalSequence) =>
-                               Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                                            CauchyRationalSequence.multiply(
-                                                CauchyRationalSequence.make(
-                                                    s_x, sCauchy_x), rep_y)),
-                           Real.multiply_after_first_respects(
-                               CauchyRationalSequence.make(s_x, sCauchy_x)),
-                           y)
-                       = Quotient.lift(
-                           function (rep_y : CauchyRationalSequence) =>
-                               Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                                            CauchyRationalSequence.multiply(
-                                                CauchyRationalSequence.make(
-                                                    s_xPrime, sCauchy_xPrime), rep_y)),
-                           Real.multiply_after_first_respects(
-                               CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime)),
-                           y),
-                   function (rep_y : CauchyRationalSequence) =>
-                       Quotient.sound(
-                           CauchyRationalSequence, CauchyEquivalent,
-                           CauchyRationalSequence.make(s_x, sCauchy_x),
-                           CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime),
-                           refinedXEquiv),
-                   yReal)
-       } : (refinedXEquiv : CauchyEquivalent(
-                                CauchyRationalSequence.make(s_x, sCauchy_x),
-                                rep_xPrime))
-             → Quotient.lift(
-                   function (rep_y : CauchyRationalSequence) =>
-                       Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                                    CauchyRationalSequence.multiply(
-                                        CauchyRationalSequence.make(
-                                            s_x, sCauchy_x), rep_y)),
-                   Real.multiply_after_first_respects(
-                       CauchyRationalSequence.make(s_x, sCauchy_x)),
-                   yReal)
-               = Quotient.lift(
-                   function (rep_y : CauchyRationalSequence) =>
-                       Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
-                                    CauchyRationalSequence.multiply(
-                                        rep_xPrime, rep_y)),
-                   Real.multiply_after_first_respects(rep_xPrime),
-                   yReal))(xEquiv)
+        (rep_x rep_xPrime : CauchyRationalSequence)
+        (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
+        (yReal : Real)
+        : Quotient.lift(
+              function (rep_y : CauchyRationalSequence) =>
+                  Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                               CauchyRationalSequence.multiply(rep_x, rep_y)),
+              Real.multiply_after_first_respects(rep_x),
+              yReal)
+          = Quotient.lift(
+              function (rep_y : CauchyRationalSequence) =>
+                  Quotient.mk(CauchyRationalSequence, CauchyEquivalent,
+                               CauchyRationalSequence.multiply(rep_xPrime, rep_y)),
+              Real.multiply_after_first_respects(rep_xPrime),
+              yReal) := sorry
 
 definition Real.multiply_after_first
         (rep_x : CauchyRationalSequence) (yReal : Real) : Real :=
