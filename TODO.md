@@ -112,6 +112,95 @@ Smaller items to land when the motivating pain becomes acute:
 - **`rewrite h at e` tactic.** Useful for non-ring rewrites; less
   urgent given `by ring` will cover the ring case.
 
+## Ergonomics audit (2026-05-16) — math-friendliness backlog
+
+From an end-to-end audit of the p-adic construction (~6600 LOC in
+`library/PAdic/`). Goal: make proofs feel familiar to mathematicians
+and LLMs.
+
+### Already implemented but not adopted (mechanical refactor required)
+
+- **Quotient.mk / sound / lift / induct / induct_two have short forms
+  with inference.** Elaborator desugarings exist at
+  `elaborator.cpp:2237–2275`:
+  - `Quotient.mk(rep)` — infers T from rep, R from expected type.
+  - `Quotient.sound(x, y, proof)` — infers T from x, R from proof.
+  - `Quotient.lift(f, h, q)` — infers T, R, U.
+  - `Quotient.induct(motive, atRep, q)` — infers T, R.
+  - `Quotient.induct_two(motive, atRep, q1, q2)` — infers T₁/R₁/T₂/R₂.
+  Our `library/PAdic/*.math` (and `library/Real/*.math`,
+  `library/Rational/*.math`) routinely use the verbose 5/6-arg forms.
+  Refactoring would cut ~150 boilerplate sites in PAdic alone.
+
+### Top friction points (with category and remedy)
+
+1. **Verbose `Quotient.mk(T, R, rep)` usage in our own code.** Elaborator
+   already supports short form. *Remedy: bulk refactor — task below.*
+
+2. **Threading `(p, primality)` through every PAdic operation.** Cat:
+   elaborator. Adds visual noise + LLMs frequently miss them. Two
+   possible remedies: (a) **implicit arguments `{p : Natural}
+   {primality : Natural.is_prime(p)}`** — the syntax + counting
+   machinery already exists (`elaborator.cpp:534–544`,
+   `implicitArgumentCounts`) but currently only fires on axioms; needs
+   extension to `definition` / `theorem`. (b) **section binders** — bigger
+   project. (a) is the smaller fix and would help PAdic immediately.
+
+3. **3-arg ring law nesting quirk (Quotient.induct + nested induct_two).**
+   Cat: kernel/elaborator. Naive triple-induct fails; we need
+   `function (yArg) (zArg) => Quotient.induct_two(...)` wrapping
+   (see `library/PAdic/ring.math:171–293`). *Remedy:* add a
+   `Quotient.induct_three` desugaring (5-arg: motive, atReps, q1, q2,
+   q3) and a corresponding `induct_two_three` etc. as needed. Sugar
+   only.
+
+4. **No operator overload on parameterized types.** Cat: elaborator.
+   `operator (+) on (PAdic, PAdic)` would need `PAdic.add` to have type
+   `PAdic → PAdic → PAdic`, but ours is
+   `(p, primality, x, y) → ...`. *Remedy:* once #2 lands and `(p,
+   primality)` become implicit, the operator signature becomes
+   `PAdic(p, primality) → PAdic(p, primality) → PAdic(p, primality)`
+   and dispatch works.
+
+5. **`by ring` v1 doesn't handle distributivity.** Cat: tactics. Every
+   multiplicative-over-additive associativity/distributivity proof
+   needs 5–15 manual `congruenceOf` steps. *Remedy:* `by ring` v2 with
+   polynomial normalization. Deferred — 1–2 day project (see item 3
+   above).
+
+6. **`Quotient.sound` needs three relation properties when expected
+   type isn't inferable.** Cat: kernel API. *Remedy:* document; rarely
+   bites once short-form is adopted.
+
+7. **Fully-qualified long names crowd lines.** Cat: elaborator/syntax.
+   `Rational.padic_absolute_value`, `PAdicCauchySequence.sequenceFunction`.
+   *Remedy:* a per-block `open NAMESPACE` directive that introduces
+   short aliases. Lower priority — long names are searchable and
+   unambiguous.
+
+8. **Hypothesis-introduction via `function (x)(eq) => cases x { ... }`.**
+   Cat: tactics. The `cases h : expr with ... in` form would be more
+   discoverable. *Remedy:* a `cases` tactic that takes a `with`-pattern
+   and binds the equation automatically. Bigger project, defer.
+
+### Quick wins (1–3 hours each)
+
+- **Refactor `library/PAdic/*.math` to use short Quotient.* forms.**
+  Mechanical, big payoff. Estimate ~150 sites, ~2 hours.
+- **Refactor `library/Rational/*.math`, `library/Real/*.math` similarly.**
+  Lower urgency but same payoff per call site.
+- **Extend implicit-arg recognition (`{x : T}` binders) to `definition`
+  and `theorem`, not just `axiom`.** Likely ~1 hour given the
+  machinery already exists. Unlocks `(p : Natural)` implicit threading
+  in PAdic.
+- **Add `Quotient.induct_three` and `Quotient.induct_four` desugarings.**
+  Patterns for n-ary ring laws. ~1 hour.
+- **Better error messages for nested Quotient.induct case-shape errors.**
+  When the case body has wrong arity, suggest "wrap with `function
+  (next_args) => ...`". ~30 min.
+- **Document the existing short-form inference in `claim_language.md`
+  or a new `quotient_idioms.md`.** ~30 min.
+
 ## Completed
 
 - **2026-05-14: Rational as CommutativeRing.** Operations
