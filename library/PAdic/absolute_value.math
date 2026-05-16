@@ -45,6 +45,9 @@ import Rational.negation
 import Rational.order
 import Rational.absolute_value
 import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.ring
+import Rational.positive
 
 -- Honest representative-level p-adic absolute value. For a
 -- Rational representative (n, d) (encoding n / succ(d)):
@@ -1466,3 +1469,33 @@ theorem Rational.padic_absolute_value_multiplicative
              = Rational.padic_absolute_value_at_representative(p, rep_x)
                * Rational.padic_absolute_value_at_representative(p, rep_y)),
       x, y)
+
+-- ----------------------------------------------------------------------
+-- Triangle inequality. The remaining norm axiom for the p-adic absolute
+-- value: |x + y|_p ≤ |x|_p + |y|_p. Goes via the ultrametric
+-- |x + y|_p ≤ max(|x|_p, |y|_p), then max ≤ sum (both are nonneg).
+
+-- Helper: x ≤ x + y when 0 ≤ y. Rational addition right-monotone.
+theorem Rational.le_add_right_of_nonneg
+        (x y : Rational) (yNonneg : Rational.zero ≤ y)
+        : x ≤ x + y :=
+  Equality.transport_proposition(
+      Rational,
+      function (m : Rational) => m ≤ x + y,
+      x + Rational.zero, x,
+      Rational.add_zero(x),
+      Rational.LessOrEqual.sum(
+          x, x, Rational.zero, y,
+          Rational.LessOrEqual.reflexive(x),
+          yNonneg))
+
+-- And the symmetric: x ≤ y + x when 0 ≤ y.
+theorem Rational.le_add_left_of_nonneg
+        (x y : Rational) (yNonneg : Rational.zero ≤ y)
+        : x ≤ y + x :=
+  Equality.transport_proposition(
+      Rational,
+      function (m : Rational) => x ≤ m,
+      x + y, y + x,
+      Rational.add_commutative(x, y),
+      Rational.le_add_right_of_nonneg(x, y, yNonneg))
