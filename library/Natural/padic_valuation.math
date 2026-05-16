@@ -17,6 +17,7 @@ import Natural.peano
 import Natural.arithmetic
 import Natural.order
 import Natural.divide
+import Equality.basics
 
 -- padic_valuation_step(fuel, prime, target): fuel-bounded valuation.
 -- With fuel ≥ floor(log_prime(target)), returns the largest k with
@@ -40,3 +41,50 @@ definition Natural.padic_valuation_step
 definition Natural.padic_valuation (prime target : Natural) : Natural :=
   Natural.padic_valuation_step(
       fuel := target, prime := prime, target := target)
+
+-- ----------------------------------------------------------------------
+-- Step-level recursive characterizations.
+
+-- When modulo(p, n) ≠ 0 (i.e., monus(modulo(p, n), 1) = some succ),
+-- the step returns 0. Used for the "p ∤ n" case.
+theorem Natural.padic_valuation_step_zero_when_not_divides
+        (fuel prime target predM : Natural)
+        (moduloIsSucc : Natural.modulo(prime, target) = successor(predM))
+        : Natural.padic_valuation_step(successor(fuel), prime, target)
+          = zero :=
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) =>
+          (cases m {
+             | zero =>
+                 successor(Natural.padic_valuation_step(
+                               fuel, prime, Natural.divide(prime, target)))
+             | successor(_) => zero
+           } : Natural) = zero,
+      successor(predM), Natural.modulo(prime, target),
+      Equality.symmetry(moduloIsSucc),
+      reflexivity(Natural, zero))
+
+-- When modulo(p, n) = 0, the step recurses.
+theorem Natural.padic_valuation_step_succ_when_divides
+        (fuel prime target : Natural)
+        (moduloZero : Natural.modulo(prime, target) = zero)
+        : Natural.padic_valuation_step(successor(fuel), prime, target)
+          = successor(Natural.padic_valuation_step(
+                          fuel, prime, Natural.divide(prime, target))) :=
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) =>
+          (cases m {
+             | zero =>
+                 successor(Natural.padic_valuation_step(
+                               fuel, prime, Natural.divide(prime, target)))
+             | successor(_) => zero
+           } : Natural)
+          = successor(Natural.padic_valuation_step(
+                          fuel, prime, Natural.divide(prime, target))),
+      zero, Natural.modulo(prime, target),
+      Equality.symmetry(moduloZero),
+      reflexivity(Natural,
+          successor(Natural.padic_valuation_step(
+              fuel, prime, Natural.divide(prime, target)))))
