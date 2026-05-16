@@ -15,6 +15,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
+import Natural.prime
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -23,37 +24,42 @@ import Rational.order
 import PAdic.absolute_value
 
 -- A p-adic-Cauchy sequence: terms get arbitrarily p-adic-close.
-definition Rational.sequence.IsPAdicCauchy (p : Natural)
+definition Rational.sequence.IsPAdicCauchy
+        (p : Natural) (primality : Natural.is_prime(p))
         (s : Natural → Rational) : Proposition :=
   (epsilon : Rational) → Rational.zero < epsilon →
     ∃ (N : Natural).
       (m : Natural) → N ≤ m →
         (n : Natural) → N ≤ n →
-          Rational.padic_absolute_value(p, s(m) - s(n)) < epsilon
+          Rational.padic_absolute_value(p, primality, s(m) - s(n)) < epsilon
 
 -- Packaged Cauchy sequence.
-inductive PAdicCauchySequence (p : Natural) : Type(0) where
+inductive PAdicCauchySequence (p : Natural) (primality : Natural.is_prime(p))
+        : Type(0) where
   | PAdicCauchySequence.make
       : (sequenceFunction : Natural → Rational)
-        → Rational.sequence.IsPAdicCauchy(p, sequenceFunction)
-        → PAdicCauchySequence(p)
+        → Rational.sequence.IsPAdicCauchy(p, primality, sequenceFunction)
+        → PAdicCauchySequence(p, primality)
 
-definition PAdicCauchySequence.sequenceFunction (p : Natural)
-        : PAdicCauchySequence(p) → (Natural → Rational)
+definition PAdicCauchySequence.sequenceFunction
+        (p : Natural) (primality : Natural.is_prime(p))
+        : PAdicCauchySequence(p, primality) → (Natural → Rational)
   | PAdicCauchySequence.make(s, _) => s
 
 -- Two p-adic Cauchy sequences are equivalent when their pointwise
 -- difference converges to zero in the p-adic norm.
-definition PAdicEquivalent (p : Natural)
-        (a b : PAdicCauchySequence(p)) : Proposition :=
+definition PAdicEquivalent
+        (p : Natural) (primality : Natural.is_prime(p))
+        (a b : PAdicCauchySequence(p, primality)) : Proposition :=
   (epsilon : Rational) → Rational.zero < epsilon →
     ∃ (N : Natural).
       (m : Natural) → N ≤ m →
-        Rational.padic_absolute_value(p,
-            PAdicCauchySequence.sequenceFunction(p, a, m)
-            - PAdicCauchySequence.sequenceFunction(p, b, m))
+        Rational.padic_absolute_value(p, primality,
+            PAdicCauchySequence.sequenceFunction(p, primality, a, m)
+            - PAdicCauchySequence.sequenceFunction(p, primality, b, m))
           < epsilon
 
 -- The p-adic numbers ℚ_p.
-definition PAdic (p : Natural) : Type(0) :=
-  Quotient(PAdicCauchySequence(p), PAdicEquivalent(p))
+definition PAdic (p : Natural) (primality : Natural.is_prime(p)) : Type(0) :=
+  Quotient(PAdicCauchySequence(p, primality),
+            PAdicEquivalent(p, primality))

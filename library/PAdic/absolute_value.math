@@ -639,51 +639,108 @@ theorem Rational.padic_absolute_value_respect
        → Rational.padic_absolute_value_at_representative(p, rep1)
          = Rational.padic_absolute_value_at_representative(p, rep2))(equivHyp)
 
--- p-adic absolute value of a rational. Returns 0 for q = 0 and
--- (1/p)^v_p(q) for q ≠ 0. Stubbed until the p-adic infrastructure
--- (Natural.padic_valuation, etc.) lands.
-definition Rational.padic_absolute_value (p : Natural) (q : Rational)
-        : Rational := Rational.zero
+-- Honest top-level: lift `padic_absolute_value_at_representative`
+-- through the Quotient using the respect proof.
+definition Rational.padic_absolute_value
+        (p : Natural) (primality : Natural.is_prime(p))
+        (q : Rational) : Rational :=
+  Quotient.lift(
+      function (rep : RationalRepresentative) =>
+          Rational.padic_absolute_value_at_representative(p, rep),
+      function (rep1 rep2 : RationalRepresentative)
+               (equiv : RationalEquivalent(rep1, rep2)) =>
+          Rational.padic_absolute_value_respect(
+              p, primality, rep1, rep2, equiv),
+      q)
 
+-- Non-negativity: 0 ≤ |q|_p for any q. Quotient.induct on q. At
+-- representative make(n, d), case on the numerator's absolute value:
+-- zero gives Rational.zero, and the successor case gives a
+-- Rational whose numerator is the image of a Natural (hence IsNonneg).
 theorem Rational.padic_absolute_value_nonneg
-        (p : Natural) (q : Rational)
-        : Rational.zero ≤ Rational.padic_absolute_value(p, q) :=
-  Rational.LessOrEqual.reflexive(Rational.zero)
-
-theorem Rational.padic_triangle_inequality
-        (p : Natural) (x y : Rational)
-        : Rational.padic_absolute_value(p, x + y)
-          ≤ Rational.padic_absolute_value(p, x)
-            + Rational.padic_absolute_value(p, y) :=
-  Equality.transport_proposition(
-      Rational,
-      function (w : Rational) =>
-          Rational.LessOrEqual(Rational.zero, w),
-      Rational.zero,
-      Rational.zero + Rational.zero,
-      Equality.symmetry(Rational.add_zero(Rational.zero)),
-      Rational.LessOrEqual.reflexive(Rational.zero))
-
-theorem Rational.padic_absolute_value_multiplicative
-        (p : Natural) (x y : Rational)
-        : Rational.padic_absolute_value(p, x * y)
-          = Rational.padic_absolute_value(p, x)
-            * Rational.padic_absolute_value(p, y) :=
-  Quotient.sound(
-      RationalRepresentative, RationalEquivalent,
-      RationalRepresentative.make(Integer.zero, zero),
-      RationalRepresentative.make(
-          Integer.zero * Integer.zero,
-          zero + zero * successor(zero)),
-      calc Integer.zero
-             * (successor(zero + zero * successor(zero)) : Integer)
-         = Integer.zero
-                by Integer.multiply_zero_left(
-                       (successor(zero + zero * successor(zero)) : Integer))
-         = Integer.zero * Integer.zero
-                by Equality.symmetry(
-                       Integer.multiply_zero_left(Integer.zero))
-         = (Integer.zero * Integer.zero) * (successor(zero) : Integer)
-                by Equality.symmetry(
-                       Integer.multiply_identity_right(
-                           Integer.zero * Integer.zero)))
+        (p : Natural) (primality : Natural.is_prime(p))
+        (q : Rational)
+        : Rational.zero ≤ Rational.padic_absolute_value(p, primality, q) :=
+  Quotient.induct(
+      function (q' : Rational) =>
+          Rational.zero ≤ Rational.padic_absolute_value(p, primality, q'),
+      function (rep : RationalRepresentative) =>
+          (cases rep {
+             | RationalRepresentative.make(n, d) =>
+                 (function (absN : Natural)
+                           (eqAbsOuter :
+                               Integer.absolute_value_natural(n) = absN) =>
+                    (cases absN {
+                       | zero =>
+                           function (eqAbs
+                                       : Integer.absolute_value_natural(n)
+                                         = zero) =>
+                             Equality.transport_proposition(
+                                 Rational,
+                                 function (r : Rational) =>
+                                     Rational.zero ≤ r,
+                                 Rational.zero,
+                                 Rational.padic_absolute_value_at_representative(
+                                     p,
+                                     RationalRepresentative.make(n, d)),
+                                 Equality.symmetry(
+                                     Rational.padic_absolute_value_at_zero(
+                                         p, n, d, eqAbs)),
+                                 Rational.LessOrEqual.reflexive(
+                                     Rational.zero))
+                       | successor(k) =>
+                           function (eqAbs
+                                       : Integer.absolute_value_natural(n)
+                                         = successor(k)) =>
+                             Equality.transport_proposition(
+                                 Rational,
+                                 function (r : Rational) =>
+                                     Rational.zero ≤ r,
+                                 Quotient.mk(
+                                     RationalRepresentative,
+                                     RationalEquivalent,
+                                     RationalRepresentative.make(
+                                         (Natural.power(
+                                              Natural.padic_valuation(
+                                                  p, successor(d)), p)
+                                              : Integer),
+                                         Natural.monus(
+                                             Natural.power(
+                                                 Natural.padic_valuation(
+                                                     p, successor(k)), p),
+                                             successor(zero)))),
+                                 Rational.padic_absolute_value_at_representative(
+                                     p,
+                                     RationalRepresentative.make(n, d)),
+                                 Equality.symmetry(
+                                     Rational.padic_absolute_value_at_succ(
+                                         p, n, d, k, eqAbs)),
+                                 Rational.LessOrEqual_zero_of_IsNonneg(
+                                     Quotient.mk(
+                                         RationalRepresentative,
+                                         RationalEquivalent,
+                                         RationalRepresentative.make(
+                                             (Natural.power(
+                                                  Natural.padic_valuation(
+                                                      p, successor(d)), p)
+                                                  : Integer),
+                                             Natural.monus(
+                                                 Natural.power(
+                                                     Natural.padic_valuation(
+                                                         p, successor(k)), p),
+                                                 successor(zero)))),
+                                     Integer.from_natural_is_nonneg(
+                                         Natural.power(
+                                             Natural.padic_valuation(
+                                                 p, successor(d)), p))))
+                     } : Integer.absolute_value_natural(n) = absN
+                         → Rational.zero
+                           ≤ Rational.padic_absolute_value_at_representative(
+                                 p,
+                                 RationalRepresentative.make(n, d)))(
+                      eqAbsOuter)
+                  )(Integer.absolute_value_natural(n),
+                    reflexivity(Natural, Integer.absolute_value_natural(n)))
+           } : Rational.zero
+               ≤ Rational.padic_absolute_value_at_representative(p, rep)),
+      q)

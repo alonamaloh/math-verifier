@@ -10,6 +10,7 @@ import Logic.basics
 import Logic.quotient
 import Equality.basics
 import Natural.basics
+import Natural.prime
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -17,13 +18,14 @@ import Rational.negation
 import PAdic.absolute_value
 import PAdic.basics
 
--- The constant Cauchy sequence is p-adic-Cauchy. With our
--- (placeholder) constant-zero `padic_absolute_value`, the bound
--- `padic_absolute_value(p, q - q) < ε` reduces to `0 < ε`, witnessed
--- by the input positivity hypothesis.
+-- The constant Cauchy sequence is p-adic-Cauchy. With the honest
+-- `padic_absolute_value`, the bound `|q - q|_p < ε` reduces via
+-- `q - q = 0` and `|0|_p = 0` to `0 < ε`, witnessed by the input
+-- positivity hypothesis.
 theorem Rational.sequence.constant_is_padic_cauchy
-        (p : Natural) (q : Rational)
-        : Rational.sequence.IsPAdicCauchy(p,
+        (p : Natural) (primality : Natural.is_prime(p))
+        (q : Rational)
+        : Rational.sequence.IsPAdicCauchy(p, primality,
               function (_ : Natural) => q) :=
   function (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) =>
@@ -32,27 +34,48 @@ theorem Rational.sequence.constant_is_padic_cauchy
         function (N : Natural) =>
           (m : Natural) → N ≤ m →
             (n : Natural) → N ≤ n →
-              Rational.padic_absolute_value(p, q - q) < epsilon,
+              Rational.padic_absolute_value(p, primality, q - q) < epsilon,
         zero,
         function (m : Natural) (_ : zero ≤ m)
                  (n : Natural) (_ : zero ≤ n) =>
-          -- padic_absolute_value(p, q - q) = 0 by definition. So
-          -- the goal reduces to 0 < epsilon = epsilonPositive.
-          epsilonPositive)
+          -- q - q = Rational.zero. |Rational.zero|_p = Rational.zero
+          -- by reflexivity (the lift on mk(make(zero, zero)) reduces
+          -- through the inner cases on |0| = 0 to Rational.zero).
+          -- So the bound reduces to 0 < epsilon.
+          Equality.transport_proposition(
+              Rational,
+              function (r : Rational) => r < epsilon,
+              Rational.zero,
+              Rational.padic_absolute_value(p, primality, q - q),
+              Equality.symmetry(
+                  Equality.transitivity(
+                      congruenceOf(
+                          function (r : Rational) =>
+                              Rational.padic_absolute_value(p, primality, r),
+                          Rational.add_negate_right(q)),
+                      reflexivity(Rational, Rational.zero))),
+              epsilonPositive))
 
-definition Rational.to_padic_constant_sequence (p : Natural) (q : Rational)
-        : PAdicCauchySequence(p) :=
+definition Rational.to_padic_constant_sequence
+        (p : Natural) (primality : Natural.is_prime(p))
+        (q : Rational)
+        : PAdicCauchySequence(p, primality) :=
   PAdicCauchySequence.make(
       function (_ : Natural) => q,
-      Rational.sequence.constant_is_padic_cauchy(p, q))
+      Rational.sequence.constant_is_padic_cauchy(p, primality, q))
 
-definition Rational.to_padic (p : Natural) (q : Rational) : PAdic(p) :=
-  Quotient.mk(PAdicCauchySequence(p), PAdicEquivalent(p),
-               Rational.to_padic_constant_sequence(p, q))
+definition Rational.to_padic
+        (p : Natural) (primality : Natural.is_prime(p))
+        (q : Rational) : PAdic(p, primality) :=
+  Quotient.mk(PAdicCauchySequence(p, primality),
+               PAdicEquivalent(p, primality),
+               Rational.to_padic_constant_sequence(p, primality, q))
 
 -- Canonical constants.
-definition PAdic.zero (p : Natural) : PAdic(p) :=
-  Rational.to_padic(p, Rational.zero)
+definition PAdic.zero (p : Natural) (primality : Natural.is_prime(p))
+        : PAdic(p, primality) :=
+  Rational.to_padic(p, primality, Rational.zero)
 
-definition PAdic.one (p : Natural) : PAdic(p) :=
-  Rational.to_padic(p, Rational.one)
+definition PAdic.one (p : Natural) (primality : Natural.is_prime(p))
+        : PAdic(p, primality) :=
+  Rational.to_padic(p, primality, Rational.one)
