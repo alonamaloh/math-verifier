@@ -1,0 +1,318 @@
+-- Rational/triangle.math
+--
+-- The Rational triangle inequality |x + y| ≤ |x| + |y|, plus a few
+-- order helpers needed to express it.
+
+module Rational.triangle
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.distance
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.sign
+import Integer.absolute_value
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.absolute_value
+
+-- Multiplicative monotonicity for IsNonneg by a positive Natural.
+-- If x is IsNonneg (= some Natural's image), then x * succ(d) is too.
+theorem Integer.IsNonneg.multiply_by_positive_natural
+        (x : Integer) (d : Natural) (xIsNonneg : Integer.IsNonneg(x))
+        : Integer.IsNonneg(x * (successor(d) : Integer)) :=
+  Exists.eliminate(
+      Natural,
+      function (n : Natural) => x = (n : Integer),
+      Integer.IsNonneg(x * (successor(d) : Integer)),
+      function (n : Natural) (xIsImage : x = (n : Integer)) =>
+          Exists.introduce(
+              Natural,
+              function (k : Natural) =>
+                  x * (successor(d) : Integer) = (k : Integer),
+              n * successor(d),
+              calc x * (successor(d) : Integer)
+                 = (n : Integer) * (successor(d) : Integer)
+                        by congruenceOf(
+                               function (y : Integer) =>
+                                   y * (successor(d) : Integer),
+                               xIsImage)
+                 = (n * successor(d) : Integer)
+                        by Equality.symmetry(
+                               Natural.to_integer.multiply_preserves(
+                                   n, successor(d)))),
+      xIsNonneg)
+
+-- The Integer-level kernel: B ≤ A and then (A - B) * succ(d) is
+-- non-negative, AND distributes through.
+-- We'll need: A * s(d) + (-B) * s(d) = (A - B) * s(d). Pure ring.
+theorem Integer.scaled_subtract_distribute
+        (A B : Integer) (d : Natural)
+        : A * (successor(d) : Integer) + -B * (successor(d) : Integer)
+          = (A - B) * (successor(d) : Integer) :=
+  calc A * (successor(d) : Integer) + -B * (successor(d) : Integer)
+     = (A + -B) * (successor(d) : Integer)
+            by Equality.symmetry(
+                   Integer.distributivity_right(
+                       A, -B, (successor(d) : Integer)))
+     = (A - B) * (successor(d) : Integer)
+            by reflexivity(Integer,
+                   (A - B) * (successor(d) : Integer))
+
+-- The Integer triangle inequality applied to (n1·s(d2)) + (n2·s(d1))
+-- and then collapsed via absolute_value_multiply_by_positive_natural:
+-- |n1·s(d2) + n2·s(d1)| ≤ |n1|·s(d2) + |n2|·s(d1).
+theorem Integer.triangle_inequality_rational_form
+        (n1 n2 : Integer) (d1 d2 : Natural)
+        : Integer.absolute_value(
+              n1 * (successor(d2) : Integer)
+              + n2 * (successor(d1) : Integer))
+          ≤ Integer.absolute_value(n1) * (successor(d2) : Integer)
+            + Integer.absolute_value(n2) * (successor(d1) : Integer) :=
+  Equality.transport_proposition(
+      Integer,
+      function (rhs : Integer) =>
+          Integer.absolute_value(
+              n1 * (successor(d2) : Integer)
+              + n2 * (successor(d1) : Integer)) ≤ rhs,
+      Integer.absolute_value(n1 * (successor(d2) : Integer))
+          + Integer.absolute_value(n2 * (successor(d1) : Integer)),
+      Integer.absolute_value(n1) * (successor(d2) : Integer)
+          + Integer.absolute_value(n2) * (successor(d1) : Integer),
+      -- |n1·s(d2)| + |n2·s(d1)| = |n1|·s(d2) + |n2|·s(d1).
+      calc Integer.absolute_value(n1 * (successor(d2) : Integer))
+           + Integer.absolute_value(n2 * (successor(d1) : Integer))
+         = Integer.absolute_value(n1) * (successor(d2) : Integer)
+           + Integer.absolute_value(n2 * (successor(d1) : Integer))
+                by congruenceOf(
+                       function (x : Integer) =>
+                           x + Integer.absolute_value(
+                                   n2 * (successor(d1) : Integer)),
+                       Integer.absolute_value_multiply_by_positive_natural(
+                           n1, d2))
+         = Integer.absolute_value(n1) * (successor(d2) : Integer)
+           + Integer.absolute_value(n2) * (successor(d1) : Integer)
+                by congruenceOf(
+                       function (x : Integer) =>
+                           Integer.absolute_value(n1)
+                               * (successor(d2) : Integer)
+                           + x,
+                       Integer.absolute_value_multiply_by_positive_natural(
+                           n2, d1)),
+      Integer.triangle_inequality(
+          n1 * (successor(d2) : Integer),
+          n2 * (successor(d1) : Integer)))
+
+-- Bridge lemma: if A·s(d) + (-B)·s(d) can be rewritten as (n·s(d) : I)
+-- (where n : Natural), then this Integer is IsNonneg. Used by the
+-- triangle_inequality_at_representatives proof.
+theorem Integer.IsNonneg.transport_from_natural_form
+        (A B : Integer) (d : Natural) (n : Natural)
+        (witnessEquation
+            : A + -B = (n : Integer))
+        : Integer.IsNonneg(
+              A * (successor(d) : Integer)
+              + -B * (successor(d) : Integer)) :=
+  Exists.introduce(
+      Natural,
+      function (k : Natural) =>
+          A * (successor(d) : Integer)
+          + -B * (successor(d) : Integer)
+          = (k : Integer),
+      n * successor(d),
+      calc A * (successor(d) : Integer)
+           + -B * (successor(d) : Integer)
+         = (A - B) * (successor(d) : Integer)
+                by Integer.scaled_subtract_distribute(A, B, d)
+         = (n : Integer) * (successor(d) : Integer)
+                by congruenceOf(
+                       function (z : Integer) =>
+                           z * (successor(d) : Integer),
+                       witnessEquation)
+         = (n * successor(d) : Integer)
+                by Equality.symmetry(
+                       Natural.to_integer.multiply_preserves(
+                           n, successor(d))))
+
+-- The representative-level triangle inequality. Both |p+q| and |p|+|q|
+-- on representatives have denominator d := d2 + d1*succ(d2), and the
+-- difference (|p|+|q|) - |p+q| evaluates to IsNonneg of
+-- (A - B) * succ(d) where A, B are the Integer numerators with
+-- B ≤ A by triangle_inequality_rational_form.
+theorem Rational.triangle_inequality_at_representatives
+        (n1 n2 : Integer) (d1 d2 : Natural)
+        : Rational.absolute_value(
+              Quotient.mk(RationalRepresentative,
+                          RationalEquivalent,
+                          RationalRepresentative.make(n1, d1))
+              + Quotient.mk(RationalRepresentative,
+                            RationalEquivalent,
+                            RationalRepresentative.make(n2, d2)))
+          ≤ Rational.absolute_value(
+                Quotient.mk(RationalRepresentative,
+                            RationalEquivalent,
+                            RationalRepresentative.make(n1, d1)))
+            + Rational.absolute_value(
+                  Quotient.mk(RationalRepresentative,
+                              RationalEquivalent,
+                              RationalRepresentative.make(n2, d2))) :=
+  -- After kernel reduction, the LessOrEqual goal becomes
+  -- Integer.IsNonneg(A·s(d) + (-B)·s(d)) where:
+  --   A = |n1|·s(d2) + |n2|·s(d1)
+  --   B = |n1·s(d2) + n2·s(d1)|
+  --   d = d2 + d1·s(d2).
+  -- From Integer.triangle_inequality_rational_form we have B ≤ A,
+  -- i.e., ∃ n. A = B + (n : I). Then A + -B = (n : I), and the
+  -- bridge lemma gives IsNonneg of the desired form.
+  Exists.eliminate(
+      Natural,
+      function (n : Natural) =>
+          Integer.absolute_value(n1) * (successor(d2) : Integer)
+          + Integer.absolute_value(n2) * (successor(d1) : Integer)
+          = Integer.absolute_value(
+                n1 * (successor(d2) : Integer)
+                + n2 * (successor(d1) : Integer))
+            + (n : Integer),
+      Integer.IsNonneg(
+          (Integer.absolute_value(n1) * (successor(d2) : Integer)
+           + Integer.absolute_value(n2) * (successor(d1) : Integer))
+          * (successor(d2 + d1 * successor(d2)) : Integer)
+          + -(Integer.absolute_value(
+                  n1 * (successor(d2) : Integer)
+                  + n2 * (successor(d1) : Integer)))
+            * (successor(d2 + d1 * successor(d2)) : Integer)),
+      function (n : Natural)
+               (witnessHypothesis
+                  : Integer.absolute_value(n1)
+                        * (successor(d2) : Integer)
+                    + Integer.absolute_value(n2)
+                        * (successor(d1) : Integer)
+                    = Integer.absolute_value(
+                          n1 * (successor(d2) : Integer)
+                          + n2 * (successor(d1) : Integer))
+                      + (n : Integer)) =>
+          Integer.IsNonneg.transport_from_natural_form(
+              Integer.absolute_value(n1) * (successor(d2) : Integer)
+                  + Integer.absolute_value(n2)
+                      * (successor(d1) : Integer),
+              Integer.absolute_value(
+                  n1 * (successor(d2) : Integer)
+                  + n2 * (successor(d1) : Integer)),
+              d2 + d1 * successor(d2),
+              n,
+              -- A + -B = (n : I). Witness: A = B + (n : I), so
+              -- A + -B = B + (n : I) + -B = (n : I) by ring.
+              calc Integer.absolute_value(n1)
+                       * (successor(d2) : Integer)
+                   + Integer.absolute_value(n2)
+                       * (successor(d1) : Integer)
+                   + -Integer.absolute_value(
+                         n1 * (successor(d2) : Integer)
+                         + n2 * (successor(d1) : Integer))
+                 = Integer.absolute_value(
+                       n1 * (successor(d2) : Integer)
+                       + n2 * (successor(d1) : Integer))
+                   + (n : Integer)
+                   + -Integer.absolute_value(
+                         n1 * (successor(d2) : Integer)
+                         + n2 * (successor(d1) : Integer))
+                        by congruenceOf(
+                               function (z : Integer) =>
+                                   z + -Integer.absolute_value(
+                                       n1 * (successor(d2) : Integer)
+                                       + n2 * (successor(d1) : Integer)),
+                               witnessHypothesis)
+                 = -Integer.absolute_value(
+                         n1 * (successor(d2) : Integer)
+                         + n2 * (successor(d1) : Integer))
+                   + (Integer.absolute_value(
+                          n1 * (successor(d2) : Integer)
+                          + n2 * (successor(d1) : Integer))
+                      + (n : Integer))
+                        by ring
+                 = (-Integer.absolute_value(
+                          n1 * (successor(d2) : Integer)
+                          + n2 * (successor(d1) : Integer))
+                    + Integer.absolute_value(
+                          n1 * (successor(d2) : Integer)
+                          + n2 * (successor(d1) : Integer)))
+                   + (n : Integer)
+                        by Equality.symmetry(
+                               Integer.add_associative(
+                                   -Integer.absolute_value(
+                                       n1 * (successor(d2) : Integer)
+                                       + n2 * (successor(d1) : Integer)),
+                                   Integer.absolute_value(
+                                       n1 * (successor(d2) : Integer)
+                                       + n2 * (successor(d1) : Integer)),
+                                   (n : Integer)))
+                 = Integer.zero + (n : Integer)
+                        by congruenceOf(
+                               function (z : Integer) =>
+                                   z + (n : Integer),
+                               Integer.add_negate_left(
+                                   Integer.absolute_value(
+                                       n1 * (successor(d2) : Integer)
+                                       + n2 * (successor(d1) : Integer))))
+                 = (n : Integer)
+                        by Integer.add_identity_left((n : Integer))),
+      Integer.triangle_inequality_rational_form(n1, n2, d1, d2))
+
+-- |x + y| ≤ |x| + |y| on Rational. Lift via Quotient.induct_two.
+theorem Rational.triangle_inequality (x y : Rational)
+        : Rational.absolute_value(x + y)
+          ≤ Rational.absolute_value(x) + Rational.absolute_value(y) :=
+  Quotient.induct_two(
+      RationalRepresentative, RationalEquivalent,
+      RationalRepresentative, RationalEquivalent,
+      function (p q : Rational) =>
+          Rational.absolute_value(p + q)
+            ≤ Rational.absolute_value(p) + Rational.absolute_value(q),
+      function (rep_p rep_q : RationalRepresentative) =>
+          (cases rep_p {
+             | RationalRepresentative.make(n1, d1) =>
+                 (cases rep_q {
+                    | RationalRepresentative.make(n2, d2) =>
+                        Rational.triangle_inequality_at_representatives(
+                            n1, n2, d1, d2)
+                  } : Rational.absolute_value(
+                          Quotient.mk(RationalRepresentative,
+                                      RationalEquivalent,
+                                      RationalRepresentative.make(n1, d1))
+                          + Quotient.mk(RationalRepresentative,
+                                        RationalEquivalent, rep_q))
+                      ≤ Rational.absolute_value(
+                            Quotient.mk(RationalRepresentative,
+                                        RationalEquivalent,
+                                        RationalRepresentative.make(n1, d1)))
+                        + Rational.absolute_value(
+                              Quotient.mk(RationalRepresentative,
+                                          RationalEquivalent, rep_q)))
+           } : Rational.absolute_value(
+                   Quotient.mk(RationalRepresentative, RationalEquivalent,
+                               rep_p)
+                   + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                 rep_q))
+               ≤ Rational.absolute_value(
+                     Quotient.mk(RationalRepresentative,
+                                 RationalEquivalent, rep_p))
+                 + Rational.absolute_value(
+                       Quotient.mk(RationalRepresentative,
+                                   RationalEquivalent, rep_q))),
+      x, y)

@@ -16,6 +16,7 @@ import Natural.peano
 import Natural.arithmetic
 import Natural.order
 import Natural.distance
+import Natural.subtraction
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
@@ -151,6 +152,109 @@ theorem Integer.negate_add (p q : Integer) : -(p + q) = -p + -q :=
                   Quotient.mk(IntegerRepresentative, IntegerEquivalent, r),
               Integer.negate_add_at_representatives(rep_p, rep_q)),
       p, q)
+
+-- ----------------------------------------------------------------------
+-- Triangle inequality.
+
+-- Monotonicity of the Natural ↪ Integer embedding: n ≤ m on Naturals
+-- implies (n : I) ≤ (m : I). Witness via Natural.subtraction_witness.
+theorem Natural.to_integer.le_preserves
+        (n m : Natural) (nLeqM : n ≤ m)
+        : (n : Integer) ≤ (m : Integer) :=
+  Exists.eliminate(
+      Natural,
+      function (k : Natural) => m = n + k,
+      Integer.LessOrEqual((n : Integer), (m : Integer)),
+      function (k : Natural) (mEqualsNPlusK : m = n + k) =>
+          Exists.introduce(
+              Natural,
+              function (j : Natural) =>
+                  (m : Integer) = (n : Integer) + (j : Integer),
+              k,
+              calc (m : Integer)
+                 = (n + k : Integer)
+                        by congruenceOf(Natural.to_integer, mEqualsNPlusK)
+                 = (n : Integer) + (k : Integer)
+                        by Natural.to_integer.add_preserves(n, k)),
+      Natural.subtraction_witness(n, m, nLeqM))
+
+-- |x + y| at representatives reduces directly: mk(a, b) + mk(c, d)
+-- = mk(a + c, b + d), |·| = (distance(a + c, b + d) : I). Stated as
+-- a sanity check / convenience.
+theorem Integer.absolute_value_add_at_representatives
+        (a b c d : Natural)
+        : Integer.absolute_value(
+              Quotient.mk(IntegerRepresentative, IntegerEquivalent,
+                          IntegerRepresentative.make(a, b))
+              + Quotient.mk(IntegerRepresentative, IntegerEquivalent,
+                            IntegerRepresentative.make(c, d)))
+          = (Natural.distance(a + c, b + d) : Integer) :=
+  reflexivity(Integer, (Natural.distance(a + c, b + d) : Integer))
+
+-- Triangle inequality on representatives. Establishes the Integer ≤
+-- between the embedded distances. The actual Integer.triangle_inequality
+-- then lifts via Quotient.induct_two.
+theorem Integer.triangle_inequality_at_representatives
+        (a b c d : Natural)
+        : (Natural.distance(a + c, b + d) : Integer)
+          ≤ (Natural.distance(a, b) : Integer)
+            + (Natural.distance(c, d) : Integer) :=
+  Equality.transport_proposition(
+      Integer,
+      function (rhs : Integer) =>
+          (Natural.distance(a + c, b + d) : Integer) ≤ rhs,
+      (Natural.distance(a, b) + Natural.distance(c, d) : Integer),
+      (Natural.distance(a, b) : Integer)
+          + (Natural.distance(c, d) : Integer),
+      Natural.to_integer.add_preserves(
+          Natural.distance(a, b), Natural.distance(c, d)),
+      Natural.to_integer.le_preserves(
+          Natural.distance(a + c, b + d),
+          Natural.distance(a, b) + Natural.distance(c, d),
+          Natural.distance_add_triangle(a, b, c, d)))
+
+-- |x + y| ≤ |x| + |y| on Integer. Lift via Quotient.induct_two.
+theorem Integer.triangle_inequality (x y : Integer)
+        : Integer.absolute_value(x + y)
+          ≤ Integer.absolute_value(x) + Integer.absolute_value(y) :=
+  Quotient.induct_two(
+      IntegerRepresentative, IntegerEquivalent,
+      IntegerRepresentative, IntegerEquivalent,
+      function (p q : Integer) =>
+          Integer.absolute_value(p + q)
+            ≤ Integer.absolute_value(p) + Integer.absolute_value(q),
+      function (rep_p rep_q : IntegerRepresentative) =>
+          (cases rep_p {
+             | IntegerRepresentative.make(a, b) =>
+                 (cases rep_q {
+                    | IntegerRepresentative.make(c, d) =>
+                        Integer.triangle_inequality_at_representatives(
+                            a, b, c, d)
+                  } : Integer.absolute_value(
+                          Quotient.mk(IntegerRepresentative,
+                                      IntegerEquivalent,
+                                      IntegerRepresentative.make(a, b))
+                          + Quotient.mk(IntegerRepresentative,
+                                        IntegerEquivalent, rep_q))
+                      ≤ Integer.absolute_value(
+                            Quotient.mk(IntegerRepresentative,
+                                        IntegerEquivalent,
+                                        IntegerRepresentative.make(a, b)))
+                        + Integer.absolute_value(
+                              Quotient.mk(IntegerRepresentative,
+                                          IntegerEquivalent, rep_q)))
+           } : Integer.absolute_value(
+                   Quotient.mk(IntegerRepresentative, IntegerEquivalent,
+                               rep_p)
+                   + Quotient.mk(IntegerRepresentative, IntegerEquivalent,
+                                 rep_q))
+               ≤ Integer.absolute_value(
+                     Quotient.mk(IntegerRepresentative,
+                                 IntegerEquivalent, rep_p))
+                 + Integer.absolute_value(
+                       Quotient.mk(IntegerRepresentative,
+                                   IntegerEquivalent, rep_q))),
+      x, y)
 
 -- x - y = -(y - x). Chained via subtract = add+negate, add_commutative,
 -- negate_add, and negate_negate.
