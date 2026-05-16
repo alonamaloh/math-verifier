@@ -185,21 +185,44 @@ and LLMs.
 
 ### Quick wins (1–3 hours each)
 
-- **Refactor `library/PAdic/*.math` to use short Quotient.* forms.**
-  Mechanical, big payoff. Estimate ~150 sites, ~2 hours.
-- **Refactor `library/Rational/*.math`, `library/Real/*.math` similarly.**
-  Lower urgency but same payoff per call site.
-- **Extend implicit-arg recognition (`{x : T}` binders) to `definition`
-  and `theorem`, not just `axiom`.** Likely ~1 hour given the
-  machinery already exists. Unlocks `(p : Natural)` implicit threading
-  in PAdic.
-- **Add `Quotient.induct_three` and `Quotient.induct_four` desugarings.**
-  Patterns for n-ary ring laws. ~1 hour.
-- **Better error messages for nested Quotient.induct case-shape errors.**
-  When the case body has wrong arity, suggest "wrap with `function
-  (next_args) => ...`". ~30 min.
-- **Document the existing short-form inference in `claim_language.md`
-  or a new `quotient_idioms.md`.** ~30 min.
+- ✅ **Refactor `library/Integer/*.math` short Quotient.* forms.** Done
+  2026-05-16: 17 lines saved across 6 files (8 sites).
+- ✅ **Refactor `library/Rational/*.math` short Quotient.* forms.** Done
+  2026-05-16: 48 lines saved across 13 files. Discovered useful trick
+  — `(Quotient.mk(rep) : Rational)` ascription unlocks short form in
+  expected-type-unfriendly positions. Documented in CLAUDE.md.
+- ⏳ **Refactor `library/PAdic/*.math` and `library/Real/*.math` short
+  Quotient.* forms.** In flight in worktree.
+- ✅ **Extend implicit-arg recognition (`{x : T}` binders) to `definition`
+  and `theorem`.** Already works. Verified by test at
+  `library/Test/implicit_args_test.math`.
+- ✅ **Add `Quotient.induct_three` desugaring.** Done. (Quotient.induct_four
+  is deferred — no 4-arg laws currently need it.)
+- ✅ **Better error messages for `Quotient.mk(rep)` inference failure.**
+  Done — names the common failure spots and suggests the explicit
+  fallback.
+- ✅ **Document short-form inference and idioms in `CLAUDE.md`.** Done.
+
+### Next sweep — Equality combinator carrier implicit
+
+`Equality.transport_proposition`, `Equality.transitivity`,
+`Equality.symmetry`, `Equality.congruence` all take an explicit
+`(A : Type)` carrier as their first argument, then `(x : A)` etc.
+The carrier is derivable from `x`'s type at every call site. Library-
+wide there are ~720 uses (192 + 527), and the carrier often takes its
+own line. Making the carrier `{A : Type}` implicit would save ~500
+lines library-wide.
+
+Plan:
+1. Change signatures in `library/Equality/basics.math` to use `{A}`.
+2. Bulk-refactor call sites to drop the carrier argument.
+3. Estimate: ~2 hours given the refactor agent template we used for
+   Quotient.* forms.
+
+Higher-friction items still deferred: `by ring` v2 with distributivity;
+PAdic operations migrating to implicit `(p : Natural) (primality :
+…)`; `operator (+) on (PAdic, PAdic)` overload; `cases h : expr with`
+tactic; per-block `open NAMESPACE`.
 
 ## Completed
 
