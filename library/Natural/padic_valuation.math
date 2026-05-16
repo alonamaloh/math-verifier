@@ -1373,3 +1373,415 @@ theorem Natural.padic_valuation_monus_ultrametric_when_ge
           ≤ Natural.padic_valuation(prime, Natural.monus(b, a)) :=
   Natural.padic_valuation_monus_ultrametric_when_le(
       prime, primeAtLeastTwo, b, a, aLeB, monusPositive, valuationLe)
+
+-- distance(a, b) equals monus(a, b) when b ≤ a (and monus(b, a) when
+-- a ≤ b). These convert between the structurally-recursive distance
+-- and the order-dependent monus formulation so we can apply divides
+-- facts.
+theorem Natural.distance_monus_when_le
+        : (b a : Natural) → b ≤ a → Natural.distance(a, b) = Natural.monus(a, b)
+  | zero, a, _ =>
+      -- distance(a, 0) = a, monus(a, 0) = a.
+      Equality.transitivity(
+          Natural.distance_zero_right(a),
+          Equality.symmetry(Natural.monus_zero(a)))
+  | successor(predB), a, succPredBLeA =>
+      (cases a {
+         | zero =>
+             function (refinedLe : successor(predB) ≤ zero) =>
+               False.eliminate_proposition(
+                   Natural.distance(zero, successor(predB))
+                     = Natural.monus(zero, successor(predB)),
+                   Natural.not_less_or_equal_successor_zero(predB, refinedLe))
+         | successor(predA) =>
+             function (refinedLe : successor(predB) ≤ successor(predA)) =>
+               -- distance(succ(predA), succ(predB)) reduces to
+               -- distance(predA, predB). monus(succ(predA), succ(predB))
+               -- reduces to monus(predA, predB).
+               Natural.distance_monus_when_le(
+                   predB, predA,
+                   Natural.less_or_equal_successor_successor_descend(
+                       predB, predA, refinedLe))
+       } : (refinedLe : successor(predB) ≤ a)
+           → Natural.distance(a, successor(predB))
+             = Natural.monus(a, successor(predB)))(succPredBLeA)
+
+-- The other side: distance(a, b) = monus(b, a) when a ≤ b. Use symmetry.
+theorem Natural.distance_monus_when_ge
+        (a b : Natural) (aLeB : a ≤ b)
+        : Natural.distance(a, b) = Natural.monus(b, a) :=
+  Equality.transitivity(
+      Natural.distance_symmetric(a, b),
+      Natural.distance_monus_when_le(a, b, aLeB))
+
+-- Helper: a ≤ c implies a + b ≤ c + b. By induction on the proof of a ≤ c.
+theorem Natural.le_add_preserves_left
+        (a c b : Natural) (aLeC : a ≤ c)
+        : a + b ≤ c + b := {
+  -- From a ≤ c get witness r : c = a + r. Then a + b ≤ a + r + b = c + b.
+  let ⟨r, cEqAplusR⟩ := Natural.subtraction_witness(a, c, aLeC);
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) => a + b ≤ m + b,
+      a + r, c,
+      Equality.symmetry(cEqAplusR),
+      -- a + b ≤ (a + r) + b. (a + r) + b = a + (r + b) by assoc; same as a + (b + r) by commutativity.
+      -- Use less_or_equal_add_right: a + b ≤ (a + b) + r.
+      Equality.transport_proposition(
+          Natural,
+          function (m : Natural) => a + b ≤ m,
+          (a + b) + r, (a + r) + b,
+          -- (a + b) + r = (a + r) + b via assoc and commutativity.
+          calc (a + b) + r
+             = a + (b + r)
+                    by Natural.add_associative(a, b, r)
+             = a + (r + b)
+                    by congruenceOf(
+                           function (m : Natural) => a + m,
+                           Natural.add_commutative(b, r))
+             = (a + r) + b
+                    by Equality.symmetry(
+                           Natural.add_associative(a, r, b)),
+          Natural.less_or_equal_add_right(a + b, r)))
+}
+
+-- And on the right: b ≤ d implies a + b ≤ a + d. Same proof, via
+-- add_commutative.
+theorem Natural.le_add_preserves_right
+        (a b d : Natural) (bLeD : b ≤ d)
+        : a + b ≤ a + d :=
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) => m ≤ a + d,
+      b + a, a + b,
+      Natural.add_commutative(b, a),
+      Equality.transport_proposition(
+          Natural,
+          function (m : Natural) => b + a ≤ m,
+          d + a, a + d,
+          Natural.add_commutative(d, a),
+          Natural.le_add_preserves_left(b, d, a, bLeD)))
+
+-- a ≤ c ∧ b ≤ d → a + b ≤ c + d.
+theorem Natural.le_add_le
+        (a c b d : Natural) (aLeC : a ≤ c) (bLeD : b ≤ d)
+        : a + b ≤ c + d :=
+  LessOrEqual.transitive(
+      a + b, c + b, c + d,
+      Natural.le_add_preserves_right(c, b, d, bLeD),
+      Natural.le_add_preserves_left(a, c, b, aLeC))
+
+-- monus expansion for sums: when a ≤ c and b ≤ d,
+-- monus(c + d, a + b) = monus(c, a) + monus(d, b).
+-- Proof: c = a + monus(c, a); d = b + monus(d, b); so c + d = (a + b) +
+-- (monus(c, a) + monus(d, b)). Then monus_add_cancel.
+theorem Natural.monus_add_distributes
+        (a c b d : Natural) (aLeC : a ≤ c) (bLeD : b ≤ d)
+        : Natural.monus(c + d, a + b)
+          = Natural.monus(c, a) + Natural.monus(d, b) := {
+  claim cDecompose : c = a + Natural.monus(c, a)
+    by Natural.monus_zero_implies_decompose(
+           a, c, Natural.le_implies_monus_zero(c, a, aLeC));
+  claim dDecompose : d = b + Natural.monus(d, b)
+    by Natural.monus_zero_implies_decompose(
+           b, d, Natural.le_implies_monus_zero(d, b, bLeD));
+  claim sumDecompose
+        : c + d = (a + b) + (Natural.monus(c, a) + Natural.monus(d, b))
+    by calc c + d
+       = (a + Natural.monus(c, a)) + (b + Natural.monus(d, b))
+              by Equality.transitivity(
+                     congruenceOf(
+                         function (m : Natural) => m + d,
+                         cDecompose),
+                     congruenceOf(
+                         function (m : Natural) =>
+                             (a + Natural.monus(c, a)) + m,
+                         dDecompose))
+       = ((a + Natural.monus(c, a)) + b) + Natural.monus(d, b)
+              by Equality.symmetry(
+                     Natural.add_associative(
+                         a + Natural.monus(c, a),
+                         b,
+                         Natural.monus(d, b)))
+       = (a + (Natural.monus(c, a) + b)) + Natural.monus(d, b)
+              by congruenceOf(
+                     function (m : Natural) => m + Natural.monus(d, b),
+                     Natural.add_associative(
+                         a, Natural.monus(c, a), b))
+       = (a + (b + Natural.monus(c, a))) + Natural.monus(d, b)
+              by congruenceOf(
+                     function (m : Natural) =>
+                         (a + m) + Natural.monus(d, b),
+                     Natural.add_commutative(
+                         Natural.monus(c, a), b))
+       = ((a + b) + Natural.monus(c, a)) + Natural.monus(d, b)
+              by congruenceOf(
+                     function (m : Natural) => m + Natural.monus(d, b),
+                     Equality.symmetry(
+                         Natural.add_associative(
+                             a, b, Natural.monus(c, a))))
+       = (a + b) + (Natural.monus(c, a) + Natural.monus(d, b))
+              by Natural.add_associative(
+                     a + b,
+                     Natural.monus(c, a),
+                     Natural.monus(d, b));
+  Equality.transitivity(
+      congruenceOf(
+          function (m : Natural) => Natural.monus(m, a + b),
+          sumDecompose),
+      Natural.monus_add_cancel(
+          a + b,
+          Natural.monus(c, a) + Natural.monus(d, b)))
+}
+
+-- Helper: d divides distance(a, b) when d divides both a and b.
+-- Case-split via totality, then apply divides_monus.
+theorem Natural.divides_distance
+        (d a b : Natural) (dDividesA : d ∣ a) (dDividesB : d ∣ b)
+        : d ∣ Natural.distance(a, b) :=
+  Or.eliminate(
+      a ≤ b, b ≤ a,
+      d ∣ Natural.distance(a, b),
+      function (aLeB : a ≤ b) =>
+        Equality.transport_proposition(
+            Natural,
+            function (m : Natural) => d ∣ m,
+            Natural.monus(b, a), Natural.distance(a, b),
+            Equality.symmetry(Natural.distance_monus_when_ge(a, b, aLeB)),
+            Natural.divides_monus(d, b, a, aLeB, dDividesB, dDividesA)),
+      function (bLeA : b ≤ a) =>
+        Equality.transport_proposition(
+            Natural,
+            function (m : Natural) => d ∣ m,
+            Natural.monus(a, b), Natural.distance(a, b),
+            Equality.symmetry(Natural.distance_monus_when_le(b, a, bLeA)),
+            Natural.divides_monus(d, a, b, bLeA, dDividesA, dDividesB)),
+      Natural.totality_of_less_or_equal(a, b))
+
+-- The key Natural-level identity: distance(a1+b1, a2+b2) is the
+-- distance of two specific quantities built from monus.
+-- When a1 ≤ a2 and b2 ≤ b1 (cross-direction), distance(a1+b1, a2+b2)
+-- = distance(monus(b1, b2), monus(a2, a1)).
+-- Proof: a2 = a1 + monus(a2, a1), b1 = b2 + monus(b1, b2). So
+-- a2 + b2 = (a1 + b2) + monus(a2, a1) and a1 + b1 = (a1 + b2) + monus(b1, b2).
+-- Then distance_add_left_cancel.
+theorem Natural.distance_sum_cross_le_le
+        (a1 a2 b1 b2 : Natural) (a1LeA2 : a1 ≤ a2) (b2LeB1 : b2 ≤ b1)
+        : Natural.distance(a1 + b1, a2 + b2)
+          = Natural.distance(Natural.monus(b1, b2), Natural.monus(a2, a1)) := {
+  claim a2Decompose : a2 = a1 + Natural.monus(a2, a1)
+    by Natural.monus_zero_implies_decompose(
+           a1, a2, Natural.le_implies_monus_zero(a2, a1, a1LeA2));
+  claim b1Decompose : b1 = b2 + Natural.monus(b1, b2)
+    by Natural.monus_zero_implies_decompose(
+           b2, b1, Natural.le_implies_monus_zero(b1, b2, b2LeB1));
+  calc Natural.distance(a1 + b1, a2 + b2)
+     = Natural.distance(a1 + (b2 + Natural.monus(b1, b2)),
+                         (a1 + Natural.monus(a2, a1)) + b2)
+            by Equality.transitivity(
+                   congruenceOf(
+                       function (m : Natural) =>
+                           Natural.distance(a1 + m, a2 + b2),
+                       b1Decompose),
+                   congruenceOf(
+                       function (m : Natural) =>
+                           Natural.distance(
+                               a1 + (b2 + Natural.monus(b1, b2)),
+                               m + b2),
+                       a2Decompose))
+     = Natural.distance((a1 + b2) + Natural.monus(b1, b2),
+                         (a1 + b2) + Natural.monus(a2, a1))
+            by Equality.transitivity(
+                   congruenceOf(
+                       function (m : Natural) =>
+                           Natural.distance(
+                               m,
+                               (a1 + Natural.monus(a2, a1)) + b2),
+                       Equality.symmetry(
+                           Natural.add_associative(
+                               a1, b2, Natural.monus(b1, b2)))),
+                   congruenceOf(
+                       function (m : Natural) =>
+                           Natural.distance(
+                               (a1 + b2) + Natural.monus(b1, b2),
+                               m),
+                       calc (a1 + Natural.monus(a2, a1)) + b2
+                          = a1 + (Natural.monus(a2, a1) + b2)
+                                 by Natural.add_associative(
+                                        a1, Natural.monus(a2, a1), b2)
+                          = a1 + (b2 + Natural.monus(a2, a1))
+                                 by congruenceOf(
+                                        function (m : Natural) => a1 + m,
+                                        Natural.add_commutative(
+                                            Natural.monus(a2, a1), b2))
+                          = (a1 + b2) + Natural.monus(a2, a1)
+                                 by Equality.symmetry(
+                                        Natural.add_associative(
+                                            a1, b2, Natural.monus(a2, a1)))))
+     = Natural.distance(Natural.monus(b1, b2), Natural.monus(a2, a1))
+            by Natural.distance_add_left_cancel(
+                   a1 + b2,
+                   Natural.monus(b1, b2),
+                   Natural.monus(a2, a1))
+}
+
+-- The Natural-level "distance ultrametric": if d divides both
+-- distance(a1, a2) and distance(b1, b2), then d divides
+-- distance(a1+b1, a2+b2). Case analysis via totality.
+theorem Natural.divides_distance_sum
+        (d a1 a2 b1 b2 : Natural)
+        (dDividesDistanceA : d ∣ Natural.distance(a1, a2))
+        (dDividesDistanceB : d ∣ Natural.distance(b1, b2))
+        : d ∣ Natural.distance(a1 + b1, a2 + b2) :=
+  Or.eliminate(
+      a1 ≤ a2, a2 ≤ a1,
+      d ∣ Natural.distance(a1 + b1, a2 + b2),
+      function (a1LeA2 : a1 ≤ a2) =>
+        Or.eliminate(
+            b1 ≤ b2, b2 ≤ b1,
+            d ∣ Natural.distance(a1 + b1, a2 + b2),
+            function (b1LeB2 : b1 ≤ b2) => {
+              -- Same direction (a1 ≤ a2, b1 ≤ b2).
+              -- distance(a1+b1, a2+b2) = monus(a2+b2, a1+b1)
+              --                       = monus(a2, a1) + monus(b2, b1)
+              --                       = distance(a1, a2) + distance(b1, b2).
+              claim sumLe : a1 + b1 ≤ a2 + b2
+                by Natural.le_add_le(a1, a2, b1, b2, a1LeA2, b1LeB2);
+              Equality.transport_proposition(
+                  Natural,
+                  function (m : Natural) => d ∣ m,
+                  Natural.distance(a1, a2) + Natural.distance(b1, b2),
+                  Natural.distance(a1 + b1, a2 + b2),
+                  calc Natural.distance(a1, a2) + Natural.distance(b1, b2)
+                     = Natural.monus(a2, a1) + Natural.distance(b1, b2)
+                            by congruenceOf(
+                                   function (m : Natural) =>
+                                       m + Natural.distance(b1, b2),
+                                   Natural.distance_monus_when_ge(
+                                       a1, a2, a1LeA2))
+                     = Natural.monus(a2, a1) + Natural.monus(b2, b1)
+                            by congruenceOf(
+                                   function (m : Natural) =>
+                                       Natural.monus(a2, a1) + m,
+                                   Natural.distance_monus_when_ge(
+                                       b1, b2, b1LeB2))
+                     = Natural.monus(a2 + b2, a1 + b1)
+                            by Equality.symmetry(
+                                   Natural.monus_add_distributes(
+                                       a1, a2, b1, b2, a1LeA2, b1LeB2))
+                     = Natural.distance(a1 + b1, a2 + b2)
+                            by Equality.symmetry(
+                                   Natural.distance_monus_when_ge(
+                                       a1 + b1, a2 + b2, sumLe)),
+                  Natural.divides_add(
+                      d,
+                      Natural.distance(a1, a2),
+                      Natural.distance(b1, b2),
+                      dDividesDistanceA, dDividesDistanceB))
+            },
+            function (b2LeB1 : b2 ≤ b1) =>
+              -- Cross direction (a1 ≤ a2, b2 ≤ b1). distance(a1+b1, a2+b2)
+              -- = distance(monus(b1, b2), monus(a2, a1)). Then divides_distance.
+              Equality.transport_proposition(
+                  Natural,
+                  function (m : Natural) => d ∣ m,
+                  Natural.distance(
+                      Natural.monus(b1, b2), Natural.monus(a2, a1)),
+                  Natural.distance(a1 + b1, a2 + b2),
+                  Equality.symmetry(
+                      Natural.distance_sum_cross_le_le(
+                          a1, a2, b1, b2, a1LeA2, b2LeB1)),
+                  Natural.divides_distance(
+                      d, Natural.monus(b1, b2), Natural.monus(a2, a1),
+                      Equality.transport_proposition(
+                          Natural,
+                          function (m : Natural) => d ∣ m,
+                          Natural.distance(b1, b2), Natural.monus(b1, b2),
+                          Natural.distance_monus_when_le(b2, b1, b2LeB1),
+                          dDividesDistanceB),
+                      Equality.transport_proposition(
+                          Natural,
+                          function (m : Natural) => d ∣ m,
+                          Natural.distance(a1, a2), Natural.monus(a2, a1),
+                          Natural.distance_monus_when_ge(a1, a2, a1LeA2),
+                          dDividesDistanceA))),
+            Natural.totality_of_less_or_equal(b1, b2)),
+      function (a2LeA1 : a2 ≤ a1) =>
+        Or.eliminate(
+            b1 ≤ b2, b2 ≤ b1,
+            d ∣ Natural.distance(a1 + b1, a2 + b2),
+            function (b1LeB2 : b1 ≤ b2) =>
+              -- Cross direction (a2 ≤ a1, b1 ≤ b2). Symmetric to AB case.
+              -- distance(a1+b1, a2+b2) = distance(a2+b2, a1+b1) by symmetry.
+              -- = distance(monus(b2, b1), monus(a1, a2)).
+              Equality.transport_proposition(
+                  Natural,
+                  function (m : Natural) => d ∣ m,
+                  Natural.distance(a2 + b2, a1 + b1),
+                  Natural.distance(a1 + b1, a2 + b2),
+                  Natural.distance_symmetric(a2 + b2, a1 + b1),
+                  Equality.transport_proposition(
+                      Natural,
+                      function (m : Natural) => d ∣ m,
+                      Natural.distance(
+                          Natural.monus(b2, b1), Natural.monus(a1, a2)),
+                      Natural.distance(a2 + b2, a1 + b1),
+                      Equality.symmetry(
+                          Natural.distance_sum_cross_le_le(
+                              a2, a1, b2, b1, a2LeA1, b1LeB2)),
+                      Natural.divides_distance(
+                          d, Natural.monus(b2, b1), Natural.monus(a1, a2),
+                          Equality.transport_proposition(
+                              Natural,
+                              function (m : Natural) => d ∣ m,
+                              Natural.distance(b1, b2),
+                              Natural.monus(b2, b1),
+                              Natural.distance_monus_when_ge(b1, b2, b1LeB2),
+                              dDividesDistanceB),
+                          Equality.transport_proposition(
+                              Natural,
+                              function (m : Natural) => d ∣ m,
+                              Natural.distance(a1, a2),
+                              Natural.monus(a1, a2),
+                              Natural.distance_monus_when_le(a2, a1, a2LeA1),
+                              dDividesDistanceA)))),
+            function (b2LeB1 : b2 ≤ b1) => {
+              -- Same direction (a2 ≤ a1, b2 ≤ b1). distance is in
+              -- terms of monus(a1, a2) and monus(b1, b2). By the
+              -- same distributivity / divides_add chain as the first case.
+              claim sumLe : a2 + b2 ≤ a1 + b1
+                by Natural.le_add_le(a2, a1, b2, b1, a2LeA1, b2LeB1);
+              Equality.transport_proposition(
+                  Natural,
+                  function (m : Natural) => d ∣ m,
+                  Natural.distance(a1, a2) + Natural.distance(b1, b2),
+                  Natural.distance(a1 + b1, a2 + b2),
+                  calc Natural.distance(a1, a2) + Natural.distance(b1, b2)
+                     = Natural.monus(a1, a2) + Natural.distance(b1, b2)
+                            by congruenceOf(
+                                   function (m : Natural) =>
+                                       m + Natural.distance(b1, b2),
+                                   Natural.distance_monus_when_le(
+                                       a2, a1, a2LeA1))
+                     = Natural.monus(a1, a2) + Natural.monus(b1, b2)
+                            by congruenceOf(
+                                   function (m : Natural) =>
+                                       Natural.monus(a1, a2) + m,
+                                   Natural.distance_monus_when_le(
+                                       b2, b1, b2LeB1))
+                     = Natural.monus(a1 + b1, a2 + b2)
+                            by Equality.symmetry(
+                                   Natural.monus_add_distributes(
+                                       a2, a1, b2, b1, a2LeA1, b2LeB1))
+                     = Natural.distance(a1 + b1, a2 + b2)
+                            by Equality.symmetry(
+                                   Natural.distance_monus_when_le(
+                                       a2 + b2, a1 + b1, sumLe)),
+                  Natural.divides_add(
+                      d,
+                      Natural.distance(a1, a2),
+                      Natural.distance(b1, b2),
+                      dDividesDistanceA, dDividesDistanceB))
+            },
+            Natural.totality_of_less_or_equal(b1, b2)),
+      Natural.totality_of_less_or_equal(a1, a2))
