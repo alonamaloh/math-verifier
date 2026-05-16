@@ -1,0 +1,147 @@
+-- Natural/power.math
+--
+-- Exponentiation on Natural by recursion on the exponent.
+--   p^0 = 1, p^(k+1) = p * p^k.
+-- Plus the basic algebraic lemmas (power_zero, power_one, power_add,
+-- power_positive) needed by the p-adic absolute value.
+
+module Natural.power
+
+import Logic.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.subtraction
+import Logic.exists
+import Equality.basics
+
+-- Exponent first so structural recursion is on the first argument.
+-- `Natural.power(k, p) = p^k`.
+definition Natural.power : Natural → Natural → Natural
+  | zero,         _ => successor(zero)
+  | successor(k), p => p * Natural.power(k, p)
+
+-- p^0 = 1.
+theorem Natural.power_zero (p : Natural) : Natural.power(zero, p) = successor(zero) :=
+  reflexivity(Natural, successor(zero))
+
+-- p^1 = p. Compute via the successor case + multiply_one.
+theorem Natural.power_one (p : Natural) : Natural.power(successor(zero), p) = p :=
+  Natural.multiply_one(p)
+
+-- p^(a + b) = p^a * p^b. With exponent first: power(a + b, p) = power(a, p) * power(b, p).
+-- Induct on a.
+theorem Natural.power_add
+        : (a b p : Natural) → Natural.power(a + b, p)
+                              = Natural.power(a, p) * Natural.power(b, p)
+  | zero, b, p =>
+      -- power(0 + b, p) = power(b, p). power(0, p) * power(b, p) = 1 * power(b, p).
+      Equality.symmetry(
+          Natural.one_multiply(Natural.power(b, p)))
+  | successor(k), b, p =>
+      calc Natural.power(successor(k) + b, p)
+         = Natural.power(successor(k + b), p)
+                by reflexivity(Natural, Natural.power(successor(k + b), p))
+         = p * Natural.power(k + b, p)
+                by reflexivity(Natural, p * Natural.power(k + b, p))
+         = p * (Natural.power(k, p) * Natural.power(b, p))
+                by congruenceOf(
+                       function (m : Natural) => p * m,
+                       Natural.power_add(k, b, p))
+         = (p * Natural.power(k, p)) * Natural.power(b, p)
+                by Equality.symmetry(
+                       Natural.multiply_associative(
+                           p, Natural.power(k, p), Natural.power(b, p)))
+         = Natural.power(successor(k), p) * Natural.power(b, p)
+                by reflexivity(Natural,
+                       Natural.power(successor(k), p) * Natural.power(b, p))
+
+-- Subtraction-witness extractor for `1 ≤ p^k`: provides a Natural m
+-- with p^k = succ(m). Useful for showing strict positivity.
+theorem Natural.power_succ_form
+        : (k p : Natural) → successor(zero) ≤ p
+          → ∃ (m : Natural). Natural.power(k, p) = successor(m)
+  | zero, p, _ =>
+      Exists.introduce(
+          Natural,
+          function (m : Natural) =>
+              Natural.power(zero, p) = successor(m),
+          zero,
+          reflexivity(Natural, successor(zero)))
+  | successor(j), p, pPositive =>
+      Exists.eliminate(
+          Natural,
+          function (m : Natural) => Natural.power(j, p) = successor(m),
+          ∃ (m : Natural).
+              Natural.power(successor(j), p) = successor(m),
+          function (m : Natural) (powerIsSucc : Natural.power(j, p) = successor(m)) =>
+            Exists.eliminate(
+                Natural,
+                function (predP : Natural) => p = successor(predP),
+                ∃ (mPrime : Natural).
+                    Natural.power(successor(j), p) = successor(mPrime),
+                function (predP : Natural) (pIsSucc : p = successor(predP)) =>
+                  Exists.introduce(
+                      Natural,
+                      function (mPrime : Natural) =>
+                          Natural.power(successor(j), p) = successor(mPrime),
+                      predP + p * m,
+                      calc Natural.power(successor(j), p)
+                         = p * Natural.power(j, p)
+                                by reflexivity(Natural,
+                                       p * Natural.power(j, p))
+                         = p * successor(m)
+                                by congruenceOf(
+                                       function (z : Natural) => p * z,
+                                       powerIsSucc)
+                         = p + p * m
+                                by Natural.multiply_successor(p, m)
+                         = successor(predP) + p * m
+                                by congruenceOf(
+                                       function (z : Natural) => z + p * m,
+                                       pIsSucc)
+                         = successor(predP + p * m)
+                                by reflexivity(Natural,
+                                       successor(predP + p * m))),
+                Exists.eliminate(
+                    Natural,
+                    function (c : Natural) => p = successor(zero) + c,
+                    ∃ (predP : Natural). p = successor(predP),
+                    function (c : Natural) (pIs : p = successor(zero) + c) =>
+                      Exists.introduce(
+                          Natural,
+                          function (predP : Natural) => p = successor(predP),
+                          c,
+                          calc p
+                             = successor(zero) + c
+                                    by pIs
+                             = successor(zero + c)
+                                    by reflexivity(Natural,
+                                           successor(zero + c))
+                             = successor(c)
+                                    by congruenceOf(successor,
+                                           reflexivity(Natural,
+                                               zero + c))),
+                    Natural.subtraction_witness(
+                        successor(zero), p, pPositive))),
+          Natural.power_succ_form(j, p, pPositive))
+
+-- p^k ≥ 1 for p ≥ 1. From the succ form.
+theorem Natural.power_positive
+        (k p : Natural) (pPositive : successor(zero) ≤ p)
+        : successor(zero) ≤ Natural.power(k, p) :=
+  Exists.eliminate(
+      Natural,
+      function (m : Natural) => Natural.power(k, p) = successor(m),
+      successor(zero) ≤ Natural.power(k, p),
+      function (m : Natural) (eq : Natural.power(k, p) = successor(m)) =>
+        Equality.transport_proposition(
+            Natural,
+            function (n : Natural) => successor(zero) ≤ n,
+            successor(m),
+            Natural.power(k, p),
+            Equality.symmetry(eq),
+            Natural.successor_less_or_equal_successor(
+                zero, m, Natural.zero_least(m))),
+      Natural.power_succ_form(k, p, pPositive))

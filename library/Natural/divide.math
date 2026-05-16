@@ -1,0 +1,50 @@
+-- Natural/divide.math
+--
+-- Honest `Natural → Natural → Natural` division and modulo functions
+-- via fuel-based recursion. Pattern-matches on `Natural.monus(p, n)`
+-- (a Natural) to decide "does p fit in n?" — Type-safe case analysis
+-- on a Natural rather than on a Proposition proof. With fuel = n,
+-- the result is correct for any (p, n) with p ≥ 1 (since each
+-- iteration strips at least one p from n, and n iterations are
+-- always enough).
+
+module Natural.divide
+
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.monus
+
+-- divide_step(fuel, p, n): fuel-bounded floor division. Fuel first
+-- so the structural recursion is on it.
+definition Natural.divide_step : Natural → Natural → Natural → Natural
+  | zero,         _, _ => zero
+  | successor(fuel), p, n =>
+      cases Natural.monus(p, n) {
+        | zero =>
+            -- p ≤ n: recurse with n - p, count one more.
+            successor(Natural.divide_step(fuel, p, Natural.monus(n, p)))
+        | successor(_) =>
+            -- p > n: stop.
+            zero
+      }
+
+-- modulo_step(fuel, p, n): fuel-bounded remainder.
+definition Natural.modulo_step : Natural → Natural → Natural → Natural
+  | zero,         _, n => n
+  | successor(fuel), p, n =>
+      cases Natural.monus(p, n) {
+        | zero =>
+            Natural.modulo_step(fuel, p, Natural.monus(n, p))
+        | successor(_) =>
+            n
+      }
+
+-- Top-level functions with fuel = n (always enough since each
+-- iteration reduces n by at least 1 when p ≥ 1).
+definition Natural.divide (p n : Natural) : Natural :=
+  Natural.divide_step(n, p, n)
+
+definition Natural.modulo (p n : Natural) : Natural :=
+  Natural.modulo_step(n, p, n)

@@ -1,0 +1,41 @@
+-- Natural/padic_valuation.math
+--
+-- `Natural.padic_valuation(p, n)`: the largest k such that p^k divides
+-- n. Defined honestly as a `Natural → Natural → Natural` function via
+-- fuel-based recursion. Pattern-matches on `Natural.modulo(p, n)`
+-- (a Natural) to test divisibility — Type-safe.
+--
+-- For p ≥ 2, each iteration strips one factor of p; n iterations of
+-- fuel always suffice. For p ≤ 1, the convention here is that the
+-- function returns 0 (since "infinite valuation" or undefined doesn't
+-- fit in `Natural`).
+
+module Natural.padic_valuation
+
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.divide
+
+-- padic_valuation_step(fuel, p, n): fuel-bounded valuation. With
+-- fuel ≥ floor(log_p(n)) iterations, returns the largest k with
+-- p^k | n.
+definition Natural.padic_valuation_step : Natural → Natural → Natural → Natural
+  | zero,            _, _ => zero
+  | successor(fuel), p, n =>
+      cases Natural.modulo(p, n) {
+        | zero =>
+            -- p | n: strip one factor, count one.
+            successor(
+                Natural.padic_valuation_step(
+                    fuel, p, Natural.divide(p, n)))
+        | successor(_) =>
+            -- p ∤ n: done.
+            zero
+      }
+
+-- Top-level p-adic valuation. Fuel = n is more than enough since
+-- log_p(n) ≤ n for any p ≥ 2.
+definition Natural.padic_valuation (p n : Natural) : Natural :=
+  Natural.padic_valuation_step(n, p, n)

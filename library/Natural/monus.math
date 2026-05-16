@@ -1,0 +1,69 @@
+-- Natural/monus.math
+--
+-- Truncated subtraction on Natural: `monus(a, b) = max(0, a - b)`.
+-- Structural on the second argument. Provides the order test used by
+-- Type-level decision procedures: `monus(p, n) = zero` iff p ≤ n.
+
+module Natural.monus
+
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.strong_recursion
+import Equality.basics
+import Logic.basics
+
+-- monus(a, b) = a -̇ b. Structural on the first argument; inner case
+-- on the second when needed (the kernel only reduces multi-constructor
+-- patterns when the inner case is explicit).
+definition Natural.monus : Natural → Natural → Natural
+  | zero,         _ => zero
+  | successor(k), b =>
+      cases b {
+        | zero         => successor(k)
+        | successor(j) => Natural.monus(k, j)
+      }
+
+-- monus(zero, b) = zero (definitional).
+theorem Natural.monus_zero_left (b : Natural) : Natural.monus(zero, b) = zero :=
+  reflexivity(Natural, zero)
+
+-- monus(a, zero) = a. Case-split a (the kernel doesn't auto-reduce when
+-- the second arg isn't a constructor).
+theorem Natural.monus_zero : (a : Natural) → Natural.monus(a, zero) = a
+  | zero         => reflexivity(zero)
+  | successor(k) => reflexivity(successor(k))
+
+-- monus(a, a) = zero. Induct on a.
+theorem Natural.monus_self : (a : Natural) → Natural.monus(a, a) = zero
+  | zero         => reflexivity(zero)
+  | successor(k) => Natural.monus_self(k)
+
+-- If a ≤ b, then monus(a, b) = zero. Induct on b, inner case on a.
+theorem Natural.le_implies_monus_zero
+        : (b a : Natural) → a ≤ b → Natural.monus(a, b) = zero
+  | zero, a, aLeqZero =>
+      -- a ≤ 0 forces a = 0. monus(0, 0) = 0.
+      Equality.transport_proposition(
+          Natural,
+          function (x : Natural) => Natural.monus(x, zero) = zero,
+          zero, a,
+          Equality.symmetry(
+              Natural.less_or_equal_zero_implies_equals_zero(a, aLeqZero)),
+          reflexivity(Natural, zero))
+  | successor(predecessorB), a, aLeqSuccB =>
+      (cases a {
+         | zero =>
+             function (refinedProof : zero ≤ successor(predecessorB)) =>
+               Natural.monus_zero_left(successor(predecessorB))
+         | successor(k) =>
+             function (refinedProof : successor(k) ≤ successor(predecessorB)) =>
+               -- monus(succ(k), succ(predecessorB)) reduces to monus(k, predecessorB).
+               -- k ≤ predecessorB by descending the LessOrEqual.
+               Natural.le_implies_monus_zero(
+                   predecessorB, k,
+                   Natural.less_or_equal_successor_successor_descend(
+                       k, predecessorB, refinedProof))
+       } : (refinedProof : a ≤ successor(predecessorB))
+           → Natural.monus(a, successor(predecessorB)) = zero)(aLeqSuccB)

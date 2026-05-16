@@ -1,0 +1,21 @@
+-- Logic/sigma.math
+--
+-- Type-level dependent pair `Sigma (A : Type) (B : A → Type) : Type`.
+-- Packages a witness value `a : A` together with a proof/value
+-- `b : B(a)`. Unlike `Exists`, `Sigma` lives in `Type` so its
+-- eliminator returns Type values — we can extract the witness as a
+-- usable Type value.
+
+module Logic.sigma
+
+inductive Sigma (A : Type) (B : A → Type) : Type where
+  | Sigma.make : (witnessValue : A) → B(witnessValue) → Sigma(A, B)
+
+-- Projections (defined by pattern-match, so the kernel reduces them
+-- when applied to a `make`).
+definition Sigma.first (A : Type) (B : A → Type) : Sigma(A, B) → A
+  | Sigma.make(a, _) => a
+
+definition Sigma.second (A : Type) (B : A → Type)
+        : (s : Sigma(A, B)) → B(Sigma.first(A, B, s))
+  | Sigma.make(_, b) => b
