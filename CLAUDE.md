@@ -31,10 +31,30 @@ definition Rational.zero : Rational :=
 
 The short form needs an expected type of shape `Quotient(T, R)` from
 context (the surrounding theorem's return type, or an enclosing
-function argument). If no expected type is available — e.g., as the
-operand of unary `-`, or as the immediate body of `function (rep)`
-inside `Quotient.lift` — the short form errors with `"cannot infer
-the equivalence relation R"`. In those cases, fall back to verbose.
+function argument). The short form does NOT fire in these positions:
+- Operand of unary `-`, binary `+`, `*`, `=`, `<`, `≤`.
+- Third arg of `Equality.transport_proposition(A, P, x, ...)` (the
+  carrier `A` doesn't propagate inward).
+- Arguments of polymorphic functions like `reflexivity`,
+  `Equality.transitivity`, `congruenceOf`, `Or.eliminate`,
+  `Exists.eliminate` (those elaborate args without an expected type).
+- Inside `congruenceOf` lambdas without an explicit annotation.
+
+**Trick:** in those positions, an explicit type ascription on the
+`mk` recovers the inference: `(Quotient.mk(rep) : Rational)`. The
+ascription is the expected type the short form needs.
+
+```math
+-- Fails:
+Rational.absolute_value(Quotient.mk(rep))
+
+-- Works:
+Rational.absolute_value((Quotient.mk(rep) : Rational))
+
+-- Also works (verbose fallback):
+Rational.absolute_value(
+    Quotient.mk(RationalRepresentative, RationalEquivalent, rep))
+```
 
 ### Quotient.sound(x, y, proof)
 
