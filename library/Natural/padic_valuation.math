@@ -1225,25 +1225,20 @@ theorem Natural.power_divides_implies_padic_valuation_ge
     }
 
 -- Natural ultrametric, asymmetric form: when v_p(a) ≤ v_p(b),
--- v_p(a) ≤ v_p(a + b). Path: p^v_p(a) divides both a and b (using
--- the bidirectional bridge above); divides_add gives p^v_p(a) | (a+b);
--- then the converse bridge gives v_p(a) ≤ v_p(a+b). Needs a ≥ 1 so
--- that a + b ≥ 1.
+-- v_p(a) ≤ v_p(a + b), provided a + b ≥ 1 (so the bridge converse
+-- applies). Path: p^v_p(a) divides both a and b (using the
+-- bidirectional bridge above); divides_add gives p^v_p(a) | (a+b);
+-- then the converse bridge gives v_p(a) ≤ v_p(a+b).
 theorem Natural.padic_valuation_ultrametric_when_le
         (prime : Natural)
         (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
         (a b : Natural)
-        (aPositive : successor(zero) ≤ a)
+        (sumPositive : successor(zero) ≤ a + b)
         (valuationLe :
             Natural.padic_valuation(prime, a)
               ≤ Natural.padic_valuation(prime, b))
         : Natural.padic_valuation(prime, a)
           ≤ Natural.padic_valuation(prime, a + b) := {
-  claim sumPositive : successor(zero) ≤ a + b
-    by LessOrEqual.transitive(
-           successor(zero), a, a + b,
-           Natural.less_or_equal_add_right(a, b),
-           aPositive);
   claim pPowerDividesA
         : Natural.divides(
               Natural.power(Natural.padic_valuation(prime, a), prime), a)
@@ -1276,7 +1271,7 @@ theorem Natural.padic_valuation_ultrametric_when_ge
         (prime : Natural)
         (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
         (a b : Natural)
-        (bPositive : successor(zero) ≤ b)
+        (sumPositive : successor(zero) ≤ a + b)
         (valuationLe :
             Natural.padic_valuation(prime, b)
               ≤ Natural.padic_valuation(prime, a))
@@ -1290,7 +1285,14 @@ theorem Natural.padic_valuation_ultrametric_when_ge
       b + a, a + b,
       Natural.add_commutative(b, a),
       Natural.padic_valuation_ultrametric_when_le(
-          prime, primeAtLeastTwo, b, a, bPositive, valuationLe))
+          prime, primeAtLeastTwo, b, a,
+          Equality.transport_proposition(
+              Natural,
+              function (m : Natural) => successor(zero) ≤ m,
+              a + b, b + a,
+              Natural.add_commutative(a, b),
+              sumPositive),
+          valuationLe))
 
 -- Subtraction preserves divides: if d | a and d | b and b ≤ a, then
 -- d | monus(a, b). Uses monus_zero_implies_decompose to express
