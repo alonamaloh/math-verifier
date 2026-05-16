@@ -1,0 +1,271 @@
+-- Real/cauchy_bounded.math
+--
+-- Cauchy sequences are eventually bounded by a Natural-image Rational.
+-- Apply the Cauchy condition with ε = 1 to get N; beyond N, |s(m)| is
+-- within 1 of |s(N)|, and |s(N)| has a Natural bound (Archimedean).
+
+module Real.cauchy_bounded
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.absolute_value
+import Rational.halve
+import Rational.positive
+import Rational.order_arithmetic
+import Rational.triangle
+import Rational.order_multiplication
+import Real.sequence
+
+-- ----------------------------------------------------------------------
+-- Algebraic helper.
+
+-- (succ K : I) + 1 = (succ (succ K) : I).
+theorem Integer.succ_natural_plus_one (K : Natural)
+        : (successor(K) : Integer) + Integer.one
+          = (successor(successor(K)) : Integer) :=
+  calc (successor(K) : Integer) + Integer.one
+     = (successor(K) : Integer) + (successor(zero) : Integer)
+            by reflexivity(Integer,
+                   (successor(K) : Integer) + (successor(zero) : Integer))
+     = ((successor(K) + successor(zero)) : Integer)
+            by Equality.symmetry(
+                   Natural.to_integer.add_preserves(
+                       successor(K), successor(zero)))
+     = (successor(successor(K)) : Integer)
+            by congruenceOf(Natural.to_integer,
+                   calc successor(K) + successor(zero)
+                      = successor(successor(K) + zero)
+                             by Natural.add_successor(successor(K), zero)
+                      = successor(successor(K))
+                             by congruenceOf(successor,
+                                    Natural.add_zero(successor(K))))
+
+-- (succ K : R) + 1 = (succ (succ K) : R) at Rational. Quotient.sound
+-- bridges the small denominator discrepancy (0 + 0 vs 0).
+theorem Rational.succ_natural_plus_one (K : Natural)
+        : (successor(K) : Rational) + Rational.one
+          = (successor(successor(K)) : Rational) :=
+  Quotient.sound(
+      RationalRepresentative, RationalEquivalent,
+      RationalRepresentative.make(
+          (successor(K) : Integer) * (successor(zero) : Integer)
+              + Integer.one * (successor(zero) : Integer),
+          zero + zero * successor(zero)),
+      RationalRepresentative.make(
+          (successor(successor(K)) : Integer), zero),
+      -- Cross: LHS_num · succ(0) = (succ (succ K) : I) · succ(0 + 0·s(0)).
+      -- Both reduce to (succ (succ K) : I) after Integer arithmetic.
+      calc ((successor(K) : Integer) * (successor(zero) : Integer)
+            + Integer.one * (successor(zero) : Integer))
+              * (successor(zero) : Integer)
+         = ((successor(K) : Integer) + Integer.one)
+              * (successor(zero) : Integer)
+                by congruenceOf(
+                       function (z : Integer) =>
+                           z * (successor(zero) : Integer),
+                       calc (successor(K) : Integer)
+                                * (successor(zero) : Integer)
+                            + Integer.one * (successor(zero) : Integer)
+                          = (successor(K) : Integer)
+                            + Integer.one * (successor(zero) : Integer)
+                                 by congruenceOf(
+                                        function (w : Integer) =>
+                                            w + Integer.one
+                                                * (successor(zero) : Integer),
+                                        Integer.multiply_identity_right(
+                                            (successor(K) : Integer)))
+                          = (successor(K) : Integer) + Integer.one
+                                 by congruenceOf(
+                                        function (w : Integer) =>
+                                            (successor(K) : Integer) + w,
+                                        Integer.multiply_identity_right(
+                                            Integer.one)))
+         = (successor(K) : Integer) + Integer.one
+                by Integer.multiply_identity_right(
+                       (successor(K) : Integer) + Integer.one)
+         = (successor(successor(K)) : Integer)
+                by Integer.succ_natural_plus_one(K)
+         = (successor(successor(K)) : Integer)
+              * (successor(zero) : Integer)
+                by Equality.symmetry(
+                       Integer.multiply_identity_right(
+                           (successor(successor(K)) : Integer)))
+         = (successor(successor(K)) : Integer)
+              * (successor(zero + zero * successor(zero)) : Integer)
+                by congruenceOf(
+                       function (m : Natural) =>
+                           (successor(successor(K)) : Integer)
+                               * (successor(m) : Integer),
+                       calc zero
+                          = zero + zero
+                                 by reflexivity(Natural, zero + zero)
+                          = zero + zero * successor(zero)
+                                 by congruenceOf(
+                                        function (w : Natural) => zero + w,
+                                        Equality.symmetry(
+                                            Natural.zero_multiply(
+                                                successor(zero))))))
+
+-- s_m = s_N + (s_m - s_N). Pure ring algebra.
+theorem Rational.split_via_anchor (a b : Rational)
+        : a = b + (a - b) :=
+  calc a
+     = Rational.zero + a
+            by Equality.symmetry(Rational.zero_add(a))
+     = (b + -b) + a
+            by congruenceOf(
+                   function (z : Rational) => z + a,
+                   Equality.symmetry(Rational.add_negate_right(b)))
+     = b + (-b + a)
+            by Rational.add_associative(b, -b, a)
+     = b + (a + -b)
+            by congruenceOf(
+                   function (z : Rational) => b + z,
+                   Rational.add_commutative(-b, a))
+     = b + (a - b)
+            by reflexivity(Rational, b + (a - b))
+
+-- ----------------------------------------------------------------------
+-- Cauchy is naturally bounded.
+
+theorem Rational.sequence.cauchy_is_naturally_bounded
+        (s : Rational.sequence.Sequence)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        : ∃ (K : Natural).
+            ∃ (N : Natural).
+              (m : Natural) → N ≤ m →
+                Rational.absolute_value(s(m))
+                  ≤ (successor(K) : Rational) :=
+  -- Step 1: apply sCauchy with ε = 1, 0 < 1.
+  Exists.eliminate(
+      Natural,
+      function (N : Natural) =>
+        (m : Natural) → N ≤ m →
+          (n : Natural) → N ≤ n →
+            Rational.absolute_value(s(m) - s(n)) < Rational.one,
+      ∃ (K : Natural).
+        ∃ (N : Natural).
+          (m : Natural) → N ≤ m →
+            Rational.absolute_value(s(m))
+              ≤ (successor(K) : Rational),
+      function (N : Natural)
+               (sCauchy_at_N
+                  : (m : Natural) → N ≤ m →
+                    (n : Natural) → N ≤ n →
+                      Rational.absolute_value(s(m) - s(n))
+                        < Rational.one) =>
+        -- Step 2: get Natural bound K_inner for |s(N)|.
+        Exists.eliminate(
+            Natural,
+            function (K_inner : Natural) =>
+              Rational.absolute_value(s(N))
+                ≤ (successor(K_inner) : Rational),
+            ∃ (K : Natural).
+              ∃ (N' : Natural).
+                (m : Natural) → N' ≤ m →
+                  Rational.absolute_value(s(m))
+                    ≤ (successor(K) : Rational),
+            function (K_inner : Natural)
+                     (s_at_N_bound
+                        : Rational.absolute_value(s(N))
+                          ≤ (successor(K_inner) : Rational)) =>
+              -- Witness: K := succ(K_inner) (so the final bound is
+              -- (succ(succ(K_inner)) : R)), N := N (unchanged).
+              Exists.introduce(
+                  Natural,
+                  function (K : Natural) =>
+                    ∃ (N' : Natural).
+                      (m : Natural) → N' ≤ m →
+                        Rational.absolute_value(s(m))
+                          ≤ (successor(K) : Rational),
+                  successor(K_inner),
+                  Exists.introduce(
+                      Natural,
+                      function (N' : Natural) =>
+                        (m : Natural) → N' ≤ m →
+                          Rational.absolute_value(s(m))
+                            ≤ (successor(successor(K_inner)) : Rational),
+                      N,
+                      function (m : Natural) (N_leq_m : N ≤ m) =>
+                        -- Chain:
+                        -- |s(m)|
+                        --   = |s(N) + (s(m) - s(N))|   (split_via_anchor)
+                        --   ≤ |s(N)| + |s(m) - s(N)|   (triangle)
+                        --   ≤ (succ K_inner : R) + |s(m) - s(N)|   (s_at_N_bound + add_preserves)
+                        --   ≤ (succ K_inner : R) + 1   (|s(m)-s(N)| < 1, weakened)
+                        --   = (succ (succ K_inner) : R)
+                        Rational.LessOrEqual.transitive(
+                            Rational.absolute_value(s(m)),
+                            (successor(K_inner) : Rational) + Rational.one,
+                            (successor(successor(K_inner)) : Rational),
+                            -- |s(m)| ≤ (succ K_inner : R) + 1.
+                            Rational.LessOrEqual.transitive(
+                                Rational.absolute_value(s(m)),
+                                Rational.absolute_value(s(N))
+                                    + Rational.absolute_value(s(m) - s(N)),
+                                (successor(K_inner) : Rational) + Rational.one,
+                                -- |s(m)| = |s(N) + (s(m)-s(N))| ≤ |s(N)| + |s(m)-s(N)|.
+                                Equality.transport_proposition(
+                                    Rational,
+                                    function (lhs : Rational) =>
+                                        Rational.LessOrEqual(
+                                            lhs,
+                                            Rational.absolute_value(s(N))
+                                                + Rational.absolute_value(
+                                                      s(m) - s(N))),
+                                    Rational.absolute_value(
+                                        s(N) + (s(m) - s(N))),
+                                    Rational.absolute_value(s(m)),
+                                    Equality.symmetry(
+                                        congruenceOf(
+                                            Rational.absolute_value,
+                                            Rational.split_via_anchor(
+                                                s(m), s(N)))),
+                                    Rational.triangle_inequality(
+                                        s(N), s(m) - s(N))),
+                                -- |s(N)| + |s(m)-s(N)| ≤ (succ K_inner) + 1
+                                -- via sum-of-≤.
+                                Rational.LessOrEqual.sum(
+                                    Rational.absolute_value(s(N)),
+                                    (successor(K_inner) : Rational),
+                                    Rational.absolute_value(s(m) - s(N)),
+                                    Rational.one,
+                                    s_at_N_bound,
+                                    And.left(
+                                        Rational.LessOrEqual(
+                                            Rational.absolute_value(s(m) - s(N)),
+                                            Rational.one),
+                                        Not(Rational.absolute_value(s(m) - s(N))
+                                            = Rational.one),
+                                        sCauchy_at_N(
+                                            m, N_leq_m, N,
+                                            LessOrEqual.reflexivity(N))))),
+                            -- (succ K_inner) + 1 = (succ (succ K_inner)) at Rational.
+                            Equality.transport_proposition(
+                                Rational,
+                                function (w : Rational) =>
+                                    Rational.LessOrEqual(
+                                        (successor(K_inner) : Rational)
+                                            + Rational.one,
+                                        w),
+                                (successor(K_inner) : Rational) + Rational.one,
+                                (successor(successor(K_inner)) : Rational),
+                                Rational.succ_natural_plus_one(K_inner),
+                                Rational.LessOrEqual.reflexive(
+                                    (successor(K_inner) : Rational) + Rational.one))))),
+            Rational.absolute_value_le_succ_natural(s(N))),
+      sIsCauchy(Rational.one, Rational.zero_less_one))

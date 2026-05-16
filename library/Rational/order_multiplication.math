@@ -562,6 +562,36 @@ theorem Rational.absolute_value_le_succ_natural (q : Rational)
       q)
 
 -- ----------------------------------------------------------------------
+-- General additive monotonicity (left-add by any constant) and
+-- sum-of-LessOrEqual.
+
+-- c ≤ d → b + c ≤ b + d. General left-add.
+theorem Rational.add_general_LessOrEqual_left
+        (b c d : Rational) (cLeqD : c ≤ d)
+        : b + c ≤ b + d :=
+  Equality.transport_proposition(
+      Rational,
+      function (w : Rational) => Rational.LessOrEqual(w, b + d),
+      c + b, b + c,
+      Rational.add_commutative(c, b),
+      Equality.transport_proposition(
+          Rational,
+          function (w : Rational) =>
+              Rational.LessOrEqual(c + b, w),
+          d + b, b + d,
+          Rational.add_commutative(d, b),
+          Rational.add_preserves_LessOrEqual(c, d, b, cLeqD)))
+
+-- a ≤ b ∧ c ≤ d → a + c ≤ b + d.
+theorem Rational.LessOrEqual.sum
+        (a b c d : Rational) (aLeqB : a ≤ b) (cLeqD : c ≤ d)
+        : a + c ≤ b + d :=
+  Rational.LessOrEqual.transitive(
+      a + c, b + c, b + d,
+      Rational.add_preserves_LessOrEqual(a, b, c, aLeqB),
+      Rational.add_general_LessOrEqual_left(b, c, d, cLeqD))
+
+-- ----------------------------------------------------------------------
 -- ε / (K + 1) construction.
 
 -- The reciprocal of (succ(K) : R) packaged as StrictPositiveRational.
