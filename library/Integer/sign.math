@@ -1,0 +1,142 @@
+-- Integer/sign.math
+--
+-- Sign decomposition: every Integer is either the image of a Natural
+-- or the negation of the image of a positive Natural. Foundation for
+-- the absolute-value multiplicativity, the Rational IsNonneg respect
+-- proof, and the rational power function used by p-adics.
+
+module Integer.sign
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.subtraction
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+
+-- Helper: subtracting at the representative level (when b ≤ a) gives
+-- a representative equivalent to the natural difference.
+-- Specifically: mk(make(a, b)) = (k : Integer) where a = b + k.
+theorem Integer.from_subtraction_witness
+        (a b k : Natural)
+        (witnessEquation : a = b + k)
+        : Quotient.mk(IntegerRepresentative, IntegerEquivalent,
+                       IntegerRepresentative.make(a, b))
+          = (k : Integer) :=
+  Quotient.sound(
+      IntegerRepresentative.make(a, b),
+      IntegerRepresentative.make(k, zero),
+      -- IntegerEquivalent(make(a, b), make(k, zero)) is a + zero = b + k.
+      calc a + zero
+         = a
+                by Natural.add_zero(a)
+         = b + k
+                by witnessEquation)
+
+-- Helper: when a ≤ b, mk(make(a, b)) is the negation of a Natural image.
+-- Specifically: mk(make(a, b)) = -(k : Integer) where b = a + k.
+theorem Integer.from_reverse_subtraction_witness
+        (a b k : Natural)
+        (witnessEquation : b = a + k)
+        : Quotient.mk(IntegerRepresentative, IntegerEquivalent,
+                       IntegerRepresentative.make(a, b))
+          = -(k : Integer) :=
+  Quotient.sound(
+      IntegerRepresentative.make(a, b),
+      IntegerRepresentative.make(zero, k),
+      -- IntegerEquivalent(make(a, b), make(zero, k)) is a + k = b + zero.
+      calc a + k
+         = b
+                by Equality.symmetry(witnessEquation)
+         = b + zero
+                by Equality.symmetry(Natural.add_zero(b)))
+
+-- The two disjuncts as named propositions (avoid huge inline forms).
+definition Integer.MkIsNonneg (a b : Natural) : Proposition :=
+  ∃ (k : Natural).
+    Quotient.mk(IntegerRepresentative, IntegerEquivalent,
+                 IntegerRepresentative.make(a, b))
+    = (k : Integer)
+
+definition Integer.MkIsNegated (a b : Natural) : Proposition :=
+  ∃ (k : Natural).
+    Quotient.mk(IntegerRepresentative, IntegerEquivalent,
+                 IntegerRepresentative.make(a, b))
+    = -(k : Integer)
+
+-- Sign trichotomy at the representative level.
+theorem Integer.sign_split_at_representative
+        (a b : Natural)
+        : Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)) :=
+  Or.eliminate(
+      LessOrEqual(a, b), LessOrEqual(b, a),
+      Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)),
+      function (aLeqB : a ≤ b) =>
+          Exists.eliminate(
+              Natural,
+              function (k : Natural) => b = a + k,
+              Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)),
+              function (k : Natural) (witnessEquation : b = a + k) =>
+                  Or.introduceRight(
+                      Integer.MkIsNonneg(a, b),
+                      Integer.MkIsNegated(a, b),
+                      Exists.introduce(
+                          Natural,
+                          function (j : Natural) =>
+                              Quotient.mk(IntegerRepresentative,
+                                           IntegerEquivalent,
+                                           IntegerRepresentative.make(a, b))
+                              = -(j : Integer),
+                          k,
+                          Integer.from_reverse_subtraction_witness(
+                              a, b, k, witnessEquation))),
+              Natural.subtraction_witness(a, b, aLeqB)),
+      function (bLeqA : b ≤ a) =>
+          Exists.eliminate(
+              Natural,
+              function (k : Natural) => a = b + k,
+              Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)),
+              function (k : Natural) (witnessEquation : a = b + k) =>
+                  Or.introduceLeft(
+                      Integer.MkIsNonneg(a, b),
+                      Integer.MkIsNegated(a, b),
+                      Exists.introduce(
+                          Natural,
+                          function (j : Natural) =>
+                              Quotient.mk(IntegerRepresentative,
+                                           IntegerEquivalent,
+                                           IntegerRepresentative.make(a, b))
+                              = (j : Integer),
+                          k,
+                          Integer.from_subtraction_witness(
+                              a, b, k, witnessEquation))),
+              Natural.subtraction_witness(b, a, bLeqA)),
+      Natural.totality_of_less_or_equal(a, b))
+
+-- The sign-split motive on Integers.
+definition Integer.SignSplitProp (y : Integer) : Proposition :=
+  Or(Integer.IsNonneg(y), ∃ (k : Natural). y = -(k : Integer))
+
+-- Top-level sign split via Quotient.induct.
+theorem Integer.sign_split (x : Integer) : Integer.SignSplitProp(x) :=
+  Quotient.induct(
+      Integer.SignSplitProp,
+      function (rep : IntegerRepresentative) =>
+          (cases rep {
+            | IntegerRepresentative.make(a, b) =>
+                Integer.sign_split_at_representative(a, b)
+          } : Integer.SignSplitProp(
+                  Quotient.mk(IntegerRepresentative,
+                               IntegerEquivalent, rep))),
+      x)
