@@ -1,0 +1,374 @@
+-- PAdic/negation.math
+--
+-- Pointwise negation of p-adic Cauchy sequences. Negation preserves
+-- the p-adic-Cauchy property because |−s(m) − −s(n)|_p = |s(m) − s(n)|_p
+-- (negation invariance of the p-adic absolute value).
+--
+-- Subtraction is the usual derived x − y := x + (−y).
+
+module PAdic.negation
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.distance
+import Natural.prime
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.absolute_value
+import Integer.absolute_value_natural
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.absolute_value
+import PAdic.absolute_value
+import PAdic.basics
+import PAdic.addition
+
+-- ----------------------------------------------------------------------
+-- Helper: Integer absolute_value_natural is invariant under negation.
+-- At rep make(a, b), negate swaps the components to make(b, a), and
+-- distance is symmetric.
+theorem Integer.absolute_value_natural_negate (x : Integer)
+        : Integer.absolute_value_natural(-x)
+          = Integer.absolute_value_natural(x) :=
+  Quotient.induct(
+      function (y : Integer) =>
+          Integer.absolute_value_natural(-y)
+            = Integer.absolute_value_natural(y),
+      function (rep : IntegerRepresentative) =>
+          (cases rep {
+             | IntegerRepresentative.make(a, b) =>
+                 Natural.distance_symmetric(b, a)
+           } : Integer.absolute_value_natural(
+                   -Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep))
+               = Integer.absolute_value_natural(
+                     Quotient.mk(IntegerRepresentative, IntegerEquivalent,
+                                 rep))),
+      x)
+
+-- ----------------------------------------------------------------------
+-- p-adic absolute value is invariant under negation at the
+-- representative level. The padic_av_at_rep function depends on the
+-- numerator only via Integer.absolute_value_natural, which the helper
+-- above shows is invariant under -.
+theorem Rational.padic_absolute_value_negate_at_representative (p : Natural)
+        : (rep : RationalRepresentative)
+          → Rational.padic_absolute_value_at_representative(
+                p, Rational.negate_representatives(rep))
+            = Rational.padic_absolute_value_at_representative(p, rep)
+  | RationalRepresentative.make(n, d) =>
+      (function (absN : Natural)
+                (eqAbsN : Integer.absolute_value_natural(n) = absN) =>
+         (cases absN {
+            | zero =>
+                function (eqZero
+                              : Integer.absolute_value_natural(n) = zero) =>
+                  Equality.transitivity(
+                      Rational,
+                      Rational.padic_absolute_value_at_representative(
+                          p, RationalRepresentative.make(-n, d)),
+                      Rational.zero,
+                      Rational.padic_absolute_value_at_representative(
+                          p, RationalRepresentative.make(n, d)),
+                      Rational.padic_absolute_value_at_zero(
+                          p, -n, d,
+                          Equality.transitivity(
+                              Natural,
+                              Integer.absolute_value_natural(-n),
+                              Integer.absolute_value_natural(n),
+                              zero,
+                              Integer.absolute_value_natural_negate(n),
+                              eqZero)),
+                      Equality.symmetry(
+                          Rational.padic_absolute_value_at_zero(
+                              p, n, d, eqZero)))
+            | successor(k) =>
+                function (eqSucc
+                              : Integer.absolute_value_natural(n)
+                                = successor(k)) =>
+                  Equality.transitivity(
+                      Rational,
+                      Rational.padic_absolute_value_at_representative(
+                          p, RationalRepresentative.make(-n, d)),
+                      Quotient.mk(
+                          RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(
+                              (Natural.power(
+                                   Natural.padic_valuation(p, successor(d)), p)
+                                   : Integer),
+                              Natural.monus(
+                                  Natural.power(
+                                      Natural.padic_valuation(p, successor(k)), p),
+                                  successor(zero)))),
+                      Rational.padic_absolute_value_at_representative(
+                          p, RationalRepresentative.make(n, d)),
+                      Rational.padic_absolute_value_at_succ(
+                          p, -n, d, k,
+                          Equality.transitivity(
+                              Natural,
+                              Integer.absolute_value_natural(-n),
+                              Integer.absolute_value_natural(n),
+                              successor(k),
+                              Integer.absolute_value_natural_negate(n),
+                              eqSucc)),
+                      Equality.symmetry(
+                          Rational.padic_absolute_value_at_succ(
+                              p, n, d, k, eqSucc)))
+          } : Integer.absolute_value_natural(n) = absN
+              → Rational.padic_absolute_value_at_representative(
+                    p, RationalRepresentative.make(-n, d))
+                = Rational.padic_absolute_value_at_representative(
+                      p, RationalRepresentative.make(n, d)))(eqAbsN))
+      (Integer.absolute_value_natural(n),
+       reflexivity(Natural, Integer.absolute_value_natural(n)))
+
+-- |−x|_p = |x|_p at the Rational level. Lift via Quotient.induct.
+theorem Rational.padic_absolute_value_negate
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x : Rational)
+        : Rational.padic_absolute_value(p, primality, -x)
+          = Rational.padic_absolute_value(p, primality, x) :=
+  Quotient.induct(
+      function (y : Rational) =>
+          Rational.padic_absolute_value(p, primality, -y)
+            = Rational.padic_absolute_value(p, primality, y),
+      function (rep : RationalRepresentative) =>
+          Rational.padic_absolute_value_negate_at_representative(p, rep),
+      x)
+
+-- |−x − −y|_p = |x − y|_p. Goes via subtract_of_negates (pure Rational
+-- algebra) and padic_absolute_value_negate.
+theorem Rational.padic_absolute_value_of_subtract_of_negates
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x y : Rational)
+        : Rational.padic_absolute_value(p, primality, -x - -y)
+          = Rational.padic_absolute_value(p, primality, x - y) :=
+  calc Rational.padic_absolute_value(p, primality, -x - -y)
+     = Rational.padic_absolute_value(p, primality, -(x - y))
+            by congruenceOf(
+                   function (r : Rational) =>
+                       Rational.padic_absolute_value(p, primality, r),
+                   Rational.subtract_of_negates(x, y))
+     = Rational.padic_absolute_value(p, primality, x - y)
+            by Rational.padic_absolute_value_negate(p, primality, x - y)
+
+-- ----------------------------------------------------------------------
+-- Pointwise negation of a p-adic Cauchy sequence is p-adic Cauchy.
+-- Same N witness; transport via the negation-invariance of |·|_p.
+theorem Rational.sequence.negate_is_padic_cauchy
+        (p : Natural) (primality : Natural.is_prime(p))
+        (s : Rational.sequence.Sequence)
+        (sIsCauchy : Rational.sequence.IsPAdicCauchy(p, primality, s))
+        : Rational.sequence.IsPAdicCauchy(p, primality,
+              function (n : Natural) => -s(n)) :=
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) =>
+    Exists.eliminate(
+        Natural,
+        function (N : Natural) =>
+          (m : Natural) → N ≤ m →
+            (n : Natural) → N ≤ n →
+              Rational.padic_absolute_value(p, primality, s(m) - s(n))
+                < epsilon,
+        ∃ (N : Natural).
+          (m : Natural) → N ≤ m →
+            (n : Natural) → N ≤ n →
+              Rational.padic_absolute_value(p, primality, -s(m) - -s(n))
+                < epsilon,
+        function (N : Natural)
+                 (sCauchy_at_N
+                     : (m : Natural) → N ≤ m →
+                       (n : Natural) → N ≤ n →
+                         Rational.padic_absolute_value(p, primality,
+                             s(m) - s(n))
+                           < epsilon) =>
+          Exists.introduce(
+              Natural,
+              function (NPrime : Natural) =>
+                (m : Natural) → NPrime ≤ m →
+                  (n : Natural) → NPrime ≤ n →
+                    Rational.padic_absolute_value(p, primality,
+                        -s(m) - -s(n))
+                      < epsilon,
+              N,
+              function (m : Natural) (N_leq_m : N ≤ m)
+                       (n : Natural) (N_leq_n : N ≤ n) =>
+                Equality.transport_proposition(
+                    Rational,
+                    function (z : Rational) =>
+                        Rational.LessThan(z, epsilon),
+                    Rational.padic_absolute_value(p, primality,
+                        s(m) - s(n)),
+                    Rational.padic_absolute_value(p, primality,
+                        -s(m) - -s(n)),
+                    Equality.symmetry(
+                        Rational.padic_absolute_value_of_subtract_of_negates(
+                            p, primality, s(m), s(n))),
+                    sCauchy_at_N(m, N_leq_m, n, N_leq_n))),
+        sIsCauchy(epsilon, epsilonPositive))
+
+-- ----------------------------------------------------------------------
+-- Pointwise negation of a packaged p-adic Cauchy sequence.
+definition PAdicCauchySequence.negate
+        (p : Natural) (primality : Natural.is_prime(p))
+        : PAdicCauchySequence(p, primality)
+          → PAdicCauchySequence(p, primality)
+  | PAdicCauchySequence.make(s, sCauchy) =>
+      PAdicCauchySequence.make(
+          function (n : Natural) => -s(n),
+          Rational.sequence.negate_is_padic_cauchy(
+              p, primality, s, sCauchy))
+
+theorem PAdicCauchySequence.sequenceFunction_negate
+        (p : Natural) (primality : Natural.is_prime(p))
+        : (rep : PAdicCauchySequence(p, primality)) → (m : Natural)
+          → PAdicCauchySequence.sequenceFunction(
+                p, primality,
+                PAdicCauchySequence.negate(p, primality, rep), m)
+            = -PAdicCauchySequence.sequenceFunction(p, primality, rep, m)
+  | PAdicCauchySequence.make(s, _), m =>
+      reflexivity(Rational, -s(m))
+
+theorem PAdic.negate_respects
+        (p : Natural) (primality : Natural.is_prime(p))
+        (rep1 rep1Prime : PAdicCauchySequence(p, primality))
+        (equivalenceHypothesis
+            : PAdicEquivalent(p, primality, rep1, rep1Prime))
+        : Quotient.mk(
+              PAdicCauchySequence(p, primality),
+              PAdicEquivalent(p, primality),
+              PAdicCauchySequence.negate(p, primality, rep1))
+          = Quotient.mk(
+                PAdicCauchySequence(p, primality),
+                PAdicEquivalent(p, primality),
+                PAdicCauchySequence.negate(p, primality, rep1Prime)) :=
+  Quotient.sound(
+      PAdicCauchySequence(p, primality),
+      PAdicEquivalent(p, primality),
+      PAdicCauchySequence.negate(p, primality, rep1),
+      PAdicCauchySequence.negate(p, primality, rep1Prime),
+      function (epsilon : Rational)
+               (epsilonPositive : Rational.zero < epsilon) =>
+        Exists.eliminate(
+            Natural,
+            function (N : Natural) =>
+              (m : Natural) → N ≤ m →
+                Rational.padic_absolute_value(p, primality,
+                    PAdicCauchySequence.sequenceFunction(
+                        p, primality, rep1, m)
+                    - PAdicCauchySequence.sequenceFunction(
+                          p, primality, rep1Prime, m))
+                  < epsilon,
+            ∃ (N : Natural).
+              (m : Natural) → N ≤ m →
+                Rational.padic_absolute_value(p, primality,
+                    PAdicCauchySequence.sequenceFunction(
+                        p, primality,
+                        PAdicCauchySequence.negate(p, primality, rep1), m)
+                    - PAdicCauchySequence.sequenceFunction(
+                        p, primality,
+                        PAdicCauchySequence.negate(p, primality, rep1Prime), m))
+                  < epsilon,
+            function (N : Natural)
+                     (origAtN : (m : Natural) → N ≤ m →
+                       Rational.padic_absolute_value(p, primality,
+                           PAdicCauchySequence.sequenceFunction(
+                               p, primality, rep1, m)
+                           - PAdicCauchySequence.sequenceFunction(
+                                 p, primality, rep1Prime, m))
+                         < epsilon) =>
+              Exists.introduce(
+                  Natural,
+                  function (NPrime : Natural) =>
+                    (m : Natural) → NPrime ≤ m →
+                      Rational.padic_absolute_value(p, primality,
+                          PAdicCauchySequence.sequenceFunction(
+                              p, primality,
+                              PAdicCauchySequence.negate(p, primality, rep1), m)
+                          - PAdicCauchySequence.sequenceFunction(
+                              p, primality,
+                              PAdicCauchySequence.negate(p, primality, rep1Prime), m))
+                        < epsilon,
+                  N,
+                  function (m : Natural) (N_leq_m : N ≤ m) =>
+                    Equality.transport_proposition(
+                        Rational,
+                        function (x : Rational) =>
+                            Rational.LessThan(x, epsilon),
+                        Rational.padic_absolute_value(p, primality,
+                            PAdicCauchySequence.sequenceFunction(
+                                p, primality, rep1, m)
+                            - PAdicCauchySequence.sequenceFunction(
+                                  p, primality, rep1Prime, m)),
+                        Rational.padic_absolute_value(p, primality,
+                            PAdicCauchySequence.sequenceFunction(
+                                p, primality,
+                                PAdicCauchySequence.negate(p, primality, rep1), m)
+                            - PAdicCauchySequence.sequenceFunction(
+                                p, primality,
+                                PAdicCauchySequence.negate(p, primality, rep1Prime), m)),
+                        Equality.symmetry(
+                            calc Rational.padic_absolute_value(p, primality,
+                                     PAdicCauchySequence.sequenceFunction(
+                                         p, primality,
+                                         PAdicCauchySequence.negate(p, primality, rep1), m)
+                                     - PAdicCauchySequence.sequenceFunction(
+                                         p, primality,
+                                         PAdicCauchySequence.negate(p, primality, rep1Prime), m))
+                               = Rational.padic_absolute_value(p, primality,
+                                     -PAdicCauchySequence.sequenceFunction(
+                                          p, primality, rep1, m)
+                                     - PAdicCauchySequence.sequenceFunction(
+                                         p, primality,
+                                         PAdicCauchySequence.negate(p, primality, rep1Prime), m))
+                                      by rewrite(
+                                          PAdicCauchySequence.sequenceFunction_negate(
+                                              p, primality, rep1, m))
+                               = Rational.padic_absolute_value(p, primality,
+                                     -PAdicCauchySequence.sequenceFunction(
+                                          p, primality, rep1, m)
+                                     - -PAdicCauchySequence.sequenceFunction(
+                                           p, primality, rep1Prime, m))
+                                      by rewrite(
+                                          PAdicCauchySequence.sequenceFunction_negate(
+                                              p, primality, rep1Prime, m))
+                               = Rational.padic_absolute_value(p, primality,
+                                     PAdicCauchySequence.sequenceFunction(
+                                         p, primality, rep1, m)
+                                     - PAdicCauchySequence.sequenceFunction(
+                                           p, primality, rep1Prime, m))
+                                      by Rational.padic_absolute_value_of_subtract_of_negates(
+                                          p, primality,
+                                          PAdicCauchySequence.sequenceFunction(
+                                              p, primality, rep1, m),
+                                          PAdicCauchySequence.sequenceFunction(
+                                              p, primality, rep1Prime, m))),
+                        origAtN(m, N_leq_m))),
+            equivalenceHypothesis(epsilon, epsilonPositive)))
+
+definition PAdic.negate (p : Natural) (primality : Natural.is_prime(p))
+        (x : PAdic(p, primality)) : PAdic(p, primality) :=
+  Quotient.lift(
+      function (rep : PAdicCauchySequence(p, primality)) =>
+          Quotient.mk(
+              PAdicCauchySequence(p, primality),
+              PAdicEquivalent(p, primality),
+              PAdicCauchySequence.negate(p, primality, rep)),
+      PAdic.negate_respects(p, primality),
+      x)
+
+-- Subtraction.
+definition PAdic.subtract
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x y : PAdic(p, primality)) : PAdic(p, primality) :=
+  PAdic.add(p, primality, x, PAdic.negate(p, primality, y))
