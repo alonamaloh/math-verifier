@@ -22,6 +22,7 @@ import Natural.cancellation
 import Natural.divisibility
 import Natural.divide
 import Natural.multiply_order
+import Natural.decide_divides
 import Natural.gcd
 import Natural.prime
 import Natural.bezout
@@ -111,3 +112,274 @@ theorem Natural.divides_one_implies_equals_one
                 → successor(predD) = 1)(refinedEq)
    } : successor(zero) = d * q → d = 1)(oneEqDTimesQ)
 }
+
+-- ----------------------------------------------------------------------
+-- Specialized Bezout: for `p` prime and `p ∤ a`, the linear combination
+-- yields 1. We apply `Natural.bezout(p, a)` to get a gcd witness `g`
+-- with an integer-coefficient equation; primality classifies `g` as
+-- either 1 or p; g = p contradicts `p ∤ a`, leaving g = 1.
+
+theorem Natural.bezout_one_when_prime_coprime
+        (p a : Natural)
+        (primality : Natural.is_prime(p))
+        (notDividesA : ¬ Natural.divides(p, a))
+        : ∃ (x : Integer). ∃ (y : Integer).
+            (p : Integer) * x + (a : Integer) * y = (1 : Integer) := {
+    obtain ⟨g, x, y, bezoutEquation, isgcd⟩
+        from Natural.bezout(p, a);
+    let ⟨gDividesP, gDividesA, _⟩ := isgcd;
+    let ⟨_, divisorClassification⟩ := primality;
+    Or.eliminate(
+        g = 1, g = p,
+        ∃ (x' : Integer). ∃ (y' : Integer).
+            (p : Integer) * x' + (a : Integer) * y' = (1 : Integer),
+        function (gEqOne : g = 1) =>
+            ⟨x, y,
+             Equality.transitivity(
+                 bezoutEquation,
+                 congruenceOf(
+                     function (m : Natural) => (m : Integer),
+                     gEqOne))⟩,
+        function (gEqP : g = p) =>
+            False.eliminate_proposition(
+                ∃ (x' : Integer). ∃ (y' : Integer).
+                    (p : Integer) * x' + (a : Integer) * y' = (1 : Integer),
+                notDividesA(
+                    Equality.transport_proposition(
+                        Natural,
+                        function (m : Natural) => m ∣ a,
+                        g, p, gEqP, gDividesA))),
+        divisorClassification(g, gDividesP))
+}
+
+-- ----------------------------------------------------------------------
+-- Sign-side helper: if `(b : Integer) = -(m : Integer)` for naturals
+-- `b` and `m`, then `b = 0`. Used when the Bezout coefficient comes
+-- out negative — combined with `b ≥ 0` (which a Natural cast always
+-- gives), the only resolution is both sides zero.
+--
+-- The Integer equality unfolds to `IntegerEquivalent(make(b, 0),
+-- make(0, m))`, which is `b + m = 0`. Hence b = 0.
+
+theorem Natural.natural_eq_negate_natural_implies_first_zero
+        (b m : Natural)
+        (equality : (b : Integer) = -(m : Integer))
+        : b = zero := {
+    -- (b : Integer) = mk(make(b, zero)). -(m : Integer) = mk(make(zero, m)).
+    -- Quotient.exact gives IntegerEquivalent(make(b, 0), make(0, m)) :=
+    --     b + m = zero + zero = zero.
+    claim representativeEquivalence
+          : IntegerEquivalent(
+                IntegerRepresentative.make(b, zero),
+                IntegerRepresentative.make(zero, m))
+        by Quotient.exact(
+               IntegerRepresentative, IntegerEquivalent,
+               IntegerEquivalent.reflexive,
+               IntegerEquivalent.symmetric,
+               IntegerEquivalent.transitive,
+               IntegerRepresentative.make(b, zero),
+               IntegerRepresentative.make(zero, m),
+               equality);
+    -- representativeEquivalence : b + m = zero + zero, which simplifies to b + m = zero.
+    claim sumIsZero : b + m = zero
+        by representativeEquivalence;
+    Natural.add_eq_zero_left_zero(b, m, sumIsZero)
+}
+
+-- ----------------------------------------------------------------------
+-- Euclid's lemma — coprime case. Given prime p with p ∤ a and p | a*b,
+-- conclude p | b. The proof multiplies the Bezout identity by b and
+-- reorganises so that b sits as a (p : Integer) multiple. The
+-- Integer-level coefficient is then sign-split: a non-negative
+-- coefficient projects back to a Natural witness for p | b; a negative
+-- coefficient forces b = 0 (and 0 is trivially a p-multiple).
+
+theorem Natural.prime_divides_product_when_coprime
+        (p a b : Natural)
+        (primality : Natural.is_prime(p))
+        (notDividesA : ¬ Natural.divides(p, a))
+        (productDivides : p ∣ a * b)
+        : p ∣ b := {
+    obtain ⟨x, y, bezoutEquation⟩
+        from Natural.bezout_one_when_prime_coprime(p, a, primality, notDividesA);
+    obtain ⟨productQuotient, productEquation⟩ from productDivides;
+    -- productEquation : a * b = p * productQuotient.
+
+    -- Step 1: multiply the Bezout combination by (b : Integer).
+    -- (p*x + a*y) * b = 1 * b = b, distributed gives p*x*b + a*y*b = b.
+    claim multipliedByB
+          : (p : Integer) * x * (b : Integer)
+                + (a : Integer) * y * (b : Integer)
+            = (b : Integer)
+        by Equality.transitivity(
+               Equality.symmetry(
+                   Integer.distributivity_right(
+                       (p : Integer) * x,
+                       (a : Integer) * y,
+                       (b : Integer))),
+               Equality.transitivity(
+                   congruenceOf(
+                       function (sumPart : Integer) =>
+                           sumPart * (b : Integer),
+                       bezoutEquation),
+                   Integer.multiply_identity_left((b : Integer))));
+
+    -- Step 2: rewrite (a*y)*b into p*((k:Integer)*y) using
+    -- a*b = p * productQuotient at Integer level.
+    claim ayb_rewritten
+          : (a : Integer) * y * (b : Integer)
+            = (p : Integer) * ((productQuotient : Integer) * y)
+        by calc (a : Integer) * y * (b : Integer)
+              = (a : Integer) * (y * (b : Integer))
+                     by Integer.multiply_associative(
+                            (a : Integer), y, (b : Integer))
+              = (a : Integer) * ((b : Integer) * y)
+                     by congruenceOf(
+                            function (factor : Integer) =>
+                                (a : Integer) * factor,
+                            Integer.multiply_commutative(y, (b : Integer)))
+              = (a : Integer) * (b : Integer) * y
+                     by Equality.symmetry(
+                            Integer.multiply_associative(
+                                (a : Integer), (b : Integer), y))
+              = (a * b : Integer) * y
+                     by congruenceOf(
+                            function (factor : Integer) => factor * y,
+                            Equality.symmetry(
+                                Natural.to_integer.multiply_preserves(a, b)))
+              = (p * productQuotient : Integer) * y
+                     by congruenceOf(
+                            function (factor : Natural) =>
+                                (factor : Integer) * y,
+                            productEquation)
+              = (p : Integer) * (productQuotient : Integer) * y
+                     by congruenceOf(
+                            function (factor : Integer) => factor * y,
+                            Natural.to_integer.multiply_preserves(
+                                p, productQuotient))
+              = (p : Integer) * ((productQuotient : Integer) * y)
+                     by Integer.multiply_associative(
+                            (p : Integer), (productQuotient : Integer), y);
+
+    -- Step 3: assemble (b : Integer) = (p : Integer) * (x*b + k*y).
+    claim bAsProduct
+          : (b : Integer)
+            = (p : Integer)
+                * (x * (b : Integer)
+                   + (productQuotient : Integer) * y)
+        by calc (b : Integer)
+              = (p : Integer) * x * (b : Integer)
+                  + (a : Integer) * y * (b : Integer)
+                     by Equality.symmetry(multipliedByB)
+              = (p : Integer) * x * (b : Integer)
+                  + (p : Integer) * ((productQuotient : Integer) * y)
+                     by congruenceOf(
+                            function (rightAddend : Integer) =>
+                                (p : Integer) * x * (b : Integer)
+                                  + rightAddend,
+                            ayb_rewritten)
+              = (p : Integer) * (x * (b : Integer))
+                  + (p : Integer) * ((productQuotient : Integer) * y)
+                     by congruenceOf(
+                            function (leftAddend : Integer) =>
+                                leftAddend
+                                + (p : Integer)
+                                  * ((productQuotient : Integer) * y),
+                            Integer.multiply_associative(
+                                (p : Integer), x, (b : Integer)))
+              = (p : Integer)
+                  * (x * (b : Integer)
+                     + (productQuotient : Integer) * y)
+                     by Equality.symmetry(
+                            Integer.distributivity_left(
+                                (p : Integer),
+                                x * (b : Integer),
+                                (productQuotient : Integer) * y));
+
+    -- Step 4: sign-split the coefficient.
+    Or.eliminate(
+        Integer.IsNonneg(
+            x * (b : Integer) + (productQuotient : Integer) * y),
+        ∃ (negativePart : Natural).
+            x * (b : Integer) + (productQuotient : Integer) * y
+              = -(negativePart : Integer),
+        p ∣ b,
+        function (zIsNonneg :
+                  Integer.IsNonneg(
+                      x * (b : Integer)
+                          + (productQuotient : Integer) * y)) => {
+          obtain ⟨coefficient, zEqCoefficient⟩ from zIsNonneg;
+          -- zEqCoefficient : x*b + k*y = (coefficient : Integer).
+          -- (b : Int) = (p : Int) * (coefficient : Int) = (p*coefficient : Int).
+          -- Inject to Natural: b = p * coefficient.
+          claim bAsCastedProduct
+                : (b : Integer) = (p * coefficient : Integer)
+            by Equality.transitivity(
+                   bAsProduct,
+                   Equality.transitivity(
+                       congruenceOf(
+                           function (z : Integer) => (p : Integer) * z,
+                           zEqCoefficient),
+                       Equality.symmetry(
+                           Natural.to_integer.multiply_preserves(
+                               p, coefficient))));
+          ⟨coefficient,
+           Natural.to_integer.injective(b, p * coefficient, bAsCastedProduct)⟩
+        },
+        function (zIsNegated :
+                  ∃ (negativePart : Natural).
+                      x * (b : Integer)
+                          + (productQuotient : Integer) * y
+                        = -(negativePart : Integer)) => {
+          obtain ⟨negativePart, zEqNegated⟩ from zIsNegated;
+          -- zEqNegated : x*b + k*y = -(negativePart : Integer).
+          -- (b : Int) = (p : Int) * -(negativePart : Int) = -((p * negativePart) : Int).
+          claim bEqNegateProduct
+                : (b : Integer) = -((p * negativePart) : Integer)
+            by Equality.transitivity(
+                   bAsProduct,
+                   Equality.transitivity(
+                       congruenceOf(
+                           function (z : Integer) => (p : Integer) * z,
+                           zEqNegated),
+                       Equality.transitivity(
+                           Integer.multiply_negate_right(
+                               (p : Integer), (negativePart : Integer)),
+                           congruenceOf(
+                               Integer.negate,
+                               Equality.symmetry(
+                                   Natural.to_integer.multiply_preserves(
+                                       p, negativePart))))));
+          claim bIsZero : b = zero
+            by Natural.natural_eq_negate_natural_implies_first_zero(
+                   b, p * negativePart, bEqNegateProduct);
+          Equality.transport_proposition(
+              Natural,
+              function (n : Natural) => p ∣ n,
+              zero, b,
+              Equality.symmetry(bIsZero),
+              Natural.divides_zero(p))
+        },
+        Integer.sign_split(
+            x * (b : Integer) + (productQuotient : Integer) * y))
+}
+
+-- ----------------------------------------------------------------------
+-- Main: Euclid's lemma.
+-- For p prime, p | a*b → p | a ∨ p | b.
+
+theorem Natural.prime_divides_product
+        (p a b : Natural)
+        (primality : Natural.is_prime(p))
+        (productDivides : p ∣ a * b)
+        : (p ∣ a) ∨ (p ∣ b) :=
+  Or.eliminate(
+      p ∣ a, p ∤ a,
+      (p ∣ a) ∨ (p ∣ b),
+      function (pDividesA : p ∣ a) => Or.introduceLeft(pDividesA),
+      function (notDividesA : p ∤ a) =>
+          Or.introduceRight(
+              Natural.prime_divides_product_when_coprime(
+                  p, a, b, primality, notDividesA, productDivides)),
+      Natural.decides_divides(p, a))
+
