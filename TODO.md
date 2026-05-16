@@ -203,6 +203,36 @@ and LLMs.
   fallback.
 - ✅ **Document short-form inference and idioms in `CLAUDE.md`.** Done.
 
+### Deferred — auto-congruence in calc steps
+
+Goal: let the user write `by eq` for any calc step whose two sides
+differ only by a function applied to both endpoints of `eq` — saving
+the explicit `congruenceOf(function (z) => …, eq)` wrap at every site.
+
+I prototyped this (`tryAutoCongruenceInCalc` in elaborator.cpp) and
+got the structure working: extract the proof's `a = b` and the goal's
+`LHS = RHS`, find the unique structural occurrence of `a` in `LHS`,
+build `Equality.congruence(λz. LHS[a→z], a, b, eq)`.
+
+What blocked it: mixing free-variable forms across pieces of the
+synthesized term. The `proofComps.leftEndpoint` extracted from the
+WHNF-opened proof type has FreeVariables (Internal origin), but the
+`proofKernel` itself has BoundVariables (since `elaborateIdentifier`
+returns BoundVariable for local binders). Synthesizing a term that
+mixes both — and then having the caller's `inferTypeInLocalContext`
+open it — results in "unbound internal variable" errors because the
+opening pass converts BoundVariables but leaves the existing
+FreeVariables alone, and the resulting form is inconsistent.
+
+Fix path: either (a) close everything before synthesis and open the
+whole result at the end, with careful index management; (b) open
+`proofKernel` first via `openOverLocalBinders` and work entirely in
+opened forms (matching what the other Quotient.* desugarings do).
+Both are doable; (b) is the cleaner approach.
+
+Reverted to keep `main` clean. Resume when there's time to debug the
+index plumbing.
+
 ### Next sweep — Equality combinator carrier implicit
 
 `Equality.transport_proposition`, `Equality.transitivity`,
