@@ -1499,3 +1499,233 @@ theorem Rational.le_add_left_of_nonneg
       x + y, y + x,
       Rational.add_commutative(x, y),
       Rational.le_add_right_of_nonneg(x, y, yNonneg))
+
+-- ----------------------------------------------------------------------
+-- Helper A for the p-adic triangle inequality.
+--
+-- For p ≥ 1 and Naturals α, β, γ, δ with α + δ ≤ β + γ:
+--   mk(make((p^α : Int), p^γ - 1))  ≤  mk(make((p^β : Int), p^δ - 1))
+--
+-- where p^k = Natural.power(k, p) and "p^γ - 1" abbreviates
+-- monus(power(γ, p), 1). The two denominators-minus-one are well-formed
+-- because p^γ, p^δ ≥ 1 when p ≥ 1.
+--
+-- Proof sketch: the difference RHS - LHS β-reduces (through Quotient.lift
+-- kernel rules on subtract = add + negate) to mk(make(NUM, DEN)) where
+--   NUM = (p^β : Int) * succ(p^γ - 1) + (-(p^α : Int)) * succ(p^δ - 1).
+-- Rational.IsNonneg β-reduces (through the lift on IsNonneg) to
+-- Integer.IsNonneg(NUM). Rewriting succ(monus(_, 1)) to the underlying
+-- power and collecting through Natural.to_integer.multiply_preserves
+-- yields NUM = (p^β · p^γ : Int) - (p^α · p^δ : Int). Since α + δ ≤ β + γ
+-- and power is exponent-monotone, p^α · p^δ ≤ p^β · p^γ, so the Natural
+-- subtraction witness s satisfies (s : Int) = NUM; IsNonneg follows from
+-- from_natural_is_nonneg.
+theorem Rational.padic_av_form_le_when_exponent_le
+        (p : Natural) (primePositive : successor(zero) ≤ p)
+        (alpha beta gamma delta : Natural)
+        (exponentLe : alpha + delta ≤ beta + gamma)
+        : Quotient.mk(
+              RationalRepresentative, RationalEquivalent,
+              RationalRepresentative.make(
+                  (Natural.power(alpha, p) : Integer),
+                  Natural.monus(Natural.power(gamma, p), successor(zero))))
+          ≤ Quotient.mk(
+                RationalRepresentative, RationalEquivalent,
+                RationalRepresentative.make(
+                    (Natural.power(beta, p) : Integer),
+                    Natural.monus(Natural.power(delta, p), successor(zero)))) := {
+  claim powerGammaPos : successor(zero) ≤ Natural.power(gamma, p)
+    by Natural.power_positive(gamma, p, primePositive);
+  claim powerDeltaPos : successor(zero) ≤ Natural.power(delta, p)
+    by Natural.power_positive(delta, p, primePositive);
+  -- p^α · p^δ ≤ p^β · p^γ via power_add + power_monotone.
+  claim productLe
+        : Natural.power(alpha, p) * Natural.power(delta, p)
+            ≤ Natural.power(beta, p) * Natural.power(gamma, p)
+    by Equality.transport_proposition(
+           Natural,
+           function (lhsForm : Natural) =>
+               lhsForm
+                 ≤ Natural.power(beta, p) * Natural.power(gamma, p),
+           Natural.power(alpha + delta, p),
+           Natural.power(alpha, p) * Natural.power(delta, p),
+           Natural.power_add(alpha, delta, p),
+           Equality.transport_proposition(
+               Natural,
+               function (rhsForm : Natural) =>
+                   Natural.power(alpha + delta, p) ≤ rhsForm,
+               Natural.power(beta + gamma, p),
+               Natural.power(beta, p) * Natural.power(gamma, p),
+               Natural.power_add(beta, gamma, p),
+               Natural.power_monotone(
+                   alpha + delta, beta + gamma, p, exponentLe,
+                   primePositive)));
+  -- Natural subtraction witness.
+  let ⟨s, witnessEq⟩ := Natural.subtraction_witness(
+      Natural.power(alpha, p) * Natural.power(delta, p),
+      Natural.power(beta, p) * Natural.power(gamma, p),
+      productLe);
+  -- The raw numerator of (RHS - LHS) equals (s : Integer).
+  claim numerEqInt
+        : (Natural.power(beta, p) : Integer)
+            * (successor(
+                  Natural.monus(Natural.power(gamma, p), successor(zero)))
+                : Integer)
+          + -(Natural.power(alpha, p) : Integer)
+              * (successor(
+                    Natural.monus(Natural.power(delta, p), successor(zero)))
+                  : Integer)
+          = (s : Integer)
+    by calc (Natural.power(beta, p) : Integer)
+              * (successor(
+                    Natural.monus(Natural.power(gamma, p), successor(zero)))
+                  : Integer)
+            + -(Natural.power(alpha, p) : Integer)
+                * (successor(
+                      Natural.monus(Natural.power(delta, p), successor(zero)))
+                    : Integer)
+         = (Natural.power(beta, p) : Integer)
+             * (Natural.power(gamma, p) : Integer)
+           + -(Natural.power(alpha, p) : Integer)
+               * (successor(
+                     Natural.monus(Natural.power(delta, p), successor(zero)))
+                   : Integer)
+                by congruenceOf(
+                       function (m : Natural) =>
+                           (Natural.power(beta, p) : Integer) * (m : Integer)
+                           + -(Natural.power(alpha, p) : Integer)
+                               * (successor(
+                                     Natural.monus(
+                                         Natural.power(delta, p),
+                                         successor(zero)))
+                                   : Integer),
+                       Natural.successor_monus_one_when_positive(
+                           Natural.power(gamma, p), powerGammaPos))
+         = (Natural.power(beta, p) : Integer)
+             * (Natural.power(gamma, p) : Integer)
+           + -(Natural.power(alpha, p) : Integer)
+               * (Natural.power(delta, p) : Integer)
+                by congruenceOf(
+                       function (m : Natural) =>
+                           (Natural.power(beta, p) : Integer)
+                             * (Natural.power(gamma, p) : Integer)
+                           + -(Natural.power(alpha, p) : Integer)
+                               * (m : Integer),
+                       Natural.successor_monus_one_when_positive(
+                           Natural.power(delta, p), powerDeltaPos))
+         = (Natural.power(beta, p) * Natural.power(gamma, p) : Integer)
+           + -(Natural.power(alpha, p) : Integer)
+               * (Natural.power(delta, p) : Integer)
+                by congruenceOf(
+                       function (m : Integer) =>
+                           m
+                           + -(Natural.power(alpha, p) : Integer)
+                               * (Natural.power(delta, p) : Integer),
+                       Equality.symmetry(
+                           Natural.to_integer.multiply_preserves(
+                               Natural.power(beta, p),
+                               Natural.power(gamma, p))))
+         = (Natural.power(beta, p) * Natural.power(gamma, p) : Integer)
+           + -((Natural.power(alpha, p) : Integer)
+                 * (Natural.power(delta, p) : Integer))
+                by congruenceOf(
+                       function (m : Integer) =>
+                           (Natural.power(beta, p)
+                                * Natural.power(gamma, p) : Integer)
+                           + m,
+                       Integer.multiply_negate_left(
+                           (Natural.power(alpha, p) : Integer),
+                           (Natural.power(delta, p) : Integer)))
+         = (Natural.power(beta, p) * Natural.power(gamma, p) : Integer)
+           + -(Natural.power(alpha, p) * Natural.power(delta, p) : Integer)
+                by congruenceOf(
+                       function (m : Integer) =>
+                           (Natural.power(beta, p)
+                                * Natural.power(gamma, p) : Integer)
+                           + -m,
+                       Equality.symmetry(
+                           Natural.to_integer.multiply_preserves(
+                               Natural.power(alpha, p),
+                               Natural.power(delta, p))))
+         = (Natural.power(alpha, p) * Natural.power(delta, p) + s : Integer)
+           + -(Natural.power(alpha, p) * Natural.power(delta, p) : Integer)
+                by congruenceOf(
+                       function (m : Natural) =>
+                           (m : Integer)
+                           + -(Natural.power(alpha, p)
+                                   * Natural.power(delta, p) : Integer),
+                       witnessEq)
+         = (Natural.power(alpha, p) * Natural.power(delta, p) : Integer)
+             + (s : Integer)
+           + -(Natural.power(alpha, p) * Natural.power(delta, p) : Integer)
+                by congruenceOf(
+                       function (m : Integer) =>
+                           m
+                           + -(Natural.power(alpha, p)
+                                   * Natural.power(delta, p) : Integer),
+                       Natural.to_integer.add_preserves(
+                           Natural.power(alpha, p)
+                             * Natural.power(delta, p),
+                           s))
+         -- (A + S) + -A = A + (S + -A)
+         = (Natural.power(alpha, p) * Natural.power(delta, p) : Integer)
+             + ((s : Integer)
+                + -(Natural.power(alpha, p)
+                        * Natural.power(delta, p) : Integer))
+                by Integer.add_associative(
+                       (Natural.power(alpha, p)
+                            * Natural.power(delta, p) : Integer),
+                       (s : Integer),
+                       -(Natural.power(alpha, p)
+                             * Natural.power(delta, p) : Integer))
+         -- A + (S + -A) = A + (-A + S)
+         = (Natural.power(alpha, p) * Natural.power(delta, p) : Integer)
+             + (-(Natural.power(alpha, p)
+                      * Natural.power(delta, p) : Integer)
+                + (s : Integer))
+                by congruenceOf(
+                       function (m : Integer) =>
+                           (Natural.power(alpha, p)
+                                * Natural.power(delta, p) : Integer)
+                           + m,
+                       Integer.add_commutative(
+                           (s : Integer),
+                           -(Natural.power(alpha, p)
+                                 * Natural.power(delta, p) : Integer)))
+         -- A + (-A + S) = (A + -A) + S
+         = ((Natural.power(alpha, p) * Natural.power(delta, p) : Integer)
+              + -(Natural.power(alpha, p)
+                      * Natural.power(delta, p) : Integer))
+             + (s : Integer)
+                by Equality.symmetry(
+                       Integer.add_associative(
+                           (Natural.power(alpha, p)
+                                * Natural.power(delta, p) : Integer),
+                           -(Natural.power(alpha, p)
+                                 * Natural.power(delta, p) : Integer),
+                           (s : Integer)))
+         -- (A + -A) + S = 0 + S
+         = Integer.zero + (s : Integer)
+                by congruenceOf(
+                       function (m : Integer) => m + (s : Integer),
+                       Integer.add_negate_right(
+                           (Natural.power(alpha, p)
+                                * Natural.power(delta, p) : Integer)))
+         -- 0 + S = S
+         = (s : Integer)
+                by Integer.add_identity_left((s : Integer));
+  Exists.introduce(
+      Natural,
+      function (k : Natural) =>
+          (Natural.power(beta, p) : Integer)
+            * (successor(
+                  Natural.monus(Natural.power(gamma, p), successor(zero)))
+                : Integer)
+          + -(Natural.power(alpha, p) : Integer)
+              * (successor(
+                    Natural.monus(Natural.power(delta, p), successor(zero)))
+                  : Integer)
+          = (k : Integer),
+      s,
+      numerEqInt)
+}
