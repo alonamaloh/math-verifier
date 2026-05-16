@@ -1,0 +1,113 @@
+-- Natural/prime_divides_product.math
+--
+-- Euclid's lemma: for any prime `p` and naturals `a`, `b`, if `p` divides
+-- `a * b` then `p` divides `a` or `p` divides `b`. The proof goes through
+-- Bezout's identity: from `p` prime and `p ∤ a` we extract integer
+-- coefficients `x`, `y` with `(p : Integer) * x + (a : Integer) * y = 1`.
+-- Multiplying the equation by `b` and using `p | a * b` decomposes `b`
+-- into a multiple of `p` (in Integer); the sign-split on the resulting
+-- coefficient projects back to a Natural witness.
+
+module Natural.prime_divides_product
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.cancellation
+import Natural.divisibility
+import Natural.divide
+import Natural.multiply_order
+import Natural.gcd
+import Natural.prime
+import Natural.bezout
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.sign
+
+-- ----------------------------------------------------------------------
+-- Helper: d ∣ 1 forces d = 1.
+--
+-- From the witness `1 = d * q`, case-split on d and q. The d = 0 case is
+-- contradicted by `1 ≠ 0`. The d = successor(_) case reduces the
+-- equation to `q + d' * q = 1`; case-splitting on q gives a successor
+-- form that, after add_equals_zero / multiply_equals_zero arguments,
+-- forces d' = 0 and q = 1 (so d = 1).
+
+theorem Natural.divides_one_implies_equals_one
+        (d : Natural) (dividesOne : d ∣ 1)
+        : d = 1 := {
+  let ⟨q, oneEqDTimesQ⟩ := dividesOne;
+  -- oneEqDTimesQ : 1 = d * q.
+  (cases d {
+     | zero =>
+         function (refinedEq : successor(zero) = zero * q) =>
+           -- zero * q = zero, so 1 = 0, contradiction.
+           False.eliminate_proposition(
+               zero = 1,
+               Natural.successor_not_zero(
+                   zero,
+                   Equality.transitivity(
+                       refinedEq, Natural.zero_multiply(q))))
+     | successor(predD) =>
+         function (refinedEq : successor(zero) = successor(predD) * q) =>
+           -- successor(predD) * q reduces to q + predD * q.
+           -- 1 = q + predD * q. Case-split q.
+           (cases q {
+              | zero =>
+                  function (refinedQEq
+                              : successor(zero)
+                                = successor(predD) * zero) =>
+                    -- successor(predD) * zero = zero. 1 = 0, contradiction.
+                    False.eliminate_proposition(
+                        successor(predD) = 1,
+                        Natural.successor_not_zero(
+                            zero,
+                            Equality.transitivity(
+                                refinedQEq,
+                                Natural.multiply_zero(
+                                    successor(predD)))))
+              | successor(predQ) =>
+                  function (refinedQEq
+                              : successor(zero)
+                                = successor(predD) * successor(predQ)) =>
+                    -- successor(predD) * successor(predQ) reduces to
+                    --   successor(predQ) + predD * successor(predQ).
+                    -- That successor expands to
+                    --   successor(predQ + predD * successor(predQ)).
+                    -- 1 = successor(0), so predQ + predD * successor(predQ) = 0.
+                    -- Hence predD * successor(predQ) = 0 (right zero),
+                    -- and since successor(predQ) ≥ 1, predD = 0.
+                    -- So d = successor(0) = 1.
+                    {
+                      claim sumEqZero
+                            : predQ + predD * successor(predQ) = zero
+                        by Natural.successor_injective(
+                               predQ + predD * successor(predQ), zero,
+                               Equality.symmetry(refinedQEq));
+                      claim productEqZero
+                            : predD * successor(predQ) = zero
+                        by Natural.add_eq_zero_right_zero(
+                               predQ, predD * successor(predQ), sumEqZero);
+                      claim predDEqZero : predD = zero
+                        by Natural.multiply_equals_zero_with_positive_right(
+                               predD, successor(predQ),
+                               Natural.successor_less_or_equal_successor(
+                                   zero, predQ, Natural.zero_least(predQ)),
+                               productEqZero);
+                      congruenceOf(successor, predDEqZero)
+                    }
+            } : successor(zero) = successor(predD) * q
+                → successor(predD) = 1)(refinedEq)
+   } : successor(zero) = d * q → d = 1)(oneEqDTimesQ)
+}
