@@ -128,6 +128,165 @@ theorem Natural.distance_le_add : (a b : Natural)
                          Natural.distance_le_add(k, m))))
        } : Natural.distance(successor(k), b) ≤ successor(k) + b)
 
+-- Cancellation on the left: distance(b + c, b + d) = distance(c, d).
+-- Induct on b. With b = s(b'), `s(b') + c` reduces to `s(b' + c)`
+-- (add is by recursion on first arg), then distance on s(_), s(_)
+-- reduces via the inner `cases`.
+theorem Natural.distance_add_left_cancel
+        : (b c d : Natural)
+          → Natural.distance(b + c, b + d) = Natural.distance(c, d)
+  | zero, c, d =>
+      reflexivity(Natural, Natural.distance(c, d))
+  | successor(b'), c, d =>
+      Natural.distance_add_left_cancel(b', c, d)
+
+-- Cancellation on the right: distance(a + b, c + b) = distance(a, c).
+-- Reduce to the left form via add_commutative.
+theorem Natural.distance_add_right_cancel (a b c : Natural)
+        : Natural.distance(a + b, c + b) = Natural.distance(a, c) :=
+  calc Natural.distance(a + b, c + b)
+     = Natural.distance(b + a, c + b)
+            by rewrite(Natural.add_commutative(a, b))
+     = Natural.distance(b + a, b + c)
+            by rewrite(Natural.add_commutative(c, b))
+     = Natural.distance(a, c)
+            by Natural.distance_add_left_cancel(b, a, c)
+
+-- Key inequality: a ≤ b + distance(a, b). One direction of the
+-- "distance ≤ z iff a ≤ c + z and c ≤ a + z" characterization, but
+-- proved standalone since that characterization needs more machinery.
+theorem Natural.le_add_distance
+        : (a b : Natural) → a ≤ b + Natural.distance(a, b)
+  | zero, b =>
+      -- 0 ≤ b + distance(0, b) = b + b.
+      Natural.zero_least(b + b)
+  | successor(k), b =>
+      -- distance(s(k), b) doesn't auto-reduce; case-split b.
+      (cases b {
+         | zero =>
+             -- s(k) ≤ 0 + distance(s(k), 0) = s(k). Reflexive.
+             LessOrEqual.reflexivity(successor(k))
+         | successor(m) =>
+             -- s(k) ≤ s(m) + distance(s(k), s(m)) = s(m) + distance(k, m).
+             -- Reduce via add on successor: s(m) + distance(k, m)
+             -- = s(m + distance(k, m)). So want s(k) ≤ s(m + distance(k, m)),
+             -- by successor monotonicity from k ≤ m + distance(k, m) (IH).
+             Natural.successor_less_or_equal_successor(
+                 k, m + Natural.distance(k, m),
+                 Natural.le_add_distance(k, m))
+       } : successor(k) ≤ b + Natural.distance(successor(k), b))
+
+-- Metric triangle inequality: distance(a, c) ≤ distance(a, b) +
+-- distance(b, c). Induct on a; inner case-splits on c and b. Base
+-- cases use `le_add_distance` and `distance_le_add`; the recursive
+-- case (s(k), s(b'), s(c')) reduces all three distances by 1.
+theorem Natural.distance_triangle
+        : (a b c : Natural)
+          → Natural.distance(a, c)
+            ≤ Natural.distance(a, b) + Natural.distance(b, c)
+  | zero, b, c =>
+      -- distance(0, c) = c. distance(0, b) + distance(b, c) =
+      -- b + distance(b, c). Want: c ≤ b + distance(b, c). By
+      -- le_add_distance(c, b): c ≤ b + distance(c, b) — but we have
+      -- distance(b, c) here. Transport via symmetry.
+      Equality.transport_proposition(
+          Natural,
+          function (rightSide : Natural) =>
+              c ≤ b + rightSide,
+          Natural.distance(c, b),
+          Natural.distance(b, c),
+          Natural.distance_symmetric(c, b),
+          Natural.le_add_distance(c, b))
+  | successor(k), b, c =>
+      (cases c {
+         | zero =>
+             -- distance(s(k), 0) = s(k). distance(b, 0) = b. So want
+             -- s(k) ≤ distance(s(k), b) + b = b + distance(s(k), b)
+             -- (after commute). By le_add_distance(s(k), b).
+             Equality.transport_proposition(
+                 Natural,
+                 function (rightSide : Natural) =>
+                     successor(k) ≤ rightSide,
+                 b + Natural.distance(successor(k), b),
+                 Natural.distance(successor(k), b)
+                     + Natural.distance(b, zero),
+                 -- b + distance(s(k), b) = distance(s(k), b) + b =
+                 --   distance(s(k), b) + distance(b, 0).
+                 calc b + Natural.distance(successor(k), b)
+                    = Natural.distance(successor(k), b) + b
+                           by Natural.add_commutative(
+                                  b, Natural.distance(successor(k), b))
+                    = Natural.distance(successor(k), b)
+                          + Natural.distance(b, zero)
+                           by congruenceOf(
+                                  function (x : Natural) =>
+                                      Natural.distance(successor(k), b)
+                                          + x,
+                                  Equality.symmetry(
+                                      Natural.distance_zero_right(b))),
+                 Natural.le_add_distance(successor(k), b))
+         | successor(c') =>
+             -- distance(s(k), s(c')) = distance(k, c'). Case-split b.
+             (cases b {
+                | zero =>
+                    -- distance(s(k), 0) = s(k); distance(0, s(c')) = s(c').
+                    -- s(k) + s(c') reduces to s(s(k + c')). Want
+                    -- distance(k, c') ≤ s(s(k + c')). Two steps from IH.
+                    Equality.transport_proposition(
+                        Natural,
+                        function (sum : Natural) =>
+                            Natural.distance(k, c') ≤ sum,
+                        successor(successor(k + c')),
+                        successor(k) + successor(c'),
+                        -- s(s(k+c')) = s(k+s(c')) = s(k)+s(c').
+                        congruenceOf(
+                            successor,
+                            Equality.symmetry(
+                                Natural.add_successor(k, c'))),
+                        LessOrEqual.step(
+                            Natural.distance(k, c'),
+                            successor(k + c'),
+                            LessOrEqual.step(
+                                Natural.distance(k, c'), k + c',
+                                Natural.distance_le_add(k, c'))))
+                | successor(b') =>
+                    -- All three distances drop by one. IH on (k, b', c').
+                    Natural.distance_triangle(k, b', c')
+              } : Natural.distance(successor(k), successor(c'))
+                  ≤ Natural.distance(successor(k), b)
+                    + Natural.distance(b, successor(c')))
+       } : Natural.distance(successor(k), c)
+           ≤ Natural.distance(successor(k), b)
+             + Natural.distance(b, c))
+
+-- distance(a + c, b + d) ≤ distance(a, b) + distance(c, d). Follows
+-- from metric triangle through `b + c` and the two cancellation
+-- lemmas. Bridges Natural-level metric structure to Integer triangle.
+theorem Natural.distance_add_triangle (a b c d : Natural)
+        : Natural.distance(a + c, b + d)
+          ≤ Natural.distance(a, b) + Natural.distance(c, d) :=
+  Equality.transport_proposition(
+      Natural,
+      function (sum : Natural) =>
+          Natural.distance(a + c, b + d) ≤ sum,
+      Natural.distance(a + c, b + c) + Natural.distance(b + c, b + d),
+      Natural.distance(a, b) + Natural.distance(c, d),
+      -- distance(a + c, b + c) = distance(a, b) (right-cancel);
+      -- distance(b + c, b + d) = distance(c, d) (left-cancel).
+      calc Natural.distance(a + c, b + c)
+                 + Natural.distance(b + c, b + d)
+         = Natural.distance(a, b) + Natural.distance(b + c, b + d)
+                by congruenceOf(
+                       function (x : Natural) =>
+                           x + Natural.distance(b + c, b + d),
+                       Natural.distance_add_right_cancel(a, c, b))
+         = Natural.distance(a, b) + Natural.distance(c, d)
+                by congruenceOf(
+                       function (x : Natural) =>
+                           Natural.distance(a, b) + x,
+                       Natural.distance_add_left_cancel(b, c, d)),
+      Natural.distance_triangle(a + c, b + c, b + d))
+
 -- Respect lemma: if `a + d = b + c`, then `distance(a, b) =
 -- distance(c, d)`. Load-bearing for Integer.absolute_value's lift.
 --
