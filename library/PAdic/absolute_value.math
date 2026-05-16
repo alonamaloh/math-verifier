@@ -824,3 +824,288 @@ theorem Rational.multiply_zero (r : Rational)
   Equality.transitivity(
       Rational.multiply_commutative(r, Rational.zero),
       Rational.zero_multiply(r))
+
+-- ----------------------------------------------------------------------
+-- Multiplicativity of the p-adic absolute value at the representative
+-- level. The "both numerators non-zero" case is the meaty one: it
+-- builds the Integer cross-equation for Quotient.sound from the
+-- multiplicativity of padic_valuation and power_add.
+
+-- Helper: the Quotient.sound input that bridges the LHS and RHS
+-- representative forms when both numerators are nonzero.
+theorem Rational.padic_multiplicative_cross_equation
+        (p : Natural) (primality : Natural.is_prime(p))
+        (dx dy kx ky : Natural)
+        : (Natural.power(
+              Natural.padic_valuation(
+                  p, successor(dy + dx * successor(dy))), p) : Integer)
+          * (successor(
+                Natural.monus(
+                    Natural.power(Natural.padic_valuation(p, successor(ky)), p),
+                    successor(zero))
+                  + Natural.monus(
+                        Natural.power(
+                            Natural.padic_valuation(p, successor(kx)), p),
+                        successor(zero))
+                    * successor(
+                        Natural.monus(
+                            Natural.power(
+                                Natural.padic_valuation(
+                                    p, successor(ky)), p),
+                            successor(zero))))
+              : Integer)
+          = ((Natural.power(Natural.padic_valuation(p, successor(dx)), p) : Integer)
+             * (Natural.power(Natural.padic_valuation(p, successor(dy)), p)
+                  : Integer))
+            * (successor(
+                  Natural.monus(
+                      Natural.power(
+                          Natural.padic_valuation(
+                              p, successor(ky + kx * successor(ky))), p),
+                      successor(zero)))
+                : Integer) := {
+  claim primeAtLeastTwo : successor(successor(zero)) ≤ p
+    by And.eliminate(
+           successor(successor(zero)) ≤ p,
+           (divisor : Natural) → divisor ∣ p
+               → divisor = successor(zero) ∨ divisor = p,
+           successor(successor(zero)) ≤ p,
+           function (twoLeP : successor(successor(zero)) ≤ p)
+                    (_ : (divisor : Natural) → divisor ∣ p
+                         → divisor = successor(zero) ∨ divisor = p) =>
+               twoLeP,
+           primality);
+  claim primePositive : successor(zero) ≤ p
+    by Natural.less_or_equal_predecessor_less_or_equal(
+           successor(zero), p, primeAtLeastTwo);
+  claim succDxPos : successor(zero) ≤ successor(dx)
+    by Natural.successor_less_or_equal_successor(
+           zero, dx, Natural.zero_least(dx));
+  claim succDyPos : successor(zero) ≤ successor(dy)
+    by Natural.successor_less_or_equal_successor(
+           zero, dy, Natural.zero_least(dy));
+  claim succKxPos : successor(zero) ≤ successor(kx)
+    by Natural.successor_less_or_equal_successor(
+           zero, kx, Natural.zero_least(kx));
+  claim succKyPos : successor(zero) ≤ successor(ky)
+    by Natural.successor_less_or_equal_successor(
+           zero, ky, Natural.zero_least(ky));
+  -- succ(dy + dx*succ(dy)) reduces to succ(dx) * succ(dy) by kernel.
+  -- So power(v_p(succ(dy + dx*succ(dy))), p) = power(v_p(succ(dx)*succ(dy)), p)
+  -- = power(v_p(succ(dx)) + v_p(succ(dy)), p)        [multiplicativity]
+  -- = power(v_p(succ(dx)), p) * power(v_p(succ(dy)), p)  [power_add].
+  claim numEqual
+        : Natural.power(
+              Natural.padic_valuation(
+                  p, successor(dy + dx * successor(dy))), p)
+          = Natural.power(Natural.padic_valuation(p, successor(dx)), p)
+              * Natural.power(Natural.padic_valuation(p, successor(dy)), p)
+    by Equality.transitivity(
+           congruenceOf(
+               function (m : Natural) => Natural.power(m, p),
+               Natural.padic_valuation_multiplicative(
+                   p, successor(dx), successor(dy),
+                   primality, succDxPos, succDyPos)),
+           Natural.power_add(
+               Natural.padic_valuation(p, successor(dx)),
+               Natural.padic_valuation(p, successor(dy)), p));
+  -- Similarly for the denominator (k side).
+  claim denomEqual
+        : Natural.power(
+              Natural.padic_valuation(
+                  p, successor(ky + kx * successor(ky))), p)
+          = Natural.power(Natural.padic_valuation(p, successor(kx)), p)
+              * Natural.power(Natural.padic_valuation(p, successor(ky)), p)
+    by Equality.transitivity(
+           congruenceOf(
+               function (m : Natural) => Natural.power(m, p),
+               Natural.padic_valuation_multiplicative(
+                   p, successor(kx), successor(ky),
+                   primality, succKxPos, succKyPos)),
+           Natural.power_add(
+               Natural.padic_valuation(p, successor(kx)),
+               Natural.padic_valuation(p, successor(ky)), p));
+  claim powerKxPos
+        : successor(zero)
+            ≤ Natural.power(Natural.padic_valuation(p, successor(kx)), p)
+    by Natural.power_positive(
+           Natural.padic_valuation(p, successor(kx)), p, primePositive);
+  claim powerKyPos
+        : successor(zero)
+            ≤ Natural.power(Natural.padic_valuation(p, successor(ky)), p)
+    by Natural.power_positive(
+           Natural.padic_valuation(p, successor(ky)), p, primePositive);
+  -- Build the Integer equation by computation.
+  -- Key: succ(monus(power(v_p(succ(ky)), p), 1) + monus(power(v_p(succ(kx)), p), 1) * succ(monus(power(v_p(succ(ky)), p), 1)))
+  --      reduces to succ(monus(power(v_p(succ(kx)), p), 1)) * succ(monus(power(v_p(succ(ky)), p), 1))
+  --      = power(v_p(succ(kx)), p) * power(v_p(succ(ky)), p) (via successor_monus_one × 2).
+  -- And succ(monus(power(v_p(succ(ky+kx*succ(ky))), p), 1)) = power(v_p(succ(ky+kx*succ(ky))), p) (also via successor_monus_one).
+  calc (Natural.power(
+            Natural.padic_valuation(
+                p, successor(dy + dx * successor(dy))), p) : Integer)
+       * (successor(
+              Natural.monus(
+                  Natural.power(
+                      Natural.padic_valuation(p, successor(ky)), p),
+                  successor(zero))
+                + Natural.monus(
+                      Natural.power(
+                          Natural.padic_valuation(p, successor(kx)), p),
+                      successor(zero))
+                  * successor(
+                      Natural.monus(
+                          Natural.power(
+                              Natural.padic_valuation(
+                                  p, successor(ky)), p),
+                          successor(zero))))
+            : Integer)
+     = (Natural.power(
+            Natural.padic_valuation(
+                p, successor(dy + dx * successor(dy))), p) : Integer)
+       * (Natural.power(Natural.padic_valuation(p, successor(kx)), p)
+            * Natural.power(Natural.padic_valuation(p, successor(ky)), p)
+            : Integer)
+            by congruenceOf(
+                   function (m : Natural) =>
+                       (Natural.power(
+                            Natural.padic_valuation(
+                                p, successor(dy + dx * successor(dy))), p)
+                            : Integer)
+                       * (m : Integer),
+                   -- succ(monus(B_x, 1) + monus(B_y, 1) * succ(monus(B_y, 1)))
+                   -- reduces (add on succ first, multiply rearrangement)
+                   -- to succ(monus(B_x, 1)) * succ(monus(B_y, 1))
+                   -- = power(v_p(succ(kx)), p) * power(v_p(succ(ky)), p).
+                   Equality.transitivity(
+                       congruenceOf(
+                           function (m : Natural) =>
+                               m
+                               * successor(
+                                   Natural.monus(
+                                       Natural.power(
+                                           Natural.padic_valuation(
+                                               p, successor(ky)), p),
+                                       successor(zero))),
+                           Natural.successor_monus_one_when_positive(
+                               Natural.power(
+                                   Natural.padic_valuation(
+                                       p, successor(kx)), p),
+                               powerKxPos)),
+                       congruenceOf(
+                           function (m : Natural) =>
+                               Natural.power(
+                                   Natural.padic_valuation(
+                                       p, successor(kx)), p)
+                               * m,
+                           Natural.successor_monus_one_when_positive(
+                               Natural.power(
+                                   Natural.padic_valuation(
+                                       p, successor(ky)), p),
+                               powerKyPos))))
+     = (Natural.power(
+            Natural.padic_valuation(
+                p, successor(dy + dx * successor(dy))), p)
+          * (Natural.power(Natural.padic_valuation(p, successor(kx)), p)
+               * Natural.power(Natural.padic_valuation(p, successor(ky)), p))
+          : Integer)
+            by Equality.symmetry(
+                   Natural.to_integer.multiply_preserves(
+                       Natural.power(
+                           Natural.padic_valuation(
+                               p, successor(dy + dx * successor(dy))), p),
+                       Natural.power(
+                           Natural.padic_valuation(p, successor(kx)), p)
+                         * Natural.power(
+                               Natural.padic_valuation(p, successor(ky)), p)))
+     = ((Natural.power(Natural.padic_valuation(p, successor(dx)), p)
+           * Natural.power(Natural.padic_valuation(p, successor(dy)), p))
+          * (Natural.power(Natural.padic_valuation(p, successor(kx)), p)
+               * Natural.power(Natural.padic_valuation(p, successor(ky)), p))
+          : Integer)
+            by congruenceOf(
+                   function (m : Natural) =>
+                       (m
+                        * (Natural.power(
+                               Natural.padic_valuation(p, successor(kx)), p)
+                            * Natural.power(
+                                  Natural.padic_valuation(p, successor(ky)), p))
+                        : Integer),
+                   numEqual)
+     = ((Natural.power(Natural.padic_valuation(p, successor(dx)), p)
+           * Natural.power(Natural.padic_valuation(p, successor(dy)), p))
+          : Integer)
+       * ((Natural.power(Natural.padic_valuation(p, successor(kx)), p)
+             * Natural.power(Natural.padic_valuation(p, successor(ky)), p))
+            : Integer)
+            by Natural.to_integer.multiply_preserves(
+                   Natural.power(Natural.padic_valuation(p, successor(dx)), p)
+                     * Natural.power(
+                           Natural.padic_valuation(p, successor(dy)), p),
+                   Natural.power(Natural.padic_valuation(p, successor(kx)), p)
+                     * Natural.power(
+                           Natural.padic_valuation(p, successor(ky)), p))
+     = ((Natural.power(Natural.padic_valuation(p, successor(dx)), p) : Integer)
+        * (Natural.power(Natural.padic_valuation(p, successor(dy)), p)
+             : Integer))
+       * ((Natural.power(Natural.padic_valuation(p, successor(kx)), p)
+             * Natural.power(Natural.padic_valuation(p, successor(ky)), p))
+            : Integer)
+            by congruenceOf(
+                   function (m : Integer) =>
+                       m
+                       * ((Natural.power(
+                               Natural.padic_valuation(p, successor(kx)), p)
+                             * Natural.power(
+                                   Natural.padic_valuation(p, successor(ky)), p))
+                            : Integer),
+                   Natural.to_integer.multiply_preserves(
+                       Natural.power(
+                           Natural.padic_valuation(p, successor(dx)), p),
+                       Natural.power(
+                           Natural.padic_valuation(p, successor(dy)), p)))
+     = ((Natural.power(Natural.padic_valuation(p, successor(dx)), p) : Integer)
+        * (Natural.power(Natural.padic_valuation(p, successor(dy)), p)
+             : Integer))
+       * (Natural.power(
+              Natural.padic_valuation(
+                  p, successor(ky + kx * successor(ky))), p)
+            : Integer)
+            by congruenceOf(
+                   function (m : Natural) =>
+                       ((Natural.power(
+                              Natural.padic_valuation(p, successor(dx)), p)
+                            : Integer)
+                         * (Natural.power(
+                                Natural.padic_valuation(p, successor(dy)), p)
+                              : Integer))
+                       * (m : Integer),
+                   Equality.symmetry(denomEqual))
+     = ((Natural.power(Natural.padic_valuation(p, successor(dx)), p) : Integer)
+        * (Natural.power(Natural.padic_valuation(p, successor(dy)), p)
+             : Integer))
+       * (successor(
+              Natural.monus(
+                  Natural.power(
+                      Natural.padic_valuation(
+                          p, successor(ky + kx * successor(ky))), p),
+                  successor(zero)))
+            : Integer)
+            by congruenceOf(
+                   function (m : Natural) =>
+                       ((Natural.power(
+                              Natural.padic_valuation(p, successor(dx)), p)
+                            : Integer)
+                         * (Natural.power(
+                                Natural.padic_valuation(p, successor(dy)), p)
+                              : Integer))
+                       * (m : Integer),
+                   Equality.symmetry(
+                       Natural.successor_monus_one_when_positive(
+                           Natural.power(
+                               Natural.padic_valuation(
+                                   p, successor(ky + kx * successor(ky))), p),
+                           Natural.power_positive(
+                               Natural.padic_valuation(
+                                   p, successor(ky + kx * successor(ky))),
+                               p, primePositive))))
+}
