@@ -23,6 +23,7 @@ import Integer.algebra
 import Integer.order
 import Integer.sign
 import Integer.absolute_value
+import Integer.absolute_value_multiplicative
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -315,4 +316,74 @@ theorem Rational.triangle_inequality (x y : Rational)
                  + Rational.absolute_value(
                        Quotient.mk(RationalRepresentative,
                                    RationalEquivalent, rep_q))),
+      x, y)
+
+-- ----------------------------------------------------------------------
+-- Multiplicativity: |x * y| = |x| * |y| at Rational.
+
+-- At representatives: both sides have the same denominator
+-- d_y + d_x · succ(d_y); numerators differ by |n_x · n_y| vs
+-- |n_x| · |n_y|, which Integer.absolute_value_multiplicative equates.
+theorem Rational.absolute_value_multiplicative_at_representatives
+        (n_x n_y : Integer) (d_x d_y : Natural)
+        : Rational.absolute_value(
+              Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(n_x, d_x))
+              * Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(n_y, d_y)))
+          = Rational.absolute_value(
+                Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(n_x, d_x)))
+            * Rational.absolute_value(
+                  Quotient.mk(RationalRepresentative, RationalEquivalent,
+                              RationalRepresentative.make(n_y, d_y))) :=
+  congruenceOf(
+      function (m : Integer) =>
+          Quotient.mk(RationalRepresentative, RationalEquivalent,
+                      RationalRepresentative.make(
+                          m, d_y + d_x * successor(d_y))),
+      Integer.absolute_value_multiplicative(n_x, n_y))
+
+-- |xy| = |x||y| on Rational. Lift via Quotient.induct_two.
+theorem Rational.absolute_value_multiplicative (x y : Rational)
+        : Rational.absolute_value(x * y)
+          = Rational.absolute_value(x) * Rational.absolute_value(y) :=
+  Quotient.induct_two(
+      RationalRepresentative, RationalEquivalent,
+      RationalRepresentative, RationalEquivalent,
+      function (xArg yArg : Rational) =>
+          Rational.absolute_value(xArg * yArg)
+            = Rational.absolute_value(xArg)
+                * Rational.absolute_value(yArg),
+      function (rep_x rep_y : RationalRepresentative) =>
+          (cases rep_x {
+             | RationalRepresentative.make(n_x, d_x) =>
+                 (cases rep_y {
+                    | RationalRepresentative.make(n_y, d_y) =>
+                        Rational.absolute_value_multiplicative_at_representatives(
+                            n_x, n_y, d_x, d_y)
+                  } : Rational.absolute_value(
+                          Quotient.mk(RationalRepresentative,
+                                      RationalEquivalent,
+                                      RationalRepresentative.make(n_x, d_x))
+                          * Quotient.mk(RationalRepresentative,
+                                        RationalEquivalent, rep_y))
+                      = Rational.absolute_value(
+                            Quotient.mk(RationalRepresentative,
+                                        RationalEquivalent,
+                                        RationalRepresentative.make(n_x, d_x)))
+                        * Rational.absolute_value(
+                              Quotient.mk(RationalRepresentative,
+                                          RationalEquivalent, rep_y)))
+           } : Rational.absolute_value(
+                   Quotient.mk(RationalRepresentative, RationalEquivalent,
+                               rep_x)
+                   * Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                 rep_y))
+               = Rational.absolute_value(
+                     Quotient.mk(RationalRepresentative,
+                                 RationalEquivalent, rep_x))
+                 * Rational.absolute_value(
+                       Quotient.mk(RationalRepresentative,
+                                   RationalEquivalent, rep_y))),
       x, y)
