@@ -17,7 +17,9 @@ import Natural.peano
 import Natural.arithmetic
 import Natural.order
 import Natural.divide
+import Natural.multiply_order
 import Equality.basics
+import Logic.basics
 
 -- padic_valuation_step(fuel, prime, target): fuel-bounded valuation.
 -- With fuel ≥ floor(log_prime(target)), returns the largest k with
@@ -88,3 +90,248 @@ theorem Natural.padic_valuation_step_succ_when_divides
       reflexivity(Natural,
           successor(Natural.padic_valuation_step(
               fuel, prime, Natural.divide(prime, target)))))
+
+-- ----------------------------------------------------------------------
+-- Helpers about Natural.divide when the modulo is zero.
+
+-- When the modulo is zero and the target is positive, the quotient is also
+-- positive. Reason: from divide_modulo_decompose, prime * divide = target;
+-- if divide were zero, prime * 0 = 0 ≠ target ≥ 1. Case-split on the
+-- value of divide, using the with-pattern.
+theorem Natural.divide_positive_when_divides
+        (prime target : Natural)
+        (targetPositive : successor(zero) ≤ target)
+        (moduloZero : Natural.modulo(prime, target) = zero)
+        : successor(zero) ≤ Natural.divide(prime, target) := {
+  claim productEqTarget : prime * Natural.divide(prime, target) = target
+    by Equality.transitivity(
+           Equality.symmetry(
+               Natural.add_zero(prime * Natural.divide(prime, target))),
+           Equality.transitivity(
+               congruenceOf(
+                   function (z : Natural) =>
+                       prime * Natural.divide(prime, target) + z,
+                   Equality.symmetry(moduloZero)),
+               Natural.divide_modulo_decompose(prime, target)));
+  (function (divideValue : Natural)
+            (divideEq : Natural.divide(prime, target) = divideValue) =>
+     (cases divideValue {
+        | zero =>
+            function (refinedDivideEq
+                        : Natural.divide(prime, target) = zero) =>
+              -- prime * 0 = 0, so target = 0, contradicting targetPositive.
+              False.eliminate_proposition(
+                  successor(zero) ≤ Natural.divide(prime, target),
+                  Natural.not_less_or_equal_successor_zero(
+                      zero,
+                      Equality.transport_proposition(
+                          Natural,
+                          function (m : Natural) => successor(zero) ≤ m,
+                          target, zero,
+                          Equality.transitivity(
+                              Equality.symmetry(productEqTarget),
+                              Equality.transitivity(
+                                  congruenceOf(
+                                      function (z : Natural) => prime * z,
+                                      refinedDivideEq),
+                                  Natural.multiply_zero(prime))),
+                          targetPositive)))
+        | successor(q') =>
+            function (refinedDivideEq
+                        : Natural.divide(prime, target) = successor(q')) =>
+              -- divide = successor(q') ≥ 1. Transport from successor(q') back.
+              Equality.transport_proposition(
+                  Natural,
+                  function (m : Natural) => successor(zero) ≤ m,
+                  successor(q'), Natural.divide(prime, target),
+                  Equality.symmetry(refinedDivideEq),
+                  Natural.successor_less_or_equal_successor(
+                      zero, q', Natural.zero_least(q')))
+      } : Natural.divide(prime, target) = divideValue
+          → successor(zero) ≤ Natural.divide(prime, target))(divideEq))(
+    Natural.divide(prime, target),
+    reflexivity(Natural, Natural.divide(prime, target)))
+}
+
+-- The quotient is strictly less than the target when prime ≥ 2,
+-- target ≥ 1, and prime divides target. From prime * divide = target
+-- with divide ≥ 1 and prime ≥ 2, successor(divide) ≤ prime * divide.
+theorem Natural.divide_lt_when_divides
+        (prime target : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (targetPositive : successor(zero) ≤ target)
+        (moduloZero : Natural.modulo(prime, target) = zero)
+        : successor(Natural.divide(prime, target)) ≤ target := {
+  claim productEqTarget : prime * Natural.divide(prime, target) = target
+    by Equality.transitivity(
+           Equality.symmetry(
+               Natural.add_zero(prime * Natural.divide(prime, target))),
+           Equality.transitivity(
+               congruenceOf(
+                   function (z : Natural) =>
+                       prime * Natural.divide(prime, target) + z,
+                   Equality.symmetry(moduloZero)),
+               Natural.divide_modulo_decompose(prime, target)));
+  claim dividePositive : successor(zero) ≤ Natural.divide(prime, target)
+    by Natural.divide_positive_when_divides(
+           prime, target, targetPositive, moduloZero);
+  -- successor(divide) ≤ prime * divide  (since 2 ≤ prime, 1 ≤ divide).
+  -- Transport via productEqTarget : prime * divide = target.
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) => successor(Natural.divide(prime, target)) ≤ m,
+      prime * Natural.divide(prime, target), target,
+      productEqTarget,
+      Natural.successor_less_or_equal_multiply(
+          prime, Natural.divide(prime, target),
+          primeAtLeastTwo, dividePositive))
+}
+
+-- ----------------------------------------------------------------------
+-- Fuel monotonicity for `padic_valuation_step` at target ≥ 1.
+--
+-- Strong induction on target. The predicate quantifies over both
+-- fuels (and the divides-quotient is smaller than target, so the IH
+-- applies). At target = 0 the predicate is vacuously true (premise
+-- 1 ≤ 0 fails). At target ≥ 1 with both fuels ≥ target, dispatch on
+-- modulo(prime, target):
+--   * modulo ≠ 0: both fuels give 0 by step_zero_when_not_divides.
+--   * modulo = 0: both fuels descend to step on divide(prime, target),
+--     a strictly smaller target; IH applies.
+
+theorem Natural.padic_valuation_step_fuel_stable
+        (prime target fuel1 fuel2 : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (targetPositive : successor(zero) ≤ target)
+        (fuel1Sufficient : target ≤ fuel1)
+        (fuel2Sufficient : target ≤ fuel2)
+        : Natural.padic_valuation_step(fuel1, prime, target)
+          = Natural.padic_valuation_step(fuel2, prime, target) :=
+  Natural.strong_induction(
+      function (t : Natural) =>
+          (f1 f2 : Natural)
+            → successor(zero) ≤ t → t ≤ f1 → t ≤ f2
+            → Natural.padic_valuation_step(f1, prime, t)
+              = Natural.padic_valuation_step(f2, prime, t),
+      function (n : Natural)
+               (inductionHypothesis :
+                   (k : Natural) → successor(k) ≤ n
+                     → (f1 f2 : Natural)
+                         → successor(zero) ≤ k → k ≤ f1 → k ≤ f2
+                         → Natural.padic_valuation_step(f1, prime, k)
+                           = Natural.padic_valuation_step(f2, prime, k)) =>
+        function (f1 f2 : Natural)
+                 (nPositive : successor(zero) ≤ n)
+                 (nLeF1 : n ≤ f1)
+                 (nLeF2 : n ≤ f2) =>
+          -- Case on f1; f1 must be a successor since n ≥ 1.
+          (cases f1 {
+             | zero =>
+                 function (refinedNLeF1 : n ≤ zero) =>
+                   False.eliminate_proposition(
+                       Natural.padic_valuation_step(zero, prime, n)
+                         = Natural.padic_valuation_step(f2, prime, n),
+                       Natural.not_less_or_equal_successor_zero(
+                           zero,
+                           LessOrEqual.transitive(
+                               successor(zero), n, zero,
+                               refinedNLeF1, nPositive)))
+             | successor(f1') =>
+                 function (refinedNLeF1 : n ≤ successor(f1')) =>
+                   -- Case on f2 next.
+                   (cases f2 {
+                      | zero =>
+                          function (refinedNLeF2 : n ≤ zero) =>
+                            False.eliminate_proposition(
+                                Natural.padic_valuation_step(successor(f1'), prime, n)
+                                  = Natural.padic_valuation_step(zero, prime, n),
+                                Natural.not_less_or_equal_successor_zero(
+                                    zero,
+                                    LessOrEqual.transitive(
+                                        successor(zero), n, zero,
+                                        refinedNLeF2, nPositive)))
+                      | successor(f2') =>
+                          function (refinedNLeF2 : n ≤ successor(f2')) =>
+                            -- Both fuels are successors. Case on modulo.
+                            (function (moduloValue : Natural)
+                                      (moduloEq :
+                                          Natural.modulo(prime, n) = moduloValue) =>
+                               (cases moduloValue {
+                                  | zero =>
+                                      function (refinedModuloEq
+                                                  : Natural.modulo(prime, n) = zero) =>
+                                        calc Natural.padic_valuation_step(
+                                                 successor(f1'), prime, n)
+                                           = successor(Natural.padic_valuation_step(
+                                                 f1', prime, Natural.divide(prime, n)))
+                                                  by Natural.padic_valuation_step_succ_when_divides(
+                                                         f1', prime, n, refinedModuloEq)
+                                           = successor(Natural.padic_valuation_step(
+                                                 f2', prime, Natural.divide(prime, n)))
+                                                  by congruenceOf(
+                                                         successor,
+                                                         inductionHypothesis(
+                                                             Natural.divide(prime, n),
+                                                             Natural.divide_lt_when_divides(
+                                                                 prime, n,
+                                                                 primeAtLeastTwo,
+                                                                 nPositive,
+                                                                 refinedModuloEq),
+                                                             f1', f2',
+                                                             Natural.divide_positive_when_divides(
+                                                                 prime, n,
+                                                                 nPositive,
+                                                                 refinedModuloEq),
+                                                             Natural.less_or_equal_successor_successor_descend(
+                                                                 Natural.divide(prime, n),
+                                                                 f1',
+                                                                 LessOrEqual.transitive(
+                                                                     successor(Natural.divide(prime, n)),
+                                                                     n, successor(f1'),
+                                                                     refinedNLeF1,
+                                                                     Natural.divide_lt_when_divides(
+                                                                         prime, n,
+                                                                         primeAtLeastTwo,
+                                                                         nPositive,
+                                                                         refinedModuloEq))),
+                                                             Natural.less_or_equal_successor_successor_descend(
+                                                                 Natural.divide(prime, n),
+                                                                 f2',
+                                                                 LessOrEqual.transitive(
+                                                                     successor(Natural.divide(prime, n)),
+                                                                     n, successor(f2'),
+                                                                     refinedNLeF2,
+                                                                     Natural.divide_lt_when_divides(
+                                                                         prime, n,
+                                                                         primeAtLeastTwo,
+                                                                         nPositive,
+                                                                         refinedModuloEq)))))
+                                           = Natural.padic_valuation_step(
+                                                 successor(f2'), prime, n)
+                                                  by Equality.symmetry(
+                                                         Natural.padic_valuation_step_succ_when_divides(
+                                                             f2', prime, n,
+                                                             refinedModuloEq))
+                                  | successor(predM) =>
+                                      function (refinedModuloEq
+                                                  : Natural.modulo(prime, n)
+                                                    = successor(predM)) =>
+                                        Equality.transitivity(
+                                            Natural.padic_valuation_step_zero_when_not_divides(
+                                                f1', prime, n, predM, refinedModuloEq),
+                                            Equality.symmetry(
+                                                Natural.padic_valuation_step_zero_when_not_divides(
+                                                    f2', prime, n, predM, refinedModuloEq)))
+                                } : Natural.modulo(prime, n) = moduloValue
+                                    → Natural.padic_valuation_step(successor(f1'), prime, n)
+                                      = Natural.padic_valuation_step(successor(f2'), prime, n))(moduloEq))(
+                              Natural.modulo(prime, n),
+                              reflexivity(Natural, Natural.modulo(prime, n)))
+                    } : (refinedNLeF2 : n ≤ f2)
+                        → Natural.padic_valuation_step(successor(f1'), prime, n)
+                          = Natural.padic_valuation_step(f2, prime, n))(nLeF2)
+           } : (refinedNLeF1 : n ≤ f1)
+               → Natural.padic_valuation_step(f1, prime, n)
+                 = Natural.padic_valuation_step(f2, prime, n))(nLeF1),
+      target,
+      fuel1, fuel2, targetPositive, fuel1Sufficient, fuel2Sufficient)
