@@ -21,13 +21,18 @@ import Natural.multiply_order
 import Natural.cancellation
 import Natural.divisibility
 import Natural.subtraction
+import Natural.distance
 import Natural.power
 import Natural.prime
 import Natural.decide_divides
 import Natural.prime_divides_product
+import Integer.basics
+import Integer.addition
+import Integer.absolute_value_natural
 import Equality.basics
 import Logic.basics
 import Logic.exists
+import Logic.quotient
 
 -- padic_valuation_step(fuel, prime, target): fuel-bounded valuation.
 -- With fuel ≥ floor(log_prime(target)), returns the largest k with
@@ -1785,3 +1790,100 @@ theorem Natural.divides_distance_sum
             },
             Natural.totality_of_less_or_equal(b1, b2)),
       Natural.totality_of_less_or_equal(a1, a2))
+
+-- Integer-level: if d divides |A|_Nat and |B|_Nat, then d divides |A+B|_Nat.
+-- Quotient.induct_two on A, B, then case_split the representatives.
+-- At reps, |A|_Nat = distance(a1, a2), |B|_Nat = distance(b1, b2),
+-- |A+B|_Nat = distance(a1+b1, a2+b2), and divides_distance_sum closes
+-- the goal.
+theorem Integer.divides_absolute_value_natural_sum
+        (d : Natural) (A B : Integer)
+        (dDividesAbsA : d ∣ Integer.absolute_value_natural(A))
+        (dDividesAbsB : d ∣ Integer.absolute_value_natural(B))
+        : d ∣ Integer.absolute_value_natural(A + B) :=
+  Quotient.induct_two(
+      IntegerRepresentative, IntegerEquivalent,
+      IntegerRepresentative, IntegerEquivalent,
+      function (A' B' : Integer) =>
+          d ∣ Integer.absolute_value_natural(A')
+            → d ∣ Integer.absolute_value_natural(B')
+            → d ∣ Integer.absolute_value_natural(A' + B'),
+      function (rep_A rep_B : IntegerRepresentative) =>
+        (cases rep_A {
+           | IntegerRepresentative.make(a1, a2) =>
+               (cases rep_B {
+                  | IntegerRepresentative.make(b1, b2) =>
+                      function (dDivDistA : d ∣ Natural.distance(a1, a2))
+                               (dDivDistB : d ∣ Natural.distance(b1, b2)) =>
+                        Natural.divides_distance_sum(
+                            d, a1, a2, b1, b2,
+                            dDivDistA, dDivDistB)
+                } : d ∣ Integer.absolute_value_natural(
+                          Quotient.mk(IntegerRepresentative,
+                                       IntegerEquivalent,
+                                       IntegerRepresentative.make(a1, a2)))
+                    → d ∣ Integer.absolute_value_natural(
+                              Quotient.mk(IntegerRepresentative,
+                                           IntegerEquivalent, rep_B))
+                    → d ∣ Integer.absolute_value_natural(
+                              Quotient.mk(IntegerRepresentative,
+                                           IntegerEquivalent,
+                                           IntegerRepresentative.make(a1, a2))
+                              + Quotient.mk(IntegerRepresentative,
+                                             IntegerEquivalent, rep_B)))
+         } : d ∣ Integer.absolute_value_natural(
+                   Quotient.mk(IntegerRepresentative,
+                                IntegerEquivalent, rep_A))
+             → d ∣ Integer.absolute_value_natural(
+                       Quotient.mk(IntegerRepresentative,
+                                    IntegerEquivalent, rep_B))
+             → d ∣ Integer.absolute_value_natural(
+                       Quotient.mk(IntegerRepresentative,
+                                    IntegerEquivalent, rep_A)
+                       + Quotient.mk(IntegerRepresentative,
+                                      IntegerEquivalent, rep_B))),
+      A, B, dDividesAbsA, dDividesAbsB)
+
+-- Integer-level p-adic ultrametric: v_p(|A|_Nat) ≤ v_p(|B|_Nat) and
+-- |A + B|_Nat ≥ 1 implies v_p(|A|_Nat) ≤ v_p(|A + B|_Nat).
+-- Goes through divides_absolute_value_natural_sum and the bidirectional
+-- v_p ↔ p^k divides bridge.
+theorem Integer.padic_valuation_absolute_value_natural_ultrametric_when_le
+        (prime : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (A B : Integer)
+        (sumAbsPositive
+            : successor(zero) ≤ Integer.absolute_value_natural(A + B))
+        (valuationLe :
+            Natural.padic_valuation(
+                prime, Integer.absolute_value_natural(A))
+              ≤ Natural.padic_valuation(
+                    prime, Integer.absolute_value_natural(B)))
+        : Natural.padic_valuation(
+              prime, Integer.absolute_value_natural(A))
+          ≤ Natural.padic_valuation(
+                prime, Integer.absolute_value_natural(A + B)) :=
+  Natural.power_divides_implies_padic_valuation_ge(
+      prime, primeAtLeastTwo,
+      Natural.padic_valuation(prime, Integer.absolute_value_natural(A)),
+      Integer.absolute_value_natural(A + B),
+      sumAbsPositive,
+      Integer.divides_absolute_value_natural_sum(
+          Natural.power(
+              Natural.padic_valuation(
+                  prime, Integer.absolute_value_natural(A)), prime),
+          A, B,
+          Natural.padic_valuation_ge_implies_power_divides(
+              prime, primeAtLeastTwo,
+              Natural.padic_valuation(
+                  prime, Integer.absolute_value_natural(A)),
+              Integer.absolute_value_natural(A),
+              LessOrEqual.reflexivity(
+                  Natural.padic_valuation(
+                      prime, Integer.absolute_value_natural(A)))),
+          Natural.padic_valuation_ge_implies_power_divides(
+              prime, primeAtLeastTwo,
+              Natural.padic_valuation(
+                  prime, Integer.absolute_value_natural(A)),
+              Integer.absolute_value_natural(B),
+              valuationLe)))
