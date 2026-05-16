@@ -19,8 +19,13 @@ import Natural.order
 import Natural.divide
 import Natural.multiply_order
 import Natural.cancellation
+import Natural.divisibility
+import Natural.prime
+import Natural.decide_divides
+import Natural.prime_divides_product
 import Equality.basics
 import Logic.basics
+import Logic.exists
 
 -- padic_valuation_step(fuel, prime, target): fuel-bounded valuation.
 -- With fuel ≥ floor(log_prime(target)), returns the largest k with
@@ -498,4 +503,381 @@ theorem Natural.padic_valuation_strip
             = successor(Natural.padic_valuation(prime, quotient)))(pqEq))(
     prime * quotient,
     reflexivity(Natural, prime * quotient))
+}
+
+-- ----------------------------------------------------------------------
+-- Multiplicativity of `padic_valuation`.
+
+-- Small helper: if succ(d) ≤ a, then succ(d + b) ≤ a + b. Definitional
+-- reductions of add on succ first arg make this a transport plus a
+-- successor-step. Induction on b.
+theorem Natural.successor_add_preserves_le
+        : (b a d : Natural)
+          → successor(d) ≤ a
+          → successor(d + b) ≤ a + b
+  | zero, a, d, succDLeA =>
+      Equality.transport_proposition(
+          Natural,
+          function (m : Natural) => successor(d + zero) ≤ m,
+          a, a + zero,
+          Equality.symmetry(Natural.add_zero(a)),
+          Equality.transport_proposition(
+              Natural,
+              function (m : Natural) => successor(m) ≤ a,
+              d, d + zero,
+              Equality.symmetry(Natural.add_zero(d)),
+              succDLeA))
+  | successor(b'), a, d, succDLeA =>
+      -- IH on b' gives succ(d + b') ≤ a + b'. By successor_preserves,
+      -- succ(succ(d + b')) ≤ succ(a + b'). Then rewrite both sides via
+      -- add_successor symmetry to express in terms of succ(b').
+      Equality.transport_proposition(
+          Natural,
+          function (m : Natural) => successor(d + successor(b')) ≤ m,
+          successor(a + b'), a + successor(b'),
+          Equality.symmetry(Natural.add_successor(a, b')),
+          Equality.transport_proposition(
+              Natural,
+              function (m : Natural) => m ≤ successor(a + b'),
+              successor(successor(d + b')), successor(d + successor(b')),
+              congruenceOf(
+                  successor,
+                  Equality.symmetry(Natural.add_successor(d, b'))),
+              Natural.successor_less_or_equal_successor(
+                  successor(d + b'), a + b',
+                  Natural.successor_add_preserves_le(b', a, d, succDLeA))))
+
+-- Main theorem: v_p(a · b) = v_p(a) + v_p(b) for prime p, a ≥ 1, b ≥ 1.
+--
+-- Strong induction on a + b. Dispatch by decides_divides:
+--   * p | a: a = p · a' with a' = divide(p, a) (a' ≥ 1, a' < a). Apply
+--     strip on the LHS and on v_p(a); recurse via IH at a' + b < a + b
+--     to relate v_p(a' · b) to v_p(a') + v_p(b).
+--   * p ∤ a, p | b: symmetric.
+--   * p ∤ a, p ∤ b: by Euclid's lemma, p ∤ (a · b). All three valuations
+--     are zero, and 0 = 0 + 0.
+
+theorem Natural.padic_valuation_multiplicative
+        (prime a b : Natural)
+        (primality : Natural.is_prime(prime))
+        (aPositive : successor(zero) ≤ a)
+        (bPositive : successor(zero) ≤ b)
+        : Natural.padic_valuation(prime, a * b)
+          = Natural.padic_valuation(prime, a)
+                + Natural.padic_valuation(prime, b) := {
+  claim primeAtLeastTwo : successor(successor(zero)) ≤ prime
+    by And.eliminate(
+           successor(successor(zero)) ≤ prime,
+           (divisor : Natural) → divisor ∣ prime
+               → divisor = successor(zero) ∨ divisor = prime,
+           successor(successor(zero)) ≤ prime,
+           function (twoLeP : successor(successor(zero)) ≤ prime)
+                    (_ : (divisor : Natural) → divisor ∣ prime
+                         → divisor = successor(zero) ∨ divisor = prime) =>
+               twoLeP,
+           primality);
+  claim primePositive : successor(zero) ≤ prime
+    by Natural.less_or_equal_predecessor_less_or_equal(
+           successor(zero), prime, primeAtLeastTwo);
+  Natural.strong_induction(
+      function (s : Natural) =>
+          (a' b' : Natural)
+            → successor(zero) ≤ a' → successor(zero) ≤ b'
+            → a' + b' = s
+            → Natural.padic_valuation(prime, a' * b')
+              = Natural.padic_valuation(prime, a')
+                    + Natural.padic_valuation(prime, b'),
+      function (n : Natural)
+               (inductionHypothesis :
+                   (k : Natural) → successor(k) ≤ n
+                     → (a' b' : Natural)
+                         → successor(zero) ≤ a' → successor(zero) ≤ b'
+                         → a' + b' = k
+                         → Natural.padic_valuation(prime, a' * b')
+                           = Natural.padic_valuation(prime, a')
+                                 + Natural.padic_valuation(prime, b')) =>
+        function (a' b' : Natural)
+                 (a'Positive : successor(zero) ≤ a')
+                 (b'Positive : successor(zero) ≤ b')
+                 (sumEq : a' + b' = n) =>
+          Or.eliminate(
+              prime ∣ a', prime ∤ a',
+              Natural.padic_valuation(prime, a' * b')
+                = Natural.padic_valuation(prime, a')
+                      + Natural.padic_valuation(prime, b'),
+              function (pDividesA : prime ∣ a') => {
+                claim moduloAIsZero : Natural.modulo(prime, a') = zero
+                  by Natural.divides_implies_modulo_zero(
+                         prime, a', primePositive, pDividesA);
+                claim divideAPositive
+                      : successor(zero) ≤ Natural.divide(prime, a')
+                  by Natural.divide_positive_when_divides(
+                         prime, a', a'Positive, moduloAIsZero);
+                claim succDivideALeA
+                      : successor(Natural.divide(prime, a')) ≤ a'
+                  by Natural.divide_lt_when_divides(
+                         prime, a', primeAtLeastTwo, a'Positive, moduloAIsZero);
+                claim aEqPrimeDivide : a' = prime * Natural.divide(prime, a')
+                  by Equality.transitivity(
+                         Equality.symmetry(
+                             Natural.divide_modulo_decompose(prime, a')),
+                         Equality.transitivity(
+                             congruenceOf(
+                                 function (z : Natural) =>
+                                     prime * Natural.divide(prime, a') + z,
+                                 moduloAIsZero),
+                             Natural.add_zero(
+                                 prime * Natural.divide(prime, a'))));
+                -- IH on (divide(p, a'), b'): need succ(divide + b') ≤ n.
+                claim recursiveSumLeN
+                      : successor(Natural.divide(prime, a') + b') ≤ n
+                  by Equality.transport_proposition(
+                         Natural,
+                         function (m : Natural) =>
+                             successor(Natural.divide(prime, a') + b') ≤ m,
+                         a' + b', n, sumEq,
+                         Natural.successor_add_preserves_le(
+                             b', a', Natural.divide(prime, a'), succDivideALeA));
+                claim recursedEq
+                      : Natural.padic_valuation(
+                            prime, Natural.divide(prime, a') * b')
+                        = Natural.padic_valuation(prime, Natural.divide(prime, a'))
+                              + Natural.padic_valuation(prime, b')
+                  by inductionHypothesis(
+                         Natural.divide(prime, a') + b',
+                         recursiveSumLeN,
+                         Natural.divide(prime, a'), b',
+                         divideAPositive, b'Positive,
+                         reflexivity(Natural,
+                             Natural.divide(prime, a') + b'));
+                calc Natural.padic_valuation(prime, a' * b')
+                   = Natural.padic_valuation(
+                         prime, (prime * Natural.divide(prime, a')) * b')
+                          by congruenceOf(
+                                 function (m : Natural) =>
+                                     Natural.padic_valuation(prime, m * b'),
+                                 aEqPrimeDivide)
+                   = Natural.padic_valuation(
+                         prime, prime * (Natural.divide(prime, a') * b'))
+                          by congruenceOf(
+                                 function (m : Natural) =>
+                                     Natural.padic_valuation(prime, m),
+                                 Natural.multiply_associative(
+                                     prime, Natural.divide(prime, a'), b'))
+                   = successor(Natural.padic_valuation(
+                         prime, Natural.divide(prime, a') * b'))
+                          by Natural.padic_valuation_strip(
+                                 prime, Natural.divide(prime, a') * b',
+                                 primeAtLeastTwo,
+                                 Natural.multiply_at_least_one(
+                                     Natural.divide(prime, a'), b',
+                                     divideAPositive, b'Positive))
+                   = successor(Natural.padic_valuation(
+                         prime, Natural.divide(prime, a'))
+                       + Natural.padic_valuation(prime, b'))
+                          by congruenceOf(successor, recursedEq)
+                   = successor(Natural.padic_valuation(
+                         prime, Natural.divide(prime, a')))
+                     + Natural.padic_valuation(prime, b')
+                          by reflexivity(Natural,
+                                 successor(Natural.padic_valuation(
+                                     prime, Natural.divide(prime, a')))
+                                 + Natural.padic_valuation(prime, b'))
+                   = Natural.padic_valuation(
+                         prime, prime * Natural.divide(prime, a'))
+                     + Natural.padic_valuation(prime, b')
+                          by congruenceOf(
+                                 function (m : Natural) =>
+                                     m + Natural.padic_valuation(prime, b'),
+                                 Equality.symmetry(
+                                     Natural.padic_valuation_strip(
+                                         prime, Natural.divide(prime, a'),
+                                         primeAtLeastTwo,
+                                         divideAPositive)))
+                   = Natural.padic_valuation(prime, a')
+                     + Natural.padic_valuation(prime, b')
+                          by congruenceOf(
+                                 function (m : Natural) =>
+                                     Natural.padic_valuation(prime, m)
+                                     + Natural.padic_valuation(prime, b'),
+                                 Equality.symmetry(aEqPrimeDivide))
+              },
+              function (notDivA : prime ∤ a') =>
+                Or.eliminate(
+                    prime ∣ b', prime ∤ b',
+                    Natural.padic_valuation(prime, a' * b')
+                      = Natural.padic_valuation(prime, a')
+                            + Natural.padic_valuation(prime, b'),
+                    function (pDividesB : prime ∣ b') => {
+                      claim moduloBIsZero : Natural.modulo(prime, b') = zero
+                        by Natural.divides_implies_modulo_zero(
+                               prime, b', primePositive, pDividesB);
+                      claim divideBPositive
+                            : successor(zero) ≤ Natural.divide(prime, b')
+                        by Natural.divide_positive_when_divides(
+                               prime, b', b'Positive, moduloBIsZero);
+                      claim succDivideBLeB
+                            : successor(Natural.divide(prime, b')) ≤ b'
+                        by Natural.divide_lt_when_divides(
+                               prime, b', primeAtLeastTwo, b'Positive,
+                               moduloBIsZero);
+                      claim bEqPrimeDivide
+                            : b' = prime * Natural.divide(prime, b')
+                        by Equality.transitivity(
+                               Equality.symmetry(
+                                   Natural.divide_modulo_decompose(prime, b')),
+                               Equality.transitivity(
+                                   congruenceOf(
+                                       function (z : Natural) =>
+                                           prime * Natural.divide(prime, b') + z,
+                                       moduloBIsZero),
+                                   Natural.add_zero(
+                                       prime * Natural.divide(prime, b'))));
+                      -- IH on (a', divide(p, b')): need succ(a' + divide) ≤ n.
+                      -- a' + divide < a' + b' = n; specifically succ(a' + divide) ≤ a' + b'.
+                      claim recursiveSumLeN
+                            : successor(a' + Natural.divide(prime, b')) ≤ n
+                        by Equality.transport_proposition(
+                               Natural,
+                               function (m : Natural) =>
+                                   successor(a' + Natural.divide(prime, b')) ≤ m,
+                               a' + b', n, sumEq,
+                               -- succ(a' + div) ≤ a' + b' from succ(div) ≤ b'.
+                               -- successor_add_preserves_le gives succ(d+x) ≤ a+x
+                               -- from succ(d) ≤ a; here d = div, x = a', a = b'.
+                               -- We want succ(a' + div) ≤ a' + b'. Use commutative.
+                               Equality.transport_proposition(
+                                   Natural,
+                                   function (m : Natural) =>
+                                       m ≤ a' + b',
+                                   successor(Natural.divide(prime, b') + a'),
+                                   successor(a' + Natural.divide(prime, b')),
+                                   congruenceOf(
+                                       successor,
+                                       Natural.add_commutative(
+                                           Natural.divide(prime, b'), a')),
+                                   Equality.transport_proposition(
+                                       Natural,
+                                       function (m : Natural) =>
+                                           successor(Natural.divide(prime, b') + a')
+                                             ≤ m,
+                                       b' + a', a' + b',
+                                       Natural.add_commutative(b', a'),
+                                       Natural.successor_add_preserves_le(
+                                           a', b', Natural.divide(prime, b'),
+                                           succDivideBLeB))));
+                      claim recursedEq
+                            : Natural.padic_valuation(
+                                  prime, a' * Natural.divide(prime, b'))
+                              = Natural.padic_valuation(prime, a')
+                                    + Natural.padic_valuation(
+                                          prime, Natural.divide(prime, b'))
+                        by inductionHypothesis(
+                               a' + Natural.divide(prime, b'),
+                               recursiveSumLeN,
+                               a', Natural.divide(prime, b'),
+                               a'Positive, divideBPositive,
+                               reflexivity(Natural,
+                                   a' + Natural.divide(prime, b')));
+                      calc Natural.padic_valuation(prime, a' * b')
+                         = Natural.padic_valuation(
+                               prime, a' * (prime * Natural.divide(prime, b')))
+                                by congruenceOf(
+                                       function (m : Natural) =>
+                                           Natural.padic_valuation(prime, a' * m),
+                                       bEqPrimeDivide)
+                         = Natural.padic_valuation(
+                               prime, prime * (a' * Natural.divide(prime, b')))
+                                by congruenceOf(
+                                       function (m : Natural) =>
+                                           Natural.padic_valuation(prime, m),
+                                       Equality.transitivity(
+                                           Equality.symmetry(
+                                               Natural.multiply_associative(
+                                                   a', prime,
+                                                   Natural.divide(prime, b'))),
+                                           Equality.transitivity(
+                                               congruenceOf(
+                                                   function (z : Natural) =>
+                                                       z * Natural.divide(prime, b'),
+                                                   Natural.multiply_commutative(
+                                                       a', prime)),
+                                               Natural.multiply_associative(
+                                                   prime, a',
+                                                   Natural.divide(prime, b')))))
+                         = successor(Natural.padic_valuation(
+                               prime, a' * Natural.divide(prime, b')))
+                                by Natural.padic_valuation_strip(
+                                       prime, a' * Natural.divide(prime, b'),
+                                       primeAtLeastTwo,
+                                       Natural.multiply_at_least_one(
+                                           a', Natural.divide(prime, b'),
+                                           a'Positive, divideBPositive))
+                         = successor(Natural.padic_valuation(prime, a')
+                                     + Natural.padic_valuation(
+                                           prime, Natural.divide(prime, b')))
+                                by congruenceOf(successor, recursedEq)
+                         = Natural.padic_valuation(prime, a')
+                             + successor(Natural.padic_valuation(
+                                   prime, Natural.divide(prime, b')))
+                                by Equality.symmetry(
+                                       Natural.add_successor(
+                                           Natural.padic_valuation(prime, a'),
+                                           Natural.padic_valuation(
+                                               prime, Natural.divide(prime, b'))))
+                         = Natural.padic_valuation(prime, a')
+                             + Natural.padic_valuation(
+                                   prime, prime * Natural.divide(prime, b'))
+                                by congruenceOf(
+                                       function (m : Natural) =>
+                                           Natural.padic_valuation(prime, a') + m,
+                                       Equality.symmetry(
+                                           Natural.padic_valuation_strip(
+                                               prime, Natural.divide(prime, b'),
+                                               primeAtLeastTwo,
+                                               divideBPositive)))
+                         = Natural.padic_valuation(prime, a')
+                             + Natural.padic_valuation(prime, b')
+                                by congruenceOf(
+                                       function (m : Natural) =>
+                                           Natural.padic_valuation(prime, a')
+                                           + Natural.padic_valuation(prime, m),
+                                       Equality.symmetry(bEqPrimeDivide))
+                    },
+                    function (notDivB : prime ∤ b') => {
+                      -- prime ∤ a' ∧ prime ∤ b' → prime ∤ (a' * b').
+                      claim notDivProduct : prime ∤ (a' * b')
+                        by function (productDivides : prime ∣ a' * b') =>
+                               Or.eliminate(
+                                   prime ∣ a', prime ∣ b',
+                                   False,
+                                   notDivA, notDivB,
+                                   Natural.prime_divides_product(
+                                       prime, a', b', primality,
+                                       productDivides));
+                      -- All three valuations are zero.
+                      calc Natural.padic_valuation(prime, a' * b')
+                         = zero
+                                by Natural.padic_valuation_when_not_divides(
+                                       prime, a' * b', notDivProduct)
+                         = zero + zero
+                                by reflexivity(Natural, zero)
+                         = Natural.padic_valuation(prime, a') + zero
+                                by congruenceOf(
+                                       function (m : Natural) => m + zero,
+                                       Equality.symmetry(
+                                           Natural.padic_valuation_when_not_divides(
+                                               prime, a', notDivA)))
+                         = Natural.padic_valuation(prime, a')
+                             + Natural.padic_valuation(prime, b')
+                                by congruenceOf(
+                                       function (m : Natural) =>
+                                           Natural.padic_valuation(prime, a') + m,
+                                       Equality.symmetry(
+                                           Natural.padic_valuation_when_not_divides(
+                                               prime, b', notDivB)))
+                    },
+                    Natural.decides_divides(prime, b')),
+              Natural.decides_divides(prime, a')),
+      a + b, a, b, aPositive, bPositive, reflexivity(Natural, a + b))
 }
