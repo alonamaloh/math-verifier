@@ -24,6 +24,12 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.divisibility
+import Natural.monus
+import Natural.power
+import Natural.padic_valuation
+import Integer.basics
+import Integer.embedding
+import Integer.absolute_value_natural
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -31,6 +37,34 @@ import Rational.negation
 import Rational.order
 import Rational.absolute_value
 import Rational.order_arithmetic
+
+-- Honest representative-level p-adic absolute value. For a
+-- Rational representative (n, d) (encoding n / succ(d)):
+--   * if the numerator is zero, return Rational.zero.
+--   * otherwise (|n| = succ(k)), return the Rational
+--         p^v_p(succ(d)) / p^v_p(succ(k)),
+--     i.e., mk(make((p^v_p(succ(d)) : Integer),
+--                   monus(p^v_p(succ(k)), 1))).
+-- The denominator stays positive because p^v_p ≥ 1 for prime p ≥ 1
+-- (witness: power_positive). The respect proof (next phase) leverages
+-- padic_valuation_multiplicative.
+definition Rational.padic_absolute_value_at_representative
+        (p : Natural) : RationalRepresentative → Rational
+  | RationalRepresentative.make(n, d) =>
+      (cases Integer.absolute_value_natural(n) {
+         | zero => Rational.zero
+         | successor(k) =>
+             Quotient.mk(
+                 RationalRepresentative, RationalEquivalent,
+                 RationalRepresentative.make(
+                     (Natural.power(
+                          Natural.padic_valuation(p, successor(d)), p)
+                          : Integer),
+                     Natural.monus(
+                         Natural.power(
+                             Natural.padic_valuation(p, successor(k)), p),
+                         successor(zero))))
+       } : Rational)
 
 -- p-adic absolute value of a rational. Returns 0 for q = 0 and
 -- (1/p)^v_p(q) for q ≠ 0. Stubbed until the p-adic infrastructure
