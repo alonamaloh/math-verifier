@@ -23,13 +23,21 @@ import Equality.basics
 import Natural.basics
 import Natural.peano
 import Natural.arithmetic
+import Natural.order
+import Natural.cancellation
 import Natural.divisibility
 import Natural.monus
 import Natural.power
+import Natural.prime
 import Natural.padic_valuation
 import Integer.basics
+import Integer.addition
+import Integer.multiplication
 import Integer.embedding
+import Integer.absolute_value
 import Integer.absolute_value_natural
+import Integer.absolute_value_multiplicative
+import Integer.sign
 import Rational.basics
 import Rational.addition
 import Rational.multiplication
@@ -65,6 +73,571 @@ definition Rational.padic_absolute_value_at_representative
                              Natural.padic_valuation(p, successor(k)), p),
                          successor(zero))))
        } : Rational)
+
+-- Helper: cross-multiplication transfers from the Integer numerator
+-- equation `n1 · succ(d2) = n2 · succ(d1)` to a Natural absolute-value
+-- equation. Apply Integer.absolute_value to both sides, multiplicativity
+-- distributes it, |succ(d) : Integer| reduces to succ(d), and the
+-- absolute_value_natural_is_image bridge plus to_integer.injective
+-- drops to Natural.
+theorem Rational.padic_cross_mult_natural_absolute_value
+        (n1 n2 : Integer) (d1 d2 : Natural)
+        (cross : n1 * (successor(d2) : Integer)
+                 = n2 * (successor(d1) : Integer))
+        : Integer.absolute_value_natural(n1) * successor(d2)
+          = Integer.absolute_value_natural(n2) * successor(d1) :=
+  Natural.to_integer.injective(
+      Integer.absolute_value_natural(n1) * successor(d2),
+      Integer.absolute_value_natural(n2) * successor(d1),
+      calc (Integer.absolute_value_natural(n1) * successor(d2) : Integer)
+         = (Integer.absolute_value_natural(n1) : Integer)
+             * (successor(d2) : Integer)
+                by Natural.to_integer.multiply_preserves(
+                       Integer.absolute_value_natural(n1), successor(d2))
+         = Integer.absolute_value(n1) * (successor(d2) : Integer)
+                by congruenceOf(
+                       function (m : Integer) =>
+                           m * (successor(d2) : Integer),
+                       Equality.symmetry(
+                           Integer.absolute_value_natural_is_image(n1)))
+         = Integer.absolute_value(n1)
+             * Integer.absolute_value((successor(d2) : Integer))
+                by congruenceOf(
+                       function (m : Integer) =>
+                           Integer.absolute_value(n1) * m,
+                       Equality.symmetry(
+                           Integer.absolute_value_of_natural(successor(d2))))
+         = Integer.absolute_value(n1 * (successor(d2) : Integer))
+                by Equality.symmetry(
+                       Integer.absolute_value_multiplicative(
+                           n1, (successor(d2) : Integer)))
+         = Integer.absolute_value(n2 * (successor(d1) : Integer))
+                by congruenceOf(Integer.absolute_value, cross)
+         = Integer.absolute_value(n2)
+             * Integer.absolute_value((successor(d1) : Integer))
+                by Integer.absolute_value_multiplicative(
+                       n2, (successor(d1) : Integer))
+         = Integer.absolute_value(n2) * (successor(d1) : Integer)
+                by congruenceOf(
+                       function (m : Integer) =>
+                           Integer.absolute_value(n2) * m,
+                       Integer.absolute_value_of_natural(successor(d1)))
+         = (Integer.absolute_value_natural(n2) : Integer)
+             * (successor(d1) : Integer)
+                by congruenceOf(
+                       function (m : Integer) =>
+                           m * (successor(d1) : Integer),
+                       Integer.absolute_value_natural_is_image(n2))
+         = (Integer.absolute_value_natural(n2) * successor(d1) : Integer)
+                by Equality.symmetry(
+                       Natural.to_integer.multiply_preserves(
+                           Integer.absolute_value_natural(n2),
+                           successor(d1))))
+
+-- Successor-after-monus-one identity: succ(monus(m, 1)) = m for m ≥ 1.
+theorem Natural.successor_monus_one_when_positive
+        : (m : Natural)
+          → successor(zero) ≤ m
+          → successor(Natural.monus(m, successor(zero))) = m
+  | zero, mPositive =>
+      False.eliminate_proposition(
+          successor(Natural.monus(zero, successor(zero))) = zero,
+          Natural.not_less_or_equal_successor_zero(zero, mPositive))
+  | successor(j), _ =>
+      congruenceOf(successor, Natural.monus_zero(j))
+
+-- The Integer equivalence equation that Quotient.sound needs in the
+-- "both numerators nonzero" branch of respect, derived from the
+-- corresponding cross-multiplication on succ(d_i) and succ(k_i) at
+-- Natural level. Uses multiplicativity of padic_valuation (needs prime).
+theorem Rational.padic_quotient_cross_equation
+        (p : Natural) (primality : Natural.is_prime(p))
+        (d1 d2 k1 k2 : Natural)
+        (succCross
+            : successor(d1) * successor(k2) = successor(d2) * successor(k1))
+        : (Natural.power(Natural.padic_valuation(p, successor(d1)), p) : Integer)
+          * (successor(Natural.monus(
+                 Natural.power(
+                     Natural.padic_valuation(p, successor(k2)), p),
+                 successor(zero))) : Integer)
+          = (Natural.power(Natural.padic_valuation(p, successor(d2)), p) : Integer)
+            * (successor(Natural.monus(
+                   Natural.power(
+                       Natural.padic_valuation(p, successor(k1)), p),
+                   successor(zero))) : Integer) := {
+  claim primeAtLeastTwo : successor(successor(zero)) ≤ p
+    by And.eliminate(
+           successor(successor(zero)) ≤ p,
+           (divisor : Natural) → divisor ∣ p
+               → divisor = successor(zero) ∨ divisor = p,
+           successor(successor(zero)) ≤ p,
+           function (twoLeP : successor(successor(zero)) ≤ p)
+                    (_ : (divisor : Natural) → divisor ∣ p
+                         → divisor = successor(zero) ∨ divisor = p) =>
+               twoLeP,
+           primality);
+  claim primePositive : successor(zero) ≤ p
+    by Natural.less_or_equal_predecessor_less_or_equal(
+           successor(zero), p, primeAtLeastTwo);
+  claim succD1Positive : successor(zero) ≤ successor(d1)
+    by Natural.successor_less_or_equal_successor(
+           zero, d1, Natural.zero_least(d1));
+  claim succD2Positive : successor(zero) ≤ successor(d2)
+    by Natural.successor_less_or_equal_successor(
+           zero, d2, Natural.zero_least(d2));
+  claim succK1Positive : successor(zero) ≤ successor(k1)
+    by Natural.successor_less_or_equal_successor(
+           zero, k1, Natural.zero_least(k1));
+  claim succK2Positive : successor(zero) ≤ successor(k2)
+    by Natural.successor_less_or_equal_successor(
+           zero, k2, Natural.zero_least(k2));
+  -- Step 1: apply v_p to succCross.
+  claim valuationCross
+        : Natural.padic_valuation(p, successor(d1) * successor(k2))
+          = Natural.padic_valuation(p, successor(d2) * successor(k1))
+    by congruenceOf(
+           function (m : Natural) => Natural.padic_valuation(p, m),
+           succCross);
+  -- Step 2: distribute multiplicativity on both sides.
+  claim valuationSum
+        : Natural.padic_valuation(p, successor(d1))
+            + Natural.padic_valuation(p, successor(k2))
+          = Natural.padic_valuation(p, successor(d2))
+              + Natural.padic_valuation(p, successor(k1))
+    by Equality.transitivity(
+           Equality.symmetry(
+               Natural.padic_valuation_multiplicative(
+                   p, successor(d1), successor(k2),
+                   primality, succD1Positive, succK2Positive)),
+           Equality.transitivity(
+               valuationCross,
+               Natural.padic_valuation_multiplicative(
+                   p, successor(d2), successor(k1),
+                   primality, succD2Positive, succK1Positive)));
+  -- Step 3: apply p^_ to both sides, distribute via power_add.
+  claim naturalProduct
+        : Natural.power(Natural.padic_valuation(p, successor(d1)), p)
+            * Natural.power(Natural.padic_valuation(p, successor(k2)), p)
+          = Natural.power(Natural.padic_valuation(p, successor(d2)), p)
+              * Natural.power(Natural.padic_valuation(p, successor(k1)), p)
+    by Equality.transitivity(
+           Equality.symmetry(
+               Natural.power_add(
+                   Natural.padic_valuation(p, successor(d1)),
+                   Natural.padic_valuation(p, successor(k2)), p)),
+           Equality.transitivity(
+               congruenceOf(
+                   function (m : Natural) => Natural.power(m, p),
+                   valuationSum),
+               Natural.power_add(
+                   Natural.padic_valuation(p, successor(d2)),
+                   Natural.padic_valuation(p, successor(k1)), p)));
+  -- Step 4: rewrite p^v_p(succ(k)) as succ(monus(p^v_p(succ(k)), 1)) using
+  -- successor_monus_one_when_positive (p^v_p ≥ 1 from power_positive).
+  claim powerSuccK1Positive
+        : successor(zero)
+            ≤ Natural.power(Natural.padic_valuation(p, successor(k1)), p)
+    by Natural.power_positive(
+           Natural.padic_valuation(p, successor(k1)), p, primePositive);
+  claim powerSuccK2Positive
+        : successor(zero)
+            ≤ Natural.power(Natural.padic_valuation(p, successor(k2)), p)
+    by Natural.power_positive(
+           Natural.padic_valuation(p, successor(k2)), p, primePositive);
+  -- Step 5: cast naturalProduct to Integer and distribute.
+  calc (Natural.power(Natural.padic_valuation(p, successor(d1)), p) : Integer)
+       * (successor(Natural.monus(
+              Natural.power(
+                  Natural.padic_valuation(p, successor(k2)), p),
+              successor(zero))) : Integer)
+     = (Natural.power(Natural.padic_valuation(p, successor(d1)), p) : Integer)
+       * (Natural.power(Natural.padic_valuation(p, successor(k2)), p)
+              : Integer)
+            by congruenceOf(
+                   function (m : Natural) =>
+                       (Natural.power(
+                            Natural.padic_valuation(p, successor(d1)), p)
+                            : Integer)
+                       * (m : Integer),
+                   Natural.successor_monus_one_when_positive(
+                       Natural.power(
+                           Natural.padic_valuation(p, successor(k2)), p),
+                       powerSuccK2Positive))
+     = (Natural.power(Natural.padic_valuation(p, successor(d1)), p)
+          * Natural.power(Natural.padic_valuation(p, successor(k2)), p)
+          : Integer)
+            by Equality.symmetry(
+                   Natural.to_integer.multiply_preserves(
+                       Natural.power(
+                           Natural.padic_valuation(p, successor(d1)), p),
+                       Natural.power(
+                           Natural.padic_valuation(p, successor(k2)), p)))
+     = (Natural.power(Natural.padic_valuation(p, successor(d2)), p)
+          * Natural.power(Natural.padic_valuation(p, successor(k1)), p)
+          : Integer)
+            by congruenceOf(
+                   function (m : Natural) => (m : Integer),
+                   naturalProduct)
+     = (Natural.power(Natural.padic_valuation(p, successor(d2)), p) : Integer)
+       * (Natural.power(Natural.padic_valuation(p, successor(k1)), p)
+              : Integer)
+            by Natural.to_integer.multiply_preserves(
+                   Natural.power(
+                       Natural.padic_valuation(p, successor(d2)), p),
+                   Natural.power(
+                       Natural.padic_valuation(p, successor(k1)), p))
+     = (Natural.power(Natural.padic_valuation(p, successor(d2)), p) : Integer)
+       * (successor(Natural.monus(
+              Natural.power(
+                  Natural.padic_valuation(p, successor(k1)), p),
+              successor(zero))) : Integer)
+            by congruenceOf(
+                   function (m : Natural) =>
+                       (Natural.power(
+                            Natural.padic_valuation(p, successor(d2)), p)
+                            : Integer)
+                       * (m : Integer),
+                   Equality.symmetry(
+                       Natural.successor_monus_one_when_positive(
+                           Natural.power(
+                               Natural.padic_valuation(p, successor(k1)), p),
+                           powerSuccK1Positive)))
+}
+
+-- Reduction lemma: when |n| = 0, the at_representative function returns
+-- Rational.zero. Transport the inner `cases` motive at zero.
+theorem Rational.padic_absolute_value_at_zero
+        (p : Natural) (n : Integer) (d : Natural)
+        (absZero : Integer.absolute_value_natural(n) = zero)
+        : Rational.padic_absolute_value_at_representative(
+              p, RationalRepresentative.make(n, d))
+          = Rational.zero :=
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) =>
+          (cases m {
+             | zero => Rational.zero
+             | successor(k) =>
+                 Quotient.mk(
+                     RationalRepresentative, RationalEquivalent,
+                     RationalRepresentative.make(
+                         (Natural.power(
+                              Natural.padic_valuation(p, successor(d)), p)
+                              : Integer),
+                         Natural.monus(
+                             Natural.power(
+                                 Natural.padic_valuation(p, successor(k)), p),
+                             successor(zero))))
+           } : Rational) = Rational.zero,
+      zero, Integer.absolute_value_natural(n),
+      Equality.symmetry(absZero),
+      reflexivity(Rational, Rational.zero))
+
+-- Reduction lemma: when |n| = succ(k), the at_representative function
+-- returns the explicit p^v_p / p^v_p Rational form.
+theorem Rational.padic_absolute_value_at_succ
+        (p : Natural) (n : Integer) (d k : Natural)
+        (absSucc : Integer.absolute_value_natural(n) = successor(k))
+        : Rational.padic_absolute_value_at_representative(
+              p, RationalRepresentative.make(n, d))
+          = Quotient.mk(
+                RationalRepresentative, RationalEquivalent,
+                RationalRepresentative.make(
+                    (Natural.power(
+                         Natural.padic_valuation(p, successor(d)), p)
+                         : Integer),
+                    Natural.monus(
+                        Natural.power(
+                            Natural.padic_valuation(p, successor(k)), p),
+                        successor(zero)))) :=
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) =>
+          (cases m {
+             | zero => Rational.zero
+             | successor(k') =>
+                 Quotient.mk(
+                     RationalRepresentative, RationalEquivalent,
+                     RationalRepresentative.make(
+                         (Natural.power(
+                              Natural.padic_valuation(p, successor(d)), p)
+                              : Integer),
+                         Natural.monus(
+                             Natural.power(
+                                 Natural.padic_valuation(p, successor(k')), p),
+                             successor(zero))))
+           } : Rational)
+          = Quotient.mk(
+                RationalRepresentative, RationalEquivalent,
+                RationalRepresentative.make(
+                    (Natural.power(
+                         Natural.padic_valuation(p, successor(d)), p)
+                         : Integer),
+                    Natural.monus(
+                        Natural.power(
+                            Natural.padic_valuation(p, successor(k)), p),
+                        successor(zero)))),
+      successor(k), Integer.absolute_value_natural(n),
+      Equality.symmetry(absSucc),
+      reflexivity(Rational,
+          Quotient.mk(
+              RationalRepresentative, RationalEquivalent,
+              RationalRepresentative.make(
+                  (Natural.power(
+                       Natural.padic_valuation(p, successor(d)), p)
+                       : Integer),
+                  Natural.monus(
+                      Natural.power(
+                          Natural.padic_valuation(p, successor(k)), p),
+                      successor(zero))))))
+
+-- The main respect proof: equivalent Rational representatives map to
+-- the same Rational under the p-adic absolute value. Four cases on
+-- the (|n1|, |n2|) values of Integer.absolute_value_natural:
+--   * both zero: both sides reduce to Rational.zero.
+--   * |n1| = 0 and |n2| = succ(k2): naturalCross gives 0 = succ(_),
+--     contradiction.
+--   * |n1| = succ(k1) and |n2| = 0: symmetric contradiction.
+--   * both successors: build the Integer cross-equation for Quotient.sound
+--     via the padic_quotient_cross_equation helper.
+theorem Rational.padic_absolute_value_respect
+        (p : Natural) (primality : Natural.is_prime(p))
+        (rep1 rep2 : RationalRepresentative)
+        (equivHyp : RationalEquivalent(rep1, rep2))
+        : Rational.padic_absolute_value_at_representative(p, rep1)
+          = Rational.padic_absolute_value_at_representative(p, rep2) :=
+  (cases rep1 {
+     | RationalRepresentative.make(n1, d1) =>
+         (cases rep2 {
+            | RationalRepresentative.make(n2, d2) =>
+             function (cross : n1 * (successor(d2) : Integer)
+                              = n2 * (successor(d1) : Integer)) => {
+               claim naturalCross
+                     : Integer.absolute_value_natural(n1) * successor(d2)
+                       = Integer.absolute_value_natural(n2) * successor(d1)
+                 by Rational.padic_cross_mult_natural_absolute_value(
+                        n1, n2, d1, d2, cross);
+               -- with-pattern on |n1| and |n2|.
+               (function (absN1 : Natural)
+                         (eqAbs1Outer
+                             : Integer.absolute_value_natural(n1) = absN1) =>
+                  (function (absN2 : Natural)
+                            (eqAbs2Outer
+                                : Integer.absolute_value_natural(n2) = absN2) =>
+                     (cases absN1 {
+                        | zero =>
+                            function (eqAbs1
+                                        : Integer.absolute_value_natural(n1)
+                                          = zero) =>
+                              (cases absN2 {
+                                 | zero =>
+                                     function (eqAbs2
+                                                 : Integer.absolute_value_natural(n2)
+                                                   = zero) =>
+                                       Equality.transitivity(
+                                           Rational.padic_absolute_value_at_zero(
+                                               p, n1, d1, eqAbs1),
+                                           Equality.symmetry(
+                                               Rational.padic_absolute_value_at_zero(
+                                                   p, n2, d2, eqAbs2)))
+                                 | successor(k2) =>
+                                     function (eqAbs2
+                                                 : Integer.absolute_value_natural(n2)
+                                                   = successor(k2)) => {
+                                       claim contradEq
+                                             : zero
+                                               = successor(k2) * successor(d1)
+                                         by Equality.transitivity(
+                                                Equality.symmetry(
+                                                    Natural.zero_multiply(
+                                                        successor(d2))),
+                                                Equality.transport_proposition(
+                                                    Natural,
+                                                    function (m : Natural) =>
+                                                        zero * successor(d2)
+                                                          = m * successor(d1),
+                                                    Integer.absolute_value_natural(n2),
+                                                    successor(k2),
+                                                    eqAbs2,
+                                                    Equality.transport_proposition(
+                                                        Natural,
+                                                        function (m : Natural) =>
+                                                            m * successor(d2)
+                                                              = Integer.absolute_value_natural(n2)
+                                                                  * successor(d1),
+                                                        Integer.absolute_value_natural(n1),
+                                                        zero,
+                                                        eqAbs1,
+                                                        naturalCross)));
+                                       -- The above derives:
+                                       -- zero = succ(k2) * succ(d1), and
+                                       -- succ(k2) * succ(d1) reduces to
+                                       -- succ(d1 + k2 * succ(d1)).
+                                       False.eliminate_proposition(
+                                           Rational.padic_absolute_value_at_representative(
+                                               p,
+                                               RationalRepresentative.make(n1, d1))
+                                             = Rational.padic_absolute_value_at_representative(
+                                                   p,
+                                                   RationalRepresentative.make(n2, d2)),
+                                           Natural.zero_not_successor(
+                                               d1 + k2 * successor(d1),
+                                               contradEq))
+                                     }
+                               } : Integer.absolute_value_natural(n2) = absN2
+                                   → Rational.padic_absolute_value_at_representative(
+                                         p, RationalRepresentative.make(n1, d1))
+                                     = Rational.padic_absolute_value_at_representative(
+                                           p, RationalRepresentative.make(n2, d2)))(
+                                eqAbs2Outer)
+                        | successor(k1) =>
+                            function (eqAbs1
+                                        : Integer.absolute_value_natural(n1)
+                                          = successor(k1)) =>
+                              (cases absN2 {
+                                 | zero =>
+                                     function (eqAbs2
+                                                 : Integer.absolute_value_natural(n2)
+                                                   = zero) => {
+                                       claim contradEq
+                                             : successor(k1) * successor(d2)
+                                               = zero
+                                         by Equality.transitivity(
+                                                Equality.transport_proposition(
+                                                    Natural,
+                                                    function (m : Natural) =>
+                                                        m * successor(d2)
+                                                          = zero * successor(d1),
+                                                    Integer.absolute_value_natural(n1),
+                                                    successor(k1),
+                                                    eqAbs1,
+                                                    Equality.transport_proposition(
+                                                        Natural,
+                                                        function (m : Natural) =>
+                                                            Integer.absolute_value_natural(n1)
+                                                              * successor(d2)
+                                                              = m * successor(d1),
+                                                        Integer.absolute_value_natural(n2),
+                                                        zero,
+                                                        eqAbs2,
+                                                        naturalCross)),
+                                                Natural.zero_multiply(
+                                                    successor(d1)));
+                                       False.eliminate_proposition(
+                                           Rational.padic_absolute_value_at_representative(
+                                               p,
+                                               RationalRepresentative.make(n1, d1))
+                                             = Rational.padic_absolute_value_at_representative(
+                                                   p,
+                                                   RationalRepresentative.make(n2, d2)),
+                                           Natural.zero_not_successor(
+                                               d2 + k1 * successor(d2),
+                                               Equality.symmetry(contradEq)))
+                                     }
+                                 | successor(k2) =>
+                                     function (eqAbs2
+                                                 : Integer.absolute_value_natural(n2)
+                                                   = successor(k2)) => {
+                                       -- Substitute into naturalCross to get
+                                       --   succ(k1) * succ(d2) = succ(k2) * succ(d1).
+                                       claim crossSubst
+                                             : successor(k1) * successor(d2)
+                                               = successor(k2) * successor(d1)
+                                         by Equality.transport_proposition(
+                                                Natural,
+                                                function (m : Natural) =>
+                                                    m * successor(d2)
+                                                      = successor(k2)
+                                                        * successor(d1),
+                                                Integer.absolute_value_natural(n1),
+                                                successor(k1),
+                                                eqAbs1,
+                                                Equality.transport_proposition(
+                                                    Natural,
+                                                    function (m : Natural) =>
+                                                        Integer.absolute_value_natural(n1)
+                                                          * successor(d2)
+                                                          = m * successor(d1),
+                                                    Integer.absolute_value_natural(n2),
+                                                    successor(k2),
+                                                    eqAbs2,
+                                                    naturalCross));
+                                       -- Reorganise via commutativity to
+                                       --   succ(d1) * succ(k2) = succ(d2) * succ(k1).
+                                       claim succCross
+                                             : successor(d1) * successor(k2)
+                                               = successor(d2) * successor(k1)
+                                         by calc successor(d1) * successor(k2)
+                                              = successor(k2) * successor(d1)
+                                                     by Natural.multiply_commutative(
+                                                            successor(d1),
+                                                            successor(k2))
+                                              = successor(k1) * successor(d2)
+                                                     by Equality.symmetry(crossSubst)
+                                              = successor(d2) * successor(k1)
+                                                     by Natural.multiply_commutative(
+                                                            successor(k1),
+                                                            successor(d2));
+                                       Equality.transitivity(
+                                           Rational.padic_absolute_value_at_succ(
+                                               p, n1, d1, k1, eqAbs1),
+                                           Equality.transitivity(
+                                               Quotient.sound(
+                                                   RationalRepresentative.make(
+                                                       (Natural.power(
+                                                            Natural.padic_valuation(
+                                                                p, successor(d1)), p)
+                                                            : Integer),
+                                                       Natural.monus(
+                                                           Natural.power(
+                                                               Natural.padic_valuation(
+                                                                   p, successor(k1)), p),
+                                                           successor(zero))),
+                                                   RationalRepresentative.make(
+                                                       (Natural.power(
+                                                            Natural.padic_valuation(
+                                                                p, successor(d2)), p)
+                                                            : Integer),
+                                                       Natural.monus(
+                                                           Natural.power(
+                                                               Natural.padic_valuation(
+                                                                   p, successor(k2)), p),
+                                                           successor(zero))),
+                                                   Rational.padic_quotient_cross_equation(
+                                                       p, primality,
+                                                       d1, d2, k1, k2,
+                                                       succCross)),
+                                               Equality.symmetry(
+                                                   Rational.padic_absolute_value_at_succ(
+                                                       p, n2, d2, k2, eqAbs2))))
+                                     }
+                               } : Integer.absolute_value_natural(n2) = absN2
+                                   → Rational.padic_absolute_value_at_representative(
+                                         p, RationalRepresentative.make(n1, d1))
+                                     = Rational.padic_absolute_value_at_representative(
+                                           p, RationalRepresentative.make(n2, d2)))(
+                                eqAbs2Outer)
+                      } : Integer.absolute_value_natural(n1) = absN1
+                          → Rational.padic_absolute_value_at_representative(
+                                p, RationalRepresentative.make(n1, d1))
+                            = Rational.padic_absolute_value_at_representative(
+                                  p, RationalRepresentative.make(n2, d2)))(
+                       eqAbs1Outer)
+                   )(Integer.absolute_value_natural(n2),
+                     reflexivity(Natural, Integer.absolute_value_natural(n2)))
+                )(Integer.absolute_value_natural(n1),
+                  reflexivity(Natural, Integer.absolute_value_natural(n1)))
+             }
+          } : (refinedEquiv :
+                   RationalEquivalent(
+                       RationalRepresentative.make(n1, d1), rep2))
+              → Rational.padic_absolute_value_at_representative(
+                    p, RationalRepresentative.make(n1, d1))
+                = Rational.padic_absolute_value_at_representative(
+                      p, rep2))
+   } : (refinedEquiv : RationalEquivalent(rep1, rep2))
+       → Rational.padic_absolute_value_at_representative(p, rep1)
+         = Rational.padic_absolute_value_at_representative(p, rep2))(equivHyp)
 
 -- p-adic absolute value of a rational. Returns 0 for q = 0 and
 -- (1/p)^v_p(q) for q ≠ 0. Stubbed until the p-adic infrastructure
