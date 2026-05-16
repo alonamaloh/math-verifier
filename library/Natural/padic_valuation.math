@@ -18,6 +18,7 @@ import Natural.arithmetic
 import Natural.order
 import Natural.divide
 import Natural.multiply_order
+import Natural.cancellation
 import Equality.basics
 import Logic.basics
 
@@ -383,3 +384,118 @@ theorem Natural.padic_valuation_when_not_divides
              reflexivity(Natural, Natural.modulo(prime, successor(predT))))
    } : ¬ Natural.divides(prime, target)
        → Natural.padic_valuation(prime, target) = zero)(notDivides)
+
+-- Stripping one factor of the prime increases the valuation by one.
+-- For prime ≥ 2 and quotient ≥ 1, modulo(prime, prime * quotient) = 0
+-- (since prime divides itself times anything). The step then peels
+-- one factor of prime; the recursive call lands on
+-- divide(prime, prime * quotient) = quotient. Fuel stability bridges
+-- the fuel difference between the recursive call (with fuel = predPQ)
+-- and padic_valuation(prime, quotient) (with fuel = quotient).
+theorem Natural.padic_valuation_strip
+        (prime quotient : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (quotientPositive : successor(zero) ≤ quotient)
+        : Natural.padic_valuation(prime, prime * quotient)
+          = successor(Natural.padic_valuation(prime, quotient)) := {
+  claim primePositive : successor(zero) ≤ prime
+    by Natural.less_or_equal_predecessor_less_or_equal(
+           successor(zero), prime, primeAtLeastTwo);
+  claim productPositive : successor(zero) ≤ prime * quotient
+    by Natural.multiply_at_least_one(
+           prime, quotient, primePositive, quotientPositive);
+  claim moduloZero : Natural.modulo(prime, prime * quotient) = zero
+    by Natural.divides_implies_modulo_zero(
+           prime, prime * quotient, primePositive,
+           Natural.divides_self_multiple(prime, quotient));
+  -- From decompose + moduloZero, prime * divide(prime, prime*quotient) = prime * quotient.
+  -- Cancel the prime factor (primePositive) to get divide = quotient.
+  claim divideEqQuotient : Natural.divide(prime, prime * quotient) = quotient
+    by Natural.multiply_cancel_left(
+           prime, Natural.divide(prime, prime * quotient), quotient,
+           primePositive,
+           Equality.transitivity(
+               Equality.symmetry(
+                   Natural.add_zero(
+                       prime * Natural.divide(prime, prime * quotient))),
+               Equality.transitivity(
+                   congruenceOf(
+                       function (z : Natural) =>
+                           prime * Natural.divide(prime, prime * quotient) + z,
+                       Equality.symmetry(moduloZero)),
+                   Natural.divide_modulo_decompose(prime, prime * quotient))));
+  -- Case-split on prime * quotient to expose successor structure for step_succ_when_divides.
+  (function (pqValue : Natural)
+            (pqEq : prime * quotient = pqValue) =>
+     (cases pqValue {
+        | zero =>
+            function (refinedPqEq : prime * quotient = zero) =>
+              False.eliminate_proposition(
+                  Natural.padic_valuation(prime, prime * quotient)
+                    = successor(Natural.padic_valuation(prime, quotient)),
+                  Natural.not_less_or_equal_successor_zero(
+                      zero,
+                      Equality.transport_proposition(
+                          Natural,
+                          function (m : Natural) => successor(zero) ≤ m,
+                          prime * quotient, zero, refinedPqEq,
+                          productPositive)))
+        | successor(predPQ) =>
+            function (refinedPqEq : prime * quotient = successor(predPQ)) =>
+              calc Natural.padic_valuation(prime, prime * quotient)
+                 = Natural.padic_valuation(prime, successor(predPQ))
+                        by congruenceOf(
+                               function (m : Natural) =>
+                                   Natural.padic_valuation(prime, m),
+                               refinedPqEq)
+                 = successor(Natural.padic_valuation_step(
+                       predPQ, prime,
+                       Natural.divide(prime, successor(predPQ))))
+                        by Natural.padic_valuation_step_succ_when_divides(
+                               predPQ, prime, successor(predPQ),
+                               Equality.transport_proposition(
+                                   Natural,
+                                   function (m : Natural) =>
+                                       Natural.modulo(prime, m) = zero,
+                                   prime * quotient, successor(predPQ),
+                                   refinedPqEq, moduloZero))
+                 = successor(Natural.padic_valuation_step(
+                       predPQ, prime, quotient))
+                        by congruenceOf(
+                               function (m : Natural) =>
+                                   successor(
+                                       Natural.padic_valuation_step(predPQ, prime, m)),
+                               Equality.transitivity(
+                                   congruenceOf(
+                                       function (m : Natural) =>
+                                           Natural.divide(prime, m),
+                                       Equality.symmetry(refinedPqEq)),
+                                   divideEqQuotient))
+                 = successor(Natural.padic_valuation_step(
+                       quotient, prime, quotient))
+                        by congruenceOf(
+                               successor,
+                               Natural.padic_valuation_step_fuel_stable(
+                                   prime, quotient, predPQ, quotient,
+                                   primeAtLeastTwo, quotientPositive,
+                                   -- quotient ≤ predPQ via succ(quotient) ≤ succ(predPQ).
+                                   Natural.less_or_equal_successor_successor_descend(
+                                       quotient, predPQ,
+                                       Equality.transport_proposition(
+                                           Natural,
+                                           function (m : Natural) =>
+                                               successor(quotient) ≤ m,
+                                           prime * quotient,
+                                           successor(predPQ),
+                                           refinedPqEq,
+                                           Natural.successor_less_or_equal_multiply(
+                                               prime, quotient,
+                                               primeAtLeastTwo,
+                                               quotientPositive))),
+                                   LessOrEqual.reflexivity(quotient)))
+      } : prime * quotient = pqValue
+          → Natural.padic_valuation(prime, prime * quotient)
+            = successor(Natural.padic_valuation(prime, quotient)))(pqEq))(
+    prime * quotient,
+    reflexivity(Natural, prime * quotient))
+}
