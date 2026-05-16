@@ -530,6 +530,189 @@ theorem Natural.modulo_bound
       divisorPositive,
       LessOrEqual.reflexivity(successor(dividend)))
 
+-- ----------------------------------------------------------------------
+-- Reverse direction: if d | n (i.e., n = d * q), then modulo(d, n) = 0.
+
+-- Helper: monus(a + b, a) = b. Subtracting `a` from `a + b` gives `b`.
+theorem Natural.monus_add_cancel
+        : (a b : Natural) → Natural.monus(a + b, a) = b
+  | zero, b =>
+      -- monus(zero + b, zero) = monus(b, zero) = b.
+      Natural.monus_zero(b)
+  | successor(k), b =>
+      -- monus(succ(k) + b, succ(k)) = monus(succ(k + b), succ(k))
+      --                            = monus(k + b, k).
+      -- By IH.
+      Natural.monus_add_cancel(k, b)
+
+-- Helper: monus(d, d + m) = 0 (d ≤ d + m, so subtraction is zero).
+theorem Natural.monus_self_plus
+        : (d m : Natural) → Natural.monus(d, d + m) = zero
+  | zero, m =>
+      reflexivity(Natural, zero)
+  | successor(k), m =>
+      -- monus(succ(k), succ(k) + m) = monus(succ(k), succ(k + m))
+      --                            = monus(k, k + m).
+      -- By IH.
+      Natural.monus_self_plus(k, m)
+
+-- Step-level: modulo_step(fuel, d, d * q) = 0 when d ≥ 1 and fuel ≥ q.
+theorem Natural.modulo_step_at_multiple
+        : (q fuel d : Natural)
+          → successor(zero) ≤ d → successor(q) ≤ successor(fuel)
+          → Natural.modulo_step(fuel, d, d * q) = zero
+  | zero, fuel, d, dPositive, _ =>
+      -- d * zero = zero. modulo_step(fuel, d, zero) for d ≥ 1.
+      -- Case fuel = 0: modulo_step(0, d, 0) = 0. ✓
+      -- Case fuel = succ(f): monus(d, 0) = d. For d ≥ 1, d = succ(d').
+      --   So monus(d, 0) = succ(d'), goes to "too big" branch, returns 0.
+      Equality.transport_proposition(
+          Natural,
+          function (m : Natural) =>
+              Natural.modulo_step(fuel, d, m) = zero,
+          zero, d * zero,
+          Equality.symmetry(Natural.multiply_zero(d)),
+          -- modulo_step(fuel, d, zero) = zero.
+          (cases fuel {
+             | zero =>
+                 -- modulo_step(0, d, 0) = 0.
+                 reflexivity(Natural, zero)
+             | successor(f) =>
+                 -- Case on d (we have d ≥ 1).
+                 (cases d {
+                    | zero =>
+                        function (refinedDPositive : successor(zero) ≤ zero) =>
+                          False.eliminate_proposition(
+                              Natural.modulo_step(successor(f), zero, zero)
+                                = zero,
+                              Natural.not_less_or_equal_successor_zero(
+                                  zero, refinedDPositive))
+                    | successor(predD) =>
+                        function (refinedDPositive
+                                    : successor(zero) ≤ successor(predD)) =>
+                          -- monus(succ(predD), zero) = succ(predD).
+                          Natural.modulo_step_succ_too_big(
+                              f, successor(predD), zero, predD,
+                              Natural.monus_succ_zero(predD))
+                  } : (refinedDPositive : successor(zero) ≤ d)
+                      → Natural.modulo_step(successor(f), d, zero)
+                        = zero)(dPositive)
+           } : Natural.modulo_step(fuel, d, zero) = zero))
+  | successor(q'), fuel, d, dPositive, succQLeSuccFuel =>
+      -- d * succ(q') = d + d*q'.
+      -- modulo_step(fuel, d, d + d*q').
+      -- For d ≥ 1, monus(d, d + d*q') = 0, so the "fits" branch:
+      --   modulo_step(fuel-1, d, monus(d + d*q', d)).
+      -- monus(d + d*q', d) = d*q'. So recurse on modulo_step(fuel-1, d, d*q').
+      -- IH on q': modulo_step(fuel-1, d, d*q') = 0. Need fuel-1 ≥ q', i.e.,
+      -- fuel ≥ succ(q'). We have succ(succ(q')) ≤ succ(fuel), so succ(q') ≤ fuel.
+      (cases fuel {
+         | zero =>
+             -- succ(succ(q')) ≤ succ(zero) is impossible.
+             function (refinedQLeSuccFuel
+                         : successor(successor(q')) ≤ successor(zero)) =>
+               False.eliminate_proposition(
+                   Natural.modulo_step(zero, d, d * successor(q'))
+                     = zero,
+                   Natural.not_less_or_equal_successor_zero(
+                       q',
+                       Natural.less_or_equal_successor_successor_descend(
+                           successor(q'), zero, refinedQLeSuccFuel)))
+         | successor(f) =>
+             function (refinedQLeSuccFuel
+                         : successor(successor(q')) ≤ successor(successor(f))) =>
+               -- succ(q') ≤ succ(f), so q' ≤ f.
+               -- modulo_step(succ(f), d, d * succ(q'))
+               --   = modulo_step(succ(f), d, d + d * q')
+               --   = modulo_step(f, d, monus(d + d*q', d))
+               --   = modulo_step(f, d, d * q')   (via monus_add_cancel)
+               --   = 0 (by IH on q' with f ≥ q').
+               Equality.transport_proposition(
+                   Natural,
+                   function (m : Natural) =>
+                       Natural.modulo_step(successor(f), d, m) = zero,
+                   d + d * q', d * successor(q'),
+                   Equality.symmetry(Natural.multiply_successor(d, q')),
+                   Equality.transitivity(
+                       Natural.modulo_step_succ_fits(
+                           f, d, d + d * q',
+                           Natural.monus_self_plus(d, d * q')),
+                       Equality.transitivity(
+                           congruenceOf(
+                               function (m : Natural) =>
+                                   Natural.modulo_step(f, d, m),
+                               Natural.monus_add_cancel(d, d * q')),
+                           Natural.modulo_step_at_multiple(
+                               q', f, d, dPositive,
+                               Natural.less_or_equal_successor_successor_descend(
+                                   successor(q'), successor(f),
+                                   refinedQLeSuccFuel)))))
+       } : (refinedQLeSuccFuel : successor(successor(q')) ≤ successor(fuel))
+           → Natural.modulo_step(fuel, d, d * successor(q')) = zero)(succQLeSuccFuel)
+
+-- Top-level: if d | n, then modulo(d, n) = 0.
+theorem Natural.divides_implies_modulo_zero
+        (divisor dividend : Natural)
+        (divisorPositive : successor(zero) ≤ divisor)
+        (dividesProof : Natural.divides(divisor, dividend))
+        : Natural.modulo(divisor, dividend) = zero :=
+  Exists.eliminate(
+      Natural,
+      function (q : Natural) => dividend = divisor * q,
+      Natural.modulo(divisor, dividend) = zero,
+      function (q : Natural) (dividendEq : dividend = divisor * q) =>
+        Equality.transport_proposition(
+            Natural,
+            function (m : Natural) =>
+                Natural.modulo_step(m, divisor, m) = zero,
+            divisor * q, dividend,
+            Equality.symmetry(dividendEq),
+            -- modulo(divisor, divisor * q) = modulo_step(divisor * q, divisor, divisor * q).
+            -- Need succ(q) ≤ succ(divisor * q), i.e., q ≤ divisor * q.
+            -- For divisor ≥ 1: divisor * q ≥ q. Proof: q = 1 * q ≤ divisor * q.
+            Natural.modulo_step_at_multiple(
+                q, divisor * q, divisor, divisorPositive,
+                Natural.successor_less_or_equal_successor(
+                    q, divisor * q,
+                    -- q ≤ divisor * q for divisor ≥ 1.
+                    Equality.transport_proposition(
+                        Natural,
+                        function (m : Natural) => m ≤ divisor * q,
+                        successor(zero) * q, q,
+                        Natural.one_multiply(q),
+                        -- successor(zero) * q ≤ divisor * q via multiply_le_preserves.
+                        -- Use add-style: divisor * q = q + (divisor - 1) * q.
+                        Equality.transport_proposition(
+                            Natural,
+                            function (m : Natural) => successor(zero) * q ≤ m,
+                            successor(zero) * q
+                                + Natural.monus(divisor, successor(zero)) * q,
+                            divisor * q,
+                            -- 1 * q + (d - 1) * q = d * q.
+                            calc successor(zero) * q
+                                     + Natural.monus(divisor, successor(zero)) * q
+                               = (successor(zero)
+                                  + Natural.monus(divisor, successor(zero))) * q
+                                      by Equality.symmetry(
+                                             Natural.distributivity_right(
+                                                 successor(zero),
+                                                 Natural.monus(divisor, successor(zero)),
+                                                 q))
+                               = divisor * q
+                                      by congruenceOf(
+                                             function (m : Natural) => m * q,
+                                             -- 1 + monus(d, 1) = d (since d ≥ 1).
+                                             Equality.symmetry(
+                                                 Natural.monus_zero_implies_decompose(
+                                                     successor(zero), divisor,
+                                                     Natural.le_implies_monus_zero(
+                                                         divisor, successor(zero),
+                                                         divisorPositive)))),
+                            Natural.less_or_equal_add_right(
+                                successor(zero) * q,
+                                Natural.monus(divisor, successor(zero)) * q)))))),
+      dividesProof)
+
 -- If modulo(d, n) = 0, then d divides n. The decomposition gives
 -- d * divide(d, n) + 0 = n, i.e., n = d * divide(d, n).
 theorem Natural.modulo_zero_implies_divides
