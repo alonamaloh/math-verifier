@@ -18,24 +18,25 @@ import Natural.arithmetic
 import Natural.order
 import Natural.divide
 
--- padic_valuation_step(fuel, p, n): fuel-bounded valuation. With
--- fuel ≥ floor(log_p(n)) iterations, returns the largest k with
--- p^k | n.
-definition Natural.padic_valuation_step : Natural → Natural → Natural → Natural
-  | zero,            _, _ => zero
-  | successor(fuel), p, n =>
-      cases Natural.modulo(p, n) {
+-- padic_valuation_step(fuel, prime, target): fuel-bounded valuation.
+-- With fuel ≥ floor(log_prime(target)), returns the largest k with
+-- prime^k | target. Recursion is structural on fuel.
+definition Natural.padic_valuation_step
+        : (fuel prime target : Natural) → Natural
+  | zero,            _,     _      => zero
+  | successor(fuel), prime, target =>
+      cases Natural.modulo(prime, target) {
         | zero =>
-            -- p | n: strip one factor, count one.
+            -- prime | target: strip one factor, count one.
             successor(
                 Natural.padic_valuation_step(
-                    fuel, p, Natural.divide(p, n)))
+                    fuel, prime, Natural.divide(prime, target)))
         | successor(_) =>
-            -- p ∤ n: done.
+            -- prime ∤ target: done.
             zero
       }
 
--- Top-level p-adic valuation. Fuel = n is more than enough since
--- log_p(n) ≤ n for any p ≥ 2.
-definition Natural.padic_valuation (p n : Natural) : Natural :=
-  Natural.padic_valuation_step(n, p, n)
+-- Top-level p-adic valuation. Fuel = target is more than enough.
+definition Natural.padic_valuation (prime target : Natural) : Natural :=
+  Natural.padic_valuation_step(
+      fuel := target, prime := prime, target := target)

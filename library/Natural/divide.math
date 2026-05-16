@@ -16,35 +16,130 @@ import Natural.arithmetic
 import Natural.order
 import Natural.monus
 
--- divide_step(fuel, p, n): fuel-bounded floor division. Fuel first
--- so the structural recursion is on it.
-definition Natural.divide_step : Natural → Natural → Natural → Natural
-  | zero,         _, _ => zero
-  | successor(fuel), p, n =>
-      cases Natural.monus(p, n) {
+-- divide_step(fuel, divisor, dividend): fuel-bounded floor division.
+-- Fuel first so the structural recursion is on it. The Pi-binder
+-- names are user-facing for named-argument calls from outside the
+-- recursion. (Recursive calls inside the pattern body use positional
+-- args because the elaborator's induction-hypothesis handling doesn't
+-- expose the parameter names.)
+definition Natural.divide_step
+        : (fuel divisor dividend : Natural) → Natural
+  | zero,            _,       _        => zero
+  | successor(fuel), divisor, dividend =>
+      cases Natural.monus(divisor, dividend) {
         | zero =>
-            -- p ≤ n: recurse with n - p, count one more.
-            successor(Natural.divide_step(fuel, p, Natural.monus(n, p)))
+            -- divisor ≤ dividend: recurse with dividend - divisor,
+            -- count one more.
+            successor(
+                Natural.divide_step(
+                    fuel, divisor, Natural.monus(dividend, divisor)))
         | successor(_) =>
-            -- p > n: stop.
+            -- divisor > dividend: stop.
             zero
       }
 
--- modulo_step(fuel, p, n): fuel-bounded remainder.
-definition Natural.modulo_step : Natural → Natural → Natural → Natural
-  | zero,         _, n => n
-  | successor(fuel), p, n =>
-      cases Natural.monus(p, n) {
+definition Natural.modulo_step
+        : (fuel divisor dividend : Natural) → Natural
+  | zero,            _,       dividend => dividend
+  | successor(fuel), divisor, dividend =>
+      cases Natural.monus(divisor, dividend) {
         | zero =>
-            Natural.modulo_step(fuel, p, Natural.monus(n, p))
+            Natural.modulo_step(
+                fuel, divisor, Natural.monus(dividend, divisor))
         | successor(_) =>
-            n
+            dividend
       }
 
--- Top-level functions with fuel = n (always enough since each
--- iteration reduces n by at least 1 when p ≥ 1).
-definition Natural.divide (p n : Natural) : Natural :=
-  Natural.divide_step(n, p, n)
+-- Top-level functions with fuel = dividend (always enough since each
+-- iteration reduces dividend by at least 1 when divisor ≥ 1).
+definition Natural.divide (divisor dividend : Natural) : Natural :=
+  Natural.divide_step(
+      fuel := dividend, divisor := divisor, dividend := dividend)
 
-definition Natural.modulo (p n : Natural) : Natural :=
-  Natural.modulo_step(n, p, n)
+definition Natural.modulo (divisor dividend : Natural) : Natural :=
+  Natural.modulo_step(
+      fuel := dividend, divisor := divisor, dividend := dividend)
+
+-- ----------------------------------------------------------------------
+-- Recursive characterization at the step level.
+
+-- The expansion at zero fuel: divide_step returns 0, modulo_step returns n.
+theorem Natural.divide_step_zero_fuel (p n : Natural)
+        : Natural.divide_step(zero, p, n) = zero :=
+  reflexivity(Natural, zero)
+
+theorem Natural.modulo_step_zero_fuel (p n : Natural)
+        : Natural.modulo_step(zero, p, n) = n :=
+  reflexivity(Natural, n)
+
+-- The expansion at successor fuel for the case p ≤ n (i.e.,
+-- monus(p, n) = zero): we strip one p and recurse.
+theorem Natural.divide_step_succ_fits
+        (fuel p n : Natural)
+        (pFits : Natural.monus(p, n) = zero)
+        : Natural.divide_step(successor(fuel), p, n)
+          = successor(Natural.divide_step(fuel, p, Natural.monus(n, p))) :=
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) =>
+          (cases m {
+             | zero =>
+                 successor(Natural.divide_step(fuel, p, Natural.monus(n, p)))
+             | successor(_) => zero
+           } : Natural)
+          = successor(Natural.divide_step(fuel, p, Natural.monus(n, p))),
+      zero, Natural.monus(p, n),
+      Equality.symmetry(pFits),
+      reflexivity(Natural,
+          successor(Natural.divide_step(fuel, p, Natural.monus(n, p)))))
+
+theorem Natural.modulo_step_succ_fits
+        (fuel p n : Natural)
+        (pFits : Natural.monus(p, n) = zero)
+        : Natural.modulo_step(successor(fuel), p, n)
+          = Natural.modulo_step(fuel, p, Natural.monus(n, p)) :=
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) =>
+          (cases m {
+             | zero => Natural.modulo_step(fuel, p, Natural.monus(n, p))
+             | successor(_) => n
+           } : Natural)
+          = Natural.modulo_step(fuel, p, Natural.monus(n, p)),
+      zero, Natural.monus(p, n),
+      Equality.symmetry(pFits),
+      reflexivity(Natural,
+          Natural.modulo_step(fuel, p, Natural.monus(n, p))))
+
+-- The expansion at successor fuel for the case p > n (monus(p, n)
+-- has a successor).
+theorem Natural.divide_step_succ_too_big
+        (fuel p n predM : Natural)
+        (pTooBig : Natural.monus(p, n) = successor(predM))
+        : Natural.divide_step(successor(fuel), p, n) = zero :=
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) =>
+          (cases m {
+             | zero =>
+                 successor(Natural.divide_step(fuel, p, Natural.monus(n, p)))
+             | successor(_) => zero
+           } : Natural) = zero,
+      successor(predM), Natural.monus(p, n),
+      Equality.symmetry(pTooBig),
+      reflexivity(Natural, zero))
+
+theorem Natural.modulo_step_succ_too_big
+        (fuel p n predM : Natural)
+        (pTooBig : Natural.monus(p, n) = successor(predM))
+        : Natural.modulo_step(successor(fuel), p, n) = n :=
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) =>
+          (cases m {
+             | zero => Natural.modulo_step(fuel, p, Natural.monus(n, p))
+             | successor(_) => n
+           } : Natural) = n,
+      successor(predM), Natural.monus(p, n),
+      Equality.symmetry(pTooBig),
+      reflexivity(Natural, n))
