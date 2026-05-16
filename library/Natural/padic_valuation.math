@@ -20,6 +20,8 @@ import Natural.divide
 import Natural.multiply_order
 import Natural.cancellation
 import Natural.divisibility
+import Natural.subtraction
+import Natural.power
 import Natural.prime
 import Natural.decide_divides
 import Natural.prime_divides_product
@@ -881,3 +883,343 @@ theorem Natural.padic_valuation_multiplicative
               Natural.decides_divides(prime, a')),
       a + b, a, b, aPositive, bPositive, reflexivity(Natural, a + b))
 }
+
+-- ----------------------------------------------------------------------
+-- Towards the ultrametric inequality: p^v_p(n) divides n.
+
+-- Helper: if d divides n, then prime * d divides prime * n. From
+-- n = d * q derive prime * n = prime * d * q = (prime * d) * q.
+theorem Natural.divides_multiply_left
+        (k d n : Natural) (dDividesN : d ∣ n)
+        : k * d ∣ k * n := {
+  let ⟨q, nEqDQ⟩ := dDividesN;
+  ⟨q,
+   calc k * n
+      = k * (d * q)
+             by congruenceOf(
+                    function (m : Natural) => k * m,
+                    nEqDQ)
+      = k * d * q
+             by Equality.symmetry(
+                    Natural.multiply_associative(k, d, q))⟩
+}
+
+-- p^v_p(n) divides n, for prime ≥ 2 and any n. Strong induction on n.
+-- Cases: m = 0 (trivial since 1 | 0); m ≥ 1 with decides_divides(p, m)
+-- dispatch.
+theorem Natural.padic_valuation_power_divides
+        (prime : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        : (n : Natural)
+          → Natural.divides(
+                Natural.power(Natural.padic_valuation(prime, n), prime), n) :=
+  Natural.strong_induction(
+      function (m : Natural) =>
+          Natural.divides(
+              Natural.power(Natural.padic_valuation(prime, m), prime), m),
+      function (m : Natural)
+               (inductionHypothesis :
+                   (k : Natural) → successor(k) ≤ m
+                     → Natural.divides(
+                           Natural.power(Natural.padic_valuation(prime, k), prime),
+                           k)) =>
+        Or.eliminate(
+            prime ∣ m, prime ∤ m,
+            Natural.divides(
+                Natural.power(Natural.padic_valuation(prime, m), prime), m),
+            function (pDividesM : prime ∣ m) => {
+              -- m = prime * q. Case on q to handle m = 0 (q = 0) vs the
+              -- recursive case (q ≥ 1).
+              let ⟨q, mEqPrimeQ⟩ := pDividesM;
+              (cases q {
+                 | zero =>
+                     function (refinedMEq : m = prime * zero) =>
+                       -- m = prime * 0 = 0. v_p(0) = 0. p^0 = 1. 1 | m = 0.
+                       Equality.transport_proposition(
+                           Natural,
+                           function (mValue : Natural) =>
+                               Natural.divides(
+                                   Natural.power(
+                                       Natural.padic_valuation(prime, mValue),
+                                       prime),
+                                   mValue),
+                           zero, m,
+                           Equality.symmetry(
+                               Equality.transitivity(
+                                   refinedMEq,
+                                   Natural.multiply_zero(prime))),
+                           Natural.one_divides(zero))
+                 | successor(predQ) =>
+                     function (refinedMEq : m = prime * successor(predQ)) => {
+                       claim primePositive : successor(zero) ≤ prime
+                         by Natural.less_or_equal_predecessor_less_or_equal(
+                                successor(zero), prime, primeAtLeastTwo);
+                       claim succQPositive
+                             : successor(zero) ≤ successor(predQ)
+                         by Natural.successor_less_or_equal_successor(
+                                zero, predQ, Natural.zero_least(predQ));
+                       -- succ(q) < m. From m = p * q with p ≥ 2, q ≥ 1:
+                       -- succ(q) ≤ p * q = m.
+                       claim succQLeM
+                             : successor(successor(predQ)) ≤ m
+                         by Equality.transport_proposition(
+                                Natural,
+                                function (n' : Natural) =>
+                                    successor(successor(predQ)) ≤ n',
+                                prime * successor(predQ), m,
+                                Equality.symmetry(refinedMEq),
+                                Natural.successor_less_or_equal_multiply(
+                                    prime, successor(predQ),
+                                    primeAtLeastTwo, succQPositive));
+                       -- IH on succ(predQ): p^v_p(succ(predQ)) | succ(predQ).
+                       claim qDivResult
+                             : Natural.divides(
+                                   Natural.power(
+                                       Natural.padic_valuation(
+                                           prime, successor(predQ)), prime),
+                                   successor(predQ))
+                         by inductionHypothesis(
+                                successor(predQ), succQLeM);
+                       -- Apply strip: v_p(p * succ(predQ)) = succ(v_p(succ(predQ))).
+                       claim valuationProduct
+                             : Natural.padic_valuation(
+                                   prime, prime * successor(predQ))
+                               = successor(
+                                     Natural.padic_valuation(
+                                         prime, successor(predQ)))
+                         by Natural.padic_valuation_strip(
+                                prime, successor(predQ),
+                                primeAtLeastTwo, succQPositive);
+                       -- power(succ(v_p(q)), p) = p * power(v_p(q), p).
+                       -- divides_multiply_left: p^v_p(q) | q → p * p^v_p(q) | p * q.
+                       claim shiftedDivides
+                             : Natural.divides(
+                                   prime
+                                     * Natural.power(
+                                           Natural.padic_valuation(
+                                               prime, successor(predQ)),
+                                           prime),
+                                   prime * successor(predQ))
+                         by Natural.divides_multiply_left(
+                                prime,
+                                Natural.power(
+                                    Natural.padic_valuation(
+                                        prime, successor(predQ)), prime),
+                                successor(predQ),
+                                qDivResult);
+                       -- Bridge: p * p^v_p(q) = p^(succ(v_p(q))) = p^v_p(p*q) = p^v_p(m).
+                       Equality.transport_proposition(
+                           Natural,
+                           function (m' : Natural) =>
+                               Natural.divides(
+                                   Natural.power(
+                                       Natural.padic_valuation(prime, m'),
+                                       prime),
+                                   m'),
+                           prime * successor(predQ), m,
+                           Equality.symmetry(refinedMEq),
+                           Equality.transport_proposition(
+                               Natural,
+                               function (v : Natural) =>
+                                   Natural.divides(
+                                       Natural.power(v, prime),
+                                       prime * successor(predQ)),
+                               successor(
+                                   Natural.padic_valuation(
+                                       prime, successor(predQ))),
+                               Natural.padic_valuation(
+                                   prime, prime * successor(predQ)),
+                               Equality.symmetry(valuationProduct),
+                               -- power(succ(v_p(q)), p) reduces to
+                               -- p * power(v_p(q), p) by definition.
+                               shiftedDivides))
+                     }
+               } : m = prime * q
+                   → Natural.divides(
+                         Natural.power(Natural.padic_valuation(prime, m), prime),
+                         m))(mEqPrimeQ)
+            },
+            function (notDivM : prime ∤ m) =>
+              -- v_p(m) = 0. p^0 = 1. 1 | m.
+              Equality.transport_proposition(
+                  Natural,
+                  function (v : Natural) =>
+                      Natural.divides(Natural.power(v, prime), m),
+                  zero, Natural.padic_valuation(prime, m),
+                  Equality.symmetry(
+                      Natural.padic_valuation_when_not_divides(
+                          prime, m, notDivM)),
+                  Natural.one_divides(m)),
+            Natural.decides_divides(prime, m)))
+
+-- p^j | p^k when j ≤ k. From j ≤ k get a witness r with k = j + r;
+-- then power(k, p) = power(j + r, p) = power(j, p) * power(r, p).
+theorem Natural.power_divides_power
+        (p j k : Natural) (jLeK : j ≤ k)
+        : Natural.divides(Natural.power(j, p), Natural.power(k, p)) :=
+  Exists.eliminate(
+      Natural,
+      function (r : Natural) => k = j + r,
+      Natural.divides(Natural.power(j, p), Natural.power(k, p)),
+      function (r : Natural) (kEqJPlusR : k = j + r) =>
+        Exists.introduce(
+            Natural,
+            function (w : Natural) =>
+                Natural.power(k, p) = Natural.power(j, p) * w,
+            Natural.power(r, p),
+            calc Natural.power(k, p)
+               = Natural.power(j + r, p)
+                      by congruenceOf(
+                             function (m : Natural) => Natural.power(m, p),
+                             kEqJPlusR)
+               = Natural.power(j, p) * Natural.power(r, p)
+                      by Natural.power_add(j, r, p)),
+      Natural.subtraction_witness(j, k, jLeK))
+
+-- Combining the above two: if k ≤ v_p(n), then p^k | n.
+theorem Natural.padic_valuation_ge_implies_power_divides
+        (prime : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (k n : Natural)
+        (kLeValuation : k ≤ Natural.padic_valuation(prime, n))
+        : Natural.divides(Natural.power(k, prime), n) :=
+  Natural.divides_transitive(
+      Natural.power(k, prime),
+      Natural.power(Natural.padic_valuation(prime, n), prime),
+      n,
+      Natural.power_divides_power(prime, k,
+          Natural.padic_valuation(prime, n), kLeValuation),
+      Natural.padic_valuation_power_divides(prime, primeAtLeastTwo, n))
+
+-- Converse direction: if p^k | n (with n ≥ 1), then k ≤ v_p(n).
+-- Induct on k. At successor(k'): from p^succ(k') | n, get p | n
+-- (since p | p^succ(k') | n). Apply IH on q = divide(p, n) using strip.
+theorem Natural.power_divides_implies_padic_valuation_ge
+        (prime : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        : (k n : Natural)
+          → successor(zero) ≤ n
+          → Natural.divides(Natural.power(k, prime), n)
+          → k ≤ Natural.padic_valuation(prime, n)
+  | zero, n, _, _ =>
+      Natural.zero_least(Natural.padic_valuation(prime, n))
+  | successor(predK), n, nPositive, succPDivides => {
+      claim primePositive : successor(zero) ≤ prime
+        by Natural.less_or_equal_predecessor_less_or_equal(
+               successor(zero), prime, primeAtLeastTwo);
+      -- p^succ(predK) = p * p^predK | n. So p | n.
+      claim pDividesN : prime ∣ n
+        by Natural.divides_transitive(
+               prime,
+               Natural.power(successor(predK), prime),
+               n,
+               -- p | p^succ(predK) — witness power(predK, p).
+               Exists.introduce(
+                   Natural,
+                   function (w : Natural) =>
+                       Natural.power(successor(predK), prime) = prime * w,
+                   Natural.power(predK, prime),
+                   reflexivity(Natural,
+                       Natural.power(successor(predK), prime))),
+               succPDivides);
+      let ⟨q, nEqPrimeQ⟩ := pDividesN;
+      -- For q = 0 case: n = 0, contradicts n ≥ 1.
+      -- For q = succ(predQ): apply strip + IH.
+      (cases q {
+         | zero =>
+             function (refinedNEq : n = prime * zero) =>
+               False.eliminate_proposition(
+                   successor(predK) ≤ Natural.padic_valuation(prime, n),
+                   Natural.not_less_or_equal_successor_zero(
+                       zero,
+                       Equality.transport_proposition(
+                           Natural,
+                           function (m : Natural) => successor(zero) ≤ m,
+                           n, zero,
+                           Equality.transitivity(
+                               refinedNEq,
+                               Natural.multiply_zero(prime)),
+                           nPositive)))
+         | successor(predQ) =>
+             function (refinedNEq : n = prime * successor(predQ)) => {
+               claim succQPositive
+                     : successor(zero) ≤ successor(predQ)
+                 by Natural.successor_less_or_equal_successor(
+                        zero, predQ, Natural.zero_least(predQ));
+               -- p^succ(predK) | n = p * succ(predQ). Hence
+               -- p * p^predK | p * succ(predQ). Cancel p (multiply_cancel_left).
+               -- Get p^predK | succ(predQ).
+               -- More directly: p^succ(predK) | p*succ(predQ), and
+               -- p^succ(predK) = p * p^predK. So p * p^predK | p * succ(predQ).
+               -- From this we extract p^predK | succ(predQ).
+               let ⟨w, nEqProductW⟩ := succPDivides;
+               -- nEqProductW : n = p^succ(predK) * w = (p * p^predK) * w
+               --             = p * (p^predK * w).
+               -- And n = p * succ(predQ) by refinedNEq.
+               -- So p * succ(predQ) = p * (p^predK * w).
+               -- By multiply_cancel_left: succ(predQ) = p^predK * w. So p^predK | succ(predQ).
+               claim qDividesEq
+                     : successor(predQ)
+                       = Natural.power(predK, prime) * w
+                 by Natural.multiply_cancel_left(
+                        prime, successor(predQ),
+                        Natural.power(predK, prime) * w,
+                        primePositive,
+                        calc prime * successor(predQ)
+                           = n
+                                  by Equality.symmetry(refinedNEq)
+                           = Natural.power(successor(predK), prime) * w
+                                  by nEqProductW
+                           = (prime * Natural.power(predK, prime)) * w
+                                  by reflexivity(Natural,
+                                         (prime * Natural.power(predK, prime)) * w)
+                           = prime * (Natural.power(predK, prime) * w)
+                                  by Natural.multiply_associative(
+                                         prime,
+                                         Natural.power(predK, prime),
+                                         w));
+               claim pPredKDividesQ
+                     : Natural.divides(
+                           Natural.power(predK, prime),
+                           successor(predQ))
+                 by Exists.introduce(
+                        Natural,
+                        function (w' : Natural) =>
+                            successor(predQ)
+                              = Natural.power(predK, prime) * w',
+                        w,
+                        qDividesEq);
+               -- By IH on (predK, succ(predQ)): predK ≤ v_p(succ(predQ)).
+               claim ihResult
+                     : predK ≤ Natural.padic_valuation(
+                                   prime, successor(predQ))
+                 by Natural.power_divides_implies_padic_valuation_ge(
+                        prime, primeAtLeastTwo,
+                        predK, successor(predQ),
+                        succQPositive, pPredKDividesQ);
+               -- v_p(n) = v_p(p * succ(predQ)) = succ(v_p(succ(predQ))) by strip.
+               -- So we want succ(predK) ≤ succ(v_p(succ(predQ))).
+               Equality.transport_proposition(
+                   Natural,
+                   function (m : Natural) =>
+                       successor(predK) ≤ m,
+                   successor(
+                       Natural.padic_valuation(prime, successor(predQ))),
+                   Natural.padic_valuation(prime, n),
+                   Equality.transitivity(
+                       Equality.symmetry(
+                           Natural.padic_valuation_strip(
+                               prime, successor(predQ),
+                               primeAtLeastTwo, succQPositive)),
+                       congruenceOf(
+                           function (m : Natural) =>
+                               Natural.padic_valuation(prime, m),
+                           Equality.symmetry(refinedNEq))),
+                   Natural.successor_less_or_equal_successor(
+                       predK,
+                       Natural.padic_valuation(prime, successor(predQ)),
+                       ihResult))
+             }
+       } : n = prime * q
+           → successor(predK) ≤ Natural.padic_valuation(prime, n))(nEqPrimeQ)
+    }
