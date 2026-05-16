@@ -1223,3 +1223,71 @@ theorem Natural.power_divides_implies_padic_valuation_ge
        } : n = prime * q
            → successor(predK) ≤ Natural.padic_valuation(prime, n))(nEqPrimeQ)
     }
+
+-- Natural ultrametric, asymmetric form: when v_p(a) ≤ v_p(b),
+-- v_p(a) ≤ v_p(a + b). Path: p^v_p(a) divides both a and b (using
+-- the bidirectional bridge above); divides_add gives p^v_p(a) | (a+b);
+-- then the converse bridge gives v_p(a) ≤ v_p(a+b). Needs a ≥ 1 so
+-- that a + b ≥ 1.
+theorem Natural.padic_valuation_ultrametric_when_le
+        (prime : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (a b : Natural)
+        (aPositive : successor(zero) ≤ a)
+        (valuationLe :
+            Natural.padic_valuation(prime, a)
+              ≤ Natural.padic_valuation(prime, b))
+        : Natural.padic_valuation(prime, a)
+          ≤ Natural.padic_valuation(prime, a + b) := {
+  claim sumPositive : successor(zero) ≤ a + b
+    by LessOrEqual.transitive(
+           successor(zero), a, a + b,
+           Natural.less_or_equal_add_right(a, b),
+           aPositive);
+  claim pPowerDividesA
+        : Natural.divides(
+              Natural.power(Natural.padic_valuation(prime, a), prime), a)
+    by Natural.padic_valuation_ge_implies_power_divides(
+           prime, primeAtLeastTwo,
+           Natural.padic_valuation(prime, a), a,
+           LessOrEqual.reflexivity(Natural.padic_valuation(prime, a)));
+  claim pPowerDividesB
+        : Natural.divides(
+              Natural.power(Natural.padic_valuation(prime, a), prime), b)
+    by Natural.padic_valuation_ge_implies_power_divides(
+           prime, primeAtLeastTwo,
+           Natural.padic_valuation(prime, a), b, valuationLe);
+  claim pPowerDividesSum
+        : Natural.divides(
+              Natural.power(Natural.padic_valuation(prime, a), prime),
+              a + b)
+    by Natural.divides_add(
+           Natural.power(Natural.padic_valuation(prime, a), prime),
+           a, b, pPowerDividesA, pPowerDividesB);
+  Natural.power_divides_implies_padic_valuation_ge(
+      prime, primeAtLeastTwo,
+      Natural.padic_valuation(prime, a),
+      a + b, sumPositive, pPowerDividesSum)
+}
+
+-- Symmetric form: when v_p(b) ≤ v_p(a), v_p(b) ≤ v_p(a + b).
+-- Derived from the previous via add_commutative.
+theorem Natural.padic_valuation_ultrametric_when_ge
+        (prime : Natural)
+        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (a b : Natural)
+        (bPositive : successor(zero) ≤ b)
+        (valuationLe :
+            Natural.padic_valuation(prime, b)
+              ≤ Natural.padic_valuation(prime, a))
+        : Natural.padic_valuation(prime, b)
+          ≤ Natural.padic_valuation(prime, a + b) :=
+  Equality.transport_proposition(
+      Natural,
+      function (m : Natural) =>
+          Natural.padic_valuation(prime, b)
+            ≤ Natural.padic_valuation(prime, m),
+      b + a, a + b,
+      Natural.add_commutative(b, a),
+      Natural.padic_valuation_ultrametric_when_le(
+          prime, primeAtLeastTwo, b, a, bPositive, valuationLe))
