@@ -1,0 +1,488 @@
+-- PAdic/algebra.math
+--
+-- Multiplicative ring laws and distributivity for PAdic. Each lifts
+-- from the corresponding pointwise Rational law via Quotient.induct(
+-- _two) + the equivalent_when_sequenceFunction_equal helper.
+
+module PAdic.algebra
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.prime
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import PAdic.absolute_value
+import PAdic.basics
+import PAdic.embedding
+import PAdic.addition
+import PAdic.negation
+import PAdic.multiplication
+import PAdic.ring
+
+-- ----------------------------------------------------------------------
+-- Multiply is commutative on PAdic.
+theorem PAdic.multiply_commutative
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x y : PAdic(p, primality))
+        : PAdic.multiply(p, primality, x, y)
+          = PAdic.multiply(p, primality, y, x) :=
+  Quotient.induct_two(
+      PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+      PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
+      function (xArg yArg : PAdic(p, primality)) =>
+          PAdic.multiply(p, primality, xArg, yArg)
+            = PAdic.multiply(p, primality, yArg, xArg),
+      function (rep_x rep_y : PAdicCauchySequence(p, primality)) =>
+        Quotient.sound(
+            PAdicCauchySequence(p, primality),
+            PAdicEquivalent(p, primality),
+            PAdicCauchySequence.multiply(p, primality, rep_x, rep_y),
+            PAdicCauchySequence.multiply(p, primality, rep_y, rep_x),
+            PAdicCauchySequence.equivalent_when_sequenceFunction_equal(
+                p, primality,
+                PAdicCauchySequence.multiply(p, primality, rep_x, rep_y),
+                PAdicCauchySequence.multiply(p, primality, rep_y, rep_x),
+                function (n : Natural) =>
+                  calc PAdicCauchySequence.sequenceFunction(
+                           p, primality,
+                           PAdicCauchySequence.multiply(
+                               p, primality, rep_x, rep_y), n)
+                     = PAdicCauchySequence.sequenceFunction(
+                           p, primality, rep_x, n)
+                       * PAdicCauchySequence.sequenceFunction(
+                             p, primality, rep_y, n)
+                            by PAdicCauchySequence.sequenceFunction_multiply(
+                                   p, primality, rep_x, rep_y, n)
+                     = PAdicCauchySequence.sequenceFunction(
+                           p, primality, rep_y, n)
+                       * PAdicCauchySequence.sequenceFunction(
+                             p, primality, rep_x, n)
+                            by Rational.multiply_commutative(
+                                   PAdicCauchySequence.sequenceFunction(
+                                       p, primality, rep_x, n),
+                                   PAdicCauchySequence.sequenceFunction(
+                                       p, primality, rep_y, n))
+                     = PAdicCauchySequence.sequenceFunction(
+                           p, primality,
+                           PAdicCauchySequence.multiply(
+                               p, primality, rep_y, rep_x), n)
+                            by Equality.symmetry(
+                                   PAdicCauchySequence.sequenceFunction_multiply(
+                                       p, primality, rep_y, rep_x, n)))),
+      x, y)
+
+-- Multiply is associative on PAdic.
+theorem PAdic.multiply_associative
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x y z : PAdic(p, primality))
+        : PAdic.multiply(p, primality,
+              PAdic.multiply(p, primality, x, y), z)
+          = PAdic.multiply(p, primality, x,
+                PAdic.multiply(p, primality, y, z)) :=
+  Quotient.induct(
+      function (xArg : PAdic(p, primality)) =>
+          (yArg : PAdic(p, primality)) → (zArg : PAdic(p, primality)) →
+              PAdic.multiply(p, primality,
+                  PAdic.multiply(p, primality, xArg, yArg), zArg)
+                = PAdic.multiply(p, primality, xArg,
+                      PAdic.multiply(p, primality, yArg, zArg)),
+      function (rep_x : PAdicCauchySequence(p, primality)) =>
+        function (yArg : PAdic(p, primality))
+                 (zArg : PAdic(p, primality)) =>
+          Quotient.induct_two(
+              PAdicCauchySequence(p, primality),
+              PAdicEquivalent(p, primality),
+              PAdicCauchySequence(p, primality),
+              PAdicEquivalent(p, primality),
+              function (yArg' : PAdic(p, primality))
+                       (zArg' : PAdic(p, primality)) =>
+                  PAdic.multiply(p, primality,
+                      PAdic.multiply(p, primality,
+                          Quotient.mk(
+                              PAdicCauchySequence(p, primality),
+                              PAdicEquivalent(p, primality), rep_x),
+                          yArg'),
+                      zArg')
+                    = PAdic.multiply(p, primality,
+                          Quotient.mk(
+                              PAdicCauchySequence(p, primality),
+                              PAdicEquivalent(p, primality), rep_x),
+                          PAdic.multiply(p, primality, yArg', zArg')),
+              function (rep_y : PAdicCauchySequence(p, primality))
+                       (rep_z : PAdicCauchySequence(p, primality)) =>
+                Quotient.sound(
+                    PAdicCauchySequence(p, primality),
+                    PAdicEquivalent(p, primality),
+                    PAdicCauchySequence.multiply(p, primality,
+                        PAdicCauchySequence.multiply(p, primality,
+                            rep_x, rep_y),
+                        rep_z),
+                    PAdicCauchySequence.multiply(p, primality,
+                        rep_x,
+                        PAdicCauchySequence.multiply(p, primality,
+                            rep_y, rep_z)),
+                    PAdicCauchySequence.equivalent_when_sequenceFunction_equal(
+                        p, primality,
+                        PAdicCauchySequence.multiply(p, primality,
+                            PAdicCauchySequence.multiply(p, primality,
+                                rep_x, rep_y),
+                            rep_z),
+                        PAdicCauchySequence.multiply(p, primality,
+                            rep_x,
+                            PAdicCauchySequence.multiply(p, primality,
+                                rep_y, rep_z)),
+                        function (n : Natural) =>
+                          calc PAdicCauchySequence.sequenceFunction(
+                                   p, primality,
+                                   PAdicCauchySequence.multiply(p, primality,
+                                       PAdicCauchySequence.multiply(p, primality,
+                                           rep_x, rep_y),
+                                       rep_z), n)
+                             = PAdicCauchySequence.sequenceFunction(
+                                   p, primality,
+                                   PAdicCauchySequence.multiply(p, primality,
+                                       rep_x, rep_y), n)
+                               * PAdicCauchySequence.sequenceFunction(
+                                     p, primality, rep_z, n)
+                                    by PAdicCauchySequence.sequenceFunction_multiply(
+                                           p, primality,
+                                           PAdicCauchySequence.multiply(p, primality,
+                                               rep_x, rep_y),
+                                           rep_z, n)
+                             = (PAdicCauchySequence.sequenceFunction(
+                                    p, primality, rep_x, n)
+                                * PAdicCauchySequence.sequenceFunction(
+                                      p, primality, rep_y, n))
+                               * PAdicCauchySequence.sequenceFunction(
+                                     p, primality, rep_z, n)
+                                    by congruenceOf(
+                                           function (r : Rational) =>
+                                               r * PAdicCauchySequence.sequenceFunction(
+                                                       p, primality, rep_z, n),
+                                           PAdicCauchySequence.sequenceFunction_multiply(
+                                               p, primality, rep_x, rep_y, n))
+                             = PAdicCauchySequence.sequenceFunction(
+                                   p, primality, rep_x, n)
+                               * (PAdicCauchySequence.sequenceFunction(
+                                      p, primality, rep_y, n)
+                                  * PAdicCauchySequence.sequenceFunction(
+                                        p, primality, rep_z, n))
+                                    by Rational.multiply_associative(
+                                           PAdicCauchySequence.sequenceFunction(
+                                               p, primality, rep_x, n),
+                                           PAdicCauchySequence.sequenceFunction(
+                                               p, primality, rep_y, n),
+                                           PAdicCauchySequence.sequenceFunction(
+                                               p, primality, rep_z, n))
+                             = PAdicCauchySequence.sequenceFunction(
+                                   p, primality, rep_x, n)
+                               * PAdicCauchySequence.sequenceFunction(
+                                     p, primality,
+                                     PAdicCauchySequence.multiply(p, primality,
+                                         rep_y, rep_z), n)
+                                    by congruenceOf(
+                                           function (r : Rational) =>
+                                               PAdicCauchySequence.sequenceFunction(
+                                                   p, primality, rep_x, n)
+                                               * r,
+                                           Equality.symmetry(
+                                               PAdicCauchySequence.sequenceFunction_multiply(
+                                                   p, primality, rep_y, rep_z, n)))
+                             = PAdicCauchySequence.sequenceFunction(
+                                   p, primality,
+                                   PAdicCauchySequence.multiply(p, primality,
+                                       rep_x,
+                                       PAdicCauchySequence.multiply(p, primality,
+                                           rep_y, rep_z)), n)
+                                    by Equality.symmetry(
+                                           PAdicCauchySequence.sequenceFunction_multiply(
+                                               p, primality,
+                                               rep_x,
+                                               PAdicCauchySequence.multiply(p, primality,
+                                                   rep_y, rep_z), n)))),
+              yArg, zArg),
+      x)(y, z)
+
+-- 1 * x = x on PAdic. The 1 is PAdic.one, the constant-1 Cauchy sequence.
+theorem PAdic.one_multiply
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x : PAdic(p, primality))
+        : PAdic.multiply(p, primality, PAdic.one(p, primality), x) = x :=
+  Quotient.induct(
+      function (xArg : PAdic(p, primality)) =>
+          PAdic.multiply(p, primality, PAdic.one(p, primality), xArg) = xArg,
+      function (rep_x : PAdicCauchySequence(p, primality)) =>
+        Quotient.sound(
+            PAdicCauchySequence(p, primality),
+            PAdicEquivalent(p, primality),
+            PAdicCauchySequence.multiply(p, primality,
+                Rational.to_padic_constant_sequence(
+                    p, primality, Rational.one),
+                rep_x),
+            rep_x,
+            PAdicCauchySequence.equivalent_when_sequenceFunction_equal(
+                p, primality,
+                PAdicCauchySequence.multiply(p, primality,
+                    Rational.to_padic_constant_sequence(
+                        p, primality, Rational.one),
+                    rep_x),
+                rep_x,
+                function (n : Natural) =>
+                  calc PAdicCauchySequence.sequenceFunction(
+                           p, primality,
+                           PAdicCauchySequence.multiply(p, primality,
+                               Rational.to_padic_constant_sequence(
+                                   p, primality, Rational.one),
+                               rep_x), n)
+                     = PAdicCauchySequence.sequenceFunction(
+                           p, primality,
+                           Rational.to_padic_constant_sequence(
+                               p, primality, Rational.one), n)
+                       * PAdicCauchySequence.sequenceFunction(
+                             p, primality, rep_x, n)
+                            by PAdicCauchySequence.sequenceFunction_multiply(
+                                   p, primality,
+                                   Rational.to_padic_constant_sequence(
+                                       p, primality, Rational.one),
+                                   rep_x, n)
+                     = Rational.one
+                       * PAdicCauchySequence.sequenceFunction(
+                             p, primality, rep_x, n)
+                            by reflexivity(
+                                   Rational,
+                                   Rational.one
+                                   * PAdicCauchySequence.sequenceFunction(
+                                         p, primality, rep_x, n))
+                     = PAdicCauchySequence.sequenceFunction(
+                           p, primality, rep_x, n)
+                            by Rational.one_multiply(
+                                   PAdicCauchySequence.sequenceFunction(
+                                       p, primality, rep_x, n)))),
+      x)
+
+-- x * 1 = x via multiply_commutative + one_multiply.
+theorem PAdic.multiply_one
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x : PAdic(p, primality))
+        : PAdic.multiply(p, primality, x, PAdic.one(p, primality)) = x :=
+  Equality.transitivity(
+      PAdic(p, primality),
+      PAdic.multiply(p, primality, x, PAdic.one(p, primality)),
+      PAdic.multiply(p, primality, PAdic.one(p, primality), x),
+      x,
+      PAdic.multiply_commutative(p, primality, x, PAdic.one(p, primality)),
+      PAdic.one_multiply(p, primality, x))
+
+-- Distributivity: x * (y + z) = x * y + x * z.
+theorem PAdic.distributivity_left
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x y z : PAdic(p, primality))
+        : PAdic.multiply(p, primality, x,
+              PAdic.add(p, primality, y, z))
+          = PAdic.add(p, primality,
+                PAdic.multiply(p, primality, x, y),
+                PAdic.multiply(p, primality, x, z)) :=
+  Quotient.induct(
+      function (xArg : PAdic(p, primality)) =>
+          (yArg : PAdic(p, primality)) → (zArg : PAdic(p, primality)) →
+              PAdic.multiply(p, primality, xArg,
+                  PAdic.add(p, primality, yArg, zArg))
+                = PAdic.add(p, primality,
+                      PAdic.multiply(p, primality, xArg, yArg),
+                      PAdic.multiply(p, primality, xArg, zArg)),
+      function (rep_x : PAdicCauchySequence(p, primality)) =>
+        function (yArg : PAdic(p, primality))
+                 (zArg : PAdic(p, primality)) =>
+          Quotient.induct_two(
+              PAdicCauchySequence(p, primality),
+              PAdicEquivalent(p, primality),
+              PAdicCauchySequence(p, primality),
+              PAdicEquivalent(p, primality),
+              function (yArg' : PAdic(p, primality))
+                       (zArg' : PAdic(p, primality)) =>
+                  PAdic.multiply(p, primality,
+                      Quotient.mk(
+                          PAdicCauchySequence(p, primality),
+                          PAdicEquivalent(p, primality), rep_x),
+                      PAdic.add(p, primality, yArg', zArg'))
+                    = PAdic.add(p, primality,
+                          PAdic.multiply(p, primality,
+                              Quotient.mk(
+                                  PAdicCauchySequence(p, primality),
+                                  PAdicEquivalent(p, primality), rep_x),
+                              yArg'),
+                          PAdic.multiply(p, primality,
+                              Quotient.mk(
+                                  PAdicCauchySequence(p, primality),
+                                  PAdicEquivalent(p, primality), rep_x),
+                              zArg')),
+              function (rep_y : PAdicCauchySequence(p, primality))
+                       (rep_z : PAdicCauchySequence(p, primality)) =>
+                Quotient.sound(
+                    PAdicCauchySequence(p, primality),
+                    PAdicEquivalent(p, primality),
+                    PAdicCauchySequence.multiply(p, primality, rep_x,
+                        PAdicCauchySequence.add(p, primality,
+                            rep_y, rep_z)),
+                    PAdicCauchySequence.add(p, primality,
+                        PAdicCauchySequence.multiply(p, primality,
+                            rep_x, rep_y),
+                        PAdicCauchySequence.multiply(p, primality,
+                            rep_x, rep_z)),
+                    PAdicCauchySequence.equivalent_when_sequenceFunction_equal(
+                        p, primality,
+                        PAdicCauchySequence.multiply(p, primality, rep_x,
+                            PAdicCauchySequence.add(p, primality,
+                                rep_y, rep_z)),
+                        PAdicCauchySequence.add(p, primality,
+                            PAdicCauchySequence.multiply(p, primality,
+                                rep_x, rep_y),
+                            PAdicCauchySequence.multiply(p, primality,
+                                rep_x, rep_z)),
+                        function (n : Natural) =>
+                          calc PAdicCauchySequence.sequenceFunction(
+                                   p, primality,
+                                   PAdicCauchySequence.multiply(p, primality,
+                                       rep_x,
+                                       PAdicCauchySequence.add(p, primality,
+                                           rep_y, rep_z)), n)
+                             = PAdicCauchySequence.sequenceFunction(
+                                   p, primality, rep_x, n)
+                               * PAdicCauchySequence.sequenceFunction(
+                                     p, primality,
+                                     PAdicCauchySequence.add(p, primality,
+                                         rep_y, rep_z), n)
+                                    by PAdicCauchySequence.sequenceFunction_multiply(
+                                           p, primality, rep_x,
+                                           PAdicCauchySequence.add(p, primality,
+                                               rep_y, rep_z), n)
+                             = PAdicCauchySequence.sequenceFunction(
+                                   p, primality, rep_x, n)
+                               * (PAdicCauchySequence.sequenceFunction(
+                                      p, primality, rep_y, n)
+                                  + PAdicCauchySequence.sequenceFunction(
+                                        p, primality, rep_z, n))
+                                    by congruenceOf(
+                                           function (r : Rational) =>
+                                               PAdicCauchySequence.sequenceFunction(
+                                                   p, primality, rep_x, n)
+                                               * r,
+                                           PAdicCauchySequence.sequenceFunction_add(
+                                               p, primality, rep_y, rep_z, n))
+                             = PAdicCauchySequence.sequenceFunction(
+                                   p, primality, rep_x, n)
+                               * PAdicCauchySequence.sequenceFunction(
+                                     p, primality, rep_y, n)
+                               + PAdicCauchySequence.sequenceFunction(
+                                     p, primality, rep_x, n)
+                                 * PAdicCauchySequence.sequenceFunction(
+                                       p, primality, rep_z, n)
+                                    by Rational.distributivity_left(
+                                           PAdicCauchySequence.sequenceFunction(
+                                               p, primality, rep_x, n),
+                                           PAdicCauchySequence.sequenceFunction(
+                                               p, primality, rep_y, n),
+                                           PAdicCauchySequence.sequenceFunction(
+                                               p, primality, rep_z, n))
+                             = PAdicCauchySequence.sequenceFunction(
+                                   p, primality,
+                                   PAdicCauchySequence.multiply(p, primality,
+                                       rep_x, rep_y), n)
+                               + PAdicCauchySequence.sequenceFunction(
+                                     p, primality, rep_x, n)
+                                 * PAdicCauchySequence.sequenceFunction(
+                                       p, primality, rep_z, n)
+                                    by congruenceOf(
+                                           function (r : Rational) =>
+                                               r + PAdicCauchySequence.sequenceFunction(
+                                                       p, primality, rep_x, n)
+                                                   * PAdicCauchySequence.sequenceFunction(
+                                                         p, primality, rep_z, n),
+                                           Equality.symmetry(
+                                               PAdicCauchySequence.sequenceFunction_multiply(
+                                                   p, primality, rep_x, rep_y, n)))
+                             = PAdicCauchySequence.sequenceFunction(
+                                   p, primality,
+                                   PAdicCauchySequence.multiply(p, primality,
+                                       rep_x, rep_y), n)
+                               + PAdicCauchySequence.sequenceFunction(
+                                     p, primality,
+                                     PAdicCauchySequence.multiply(p, primality,
+                                         rep_x, rep_z), n)
+                                    by congruenceOf(
+                                           function (r : Rational) =>
+                                               PAdicCauchySequence.sequenceFunction(
+                                                   p, primality,
+                                                   PAdicCauchySequence.multiply(
+                                                       p, primality,
+                                                       rep_x, rep_y), n)
+                                               + r,
+                                           Equality.symmetry(
+                                               PAdicCauchySequence.sequenceFunction_multiply(
+                                                   p, primality, rep_x, rep_z, n)))
+                             = PAdicCauchySequence.sequenceFunction(
+                                   p, primality,
+                                   PAdicCauchySequence.add(p, primality,
+                                       PAdicCauchySequence.multiply(p, primality,
+                                           rep_x, rep_y),
+                                       PAdicCauchySequence.multiply(p, primality,
+                                           rep_x, rep_z)), n)
+                                    by Equality.symmetry(
+                                           PAdicCauchySequence.sequenceFunction_add(
+                                               p, primality,
+                                               PAdicCauchySequence.multiply(
+                                                   p, primality,
+                                                   rep_x, rep_y),
+                                               PAdicCauchySequence.multiply(
+                                                   p, primality,
+                                                   rep_x, rep_z), n)))),
+              yArg, zArg),
+      x)(y, z)
+
+-- Distributivity right: (x + y) * z = x * z + y * z. Via
+-- multiply_commutative + distributivity_left.
+theorem PAdic.distributivity_right
+        (p : Natural) (primality : Natural.is_prime(p))
+        (x y z : PAdic(p, primality))
+        : PAdic.multiply(p, primality,
+              PAdic.add(p, primality, x, y), z)
+          = PAdic.add(p, primality,
+                PAdic.multiply(p, primality, x, z),
+                PAdic.multiply(p, primality, y, z)) :=
+  calc PAdic.multiply(p, primality,
+           PAdic.add(p, primality, x, y), z)
+     = PAdic.multiply(p, primality, z,
+           PAdic.add(p, primality, x, y))
+            by PAdic.multiply_commutative(p, primality,
+                   PAdic.add(p, primality, x, y), z)
+     = PAdic.add(p, primality,
+           PAdic.multiply(p, primality, z, x),
+           PAdic.multiply(p, primality, z, y))
+            by PAdic.distributivity_left(p, primality, z, x, y)
+     = PAdic.add(p, primality,
+           PAdic.multiply(p, primality, x, z),
+           PAdic.multiply(p, primality, z, y))
+            by congruenceOf(
+                   function (w : PAdic(p, primality)) =>
+                       PAdic.add(p, primality, w,
+                           PAdic.multiply(p, primality, z, y)),
+                   PAdic.multiply_commutative(p, primality, z, x))
+     = PAdic.add(p, primality,
+           PAdic.multiply(p, primality, x, z),
+           PAdic.multiply(p, primality, y, z))
+            by congruenceOf(
+                   function (w : PAdic(p, primality)) =>
+                       PAdic.add(p, primality,
+                           PAdic.multiply(p, primality, x, z),
+                           w),
+                   PAdic.multiply_commutative(p, primality, z, y))
