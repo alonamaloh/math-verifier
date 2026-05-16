@@ -6461,7 +6461,13 @@ private:
         if (!relation) {
             throwElaborate(
                 "Quotient.mk(rep): cannot infer the equivalence "
-                "relation `R` without an expected type of the form "
+                "relation `R`. The short form needs an expected type "
+                "of shape `Quotient(T, R)` from context. Common spots "
+                "this fails: operand of unary `-`, immediate body of "
+                "`function (rep) =>` inside `Quotient.lift`, or any "
+                "position with no propagated expected type. Fall back "
+                "to the explicit 3-arg form: `Quotient.mk(T, R, rep)`. "
+                "Needed an expected type of the form "
                 "`Quotient(T, R)` in context");
         }
         ExpressionPointer call = makeConstant(
