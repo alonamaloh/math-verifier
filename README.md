@@ -81,18 +81,18 @@ The patterns are documented in detail in `CLAUDE.md`. Highlights:
 
 - **Calc with auto-prover.** `by <reason>` is optional on every calc
   step. When absent, the elaborator tries definitional equality →
-  reflexivity, single-position diff classified as
-  commutativity/associativity/identity/local-hypothesis (with multi-
-  level descent + path-aware `Equality.congruence` wrapping), and
-  finally a `ring`-style AC-rearrangement fallback. Commutativity,
-  associativity, and identity lemmas are auto-detected from their
-  type shape at theorem-declaration time, including across `.mathv`
-  dependencies.
+  reflexivity, single-position diff resolved through a library-wide
+  rewrite-lemma index (any `Π x₁…xₙ. LHS = RHS` lemma bucketed by
+  the spine head of its sides, matched with a first-order matcher,
+  emitted as a kernel-checked application with `Equality.symmetry`
+  wrapped on for reverse direction) → local-hypothesis match, and
+  finally a `ring`-style AC-rearrangement fallback. Lemma
+  registration runs at theorem-declaration time and on `.mathv`
+  load, so the index covers the whole library uniformly.
 - **Subtree hashing.** Every `Expression` and `Level` carries a cached
   bottom-up structural hash; `structurallyEqual` uses it as an O(1)
-  fast-reject. Foundation for future AC-canonical hashing and
-  theorem-shape indexing (TODO.md "subtree hashing for the
-  auto-prover").
+  fast-reject. A coarser spine-head hash drives the calc
+  auto-prover's lemma-index bucket lookup.
 - **`Quotient.mk` short forms.** Type and relation inferred from
   context; only the representative is written.
 - **Implicit arguments** `{x : T}` on `definition` / `theorem` / `axiom`.

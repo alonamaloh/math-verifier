@@ -1,0 +1,52 @@
+-- Phase 3 lemma index: a user-defined rewrite lemma fires
+-- automatically in unannotated calc steps. The auto-prover doesn't
+-- know anything special about `double_zero` — it's just an arbitrary
+-- rewrite `(a b : Natural) → double(a) + b + double(zero) = double(a) + b`
+-- whose LHS shape can sit at a single-position diff. The lemma-index
+-- lookup buckets it by its head Constant, the first-order matcher
+-- binds the metavariables, and the kernel rechecks the assembled
+-- application term.
+
+module Test.lemma_index_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- Doubling on Naturals — a fresh user-defined op so we can attach
+-- our own rewrite lemmas to it without colliding with anything in
+-- the standard library.
+definition double : Natural → Natural :=
+  function (n : Natural) => n + n
+
+-- The rewrite lemma. Note: no Π-binder destructure cleverness;
+-- this is just an equality lemma the elaborator hasn't seen before.
+theorem double_split (a b : Natural)
+        : double(a) + b = a + (a + b) :=
+  Natural.add_associative(a, a, b)
+
+-- Calc step uses `double_split` implicitly: the diff position is
+-- `double(x) + y` ↔ `x + (x + y)`. The auto-prover's lemma index
+-- buckets `double_split` under the spine head `Natural.add` and the
+-- matcher binds the binders.
+theorem use_double_split (x y : Natural)
+        : double(x) + y = x + (x + y) :=
+  calc double(x) + y
+     = x + (x + y)
+
+-- Multi-step calc: each step is a single-position application of
+-- `double_split` plus surrounding stock arithmetic.
+theorem use_double_split_chained (x y : Natural)
+        : double(x) + (y + zero) = x + (x + y) :=
+  calc double(x) + (y + zero)
+     = double(x) + y                                       -- add_zero
+     = x + (x + y)                                         -- double_split
+
+-- Reverse direction: the lemma index registers both directions, so
+-- `x + (x + y) = double(x) + y` also closes without `by`.
+theorem use_double_split_reverse (x y : Natural)
+        : x + (x + y) = double(x) + y :=
+  calc x + (x + y)
+     = double(x) + y                                       -- reverse double_split

@@ -20,53 +20,25 @@ chain in roughly the order listed.
 - **More generic abelian-group / ring / field lemmas** as the
   Real and PAdic proofs surface them.
 
-## Calc auto-prover — Phase 3 (next)
-
-Theorem-shape indexing for arbitrary library lemmas. Building on
-Phase 1's structural hash (already landed):
-
-1. At theorem-declaration time, hash each lemma's conclusion-LHS
-   under the AC-canonical hash and store
-   `acHash(LHS) → list-of-lemmas` in a registry.
-2. At classify time, given a diff `(sub_l, sub_r)`:
-   1. Compute `acHash(sub_l)`.
-   2. Look up candidate lemmas.
-   3. For each candidate, a small one-way matcher instantiates the
-      lemma's binders against `sub_l`.
-   4. Check `acEqual(instantiated RHS, sub_r)`.
-   5. If yes, emit the lemma application as the proof.
-
-This subsumes the bespoke commutativity / associativity / identity
-classifiers — any user-written rewrite lemma whose LHS matches the
-diff fires automatically.
-
-The full AC-canonical equality (Phase 2 of the original plan) was
-implemented as a minimal "auto-invoke `ring` when single-position
-descent fails." Phase 3 is the bigger structural change and the one
-that opens up arbitrary lemmas, so it comes next.
-
-Risk: the matcher must refuse over-eager unification (e.g. don't
-match `f(x)` against `g(y)` just because both are Applications).
-Standard first-order matching solves this; collisions in the hash
-bucket are correctness-preserving because we always verify by
-emitting and kernel-checking the proof.
-
-See also `HASH_USE_VS_LEAN.md`: Lean uses discrimination trees for
-this; hash buckets keyed by AC-canonical hash are a cheaper first
-cut that covers most closed-LHS rewrites.
-
-### Subtraction / division normalisation for AC
-
-When Phase 3 lands and the AC-hash sees real use, `subtract(a, b)`
-should normalise to `add(a, negate(b))` before hashing so AC
-rearrangements involving subtraction work. Same idea for division
-(`divide(a, b) → multiply(a, reciprocal(b))`), but division needs
-the non-zero side condition, so it's a follow-up rather than part
-of the first cut. Three lines per registered op.
-
 ## Calc auto-prover — smaller open follow-ups
 
-Each is meaningful but smaller than Phase 3.
+With Phases 1–3 landed (structural hash, `ring` AC-fallback,
+lemma-index lookup by spineHash), the residual items are:
+
+- **Polymorphic-lemma indexing.** `registerGenericRewriteLemma`
+  currently skips theorems with universe parameters (most of the
+  library's Natural/Integer/Rational lemmas are concrete-carrier
+  and zero-universe-param, so this covers the common case). To
+  index e.g. a generic monoid lemma, the matcher needs to infer
+  universe-arg instantiation from the subject's carrier level.
+  Straightforward extension once a polymorphic rewrite lemma is
+  actually exercised.
+
+- **Subtraction / division normalisation.** When the diff involves
+  `subtract(a, b)`, normalise to `add(a, negate(b))` before matching
+  so rewrites stated additively also fire on subtraction. Same idea
+  for division → multiplication-by-reciprocal, gated on the non-zero
+  side condition. Three lines per registered op.
 
 - **Multi-position diff.** When the walker is stuck because both
   function and argument differ at the current App level, recursively
@@ -95,8 +67,8 @@ Each is meaningful but smaller than Phase 3.
   `HASH_USE_VS_LEAN.md` §5. Same construction sites as the structural
   hash; high 8 bits of the 64-bit field; would make `substitute` /
   `openBinder` / `closeBinder` O(1) on closed subtrees. **Trigger:**
-  after Phase 3 lands, profile a cold-rebuild — pack the bits only
-  if `substitute` / `openBinder` show up in the top 5.
+  profile a cold-rebuild — pack the bits only if `substitute` /
+  `openBinder` show up in the top 5.
 
 ## Equality combinator carrier implicit
 

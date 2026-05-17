@@ -80,20 +80,31 @@ exact-shape match in O(1), but lemmas have *metavariables*
 separate wildcard slot, which forces a fallback to linear scan.
 Discrimination trees encode wildcards natively as a branch.
 
-What Phase 3 buys at lower cost: if we hash the *AC-canonical* form
-(Phase 2's `acHash`) and lemma LHSs are also hashed in canonical form,
-we get AC-tolerant exact-match for closed-LHS rewrites — commutativity,
-associativity, identity, and distributivity-after-canonicalization.
-That covers most of the calc-step boilerplate the audit flagged, *as
-long as* a lemma's metavariables are all in argument position (so the
-canonical hash treats them as fresh leaves consistently). For real
-unification-style matching (`f(?x, g(?x))`) we'd still need a small
-one-way matcher *after* the hash-bucket prefilter — which Phase 3's
-plan already specifies.
+**What we landed (Phase 3).** Each rewrite lemma `Π x₁…xₙ. LHS = RHS`
+is registered twice in a `multimap<uint64_t, RewriteLemma>` keyed by
+`spineHash` — once per side, with a flag indicating which direction
+the entry represents. `spineHash` walks the Application spine to its
+head and hashes just that head's Constant name (other heads — leaves,
+binders, Sort — share one wildcard tag). Two lemmas whose LHSs share
+a head land in the same bucket; lemmas whose RHS is a bare binder
+land in the wildcard bucket for reverse-direction firing. The bucket
+size in the current library is ~10 at peak per head.
 
-So Phase 3 is reasonable as a cheap first cut; graduating to
-discrimination trees becomes attractive once the lemma corpus is big
-enough that hash collisions in wildcard space start mattering.
+At classify time we hash the diff's `subLeft`, walk the bucket plus
+the wildcard bucket, and run a one-way matcher (BV(i) with i below
+the lemma's binder count is a metavariable; multi-occurrence requires
+`structurallyEqual` against the existing binding). On match we
+simultaneously substitute the bindings into the other side, compare
+with `subRight`, and emit a kernel-checked lemma application —
+wrapped in `Equality.symmetry` when the match was against the
+lemma's RHS.
+
+The trade-off vs Lean's discrimination trees: we lose intra-bucket
+discrimination on argument shape (a bucket can mix
+`commutativity`, `associativity`, `add_zero`, distributivity, …),
+which the matcher resolves linearly. Acceptable for the library's
+current scale; the upgrade path is a real discrimination tree if
+bucket sizes start mattering.
 
 ## 5. Packing the cached metadata into the hash word
 
@@ -161,26 +172,26 @@ planning either, and FNV-1a isn't a hash we'd expose externally anyway.
 
 | Use | Lean | Us (current / planned) |
 |---|---|---|
-| Per-node cached hash for fast-reject | yes | **Phase 1** |
+| Per-node cached hash for fast-reject | yes | **Phase 1 — landed** |
 | Hash-consing / dedup → pointer-identity everywhere | yes (primary use) | not planned |
 | Cached `hasFVar` / `hasMVar` / loose-bvar metadata | yes | not planned |
 | AC-modulo equality in the trusted base | no | not planned (would be unsound) |
-| AC-modulo equality in the auto-prover | no (tactics emit explicit proofs from canonical forms) | **Phase 2** |
-| Lemma indexing | discrimination trees | **Phase 3** (hash buckets, AC-canonical) |
+| AC-modulo equality in the auto-prover | no (tactics emit explicit proofs from canonical forms) | **Phase 2 — landed** (auto-invokes `ring`) |
+| Lemma indexing | discrimination trees | **Phase 3 — landed** (hash buckets keyed on spine head) |
 
 ## Bottom line
 
-If we want one piece of Lean's approach that we don't have and can fold
-into the in-flight Phase 1 work at low marginal cost, it's the cached
+With Phases 1–3 landed, the open question is which Lean-style cached
+metadata to fold into the existing hash field. The
 `hasFreeVariable` / `hasLooseBoundVariable` / `looseBoundVariableRange`
-bits — same construction sites as the hash, and they make whole-subtree
-skips in substitution/opening/closing O(1). We can keep the per-node
-footprint at one 64-bit word by packing them into the high 8 bits of
-the hash field (see §5); 56-bit hash is comfortably above our scale.
+bits — same construction sites as the hash, packed into the high
+8 bits per §5 — would make whole-subtree skips in
+substitution/opening/closing O(1). Trigger is a profile showing
+`substitute` / `openBinder` in the cold-rebuild top 5; until then
+this stays a planned-but-deferred item in TODO.md.
 
 The dedup table (point 2) is a bigger commit and best deferred until
-the bare hash has proved out in Phase 1 and we have a profile that
-shows allocation-heavy hotspots.
+we have a profile that shows allocation-heavy hotspots.
 
 Phase 2 is intentionally *not* Lean's approach. That's fine — `ring`
 in Lean is a tactic, not a kernel feature, and we are explicitly

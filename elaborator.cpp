@@ -21,6 +21,51 @@ struct LocalBinder {
     ExpressionPointer type;
 };
 
+// Spine-head hash used to bucket rewrite lemmas in the calc auto-prover's
+// lemma index (Phase 3). We walk the Application spine to its head and
+// hash just that head's identifying tag (Constant name, or a leaf-shape
+// tag for anything else). Two terms whose spines share the same head
+// land in the same bucket — e.g. `(a+b)+c`, `a+b`, and `a+0` all bucket
+// under `Natural.add` along with every other lemma whose LHS is rooted
+// at that operator. The subsequent first-order matcher resolves the
+// (small) bucket, and the kernel rechecks whatever proof term we emit.
+//
+// Coarse on purpose: argument shape can't be part of the bucket key
+// because lemma binders match arbitrary subtrees, and the hash of a
+// `BoundVariable` placeholder can't agree with the hash of an
+// arbitrary concrete subterm at the same slot. Discrimination trees
+// solve this by branching at wildcard slots; head-only buckets get
+// most of the speedup at a fraction of the implementation cost.
+inline uint64_t spineHash(ExpressionPointer expression) {
+    constexpr uint64_t kTagWildcard = 0xfeULL;
+    ExpressionPointer head = expression;
+    while (auto* application =
+               std::get_if<Application>(&head->node)) {
+        head = application->function;
+    }
+    uint64_t h = subtree_hash::kSeed;
+    if (auto* constant = std::get_if<Constant>(&head->node)) {
+        h = subtree_hash::mix(h, subtree_hash::kTagConstant);
+        h = subtree_hash::mix(h,
+            subtree_hash::hashString(constant->name));
+        return h;
+    }
+    if (std::holds_alternative<Pi>(head->node)) {
+        return subtree_hash::mix(h, subtree_hash::kTagPi);
+    }
+    if (std::holds_alternative<Lambda>(head->node)) {
+        return subtree_hash::mix(h, subtree_hash::kTagLambda);
+    }
+    if (std::holds_alternative<Let>(head->node)) {
+        return subtree_hash::mix(h, subtree_hash::kTagLet);
+    }
+    // BoundVariable / FreeVariable / Sort heads share one wildcard
+    // bucket: it's only consulted when the diff position itself is a
+    // bare leaf (rare), which is also exactly when reverse-direction
+    // identity lemmas need to fire.
+    return subtree_hash::mix(h, kTagWildcard);
+}
+
 class Elaborator {
 public:
     Elaborator(Environment& environment,
@@ -30,9 +75,9 @@ public:
 
     void runModule(const SurfaceModule& module) {
         moduleName_ = module.moduleName;
-        // Seed commutativity/associativity registries from theorems
-        // loaded via .mathv dependencies. New theorems added during
-        // this module's elaboration get registered incrementally in
+        // Seed the rewrite-lemma index from theorems loaded via .mathv
+        // dependencies. New theorems added during this module's
+        // elaboration get registered incrementally in
         // elaborateDefinition / elaboratePatternMatchDefinition.
         seedAlgebraicRegistryFromEnvironment();
         for (const auto& statement : module.statements) {
@@ -3381,228 +3426,85 @@ private:
         return true;
     }
 
-    // If `typeExpr` has the shape
-    //   Pi x1 ... Pi xN. Equality(_, op(BV(N-1-i), BV(N-1-j)),
-    //                                op(BV(N-1-j), BV(N-1-i)))
-    // with N == 2 and {i, j} == {0, 1}, return the op's constant name.
-    // Otherwise return empty string.
-    std::string detectCommutativityShape(ExpressionPointer typeExpr) {
-        int binderCount = 0;
-        ExpressionPointer cursor = typeExpr;
-        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
-            ++binderCount;
-            cursor = pi->codomain;
-        }
-        if (binderCount != 2) return {};
-        auto* eqApp3 = std::get_if<Application>(&cursor->node);
-        if (!eqApp3) return {};
-        auto* eqApp2 =
-            std::get_if<Application>(&eqApp3->function->node);
-        if (!eqApp2) return {};
-        auto* eqApp1 =
-            std::get_if<Application>(&eqApp2->function->node);
-        if (!eqApp1) return {};
-        auto* eqHead = std::get_if<Constant>(&eqApp1->function->node);
-        if (!eqHead || eqHead->name != "Equality") return {};
-        ExpressionPointer lhs = eqApp3->function;
-        // lhs above is App(App(Equality, A), x) — we want eqApp3's args.
-        // Equality.{u}(A, x, y) shape: App(App(App(Equality, A), x), y).
-        // So lhs (x) = eqApp2->argument, rhs (y) = eqApp3->argument.
-        ExpressionPointer x = eqApp2->argument;
-        ExpressionPointer y = eqApp3->argument;
-        std::string lhsOp, rhsOp;
-        std::vector<LevelPointer> lhsUniv, rhsUniv;
-        ExpressionPointer lLeft, lRight, rLeft, rRight;
-        if (!decomposeBinaryOpApplication(x, lhsOp, lhsUniv,
-                                           lLeft, lRight)) return {};
-        if (!decomposeBinaryOpApplication(y, rhsOp, rhsUniv,
-                                           rLeft, rRight)) return {};
-        if (lhsOp != rhsOp) return {};
-        // Args on lhs must each be one of the two binders (BV(0) or
-        // BV(1)), and rhs must use them swapped.
-        auto* lLeftBV = std::get_if<BoundVariable>(&lLeft->node);
-        auto* lRightBV = std::get_if<BoundVariable>(&lRight->node);
-        auto* rLeftBV = std::get_if<BoundVariable>(&rLeft->node);
-        auto* rRightBV = std::get_if<BoundVariable>(&rRight->node);
-        if (!lLeftBV || !lRightBV || !rLeftBV || !rRightBV) return {};
-        if (lLeftBV->deBruijnIndex == rRightBV->deBruijnIndex
-            && lRightBV->deBruijnIndex == rLeftBV->deBruijnIndex
-            && lLeftBV->deBruijnIndex != lRightBV->deBruijnIndex
-            && (lLeftBV->deBruijnIndex == 0
-                || lLeftBV->deBruijnIndex == 1)
-            && (lRightBV->deBruijnIndex == 0
-                || lRightBV->deBruijnIndex == 1)) {
-            return lhsOp;
-        }
-        return {};
-    }
-
-    // If `typeExpr` has the shape
-    //   Pi a Pi b Pi c. Equality(_, op(op(a, b), c), op(a, op(b, c)))
-    // with three binders and the BV indices arranged so the same
-    // bound variables appear in the indicated positions, return the
-    // op's constant name. Otherwise return empty string.
-    std::string detectAssociativityShape(ExpressionPointer typeExpr) {
-        int binderCount = 0;
-        ExpressionPointer cursor = typeExpr;
-        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
-            ++binderCount;
-            cursor = pi->codomain;
-        }
-        if (binderCount != 3) return {};
-        auto* eqApp3 = std::get_if<Application>(&cursor->node);
-        if (!eqApp3) return {};
-        auto* eqApp2 =
-            std::get_if<Application>(&eqApp3->function->node);
-        if (!eqApp2) return {};
-        auto* eqApp1 =
-            std::get_if<Application>(&eqApp2->function->node);
-        if (!eqApp1) return {};
-        auto* eqHead = std::get_if<Constant>(&eqApp1->function->node);
-        if (!eqHead || eqHead->name != "Equality") return {};
-        ExpressionPointer x = eqApp2->argument;
-        ExpressionPointer y = eqApp3->argument;
-        // lhs = op(op(a, b), c).
-        std::string outerOpL, innerOpL;
-        std::vector<LevelPointer> outerLUniv, innerLUniv;
-        ExpressionPointer lhsInner, lhsCArg, lhsA, lhsB;
-        if (!decomposeBinaryOpApplication(x, outerOpL, outerLUniv,
-                                           lhsInner, lhsCArg)) return {};
-        if (!decomposeBinaryOpApplication(lhsInner, innerOpL,
-                                           innerLUniv,
-                                           lhsA, lhsB)) return {};
-        // rhs = op(a, op(b, c)).
-        std::string outerOpR, innerOpR;
-        std::vector<LevelPointer> outerRUniv, innerRUniv;
-        ExpressionPointer rhsAArg, rhsInner, rhsB, rhsC;
-        if (!decomposeBinaryOpApplication(y, outerOpR, outerRUniv,
-                                           rhsAArg, rhsInner)) return {};
-        if (!decomposeBinaryOpApplication(rhsInner, innerOpR,
-                                           innerRUniv,
-                                           rhsB, rhsC)) return {};
-        if (outerOpL != innerOpL || outerOpL != outerOpR
-            || outerOpL != innerOpR) return {};
-        // Each of lhsA/lhsB/lhsCArg must be a distinct BV in {0, 1, 2}
-        // and the rhs positions must echo them: rhsAArg == lhsA,
-        // rhsB == lhsB, rhsC == lhsCArg.
-        auto* lABV = std::get_if<BoundVariable>(&lhsA->node);
-        auto* lBBV = std::get_if<BoundVariable>(&lhsB->node);
-        auto* lCBV = std::get_if<BoundVariable>(&lhsCArg->node);
-        auto* rABV = std::get_if<BoundVariable>(&rhsAArg->node);
-        auto* rBBV = std::get_if<BoundVariable>(&rhsB->node);
-        auto* rCBV = std::get_if<BoundVariable>(&rhsC->node);
-        if (!lABV || !lBBV || !lCBV || !rABV || !rBBV || !rCBV) return {};
-        if (lABV->deBruijnIndex != rABV->deBruijnIndex) return {};
-        if (lBBV->deBruijnIndex != rBBV->deBruijnIndex) return {};
-        if (lCBV->deBruijnIndex != rCBV->deBruijnIndex) return {};
-        std::set<int> seen{
-            lABV->deBruijnIndex, lBBV->deBruijnIndex,
-            lCBV->deBruijnIndex};
-        if (seen.size() != 3) return {};
-        if (seen.count(0) == 0 || seen.count(1) == 0
-            || seen.count(2) == 0) return {};
-        return outerOpL;
-    }
-
-    // Detect `(x : T) → op(unit, x) = x` (left-identity, unitOnLeft =
-    // true) or `(x : T) → op(x, unit) = x` (right-identity,
-    // unitOnLeft = false). On match returns true and fills outOp /
-    // outUnit / outUnitOnLeft. `unit` must be a closed term (no
-    // reference to the binder).
-    bool detectIdentityShape(ExpressionPointer typeExpr,
-                              std::string& outOp,
-                              ExpressionPointer& outUnit,
-                              bool& outUnitOnLeft) {
-        int binderCount = 0;
-        ExpressionPointer cursor = typeExpr;
-        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
-            ++binderCount;
-            cursor = pi->codomain;
-        }
-        if (binderCount != 1) return false;
-        auto* eqApp3 = std::get_if<Application>(&cursor->node);
-        if (!eqApp3) return false;
-        auto* eqApp2 =
-            std::get_if<Application>(&eqApp3->function->node);
-        if (!eqApp2) return false;
-        auto* eqApp1 =
-            std::get_if<Application>(&eqApp2->function->node);
-        if (!eqApp1) return false;
-        auto* eqHead = std::get_if<Constant>(&eqApp1->function->node);
-        if (!eqHead || eqHead->name != "Equality") return false;
-        ExpressionPointer lhs = eqApp2->argument;
-        ExpressionPointer rhs = eqApp3->argument;
-        // rhs must be BV(0).
-        auto* rhsBV = std::get_if<BoundVariable>(&rhs->node);
-        if (!rhsBV || rhsBV->deBruijnIndex != 0) return false;
-        // lhs must be op(a, b).
-        std::string opName;
-        std::vector<LevelPointer> opUniv;
-        ExpressionPointer a, b;
-        if (!decomposeBinaryOpApplication(lhs, opName, opUniv, a, b))
-            return false;
-        // Exactly one of a or b is BV(0); the other is the unit (and
-        // must be closed — must not mention BV(0)).
-        auto* aBV = std::get_if<BoundVariable>(&a->node);
-        auto* bBV = std::get_if<BoundVariable>(&b->node);
-        bool aIsBinder = aBV && aBV->deBruijnIndex == 0;
-        bool bIsBinder = bBV && bBV->deBruijnIndex == 0;
-        if (aIsBinder == bIsBinder) return false;
-        if (aIsBinder) {
-            // op(BV(0), unit) = BV(0) — right-identity.
-            if (referencesBoundBelowThreshold(b, 1)) return false;
-            outOp = opName;
-            outUnit = b;
-            outUnitOnLeft = false;
-        } else {
-            // op(unit, BV(0)) = BV(0) — left-identity.
-            if (referencesBoundBelowThreshold(a, 1)) return false;
-            outOp = opName;
-            outUnit = a;
-            outUnitOnLeft = true;
-        }
-        return true;
-    }
-
     // Hook called after each theorem is added to the environment.
-    // Records `<theoremName>` in commutativityLemmas_/associativityLemmas_/
-    // identityLemmas_ if its type fits one of the canonical shapes.
-    // Silent on non-match.
+    // If the type fits the rewrite-lemma shape, registers it in
+    // `lemmaIndex_` under both `spineHash(LHS)` and `spineHash(RHS)`
+    // so the calc auto-prover can apply it in either direction.
     void registerAlgebraicShape(const std::string& theoremName,
                                   ExpressionPointer typeExpr) {
-        std::string opName = detectCommutativityShape(typeExpr);
-        if (!opName.empty()
-            && commutativityLemmas_.count(opName) == 0) {
-            commutativityLemmas_[opName] = theoremName;
+        registerGenericRewriteLemma(theoremName, typeExpr);
+    }
+
+    // Rewrite-lemma registration. If `typeExpr` has the shape
+    //   Π x₁ : T₁. … Π xₙ : Tₙ. Equality.{u}(carrier, LHS, RHS)
+    // *and* the theorem has no universe parameters (first-cut
+    // limitation: universe-arg instantiation at use-site isn't wired
+    // up yet), index the lemma under both `spineHash(LHS)` and
+    // `spineHash(RHS)`. The reverse-direction entry lets the calc
+    // auto-prover handle `subLeft = … RHS-shape …`, wrapping the
+    // emitted proof in `Equality.symmetry`.
+    //
+    // We skip degenerate shapes: zero binders (the LHS would be
+    // closed, which makes the matcher pointless), or an LHS that is a
+    // bare BoundVariable (would match anything and is unlikely to be
+    // a useful rewrite).
+    void registerGenericRewriteLemma(const std::string& theoremName,
+                                       ExpressionPointer typeExpr) {
+        // First-cut: zero-universe-parameter lemmas only.
+        const Declaration* declaration =
+            environment_.lookup(theoremName);
+        if (!declaration) return;
+        auto* asDefinition =
+            std::get_if<Definition>(declaration);
+        if (!asDefinition) return;
+        if (!asDefinition->universeParameters.empty()) return;
+        // Peel leading Pi binders.
+        int binderCount = 0;
+        ExpressionPointer cursor = typeExpr;
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            ++binderCount;
+            cursor = pi->codomain;
+        }
+        if (binderCount == 0) return;
+        // Body must be App(App(App(Equality, carrier), lhs), rhs).
+        auto* eqApp3 = std::get_if<Application>(&cursor->node);
+        if (!eqApp3) return;
+        auto* eqApp2 =
+            std::get_if<Application>(&eqApp3->function->node);
+        if (!eqApp2) return;
+        auto* eqApp1 =
+            std::get_if<Application>(&eqApp2->function->node);
+        if (!eqApp1) return;
+        auto* eqHead = std::get_if<Constant>(&eqApp1->function->node);
+        if (!eqHead || eqHead->name != "Equality") return;
+        ExpressionPointer lhs = eqApp2->argument;
+        ExpressionPointer rhs = eqApp3->argument;
+        // Skip trivially-degenerate `(a : T) → a = a` shapes.
+        if (std::holds_alternative<BoundVariable>(lhs->node)
+            && std::holds_alternative<BoundVariable>(rhs->node)) {
             return;
         }
-        opName = detectAssociativityShape(typeExpr);
-        if (!opName.empty()
-            && associativityLemmas_.count(opName) == 0) {
-            associativityLemmas_[opName] = theoremName;
-            return;
-        }
-        std::string idOp;
-        ExpressionPointer idUnit;
-        bool idUnitOnLeft = false;
-        if (detectIdentityShape(typeExpr, idOp, idUnit, idUnitOnLeft)) {
-            // Skip if an identical entry is already present.
-            const auto& existing = identityLemmas_[idOp];
-            for (const auto& entry : existing) {
-                if (entry.unitOnLeft == idUnitOnLeft
-                    && structurallyEqual(entry.unit, idUnit)) {
-                    return;
-                }
-            }
-            IdentityLemma il;
-            il.lemmaName = theoremName;
-            il.unit = idUnit;
-            il.unitOnLeft = idUnitOnLeft;
-            // We currently never instantiate universe args for these
-            // lemmas — Natural / Integer / Rational identity lemmas
-            // have no universe parameters.
-            identityLemmas_[idOp].push_back(std::move(il));
-        }
+        // Register both directions. When a side is a bare BoundVariable
+        // its spineHash is the wildcard tag, which lands the entry in
+        // the wildcard bucket. That bucket is consulted only when the
+        // diff position is itself a leaf (a BV/FV/Sort) — so reverse-
+        // direction identity entries don't pollute regular lookups.
+        RewriteLemma forwardEntry;
+        forwardEntry.lemmaName = theoremName;
+        forwardEntry.binderCount = binderCount;
+        forwardEntry.lhs = lhs;
+        forwardEntry.rhs = rhs;
+        forwardEntry.reverseDirection = false;
+        lemmaIndex_.emplace(spineHash(lhs),
+                              std::move(forwardEntry));
+        RewriteLemma reverseEntry;
+        reverseEntry.lemmaName = theoremName;
+        reverseEntry.binderCount = binderCount;
+        reverseEntry.lhs = lhs;
+        reverseEntry.rhs = rhs;
+        reverseEntry.reverseDirection = true;
+        lemmaIndex_.emplace(spineHash(rhs),
+                              std::move(reverseEntry));
     }
 
     // Auto-prover for unannotated calc steps. Given a calc step's
@@ -3818,202 +3720,264 @@ private:
         }
     }
 
+    // Phase 3 first-order matcher. Walks `pattern` (a lemma's LHS or
+    // RHS, in closed-over-binders form) against `subject` (a term
+    // from the calc step's diff position, in closed-over-local-binders
+    // form). A BoundVariable in the pattern with index < binderCount
+    // is treated as a metavariable: on first occurrence it binds to
+    // the subject sub-term; on subsequent occurrences the new binding
+    // must be `structurallyEqual` to the existing one. Non-BV
+    // positions must match exactly (with `levelsDefinitionallyEqual`
+    // for Sort levels and Constant universe arguments).
+    //
+    // On success, `bindings[i]` holds the value matched against the
+    // lemma's binder with de Bruijn index `i` (so `bindings[0]` is the
+    // innermost binder). On failure, `bindings` may be partially
+    // populated; the caller treats that as "no match".
+    bool matchAgainstPattern(
+        ExpressionPointer pattern,
+        ExpressionPointer subject,
+        int binderCount,
+        std::vector<ExpressionPointer>& bindings) {
+        if (auto* patternBV =
+                std::get_if<BoundVariable>(&pattern->node)) {
+            if (patternBV->deBruijnIndex < binderCount) {
+                int slot = patternBV->deBruijnIndex;
+                if (!bindings[slot]) {
+                    bindings[slot] = subject;
+                    return true;
+                }
+                return structurallyEqual(bindings[slot], subject);
+            }
+        }
+        if (pattern->node.index() != subject->node.index()) {
+            return false;
+        }
+        if (auto* p = std::get_if<BoundVariable>(&pattern->node)) {
+            auto* s = std::get_if<BoundVariable>(&subject->node);
+            // Pattern BVs with index >= binderCount refer to binders
+            // outside the lemma — shouldn't occur in a well-formed
+            // top-level lemma, but be defensive: require equal index.
+            return p->deBruijnIndex == s->deBruijnIndex;
+        }
+        if (auto* p = std::get_if<FreeVariable>(&pattern->node)) {
+            auto* s = std::get_if<FreeVariable>(&subject->node);
+            return p->name == s->name && p->origin == s->origin;
+        }
+        if (auto* p = std::get_if<Sort>(&pattern->node)) {
+            auto* s = std::get_if<Sort>(&subject->node);
+            return levelsDefinitionallyEqual(p->level, s->level);
+        }
+        if (auto* p = std::get_if<Application>(&pattern->node)) {
+            auto* s = std::get_if<Application>(&subject->node);
+            return matchAgainstPattern(p->function, s->function,
+                                          binderCount, bindings)
+                && matchAgainstPattern(p->argument, s->argument,
+                                          binderCount, bindings);
+        }
+        if (auto* p = std::get_if<Constant>(&pattern->node)) {
+            auto* s = std::get_if<Constant>(&subject->node);
+            if (p->name != s->name) return false;
+            if (p->universeArguments.size()
+                    != s->universeArguments.size()) {
+                return false;
+            }
+            for (size_t i = 0; i < p->universeArguments.size(); ++i) {
+                if (!levelsDefinitionallyEqual(
+                        p->universeArguments[i],
+                        s->universeArguments[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        // Pi / Lambda / Let are rare in lemma LHSs and require binder-
+        // index bookkeeping we haven't wired up. Bail conservatively.
+        return false;
+    }
+
+    // Simultaneously substitute the matched bindings into a lemma's
+    // LHS or RHS. The lemma's expression is in closed-over-binders
+    // form: BoundVariable indices `0..bindings.size()-1` refer to the
+    // lemma's metavariable binders; `bindings[i]` is the value for
+    // BV(i), expressed in the *subject's* (calc-step) scope. The
+    // result lives in the subject's scope.
+    //
+    // We do this in a single walk rather than chaining the kernel's
+    // single-binder `substitute`. The chained-substitute approach
+    // corrupts a binding's BoundVariable indices the second time the
+    // walker passes over it: after substituting BV(0) → bindings[0],
+    // a subsequent `substitute(_, 0, bindings[1])` walks the entire
+    // tree (including bindings[0]) and decrements BV(>=1) — clobbering
+    // bindings[0]'s outer-binder references. A single combined walk
+    // sidesteps that by treating each binding as opaque once placed.
+    ExpressionPointer instantiateLemmaBinders(
+        ExpressionPointer expression,
+        const std::vector<ExpressionPointer>& bindings,
+        int nestedBinderDepth = 0) {
+        int N = static_cast<int>(bindings.size());
+        if (auto* bv =
+                std::get_if<BoundVariable>(&expression->node)) {
+            if (bv->deBruijnIndex < nestedBinderDepth) {
+                return expression;
+            }
+            int relative = bv->deBruijnIndex - nestedBinderDepth;
+            if (relative < N) {
+                return liftBoundVariables(bindings[relative],
+                                            nestedBinderDepth, 0);
+            }
+            // A reference past the lemma's own binders. Library
+            // rewrite lemmas shouldn't produce one, but if they do,
+            // close the gap left by the eliminated lemma binders.
+            return makeBoundVariable(
+                bv->deBruijnIndex - N);
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return makeApplication(
+                instantiateLemmaBinders(application->function,
+                                          bindings, nestedBinderDepth),
+                instantiateLemmaBinders(application->argument,
+                                          bindings, nestedBinderDepth));
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return makePi(pi->displayHint,
+                instantiateLemmaBinders(pi->domain, bindings,
+                                          nestedBinderDepth),
+                instantiateLemmaBinders(pi->codomain, bindings,
+                                          nestedBinderDepth + 1));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return makeLambda(lambda->displayHint,
+                instantiateLemmaBinders(lambda->domain, bindings,
+                                          nestedBinderDepth),
+                instantiateLemmaBinders(lambda->body, bindings,
+                                          nestedBinderDepth + 1));
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            return makeLet(let->displayHint,
+                instantiateLemmaBinders(let->type, bindings,
+                                          nestedBinderDepth),
+                instantiateLemmaBinders(let->value, bindings,
+                                          nestedBinderDepth),
+                instantiateLemmaBinders(let->body, bindings,
+                                          nestedBinderDepth + 1));
+        }
+        return expression;
+    }
+
+    // Phase 3 lemma-index lookup. Tries to close `subLeft = subRight`
+    // (at a single calc-step diff position) using a registered rewrite
+    // lemma. Subsumes the bespoke commutativity / associativity /
+    // identity classifiers and additionally fires on arbitrary
+    // user-written rewrite lemmas. Returns nullptr on miss; caller
+    // falls through to the local-hypothesis path and then to the
+    // Phase-2 AC-rearrangement fallback.
+    ExpressionPointer tryLemmaIndexLookup(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer subLeft,
+        ExpressionPointer subRight) {
+        // We look up two buckets: the subLeft-keyed bucket, and the
+        // wildcard bucket. The wildcard bucket holds reverse-direction
+        // entries for lemmas whose RHS is a bare metavariable (e.g.
+        // the identity `(x : T) → op(x, unit) = x`, which we want to
+        // fire when subLeft is `x` and subRight is `op(x, unit)`). The
+        // forward-direction entry of those lemmas, indexed under their
+        // op-headed LHS, lands in the regular bucket as usual.
+        std::vector<uint64_t> keys;
+        keys.push_back(spineHash(subLeft));
+        ExpressionPointer wildcardProbe = makeBoundVariable(0);
+        uint64_t wildcardKey = spineHash(wildcardProbe);
+        if (wildcardKey != keys[0]) {
+            keys.push_back(wildcardKey);
+        }
+        for (uint64_t key : keys) {
+        auto range = lemmaIndex_.equal_range(key);
+        for (auto iterator = range.first;
+             iterator != range.second; ++iterator) {
+            const RewriteLemma& lemma = iterator->second;
+            std::vector<ExpressionPointer> bindings(lemma.binderCount);
+            ExpressionPointer patternFor = lemma.reverseDirection
+                ? lemma.rhs : lemma.lhs;
+            ExpressionPointer otherSide = lemma.reverseDirection
+                ? lemma.lhs : lemma.rhs;
+            if (!matchAgainstPattern(patternFor, subLeft,
+                                       lemma.binderCount, bindings)) {
+                continue;
+            }
+            bool allBound = true;
+            for (const auto& binding : bindings) {
+                if (!binding) { allBound = false; break; }
+            }
+            if (!allBound) continue;
+            ExpressionPointer expectedOther =
+                instantiateLemmaBinders(otherSide, bindings);
+            if (!structurallyEqual(expectedOther, subRight)) continue;
+            // Assemble the lemma application: `lemmaName(binding_for_BV(n-1),
+            // …, binding_for_BV(0))` — outer binder first since that's
+            // the order of the Π chain.
+            ExpressionPointer call =
+                makeConstant(lemma.lemmaName, {});
+            for (int i = lemma.binderCount - 1; i >= 0; --i) {
+                call = makeApplication(std::move(call), bindings[i]);
+            }
+            if (!lemma.reverseDirection) {
+                return call;
+            }
+            // Reverse direction: lemma proves `RHS = LHS` but the diff
+            // wants `subLeft = subRight` where subLeft matches the
+            // lemma's RHS. So the lemma instance proves
+            // `subRight = subLeft`, which we wrap with
+            // `Equality.symmetry` to get the desired direction.
+            ExpressionPointer carrierClosed;
+            LevelPointer carrierLevelAtThisLevel;
+            try {
+                carrierClosed = inferTypeInLocalContext(
+                    localBinders, subLeft);
+                carrierLevelAtThisLevel = typeUniverseOf(
+                    localBinders, subLeft);
+            } catch (const TypeError&) {
+                continue;
+            } catch (const ElaborateError&) {
+                continue;
+            }
+            ExpressionPointer symmetryCall = makeConstant(
+                "Equality.symmetry", {carrierLevelAtThisLevel});
+            symmetryCall = makeApplication(
+                std::move(symmetryCall), carrierClosed);
+            symmetryCall = makeApplication(
+                std::move(symmetryCall), subRight);
+            symmetryCall = makeApplication(
+                std::move(symmetryCall), subLeft);
+            symmetryCall = makeApplication(
+                std::move(symmetryCall), std::move(call));
+            return symmetryCall;
+        }
+        }
+        return nullptr;
+    }
+
     // Try to prove `Equality(_, subLeft, subRight)` at a single
-    // diff position. Strategies: commutativity (subLeft = op(X, Y),
-    // subRight = op(Y, X) and op is registered); associativity
-    // (subLeft = op(op(A,B),C), subRight = op(A,op(B,C)) or
-    // vice versa); local hypothesis match (a binder of type
-    // subLeft = subRight, or its symmetric form). Returns nullptr
-    // on miss. Result is in CLOSED-over-localBinders form.
+    // diff position. Strategies, in order:
+    //   1. Lemma-index lookup (`tryLemmaIndexLookup`): bucket library
+    //      rewrite lemmas by `spineHash(LHS)` and `spineHash(RHS)`,
+    //      run a small first-order matcher on hits, emit the lemma
+    //      application (wrapping in `Equality.symmetry` for reverse
+    //      direction). Subsumes commutativity / associativity /
+    //      identity / arbitrary user-written rewrite lemmas.
+    //   2. Local hypothesis match: a binder of type
+    //      `Equality(_, subLeft, subRight)` or its symmetric form is
+    //      used directly (with a symmetry wrap on the symmetric case).
+    // Returns nullptr on miss. Result is in CLOSED-over-localBinders
+    // form.
     ExpressionPointer tryClassifyDiff(
         const std::vector<LocalBinder>& localBinders,
         const Context& openedContext,
         ExpressionPointer subLeft,
         ExpressionPointer subRight) {
-        // Commutativity.
-        {
-            std::string lOp, rOp;
-            std::vector<LevelPointer> lUniv, rUniv;
-            ExpressionPointer lA, lB, rA, rB;
-            if (decomposeBinaryOpApplication(
-                    subLeft, lOp, lUniv, lA, lB)
-                && decomposeBinaryOpApplication(
-                    subRight, rOp, rUniv, rA, rB)
-                && lOp == rOp
-                && structurallyEqual(lA, rB)
-                && structurallyEqual(lB, rA)
-                && commutativityLemmas_.count(lOp) > 0) {
-                const std::string& lemmaName =
-                    commutativityLemmas_.at(lOp);
-                ExpressionPointer call =
-                    makeConstant(lemmaName, lUniv);
-                call = makeApplication(std::move(call), lA);
-                call = makeApplication(std::move(call), lB);
-                return call;
-            }
-        }
-        // Associativity LHS-style: subLeft = op(op(A,B),C),
-        // subRight = op(A, op(B,C)).
-        {
-            std::string outerOpL, innerOpL, outerOpR, innerOpR;
-            std::vector<LevelPointer> outerLU, innerLU, outerRU, innerRU;
-            ExpressionPointer lInner, lC, lA, lB;
-            ExpressionPointer rA, rInner, rB, rC;
-            if (decomposeBinaryOpApplication(
-                    subLeft, outerOpL, outerLU, lInner, lC)
-                && decomposeBinaryOpApplication(
-                    lInner, innerOpL, innerLU, lA, lB)
-                && decomposeBinaryOpApplication(
-                    subRight, outerOpR, outerRU, rA, rInner)
-                && decomposeBinaryOpApplication(
-                    rInner, innerOpR, innerRU, rB, rC)
-                && outerOpL == innerOpL && outerOpL == outerOpR
-                && outerOpL == innerOpR
-                && structurallyEqual(lA, rA)
-                && structurallyEqual(lB, rB)
-                && structurallyEqual(lC, rC)
-                && associativityLemmas_.count(outerOpL) > 0) {
-                const std::string& lemmaName =
-                    associativityLemmas_.at(outerOpL);
-                ExpressionPointer call =
-                    makeConstant(lemmaName, outerLU);
-                call = makeApplication(std::move(call), lA);
-                call = makeApplication(std::move(call), lB);
-                call = makeApplication(std::move(call), lC);
-                return call;
-            }
-        }
-        // Associativity reversed: subLeft = op(A, op(B,C)),
-        // subRight = op(op(A,B), C). Wrap the canonical form with
-        // Equality.symmetry.
-        {
-            std::string outerOpL, innerOpL, outerOpR, innerOpR;
-            std::vector<LevelPointer> outerLU, innerLU, outerRU, innerRU;
-            ExpressionPointer lA, lInner, lB, lC;
-            ExpressionPointer rInner, rC, rA, rB;
-            if (decomposeBinaryOpApplication(
-                    subLeft, outerOpL, outerLU, lA, lInner)
-                && decomposeBinaryOpApplication(
-                    lInner, innerOpL, innerLU, lB, lC)
-                && decomposeBinaryOpApplication(
-                    subRight, outerOpR, outerRU, rInner, rC)
-                && decomposeBinaryOpApplication(
-                    rInner, innerOpR, innerRU, rA, rB)
-                && outerOpL == innerOpL && outerOpL == outerOpR
-                && outerOpL == innerOpR
-                && structurallyEqual(lA, rA)
-                && structurallyEqual(lB, rB)
-                && structurallyEqual(lC, rC)
-                && associativityLemmas_.count(outerOpL) > 0) {
-                const std::string& lemmaName =
-                    associativityLemmas_.at(outerOpL);
-                ExpressionPointer assocCall =
-                    makeConstant(lemmaName, outerLU);
-                assocCall = makeApplication(std::move(assocCall), lA);
-                assocCall = makeApplication(std::move(assocCall), lB);
-                assocCall = makeApplication(std::move(assocCall), lC);
-                // assocCall : op(op(A,B),C) = op(A, op(B,C)).
-                // We need the opposite direction.
-                // Equality.symmetry.{u}(carrier, op(op(A,B),C),
-                //   op(A,op(B,C)), assocCall). Infer carrier and
-                // level from subLeft (it's in closed form already).
-                ExpressionPointer carrierClosed;
-                LevelPointer carrierLevelAtThisLevel;
-                try {
-                    ExpressionPointer typeOfSub =
-                        inferTypeInLocalContext(localBinders, subLeft);
-                    carrierClosed = typeOfSub;
-                    carrierLevelAtThisLevel = typeUniverseOf(
-                        localBinders, subLeft);
-                } catch (const TypeError&) {
-                    return nullptr;
-                } catch (const ElaborateError&) {
-                    return nullptr;
-                }
-                ExpressionPointer assocLHS = subRight;
-                ExpressionPointer assocRHS = subLeft;
-                ExpressionPointer symmetryCall = makeConstant(
-                    "Equality.symmetry",
-                    {carrierLevelAtThisLevel});
-                symmetryCall = makeApplication(
-                    std::move(symmetryCall), carrierClosed);
-                symmetryCall = makeApplication(
-                    std::move(symmetryCall), assocLHS);
-                symmetryCall = makeApplication(
-                    std::move(symmetryCall), assocRHS);
-                symmetryCall = makeApplication(
-                    std::move(symmetryCall), std::move(assocCall));
-                return symmetryCall;
-            }
-        }
-        // Identity lemma: subLeft = op(unit, x), subRight = x (or the
-        // mirror with unit on the right, or the reverse direction
-        // where subRight is the op). Looks up identityLemmas_[op]
-        // for a registered (unit, side) match, then calls the lemma
-        // with x.
-        for (int direction = 0; direction < 2; ++direction) {
-            ExpressionPointer opSide =
-                direction == 0 ? subLeft : subRight;
-            ExpressionPointer plainSide =
-                direction == 0 ? subRight : subLeft;
-            std::string opName;
-            std::vector<LevelPointer> opUniv;
-            ExpressionPointer aArg, bArg;
-            if (!decomposeBinaryOpApplication(
-                    opSide, opName, opUniv, aArg, bArg)) continue;
-            auto it = identityLemmas_.find(opName);
-            if (it == identityLemmas_.end()) continue;
-            for (const auto& il : it->second) {
-                ExpressionPointer storedUnit = il.unit;
-                ExpressionPointer storedVar = aArg;
-                bool unitOk = false;
-                if (il.unitOnLeft) {
-                    if (structurallyEqual(aArg, storedUnit)) {
-                        storedVar = bArg;
-                        unitOk = true;
-                    }
-                } else {
-                    if (structurallyEqual(bArg, storedUnit)) {
-                        storedVar = aArg;
-                        unitOk = true;
-                    }
-                }
-                if (!unitOk) continue;
-                if (!structurallyEqual(storedVar, plainSide)) continue;
-                ExpressionPointer call =
-                    makeConstant(il.lemmaName, il.universeArguments);
-                call = makeApplication(std::move(call), storedVar);
-                if (direction == 1) {
-                    // subRight = op(...) and subLeft = x; lemma proves
-                    // op(...) = x but the calc step expects x = op(...).
-                    // Wrap with Equality.symmetry.
-                    ExpressionPointer carrierClosed;
-                    LevelPointer carrierLevelAtThisLevel;
-                    try {
-                        carrierClosed = inferTypeInLocalContext(
-                            localBinders, subLeft);
-                        carrierLevelAtThisLevel = typeUniverseOf(
-                            localBinders, subLeft);
-                    } catch (const TypeError&) {
-                        return nullptr;
-                    } catch (const ElaborateError&) {
-                        return nullptr;
-                    }
-                    ExpressionPointer symmetryCall = makeConstant(
-                        "Equality.symmetry",
-                        {carrierLevelAtThisLevel});
-                    symmetryCall = makeApplication(
-                        std::move(symmetryCall), carrierClosed);
-                    symmetryCall = makeApplication(
-                        std::move(symmetryCall), subRight);
-                    symmetryCall = makeApplication(
-                        std::move(symmetryCall), subLeft);
-                    symmetryCall = makeApplication(
-                        std::move(symmetryCall), std::move(call));
-                    return symmetryCall;
-                }
-                return call;
-            }
+        if (ExpressionPointer proof = tryLemmaIndexLookup(
+                localBinders, subLeft, subRight)) {
+            return proof;
         }
         // Local hypothesis match (forward and symmetric). Scan
         // local binders for one whose type is
@@ -8736,26 +8700,30 @@ private:
         std::vector<SurfaceConventionProposition> propositions;
     };
     std::unordered_map<std::string, ConventionEntry> conventionRegistry_;
-    // Maps from binary-operator constant name (e.g. "Natural.add") to
-    // the name of a previously-declared theorem proving its
-    // commutativity / associativity. Populated by
-    // detectAlgebraicShape() at each definition's add-to-environment
-    // time. Consulted by the calc auto-prover when a step's LHS/RHS
-    // diff at a single position matches the corresponding pattern.
-    std::unordered_map<std::string, std::string> commutativityLemmas_;
-    std::unordered_map<std::string, std::string> associativityLemmas_;
-    // Identity lemmas: `(x : T) → op(unit, x) = x` (left-identity) or
-    // `(x : T) → op(x, unit) = x` (right-identity). One op can have
-    // both forms registered; we store them as a list. The `unit` term
-    // is the closed expression that plays the identity role.
-    struct IdentityLemma {
+    // Phase 3 lemma index. Each registered rewrite lemma — anything of
+    // shape `Π x₁ … xₙ. Equality.{u}(carrier, LHS, RHS)` with no
+    // universe parameters — is keyed by `spineHash(LHS)` (and again by
+    // `spineHash(RHS)` so a reverse-direction lookup works without a
+    // separate scan). At calc-step classify time we hash the diff,
+    // pull candidates from the bucket, run a small first-order matcher,
+    // substitute the matched bindings into the lemma's RHS, and verify
+    // structural equality against the other endpoint. This subsumes
+    // the bespoke commutativity/associativity/identity classifiers and
+    // additionally fires on any user-written rewrite lemma whose LHS
+    // matches the diff.
+    struct RewriteLemma {
         std::string lemmaName;
-        std::vector<LevelPointer> universeArguments;
-        ExpressionPointer unit;
-        bool unitOnLeft;  // true: op(unit, x) = x; false: op(x, unit) = x
+        int binderCount = 0;
+        // LHS / RHS in closed-over-binders form: BoundVariable(0..n-1)
+        // refer to the lemma's binders, BV(0) being the *innermost*.
+        ExpressionPointer lhs;
+        ExpressionPointer rhs;
+        // Set when this entry indexes the lemma's RHS (so a hash hit
+        // means we matched the wrong side and must emit
+        // `Equality.symmetry`).
+        bool reverseDirection = false;
     };
-    std::unordered_map<std::string, std::vector<IdentityLemma>>
-        identityLemmas_;
+    std::unordered_multimap<uint64_t, RewriteLemma> lemmaIndex_;
     // Context frames describing what the elaborator is currently doing.
     // Each frame is a short phrase like "while elaborating cases at
     // line 42". `Frame` is an RAII guard that pushes on construction
