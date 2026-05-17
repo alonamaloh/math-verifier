@@ -515,20 +515,25 @@ struct SurfaceOverloadDeclaration {
     std::string functionName;
 };
 
-// `convention <name+> : <type> [with <prop>];` — name-bound implicit
-// binders. Any subsequent definition or theorem that mentions a
-// convention-bound name as a free identifier in its signature gets
-// `{name : type} {_h_n : prop1} ...` prepended to its binder list as
-// implicit binders. This is the file-level equivalent of math books
-// saying "throughout this chapter, p and q denote prime numbers."
+// `convention <name+> : <type> [with <propBinder>+];` — name-bound
+// implicit binders. Any subsequent definition or theorem that
+// mentions a convention-bound name as a free identifier in its
+// signature gets `{name : type} {hypName : prop1} ...` prepended to
+// its binder list as implicit binders. This is the file-level
+// equivalent of math books saying "throughout this chapter, p and q
+// denote prime numbers."
+//
+// Each `with` clause is one of:
+//   - `<prop>`            — anonymous hypothesis (auto-named `_convention_hN`)
+//   - `<name> : <prop>`   — named hypothesis the body can refer to
+struct SurfaceConventionProposition {
+    std::string name;            // empty for anonymous
+    SurfaceExpressionPointer proposition;
+};
 struct SurfaceConventionDeclaration {
-    std::vector<std::string> names;          // e.g. ["p", "q"] for shared type/props
+    std::vector<std::string> names;          // e.g. ["p", "q"]
     SurfaceExpressionPointer type;           // e.g. Natural
-    // Each propositional side-condition is a SurfaceExpression that can
-    // reference any name in `names` (or the surrounding scope). Each
-    // becomes an implicit binder of that proposition's type, with an
-    // anonymous (generated) name.
-    std::vector<SurfaceExpressionPointer> propositions;
+    std::vector<SurfaceConventionProposition> propositions;
 };
 
 // `coercion (<sourceTypeName>, <targetTypeName>) := <function>` —

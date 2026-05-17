@@ -499,13 +499,30 @@ private:
         declaration.type = parseExpression();
         if (peek().kind == TokenKind::KeywordWith) {
             consumeAny();  // 'with'
-            declaration.propositions.push_back(parseExpression());
+            declaration.propositions.push_back(parseConventionProposition());
             while (peek().kind == TokenKind::Comma) {
                 consumeAny();  // ','
-                declaration.propositions.push_back(parseExpression());
+                declaration.propositions.push_back(
+                    parseConventionProposition());
             }
         }
         return declaration;
+    }
+
+    // One `with` entry: either an anonymous proposition `<expr>` or a
+    // named one `<name> : <expr>`. We disambiguate by lookahead: an
+    // identifier followed by `:` (and not by `.` — qualified names are
+    // legal expressions) starts a named entry.
+    SurfaceConventionProposition parseConventionProposition() {
+        SurfaceConventionProposition entry;
+        if (isIdentifierLike(peek().kind)
+            && position_ + 1 < tokens_.size()
+            && tokens_[position_ + 1].kind == TokenKind::Colon) {
+            entry.name = consumeAny().lexeme;
+            consumeAny();  // ':'
+        }
+        entry.proposition = parseExpression();
+        return entry;
     }
 
     SurfaceInductiveDeclaration parseInductiveDeclaration() {

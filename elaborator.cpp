@@ -787,8 +787,11 @@ private:
             for (const auto& prop : entry.propositions) {
                 SurfaceBinder propBinder;
                 propBinder.names = {
-                    "_convention_h" + std::to_string(propCounter++)};
-                propBinder.type = prop;
+                    prop.name.empty()
+                        ? ("_convention_h"
+                           + std::to_string(propCounter++))
+                        : prop.name};
+                propBinder.type = prop.proposition;
                 propBinder.isImplicit = true;
                 prepended.push_back(propBinder);
             }
@@ -7867,7 +7870,7 @@ private:
     // matches the per-module verifier invocation).
     struct ConventionEntry {
         SurfaceExpressionPointer type;
-        std::vector<SurfaceExpressionPointer> propositions;
+        std::vector<SurfaceConventionProposition> propositions;
     };
     std::unordered_map<std::string, ConventionEntry> conventionRegistry_;
     // Context frames describing what the elaborator is currently doing.
