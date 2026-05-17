@@ -399,6 +399,30 @@ miss; a future "normal-form hashing" extension covers it. **Task
 Implementation order: land Phase 1, measure speedup, then Phase 2.
 Phase 3 builds cleanly on Phase 2's `acEqual`.
 
+#### Deferred — pack loose-bvar / free-var flags into the hash word
+
+See `HASH_USE_VS_LEAN.md` §2 and §5. Lean caches `hasFVar`,
+`hasLooseBVar`, and `looseBVarRange` per Expr next to the hash, and
+uses those to make `instantiate` / `abstract` / `substitute` O(1) on
+closed subtrees. We could do the same — same construction sites as
+the hash, and the bits fit in the high 8 bits of our `uint64_t hash`
+field (56-bit hash is comfortably above our 10^5–10^6 expression
+scale; collisions in all our use cases are correctness-preserving).
+
+Decided to defer for two reasons:
+
+1. **Different concern.** Phase 1 was equality fast-reject; the
+   packed flags are about substitution-skip. They're orthogonal.
+   Phases 2 and 3 don't need the flags.
+2. **No measurement yet.** Phase 1 already gave us a 4× cold-rebuild
+   speedup; we don't yet know whether `substitute` / `openBinder` are
+   the next bottleneck. The decision should be data-driven.
+
+**Trigger:** after Phases 2 and 3 land, profile a cold-rebuild of
+the whole library. If `substitute` / `openBinder` show up in the top
+5, pack the 8 bits. Otherwise defer further or drop. The packing
+isn't load-bearing; it's a perf optimization gated on a profile.
+
 ### Next sweep — Equality combinator carrier implicit
 
 `Equality.transport_proposition`, `Equality.transitivity`,
