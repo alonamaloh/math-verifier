@@ -203,6 +203,32 @@ and LLMs.
   fallback.
 - ✅ **Document short-form inference and idioms in `CLAUDE.md`.** Done.
 
+### Deferred — short forms of Or/And/Exists.eliminate
+
+`Or.eliminate(hL, hR, disj)`, `And.eliminate(h, conj)`,
+`Exists.eliminate(h, ex)` short desugarings were prototyped. The
+mechanical part (extracting types from the third/second argument,
+constructing the full call) works fine; the trip-up is that when the
+*outer expected type* contains free variables from local binders
+(common — any theorem with parameters), threading it as
+`makePi("_", A, expectedType)` into the handler's elaboration causes
+the kernel to lose track of those free variables ("unbound internal
+variable: m" or similar).
+
+The no-expectedType fallback works for the OUTERMOST call (the
+elaborator gets Goal from handleLeft's codomain), but inside a
+nested Or/Exists/And.eliminate, the inner call has no expected type
+unless we propagate, so constructors like `Or.introduceLeft(p)` (with
+implicit A, B from context) fail to infer their parameters.
+
+This is structurally the same blocker as the auto-congruence in calc
+prototype (item above): synthesizing terms that mix
+opened-form FreeVariables with kernel-level BoundVariables. Fix
+needs a careful close/open dance during desugar synthesis.
+
+Reverted. The verbose `Or.eliminate(A, B, Goal, hL, hR, disj)` form
+still works.
+
 ### Deferred — auto-congruence in calc steps
 
 Goal: let the user write `by eq` for any calc step whose two sides
