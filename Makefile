@@ -53,11 +53,20 @@ clean:
 
 BUILD_DIR := build
 MATH_FILES := $(shell find library -name '*.math' | sort)
-MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(MATH_FILES))
+# Split: `library` verifies math content; `tests` verifies the elaborator-
+# feature exercises under library/Test/. `library` is the inner loop —
+# keep it fast and noise-free (the test files use `sorry` deliberately,
+# which produces warnings at every build).
+LIBRARY_MATH_FILES := $(filter-out library/Test/%,$(MATH_FILES))
+TEST_MATH_FILES := $(filter library/Test/%,$(MATH_FILES))
+LIBRARY_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(LIBRARY_MATH_FILES))
+TEST_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(TEST_MATH_FILES))
 
-.PHONY: library library-clean
+.PHONY: library library-clean tests
 
-library: $(MATHV_FILES)
+library: $(LIBRARY_MATHV_FILES)
+
+tests: library $(TEST_MATHV_FILES)
 
 # Recipe for a .mathv. The pattern rule provides the .math prerequisite;
 # explicit .mathv prerequisites come from the included dependency file
@@ -71,6 +80,8 @@ $(BUILD_DIR)/%.mathv: %.math | kernel
 
 -include $(BUILD_DIR)/library-depends.mk
 
+# Depends generation covers ALL math files (library + tests) so the
+# included rule set works whether the user invokes `library` or `tests`.
 $(BUILD_DIR)/library-depends.mk: $(MATH_FILES) | kernel
 	@mkdir -p $(BUILD_DIR)
 	./kernel deps --cache-root $(BUILD_DIR) $(MATH_FILES) > $@
