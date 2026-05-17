@@ -282,6 +282,25 @@ tactic; per-block `open NAMESPACE`.
 
 ## Completed
 
+- **2026-05-17: Auto-prover for calc steps + `by` optional.** `by`
+  is now optional on calc steps. When absent, the elaborator runs an
+  auto-prover that tries:
+  (1) definitional equality → `reflexivity`;
+  (2) single-position diff classified as commutativity / associativity
+      (forward or reverse) / local-hypothesis match, then wrapped with
+      `Equality.congruence` for each App level the diff walker
+      descended through (supports both Arg and Fn descent, so a diff
+      in the *first* argument of a binary op also closes).
+  Commutativity and associativity lemmas are auto-registered at
+  declaration time and seeded from `.mathv` deps at module start —
+  no convention block needed. Sample reduction: in `Natural.multiply_
+  successor_no_by`, six of seven steps drop their `by` clauses; only
+  the combined β + assoc-reverse step still needs one. New tests in
+  `library/Test/induction_style_test.math`. Files: `parser.cpp`
+  (optional `by`), `elaborator.cpp` (shape detection +
+  `autoProveCalcStep` + `tryClassifyDiff` +
+  `seedAlgebraicRegistryFromEnvironment`).
+
 - **2026-05-14: Rational as CommutativeRing.** Operations
   (add/multiply/negate/subtract) + respect proofs + ring laws
   (commutativity, identity, inverse, associativity, distributivity)

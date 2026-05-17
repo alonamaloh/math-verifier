@@ -1609,19 +1609,27 @@ private:
         while (peek().kind == TokenKind::Equal) {
             Token equalToken = consumeAny();  // '='
             auto nextExpression = parseRelational();
-            expect(TokenKind::KeywordBy,
-                   "after target expression in calc step");
-            auto stepProof = parseCalcStepProof();
             SurfaceCalcStep step;
             step.nextExpression = std::move(nextExpression);
-            step.stepProof = std::move(stepProof);
             step.line = equalToken.line;
             step.column = equalToken.column;
+            // `by <proof>` is optional. When omitted, the elaborator
+            // runs an auto-prover that tries reflexivity (def-eq) and
+            // single-position diffs categorized as commutativity /
+            // associativity / local hypothesis. If the auto-prover
+            // can't close the step, the user gets an error and supplies
+            // `by <reason>`.
+            if (peek().kind == TokenKind::KeywordBy) {
+                consumeAny();  // 'by'
+                step.stepProof = parseCalcStepProof();
+            } else {
+                step.stepProof = nullptr;
+            }
             steps.push_back(std::move(step));
         }
         if (steps.empty()) {
             throwHere("calc block needs at least one "
-                      "'= <expression> by <proof>' step");
+                      "'= <expression> [by <proof>]' step");
         }
         return makeSurfaceCalc(std::move(initialExpression),
                                 std::move(steps),

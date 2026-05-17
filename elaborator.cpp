@@ -30,8 +30,27 @@ public:
 
     void runModule(const SurfaceModule& module) {
         moduleName_ = module.moduleName;
+        // Seed commutativity/associativity registries from theorems
+        // loaded via .mathv dependencies. New theorems added during
+        // this module's elaboration get registered incrementally in
+        // elaborateDefinition / elaboratePatternMatchDefinition.
+        seedAlgebraicRegistryFromEnvironment();
         for (const auto& statement : module.statements) {
             elaborateTopStatement(statement);
+        }
+    }
+
+    // Walk the pre-loaded environment and run shape detection on
+    // every Definition's declared type. We restrict to Definitions
+    // (not Axioms) since theorems serialise as Definitions with a
+    // proof body.
+    void seedAlgebraicRegistryFromEnvironment() {
+        for (const auto& entry : environment_.declarations) {
+            const std::string& name = entry.first;
+            const auto& declaration = entry.second;
+            if (auto* def = std::get_if<Definition>(&declaration)) {
+                registerAlgebraicShape(name, def->type);
+            }
         }
     }
 
@@ -948,6 +967,10 @@ private:
                                    fullBody);
         }
 
+        // We are about to move fullType/fullBody into addDefinition. Keep
+        // a copy of the type for post-registration algebraic-shape
+        // detection.
+        ExpressionPointer typeForDetection = fullType;
         try {
             addDefinition(environment_, declaration.name,
                           finalUniverseParameters(declaration.universeParameters),
@@ -960,6 +983,9 @@ private:
         if (implicitCount > 0) {
             environment_.implicitArgumentCounts[declaration.name] =
                 implicitCount;
+        }
+        if (declaration.isTheorem) {
+            registerAlgebraicShape(declaration.name, typeForDetection);
         }
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
@@ -1399,6 +1425,7 @@ private:
                                    std::move(fullBody));
         }
 
+        ExpressionPointer typeForDetection = fullType;
         try {
             addDefinition(environment_, declaration.name,
                           finalUniverseParameters(declaration.universeParameters),
@@ -1411,6 +1438,9 @@ private:
         if (implicitCount > 0) {
             environment_.implicitArgumentCounts[declaration.name] =
                 implicitCount;
+        }
+        if (declaration.isTheorem) {
+            registerAlgebraicShape(declaration.name, typeForDetection);
         }
 
         currentUniverseParametersOrdered_.clear();
@@ -3218,8 +3248,26 @@ private:
                         carrierType),
                     previousKernel),
                 nextKernel);
-            ExpressionPointer stepProofKernel = elaborateExpression(
-                *step.stepProof, localBinders, stepEqualityType);
+            ExpressionPointer stepProofKernel;
+            if (step.stepProof) {
+                stepProofKernel = elaborateExpression(
+                    *step.stepProof, localBinders, stepEqualityType);
+            } else {
+                // No `by <proof>` — run the auto-prover. v0: try
+                // reflexivity (definitional equality) only. Future
+                // iterations add commutativity/associativity/local-
+                // hypothesis recognition via a single-position diff.
+                stepProofKernel = autoProveCalcStep(
+                    localBinders, previousKernel, nextKernel,
+                    carrierType, carrierLevel, stepEqualityType,
+                    step.line, step.column);
+                if (!stepProofKernel) {
+                    throwElaborate(
+                        "calc step has no `by <proof>` and the "
+                        "auto-prover couldn't close it. Add `by "
+                        "<reason>` to disambiguate.");
+                }
+            }
             // Verify the proof actually has the equality type the step
             // claims — bare identifier proofs don't get checked against
             // expectedType during elaboration, so a wrong proof would
@@ -3247,15 +3295,19 @@ private:
                 // occurrence of the proof's LHS in the goal's LHS
                 // and wraps the proof in `Equality.congruence`.
                 // Lets the user write `by IH` instead of
-                // `by rewrite(IH)`.
+                // `by rewrite(IH)`. Only fires when a surface proof
+                // was supplied — when stepProof is nullptr the
+                // auto-prover above has already run.
                 ExpressionPointer rewriteAttempt;
-                try {
-                    rewriteAttempt = desugarRewrite(
-                        step.stepProof, localBinders,
-                        stepEqualityType,
-                        step.line, step.column);
-                } catch (const ElaborateError&) {
-                    rewriteAttempt = nullptr;
+                if (step.stepProof) {
+                    try {
+                        rewriteAttempt = desugarRewrite(
+                            step.stepProof, localBinders,
+                            stepEqualityType,
+                            step.line, step.column);
+                    } catch (const ElaborateError&) {
+                        rewriteAttempt = nullptr;
+                    }
                 }
                 if (rewriteAttempt) {
                     ExpressionPointer rewriteType =
@@ -3303,6 +3355,548 @@ private:
             running = std::move(call);
         }
         return running;
+    }
+
+    // Try to decompose `term` as `op(left, right)` where `op` is a
+    // top-level Constant. Returns true with the op name, universe
+    // arguments, and the two argument expressions on success.
+    bool decomposeBinaryOpApplication(
+        ExpressionPointer term,
+        std::string& outOpName,
+        std::vector<LevelPointer>& outOpUniverseArguments,
+        ExpressionPointer& outLeft,
+        ExpressionPointer& outRight) {
+        auto* outerApp = std::get_if<Application>(&term->node);
+        if (!outerApp) return false;
+        auto* innerApp =
+            std::get_if<Application>(&outerApp->function->node);
+        if (!innerApp) return false;
+        auto* opConst =
+            std::get_if<Constant>(&innerApp->function->node);
+        if (!opConst) return false;
+        outOpName = opConst->name;
+        outOpUniverseArguments = opConst->universeArguments;
+        outLeft = innerApp->argument;
+        outRight = outerApp->argument;
+        return true;
+    }
+
+    // If `typeExpr` has the shape
+    //   Pi x1 ... Pi xN. Equality(_, op(BV(N-1-i), BV(N-1-j)),
+    //                                op(BV(N-1-j), BV(N-1-i)))
+    // with N == 2 and {i, j} == {0, 1}, return the op's constant name.
+    // Otherwise return empty string.
+    std::string detectCommutativityShape(ExpressionPointer typeExpr) {
+        int binderCount = 0;
+        ExpressionPointer cursor = typeExpr;
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            ++binderCount;
+            cursor = pi->codomain;
+        }
+        if (binderCount != 2) return {};
+        auto* eqApp3 = std::get_if<Application>(&cursor->node);
+        if (!eqApp3) return {};
+        auto* eqApp2 =
+            std::get_if<Application>(&eqApp3->function->node);
+        if (!eqApp2) return {};
+        auto* eqApp1 =
+            std::get_if<Application>(&eqApp2->function->node);
+        if (!eqApp1) return {};
+        auto* eqHead = std::get_if<Constant>(&eqApp1->function->node);
+        if (!eqHead || eqHead->name != "Equality") return {};
+        ExpressionPointer lhs = eqApp3->function;
+        // lhs above is App(App(Equality, A), x) — we want eqApp3's args.
+        // Equality.{u}(A, x, y) shape: App(App(App(Equality, A), x), y).
+        // So lhs (x) = eqApp2->argument, rhs (y) = eqApp3->argument.
+        ExpressionPointer x = eqApp2->argument;
+        ExpressionPointer y = eqApp3->argument;
+        std::string lhsOp, rhsOp;
+        std::vector<LevelPointer> lhsUniv, rhsUniv;
+        ExpressionPointer lLeft, lRight, rLeft, rRight;
+        if (!decomposeBinaryOpApplication(x, lhsOp, lhsUniv,
+                                           lLeft, lRight)) return {};
+        if (!decomposeBinaryOpApplication(y, rhsOp, rhsUniv,
+                                           rLeft, rRight)) return {};
+        if (lhsOp != rhsOp) return {};
+        // Args on lhs must each be one of the two binders (BV(0) or
+        // BV(1)), and rhs must use them swapped.
+        auto* lLeftBV = std::get_if<BoundVariable>(&lLeft->node);
+        auto* lRightBV = std::get_if<BoundVariable>(&lRight->node);
+        auto* rLeftBV = std::get_if<BoundVariable>(&rLeft->node);
+        auto* rRightBV = std::get_if<BoundVariable>(&rRight->node);
+        if (!lLeftBV || !lRightBV || !rLeftBV || !rRightBV) return {};
+        if (lLeftBV->deBruijnIndex == rRightBV->deBruijnIndex
+            && lRightBV->deBruijnIndex == rLeftBV->deBruijnIndex
+            && lLeftBV->deBruijnIndex != lRightBV->deBruijnIndex
+            && (lLeftBV->deBruijnIndex == 0
+                || lLeftBV->deBruijnIndex == 1)
+            && (lRightBV->deBruijnIndex == 0
+                || lRightBV->deBruijnIndex == 1)) {
+            return lhsOp;
+        }
+        return {};
+    }
+
+    // If `typeExpr` has the shape
+    //   Pi a Pi b Pi c. Equality(_, op(op(a, b), c), op(a, op(b, c)))
+    // with three binders and the BV indices arranged so the same
+    // bound variables appear in the indicated positions, return the
+    // op's constant name. Otherwise return empty string.
+    std::string detectAssociativityShape(ExpressionPointer typeExpr) {
+        int binderCount = 0;
+        ExpressionPointer cursor = typeExpr;
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            ++binderCount;
+            cursor = pi->codomain;
+        }
+        if (binderCount != 3) return {};
+        auto* eqApp3 = std::get_if<Application>(&cursor->node);
+        if (!eqApp3) return {};
+        auto* eqApp2 =
+            std::get_if<Application>(&eqApp3->function->node);
+        if (!eqApp2) return {};
+        auto* eqApp1 =
+            std::get_if<Application>(&eqApp2->function->node);
+        if (!eqApp1) return {};
+        auto* eqHead = std::get_if<Constant>(&eqApp1->function->node);
+        if (!eqHead || eqHead->name != "Equality") return {};
+        ExpressionPointer x = eqApp2->argument;
+        ExpressionPointer y = eqApp3->argument;
+        // lhs = op(op(a, b), c).
+        std::string outerOpL, innerOpL;
+        std::vector<LevelPointer> outerLUniv, innerLUniv;
+        ExpressionPointer lhsInner, lhsCArg, lhsA, lhsB;
+        if (!decomposeBinaryOpApplication(x, outerOpL, outerLUniv,
+                                           lhsInner, lhsCArg)) return {};
+        if (!decomposeBinaryOpApplication(lhsInner, innerOpL,
+                                           innerLUniv,
+                                           lhsA, lhsB)) return {};
+        // rhs = op(a, op(b, c)).
+        std::string outerOpR, innerOpR;
+        std::vector<LevelPointer> outerRUniv, innerRUniv;
+        ExpressionPointer rhsAArg, rhsInner, rhsB, rhsC;
+        if (!decomposeBinaryOpApplication(y, outerOpR, outerRUniv,
+                                           rhsAArg, rhsInner)) return {};
+        if (!decomposeBinaryOpApplication(rhsInner, innerOpR,
+                                           innerRUniv,
+                                           rhsB, rhsC)) return {};
+        if (outerOpL != innerOpL || outerOpL != outerOpR
+            || outerOpL != innerOpR) return {};
+        // Each of lhsA/lhsB/lhsCArg must be a distinct BV in {0, 1, 2}
+        // and the rhs positions must echo them: rhsAArg == lhsA,
+        // rhsB == lhsB, rhsC == lhsCArg.
+        auto* lABV = std::get_if<BoundVariable>(&lhsA->node);
+        auto* lBBV = std::get_if<BoundVariable>(&lhsB->node);
+        auto* lCBV = std::get_if<BoundVariable>(&lhsCArg->node);
+        auto* rABV = std::get_if<BoundVariable>(&rhsAArg->node);
+        auto* rBBV = std::get_if<BoundVariable>(&rhsB->node);
+        auto* rCBV = std::get_if<BoundVariable>(&rhsC->node);
+        if (!lABV || !lBBV || !lCBV || !rABV || !rBBV || !rCBV) return {};
+        if (lABV->deBruijnIndex != rABV->deBruijnIndex) return {};
+        if (lBBV->deBruijnIndex != rBBV->deBruijnIndex) return {};
+        if (lCBV->deBruijnIndex != rCBV->deBruijnIndex) return {};
+        std::set<int> seen{
+            lABV->deBruijnIndex, lBBV->deBruijnIndex,
+            lCBV->deBruijnIndex};
+        if (seen.size() != 3) return {};
+        if (seen.count(0) == 0 || seen.count(1) == 0
+            || seen.count(2) == 0) return {};
+        return outerOpL;
+    }
+
+    // Hook called after each theorem is added to the environment.
+    // Records `<theoremName>` in commutativityLemmas_/associativityLemmas_
+    // if its type fits the canonical shape. Silent on non-match.
+    void registerAlgebraicShape(const std::string& theoremName,
+                                  ExpressionPointer typeExpr) {
+        std::string opName = detectCommutativityShape(typeExpr);
+        if (!opName.empty()
+            && commutativityLemmas_.count(opName) == 0) {
+            commutativityLemmas_[opName] = theoremName;
+            return;
+        }
+        opName = detectAssociativityShape(typeExpr);
+        if (!opName.empty()
+            && associativityLemmas_.count(opName) == 0) {
+            associativityLemmas_[opName] = theoremName;
+        }
+    }
+
+    // Auto-prover for unannotated calc steps. Given a calc step's
+    // previous and next endpoints (both kernel terms in closed form),
+    // try a small bag of strategies in priority order to construct a
+    // proof of `Equality.{u}(carrier, previous, next)`. Returns
+    // nullptr if none succeed; the caller then errors with a
+    // "supply `by <reason>`" diagnostic.
+    //
+    // v0 strategies:
+    //   1. Definitional equality via the kernel's isDefinitionallyEqual.
+    //      Catches β/ι/δ reductions (e.g. `succ(b) + x` vs `succ(b+x)`).
+    //
+    // Future strategies (v1+):
+    //   2. Single-position diff classified as commutativity /
+    //      associativity / identity / local-hypothesis.
+    //   3. Multi-position composition.
+    ExpressionPointer autoProveCalcStep(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        ExpressionPointer stepEqualityType,
+        int line, int column) {
+        (void)stepEqualityType;
+        (void)column;
+        (void)line;
+        // Strategy 1: reflexivity for definitionally-equal endpoints.
+        Context openedContext;
+        for (size_t i = 0; i < localBinders.size(); ++i) {
+            ExpressionPointer openedType = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            openedContext.push_back({localBinders[i].name, openedType,
+                                       FreeVariableOrigin::Internal});
+        }
+        ExpressionPointer previousOpened = openOverLocalBinders(
+            previousKernel, localBinders, localBinders.size());
+        ExpressionPointer nextOpened = openOverLocalBinders(
+            nextKernel, localBinders, localBinders.size());
+        if (isDefinitionallyEqual(environment_, openedContext,
+                                    previousOpened, nextOpened)) {
+            ExpressionPointer call =
+                makeConstant("reflexivity", {carrierLevel});
+            call = makeApplication(std::move(call), carrierType);
+            call = makeApplication(std::move(call), previousKernel);
+            return call;
+        }
+        // Strategy 2: single-position diff classification. Walk both
+        // sides in lockstep through Application nodes. At each App
+        // level there are three possibilities: function parts equal
+        // (descend into argument), arguments equal (descend into
+        // function), or both differ (bail). We collect a list of
+        // path steps and reconstruct the proof inside-out with
+        // Equality.congruence wrappers.
+        struct CalcPathStep {
+            enum class Kind { Arg, Fn };
+            Kind kind;
+            // Arg: the function part that we're keeping fixed.
+            // Fn:  the argument part that we're keeping fixed.
+            ExpressionPointer savedSide;
+        };
+        std::vector<CalcPathStep> pathStepsOutsideIn;
+        ExpressionPointer leftCursor = previousKernel;
+        ExpressionPointer rightCursor = nextKernel;
+        while (true) {
+            auto* leftApp =
+                std::get_if<Application>(&leftCursor->node);
+            auto* rightApp =
+                std::get_if<Application>(&rightCursor->node);
+            if (!leftApp || !rightApp) break;
+            bool functionEqual = structurallyEqual(
+                leftApp->function, rightApp->function);
+            bool argumentEqual = structurallyEqual(
+                leftApp->argument, rightApp->argument);
+            if (functionEqual && argumentEqual) {
+                return nullptr;
+            }
+            if (functionEqual) {
+                pathStepsOutsideIn.push_back(
+                    {CalcPathStep::Kind::Arg, leftApp->function});
+                leftCursor = leftApp->argument;
+                rightCursor = rightApp->argument;
+                continue;
+            }
+            if (argumentEqual) {
+                pathStepsOutsideIn.push_back(
+                    {CalcPathStep::Kind::Fn, leftApp->argument});
+                leftCursor = leftApp->function;
+                rightCursor = rightApp->function;
+                continue;
+            }
+            // Multi-position diff at this level. Bail.
+            break;
+        }
+        ExpressionPointer innerProof = tryClassifyDiff(
+            localBinders, openedContext, leftCursor, rightCursor);
+        if (!innerProof) return nullptr;
+        // Wrap from innermost out. At each step we need the type of
+        // the "varying side" (lambda domain) and the type of the
+        // result of applying the lambda (lambda codomain). We use
+        // inferTypeInLocalContext and typeUniverseOf to compute them
+        // — if either throws, bail.
+        ExpressionPointer currentLeft = leftCursor;
+        ExpressionPointer currentRight = rightCursor;
+        ExpressionPointer currentProof = innerProof;
+        try {
+            for (auto iterator = pathStepsOutsideIn.rbegin();
+                 iterator != pathStepsOutsideIn.rend(); ++iterator) {
+                const CalcPathStep& step = *iterator;
+                LevelPointer varLevel = typeUniverseOf(
+                    localBinders, currentLeft);
+                ExpressionPointer varType = inferTypeInLocalContext(
+                    localBinders, currentLeft);
+                ExpressionPointer lambdaBody;
+                ExpressionPointer outerLeft, outerRight;
+                if (step.kind == CalcPathStep::Kind::Arg) {
+                    ExpressionPointer liftedFunction =
+                        liftBoundVariables(step.savedSide, 1, 0);
+                    lambdaBody = makeApplication(
+                        std::move(liftedFunction),
+                        makeBoundVariable(0));
+                    outerLeft = makeApplication(step.savedSide,
+                                                 currentLeft);
+                    outerRight = makeApplication(step.savedSide,
+                                                  currentRight);
+                } else {
+                    ExpressionPointer liftedArgument =
+                        liftBoundVariables(step.savedSide, 1, 0);
+                    lambdaBody = makeApplication(
+                        makeBoundVariable(0),
+                        std::move(liftedArgument));
+                    outerLeft = makeApplication(currentLeft,
+                                                 step.savedSide);
+                    outerRight = makeApplication(currentRight,
+                                                  step.savedSide);
+                }
+                ExpressionPointer lambda = makeLambda(
+                    "_calc_z", varType, std::move(lambdaBody));
+                LevelPointer outerLevel = typeUniverseOf(
+                    localBinders, outerLeft);
+                ExpressionPointer outerType =
+                    inferTypeInLocalContext(localBinders, outerLeft);
+                ExpressionPointer call = makeConstant(
+                    "Equality.congruence",
+                    {varLevel, outerLevel});
+                call = makeApplication(std::move(call), varType);
+                call = makeApplication(std::move(call), outerType);
+                call = makeApplication(std::move(call),
+                                        std::move(lambda));
+                call = makeApplication(std::move(call), currentLeft);
+                call = makeApplication(std::move(call), currentRight);
+                call = makeApplication(std::move(call),
+                                        std::move(currentProof));
+                currentProof = std::move(call);
+                currentLeft = std::move(outerLeft);
+                currentRight = std::move(outerRight);
+            }
+        } catch (const TypeError&) {
+            return nullptr;
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+        (void)carrierType;
+        (void)carrierLevel;
+        return currentProof;
+    }
+
+    // Try to prove `Equality(_, subLeft, subRight)` at a single
+    // diff position. Strategies: commutativity (subLeft = op(X, Y),
+    // subRight = op(Y, X) and op is registered); associativity
+    // (subLeft = op(op(A,B),C), subRight = op(A,op(B,C)) or
+    // vice versa); local hypothesis match (a binder of type
+    // subLeft = subRight, or its symmetric form). Returns nullptr
+    // on miss. Result is in CLOSED-over-localBinders form.
+    ExpressionPointer tryClassifyDiff(
+        const std::vector<LocalBinder>& localBinders,
+        const Context& openedContext,
+        ExpressionPointer subLeft,
+        ExpressionPointer subRight) {
+        // Commutativity.
+        {
+            std::string lOp, rOp;
+            std::vector<LevelPointer> lUniv, rUniv;
+            ExpressionPointer lA, lB, rA, rB;
+            if (decomposeBinaryOpApplication(
+                    subLeft, lOp, lUniv, lA, lB)
+                && decomposeBinaryOpApplication(
+                    subRight, rOp, rUniv, rA, rB)
+                && lOp == rOp
+                && structurallyEqual(lA, rB)
+                && structurallyEqual(lB, rA)
+                && commutativityLemmas_.count(lOp) > 0) {
+                const std::string& lemmaName =
+                    commutativityLemmas_.at(lOp);
+                ExpressionPointer call =
+                    makeConstant(lemmaName, lUniv);
+                call = makeApplication(std::move(call), lA);
+                call = makeApplication(std::move(call), lB);
+                return call;
+            }
+        }
+        // Associativity LHS-style: subLeft = op(op(A,B),C),
+        // subRight = op(A, op(B,C)).
+        {
+            std::string outerOpL, innerOpL, outerOpR, innerOpR;
+            std::vector<LevelPointer> outerLU, innerLU, outerRU, innerRU;
+            ExpressionPointer lInner, lC, lA, lB;
+            ExpressionPointer rA, rInner, rB, rC;
+            if (decomposeBinaryOpApplication(
+                    subLeft, outerOpL, outerLU, lInner, lC)
+                && decomposeBinaryOpApplication(
+                    lInner, innerOpL, innerLU, lA, lB)
+                && decomposeBinaryOpApplication(
+                    subRight, outerOpR, outerRU, rA, rInner)
+                && decomposeBinaryOpApplication(
+                    rInner, innerOpR, innerRU, rB, rC)
+                && outerOpL == innerOpL && outerOpL == outerOpR
+                && outerOpL == innerOpR
+                && structurallyEqual(lA, rA)
+                && structurallyEqual(lB, rB)
+                && structurallyEqual(lC, rC)
+                && associativityLemmas_.count(outerOpL) > 0) {
+                const std::string& lemmaName =
+                    associativityLemmas_.at(outerOpL);
+                ExpressionPointer call =
+                    makeConstant(lemmaName, outerLU);
+                call = makeApplication(std::move(call), lA);
+                call = makeApplication(std::move(call), lB);
+                call = makeApplication(std::move(call), lC);
+                return call;
+            }
+        }
+        // Associativity reversed: subLeft = op(A, op(B,C)),
+        // subRight = op(op(A,B), C). Wrap the canonical form with
+        // Equality.symmetry.
+        {
+            std::string outerOpL, innerOpL, outerOpR, innerOpR;
+            std::vector<LevelPointer> outerLU, innerLU, outerRU, innerRU;
+            ExpressionPointer lA, lInner, lB, lC;
+            ExpressionPointer rInner, rC, rA, rB;
+            if (decomposeBinaryOpApplication(
+                    subLeft, outerOpL, outerLU, lA, lInner)
+                && decomposeBinaryOpApplication(
+                    lInner, innerOpL, innerLU, lB, lC)
+                && decomposeBinaryOpApplication(
+                    subRight, outerOpR, outerRU, rInner, rC)
+                && decomposeBinaryOpApplication(
+                    rInner, innerOpR, innerRU, rA, rB)
+                && outerOpL == innerOpL && outerOpL == outerOpR
+                && outerOpL == innerOpR
+                && structurallyEqual(lA, rA)
+                && structurallyEqual(lB, rB)
+                && structurallyEqual(lC, rC)
+                && associativityLemmas_.count(outerOpL) > 0) {
+                const std::string& lemmaName =
+                    associativityLemmas_.at(outerOpL);
+                ExpressionPointer assocCall =
+                    makeConstant(lemmaName, outerLU);
+                assocCall = makeApplication(std::move(assocCall), lA);
+                assocCall = makeApplication(std::move(assocCall), lB);
+                assocCall = makeApplication(std::move(assocCall), lC);
+                // assocCall : op(op(A,B),C) = op(A, op(B,C)).
+                // We need the opposite direction.
+                // Equality.symmetry.{u}(carrier, op(op(A,B),C),
+                //   op(A,op(B,C)), assocCall). Infer carrier and
+                // level from subLeft (it's in closed form already).
+                ExpressionPointer carrierClosed;
+                LevelPointer carrierLevelAtThisLevel;
+                try {
+                    ExpressionPointer typeOfSub =
+                        inferTypeInLocalContext(localBinders, subLeft);
+                    carrierClosed = typeOfSub;
+                    carrierLevelAtThisLevel = typeUniverseOf(
+                        localBinders, subLeft);
+                } catch (const TypeError&) {
+                    return nullptr;
+                } catch (const ElaborateError&) {
+                    return nullptr;
+                }
+                ExpressionPointer assocLHS = subRight;
+                ExpressionPointer assocRHS = subLeft;
+                ExpressionPointer symmetryCall = makeConstant(
+                    "Equality.symmetry",
+                    {carrierLevelAtThisLevel});
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall), carrierClosed);
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall), assocLHS);
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall), assocRHS);
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall), std::move(assocCall));
+                return symmetryCall;
+            }
+        }
+        // Local hypothesis match (forward and symmetric). Scan
+        // local binders for one whose type is
+        // Equality(_, subLeft, subRight) or
+        // Equality(_, subRight, subLeft).
+        {
+            ExpressionPointer subLeftOpened = openOverLocalBinders(
+                subLeft, localBinders, localBinders.size());
+            ExpressionPointer subRightOpened = openOverLocalBinders(
+                subRight, localBinders, localBinders.size());
+            for (int i =
+                     static_cast<int>(localBinders.size()) - 1;
+                 i >= 0; --i) {
+                ExpressionPointer binderTypeOpened = openOverLocalBinders(
+                    localBinders[i].type, localBinders, i);
+                ExpressionPointer normalized = weakHeadNormalForm(
+                    environment_, binderTypeOpened);
+                // Expect App(App(App(Equality, carrier), x), y).
+                auto* app3 =
+                    std::get_if<Application>(&normalized->node);
+                if (!app3) continue;
+                auto* app2 =
+                    std::get_if<Application>(&app3->function->node);
+                if (!app2) continue;
+                auto* app1 =
+                    std::get_if<Application>(&app2->function->node);
+                if (!app1) continue;
+                auto* head =
+                    std::get_if<Constant>(&app1->function->node);
+                if (!head || head->name != "Equality") continue;
+                ExpressionPointer eqLeft = app2->argument;
+                ExpressionPointer eqRight = app3->argument;
+                int deBruijnIndex =
+                    static_cast<int>(localBinders.size()) - 1 - i;
+                if (isDefinitionallyEqual(environment_,
+                        openedContext, eqLeft, subLeftOpened)
+                    && isDefinitionallyEqual(environment_,
+                        openedContext, eqRight, subRightOpened)) {
+                    return makeBoundVariable(deBruijnIndex);
+                }
+                if (isDefinitionallyEqual(environment_,
+                        openedContext, eqLeft, subRightOpened)
+                    && isDefinitionallyEqual(environment_,
+                        openedContext, eqRight, subLeftOpened)) {
+                    // Wrap with Equality.symmetry.
+                    auto* carrierConst =
+                        std::get_if<Constant>(&app1->argument->node);
+                    (void)carrierConst;
+                    ExpressionPointer carrierAtThisLevel =
+                        app1->argument;
+                    LevelPointer carrierLevelAtThisLevel;
+                    if (!head->universeArguments.empty()) {
+                        carrierLevelAtThisLevel =
+                            head->universeArguments[0];
+                    } else {
+                        // Should not happen: Equality is universe-
+                        // polymorphic and always has a level arg.
+                        return nullptr;
+                    }
+                    ExpressionPointer carrierClosed =
+                        closeOverLocalBinders(
+                            carrierAtThisLevel, localBinders,
+                            localBinders.size());
+                    ExpressionPointer hypBoundVar =
+                        makeBoundVariable(deBruijnIndex);
+                    ExpressionPointer symmetryCall = makeConstant(
+                        "Equality.symmetry",
+                        {carrierLevelAtThisLevel});
+                    symmetryCall = makeApplication(
+                        std::move(symmetryCall), carrierClosed);
+                    symmetryCall = makeApplication(
+                        std::move(symmetryCall), subRight);
+                    symmetryCall = makeApplication(
+                        std::move(symmetryCall), subLeft);
+                    symmetryCall = makeApplication(
+                        std::move(symmetryCall),
+                        std::move(hypBoundVar));
+                    return symmetryCall;
+                }
+            }
+        }
+        return nullptr;
     }
 
     // Phase 3.0 hammer: a `?` placeholder asks the elaborator to fill
@@ -7943,6 +8537,14 @@ private:
         std::vector<SurfaceConventionProposition> propositions;
     };
     std::unordered_map<std::string, ConventionEntry> conventionRegistry_;
+    // Maps from binary-operator constant name (e.g. "Natural.add") to
+    // the name of a previously-declared theorem proving its
+    // commutativity / associativity. Populated by
+    // detectAlgebraicShape() at each definition's add-to-environment
+    // time. Consulted by the calc auto-prover when a step's LHS/RHS
+    // diff at a single position matches the corresponding pattern.
+    std::unordered_map<std::string, std::string> commutativityLemmas_;
+    std::unordered_map<std::string, std::string> associativityLemmas_;
     // Context frames describing what the elaborator is currently doing.
     // Each frame is a short phrase like "while elaborating cases at
     // line 42". `Frame` is an RAII guard that pushes on construction

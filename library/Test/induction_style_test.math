@@ -130,6 +130,89 @@ theorem Natural.multiply_successor_bare_reflexivity (a b : Natural)
 -- abstractStructuralOccurrence), the three congruenceOf lines below
 -- would collapse to three `by rewrite(...)` lines.
 
+-- Smallest test: `=` step with no `by` clause. The auto-prover
+-- closes when the two sides are definitionally equal.
+theorem calc_no_by_reflexive (a b : Natural)
+        : a + b = a + b :=
+  calc a + b
+     = a + b
+
+-- One-step calc with `by` omitted, relying on the kernel β of
+-- Natural.add for successor in the first argument.
+theorem calc_no_by_beta (b : Natural) (Y : Natural)
+        : Natural.add(successor(b), Y) = successor(Natural.add(b, Y)) :=
+  calc Natural.add(successor(b), Y)
+     = successor(Natural.add(b, Y))
+
+-- Commutativity at a single position, no `by` clause.
+-- The auto-prover detects subL = op(a, b), subR = op(b, a) and looks
+-- up Natural.add as commutative.
+theorem calc_no_by_commutative (a b : Natural)
+        : a + b = b + a :=
+  calc a + b
+     = b + a
+
+-- Associativity at a single position.
+theorem calc_no_by_associative (a b c : Natural)
+        : (a + b) + c = a + (b + c) :=
+  calc (a + b) + c
+     = a + (b + c)
+
+-- Associativity reversed: uses Equality.symmetry under the hood.
+theorem calc_no_by_associative_reverse (a b c : Natural)
+        : a + (b + c) = (a + b) + c :=
+  calc a + (b + c)
+     = (a + b) + c
+
+-- Commutativity at a nested position: inside successor(_).
+-- Exercises the path-aware congruence wrapping.
+theorem calc_no_by_commutative_nested (a b : Natural)
+        : successor(a + b) = successor(b + a) :=
+  calc successor(a + b)
+     = successor(b + a)
+
+-- Multi-step chain mixing commutativity, associativity, and
+-- definitional equality, all without `by`. This is the form we
+-- want the multiply_successor proof to eventually shrink down to.
+theorem calc_no_by_chain (a b c : Natural)
+        : (a + b) + c = c + (a + b) :=
+  calc (a + b) + c
+     = c + (a + b)
+
+-- Same algebraic chain as multiply_successor's nested rearrangement,
+-- with all `by ...` clauses dropped. The auto-prover should classify
+-- each step (associativity / commutativity / associativity-reverse)
+-- and wrap with congruence under `successor(_)`.
+theorem calc_no_by_multiply_successor_inner (b predecessor : Natural)
+        : successor(b + (predecessor + predecessor * b))
+        = successor(predecessor + (b + predecessor * b)) :=
+  calc successor(b + (predecessor + predecessor * b))
+     = successor((b + predecessor) + predecessor * b)
+     = successor((predecessor + b) + predecessor * b)
+     = successor(predecessor + (b + predecessor * b))
+
+-- Multiply-successor with NO `by` clauses anywhere. The auto-prover
+-- closes each step via reflexivity (β/ι/δ definitional equality),
+-- IH lookup (local-hypothesis match), or commutativity/associativity
+-- recognition + path-aware congruence.
+theorem Natural.multiply_successor_no_by (a b : Natural)
+        : a * successor(b) = a + a * b :=
+  by_induction on a with IH {
+    case zero: reflexivity;
+    case successor(predecessor):
+      calc successor(predecessor) * successor(b)
+         = successor(b) + predecessor * successor(b)
+         = successor(b) + (predecessor + predecessor * b)
+         = successor((b + predecessor) + predecessor * b)
+                by congruenceOf(
+                       successor,
+                       Equality.symmetry(Natural.add_associative(
+                           b, predecessor, predecessor * b)))
+         = successor((predecessor + b) + predecessor * b)
+         = successor(predecessor + (b + predecessor * b))
+         = successor(predecessor) + successor(predecessor) * b;
+  }
+
 -- Version with bare `by IH` (auto-rewrite fallback).
 theorem Natural.multiply_successor_by_IH (a b : Natural)
         : a * successor(b) = a + a * b :=
