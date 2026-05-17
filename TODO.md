@@ -322,6 +322,149 @@ PAdic operations migrating to implicit `(p : Natural) (primality :
 …)`; `operator (+) on (PAdic, PAdic)` overload; `cases h : expr with`
 tactic; per-block `open NAMESPACE`.
 
+## Ergonomics audit (2026-05-17) — full-library cross-cut
+
+Findings from a parallel six-agent review of every directory under
+`library/`. Convergence: the same five pain points dominate from
+`Logic/` through `PAdic/`. Items already on the backlog above are
+noted as **(see N)**; new items are flagged with the directories
+that motivate them.
+
+### New friction points
+
+1. **Case-on-expression with retained equation — biggest line-eater
+   across the library.** The function-wrap pattern from CLAUDE.md
+   ("`cases` with hypothesis") appears 20+ times in
+   `Natural/padic_valuation.math`, 8 times in `Natural/divide.math`
+   alone, plus heavy use in `Natural/division.math`,
+   `Natural/cancellation.math`, `Natural/decide_divides.math`,
+   `Logic/constructor_totality.math`, `Integer/absolute_value*.math`.
+   Each instance is a 6-line wrapper around what a textbook writes
+   in one line. *Remedy:* `match E with eqHyp returning G { | c₁ =>
+   … | c₂ => … }` where `eqHyp : E = c_i` is bound automatically in
+   each arm. Sharper formulation of item 8 in the 2026-05-16 audit.
+
+2. **`rewrite` only fires inside `calc` steps.** Outside `calc`,
+   users fall back to the 6-arg
+   `Equality.transport_proposition(T, motive, x, y, eq, term)` form,
+   which appears 40+ times in `Natural/divide.math` alone and is
+   the dominant boilerplate in `Logic/quotient.math`,
+   `Natural/factorization.math`, `Natural/prime_split.math`,
+   `Natural/padic_valuation.math`. *Remedy:* `by rewrite(L)`,
+   `by rewrite(← L)`, and `by rewrite(L) in h` at any proof-script
+   position, with motive inferred from the goal/hypothesis.
+   Generalizes the existing in-calc tactic.
+
+3. **Short `Quotient.mk` blocked under `+`, `*`, `=`, `≤`.**
+   Documented in CLAUDE.md as a known limitation; in practice it
+   bloats `Integer/ring.math` by ~30% and shows up at
+   `Rational/triangle.math:282-294`, `Rational/positive.math:142-157`,
+   `Rational/order_arithmetic.math:191-206`. *Remedy:* when an
+   operand of a registered operator has head `Integer` / `Rational`
+   / `Real` / `PAdic`, propagate that head as the expected type for
+   an unresolved `Quotient.mk` on the other side. Roughly: have the
+   operator registry seed expected types for short-form inference.
+
+4. **`Or.eliminate` / `Exists.eliminate` / `And.eliminate` re-type
+   the motive that the elaborator already knows from context.** The
+   third argument is almost always the surrounding goal, retyped
+   verbatim. Pyramids of these forms dominate
+   `Natural/prime_split.math` (200-line `Or → Exists → And`
+   staircase), `Integer/absolute_value_multiplicative.math:151-237`
+   (87 lines of four-way sign dispatch), and the Cauchy-equivalence
+   transitivity in `Real/basics.math:160-298` (139 lines, mostly
+   ∃-unpacking). *Remedy:* `dispatch on X { case Or.introduceLeft(p):
+   … }` / `case ⟨w, hw⟩: …` syntax that scrutinizes the eliminator
+   targets without taking an explicit motive. This is the deferred
+   sibling of the 2026-05-16 "Deferred — short forms of
+   Or/And/Exists.eliminate" work; resuming it is high-leverage.
+
+5. **`obtain ⟨a, b, c⟩ from …` cannot flat-destructure nested
+   existentials and conjunctions in one step.**
+   `Natural/division.math:119-179` is 60 lines whose math is
+   `let ⟨q, r, eq, bound⟩ := w; ⟨succ(q), r, …, …⟩`. The current
+   pattern needs three nested `Exists.eliminate` and an
+   `And.eliminate`. *Remedy:* allow `let ⟨a, b, c, d⟩ := h` for
+   `h : ∃ a. ∃ b. P ∧ Q`. Likely a small extension of the existing
+   single-level destructure.
+
+6. **`by_induction … using` (v3 of prime_divisor) needs the return-
+   type ascription stripped.** `Natural/prime_divisor_v3.math:50-52`
+   ends with `: 2 ≤ n → ∃ …)(atLeastTwo)` — the only remaining piece
+   of CIC plumbing in an otherwise textbook proof. v2 is the current
+   sweet spot; v3 wins once it infers its return type from the
+   enclosing `theorem`.
+
+7. **`by bridge` for pattern-match definitions on quotient reps.**
+   Every binary-op respect proof in Real/PAdic spends ~30 lines
+   converting `sequenceFunction(add(rep1, rep2), m)` into
+   `sequenceFunction(rep1, m) + sequenceFunction(rep2, m)` via
+   manual `cases` + `reflexivity`. See
+   `Real/addition.math:189-198, 267-299`,
+   `Real/negation.math:105-129`, and PAdic parallels. *Remedy:* a
+   tactic that exposes a pattern-match definition's β-reduction as
+   a one-step calc rewrite when the matched argument is structurally
+   a constructor.
+
+8. **Strict `<` doesn't transport cleanly.** `LessThan` is
+   `And(LessOrEqual, Not(_ = _))`, so every transport along `<`
+   manually destructures and rebuilds. See
+   `Rational/order_arithmetic.math:336-356, 421-434`. *Remedy:*
+   either make `<` a single-constructor record with first-class
+   destructure, or add a `by strict_mono(weak_lemma, neq_lemma)`
+   tactic that auto-assembles `And.introduction`.
+
+### New big idea — `Algebra/CauchyCompletion`
+
+`Real/*.math` (~2600 lines) and `PAdic/*.math` (~5300 lines) are
+~80% parallel: same Cauchy/bounded definitions, same equivalence
+relation, same Step-1/Step-2 anchor split in `cauchy_bounded.math`,
+same ε/2-and-triangle pattern in `sum_is_cauchy`, identical lifts
+of ring laws through `equivalent_when_sequenceFunction_equal`. A
+generic completion functor parameterized by a Rational-valued
+seminorm (with triangle and `norm(0) = 0`) could absorb 1500-2000
+lines and force the abstraction the textbooks take for granted.
+Blocked on item 2 of the 2026-05-16 audit (`(p, primality)`
+implicit), so the seminorm parameter can carry its own implicits.
+
+### prime_divisor v1 vs v2 vs v3 — adopt v2 as default for now
+
+v2 (`obtain ⟨…⟩ from …` + anonymous `⟨…⟩` + `cases` on Or) is the
+current readability sweet spot (~65 lines, reads like math). v3's
+`by_induction using` is a net win but blocked by the type-ascription
+leak (item 6 above). Until 6 lands, new strong-induction proofs
+should follow v2's style. Once 6 lands, v3 becomes the textbook
+form and v2 should migrate.
+
+### Quick reference — directories ranked by math:plumbing ratio
+
+Per-agent rough estimates (lower = more plumbing):
+
+- `Algebra/` ~85% math — already textbook-shaped.
+- `Rational/algebra.math`, `Rational/instances.math`,
+  `Rational/embedding.math` ~75% math.
+- `Natural/bezout.math`, `Natural/euclid.math` ~65% math
+  (`claim … by` wins).
+- `Natural/` (avg.) ~40% math.
+- `Integer/` (avg.) ~35% math — quotient boundary leaks.
+- `Rational/` (avg.) ~35% math — short-Quotient.mk gap dominates.
+- `Real/` (avg.) ~25% math — ε-N is `Exists.eliminate` nesting.
+- `PAdic/` (avg.) ~20% math — same ε-N + `(p, primality)` everywhere.
+- `Logic/` ~35% math — appropriate for the foundational layer.
+
+### Proposed first sprint (3 items, all small-to-medium elaborator changes)
+
+1. `match E with eqHyp returning G { | … }` (item 1 above).
+2. `by rewrite(L)` / `← L` / `in h` at any goal position (item 2).
+3. Flat-nested `let ⟨…⟩ := …` for `∃ ∧ ∃ ∧ …` (item 5).
+
+These are orthogonal and together retire roughly half the plumbing
+the audit flagged. Items 3, 4, and the resumed Or/And/Exists
+eliminator short-forms (item 4 above + the 2026-05-16 deferred
+sibling) are the natural next batch — they unlock the higher-layer
+wins (`by ring` v2, the CauchyCompletion functor, PAdic operator
+overloads).
+
 ## Completed
 
 - **2026-05-17: Auto-prover for calc steps + `by` optional.** `by`
