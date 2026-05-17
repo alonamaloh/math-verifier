@@ -3670,10 +3670,10 @@ private:
         ExpressionPointer rightCursor = nextKernel;
         ExpressionPointer innerProof = nullptr;
         // At every level we first try to classify the current pair
-        // directly (commutativity / associativity / local-hypothesis).
-        // Only descend if no classifier fires. This lets a local
-        // hypothesis whose endpoints sit at some intermediate level
-        // match without us descending past it.
+        // directly (commutativity / associativity / identity / local-
+        // hypothesis). Only descend if no classifier fires. This lets a
+        // local hypothesis whose endpoints sit at some intermediate
+        // level match without us descending past it.
         while (true) {
             innerProof = tryClassifyDiff(
                 localBinders, openedContext, leftCursor, rightCursor);
