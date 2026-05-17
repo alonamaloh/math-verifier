@@ -3585,7 +3585,16 @@ private:
         std::vector<CalcPathStep> pathStepsOutsideIn;
         ExpressionPointer leftCursor = previousKernel;
         ExpressionPointer rightCursor = nextKernel;
+        ExpressionPointer innerProof = nullptr;
+        // At every level we first try to classify the current pair
+        // directly (commutativity / associativity / local-hypothesis).
+        // Only descend if no classifier fires. This lets a local
+        // hypothesis whose endpoints sit at some intermediate level
+        // match without us descending past it.
         while (true) {
+            innerProof = tryClassifyDiff(
+                localBinders, openedContext, leftCursor, rightCursor);
+            if (innerProof) break;
             auto* leftApp =
                 std::get_if<Application>(&leftCursor->node);
             auto* rightApp =
@@ -3615,8 +3624,6 @@ private:
             // Multi-position diff at this level. Bail.
             break;
         }
-        ExpressionPointer innerProof = tryClassifyDiff(
-            localBinders, openedContext, leftCursor, rightCursor);
         if (!innerProof) return nullptr;
         // Wrap from innermost out. At each step we need the type of
         // the "varying side" (lambda domain) and the type of the
