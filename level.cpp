@@ -1,14 +1,26 @@
 #include "level.hpp"
+#include "subtree_hash.hpp"
 
 #include <algorithm>
 #include <sstream>
 
 LevelPointer makeLevelConst(int value) {
-    return std::make_shared<Level>(LevelConst{value});
+    auto level = std::make_shared<Level>(LevelConst{value});
+    level->hash = subtree_hash::mix(
+        subtree_hash::mix(subtree_hash::kSeed,
+                           subtree_hash::kTagLevelConst),
+        static_cast<uint64_t>(value));
+    return level;
 }
 
 LevelPointer makeLevelParam(std::string name) {
-    return std::make_shared<Level>(LevelParam{std::move(name)});
+    uint64_t nameHash = subtree_hash::hashString(name);
+    auto level = std::make_shared<Level>(LevelParam{std::move(name)});
+    level->hash = subtree_hash::mix(
+        subtree_hash::mix(subtree_hash::kSeed,
+                           subtree_hash::kTagLevelParam),
+        nameHash);
+    return level;
 }
 
 LevelPointer makeLevelSuccessor(LevelPointer base) {
@@ -16,7 +28,13 @@ LevelPointer makeLevelSuccessor(LevelPointer base) {
     if (auto* concrete = std::get_if<LevelConst>(&base->node)) {
         return makeLevelConst(concrete->value + 1);
     }
-    return std::make_shared<Level>(LevelSuccessor{std::move(base)});
+    uint64_t baseHash = base->hash;
+    auto level = std::make_shared<Level>(LevelSuccessor{std::move(base)});
+    level->hash = subtree_hash::mix(
+        subtree_hash::mix(subtree_hash::kSeed,
+                           subtree_hash::kTagLevelSuccessor),
+        baseHash);
+    return level;
 }
 
 LevelPointer makeLevelMax(LevelPointer left, LevelPointer right) {
@@ -28,7 +46,17 @@ LevelPointer makeLevelMax(LevelPointer left, LevelPointer right) {
     if (leftConst  && leftConst->value  == 0) return right;
     if (rightConst && rightConst->value == 0) return left;
     if (levelsDefinitionallyEqual(left, right)) return left;
-    return std::make_shared<Level>(LevelMax{std::move(left), std::move(right)});
+    uint64_t leftHash = left->hash;
+    uint64_t rightHash = right->hash;
+    auto level = std::make_shared<Level>(
+        LevelMax{std::move(left), std::move(right)});
+    level->hash = subtree_hash::mix(
+        subtree_hash::mix(
+            subtree_hash::mix(subtree_hash::kSeed,
+                               subtree_hash::kTagLevelMax),
+            leftHash),
+        rightHash);
+    return level;
 }
 
 LevelPointer makeLevelIMax(LevelPointer left, LevelPointer right) {
@@ -42,7 +70,17 @@ LevelPointer makeLevelIMax(LevelPointer left, LevelPointer right) {
     if (std::holds_alternative<LevelSuccessor>(right->node)) {
         return makeLevelMax(std::move(left), std::move(right));
     }
-    return std::make_shared<Level>(LevelIMax{std::move(left), std::move(right)});
+    uint64_t leftHash = left->hash;
+    uint64_t rightHash = right->hash;
+    auto level = std::make_shared<Level>(
+        LevelIMax{std::move(left), std::move(right)});
+    level->hash = subtree_hash::mix(
+        subtree_hash::mix(
+            subtree_hash::mix(subtree_hash::kSeed,
+                               subtree_hash::kTagLevelIMax),
+            leftHash),
+        rightHash);
+    return level;
 }
 
 std::optional<int> levelAsConstant(LevelPointer level) {

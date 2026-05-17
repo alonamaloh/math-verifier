@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -26,6 +27,11 @@ struct LevelIMax  { LevelPointer left; LevelPointer right; };
 
 struct Level {
     std::variant<LevelConst, LevelParam, LevelSuccessor, LevelMax, LevelIMax> node;
+    // Bottom-up structural hash, populated by the makeLevel* helpers.
+    // 0 indicates the field has not been initialised (raw Level{}
+    // construction); kernel code should always go through the helpers
+    // to ensure it is set.
+    uint64_t hash = 0;
 
     Level() = default;
 

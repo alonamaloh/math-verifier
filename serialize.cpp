@@ -183,10 +183,20 @@ ExpressionPointer readExpression(Reader& reader) {
             std::string name = reader.readString();
             uint8_t originTag = reader.readU8();
             auto result = makeFreeVariable(std::move(name));
-            // Override origin if Internal.
+            // Override origin if Internal. The makeFreeVariable hash
+            // was computed for User origin, so we recompute it here.
             if (originTag == 1) {
-                std::get<FreeVariable>(result->node).origin =
-                    FreeVariableOrigin::Internal;
+                auto& freeVariable =
+                    std::get<FreeVariable>(result->node);
+                freeVariable.origin = FreeVariableOrigin::Internal;
+                uint64_t nameHash =
+                    subtree_hash::hashString(freeVariable.name);
+                result->hash = subtree_hash::mix(
+                    subtree_hash::mix(
+                        subtree_hash::mix(subtree_hash::kSeed,
+                                           subtree_hash::kTagFreeVariable),
+                        nameHash),
+                    static_cast<uint64_t>(FreeVariableOrigin::Internal));
             } else if (originTag != 0) {
                 throw SerializationError(
                     "readExpression: bad FreeVariable origin tag");

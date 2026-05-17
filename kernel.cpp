@@ -41,8 +41,16 @@ namespace {
 // (not in expression.hpp) so clients of the kernel cannot construct them
 // through the public API.
 ExpressionPointer makeInternalFreeVariable(std::string name) {
-    return std::make_shared<Expression>(
+    uint64_t nameHash = subtree_hash::hashString(name);
+    auto expression = std::make_shared<Expression>(
         FreeVariable{std::move(name), FreeVariableOrigin::Internal});
+    expression->hash = subtree_hash::mix(
+        subtree_hash::mix(
+            subtree_hash::mix(subtree_hash::kSeed,
+                               subtree_hash::kTagFreeVariable),
+            nameHash),
+        static_cast<uint64_t>(FreeVariableOrigin::Internal));
+    return expression;
 }
 
 // Lean's imax rule on level expressions: makeLevelIMax already encodes the
@@ -216,8 +224,15 @@ ExpressionPointer substitute(ExpressionPointer expression,
 ExpressionPointer openBinder(ExpressionPointer expression,
                              const std::string& freshName,
                              FreeVariableOrigin origin) {
+    uint64_t nameHash = subtree_hash::hashString(freshName);
     auto freeVar = std::make_shared<Expression>(
         FreeVariable{freshName, origin});
+    freeVar->hash = subtree_hash::mix(
+        subtree_hash::mix(
+            subtree_hash::mix(subtree_hash::kSeed,
+                               subtree_hash::kTagFreeVariable),
+            nameHash),
+        static_cast<uint64_t>(origin));
     return substitute(std::move(expression), 0, std::move(freeVar));
 }
 
@@ -601,6 +616,10 @@ std::string makeOpeningName(const Context& context) {
 // level prunes aggressively once we hit shared subtrees.
 bool structurallyEqual(ExpressionPointer left, ExpressionPointer right) {
     if (left.get() == right.get()) return true;
+    // Hash fast-reject: bottom-up structural hashes are populated at
+    // construction. A mismatch is a definitive "not equal"; a match
+    // means we still recurse, since hash collisions are possible.
+    if (left->hash != right->hash) return false;
     if (left->node.index() != right->node.index()) return false;
     if (auto* leftBound = std::get_if<BoundVariable>(&left->node)) {
         auto* rightBound = std::get_if<BoundVariable>(&right->node);
