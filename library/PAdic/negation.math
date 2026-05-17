@@ -34,6 +34,8 @@ import PAdic.absolute_value
 import PAdic.basics
 import PAdic.addition
 
+convention p : Natural with primality : Natural.is_prime(p)
+
 -- ----------------------------------------------------------------------
 -- Helper: Integer absolute_value_natural is invariant under negation.
 -- At rep make(a, b), negate swaps the components to make(b, a), and
@@ -132,7 +134,6 @@ theorem Rational.padic_absolute_value_negate_at_representative (p : Natural)
 
 -- |−x|_p = |x|_p at the Rational level. Lift via Quotient.induct.
 theorem Rational.padic_absolute_value_negate
-        (p : Natural) (primality : Natural.is_prime(p))
         (x : Rational)
         : Rational.padic_absolute_value(p, primality, -x)
           = Rational.padic_absolute_value(p, primality, x) :=
@@ -147,7 +148,6 @@ theorem Rational.padic_absolute_value_negate
 -- |−x − −y|_p = |x − y|_p. Goes via subtract_of_negates (pure Rational
 -- algebra) and padic_absolute_value_negate.
 theorem Rational.padic_absolute_value_of_subtract_of_negates
-        (p : Natural) (primality : Natural.is_prime(p))
         (x y : Rational)
         : Rational.padic_absolute_value(p, primality, -x - -y)
           = Rational.padic_absolute_value(p, primality, x - y) :=
@@ -164,7 +164,6 @@ theorem Rational.padic_absolute_value_of_subtract_of_negates
 -- Pointwise negation of a p-adic Cauchy sequence is p-adic Cauchy.
 -- Same N witness; transport via the negation-invariance of |·|_p.
 theorem Rational.sequence.negate_is_padic_cauchy
-        (p : Natural) (primality : Natural.is_prime(p))
         (s : Rational.sequence.Sequence)
         (sIsCauchy : Rational.sequence.IsPAdicCauchy(p, primality, s))
         : Rational.sequence.IsPAdicCauchy(p, primality,
@@ -218,7 +217,6 @@ theorem Rational.sequence.negate_is_padic_cauchy
 -- ----------------------------------------------------------------------
 -- Pointwise negation of a packaged p-adic Cauchy sequence.
 definition PAdicCauchySequence.negate
-        (p : Natural) (primality : Natural.is_prime(p))
         : PAdicCauchySequence(p, primality)
           → PAdicCauchySequence(p, primality)
   | PAdicCauchySequence.make(s, sCauchy) =>
@@ -228,7 +226,6 @@ definition PAdicCauchySequence.negate
               p, primality, s, sCauchy))
 
 theorem PAdicCauchySequence.sequenceFunction_negate
-        (p : Natural) (primality : Natural.is_prime(p))
         : (rep : PAdicCauchySequence(p, primality)) → (m : Natural)
           → PAdicCauchySequence.sequenceFunction(
                 p, primality,
@@ -238,7 +235,6 @@ theorem PAdicCauchySequence.sequenceFunction_negate
       reflexivity(Rational, -s(m))
 
 theorem PAdic.negate_respects
-        (p : Natural) (primality : Natural.is_prime(p))
         (rep1 rep1Prime : PAdicCauchySequence(p, primality))
         (equivalenceHypothesis
             : PAdicEquivalent(p, primality, rep1, rep1Prime))
@@ -354,7 +350,7 @@ theorem PAdic.negate_respects
                         origAtN(m, N_leq_m))),
             equivalenceHypothesis(epsilon, epsilonPositive)))
 
-definition PAdic.negate (p : Natural) (primality : Natural.is_prime(p))
+definition PAdic.negate
         (x : PAdic(p, primality)) : PAdic(p, primality) :=
   Quotient.lift(
       function (rep : PAdicCauchySequence(p, primality)) =>
@@ -367,6 +363,5 @@ definition PAdic.negate (p : Natural) (primality : Natural.is_prime(p))
 
 -- Subtraction.
 definition PAdic.subtract
-        (p : Natural) (primality : Natural.is_prime(p))
         (x y : PAdic(p, primality)) : PAdic(p, primality) :=
   PAdic.add(p, primality, x, PAdic.negate(p, primality, y))
