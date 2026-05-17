@@ -104,6 +104,33 @@ added to avoid the awkward `function (yArg) (zArg) =>
 Quotient.induct_two(yArg, zArg)` lambda-wrap that the older library
 files use. New 3-arg laws should prefer `induct_three`.
 
+## Name-bound conventions
+
+`convention p [q ...] : T [with H1 [, H2 ...]];` at the file top
+registers a name as an auto-prepended implicit binder. Mirrors the
+math-book "throughout this chapter, p and q denote prime numbers"
+convention.
+
+```math
+convention p : Natural with Natural.is_prime(p)
+
+-- Subsequent theorems mentioning `p` get
+-- {p : Natural} {_ : Natural.is_prime(p)} prepended implicitly.
+theorem prime_self_divides : p ∣ p :=
+  ⟨successor(zero), ...⟩
+```
+
+Notes:
+- No semicolon at the end (matches other top-level declarations).
+- If the user shadows the convention name with their own binder, the
+  convention does NOT fire for that declaration.
+- v1 fires on `definition` and `theorem`. Inductive declarations and
+  axioms are not yet covered.
+- Call sites still rely on the existing implicit-arg machinery —
+  arguments uniquely determined by another argument's type are
+  inferred; purely propositional arguments may need to be passed
+  explicitly.
+
 ## Implicit arguments
 
 `{x : T}` binder syntax is supported on `definition`, `theorem`, and
