@@ -104,24 +104,11 @@ theorem Integer.multiply_negate_right (x y : Integer)
 
 -- Left companion via commutativity.
 theorem Integer.multiply_negate_left (x y : Integer)
-        : -x * y = -(x * y) := {
-    claim swapOuter
-          : -x * y
-            = y * -x
-        by Integer.multiply_commutative(-x, y);
-    claim moveOut
-          : y * -x
-            = -(y * x)
-        by Integer.multiply_negate_right(y, x);
-    claim swapInner
-          : -(y * x)
-            = -(x * y)
-        by congruenceOf(
-               Integer.negate,
-               Integer.multiply_commutative(y, x));
-    Equality.transitivity(swapOuter,
-        Equality.transitivity(moveOut, swapInner))
-}
+        : -x * y = -(x * y) :=
+  calc -x * y
+     = y * -x
+     = -(y * x)   by Integer.multiply_negate_right(y, x)
+     = -(x * y)
 
 -- ----------------------------------------------------------------------
 -- Distributivity over subtraction.
@@ -132,30 +119,21 @@ theorem Integer.multiply_negate_left (x y : Integer)
 --             = a · b − a · c             [definitional: subtract = add+negate, reversed]
 
 theorem Integer.distributivity_left_over_subtract (x y z : Integer)
-        : x * (y - z) = x * y - x * z := {
-    claim distributeLeft
-          : x * (y + -z)
-            = x * y + x * -z
-        by Integer.distributivity_left(x, y, -z);
-    claim moveNegateOut
-          : x * y + x * -z
-            = x * y + -(x * z)
-        by rewrite(Integer.multiply_negate_right(x, z));
-    Equality.transitivity(distributeLeft, moveNegateOut)
-}
+        : x * (y - z) = x * y - x * z :=
+  -- `y - z` ≡ `y + -z` and `x * y - x * z` ≡ `x * y + -(x * z)`
+  -- definitionally, so the only real step is distributing and then
+  -- pushing the negation out of the second summand.
+  calc x * (y + -z)
+     = x * y + x * -z      by Integer.distributivity_left(x, y, -z)
+     = x * y + -(x * z)
+            by rewrite(Integer.multiply_negate_right(x, z))
 
 theorem Integer.distributivity_right_over_subtract (x y z : Integer)
-        : (x - y) * z = x * z - y * z := {
-    claim distributeRight
-          : (x + -y) * z
-            = x * z + -y * z
-        by Integer.distributivity_right(x, -y, z);
-    claim moveNegateOut
-          : x * z + -y * z
-            = x * z + -(y * z)
-        by rewrite(Integer.multiply_negate_left(y, z));
-    Equality.transitivity(distributeRight, moveNegateOut)
-}
+        : (x - y) * z = x * z - y * z :=
+  calc (x + -y) * z
+     = x * z + -y * z      by Integer.distributivity_right(x, -y, z)
+     = x * z + -(y * z)
+            by rewrite(Integer.multiply_negate_left(y, z))
 
 -- ----------------------------------------------------------------------
 -- Cancellation: if a = b + c then a − b = c. The proof reshapes
@@ -164,28 +142,12 @@ theorem Integer.distributivity_right_over_subtract (x y z : Integer)
 
 theorem Integer.subtract_left_add (a b c : Integer)
         (decomposition : a = b + c)
-        : a - b = c := {
-    claim rewriteSubtrahend
-          : a + -b
-            = b + c + -b
-        by rewrite(decomposition);
-    claim swapInner
-          : b + c + -b
-            = c + b + -b
-        by rewrite(Integer.add_commutative(b, c));
-    claim reassociate
-          : c + b + -b
-            = c + (b + -b)
-        by Integer.add_associative(c, b, -b);
-    claim cancelInverse
-          : c + (b + -b)
-            = c + Integer.zero
-        by rewrite(Integer.add_negate_right(b));
-    claim removeZero
-          : c + Integer.zero = c
-        by Integer.add_identity_right(c);
-    Equality.transitivity(rewriteSubtrahend,
-        Equality.transitivity(swapInner,
-            Equality.transitivity(reassociate,
-                Equality.transitivity(cancelInverse, removeZero))))
-}
+        : a - b = c :=
+  -- `a - b` ≡ `a + -b` definitionally; reshape via decomposition,
+  -- commute, reassociate, cancel.
+  calc a + -b
+     = b + c + -b
+     = c + b + -b
+     = c + (b + -b)
+     = c + Integer.zero    by rewrite(Integer.add_negate_right(b))
+     = c                    by Integer.add_identity_right(c)

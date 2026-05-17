@@ -38,11 +38,13 @@ theorem IntegerEquivalent.from_components_equal
         (secondComponentEquality : b = d)
         : IntegerEquivalent(IntegerRepresentative.make(a, b),
                             IntegerRepresentative.make(c, d)) :=
-  -- goal reduces to `a + d = b + c`.
+  -- goal reduces to `a + d = b + c`. The auto-prover handles the
+  -- two local-hypothesis steps (one forward, one via symmetry) and
+  -- the commutativity step on its own.
   calc a + d
-     = a + b   by rewrite(secondComponentEquality)
-     = b + a   by Natural.add_commutative(a, b)
-     = b + c   by rewrite(firstComponentEquality)
+     = a + b
+     = b + a
+     = b + c
 
 -- ======================================================================
 -- Addition
@@ -194,13 +196,9 @@ theorem Integer.add_identity_left (x : Integer)
 -- Integer.add_identity_right — derived via commutativity + identity_left.
 theorem Integer.add_identity_right (x : Integer)
         : x + Integer.zero = x :=
-  Equality.transitivity(
-      Integer,
-      x + Integer.zero,
-      Integer.zero + x,
-      x,
-      Integer.add_commutative(x, Integer.zero),
-      Integer.add_identity_left(x))
+  calc x + Integer.zero
+     = Integer.zero + x
+     = x   by Integer.add_identity_left(x)
 
 -- ======================================================================
 -- Multiplication
@@ -217,19 +215,14 @@ theorem Integer.add_identity_right (x : Integer)
 theorem Integer.multiply_commutative_natural (a b c d : Natural)
         : (a * c + b * d) + (c * b + d * a)
           = (a * d + b * c) + (c * a + d * b) :=
+  -- Each step is a single-position commutativity swap — auto-prover.
   calc (a * c + b * d) + (c * b + d * a)
      = (a * c + b * d) + (b * c + d * a)
-            by rewrite(Natural.multiply_commutative(c, b))
      = (a * c + b * d) + (b * c + a * d)
-            by rewrite(Natural.multiply_commutative(d, a))
      = (b * c + a * d) + (a * c + b * d)
-            by Natural.add_commutative(a * c + b * d, b * c + a * d)
      = (a * d + b * c) + (a * c + b * d)
-            by rewrite(Natural.add_commutative(b * c, a * d))
      = (a * d + b * c) + (c * a + b * d)
-            by rewrite(Natural.multiply_commutative(a, c))
      = (a * d + b * c) + (c * a + d * b)
-            by rewrite(Natural.multiply_commutative(b, d))
 
 theorem Integer.multiply_commutative_at_representatives
         : (rep1 rep2 : IntegerRepresentative)
@@ -321,13 +314,9 @@ theorem Integer.multiply_identity_left (x : Integer)
 -- Integer.multiply_identity_right — derived via commutativity.
 theorem Integer.multiply_identity_right (x : Integer)
         : x * Integer.one = x :=
-  Equality.transitivity(
-      Integer,
-      x * Integer.one,
-      Integer.one * x,
-      x,
-      Integer.multiply_commutative(x, Integer.one),
-      Integer.multiply_identity_left(x))
+  calc x * Integer.one
+     = Integer.one * x
+     = x   by Integer.multiply_identity_left(x)
 
 -- ======================================================================
 -- Distributivity
@@ -441,31 +430,12 @@ theorem Integer.distributivity_left (x y z : Integer)
 -- Integer.distributivity_right: (x + y) * z = x * z + y * z. Derived
 -- from distributivity_left + multiply_commutative.
 theorem Integer.distributivity_right (x y z : Integer)
-        : (x + y) * z = x * z + y * z := {
-  claim swapOuter
-        : (x + y) * z
-          = z * (x + y)
-    by Integer.multiply_commutative(x + y, z);
-  claim applyLeft
-        : z * (x + y)
-          = z * x + z * y
-    by Integer.distributivity_left(z, x, y);
-  claim swapFirstSummand
-        : z * x + z * y
-          = x * z + z * y
-    by rewrite(Integer.multiply_commutative(z, x));
-  claim swapSecondSummand
-        : x * z + z * y
-          = x * z + y * z
-    by rewrite(Integer.multiply_commutative(z, y));
-  Equality.transitivity(
-      Integer,
-      (x + y) * z,
-      z * x + z * y,
-      x * z + y * z,
-      Equality.transitivity(swapOuter, applyLeft),
-      Equality.transitivity(swapFirstSummand, swapSecondSummand))
-}
+        : (x + y) * z = x * z + y * z :=
+  calc (x + y) * z
+     = z * (x + y)
+     = z * x + z * y   by Integer.distributivity_left(z, x, y)
+     = x * z + z * y
+     = x * z + y * z
 
 -- ======================================================================
 -- Multiplication associativity
@@ -496,49 +466,32 @@ theorem Integer.multiply_associative_expand (a b c d p q : Natural)
             by Natural.add_two_two_swap(
                    a * c * p, b * d * p, a * d * q, b * c * q)
      = (a * (c * p) + a * d * q) + (b * d * p + b * c * q)
-            by rewrite(Natural.multiply_associative(a, c, p))
      = (a * (c * p) + a * (d * q)) + (b * d * p + b * c * q)
-            by rewrite(Natural.multiply_associative(a, d, q))
      = a * (c * p + d * q) + (b * d * p + b * c * q)
             by rewrite(Natural.multiply_distributes_left_over_add(
                            a, c * p, d * q))
      = a * (c * p + d * q) + (b * (d * p) + b * c * q)
-            by rewrite(Natural.multiply_associative(b, d, p))
      = a * (c * p + d * q) + (b * (d * p) + b * (c * q))
-            by rewrite(Natural.multiply_associative(b, c, q))
      = a * (c * p + d * q) + b * (d * p + c * q)
             by rewrite(Natural.multiply_distributes_left_over_add(
                            b, d * p, c * q))
 
 theorem Integer.multiply_associative_first_component (a b c d e f : Natural)
         : (a * c + b * d) * e + (a * d + b * c) * f
-          = a * (c * e + d * f) + b * (c * f + d * e) := {
-  claim expanded
-        : (a * c + b * d) * e + (a * d + b * c) * f
-          = a * (c * e + d * f) + b * (d * e + c * f)
-    by Integer.multiply_associative_expand(a, b, c, d, e, f);
-  -- Reshuffle the b-clause: d*e + c*f → c*f + d*e via add_commutative.
-  claim reshuffleB
-        : a * (c * e + d * f) + b * (d * e + c * f)
-          = a * (c * e + d * f) + b * (c * f + d * e)
-    by rewrite(Natural.add_commutative(d * e, c * f));
-  Equality.transitivity(expanded, reshuffleB)
-}
+          = a * (c * e + d * f) + b * (c * f + d * e) :=
+  calc (a * c + b * d) * e + (a * d + b * c) * f
+     = a * (c * e + d * f) + b * (d * e + c * f)
+            by Integer.multiply_associative_expand(a, b, c, d, e, f)
+     = a * (c * e + d * f) + b * (c * f + d * e)
 
 theorem Integer.multiply_associative_second_component
         (a b c d e f : Natural)
         : (a * c + b * d) * f + (a * d + b * c) * e
-          = a * (c * f + d * e) + b * (c * e + d * f) := {
-  claim expanded
-        : (a * c + b * d) * f + (a * d + b * c) * e
-          = a * (c * f + d * e) + b * (d * f + c * e)
-    by Integer.multiply_associative_expand(a, b, c, d, f, e);
-  claim reshuffleB
-        : a * (c * f + d * e) + b * (d * f + c * e)
-          = a * (c * f + d * e) + b * (c * e + d * f)
-    by rewrite(Natural.add_commutative(d * f, c * e));
-  Equality.transitivity(expanded, reshuffleB)
-}
+          = a * (c * f + d * e) + b * (c * e + d * f) :=
+  calc (a * c + b * d) * f + (a * d + b * c) * e
+     = a * (c * f + d * e) + b * (d * f + c * e)
+            by Integer.multiply_associative_expand(a, b, c, d, f, e)
+     = a * (c * f + d * e) + b * (c * e + d * f)
 
 theorem Integer.multiply_associative_at_representatives
         : (rep1 rep2 rep3 : IntegerRepresentative)
