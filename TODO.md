@@ -100,15 +100,15 @@ the directories that motivate it.
    … | c₂ => … }` where `eqHyp : E = c_i` is bound automatically in
    each arm. **Biggest line-eater across the library.**
 
-2. **`rewrite` only fires inside `calc` steps.** Outside `calc`,
+2. **`rewrite` only fires inside `calc` steps.** ~~Outside `calc`,
    users fall back to the 6-arg
-   `Equality.transport_proposition(T, motive, x, y, eq, term)` form,
-   which appears 40+ times in `Natural/divide.math` alone and
-   dominates `Logic/quotient.math`, `Natural/factorization.math`,
-   `Natural/prime_split.math`, `Natural/padic_valuation.math`.
-   Remedy: `by rewrite(L)`, `by rewrite(← L)`, and
-   `by rewrite(L) in h` at any proof-script position, with motive
-   inferred from the goal/hypothesis.
+   `Equality.transport_proposition(T, motive, x, y, eq, term)`
+   form.~~ **Partial fix landed:** the 2-arg `rewrite(eq, term)`
+   term-level form desugars to `Equality.transport_proposition(...)`
+   automatically, recovering the motive from `term`'s inferred type.
+   Covers the witness-transport sites (40+ in `Natural/divide.math`
+   etc.). Still missing: a reverse-direction form (`← L`) and a
+   "rewrite a hypothesis in place" form for `let` / `claim` bindings.
 
 3. **Short `Quotient.mk` blocked under `+`, `*`, `=`, `≤`.**
    Documented in CLAUDE.md; in practice bloats `Integer/ring.math` by

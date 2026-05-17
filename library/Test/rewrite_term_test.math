@@ -1,0 +1,42 @@
+-- Term-level `rewrite(eqProof, term)`. Replaces the 6-arg
+-- `Equality.transport_proposition(T, motive, x, y, eq, term)` call
+-- with a 2-arg form that recovers T, x, y from `eqProof`'s type and
+-- the motive from `term`'s inferred type by locating the unique
+-- structural occurrence of x.
+
+module Test.rewrite_term_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+
+-- (1) Forward rewrite: given `a = b` and `0 ≤ a`, conclude `0 ≤ b`.
+theorem RewriteForward
+        (a b : Natural)
+        (equality : a = b)
+        (smallA : zero ≤ a)
+        : zero ≤ b :=
+  rewrite(equality, smallA)
+
+-- (2) Same shape, but the rewrite happens deeper inside an
+-- expression (the right side of a `≤`).
+theorem RewriteOnRightOfRelation
+        (a b : Natural)
+        (equality : a = b)
+        (oneLeAddOne : 1 ≤ Natural.add(a, 1))
+        : 1 ≤ Natural.add(b, 1) :=
+  rewrite(equality, oneLeAddOne)
+
+-- (3) Verbose form for comparison — equivalent to (1).
+theorem RewriteVerbose
+        (a b : Natural)
+        (equality : a = b)
+        (smallA : zero ≤ a)
+        : zero ≤ b :=
+  Equality.transport_proposition(
+      Natural,
+      function (rest : Natural) => zero ≤ rest,
+      a, b, equality, smallA)

@@ -2540,6 +2540,13 @@ private:
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
+                if (name == "rewrite" && argumentCount == 2) {
+                    return desugarRewriteTerm(
+                        positionalArguments[0],
+                        positionalArguments[1],
+                        localBinders,
+                        expression.line, expression.column);
+                }
                 // Quotient operations with implicit `T, R` inference.
                 // Each user-facing form takes the explicit value args
                 // only; the carrier and equivalence are recovered from
@@ -7213,6 +7220,92 @@ private:
     // replacing it with the binder of an inserted Lambda. Errors if `x`
     // doesn't appear or appears more than once (the user would have to
     // disambiguate via explicit `congruenceOf`).
+    // `rewrite(equalityProof, term)` — term-level form. Given
+    // `equalityProof : Equality(A, x, y)` and `term : P(x)` for some
+    // Proposition-valued `P`, returns a term of type `P(y)`. Implemented
+    // as `Equality.transport_proposition(A, λz. P[x↦z], x, y,
+    // equalityProof, term)`. The motive is recovered by locating the
+    // unique structural occurrence of `x` in `term`'s inferred type and
+    // abstracting it.
+    //
+    // Distinguished from the 1-arg `rewrite(equalityProof)` (calc-step
+    // form) by argument count. The two have different return types and
+    // operate in different positions: term-level transport produces a
+    // proof witness; calc-step rewrite produces an equality between two
+    // calc endpoints.
+    ExpressionPointer desugarRewriteTerm(
+        SurfaceExpressionPointer equalityProofSurface,
+        SurfaceExpressionPointer termSurface,
+        const std::vector<LocalBinder>& localBinders,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "rewrite (term-level) at line " + std::to_string(line));
+        ExpressionPointer equalityProofKernel = elaborateExpression(
+            *equalityProofSurface, localBinders);
+        ExpressionPointer equalityProofTypeOpened = weakHeadNormalForm(
+            environment_,
+            inferTypeInLocalContext(localBinders, equalityProofKernel));
+        EqualityComponents lemmaComponentsOpened =
+            extractEqualityComponents(
+                equalityProofTypeOpened, "rewrite (equality proof)",
+                line);
+        ExpressionPointer carrierType = closeOverLocalBinders(
+            lemmaComponentsOpened.carrierType,
+            localBinders, localBinders.size());
+        ExpressionPointer leftEndpoint = closeOverLocalBinders(
+            lemmaComponentsOpened.leftEndpoint,
+            localBinders, localBinders.size());
+        ExpressionPointer rightEndpoint = closeOverLocalBinders(
+            lemmaComponentsOpened.rightEndpoint,
+            localBinders, localBinders.size());
+
+        ExpressionPointer termKernel = elaborateExpression(
+            *termSurface, localBinders);
+        ExpressionPointer termTypeOpened = weakHeadNormalForm(
+            environment_,
+            inferTypeInLocalContext(localBinders, termKernel));
+        ExpressionPointer termTypeClosed = closeOverLocalBinders(
+            termTypeOpened, localBinders, localBinders.size());
+
+        int occurrenceCount = 0;
+        ExpressionPointer abstractedBody = abstractStructuralOccurrence(
+            termTypeClosed, leftEndpoint,
+            /*currentDepth=*/0, occurrenceCount);
+        if (occurrenceCount == 0) {
+            throwElaborate(
+                "rewrite(eq, term): the equality's left endpoint "
+                "does not appear (structurally) in term's type "
+                "(`"
+                + prettyPrintInLocalScope(termTypeOpened, localBinders)
+                + "`); use explicit "
+                "Equality.transport_proposition(...) if a "
+                "non-structural rewrite is intended");
+        }
+        if (occurrenceCount > 1) {
+            throwElaborate(
+                "rewrite(eq, term): the equality's left endpoint "
+                "appears "
+                + std::to_string(occurrenceCount)
+                + " times in term's type — use explicit "
+                "Equality.transport_proposition(...) to "
+                "disambiguate the position");
+        }
+        ExpressionPointer motiveLambda = makeLambda(
+            "_rewriteHole", carrierType, std::move(abstractedBody));
+
+        ExpressionPointer call = makeConstant(
+            "Equality.transport_proposition",
+            {lemmaComponentsOpened.carrierUniverseLevel});
+        call = makeApplication(std::move(call), carrierType);
+        call = makeApplication(std::move(call), std::move(motiveLambda));
+        call = makeApplication(std::move(call), std::move(leftEndpoint));
+        call = makeApplication(std::move(call), std::move(rightEndpoint));
+        call = makeApplication(std::move(call),
+                                std::move(equalityProofKernel));
+        call = makeApplication(std::move(call), std::move(termKernel));
+        return call;
+    }
+
     ExpressionPointer desugarRewrite(
         SurfaceExpressionPointer lemmaSurface,
         const std::vector<LocalBinder>& localBinders,

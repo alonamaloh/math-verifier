@@ -198,13 +198,24 @@ explicit `Rational.distributivity_left/right`, `add_commutative`,
 A `by ring` v2 with polynomial normalization is on TODO.md but
 deferred until enough algebra content drives the design.
 
-## `rewrite(lemma)`
+## `rewrite(lemma)` / `rewrite(lemma, term)`
 
-Inside a `calc` step, `by rewrite(L)` for `L : a = b` finds the
-unique structural occurrence of `a` on the calc step's LHS and
+Two forms, disambiguated by argument count.
+
+**1-arg, in `calc` context**: `by rewrite(L)` for `L : a = b` finds
+the unique structural occurrence of `a` on the calc step's LHS and
 replaces with `b`. Only works in calc context (needs the step's
 target as expected type). If `a` occurs multiple times or zero
 times, fall back to explicit `congruenceOf(function (z) => …, L)`.
+
+**2-arg, term-level**: `rewrite(eq, term)` for `eq : a = b` and
+`term : P(a)` returns a term of type `P(b)`. Desugars to
+`Equality.transport_proposition(T, λz. P[a↦z], a, b, eq, term)` —
+the motive is recovered by locating the unique structural
+occurrence of `a` in `term`'s inferred type. Use this wherever the
+6-arg `Equality.transport_proposition(...)` was the only option
+(outside calc — `≤`/`∣` witness contexts, `Or.introduceRight(...)`
+arguments, etc.).
 
 ## File organization
 
