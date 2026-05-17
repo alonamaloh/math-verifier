@@ -2367,7 +2367,43 @@ private:
 
         if (auto* identifier =
                 std::get_if<SurfaceIdentifier>(&expression.node)) {
-            (void)expectedType;
+            // Special case: bare `reflexivity` with an expected
+            // equality type closes the step by inferring the
+            // argument. Reads as "by reflexivity" in math.
+            if (identifier->qualifiedName == "reflexivity"
+                && identifier->universeArgs.empty()
+                && expectedType) {
+                ExpressionPointer expectedOpened = openOverLocalBinders(
+                    expectedType, localBinders, localBinders.size());
+                ExpressionPointer expectedWhnf = weakHeadNormalForm(
+                    environment_, expectedOpened);
+                EqualityComponents goalComps;
+                try {
+                    goalComps = extractEqualityComponents(
+                        expectedWhnf, "bare reflexivity",
+                        expression.line);
+                } catch (const ElaborateError&) {
+                    return elaborateIdentifier(
+                        *identifier, localBinders,
+                        expression.line, expression.column);
+                }
+                // Build reflexivity.{u}(carrier, leftEndpoint). The
+                // kernel checks left and right are def-equal.
+                ExpressionPointer call = makeConstant(
+                    "reflexivity",
+                    {goalComps.carrierUniverseLevel});
+                ExpressionPointer carrier = closeOverLocalBinders(
+                    goalComps.carrierType, localBinders,
+                    localBinders.size());
+                ExpressionPointer leftEndpoint = closeOverLocalBinders(
+                    goalComps.leftEndpoint, localBinders,
+                    localBinders.size());
+                call = makeApplication(
+                    std::move(call), std::move(carrier));
+                call = makeApplication(
+                    std::move(call), std::move(leftEndpoint));
+                return call;
+            }
             return elaborateIdentifier(*identifier, localBinders,
                                         expression.line, expression.column);
         }
@@ -3198,6 +3234,40 @@ private:
                     localBinders[i].type, localBinders, i);
                 stepContext.push_back({localBinders[i].name, openedType,
                                           FreeVariableOrigin::Internal});
+            }
+            if (!isDefinitionallyEqual(environment_, stepContext,
+                                        stepProofType,
+                                        stepEqualityTypeOpened)) {
+                // Auto-rewrite fallback. If the user wrote a bare
+                // expression of equality type as the step proof
+                // (most commonly a hypothesis name like `IH`), and
+                // it doesn't match the expected step equality, try
+                // re-elaborating it as `rewrite(<surface>)`. The
+                // existing rewrite desugaring finds the unique
+                // occurrence of the proof's LHS in the goal's LHS
+                // and wraps the proof in `Equality.congruence`.
+                // Lets the user write `by IH` instead of
+                // `by rewrite(IH)`.
+                ExpressionPointer rewriteAttempt;
+                try {
+                    rewriteAttempt = desugarRewrite(
+                        step.stepProof, localBinders,
+                        stepEqualityType,
+                        step.line, step.column);
+                } catch (const ElaborateError&) {
+                    rewriteAttempt = nullptr;
+                }
+                if (rewriteAttempt) {
+                    ExpressionPointer rewriteType =
+                        inferTypeInLocalContext(localBinders,
+                            rewriteAttempt);
+                    if (isDefinitionallyEqual(environment_, stepContext,
+                                                rewriteType,
+                                                stepEqualityTypeOpened)) {
+                        stepProofKernel = rewriteAttempt;
+                        stepProofType = rewriteType;
+                    }
+                }
             }
             if (!isDefinitionallyEqual(environment_, stepContext,
                                         stepProofType,

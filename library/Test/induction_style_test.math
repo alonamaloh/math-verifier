@@ -25,6 +25,8 @@ theorem Natural.multiply_successor_inductive (a b : Natural)
     case zero:
       reflexivity(zero);
     case successor(predecessor):
+      -- (Original verbose version below; the un-reduced form follows
+      -- as `Natural.multiply_successor_unreduced`.)
       -- The kernel β-reduces both sides of the goal:
       --   LHS = successor(predecessor) * successor(b)
       --       ≡ successor(b) + predecessor * successor(b)
@@ -48,4 +50,103 @@ theorem Natural.multiply_successor_inductive (a b : Natural)
          = successor(predecessor + (b + predecessor * b))
               by rewrite(Natural.add_associative(
                   predecessor, b, predecessor * b));
+  }
+
+-- Same proof, written with the calc LHS in its un-reduced surface
+-- form. Each step is honest about whether it's a β-reduction (only
+-- the kernel's definitional equality is needed) or a real rewrite
+-- (needs an explicit lemma).
+theorem Natural.multiply_successor_unreduced (a b : Natural)
+        : a * successor(b) = a + a * b :=
+  by_induction on a with IH {
+    case zero:
+      reflexivity(zero);
+    case successor(predecessor):
+      -- IH : predecessor * successor(b) = predecessor + predecessor * b
+      calc successor(predecessor) * successor(b)
+         -- β of * on the LHS exposes the IH-shaped subterm.
+         = successor(b) + predecessor * successor(b)
+              by reflexivity(successor(b) + predecessor * successor(b))
+         -- Apply IH under successor(b) + _.
+         = successor(b) + (predecessor + predecessor * b)
+              by rewrite(IH)
+         -- Algebra of +: re-associate and swap.
+         = successor((b + predecessor) + predecessor * b)
+              by congruenceOf(
+                     successor,
+                     Equality.symmetry(Natural.add_associative(
+                         b, predecessor, predecessor * b)))
+         = successor((predecessor + b) + predecessor * b)
+              by congruenceOf(
+                     function (rest : Natural) =>
+                         successor(rest + predecessor * b),
+                     Natural.add_commutative(b, predecessor))
+         = successor(predecessor + (b + predecessor * b))
+              by congruenceOf(
+                     successor,
+                     Natural.add_associative(
+                         predecessor, b, predecessor * b))
+         -- β of * on the RHS, in reverse.
+         = successor(predecessor) + successor(predecessor) * b
+              by reflexivity(successor(predecessor + (b + predecessor * b)));
+  }
+
+-- Same proof, but using bare `reflexivity` (no args) — the
+-- elaborator infers the subject from the calc step's expected
+-- equality type and closes the step when both sides are
+-- definitionally equal.
+theorem Natural.multiply_successor_bare_reflexivity (a b : Natural)
+        : a * successor(b) = a + a * b :=
+  by_induction on a with IH {
+    case zero: reflexivity;
+    case successor(predecessor):
+      calc successor(predecessor) * successor(b)
+         = successor(b) + predecessor * successor(b)             by reflexivity
+         = successor(b) + (predecessor + predecessor * b)        by rewrite(IH)
+         = successor((b + predecessor) + predecessor * b)
+              by congruenceOf(
+                     successor,
+                     Equality.symmetry(Natural.add_associative(
+                         b, predecessor, predecessor * b)))
+         = successor((predecessor + b) + predecessor * b)
+              by congruenceOf(
+                     function (rest : Natural) =>
+                         successor(rest + predecessor * b),
+                     Natural.add_commutative(b, predecessor))
+         = successor(predecessor + (b + predecessor * b))
+              by congruenceOf(
+                     successor,
+                     Natural.add_associative(
+                         predecessor, b, predecessor * b))
+         = successor(predecessor) + successor(predecessor) * b   by reflexivity;
+  }
+
+-- `by ring` v1 doesn't handle rearrangements inside `successor(_)`,
+-- so the 3-step + algebra chunk below stays manual until ring v2 lands.
+
+-- Version with bare `by IH` (auto-rewrite fallback).
+theorem Natural.multiply_successor_by_IH (a b : Natural)
+        : a * successor(b) = a + a * b :=
+  by_induction on a with IH {
+    case zero: reflexivity;
+    case successor(predecessor):
+      calc successor(predecessor) * successor(b)
+         = successor(b) + predecessor * successor(b)             by reflexivity
+         = successor(b) + (predecessor + predecessor * b)        by IH
+         = successor((b + predecessor) + predecessor * b)
+              by congruenceOf(
+                     successor,
+                     Equality.symmetry(Natural.add_associative(
+                         b, predecessor, predecessor * b)))
+         = successor((predecessor + b) + predecessor * b)
+              by congruenceOf(
+                     function (rest : Natural) =>
+                         successor(rest + predecessor * b),
+                     Natural.add_commutative(b, predecessor))
+         = successor(predecessor + (b + predecessor * b))
+              by congruenceOf(
+                     successor,
+                     Natural.add_associative(
+                         predecessor, b, predecessor * b))
+         = successor(predecessor) + successor(predecessor) * b   by reflexivity;
   }
