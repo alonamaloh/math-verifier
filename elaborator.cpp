@@ -3504,9 +3504,70 @@ private:
         return outerOpL;
     }
 
+    // Detect `(x : T) → op(unit, x) = x` (left-identity, unitOnLeft =
+    // true) or `(x : T) → op(x, unit) = x` (right-identity,
+    // unitOnLeft = false). On match returns true and fills outOp /
+    // outUnit / outUnitOnLeft. `unit` must be a closed term (no
+    // reference to the binder).
+    bool detectIdentityShape(ExpressionPointer typeExpr,
+                              std::string& outOp,
+                              ExpressionPointer& outUnit,
+                              bool& outUnitOnLeft) {
+        int binderCount = 0;
+        ExpressionPointer cursor = typeExpr;
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            ++binderCount;
+            cursor = pi->codomain;
+        }
+        if (binderCount != 1) return false;
+        auto* eqApp3 = std::get_if<Application>(&cursor->node);
+        if (!eqApp3) return false;
+        auto* eqApp2 =
+            std::get_if<Application>(&eqApp3->function->node);
+        if (!eqApp2) return false;
+        auto* eqApp1 =
+            std::get_if<Application>(&eqApp2->function->node);
+        if (!eqApp1) return false;
+        auto* eqHead = std::get_if<Constant>(&eqApp1->function->node);
+        if (!eqHead || eqHead->name != "Equality") return false;
+        ExpressionPointer lhs = eqApp2->argument;
+        ExpressionPointer rhs = eqApp3->argument;
+        // rhs must be BV(0).
+        auto* rhsBV = std::get_if<BoundVariable>(&rhs->node);
+        if (!rhsBV || rhsBV->deBruijnIndex != 0) return false;
+        // lhs must be op(a, b).
+        std::string opName;
+        std::vector<LevelPointer> opUniv;
+        ExpressionPointer a, b;
+        if (!decomposeBinaryOpApplication(lhs, opName, opUniv, a, b))
+            return false;
+        // Exactly one of a or b is BV(0); the other is the unit (and
+        // must be closed — must not mention BV(0)).
+        auto* aBV = std::get_if<BoundVariable>(&a->node);
+        auto* bBV = std::get_if<BoundVariable>(&b->node);
+        bool aIsBinder = aBV && aBV->deBruijnIndex == 0;
+        bool bIsBinder = bBV && bBV->deBruijnIndex == 0;
+        if (aIsBinder == bIsBinder) return false;
+        if (aIsBinder) {
+            // op(BV(0), unit) = BV(0) — right-identity.
+            if (referencesBoundBelowThreshold(b, 1)) return false;
+            outOp = opName;
+            outUnit = b;
+            outUnitOnLeft = false;
+        } else {
+            // op(unit, BV(0)) = BV(0) — left-identity.
+            if (referencesBoundBelowThreshold(a, 1)) return false;
+            outOp = opName;
+            outUnit = a;
+            outUnitOnLeft = true;
+        }
+        return true;
+    }
+
     // Hook called after each theorem is added to the environment.
-    // Records `<theoremName>` in commutativityLemmas_/associativityLemmas_
-    // if its type fits the canonical shape. Silent on non-match.
+    // Records `<theoremName>` in commutativityLemmas_/associativityLemmas_/
+    // identityLemmas_ if its type fits one of the canonical shapes.
+    // Silent on non-match.
     void registerAlgebraicShape(const std::string& theoremName,
                                   ExpressionPointer typeExpr) {
         std::string opName = detectCommutativityShape(typeExpr);
@@ -3519,6 +3580,28 @@ private:
         if (!opName.empty()
             && associativityLemmas_.count(opName) == 0) {
             associativityLemmas_[opName] = theoremName;
+            return;
+        }
+        std::string idOp;
+        ExpressionPointer idUnit;
+        bool idUnitOnLeft = false;
+        if (detectIdentityShape(typeExpr, idOp, idUnit, idUnitOnLeft)) {
+            // Skip if an identical entry is already present.
+            const auto& existing = identityLemmas_[idOp];
+            for (const auto& entry : existing) {
+                if (entry.unitOnLeft == idUnitOnLeft
+                    && structurallyEqual(entry.unit, idUnit)) {
+                    return;
+                }
+            }
+            IdentityLemma il;
+            il.lemmaName = theoremName;
+            il.unit = idUnit;
+            il.unitOnLeft = idUnitOnLeft;
+            // We currently never instantiate universe args for these
+            // lemmas — Natural / Integer / Rational identity lemmas
+            // have no universe parameters.
+            identityLemmas_[idOp].push_back(std::move(il));
         }
     }
 
@@ -3821,6 +3904,75 @@ private:
                 symmetryCall = makeApplication(
                     std::move(symmetryCall), std::move(assocCall));
                 return symmetryCall;
+            }
+        }
+        // Identity lemma: subLeft = op(unit, x), subRight = x (or the
+        // mirror with unit on the right, or the reverse direction
+        // where subRight is the op). Looks up identityLemmas_[op]
+        // for a registered (unit, side) match, then calls the lemma
+        // with x.
+        for (int direction = 0; direction < 2; ++direction) {
+            ExpressionPointer opSide =
+                direction == 0 ? subLeft : subRight;
+            ExpressionPointer plainSide =
+                direction == 0 ? subRight : subLeft;
+            std::string opName;
+            std::vector<LevelPointer> opUniv;
+            ExpressionPointer aArg, bArg;
+            if (!decomposeBinaryOpApplication(
+                    opSide, opName, opUniv, aArg, bArg)) continue;
+            auto it = identityLemmas_.find(opName);
+            if (it == identityLemmas_.end()) continue;
+            for (const auto& il : it->second) {
+                ExpressionPointer storedUnit = il.unit;
+                ExpressionPointer storedVar = aArg;
+                bool unitOk = false;
+                if (il.unitOnLeft) {
+                    if (structurallyEqual(aArg, storedUnit)) {
+                        storedVar = bArg;
+                        unitOk = true;
+                    }
+                } else {
+                    if (structurallyEqual(bArg, storedUnit)) {
+                        storedVar = aArg;
+                        unitOk = true;
+                    }
+                }
+                if (!unitOk) continue;
+                if (!structurallyEqual(storedVar, plainSide)) continue;
+                ExpressionPointer call =
+                    makeConstant(il.lemmaName, il.universeArguments);
+                call = makeApplication(std::move(call), storedVar);
+                if (direction == 1) {
+                    // subRight = op(...) and subLeft = x; lemma proves
+                    // op(...) = x but the calc step expects x = op(...).
+                    // Wrap with Equality.symmetry.
+                    ExpressionPointer carrierClosed;
+                    LevelPointer carrierLevelAtThisLevel;
+                    try {
+                        carrierClosed = inferTypeInLocalContext(
+                            localBinders, subLeft);
+                        carrierLevelAtThisLevel = typeUniverseOf(
+                            localBinders, subLeft);
+                    } catch (const TypeError&) {
+                        return nullptr;
+                    } catch (const ElaborateError&) {
+                        return nullptr;
+                    }
+                    ExpressionPointer symmetryCall = makeConstant(
+                        "Equality.symmetry",
+                        {carrierLevelAtThisLevel});
+                    symmetryCall = makeApplication(
+                        std::move(symmetryCall), carrierClosed);
+                    symmetryCall = makeApplication(
+                        std::move(symmetryCall), subRight);
+                    symmetryCall = makeApplication(
+                        std::move(symmetryCall), subLeft);
+                    symmetryCall = makeApplication(
+                        std::move(symmetryCall), std::move(call));
+                    return symmetryCall;
+                }
+                return call;
             }
         }
         // Local hypothesis match (forward and symmetric). Scan
@@ -8552,6 +8704,18 @@ private:
     // diff at a single position matches the corresponding pattern.
     std::unordered_map<std::string, std::string> commutativityLemmas_;
     std::unordered_map<std::string, std::string> associativityLemmas_;
+    // Identity lemmas: `(x : T) → op(unit, x) = x` (left-identity) or
+    // `(x : T) → op(x, unit) = x` (right-identity). One op can have
+    // both forms registered; we store them as a list. The `unit` term
+    // is the closed expression that plays the identity role.
+    struct IdentityLemma {
+        std::string lemmaName;
+        std::vector<LevelPointer> universeArguments;
+        ExpressionPointer unit;
+        bool unitOnLeft;  // true: op(unit, x) = x; false: op(x, unit) = x
+    };
+    std::unordered_map<std::string, std::vector<IdentityLemma>>
+        identityLemmas_;
     // Context frames describing what the elaborator is currently doing.
     // Each frame is a short phrase like "while elaborating cases at
     // line 42". `Frame` is an RAII guard that pushes on construction
