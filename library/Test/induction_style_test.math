@@ -1,0 +1,51 @@
+-- Test the by_induction-on-cases proof style. Should let us write
+-- `a * succ(b) = a + a*b` in a mathematician-friendly induction
+-- form. The existing parser already supports
+--   by_induction on EXPR with IH_NAME { case ... }
+-- where the IH is injected as an extra binder on each recursive
+-- constructor pattern.
+
+module Test.induction_style_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- The user's theorem, rewritten in the induction-tactic style.
+-- This uses the EXISTING infrastructure:
+--   by_induction on a with IH { case zero: ... case successor(p): ... }
+-- The IH is injected as an extra binder on each recursive constructor;
+-- inside `case successor(predecessor)`, the name `IH` refers to
+-- `predecessor * successor(b) = predecessor + predecessor * b`.
+theorem Natural.multiply_successor_inductive (a b : Natural)
+        : a * successor(b) = a + a * b :=
+  by_induction on a with IH {
+    case zero:
+      reflexivity(zero);
+    case successor(predecessor):
+      -- The kernel β-reduces both sides of the goal:
+      --   LHS = successor(predecessor) * successor(b)
+      --       ≡ successor(b) + predecessor * successor(b)
+      --       ≡ successor(b + predecessor * successor(b))
+      --   RHS = successor(predecessor) + successor(predecessor) * b
+      --       ≡ successor(predecessor + successor(predecessor) * b)
+      --       ≡ successor(predecessor + (b + predecessor * b))
+      -- So the visible goal is
+      --   successor(b + predecessor * successor(b))
+      --   = successor(predecessor + (b + predecessor * b))
+      -- which we prove by rewriting under the `successor(_)` wrapper.
+      calc successor(b + predecessor * successor(b))
+         = successor(b + (predecessor + predecessor * b))
+              by rewrite(IH)
+         = successor((b + predecessor) + predecessor * b)
+              by rewrite(Equality.symmetry(
+                  Natural.add_associative(
+                      b, predecessor, predecessor * b)))
+         = successor((predecessor + b) + predecessor * b)
+              by rewrite(Natural.add_commutative(b, predecessor))
+         = successor(predecessor + (b + predecessor * b))
+              by rewrite(Natural.add_associative(
+                  predecessor, b, predecessor * b));
+  }
