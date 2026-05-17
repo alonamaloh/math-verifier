@@ -1,0 +1,56 @@
+-- Short forms of Exists / And / Or .eliminate.
+--
+-- These desugar from the 2/2/3-arg call shape (recover A, B, P,
+-- Goal from the scrutinee's type and the expected goal) to the
+-- 5/5/6-arg verbose form. The trip-up case used to be: when the
+-- outer expected type contains BoundVariables referring to the
+-- enclosing theorem's parameters, the desugar must NOT re-close it
+-- (it's already in closed form) but must close A/B/P which came out
+-- of inferType in opened form. Without that, the assembled call has
+-- mixed closed/opened sub-terms and the kernel trips on a bare
+-- BoundVariable or an unbound Internal FreeVariable.
+
+module Test.eliminate_short_form_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- (1) Exists.eliminate short form, theorem with one parameter.
+theorem ExistsShortFormWithParameters
+        (a : Natural) (existsProof : Exists(Natural, function (k : Natural) => a = k))
+        : a = a :=
+  Exists.eliminate(
+      function (k : Natural) (proofAEqK : a = k) => reflexivity(a),
+      existsProof)
+
+-- (2) And.eliminate short form. Project the left component.
+theorem AndShortFormLeftProjection
+        (P Q : Proposition) (proof : And(P, Q))
+        : P :=
+  And.eliminate(
+      function (leftProof : P) (rightProof : Q) => leftProof,
+      proof)
+
+-- (3) Or.eliminate short form. Both alternatives prove the same Q.
+theorem OrShortFormConstant
+        (P Q : Proposition) (proofQ : Q) (alternatives : Or(P, P))
+        : Q :=
+  Or.eliminate(
+      function (leftProof : P) => proofQ,
+      function (rightProof : P) => proofQ,
+      alternatives)
+
+-- (4) Three parameters threaded through Or.eliminate. Exercises the
+-- expected-type-lift behaviour when the goal mentions multiple
+-- enclosing binders.
+theorem OrShortFormManyParameters
+        (P Q R : Proposition) (proofR : R) (disjunction : Or(P, Q))
+        : R :=
+  Or.eliminate(
+      function (leftP : P) => proofR,
+      function (rightQ : Q) => proofR,
+      disjunction)

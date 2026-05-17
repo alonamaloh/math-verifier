@@ -126,10 +126,13 @@ the directories that motivate it.
    `Integer/absolute_value_multiplicative.math:151-237` (87 lines of
    four-way sign dispatch), and the Cauchy-equivalence transitivity
    in `Real/basics.math:160-298` (139 lines, mostly ∃-unpacking).
-   Remedy: `dispatch on X { case Or.introduceLeft(p): … }` /
+   Partial fix landed: `Or.eliminate(hL, hR, disj)`,
+   `And.eliminate(h, conj)`, `Exists.eliminate(h, ex)` short forms
+   recover A, B, P, and the goal-Proposition from the scrutinee's
+   type and the call-site expected type. Remaining ergonomic win:
+   `dispatch on X { case Or.introduceLeft(p): … }` /
    `case ⟨w, hw⟩: …` syntax that scrutinizes the eliminator targets
-   without taking an explicit motive. See "deferred — short forms of
-   Or/And/Exists.eliminate" below for the prototype-and-revert.
+   inline, eliding the outer `… .eliminate` head.
 
 5. **`obtain ⟨a, b, c⟩ from …` cannot flat-destructure nested
    existentials and conjunctions.** `Natural/division.math:119-179`
@@ -210,29 +213,18 @@ Prototyped (`tryAutoCongruenceInCalc` in elaborator.cpp). The
 structure works — extract the proof's `a = b` and the goal's
 `LHS = RHS`, find the unique structural occurrence of `a` in `LHS`,
 build `Equality.congruence(λz. LHS[a→z], a, b, eq)` — but
-synthesizing terms that mix opened-form FreeVariables with kernel-
-level BoundVariables triggers "unbound internal variable" errors
-because the opening pass converts BoundVariables but leaves the
-existing FreeVariables alone.
+synthesizing terms that mix opened-form FreeVariables with closed-
+form BoundVariables yields a malformed kernel term (see the diagnosis
+in the Exists/And/Or.eliminate short forms, which had the same root
+cause: `expectedType` from the call site is in CLOSED form while
+sub-types pulled out of `inferTypeInLocalContext` are in OPENED
+form; closing or lifting one to match the other resolves it).
 
 Fix path: open `proofKernel` first via `openOverLocalBinders` and
 work entirely in opened forms (matching the other Quotient.*
 desugarings). Reverted to keep `main` clean; resume when there's
 time to debug the index plumbing.
 
-## Deferred — short forms of `Or` / `And` / `Exists.eliminate`
-
-`Or.eliminate(hL, hR, disj)`, `And.eliminate(h, conj)`,
-`Exists.eliminate(h, ex)` short desugarings were prototyped. The
-mechanical part works; the trip-up is that when the *outer* expected
-type contains free variables from local binders (common — any
-theorem with parameters), threading it as
-`makePi("_", A, expectedType)` into the handler's elaboration causes
-the kernel to lose track of those free variables.
-
-Same root cause as auto-congruence in calc; same fix path. Reverted.
-The verbose `Or.eliminate(A, B, Goal, hL, hR, disj)` form still
-works.
 
 ## Opportunistic — smaller items
 

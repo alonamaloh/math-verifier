@@ -964,10 +964,23 @@ ExpressionPointer inferTypeWork(const Environment& environment,
                                 const Context& context,
                                 ExpressionPointer expression) {
     if (auto* boundVariable = std::get_if<BoundVariable>(&expression->node)) {
-        throw TypeError(
+        std::string message =
             "internal: bare BoundVariable reached inferType (index " +
             std::to_string(boundVariable->deBruijnIndex) +
-            "); binders should be opened before recursing");
+            "); binders should be opened before recursing";
+        if (!context.empty()) {
+            message += " (context has";
+            for (const auto& entry : context) {
+                message += " ";
+                message +=
+                    entry.origin == FreeVariableOrigin::Internal ? "@" : "";
+                message += entry.name;
+            }
+            message += ")";
+        } else {
+            message += " (empty context)";
+        }
+        throw TypeError(message);
     }
     if (auto* freeVariable = std::get_if<FreeVariable>(&expression->node)) {
         for (auto entry = context.rbegin(); entry != context.rend(); ++entry) {
@@ -976,11 +989,29 @@ ExpressionPointer inferTypeWork(const Environment& environment,
                 return entry->type;
             }
         }
-        throw TypeError(
+        // Build a diagnostic that lists what was in scope so the
+        // caller can see whether the variable is truly missing or
+        // present under a different origin (User vs Internal — a
+        // common confusion when an elaborator desugar mixes opened
+        // and closed sub-expressions).
+        std::string message =
             std::string(freeVariable->origin == FreeVariableOrigin::User
                             ? "unbound free variable: "
                             : "unbound internal variable: ")
-            + freeVariable->name);
+            + freeVariable->name;
+        if (context.empty()) {
+            message += " (context is empty)";
+        } else {
+            message += " (in-scope:";
+            for (const auto& entry : context) {
+                message += " ";
+                message +=
+                    entry.origin == FreeVariableOrigin::Internal ? "@" : "";
+                message += entry.name;
+            }
+            message += ")";
+        }
+        throw TypeError(message);
     }
     if (auto* constant = std::get_if<Constant>(&expression->node)) {
         auto* declaration = environment.lookup(constant->name);

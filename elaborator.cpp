@@ -2569,6 +2569,28 @@ private:
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
+                if (name == "Exists.eliminate" && argumentCount == 2) {
+                    return desugarExistsEliminate(
+                        positionalArguments[0],
+                        positionalArguments[1],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
+                if (name == "And.eliminate" && argumentCount == 2) {
+                    return desugarAndEliminate(
+                        positionalArguments[0],
+                        positionalArguments[1],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
+                if (name == "Or.eliminate" && argumentCount == 3) {
+                    return desugarOrEliminate(
+                        positionalArguments[0],
+                        positionalArguments[1],
+                        positionalArguments[2],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
                 if (name == "Quotient.induct" && argumentCount == 3) {
                     return desugarQuotientInduct(
                         positionalArguments[0],
@@ -7600,6 +7622,238 @@ private:
         call = makeApplication(std::move(call), std::move(xKernel));
         call = makeApplication(std::move(call), std::move(yKernel));
         call = makeApplication(std::move(call), std::move(proofKernel));
+        return call;
+    }
+
+    // `And.eliminate(handler, conjunction)` — short form. Desugars to
+    // the verbose `And.eliminate(A, B, Goal, handler, conjunction)`.
+    ExpressionPointer desugarAndEliminate(
+        SurfaceExpressionPointer handlerSurface,
+        SurfaceExpressionPointer conjSurface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "And.eliminate at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "And.eliminate(handler, conjunction): short form needs "
+                "an expected goal type from context; use the 5-arg "
+                "verbose form when no expected type is available");
+        }
+        ExpressionPointer conjKernel = elaborateExpression(
+            *conjSurface, localBinders);
+        ExpressionPointer conjType = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, conjKernel));
+        auto* outerApp = std::get_if<Application>(&conjType->node);
+        auto* innerApp = outerApp
+            ? std::get_if<Application>(&outerApp->function->node)
+            : nullptr;
+        auto* head = innerApp
+            ? std::get_if<Constant>(&innerApp->function->node)
+            : nullptr;
+        if (!head || head->name != "And") {
+            throwElaborate(
+                "And.eliminate(handler, conjunction): second argument's "
+                "type must be `And(A, B)`, got `"
+                + prettyPrintInLocalScope(conjType, localBinders) + "`");
+        }
+        ExpressionPointer aProp = innerApp->argument;
+        ExpressionPointer bProp = outerApp->argument;
+        // Handler's expected type: A → B → Goal. The Pi binders are
+        // independent of the codomain, so expectedType (already
+        // closed at the call's depth) needs no lifting in the
+        // current Pi-codomain position when the surface elaborator
+        // matches a Lambda against it.
+        ExpressionPointer handlerExpected = makePi("leftProof", aProp,
+            makePi("rightProof", bProp, expectedType));
+        ExpressionPointer handlerKernel = elaborateExpression(
+            *handlerSurface, localBinders, handlerExpected);
+        ExpressionPointer aClosed = closeOverLocalBinders(
+            aProp, localBinders, localBinders.size());
+        ExpressionPointer bClosed = closeOverLocalBinders(
+            bProp, localBinders, localBinders.size());
+        ExpressionPointer call = makeConstant("And.eliminate", {});
+        call = makeApplication(std::move(call), std::move(aClosed));
+        call = makeApplication(std::move(call), std::move(bClosed));
+        call = makeApplication(std::move(call), expectedType);
+        call = makeApplication(std::move(call), std::move(handlerKernel));
+        call = makeApplication(std::move(call), std::move(conjKernel));
+        return call;
+    }
+
+    // `Or.eliminate(handleLeft, handleRight, disjunction)` — short
+    // form. Desugars to `Or.eliminate(A, B, Goal, handleLeft,
+    // handleRight, disjunction)`.
+    ExpressionPointer desugarOrEliminate(
+        SurfaceExpressionPointer handleLeftSurface,
+        SurfaceExpressionPointer handleRightSurface,
+        SurfaceExpressionPointer disjSurface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "Or.eliminate at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "Or.eliminate(hL, hR, disj): short form needs an "
+                "expected goal type from context; use the 6-arg "
+                "verbose form when no expected type is available");
+        }
+        ExpressionPointer disjKernel = elaborateExpression(
+            *disjSurface, localBinders);
+        ExpressionPointer disjType = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, disjKernel));
+        auto* outerApp = std::get_if<Application>(&disjType->node);
+        auto* innerApp = outerApp
+            ? std::get_if<Application>(&outerApp->function->node)
+            : nullptr;
+        auto* head = innerApp
+            ? std::get_if<Constant>(&innerApp->function->node)
+            : nullptr;
+        if (!head || head->name != "Or") {
+            throwElaborate(
+                "Or.eliminate(hL, hR, disj): third argument's type "
+                "must be `Or(A, B)`, got `"
+                + prettyPrintInLocalScope(disjType, localBinders) + "`");
+        }
+        ExpressionPointer aProp = innerApp->argument;
+        ExpressionPointer bProp = outerApp->argument;
+        // Each handler has type A → Goal / B → Goal.
+        ExpressionPointer handleLeftExpected = makePi("leftProof",
+            aProp, expectedType);
+        ExpressionPointer handleRightExpected = makePi("rightProof",
+            bProp, expectedType);
+        ExpressionPointer handleLeftKernel = elaborateExpression(
+            *handleLeftSurface, localBinders, handleLeftExpected);
+        ExpressionPointer handleRightKernel = elaborateExpression(
+            *handleRightSurface, localBinders, handleRightExpected);
+        ExpressionPointer aClosed = closeOverLocalBinders(
+            aProp, localBinders, localBinders.size());
+        ExpressionPointer bClosed = closeOverLocalBinders(
+            bProp, localBinders, localBinders.size());
+        ExpressionPointer call = makeConstant("Or.eliminate", {});
+        call = makeApplication(std::move(call), std::move(aClosed));
+        call = makeApplication(std::move(call), std::move(bClosed));
+        call = makeApplication(std::move(call), expectedType);
+        call = makeApplication(std::move(call), std::move(handleLeftKernel));
+        call = makeApplication(std::move(call), std::move(handleRightKernel));
+        call = makeApplication(std::move(call), std::move(disjKernel));
+        return call;
+    }
+
+    // `Exists.eliminate(handler, witness)` — short form. Desugars to
+    // the verbose `Exists.eliminate(A, P, Goal, handler, witness)` by
+    // recovering A and P from `witness`'s type (`Exists(A, P)`) and
+    // Goal from the call-site expectedType.
+    //
+    // The handler must have type `(w : A) → P(w) → Goal`. We build
+    // that Pi-chain as the expected type for the handler so the
+    // user-side lambda can be type-driven (no need to annotate the
+    // binders).
+    //
+    // Subtle: the contract of `expectedType` here is *closed* form
+    // — BoundVariable indices already account for the call-site's
+    // enclosing Pi/Lambda binders. `aType` / `predicate` extracted
+    // from the witness's *inferred* type are in *opened* form
+    // (Internal FreeVariables, since `inferTypeInLocalContext`
+    // opens). Mixing the two without conversion produces dangling
+    // BoundVariables or unbound FreeVariables in the assembled
+    // call. See the close/no-close discipline at the end.
+    ExpressionPointer desugarExistsEliminate(
+        SurfaceExpressionPointer handlerSurface,
+        SurfaceExpressionPointer witnessSurface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "Exists.eliminate at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "Exists.eliminate(handler, witness): short form needs "
+                "an expected goal type from context (e.g. inside a "
+                "theorem body); use the 5-arg verbose form "
+                "Exists.eliminate(A, P, Goal, handler, witness) "
+                "when no expected type is available");
+        }
+        ExpressionPointer witnessKernel = elaborateExpression(
+            *witnessSurface, localBinders);
+        ExpressionPointer witnessType = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, witnessKernel));
+        // witnessType should be `App(App(Const("Exists"), A), P)`.
+        auto* outerApp = std::get_if<Application>(&witnessType->node);
+        auto* innerApp = outerApp
+            ? std::get_if<Application>(&outerApp->function->node)
+            : nullptr;
+        auto* head = innerApp
+            ? std::get_if<Constant>(&innerApp->function->node)
+            : nullptr;
+        if (!head || head->name != "Exists") {
+            throwElaborate(
+                "Exists.eliminate(handler, witness): second argument's "
+                "type must be `Exists(A, P)`, got `"
+                + prettyPrintInLocalScope(witnessType, localBinders)
+                + "`");
+        }
+        ExpressionPointer aType = innerApp->argument;
+        ExpressionPointer predicate = outerApp->argument;
+        // Build handler's expected type:
+        //   Pi w : A. Pi _ : (predicate w). expectedType
+        // aType, predicate, expectedType are all in OPENED form
+        // (FreeVariable for outer local binders). Inside the outer
+        // Pi the codomain references the binder via BV(0); to
+        // construct `predicate w` we apply the (BV-free) predicate
+        // to BV(0). expectedType doesn't mention the new binders.
+        ExpressionPointer predicateAppliedToW = makeApplication(
+            predicate, makeBoundVariable(0));
+        ExpressionPointer innerPi = makePi("_",
+            std::move(predicateAppliedToW), expectedType);
+        ExpressionPointer handlerExpected = makePi("w",
+            aType, std::move(innerPi));
+        ExpressionPointer handlerKernel = elaborateExpression(
+            *handlerSurface, localBinders, handlerExpected);
+        // Universe argument: Exists's first universe is the carrier's
+        // level. Compute it from A's type.
+        LevelPointer carrierLevel;
+        try {
+            ExpressionPointer aTypeOfType = weakHeadNormalForm(
+                environment_,
+                inferTypeInLocalContext(localBinders, aType));
+            auto* aTypeSort = std::get_if<Sort>(&aTypeOfType->node);
+            if (!aTypeSort) {
+                throwElaborate(
+                    "Exists.eliminate: cannot determine the carrier "
+                    "type's universe");
+            }
+            carrierLevel = predecessorOfSortLevel(aTypeSort->level);
+        } catch (const TypeError&) {
+            throwElaborate(
+                "Exists.eliminate: cannot infer the carrier universe");
+        }
+        // Asymmetric form discipline:
+        //   * `expectedType` is in CLOSED form — the caller computed
+        //     it at the call site's scope and its BoundVariables
+        //     already index the surrounding theorem binders. Use it
+        //     directly. Closing it again would bump every BV by
+        //     `localBinders.size()`, producing dangling indices.
+        //   * `aType` / `predicate` came out of
+        //     `inferTypeInLocalContext` and so are in OPENED form
+        //     (Internal FreeVariables for the same binders). Close
+        //     them to match.
+        //   * `handlerKernel` / `witnessKernel` came back from
+        //     `elaborateExpression`, which produces CLOSED form, so
+        //     they need no transformation.
+        ExpressionPointer aClosed = closeOverLocalBinders(
+            aType, localBinders, localBinders.size());
+        ExpressionPointer pClosed = closeOverLocalBinders(
+            predicate, localBinders, localBinders.size());
+        ExpressionPointer call = makeConstant(
+            "Exists.eliminate", {carrierLevel});
+        call = makeApplication(std::move(call), std::move(aClosed));
+        call = makeApplication(std::move(call), std::move(pClosed));
+        call = makeApplication(std::move(call), expectedType);
+        call = makeApplication(std::move(call), std::move(handlerKernel));
+        call = makeApplication(std::move(call), std::move(witnessKernel));
         return call;
     }
 
