@@ -259,6 +259,48 @@ Both are doable; (b) is the cleaner approach.
 Reverted to keep `main` clean. Resume when there's time to debug the
 index plumbing.
 
+### Big idea — subtree hashing for the auto-prover
+
+User-proposed (2026-05-17). Cache a hash on each `ExpressionPointer`,
+computed bottom-up. Equality of subtrees is then O(1) hash compare
+instead of recursive `structurallyEqual`. The clever trick: pick hash
+functions that bake commutativity (and ideally associativity) into the
+hash, so `hash(a+b) == hash(b+a)` and `hash((a*b)*c) == hash(a*(b*c))`
+fall out of the construction. Concrete design:
+
+- Commutative ops: `hash(op, args)` combines `op_hash` with a
+  commutative integer combine of the arg hashes (XOR or modular add).
+- Associative+commutative ops: flatten chains into a multiset of leaf
+  atoms, hash the multiset.
+- Non-AC parts: ordered Merkle hash as usual.
+
+What this unlocks beyond the speed win:
+
+1. The classifier becomes uniform. Commutativity/associativity no
+   longer need bespoke `decomposeBinaryOpApplication` matchers — the
+   hashes line up automatically.
+2. Indexing arbitrary library theorems. Hash each theorem's
+   conclusion-LHS shape. At classify time, hash the diff's left side
+   and look up candidate lemmas. Distributivity, identity, and any
+   user-defined lemma become first-class without bespoke detection.
+3. Normal-form hashing for laws like distributivity: maintain a
+   canonical form (e.g. push multiplication over addition); hash the
+   canonical form. Then `hash(a*(b+c)) == hash(a*b + a*c)` and the
+   classifier can pick either with a synthesized rewrite.
+
+Caveats:
+
+- Hashes are probabilistic. We still need a verification step where
+  the kernel typechecks the candidate proof — cheap, since the kernel
+  is fast.
+- Under binders we'd hash α-equivalence-modulo de-Bruijn (canonical).
+- Universe arguments and FreeVariable origins need careful inclusion.
+
+Scope: medium-large rewrite of the auto-prover's classifier and a
+small kernel/elaborator change to cache hashes. Defer until the
+smaller follow-ups (multi-position diff, ergonomic refactors) are
+done — but this is the natural next big lever.
+
 ### Next sweep — Equality combinator carrier implicit
 
 `Equality.transport_proposition`, `Equality.transitivity`,
