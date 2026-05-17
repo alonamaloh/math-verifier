@@ -259,47 +259,145 @@ Both are doable; (b) is the cleaner approach.
 Reverted to keep `main` clean. Resume when there's time to debug the
 index plumbing.
 
-### Big idea — subtree hashing for the auto-prover
+### Open follow-ups for the calc auto-prover (smaller, defer to taste)
 
-User-proposed (2026-05-17). Cache a hash on each `ExpressionPointer`,
-computed bottom-up. Equality of subtrees is then O(1) hash compare
-instead of recursive `structurallyEqual`. The clever trick: pick hash
-functions that bake commutativity (and ideally associativity) into the
-hash, so `hash(a+b) == hash(b+a)` and `hash((a*b)*c) == hash(a*(b*c))`
-fall out of the construction. Concrete design:
+These are the natural extensions to the current
+`autoProveCalcStep` + `tryClassifyDiff` that we considered but didn't
+take. Each is meaningful but smaller than the hashing project below.
 
-- Commutative ops: `hash(op, args)` combines `op_hash` with a
-  commutative integer combine of the arg hashes (XOR or modular add).
-- Associative+commutative ops: flatten chains into a multiset of leaf
-  atoms, hash the multiset.
-- Non-AC parts: ordered Merkle hash as usual.
+- **Multi-position diff.** When `tryClassifyDiff` is stuck because
+  both function and argument differ at the current App level,
+  recursively prove `fn_l = fn_r` and `arg_l = arg_r` separately and
+  stitch with two congruences + transitivity. Handles
+  `(a+b)+(c+d) = (b+a)+(d+c)` and the remaining
+  `Equality.transitivity(rewrite(A), rewrite(B))` chains in the
+  library. Phase 2 of the hashing work subsumes most of this — once
+  AC-equality fires at the top of `(a+b)+(c+d)` directly, the walker
+  doesn't even need to descend.
+
+- **β-aware descent (attempted, reverted).** Tried WHNF on cursors
+  during descent; the problem is that `weakHeadNormalForm` unfolds
+  `Natural.add` (a Definition) into a raw `Natural_recursor`
+  application, which the classifier doesn't recognize as a binary
+  op. Two paths forward: (a) teach the classifier about recursor-
+  call shapes (much code, brittle), or (b) add a shallow "one ι-step
+  only" reducer to the kernel that fires the constructor case but
+  keeps the surface name. Defer until clearly motivated.
+
+- **Local-hyp match through polymorphic binders.** The Algebra agent
+  hit `combineHypothesis : op(a, b) = identity` as a function
+  parameter in a generic ring lemma. Our local-hyp scan opens it for
+  the def-eq check, but the polymorphic `carrier`/`operation`
+  parameters leak as `Internal` FreeVariables in the synthesized
+  proof and the kernel rejects it. Same root cause as the "auto-
+  congruence in calc" deferred item — careful open/close index
+  plumbing.
+
+### Active — subtree hashing for the auto-prover (2026-05-17, in flight)
+
+User-proposed and adopted in the phased form below. The idea: cache a
+hash on each `ExpressionPointer`, computed bottom-up. Equality of
+subtrees becomes O(1) hash compare instead of recursive
+`structurallyEqual`. Then design hashes so that commutativity and
+associativity fall out of equality, and use the hash to index
+arbitrary library theorems by their conclusion shape.
 
 What this unlocks beyond the speed win:
 
-1. The classifier becomes uniform. Commutativity/associativity no
-   longer need bespoke `decomposeBinaryOpApplication` matchers — the
+1. The classifier becomes uniform — commutativity / associativity no
+   longer need bespoke `decomposeBinaryOpApplication` matchers; the
    hashes line up automatically.
 2. Indexing arbitrary library theorems. Hash each theorem's
-   conclusion-LHS shape. At classify time, hash the diff's left side
+   conclusion-LHS shape; at classify time, hash the diff's left side
    and look up candidate lemmas. Distributivity, identity, and any
-   user-defined lemma become first-class without bespoke detection.
+   user-defined rewrite lemma become first-class without bespoke
+   detection.
 3. Normal-form hashing for laws like distributivity: maintain a
    canonical form (e.g. push multiplication over addition); hash the
    canonical form. Then `hash(a*(b+c)) == hash(a*b + a*c)` and the
-   classifier can pick either with a synthesized rewrite.
+   classifier can pick either with a synthesized rewrite. (Future.)
 
 Caveats:
 
 - Hashes are probabilistic. We still need a verification step where
   the kernel typechecks the candidate proof — cheap, since the kernel
   is fast.
-- Under binders we'd hash α-equivalence-modulo de-Bruijn (canonical).
+- Under binders we hash α-equivalence-modulo de-Bruijn (canonical).
 - Universe arguments and FreeVariable origins need careful inclusion.
 
-Scope: medium-large rewrite of the auto-prover's classifier and a
-small kernel/elaborator change to cache hashes. Defer until the
-smaller follow-ups (multi-position diff, ergonomic refactors) are
-done — but this is the natural next big lever.
+#### Phase 1 — structural subtree hash
+
+Add a `uint64_t hash_` field to `Expression` and `Level`, populated at
+construction in each `make*` function. Hash composition:
+
+- Atoms (`Sort`, `Constant`, `BoundVariable`, `FreeVariable`): mix
+  identifying fields (name / index / origin / universe args) with a
+  variant tag byte.
+- Compound (`Pi`, `Lambda`, `Application`, `Let`): mix the variant tag
+  with the children's hashes via a non-commutative combiner
+  (FNV-1a step or similar).
+- Universe levels: same pattern.
+
+First win: use the hash as a fast-reject in `structurallyEqual` —
+hashes differ → return false immediately; otherwise fall back to the
+recursive compare. α-equivalence comes for free because
+`BoundVariable` hashes by de Bruijn index.
+
+Cost: ~50 lines in kernel, +8 bytes per Expression node. No semantic
+changes; purely a perf foundation. **Task #31.**
+
+#### Phase 2 — AC-canonical equality for registered ops
+
+Kernel stays structural. Elaborator gains `acEqual(env, l, r)`:
+
+- At a node whose head is registered-commutative: compare ignoring
+  child order (multiset of arg-hashes).
+- At a registered-associative node: flatten the chain first.
+- At a node that's both: multiset of leaves over the flattened chain.
+- Otherwise: structural recursion.
+
+Lazy AC-canonical hash cached per `(Expression*, op_set_version)`.
+The auto-prover's classifier and walker switch from
+`structurallyEqual` to `acEqual`. The bespoke
+commutativity/associativity decomposers retire — equality alone
+handles them. Cases like `(a+b) + (c+d) = (b+a) + (d+c)` (both
+children commuted) trivially succeed because the walker no longer has
+a "both differ" failure mode for AC ops. **Task #32.**
+
+#### Phase 3 — theorem-shape indexing
+
+Build a registry: `acHash(conclusion-LHS) → list-of-lemmas`.
+Populated at theorem-declaration time using the AC-canonical hash
+from Phase 2 so commut/assoc-equivalent LHSs collide deliberately.
+
+At classify time, given a diff `(sub_l, sub_r)`:
+
+1. Compute `acHash(sub_l)`.
+2. Look up candidate lemmas.
+3. For each candidate, run a small one-way matcher to instantiate the
+   lemma's binders against `sub_l`.
+4. Check `acEqual(instantiated RHS, sub_r)`.
+5. If yes, emit the lemma application as the proof.
+
+Handles arbitrary user-written rewrite lemmas — not just commut /
+assoc / identity. The bespoke identity classifier added in Phase 0
+can be retired. Distributivity in its non-canonical form would still
+miss; a future "normal-form hashing" extension covers it. **Task
+#33.**
+
+#### Risks and order
+
+- Phase 1 is risk-free. Hash collisions still let `structurallyEqual`
+  fall through to the recursive compare; correctness preserved.
+- Phase 2's main risk: AC-flattening under binders. De Bruijn indices
+  keep α-equivalent terms hashing the same; we just need to flatten
+  with care.
+- Phase 3's risk: the matcher must refuse over-eager unification
+  (e.g. don't match `f(x)` against `g(y)` just because both are
+  Applications). Standard first-order matching solves this.
+
+Implementation order: land Phase 1, measure speedup, then Phase 2.
+Phase 3 builds cleanly on Phase 2's `acEqual`.
 
 ### Next sweep — Equality combinator carrier implicit
 
