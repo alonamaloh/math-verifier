@@ -1,0 +1,174 @@
+-- Logic/constructor_totality.math
+--
+-- Constructor totality lemmas. For each inductive type T with
+-- constructors C_1, ..., C_n, the corresponding lemma says: every
+-- value of T is structurally one of those forms. Phrased as a
+-- disjunction (or, with a single constructor, just an existence
+-- statement) that can be eliminated by `Or.eliminate` /
+-- `Exists.eliminate`.
+--
+-- The motivation is to replace the awkward "cases-with-retained-
+-- equation" pattern (where one wraps the expression to be
+-- case-analysed inside a function, threads it through with an
+-- equality `expression = freshName`, and `cases` on the fresh name).
+-- See `library/Natural/padic_valuation.math:129-167` for an instance
+-- of that pattern in action; with these lemmas the same proof can be
+-- rewritten as a clean `Or.eliminate` / `Exists.eliminate`.
+--
+-- Caveat: for inductives that live in `Proposition` (Sort 0) — namely
+-- `And`, `Or`, `Exists`, and the indexed `LessOrEqual` — the standard
+-- equation `value = Constructor(...)` runs into two kernel
+-- restrictions. (a) `Exists` quantifies over Type, not Proposition,
+-- so we cannot existentially abstract over a witness from a
+-- Proposition. (b) `Equality`'s carrier must be in `Type(u)`, and the
+-- `=` desugaring needs a syntactic successor universe — Proposition
+-- (Sort 0) fails that test, so equations on Proposition-typed values
+-- require the explicit `Equality.{0}(...)` form. We work around these
+-- with: an indices-and-substructure form for `LessOrEqual`; an
+-- explicit `Equality.{0}` equation for `And`; and trivial "round-
+-- trip" eliminator-shaped statements for `Or` and `Exists` (whose
+-- actual destructuring is best done via `Or.eliminate` /
+-- `Exists.eliminate` directly).
+
+module Logic.constructor_totality
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Rational.basics
+
+theorem Natural.constructor_totality
+        : (subject : Natural)
+          → subject = zero ∨ ∃ (predecessor : Natural). subject = successor(predecessor)
+  | zero =>
+      Or.introduceLeft(reflexivity(zero))
+  | successor(predecessor) =>
+      Or.introduceRight(
+          Exists.introduce(
+              Natural,
+              function (p : Natural) => successor(predecessor) = successor(p),
+              predecessor,
+              reflexivity(successor(predecessor))))
+
+theorem LessOrEqual.constructor_totality
+        (smaller larger : Natural)
+        : smaller ≤ larger
+          → smaller = larger
+            ∨ ∃ (largerPredecessor : Natural).
+                  larger = successor(largerPredecessor)
+                  ∧ smaller ≤ largerPredecessor
+  | LessOrEqual.reflexivity(commonValue) =>
+      Or.introduceLeft(reflexivity(commonValue))
+  | LessOrEqual.step(smallerD, largerPredecessor, subproof) =>
+      Or.introduceRight(
+          Exists.introduce(
+              Natural,
+              function (predecessor : Natural) =>
+                  successor(largerPredecessor) = successor(predecessor)
+                  ∧ smallerD ≤ predecessor,
+              largerPredecessor,
+              And.introduction(
+                  reflexivity(successor(largerPredecessor)),
+                  subproof)))
+
+-- And's components live in Proposition, so we cannot wrap them in
+-- `Exists` (which quantifies over Type). And since `Equality` requires
+-- its carrier to be in `Type(u)` (and the elaborator's `=` desugaring
+-- needs a syntactic successor universe), an equation on the And
+-- value itself only goes through with the explicit Equality.{0}(...)
+-- form. We use that here to state: every conjunction equals the
+-- introduction-form of its projections.
+theorem And.constructor_totality
+        (A B : Proposition)
+        : (conjunction : And(A, B))
+          → Equality.{0}(
+                And(A, B),
+                conjunction,
+                And.introduction(
+                    A, B,
+                    And.left(A, B, conjunction),
+                    And.right(A, B, conjunction)))
+  | And.introduction(leftProof, rightProof) =>
+      reflexivity.{0}(
+          And(A, B),
+          And.introduction(A, B, leftProof, rightProof))
+
+-- Every Or value is either an `Or.introduceLeft` of an A-proof or an
+-- `Or.introduceRight` of a B-proof. Because `A` and `B` are
+-- Propositions we cannot existentially quantify the witness with
+-- `Exists` (which is restricted to Type witnesses). Instead we expose
+-- the constructor branches via a pattern-match that re-introduces
+-- each side. The result type is just `A ∨ B` — equationally
+-- equivalent to the input, and meant to be consumed by `Or.eliminate`
+-- (whose handlers have direct access to the witness).
+theorem Or.constructor_totality
+        (A B : Proposition)
+        : (disjunction : Or(A, B)) → Or(A, B)
+  | Or.introduceLeft(leftProof)   => Or.introduceLeft(leftProof)
+  | Or.introduceRight(rightProof) => Or.introduceRight(rightProof)
+
+-- Every Exists value is an `Exists.introduce` of a witness and a
+-- predicate proof. Because `Exists` itself is in `Proposition`, we
+-- cannot use a second `Exists` to pull the witness out as a Type
+-- value — that would be large elimination from Prop, which CIC
+-- forbids. The most we can state is the trivial "Exists implies
+-- Exists" eliminable shape; the actual destructuring happens through
+-- `Exists.eliminate`.
+theorem Exists.constructor_totality
+        (A : Type) (P : A → Proposition)
+        : (existsProof : Exists(A, P)) → Exists(A, P)
+  | Exists.introduce(witnessValue, predicateProof) =>
+      Exists.introduce(A, P, witnessValue, predicateProof)
+
+-- Every IntegerRepresentative is an `IntegerRepresentative.make` of
+-- its positive and negative parts. The representative lives in Type
+-- (it's the underlying carrier of the Integer quotient), so we get a
+-- clean equational form with `Exists`.
+theorem IntegerRepresentative.constructor_totality
+        : (representative : IntegerRepresentative)
+          → ∃ (positivePart : Natural). ∃ (negativePart : Natural).
+                representative = IntegerRepresentative.make(positivePart, negativePart)
+  | IntegerRepresentative.make(positivePart, negativePart) =>
+      Exists.introduce(
+          Natural,
+          function (a : Natural) =>
+              ∃ (b : Natural).
+                  IntegerRepresentative.make(positivePart, negativePart)
+                  = IntegerRepresentative.make(a, b),
+          positivePart,
+          Exists.introduce(
+              Natural,
+              function (b : Natural) =>
+                  IntegerRepresentative.make(positivePart, negativePart)
+                  = IntegerRepresentative.make(positivePart, b),
+              negativePart,
+              reflexivity(
+                  IntegerRepresentative.make(positivePart, negativePart))))
+
+-- Every RationalRepresentative is a `RationalRepresentative.make` of
+-- its numerator (an Integer) and denominator-predecessor (a Natural).
+theorem RationalRepresentative.constructor_totality
+        : (representative : RationalRepresentative)
+          → ∃ (numerator : Integer).
+              ∃ (denominatorPredecessor : Natural).
+                  representative
+                  = RationalRepresentative.make(numerator, denominatorPredecessor)
+  | RationalRepresentative.make(numerator, denominatorPredecessor) =>
+      Exists.introduce(
+          Integer,
+          function (n : Integer) =>
+              ∃ (d : Natural).
+                  RationalRepresentative.make(numerator, denominatorPredecessor)
+                  = RationalRepresentative.make(n, d),
+          numerator,
+          Exists.introduce(
+              Natural,
+              function (d : Natural) =>
+                  RationalRepresentative.make(numerator, denominatorPredecessor)
+                  = RationalRepresentative.make(numerator, d),
+              denominatorPredecessor,
+              reflexivity(
+                  RationalRepresentative.make(numerator, denominatorPredecessor))))
