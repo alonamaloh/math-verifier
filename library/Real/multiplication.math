@@ -47,13 +47,9 @@ theorem Rational.multiply_negate_right (a b : Rational)
         : a * -b = -(a * b) :=
   calc a * -b
      = -b * a
-            by Rational.multiply_commutative(a, -b)
      = -(b * a)
             by Rational.multiply_negate_left(b, a)
      = -(a * b)
-            by congruenceOf(
-                   Rational.negate,
-                   Rational.multiply_commutative(b, a))
 
 theorem Rational.product_difference_decomposition (a b c d : Rational)
         : a * b - c * d = a * (b - d) + d * (a - c) :=
@@ -80,15 +76,7 @@ theorem Rational.product_difference_decomposition (a b c d : Rational)
                            (a * b + -(a * d)) + (d * a + z),
                        Rational.multiply_negate_right(d, c))
          = (a * b + -(a * d)) + (a * d + -(d * c))
-                by congruenceOf(
-                       function (z : Rational) =>
-                           (a * b + -(a * d)) + (z + -(d * c)),
-                       Rational.multiply_commutative(d, a))
          = (a * b + -(a * d)) + (a * d + -(c * d))
-                by congruenceOf(
-                       function (z : Rational) =>
-                           (a * b + -(a * d)) + (a * d + -z),
-                       Rational.multiply_commutative(d, c))
          = a * b + ((-(a * d) + a * d) + -(c * d))
                 by Equality.transitivity(
                        Rational.add_associative(
@@ -107,8 +95,7 @@ theorem Rational.product_difference_decomposition (a b c d : Rational)
                 by congruenceOf(
                        function (z : Rational) => a * b + z,
                        Rational.zero_add(-(c * d)))
-         = a * b - c * d
-                by reflexivity(Rational, a * b - c * d))
+         = a * b - c * d)
 
 -- ----------------------------------------------------------------------
 -- Natural → Rational monotonicity for `succ`.
@@ -132,10 +119,6 @@ theorem Rational.from_natural_le_preserves
             Equality.symmetry(
                 calc (b : Rational) - (a : Rational)
                    = ((a + c) : Rational) - (a : Rational)
-                          by congruenceOf(
-                                 function (m : Natural) =>
-                                     (m : Rational) - (a : Rational),
-                                 witnessEquation)
                    -- ((a+c) : R) - (a : R) = (c : R). Use Quotient.sound.
                    = (c : Rational)
                           by Quotient.sound(
@@ -193,17 +176,8 @@ theorem Rational.from_natural_le_preserves
                                                   Natural.to_integer.add_preserves(a, c))
                                     = ((c : Integer) + (a : Integer))
                                           + -(a : Integer)
-                                           by congruenceOf(
-                                                  function (z : Integer) =>
-                                                      z + -(a : Integer),
-                                                  Integer.add_commutative(
-                                                      (a : Integer), (c : Integer)))
                                     = (c : Integer)
                                           + ((a : Integer) + -(a : Integer))
-                                           by Integer.add_associative(
-                                                  (c : Integer),
-                                                  (a : Integer),
-                                                  -(a : Integer))
                                     = (c : Integer) + Integer.zero
                                            by congruenceOf(
                                                   function (z : Integer) =>
@@ -226,7 +200,6 @@ theorem Rational.from_natural_le_preserves
                                                           * (successor(m) : Integer),
                                                   calc zero
                                                      = zero + zero
-                                                            by reflexivity(Natural, zero + zero)
                                                      = zero + zero * successor(zero)
                                                             by congruenceOf(
                                                                    function (w : Natural) =>
@@ -847,7 +820,6 @@ theorem Rational.factor_subtract_distribute (a b c : Rational)
         : a * b - a * c = a * (b - c) :=
   calc a * b - a * c
      = a * b + -(a * c)
-            by reflexivity(Rational, a * b + -(a * c))
      = a * b + a * -c
             by congruenceOf(
                    function (z : Rational) => a * b + z,
@@ -855,7 +827,6 @@ theorem Rational.factor_subtract_distribute (a b c : Rational)
      = a * (b + -c)
             by Equality.symmetry(Rational.distributivity_left(a, b, -c))
      = a * (b - c)
-            by reflexivity(Rational, a * (b - c))
 
 -- The respect-proof inner chain: given the bound |s_x(m)| ≤ (succ K : R)
 -- and the difference bound |s_y(m) - s_y'(m)| < δ, conclude
@@ -1183,17 +1154,7 @@ theorem Real.multiply_respects_at_rep_y_inner
                       Rational.absolute_value,
                       calc s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)
                          = s_x(m) * s_y(m) - s_y(m) * s_xPrime(m)
-                                by congruenceOf(
-                                       function (z : Rational) =>
-                                           z - s_y(m) * s_xPrime(m),
-                                       Rational.multiply_commutative(
-                                           s_y(m), s_x(m)))
-                         = s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)
-                                by congruenceOf(
-                                       function (z : Rational) =>
-                                           s_x(m) * s_y(m) - z,
-                                       Rational.multiply_commutative(
-                                           s_y(m), s_xPrime(m)))),
+                         = s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)),
                   boundedY(m, N_leq_m))),
       Real.multiply_after_first_respects_at_rep_inner(
           s_y, sCauchy_y, s_x, s_xPrime, sCauchy_x, sCauchy_xPrime,
