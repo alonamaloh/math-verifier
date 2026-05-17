@@ -230,6 +230,23 @@ theorem calc_no_by_add_zero_nested (a : Natural)
   calc successor(a + zero)
      = successor(a)
 
+-- Multi-position AC rearrangement: `(a+b) + (c+d) = (b+a) + (d+c)`
+-- changes the order of args in two places simultaneously. The single-
+-- position diff walker bails because both function and argument
+-- differ at the top level; the Phase-2 `ring` fallback succeeds by
+-- flattening both sides and comparing multisets of leaves.
+theorem calc_no_by_ac_multi_position (a b c d : Natural)
+        : (a + b) + (c + d) = (b + a) + (d + c) :=
+  calc (a + b) + (c + d)
+     = (b + a) + (d + c)
+
+-- Deeply nested AC rearrangement: `((a+b)+c)+d = a + (b + (c + d))`.
+-- All four leaves preserved; structure completely re-balanced.
+theorem calc_no_by_ac_reassociation (a b c d : Natural)
+        : ((a + b) + c) + d = a + (b + (c + d)) :=
+  calc ((a + b) + c) + d
+     = a + (b + (c + d))
+
 -- Definitional equality at calc step level: `succ(b) + X ≡
 -- succ(b + X)` reduces in the kernel, so the def-eq strategy of the
 -- auto-prover (its first pass) closes this without descent.

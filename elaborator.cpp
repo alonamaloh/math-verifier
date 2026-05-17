@@ -3707,7 +3707,18 @@ private:
             // Multi-position diff at this level. Bail.
             break;
         }
-        if (!innerProof) return nullptr;
+        if (!innerProof) {
+            // Phase-2 fallback: try AC rearrangement via the existing
+            // `ring` proof emitter on the full goal. This catches
+            // multi-position commutative / associative shuffles like
+            // `(a + b) + (c + d) = (b + a) + (d + c)` that the
+            // single-position walker bails on.
+            ExpressionPointer ringProof = tryAcRearrangement(
+                localBinders, previousKernel, nextKernel,
+                carrierType, carrierLevel, line);
+            if (ringProof) return ringProof;
+            return nullptr;
+        }
         // Wrap from innermost out. At each step we need the type of
         // the "varying side" (lambda domain) and the type of the
         // result of applying the lambda (lambda codomain). We use
@@ -3776,6 +3787,35 @@ private:
         (void)carrierType;
         (void)carrierLevel;
         return currentProof;
+    }
+
+    // Phase-2 fallback: invoke the existing `ring` proof emitter on
+    // the goal `Equality(carrier, previous, next)`. Handles
+    // multi-position AC rearrangement that the single-position
+    // walker bails on. Returns nullptr on miss (e.g., the goal
+    // isn't a pure sum or pure product of the same multiset of
+    // atoms).
+    ExpressionPointer tryAcRearrangement(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        ExpressionPointer expectedType = makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeConstant("Equality", {carrierLevel}),
+                    carrierType),
+                previousKernel),
+            nextKernel);
+        try {
+            return elaborateRing(localBinders, expectedType, line, 0);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        } catch (const TypeError&) {
+            return nullptr;
+        }
     }
 
     // Try to prove `Equality(_, subLeft, subRight)` at a single
