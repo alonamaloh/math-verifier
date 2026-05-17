@@ -1,0 +1,126 @@
+-- Test/constructor_totality_test.math
+--
+-- Demonstrates the constructor totality lemmas in
+-- `Logic.constructor_totality`. The same theorem is proved twice:
+--
+--   (a) The old way: case-analyse an expression by wrapping it in a
+--       function that takes a fresh name and an equation
+--       `expression = freshName`, then `cases` on the fresh name so
+--       each branch carries a refined equation. This is the pattern
+--       used in `library/Natural/padic_valuation.math:129-167`.
+--
+--   (b) The new way: apply `Natural.constructor_totality` to the
+--       expression directly, then use `Or.eliminate` /
+--       `Exists.eliminate` to dispatch each constructor branch with
+--       its equation already destructured.
+--
+-- The theorem itself: for any `m, n : Natural`,
+--   m + n = zero  ∨  successor(zero) ≤ m + n
+-- We case-split on the *expression* `m + n` (not a bare variable),
+-- which is exactly where the wrapper-and-equation trick is needed.
+
+module Test.constructor_totality_test
+
+import Logic.basics
+import Logic.exists
+import Logic.constructor_totality
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+
+-- ----------------------------------------------------------------------
+-- (a) The old form: wrapper + cases-with-retained-equation.
+--
+-- We need to case-split on `m + n` (an expression, not a binder), so we
+-- wrap the goal in a `function (sumValue : Natural) (eq : m + n =
+-- sumValue) => …` and then `cases sumValue`. In each branch the body
+-- receives the refined equation as an explicit function argument with
+-- a more specific type than the outer `eq`.
+theorem add_zero_or_positive_old (m n : Natural)
+        : m + n = zero ∨ successor(zero) ≤ m + n :=
+  (function (sumValue : Natural) (sumEq : m + n = sumValue) =>
+     (cases sumValue {
+        | zero =>
+            function (refinedEq : m + n = zero) =>
+              Or.introduceLeft(refinedEq)
+        | successor(predecessor) =>
+            function (refinedEq : m + n = successor(predecessor)) =>
+              Or.introduceRight(
+                  Equality.transport_proposition(
+                      Natural,
+                      function (k : Natural) => successor(zero) ≤ k,
+                      successor(predecessor), m + n,
+                      Equality.symmetry(refinedEq),
+                      Natural.successor_less_or_equal_successor(
+                          zero, predecessor,
+                          Natural.zero_least(predecessor))))
+      } : m + n = sumValue
+          → (m + n = zero ∨ successor(zero) ≤ m + n))(sumEq))(
+    m + n,
+    reflexivity(m + n))
+
+-- ----------------------------------------------------------------------
+-- (b) The new form: Natural.constructor_totality + Or.eliminate +
+-- Exists.eliminate.
+--
+-- `Natural.constructor_totality(m + n)` returns
+--   (m + n = zero) ∨ ∃ (predecessor : Natural). m + n = successor(predecessor)
+-- which we eliminate with `Or.eliminate`. The right branch is
+-- existentially quantified, so we destructure with `Exists.eliminate`
+-- to get both the predecessor and the refined equation as bound
+-- variables in the handler.
+theorem add_zero_or_positive_new (m n : Natural)
+        : m + n = zero ∨ successor(zero) ≤ m + n :=
+  Or.eliminate(
+      m + n = zero,
+      ∃ (predecessor : Natural). m + n = successor(predecessor),
+      m + n = zero ∨ successor(zero) ≤ m + n,
+      function (sumIsZero : m + n = zero) =>
+          Or.introduceLeft(
+              m + n = zero,
+              successor(zero) ≤ m + n,
+              sumIsZero),
+      function (sumIsSuccessor
+                  : ∃ (predecessor : Natural). m + n = successor(predecessor)) =>
+          Exists.eliminate(
+              Natural,
+              function (predecessor : Natural) =>
+                  m + n = successor(predecessor),
+              m + n = zero ∨ successor(zero) ≤ m + n,
+              function (predecessor : Natural)
+                       (refinedEq : m + n = successor(predecessor)) =>
+                  Or.introduceRight(
+                      m + n = zero,
+                      successor(zero) ≤ m + n,
+                      Equality.transport_proposition(
+                          Natural,
+                          function (k : Natural) => successor(zero) ≤ k,
+                          successor(predecessor), m + n,
+                          Equality.symmetry(refinedEq),
+                          Natural.successor_less_or_equal_successor(
+                              zero, predecessor,
+                              Natural.zero_least(predecessor)))),
+              sumIsSuccessor),
+      Natural.constructor_totality(m + n))
+
+-- Both proofs inhabit the same theorem statement; the kernel
+-- verifies the bodies independently. The "new" version replaces the
+-- function-wrapper-then-cases idiom (which open-codes a CIC
+-- dependent-pattern-match motive trick) with a straight
+-- disjunction/existence elimination — the same operational pattern,
+-- but built out of named library lemmas.
+--
+-- Line count comparison (proof body, excluding signature/comments):
+--   old: 20 lines (lines 42-61), dominated by the explicit motive
+--        annotation `: m + n = sumValue → …` on the cases block and
+--        the manual `(…)(sumEq)` plumbing.
+--   new: 31 lines (lines 75-105), all explicit `Or.eliminate` /
+--        `Exists.eliminate` calls with their goal types spelled out.
+--
+-- The new form is more verbose here, but it scales better: each
+-- destructuring is a named library call with a stable interface,
+-- nothing depends on the kernel's motive-substitution behaviour, and
+-- the existential branch handler binds the predecessor and equation
+-- as ordinary parameters rather than threading them through a
+-- nested function wrapper.
