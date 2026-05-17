@@ -456,10 +456,6 @@ theorem Natural.padic_valuation_strip
             function (refinedPqEq : prime * quotient = successor(predPQ)) =>
               calc Natural.padic_valuation(prime, prime * quotient)
                  = Natural.padic_valuation(prime, successor(predPQ))
-                        by congruenceOf(
-                               function (m : Natural) =>
-                                   Natural.padic_valuation(prime, m),
-                               refinedPqEq)
                  = successor(Natural.padic_valuation_step(
                        predPQ, prime,
                        Natural.divide(prime, successor(predPQ))))
@@ -660,17 +656,8 @@ theorem Natural.padic_valuation_multiplicative
                 calc Natural.padic_valuation(prime, a' * b')
                    = Natural.padic_valuation(
                          prime, (prime * Natural.divide(prime, a')) * b')
-                          by congruenceOf(
-                                 function (m : Natural) =>
-                                     Natural.padic_valuation(prime, m * b'),
-                                 aEqPrimeDivide)
                    = Natural.padic_valuation(
                          prime, prime * (Natural.divide(prime, a') * b'))
-                          by congruenceOf(
-                                 function (m : Natural) =>
-                                     Natural.padic_valuation(prime, m),
-                                 Natural.multiply_associative(
-                                     prime, Natural.divide(prime, a'), b'))
                    = successor(Natural.padic_valuation(
                          prime, Natural.divide(prime, a') * b'))
                           by Natural.padic_valuation_strip(
@@ -682,14 +669,9 @@ theorem Natural.padic_valuation_multiplicative
                    = successor(Natural.padic_valuation(
                          prime, Natural.divide(prime, a'))
                        + Natural.padic_valuation(prime, b'))
-                          by congruenceOf(successor, recursedEq)
                    = successor(Natural.padic_valuation(
                          prime, Natural.divide(prime, a')))
                      + Natural.padic_valuation(prime, b')
-                          by reflexivity(Natural,
-                                 successor(Natural.padic_valuation(
-                                     prime, Natural.divide(prime, a')))
-                                 + Natural.padic_valuation(prime, b'))
                    = Natural.padic_valuation(
                          prime, prime * Natural.divide(prime, a'))
                      + Natural.padic_valuation(prime, b')
@@ -703,11 +685,6 @@ theorem Natural.padic_valuation_multiplicative
                                          divideAPositive)))
                    = Natural.padic_valuation(prime, a')
                      + Natural.padic_valuation(prime, b')
-                          by congruenceOf(
-                                 function (m : Natural) =>
-                                     Natural.padic_valuation(prime, m)
-                                     + Natural.padic_valuation(prime, b'),
-                                 Equality.symmetry(aEqPrimeDivide))
               },
               function (notDivA : prime ∤ a') =>
                 Or.eliminate(
@@ -789,29 +766,15 @@ theorem Natural.padic_valuation_multiplicative
                       calc Natural.padic_valuation(prime, a' * b')
                          = Natural.padic_valuation(
                                prime, a' * (prime * Natural.divide(prime, b')))
-                                by congruenceOf(
-                                       function (m : Natural) =>
-                                           Natural.padic_valuation(prime, a' * m),
-                                       bEqPrimeDivide)
                          = Natural.padic_valuation(
                                prime, prime * (a' * Natural.divide(prime, b')))
                                 by congruenceOf(
                                        function (m : Natural) =>
                                            Natural.padic_valuation(prime, m),
-                                       Equality.transitivity(
-                                           Equality.symmetry(
-                                               Natural.multiply_associative(
-                                                   a', prime,
-                                                   Natural.divide(prime, b'))),
-                                           Equality.transitivity(
-                                               congruenceOf(
-                                                   function (z : Natural) =>
-                                                       z * Natural.divide(prime, b'),
-                                                   Natural.multiply_commutative(
-                                                       a', prime)),
-                                               Natural.multiply_associative(
-                                                   prime, a',
-                                                   Natural.divide(prime, b')))))
+                                       calc a' * (prime * Natural.divide(prime, b'))
+                                          = (a' * prime) * Natural.divide(prime, b')
+                                          = (prime * a') * Natural.divide(prime, b')
+                                          = prime * (a' * Natural.divide(prime, b')))
                          = successor(Natural.padic_valuation(
                                prime, a' * Natural.divide(prime, b')))
                                 by Natural.padic_valuation_strip(
@@ -823,7 +786,6 @@ theorem Natural.padic_valuation_multiplicative
                          = successor(Natural.padic_valuation(prime, a')
                                      + Natural.padic_valuation(
                                            prime, Natural.divide(prime, b')))
-                                by congruenceOf(successor, recursedEq)
                          = Natural.padic_valuation(prime, a')
                              + successor(Natural.padic_valuation(
                                    prime, Natural.divide(prime, b')))
@@ -845,11 +807,6 @@ theorem Natural.padic_valuation_multiplicative
                                                divideBPositive)))
                          = Natural.padic_valuation(prime, a')
                              + Natural.padic_valuation(prime, b')
-                                by congruenceOf(
-                                       function (m : Natural) =>
-                                           Natural.padic_valuation(prime, a')
-                                           + Natural.padic_valuation(prime, m),
-                                       Equality.symmetry(bEqPrimeDivide))
                     },
                     function (notDivB : prime ∤ b') => {
                       -- prime ∤ a' ∧ prime ∤ b' → prime ∤ (a' * b').
@@ -868,7 +825,6 @@ theorem Natural.padic_valuation_multiplicative
                                 by Natural.padic_valuation_when_not_divides(
                                        prime, a' * b', notDivProduct)
                          = zero + zero
-                                by reflexivity(Natural, zero)
                          = Natural.padic_valuation(prime, a') + zero
                                 by congruenceOf(
                                        function (m : Natural) => m + zero,
@@ -1176,13 +1132,7 @@ theorem Natural.power_divides_implies_padic_valuation_ge
                            = Natural.power(successor(predK), prime) * w
                                   by nEqProductW
                            = (prime * Natural.power(predK, prime)) * w
-                                  by reflexivity(Natural,
-                                         (prime * Natural.power(predK, prime)) * w)
-                           = prime * (Natural.power(predK, prime) * w)
-                                  by Natural.multiply_associative(
-                                         prime,
-                                         Natural.power(predK, prime),
-                                         w));
+                           = prime * (Natural.power(predK, prime) * w));
                claim pPredKDividesQ
                      : Natural.divides(
                            Natural.power(predK, prime),
@@ -1439,14 +1389,8 @@ theorem Natural.le_add_preserves_left
           -- (a + b) + r = (a + r) + b via assoc and commutativity.
           calc (a + b) + r
              = a + (b + r)
-                    by Natural.add_associative(a, b, r)
              = a + (r + b)
-                    by congruenceOf(
-                           function (m : Natural) => a + m,
-                           Natural.add_commutative(b, r))
-             = (a + r) + b
-                    by Equality.symmetry(
-                           Natural.add_associative(a, r, b)),
+             = (a + r) + b,
           Natural.less_or_equal_add_right(a + b, r)))
 }
 
@@ -1503,33 +1447,10 @@ theorem Natural.monus_add_distributes
                              (a + Natural.monus(c, a)) + m,
                          dDecompose))
        = ((a + Natural.monus(c, a)) + b) + Natural.monus(d, b)
-              by Equality.symmetry(
-                     Natural.add_associative(
-                         a + Natural.monus(c, a),
-                         b,
-                         Natural.monus(d, b)))
        = (a + (Natural.monus(c, a) + b)) + Natural.monus(d, b)
-              by congruenceOf(
-                     function (m : Natural) => m + Natural.monus(d, b),
-                     Natural.add_associative(
-                         a, Natural.monus(c, a), b))
        = (a + (b + Natural.monus(c, a))) + Natural.monus(d, b)
-              by congruenceOf(
-                     function (m : Natural) =>
-                         (a + m) + Natural.monus(d, b),
-                     Natural.add_commutative(
-                         Natural.monus(c, a), b))
        = ((a + b) + Natural.monus(c, a)) + Natural.monus(d, b)
-              by congruenceOf(
-                     function (m : Natural) => m + Natural.monus(d, b),
-                     Equality.symmetry(
-                         Natural.add_associative(
-                             a, b, Natural.monus(c, a))))
-       = (a + b) + (Natural.monus(c, a) + Natural.monus(d, b))
-              by Natural.add_associative(
-                     a + b,
-                     Natural.monus(c, a),
-                     Natural.monus(d, b));
+       = (a + b) + (Natural.monus(c, a) + Natural.monus(d, b));
   Equality.transitivity(
       congruenceOf(
           function (m : Natural) => Natural.monus(m, a + b),
@@ -1612,17 +1533,8 @@ theorem Natural.distance_sum_cross_le_le
                                m),
                        calc (a1 + Natural.monus(a2, a1)) + b2
                           = a1 + (Natural.monus(a2, a1) + b2)
-                                 by Natural.add_associative(
-                                        a1, Natural.monus(a2, a1), b2)
                           = a1 + (b2 + Natural.monus(a2, a1))
-                                 by congruenceOf(
-                                        function (m : Natural) => a1 + m,
-                                        Natural.add_commutative(
-                                            Natural.monus(a2, a1), b2))
-                          = (a1 + b2) + Natural.monus(a2, a1)
-                                 by Equality.symmetry(
-                                        Natural.add_associative(
-                                            a1, b2, Natural.monus(a2, a1)))))
+                          = (a1 + b2) + Natural.monus(a2, a1)))
      = Natural.distance(Natural.monus(b1, b2), Natural.monus(a2, a1))
             by Natural.distance_add_left_cancel(
                    a1 + b2,
