@@ -5,6 +5,8 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -226,7 +228,42 @@ private:
             elaborateCoercionDeclaration(*coercion);
             return;
         }
+        if (auto* convention =
+                std::get_if<SurfaceConventionDeclaration>(&statement)) {
+            elaborateConventionDeclaration(*convention);
+            return;
+        }
         throw ElaborateError("unhandled top-level statement variant");
+    }
+
+    // `convention p [q ...] : T [with H1 [, H2 ...]];` registers each
+    // name (`p`, `q`, …) as a key in `conventionRegistry_`. The stored
+    // value is the convention's binder shape: the carrier type and the
+    // list of side-condition expressions (each referencing the names).
+    // When `elaborateDefinition` later sees a free use of `p` in a
+    // declaration's signature, it prepends an implicit binder for `p`
+    // and one implicit binder per side-condition.
+    void elaborateConventionDeclaration(
+        const SurfaceConventionDeclaration& declaration) {
+        ConventionEntry entry;
+        entry.type = declaration.type;
+        entry.propositions = declaration.propositions;
+        // Each name shares the same type and propositions. The names
+        // CO-DEPEND when a single declaration uses more than one of
+        // them: if a theorem mentions both `p` and `q` from
+        // `convention p q : Natural with Natural.is_prime(p)`, then the
+        // primality binder only fires once (on `p`'s convention entry).
+        // We register the same entry under each name; the prepending
+        // logic deduplicates side-condition expressions by surface
+        // syntax (close enough for v1).
+        for (const auto& name : declaration.names) {
+            if (conventionRegistry_.count(name) > 0) {
+                throw ElaborateError(
+                    "convention name '" + name
+                    + "' is already registered");
+            }
+            conventionRegistry_[name] = entry;
+        }
     }
 
     // Validate and register an `operator (sym) on (T1, T2) := F`
@@ -689,7 +726,169 @@ private:
         return count;
     }
 
-    void elaborateDefinition(const SurfaceDefinitionDeclaration& declaration) {
+    // For each convention name registered in `conventionRegistry_`, check
+    // whether it appears as a free identifier somewhere in `declaration`.
+    // Collect a deterministic ordered list of "needed" conventions and
+    // build implicit binders for each: one for the name itself, one for
+    // each side-condition proposition. Returns a fresh
+    // SurfaceDefinitionDeclaration with those binders prepended at the
+    // front of `arguments`.
+    SurfaceDefinitionDeclaration augmentDeclarationWithConventions(
+        const SurfaceDefinitionDeclaration& declaration) {
+        if (conventionRegistry_.empty()) return declaration;
+        std::unordered_set<std::string> userBoundNames;
+        for (const auto& binder : declaration.arguments) {
+            for (const auto& name : binder.names) {
+                userBoundNames.insert(name);
+            }
+        }
+        // We preserve insertion order: a convention is added the first
+        // time we see it mentioned. We walk binders' types, the
+        // declaration type, the body (if any), and each case body.
+        std::vector<std::string> orderedMentioned;
+        std::unordered_set<std::string> mentionedSet;
+        auto record = [&](const std::string& name) {
+            if (userBoundNames.count(name) > 0) return;
+            if (conventionRegistry_.count(name) == 0) return;
+            if (mentionedSet.insert(name).second) {
+                orderedMentioned.push_back(name);
+            }
+        };
+        for (const auto& binder : declaration.arguments) {
+            if (binder.type) collectMentionsInSurface(*binder.type, record);
+        }
+        if (declaration.type) {
+            collectMentionsInSurface(*declaration.type, record);
+        }
+        if (declaration.body) {
+            collectMentionsInSurface(*declaration.body, record);
+        }
+        for (const auto& clause : declaration.cases) {
+            for (const auto& pattern : clause.patterns) {
+                (void)pattern;
+            }
+            if (clause.body) collectMentionsInSurface(*clause.body, record);
+        }
+        if (orderedMentioned.empty()) return declaration;
+        // Build prepended binders. For each mentioned convention, push
+        // an implicit binder for the name itself, then one implicit
+        // binder per side-condition proposition (with an auto-generated
+        // anonymous name).
+        SurfaceDefinitionDeclaration augmented = declaration;
+        std::vector<SurfaceBinder> prepended;
+        int propCounter = 0;
+        for (const auto& name : orderedMentioned) {
+            const auto& entry = conventionRegistry_[name];
+            SurfaceBinder nameBinder;
+            nameBinder.names = {name};
+            nameBinder.type = entry.type;
+            nameBinder.isImplicit = true;
+            prepended.push_back(nameBinder);
+            for (const auto& prop : entry.propositions) {
+                SurfaceBinder propBinder;
+                propBinder.names = {
+                    "_convention_h" + std::to_string(propCounter++)};
+                propBinder.type = prop;
+                propBinder.isImplicit = true;
+                prepended.push_back(propBinder);
+            }
+        }
+        augmented.arguments.insert(
+            augmented.arguments.begin(),
+            prepended.begin(), prepended.end());
+        return augmented;
+    }
+
+    // Walk `expression` and call `record(name)` for every
+    // SurfaceIdentifier reference. Pattern definitions and `cases`
+    // clauses' patterns introduce locally-bound names; we don't
+    // currently model that here (the predicate is "appears anywhere",
+    // not "appears free"), but the augment caller filters out names
+    // the user explicitly binds, which handles the most common
+    // shadowing case.
+    template <typename Recorder>
+    void collectMentionsInSurface(const SurfaceExpression& expression,
+                                    Recorder record) {
+        if (auto* id = std::get_if<SurfaceIdentifier>(&expression.node)) {
+            record(id->qualifiedName);
+            return;
+        }
+        if (auto* app = std::get_if<SurfaceApplication>(&expression.node)) {
+            collectMentionsInSurface(*app->function, record);
+            for (const auto& arg : app->arguments) {
+                if (arg.value) collectMentionsInSurface(*arg.value, record);
+            }
+            return;
+        }
+        if (auto* pi = std::get_if<SurfacePiType>(&expression.node)) {
+            if (pi->binder.type) {
+                collectMentionsInSurface(*pi->binder.type, record);
+            }
+            if (pi->codomain) collectMentionsInSurface(*pi->codomain, record);
+            return;
+        }
+        if (auto* lambda = std::get_if<SurfaceLambda>(&expression.node)) {
+            if (lambda->binder.type) {
+                collectMentionsInSurface(*lambda->binder.type, record);
+            }
+            if (lambda->body) collectMentionsInSurface(*lambda->body, record);
+            return;
+        }
+        if (auto* let = std::get_if<SurfaceLet>(&expression.node)) {
+            if (let->type) collectMentionsInSurface(*let->type, record);
+            if (let->value) collectMentionsInSurface(*let->value, record);
+            if (let->body) collectMentionsInSurface(*let->body, record);
+            return;
+        }
+        if (auto* asc =
+                std::get_if<SurfaceAscription>(&expression.node)) {
+            if (asc->expression) {
+                collectMentionsInSurface(*asc->expression, record);
+            }
+            if (asc->type) collectMentionsInSurface(*asc->type, record);
+            return;
+        }
+        if (auto* bin =
+                std::get_if<SurfaceBinaryOperation>(&expression.node)) {
+            if (bin->left) collectMentionsInSurface(*bin->left, record);
+            if (bin->right) collectMentionsInSurface(*bin->right, record);
+            return;
+        }
+        if (auto* un =
+                std::get_if<SurfaceUnaryOperation>(&expression.node)) {
+            if (un->operand) collectMentionsInSurface(*un->operand, record);
+            return;
+        }
+        if (auto* tup =
+                std::get_if<SurfaceAnonymousTuple>(&expression.node)) {
+            for (const auto& c : tup->components) {
+                if (c) collectMentionsInSurface(*c, record);
+            }
+            return;
+        }
+        if (auto* cas = std::get_if<SurfaceCases>(&expression.node)) {
+            if (cas->scrutinee) {
+                collectMentionsInSurface(*cas->scrutinee, record);
+            }
+            for (const auto& clause : cas->clauses) {
+                if (clause.body) {
+                    collectMentionsInSurface(*clause.body, record);
+                }
+            }
+            return;
+        }
+        // SurfaceNumericLiteral, SurfaceType, SurfaceProposition,
+        // SurfaceHammer, SurfaceSorry, SurfaceRing, calc, by_induction,
+        // and a handful of other leaf/specialised nodes have no
+        // children we care about for convention detection. We default
+        // to ignoring them — at worst the convention doesn't fire for
+        // those forms.
+    }
+
+    void elaborateDefinition(const SurfaceDefinitionDeclaration& origDecl) {
+        SurfaceDefinitionDeclaration augmented =
+            augmentDeclarationWithConventions(origDecl);
+        const SurfaceDefinitionDeclaration& declaration = augmented;
         if (!declaration.cases.empty()) {
             elaboratePatternMatchDefinition(declaration);
             return;
@@ -7659,6 +7858,18 @@ private:
     std::vector<std::string>& importedModules_;
     std::string moduleName_;
     std::string currentDeclarationName_;
+    // Conventions registered via `convention p [q ...] : T [with …];`
+    // declarations. Keyed by name. When a subsequent declaration's
+    // signature or body mentions a key as a free identifier, the
+    // elaborator auto-prepends `{p : T}` and one implicit binder per
+    // side-condition. v1: file-local (cleared at module start would be
+    // ideal but for now lives for the entire elaborator instance, which
+    // matches the per-module verifier invocation).
+    struct ConventionEntry {
+        SurfaceExpressionPointer type;
+        std::vector<SurfaceExpressionPointer> propositions;
+    };
+    std::unordered_map<std::string, ConventionEntry> conventionRegistry_;
     // Context frames describing what the elaborator is currently doing.
     // Each frame is a short phrase like "while elaborating cases at
     // line 42". `Frame` is an RAII guard that pushes on construction

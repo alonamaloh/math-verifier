@@ -323,10 +323,12 @@ private:
             case TokenKind::KeywordOperator:   return parseOperatorDeclaration();
             case TokenKind::KeywordOverload:   return parseOverloadDeclaration();
             case TokenKind::KeywordCoercion:   return parseCoercionDeclaration();
+            case TokenKind::KeywordConvention: return parseConventionDeclaration();
             default:
                 throwHere("expected top-level statement keyword "
                           "(import / using / inductive / axiom / "
-                          "definition / theorem / operator / overload)");
+                          "definition / theorem / operator / overload / "
+                          "convention)");
         }
     }
 
@@ -464,6 +466,44 @@ private:
         } else {
             throwHere("expected 'operators', 'literals', or '{' after '.'"
                       " in using directive");
+        }
+        return declaration;
+    }
+
+    // `convention p [q ...] : <type> [with <prop1> [, <prop2> ...]];`
+    //
+    // Registers `p`, `q`, etc. as implicitly-bound names of `<type>` in
+    // any subsequent definition/theorem that mentions them. Each `with`
+    // proposition becomes an additional implicit binder (anonymous-named).
+    //
+    // Examples:
+    //   convention p : Natural with Natural.is_prime(p);
+    //   convention n m k : Natural;
+    //   convention x y z : Rational;
+    SurfaceConventionDeclaration parseConventionDeclaration() {
+        consumeAny();  // 'convention'
+        SurfaceConventionDeclaration declaration;
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected at least one name after 'convention'");
+        }
+        declaration.names.push_back(consumeAny().lexeme);
+        // Optional additional names share the same type/propositions.
+        while (peek().kind != TokenKind::Colon) {
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected ':' or another name in convention "
+                          "declaration");
+            }
+            declaration.names.push_back(consumeAny().lexeme);
+        }
+        expect(TokenKind::Colon, "before convention type");
+        declaration.type = parseExpression();
+        if (peek().kind == TokenKind::KeywordWith) {
+            consumeAny();  // 'with'
+            declaration.propositions.push_back(parseExpression());
+            while (peek().kind == TokenKind::Comma) {
+                consumeAny();  // ','
+                declaration.propositions.push_back(parseExpression());
+            }
         }
         return declaration;
     }

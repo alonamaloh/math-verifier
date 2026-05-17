@@ -1,0 +1,54 @@
+-- Test `convention` declarations: name-bound implicit binders.
+-- Mirrors the math-book "throughout this chapter, p denotes a prime"
+-- convention. Any subsequent definition or theorem that mentions
+-- `p` as a free identifier gets {p : Natural} and {_ : Natural.is_prime(p)}
+-- prepended automatically as implicit binders.
+
+module Test.convention_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.divisibility
+import Natural.prime
+
+-- Register the convention. Subsequent declarations mentioning `p`
+-- automatically get implicit `p : Natural` and `_ : Natural.is_prime(p)`
+-- binders prepended.
+convention p : Natural with Natural.is_prime(p)
+
+-- (1) Theorem statement uses `p` freely. The elaborator prepends the
+-- implicit binders and `Natural.is_prime(p)` is in scope as an
+-- (anonymous-named) hypothesis.
+theorem convention_self_refl : p = p :=
+  reflexivity(Natural, p)
+
+-- (2) Multiple conventions at once.
+convention n m : Natural
+
+theorem convention_natural_self_refl : n + zero = n + zero :=
+  reflexivity(Natural, n + zero)
+
+-- (3) Mixing convention `p` with user binders is OK: the user's `(q : Natural)`
+-- introduces an explicit binder; `p` is implicit via the convention.
+theorem convention_with_explicit (q : Natural) : p = p :=
+  reflexivity(Natural, p)
+
+-- (4) Without `convention`, this theorem would need to take p and
+-- primality explicitly. With the convention, they're implicit and
+-- silent.
+--
+-- Before:
+--   theorem prime_self_divides (p : Natural) (primality : Natural.is_prime(p))
+--           : p ∣ p := ⟨successor(zero), Equality.symmetry(Natural, p, p * successor(zero), Natural.multiply_one(p))⟩
+--
+-- After (this version):
+theorem prime_self_divides : p ∣ p :=
+  Exists.introduce(
+      Natural,
+      function (q : Natural) => p = p * q,
+      successor(zero),
+      Equality.symmetry(
+          Natural, p * successor(zero), p,
+          Natural.multiply_one(p)))

@@ -42,6 +42,7 @@ enum class TokenKind {
     KeywordSet,             // `set n := E;` — transparent local definition
     KeywordSorry,           // `sorry` — placeholder for an unwritten proof
     KeywordRing,            // `ring` — commutative-ring decision tactic
+    KeywordConvention,      // `convention p : T with H` — name-bound implicit binder
 
     // Punctuation
     LeftParen, RightParen,
