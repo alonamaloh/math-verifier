@@ -7501,16 +7501,53 @@ private:
 
         ExpressionPointer termKernel = elaborateExpression(
             *termSurface, localBinders);
-        ExpressionPointer termTypeOpened = weakHeadNormalForm(
-            environment_,
-            inferTypeInLocalContext(localBinders, termKernel));
-        ExpressionPointer termTypeClosed = closeOverLocalBinders(
-            termTypeOpened, localBinders, localBinders.size());
+        // Deliberately DON'T weak-head-normalise term's inferred type
+        // here: definitions like `Rational.LessThan(x, y) :=
+        // And(LessOrEqual(x, y), Not(x = y))` unfold to a Constant
+        // head whose argument appears twice (once on each conjunct),
+        // and `Rational.IsNonneg(Quotient.mk(rep))` unfolds via
+        // `Quotient.lift` so the `Quotient.mk` head disappears.
+        // Either kills the structural-occurrence search. Keeping the
+        // unreduced form gives us the user-visible motive shape, with
+        // the rewrite endpoint exactly where they expect it. If no
+        // match is found at this level we fall back to WHNF — that
+        // covers sites where the term's type is genuinely behind a
+        // definition that must be peeled.
+        ExpressionPointer termTypeUnreduced =
+            inferTypeInLocalContext(localBinders, termKernel);
+        ExpressionPointer termTypeUnreducedClosed = closeOverLocalBinders(
+            termTypeUnreduced, localBinders, localBinders.size());
 
         int occurrenceCount = 0;
         ExpressionPointer abstractedBody = abstractStructuralOccurrence(
-            termTypeClosed, leftEndpoint,
+            termTypeUnreducedClosed, leftEndpoint,
             /*currentDepth=*/0, occurrenceCount);
+        if (occurrenceCount != 1) {
+            // Retry with the WHNF'd form. Catches the case where the
+            // rewrite target sits behind a definition that has to be
+            // unfolded to expose it (e.g. propositional aliases that
+            // wrap the type the user actually wants to rewrite into).
+            ExpressionPointer termTypeWhnf = weakHeadNormalForm(
+                environment_, termTypeUnreduced);
+            ExpressionPointer termTypeWhnfClosed = closeOverLocalBinders(
+                termTypeWhnf, localBinders, localBinders.size());
+            int whnfOccurrenceCount = 0;
+            ExpressionPointer whnfAbstractedBody =
+                abstractStructuralOccurrence(
+                    termTypeWhnfClosed, leftEndpoint,
+                    /*currentDepth=*/0, whnfOccurrenceCount);
+            if (whnfOccurrenceCount == 1) {
+                occurrenceCount = whnfOccurrenceCount;
+                abstractedBody = std::move(whnfAbstractedBody);
+            } else if (occurrenceCount == 0) {
+                // Adopt the WHNF result so the error diagnostic shows
+                // the deeper count if it found one.
+                occurrenceCount = whnfOccurrenceCount;
+                abstractedBody = std::move(whnfAbstractedBody);
+            }
+        }
+        // Use the unreduced form for the diagnostic display.
+        ExpressionPointer termTypeOpened = termTypeUnreduced;
         if (occurrenceCount == 0) {
             throwElaborate(
                 "rewrite(eq, term): the equality's left endpoint "
