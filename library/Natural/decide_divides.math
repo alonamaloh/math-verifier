@@ -115,84 +115,76 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
           function (noneEarlier :
                   (q : Natural)
                   → q ≤ prevBound
-                  → n ≠ d * q) =>
-              Or.eliminate(
-                  n = d * successor(prevBound),
-                  n ≠ d * successor(prevBound),
-                  Or(∃ (qInner : Natural). qInner ≤ successor(prevBound) ∧ n = d * qInner,
-                      (qInner : Natural)
-                        → qInner ≤ successor(prevBound)
-                        → n ≠ d * qInner),
-                  function (nEqualsDTimesSuccessorPrevious :
-                          n = d * successor(prevBound)) =>
-                      Or.introduceLeft(
-                          Exists.introduce(
-                              successor(prevBound),
-                              And.introduction(
-                                  LessOrEqual.reflexivity(
-                                      successor(prevBound)),
-                                  nEqualsDTimesSuccessorPrevious))),
-                  function (nNotDTimesSuccessorPrevious :
-                          n ≠ d * successor(prevBound)) =>
-                      Or.introduceRight(
-                          function (q : Natural)
-                              (quotientLessOrEqualSuccessorPrevious :
-                                  q ≤ successor(prevBound))
-                              (nEqualsDTimesQuotient : n = d * q) =>
+                  → n ≠ d * q) => {
+            claim (n = d * successor(prevBound)) ∨ (n ≠ d * successor(prevBound))
+                by Natural.decides_equality(n, d * successor(prevBound))
+            claim by cases {
+              in (n = d * successor(prevBound)) as nEqualsDTimesSuccessorPrevious:
+                  Or.introduceLeft(
+                      Exists.introduce(
+                          successor(prevBound),
+                          And.introduction(
+                              LessOrEqual.reflexivity(
+                                  successor(prevBound)),
+                              nEqualsDTimesSuccessorPrevious)))
+              in (n ≠ d * successor(prevBound)) as nNotDTimesSuccessorPrevious:
+                  Or.introduceRight(
+                      function (q : Natural)
+                          (quotientLessOrEqualSuccessorPrevious :
+                              q ≤ successor(prevBound))
+                          (nEqualsDTimesQuotient : n = d * q) => {
                             -- q ≤ successor(prevBound): either q = successor(prevBound)
                             -- (contradicts nNotDTimesSuccessorPrevious) or q ≤ prevBound
                             -- (contradicts noneEarlier).
-                            Or.eliminate(
-                                q = successor(prevBound),
-                                ∃ (bPredecessor : Natural). successor(prevBound) =
-                                                successor(bPredecessor) ∧ q ≤ bPredecessor,
-                                False,
-                                function (quotientEqualsSuccessorPrevious :
-                                        q = successor(prevBound)) =>
-                                    nNotDTimesSuccessorPrevious(
-                                        rewrite(
-                                            quotientEqualsSuccessorPrevious,
-                                            nEqualsDTimesQuotient)),
-                                function (existsProof :
-                                        ∃ (bPredecessor : Natural). successor(prevBound) =
-                                                        successor(bPredecessor) ∧ q ≤ bPredecessor) =>
-                                    Exists.eliminate(
-                                        Natural,
-                                        function (bPredecessor : Natural) =>
+                            claim (q = successor(prevBound))
+                                  ∨ (∃ (bPredecessor : Natural). successor(prevBound) =
+                                                  successor(bPredecessor) ∧ q ≤ bPredecessor)
+                                by LessOrEqual.invert(
+                                       q, successor(prevBound),
+                                       quotientLessOrEqualSuccessorPrevious)
+                            claim by cases {
+                              in (q = successor(prevBound)) as quotientEqualsSuccessorPrevious:
+                                  nNotDTimesSuccessorPrevious(
+                                      rewrite(
+                                          quotientEqualsSuccessorPrevious,
+                                          nEqualsDTimesQuotient))
+                              in (∃ (bPredecessor : Natural). successor(prevBound) =
+                                                  successor(bPredecessor) ∧ q ≤ bPredecessor) as existsProof:
+                                  Exists.eliminate(
+                                      Natural,
+                                      function (bPredecessor : Natural) =>
+                                          successor(prevBound) =
+                                                  successor(bPredecessor) ∧ q ≤ bPredecessor,
+                                      False,
+                                      function (bPredecessor : Natural)
+                                          (combined : successor(prevBound) =
+                                                              successor(bPredecessor) ∧ q ≤ bPredecessor) =>
+                                        And.eliminate(
                                             successor(prevBound) =
-                                                    successor(bPredecessor) ∧ q ≤ bPredecessor,
-                                        False,
-                                        function (bPredecessor : Natural)
-                                            (combined : successor(prevBound) =
-                                                                successor(bPredecessor) ∧ q ≤ bPredecessor) =>
-                                          And.eliminate(
-                                              successor(prevBound) =
-                                                  successor(bPredecessor),
-                                              q ≤ bPredecessor,
-                                              False,
-                                              function (successorEquals :
-                                                      successor(prevBound) =
-                                                          successor(bPredecessor))
-                                                  (quotientLessOrEqualBPredecessor :
-                                                      q ≤ bPredecessor) =>
-                                                  noneEarlier(
-                                                      q,
-                                                      rewrite(
-                                                          Equality.symmetry(
-                                                              Natural.successor_injective(
-                                                                  prevBound,
-                                                                  bPredecessor,
-                                                                  successorEquals)),
-                                                          quotientLessOrEqualBPredecessor),
-                                                      nEqualsDTimesQuotient),
-                                              combined),
-                                        existsProof),
-                                LessOrEqual.invert(
-                                    q, successor(prevBound),
-                                    quotientLessOrEqualSuccessorPrevious))),
-                  Natural.decides_equality(
-                      n,
-                      d * successor(prevBound))),
+                                                successor(bPredecessor),
+                                            q ≤ bPredecessor,
+                                            False,
+                                            function (successorEquals :
+                                                    successor(prevBound) =
+                                                        successor(bPredecessor))
+                                                (quotientLessOrEqualBPredecessor :
+                                                    q ≤ bPredecessor) =>
+                                                noneEarlier(
+                                                    q,
+                                                    rewrite(
+                                                        Equality.symmetry(
+                                                            Natural.successor_injective(
+                                                                prevBound,
+                                                                bPredecessor,
+                                                                successorEquals)),
+                                                        quotientLessOrEqualBPredecessor),
+                                                    nEqualsDTimesQuotient),
+                                            combined),
+                                      existsProof)
+                            }
+                          })
+            }
+          },
           Natural.search_quotient_witness_up_to(d, n, prevBound))
 
 -- Decidable divisibility on Natural. For d = 0, dispatches via

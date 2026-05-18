@@ -76,50 +76,50 @@ definition Integer.MkIsNegated (a b : Natural) : Proposition :=
 theorem Integer.sign_split_at_representative
         (a b : Natural)
         : Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)) :=
-  Or.eliminate(
-      LessOrEqual(a, b), LessOrEqual(b, a),
-      Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)),
-      function (aLeqB : a ≤ b) =>
-          Exists.eliminate(
-              Natural,
-              function (k : Natural) => b = a + k,
-              Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)),
-              function (k : Natural) (witnessEquation : b = a + k) =>
-                  Or.introduceRight(
-                      Integer.MkIsNonneg(a, b),
-                      Integer.MkIsNegated(a, b),
-                      Exists.introduce(
-                          Natural,
-                          function (j : Natural) =>
-                              Quotient.mk(IntegerRepresentative,
-                                           IntegerEquivalent,
-                                           IntegerRepresentative.make(a, b))
-                              = -(j : Integer),
-                          k,
-                          Integer.from_reverse_subtraction_witness(
-                              a, b, k, witnessEquation))),
-              Natural.subtraction_witness(a, b, aLeqB)),
-      function (bLeqA : b ≤ a) =>
-          Exists.eliminate(
-              Natural,
-              function (k : Natural) => a = b + k,
-              Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)),
-              function (k : Natural) (witnessEquation : a = b + k) =>
-                  Or.introduceLeft(
-                      Integer.MkIsNonneg(a, b),
-                      Integer.MkIsNegated(a, b),
-                      Exists.introduce(
-                          Natural,
-                          function (j : Natural) =>
-                              Quotient.mk(IntegerRepresentative,
-                                           IntegerEquivalent,
-                                           IntegerRepresentative.make(a, b))
-                              = (j : Integer),
-                          k,
-                          Integer.from_subtraction_witness(
-                              a, b, k, witnessEquation))),
-              Natural.subtraction_witness(b, a, bLeqA)),
-      Natural.totality_of_less_or_equal(a, b))
+  claim LessOrEqual(a, b) ∨ LessOrEqual(b, a)
+      by Natural.totality_of_less_or_equal(a, b)
+  claim by cases {
+    in (LessOrEqual(a, b)) as aLeqB:
+        Exists.eliminate(
+            Natural,
+            function (k : Natural) => b = a + k,
+            Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)),
+            function (k : Natural) (witnessEquation : b = a + k) =>
+                Or.introduceRight(
+                    Integer.MkIsNonneg(a, b),
+                    Integer.MkIsNegated(a, b),
+                    Exists.introduce(
+                        Natural,
+                        function (j : Natural) =>
+                            Quotient.mk(IntegerRepresentative,
+                                         IntegerEquivalent,
+                                         IntegerRepresentative.make(a, b))
+                            = -(j : Integer),
+                        k,
+                        Integer.from_reverse_subtraction_witness(
+                            a, b, k, witnessEquation))),
+            Natural.subtraction_witness(a, b, aLeqB))
+    in (LessOrEqual(b, a)) as bLeqA:
+        Exists.eliminate(
+            Natural,
+            function (k : Natural) => a = b + k,
+            Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)),
+            function (k : Natural) (witnessEquation : a = b + k) =>
+                Or.introduceLeft(
+                    Integer.MkIsNonneg(a, b),
+                    Integer.MkIsNegated(a, b),
+                    Exists.introduce(
+                        Natural,
+                        function (j : Natural) =>
+                            Quotient.mk(IntegerRepresentative,
+                                         IntegerEquivalent,
+                                         IntegerRepresentative.make(a, b))
+                            = (j : Integer),
+                        k,
+                        Integer.from_subtraction_witness(
+                            a, b, k, witnessEquation))),
+            Natural.subtraction_witness(b, a, bLeqA))
+  }
 
 -- The sign-split motive on Integers.
 definition Integer.SignSplitProp (y : Integer) : Proposition :=
@@ -262,12 +262,10 @@ theorem Integer.absolute_value_multiply_by_positive_natural
         (x : Integer) (d : Natural)
         : Integer.absolute_value(x * (successor(d) : Integer))
           = Integer.absolute_value(x) * (successor(d) : Integer) :=
-  Or.eliminate(
-      Integer.IsNonneg(x),
-      ∃ (k : Natural). x = -(k : Integer),
-      Integer.absolute_value(x * (successor(d) : Integer))
-        = Integer.absolute_value(x) * (successor(d) : Integer),
-      function (xIsNonneg : Integer.IsNonneg(x)) =>
+  claim Integer.IsNonneg(x) ∨ (∃ (k : Natural). x = -(k : Integer))
+      by Integer.sign_split(x)
+  claim by cases {
+    in (Integer.IsNonneg(x)) as xIsNonneg:
         Exists.eliminate(
             Natural,
             function (a : Natural) => x = (a : Integer),
@@ -293,8 +291,8 @@ theorem Integer.absolute_value_multiply_by_positive_natural
                  = Integer.absolute_value((a : Integer))
                    * (successor(d) : Integer)
                  = Integer.absolute_value(x) * (successor(d) : Integer),
-            xIsNonneg),
-      function (xNegEvidence : ∃ (k : Natural). x = -(k : Integer)) =>
+            xIsNonneg)
+    in (∃ (k : Natural). x = -(k : Integer)) as xNegEvidence:
         Exists.eliminate(
             Natural,
             function (k : Natural) => x = -(k : Integer),
@@ -330,5 +328,5 @@ theorem Integer.absolute_value_multiply_by_positive_natural
                  = Integer.absolute_value(-(k : Integer))
                    * (successor(d) : Integer)
                  = Integer.absolute_value(x) * (successor(d) : Integer),
-            xNegEvidence),
-      Integer.sign_split(x))
+            xNegEvidence)
+  }

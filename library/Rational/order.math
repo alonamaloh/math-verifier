@@ -48,14 +48,12 @@ theorem Rational.IsNonneg_forward_helper
       Natural,
       function (a : Natural) => n1 = (a : Integer),
       Integer.IsNonneg(n2),
-      function (a : Natural) (n1IsImage : n1 = (a : Integer)) =>
-        Or.eliminate(
-            Integer.IsNonneg(n2),
-            ∃ (k : Natural). n2 = -(k : Integer),
-            Integer.IsNonneg(n2),
-            function (n2IsNonneg : Integer.IsNonneg(n2)) => n2IsNonneg,
-            function (n2NegEvidence
-                          : ∃ (k : Natural). n2 = -(k : Integer)) =>
+      function (a : Natural) (n1IsImage : n1 = (a : Integer)) => ({
+        claim Integer.IsNonneg(n2) ∨ (∃ (k : Natural). n2 = -(k : Integer))
+            by Integer.sign_split(n2)
+        claim by cases {
+          in (Integer.IsNonneg(n2)) as n2IsNonneg: n2IsNonneg
+          in (∃ (k : Natural). n2 = -(k : Integer)) as n2NegEvidence:
               Exists.eliminate(
                   Natural,
                   function (k : Natural) => n2 = -(k : Integer),
@@ -83,8 +81,9 @@ theorem Rational.IsNonneg_forward_helper
                         Equality.symmetry(n2EqZero),
                         Integer.zero_is_nonneg)
                   },
-                  n2NegEvidence),
-            Integer.sign_split(n2)),
+                  n2NegEvidence)
+        }
+      } : Integer.IsNonneg(n2)),
       n1IsNonneg)
 
 -- Respect: via propositional extensionality, forward and backward.

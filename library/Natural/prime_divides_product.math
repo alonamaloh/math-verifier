@@ -129,24 +129,23 @@ theorem Natural.bezout_one_when_prime_coprime
         from Natural.bezout(p, a);
     let ⟨gDividesP, gDividesA, _⟩ := isgcd;
     let ⟨_, divisorClassification⟩ := primality;
-    Or.eliminate(
-        g = 1, g = p,
-        ∃ (x' : Integer). ∃ (y' : Integer).
-            (p : Integer) * x' + (a : Integer) * y' = (1 : Integer),
-        function (gEqOne : g = 1) =>
-            ⟨x, y,
-             Equality.transitivity(
-                 bezoutEquation,
-                 congruenceOf(
-                     function (m : Natural) => (m : Integer),
-                     gEqOne))⟩,
-        function (gEqP : g = p) =>
-            False.eliminate_proposition(
-                ∃ (x' : Integer). ∃ (y' : Integer).
-                    (p : Integer) * x' + (a : Integer) * y' = (1 : Integer),
-                notDividesA(
-                    rewrite(gEqP, gDividesA))),
-        divisorClassification(g, gDividesP))
+    claim (g = 1) ∨ (g = p)
+        by divisorClassification(g, gDividesP)
+    claim by cases {
+      in (g = 1) as gEqOne:
+          ⟨x, y,
+           Equality.transitivity(
+               bezoutEquation,
+               congruenceOf(
+                   function (m : Natural) => (m : Integer),
+                   gEqOne))⟩
+      in (g = p) as gEqP:
+          False.eliminate_proposition(
+              ∃ (x' : Integer). ∃ (y' : Integer).
+                  (p : Integer) * x' + (a : Integer) * y' = (1 : Integer),
+              notDividesA(
+                  rewrite(gEqP, gDividesA)))
+    }
 }
 
 -- ----------------------------------------------------------------------
@@ -251,68 +250,64 @@ theorem Natural.prime_divides_product_when_coprime
                      + (productQuotient : Integer) * y);
 
     -- Step 4: sign-split the coefficient.
-    Or.eliminate(
-        Integer.IsNonneg(
-            x * (b : Integer) + (productQuotient : Integer) * y),
-        ∃ (negativePart : Natural).
-            x * (b : Integer) + (productQuotient : Integer) * y
-              = -(negativePart : Integer),
-        p ∣ b,
-        function (zIsNonneg :
-                  Integer.IsNonneg(
-                      x * (b : Integer)
-                          + (productQuotient : Integer) * y)) => {
-          obtain ⟨coefficient, zEqCoefficient⟩ from zIsNonneg;
-          -- zEqCoefficient : x*b + k*y = (coefficient : Integer).
-          -- (b : Int) = (p : Int) * (coefficient : Int) = (p*coefficient : Int).
-          -- Inject to Natural: b = p * coefficient.
-          claim bAsCastedProduct
-                : (b : Integer) = (p * coefficient : Integer)
-            by Equality.transitivity(
-                   bAsProduct,
-                   Equality.transitivity(
-                       congruenceOf(
-                           function (z : Integer) => (p : Integer) * z,
-                           zEqCoefficient),
-                       Equality.symmetry(
-                           Natural.to_integer.multiply_preserves(
-                               p, coefficient))));
-          ⟨coefficient,
-           Natural.to_integer.injective(b, p * coefficient, bAsCastedProduct)⟩
-        },
-        function (zIsNegated :
-                  ∃ (negativePart : Natural).
-                      x * (b : Integer)
-                          + (productQuotient : Integer) * y
-                        = -(negativePart : Integer)) => {
-          obtain ⟨negativePart, zEqNegated⟩ from zIsNegated;
-          -- zEqNegated : x*b + k*y = -(negativePart : Integer).
-          -- (b : Int) = (p : Int) * -(negativePart : Int) = -((p * negativePart) : Int).
-          claim bEqNegateProduct
-                : (b : Integer) = -((p * negativePart) : Integer)
-            by Equality.transitivity(
-                   bAsProduct,
-                   Equality.transitivity(
-                       congruenceOf(
-                           function (z : Integer) => (p : Integer) * z,
-                           zEqNegated),
-                       Equality.transitivity(
-                           Integer.multiply_negate_right(
-                               (p : Integer), (negativePart : Integer)),
-                           congruenceOf(
-                               Integer.negate,
-                               Equality.symmetry(
-                                   Natural.to_integer.multiply_preserves(
-                                       p, negativePart))))));
-          claim bIsZero : b = zero
-            by Natural.natural_eq_negate_natural_implies_first_zero(
-                   b, p * negativePart, bEqNegateProduct);
-          rewrite(
-              Equality.symmetry(bIsZero),
-              Natural.divides_zero(p))
-        },
-        Integer.sign_split(
-            x * (b : Integer) + (productQuotient : Integer) * y))
+    claim Integer.IsNonneg(
+              x * (b : Integer) + (productQuotient : Integer) * y)
+          ∨ (∃ (negativePart : Natural).
+                x * (b : Integer) + (productQuotient : Integer) * y
+                  = -(negativePart : Integer))
+        by Integer.sign_split(
+               x * (b : Integer) + (productQuotient : Integer) * y)
+    claim by cases {
+      in (Integer.IsNonneg(
+              x * (b : Integer) + (productQuotient : Integer) * y)) as zIsNonneg: {
+        obtain ⟨coefficient, zEqCoefficient⟩ from zIsNonneg;
+        -- zEqCoefficient : x*b + k*y = (coefficient : Integer).
+        -- (b : Int) = (p : Int) * (coefficient : Int) = (p*coefficient : Int).
+        -- Inject to Natural: b = p * coefficient.
+        claim bAsCastedProduct
+              : (b : Integer) = (p * coefficient : Integer)
+          by Equality.transitivity(
+                 bAsProduct,
+                 Equality.transitivity(
+                     congruenceOf(
+                         function (z : Integer) => (p : Integer) * z,
+                         zEqCoefficient),
+                     Equality.symmetry(
+                         Natural.to_integer.multiply_preserves(
+                             p, coefficient))));
+        ⟨coefficient,
+         Natural.to_integer.injective(b, p * coefficient, bAsCastedProduct)⟩
+      }
+      in (∃ (negativePart : Natural).
+              x * (b : Integer) + (productQuotient : Integer) * y
+                = -(negativePart : Integer)) as zIsNegated: {
+        obtain ⟨negativePart, zEqNegated⟩ from zIsNegated;
+        -- zEqNegated : x*b + k*y = -(negativePart : Integer).
+        -- (b : Int) = (p : Int) * -(negativePart : Int) = -((p * negativePart) : Int).
+        claim bEqNegateProduct
+              : (b : Integer) = -((p * negativePart) : Integer)
+          by Equality.transitivity(
+                 bAsProduct,
+                 Equality.transitivity(
+                     congruenceOf(
+                         function (z : Integer) => (p : Integer) * z,
+                         zEqNegated),
+                     Equality.transitivity(
+                         Integer.multiply_negate_right(
+                             (p : Integer), (negativePart : Integer)),
+                         congruenceOf(
+                             Integer.negate,
+                             Equality.symmetry(
+                                 Natural.to_integer.multiply_preserves(
+                                     p, negativePart))))));
+        claim bIsZero : b = zero
+          by Natural.natural_eq_negate_natural_implies_first_zero(
+                 b, p * negativePart, bEqNegateProduct);
+        rewrite(
+            Equality.symmetry(bIsZero),
+            Natural.divides_zero(p))
+      }
+    }
 }
 
 -- ----------------------------------------------------------------------

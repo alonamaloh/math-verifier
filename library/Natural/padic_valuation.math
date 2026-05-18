@@ -607,12 +607,10 @@ theorem Natural.padic_valuation_multiplicative
                      + Natural.padic_valuation(prime, b')
               }
             in (prime ∤ a') as notDivA:
-                Or.eliminate(
-                    prime ∣ b', prime ∤ b',
-                    Natural.padic_valuation(prime, a' * b')
-                      = Natural.padic_valuation(prime, a')
-                            + Natural.padic_valuation(prime, b'),
-                    function (pDividesB : prime ∣ b') => {
+                claim (prime ∣ b') ∨ (prime ∤ b')
+                    by Natural.decides_divides(prime, b')
+                claim by cases {
+                  in (prime ∣ b') as pDividesB: {
                       claim moduloBIsZero : Natural.modulo(prime, b') = zero
                         by Natural.divides_implies_modulo_zero(
                                prime, b', primePositive, pDividesB);
@@ -707,18 +705,21 @@ theorem Natural.padic_valuation_multiplicative
                                                divideBPositive)))
                          = Natural.padic_valuation(prime, a')
                              + Natural.padic_valuation(prime, b')
-                    },
-                    function (notDivB : prime ∤ b') => {
+                    }
+                  in (prime ∤ b') as notDivB: {
                       -- prime ∤ a' ∧ prime ∤ b' → prime ∤ (a' * b').
                       claim notDivProduct : prime ∤ (a' * b')
                         by function (productDivides : prime ∣ a' * b') =>
-                               Or.eliminate(
-                                   prime ∣ a', prime ∣ b',
-                                   False,
-                                   notDivA, notDivB,
-                                   Natural.prime_divides_product(
-                                       prime, a', b', primality,
-                                       productDivides));
+                               {
+                               claim (prime ∣ a') ∨ (prime ∣ b')
+                                   by Natural.prime_divides_product(
+                                          prime, a', b', primality,
+                                          productDivides)
+                               claim by cases {
+                                 in (prime ∣ a') as primeDivA: notDivA(primeDivA)
+                                 in (prime ∣ b') as primeDivB: notDivB(primeDivB)
+                               }
+                               };
                       -- All three valuations are zero.
                       calc Natural.padic_valuation(prime, a' * b')
                          = zero
@@ -739,8 +740,8 @@ theorem Natural.padic_valuation_multiplicative
                                        Equality.symmetry(
                                            Natural.padic_valuation_when_not_divides(
                                                prime, b', notDivB)))
-                    },
-                    Natural.decides_divides(prime, b'))
+                    }
+                }
           },
       a + b, a, b, aPositive, bPositive, reflexivity(Natural, a + b))
 }
@@ -1305,18 +1306,18 @@ theorem Natural.monus_add_distributes
 theorem Natural.divides_distance
         (d a b : Natural) (dDividesA : d ∣ a) (dDividesB : d ∣ b)
         : d ∣ Natural.distance(a, b) :=
-  Or.eliminate(
-      a ≤ b, b ≤ a,
-      d ∣ Natural.distance(a, b),
-      function (aLeB : a ≤ b) =>
+  claim (a ≤ b) ∨ (b ≤ a)
+      by Natural.totality_of_less_or_equal(a, b)
+  claim by cases {
+    in (a ≤ b) as aLeB:
         rewrite(
             Equality.symmetry(Natural.distance_monus_when_ge(a, b, aLeB)),
-            Natural.divides_monus(d, b, a, aLeB, dDividesB, dDividesA)),
-      function (bLeA : b ≤ a) =>
+            Natural.divides_monus(d, b, a, aLeB, dDividesB, dDividesA))
+    in (b ≤ a) as bLeA:
         rewrite(
             Equality.symmetry(Natural.distance_monus_when_le(b, a, bLeA)),
-            Natural.divides_monus(d, a, b, bLeA, dDividesA, dDividesB)),
-      Natural.totality_of_less_or_equal(a, b))
+            Natural.divides_monus(d, a, b, bLeA, dDividesA, dDividesB))
+  }
 
 -- The key Natural-level identity: distance(a1+b1, a2+b2) is the
 -- distance of two specific quantities built from monus.
@@ -1375,14 +1376,15 @@ theorem Natural.divides_distance_sum
         (dDividesDistanceA : d ∣ Natural.distance(a1, a2))
         (dDividesDistanceB : d ∣ Natural.distance(b1, b2))
         : d ∣ Natural.distance(a1 + b1, a2 + b2) :=
-  Or.eliminate(
-      a1 ≤ a2, a2 ≤ a1,
-      d ∣ Natural.distance(a1 + b1, a2 + b2),
-      function (a1LeA2 : a1 ≤ a2) =>
-        Or.eliminate(
-            b1 ≤ b2, b2 ≤ b1,
-            d ∣ Natural.distance(a1 + b1, a2 + b2),
-            function (b1LeB2 : b1 ≤ b2) => {
+  claim (a1 ≤ a2) ∨ (a2 ≤ a1)
+      by Natural.totality_of_less_or_equal(a1, a2)
+  claim by cases {
+    in (a1 ≤ a2) as a1LeA2:
+        {
+        claim (b1 ≤ b2) ∨ (b2 ≤ b1)
+            by Natural.totality_of_less_or_equal(b1, b2)
+        claim by cases {
+          in (b1 ≤ b2) as b1LeB2: {
               -- Same direction (a1 ≤ a2, b1 ≤ b2).
               -- distance(a1+b1, a2+b2) = monus(a2+b2, a1+b1)
               --                       = monus(a2, a1) + monus(b2, b1)
@@ -1416,8 +1418,8 @@ theorem Natural.divides_distance_sum
                       Natural.distance(a1, a2),
                       Natural.distance(b1, b2),
                       dDividesDistanceA, dDividesDistanceB))
-            },
-            function (b2LeB1 : b2 ≤ b1) =>
+            }
+          in (b2 ≤ b1) as b2LeB1:
               -- Cross direction (a1 ≤ a2, b2 ≤ b1). distance(a1+b1, a2+b2)
               -- = distance(monus(b1, b2), monus(a2, a1)). Then divides_distance.
               rewrite(
@@ -1431,13 +1433,15 @@ theorem Natural.divides_distance_sum
                           dDividesDistanceB),
                       rewrite(
                           Natural.distance_monus_when_ge(a1, a2, a1LeA2),
-                          dDividesDistanceA))),
-            Natural.totality_of_less_or_equal(b1, b2)),
-      function (a2LeA1 : a2 ≤ a1) =>
-        Or.eliminate(
-            b1 ≤ b2, b2 ≤ b1,
-            d ∣ Natural.distance(a1 + b1, a2 + b2),
-            function (b1LeB2 : b1 ≤ b2) =>
+                          dDividesDistanceA)))
+        }
+        }
+    in (a2 ≤ a1) as a2LeA1:
+        {
+        claim (b1 ≤ b2) ∨ (b2 ≤ b1)
+            by Natural.totality_of_less_or_equal(b1, b2)
+        claim by cases {
+          in (b1 ≤ b2) as b1LeB2:
               -- Cross direction (a2 ≤ a1, b1 ≤ b2). Symmetric to AB case.
               -- distance(a1+b1, a2+b2) = distance(a2+b2, a1+b1) by symmetry.
               -- = distance(monus(b2, b1), monus(a1, a2)).
@@ -1454,8 +1458,8 @@ theorem Natural.divides_distance_sum
                               dDividesDistanceB),
                           rewrite(
                               Natural.distance_monus_when_le(a2, a1, a2LeA1),
-                              dDividesDistanceA)))),
-            function (b2LeB1 : b2 ≤ b1) => {
+                              dDividesDistanceA))))
+          in (b2 ≤ b1) as b2LeB1: {
               -- Same direction (a2 ≤ a1, b2 ≤ b1). distance is in
               -- terms of monus(a1, a2) and monus(b1, b2). By the
               -- same distributivity / divides_add chain as the first case.
@@ -1488,9 +1492,10 @@ theorem Natural.divides_distance_sum
                       Natural.distance(a1, a2),
                       Natural.distance(b1, b2),
                       dDividesDistanceA, dDividesDistanceB))
-            },
-            Natural.totality_of_less_or_equal(b1, b2)),
-      Natural.totality_of_less_or_equal(a1, a2))
+            }
+        }
+        }
+  }
 
 -- Integer-level: if d divides |A|_Nat and |B|_Nat, then d divides |A+B|_Nat.
 -- Quotient.induct_two on A, B, then case_split the representatives.
