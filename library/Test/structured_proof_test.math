@@ -56,6 +56,28 @@ theorem ClaimTerminalFromHypothesis (n : Natural)
         (alreadyHave : zero ≤ n) : zero ≤ n :=
   claim zero ≤ n
 
+-- (4e) Structured claim inside a `{ }` block. The block parser
+-- previously eat `claim` as a legacy named statement; with the
+-- legacy-shape lookahead, the new form now passes through.
+theorem ClaimInsideBlock (n : Natural) (h : zero ≤ n) : zero ≤ n := {
+  let m : Natural := n;
+  claim
+}
+
+-- (4f) `claim by cases` inside a `{ }` block — the harder mix that
+-- the Or.eliminate sweep hit. let-bindings introduce intermediate
+-- values, then a structured-claim chain handles the case-split.
+theorem ClaimByCasesInsideBlock (p m : Natural)
+        (succP_le_succM : successor(p) ≤ successor(m))
+        : p ≤ m := {
+  let dummy : Natural := zero;
+  claim (p = m) ∨ (successor(p) ≤ m)
+  claim by cases {
+    in (p = m):              claim
+    in (successor(p) ≤ m):   claim
+  }
+}
+
 -- (5) The motivating example from the design conversation, written
 -- in the most stripped-down form: every step is just `claim`. No
 -- `function` wrapper, no scrutinee name, no `Or.eliminate` positional

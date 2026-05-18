@@ -655,6 +655,18 @@ private:
                || peek().kind == TokenKind::KeywordObtain
                || peek().kind == TokenKind::KeywordAssume
                || peek().kind == TokenKind::KeywordSet) {
+            // `claim` has two block-statement shapes:
+            //   - Legacy:    `claim NAME : TYPE [by V];` (typed let-synonym)
+            //   - Structured: `claim …` (any of the new structured-proof
+            //     forms; chained by parseStructuredClaimSequence).
+            // Disambiguate by lookahead — legacy needs `claim NAME :`.
+            // If we're at the structured form, leave the wrapper loop;
+            // parseExpression() at the end of parseBlockContents picks
+            // up the structured-claim chain.
+            if (peek().kind == TokenKind::KeywordClaim
+                && !looksLikeLegacyClaim()) {
+                break;
+            }
             Token statementToken = consumeAny();
             bool isClaim =
                 statementToken.kind == TokenKind::KeywordClaim;
@@ -1760,6 +1772,19 @@ private:
             std::move(first),
             std::move(rest),
             firstLine, firstColumn);
+    }
+
+    // Lookahead for the legacy block-statement `claim NAME : TYPE`
+    // shape. The current token is `claim`; if the next-next sequence
+    // is identifier followed by `:`, this is the legacy form (handled
+    // by parseBlockContents' wrapper loop). Otherwise it's one of the
+    // new structured-proof forms, which the structured-claim parser
+    // handles via parseExpression. Restoring lookahead by saving and
+    // resetting position_ — non-destructive.
+    bool looksLikeLegacyClaim() {
+        if (position_ + 2 >= tokens_.size()) return false;
+        return isIdentifierLike(tokens_[position_ + 1].kind)
+            && tokens_[position_ + 2].kind == TokenKind::Colon;
     }
 
     // True if the next token can only end a bare `claim` (no
