@@ -3748,9 +3748,11 @@ private:
         ExpressionPointer leftLambda = buildArmLambda(0, leftDisjunct);
         ExpressionPointer rightLambda = buildArmLambda(1, rightDisjunct);
 
-        // Establish the disjunction proof. Use the `by` hint if
-        // present (Step 2 machinery handles arg-fill); Step 5 will
-        // add library lookup for the no-`by` case.
+        // Establish the disjunction proof. With a `by` hint, run
+        // Step 2's auto-fill against the proposition. Without one,
+        // fall through to Step 5's library lookup — for the user's
+        // motivating example the inversion lemma is found by
+        // conclusion shape (Or-headed).
         ExpressionPointer disjProof;
         if (claim.byHint) {
             ExpressionPointer hintTerm = elaborateExpression(
@@ -3763,9 +3765,8 @@ private:
                 hintTerm, hintTypeClosed, propClosed,
                 localBinders, line);
         } else {
-            throwElaborate(
-                "disjunctive `claim` without `by` not yet supported "
-                "(structured-proof Step 5)");
+            disjProof = lookupClaimByLibrary(
+                propClosed, localBinders, line);
         }
 
         // Build Or.eliminate(A, B, Goal, leftLambda, rightLambda,

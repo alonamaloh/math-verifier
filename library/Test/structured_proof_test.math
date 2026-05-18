@@ -56,17 +56,25 @@ theorem ClaimTerminalFromHypothesis (n : Natural)
         (alreadyHave : zero ≤ n) : zero ≤ n :=
   claim zero ≤ n
 
--- (5) Step 4: disjunctive claim with arms. The user-facing shape
--- discussed in the design conversation. Each arm gets its disjunct
--- as an anonymous hypothesis; the body proves the surrounding
--- goal. `Or.eliminate` is synthesized at the kernel. The left arm
--- uses Step 3's `given (P)` to cite the disjunct by its proposition
--- (rather than knowing the internal binder name).
+-- (5) The motivating example from the design conversation, written
+-- in the most stripped-down form the current feature set supports:
+-- no `function` wrapper, no scrutinee name, no `Or.eliminate`
+-- positional call, no explicit inversion-lemma citation. The
+-- elaborator finds the inversion by conclusion shape (Step 5
+-- library lookup, Or-headed), synthesizes `Or.eliminate` from the
+-- two arms (Step 4), pulls `succ(p) ≤ m` out of the right arm's
+-- anonymous hypothesis to close the right-arm `claim` (Step 5 +
+-- Step 2 auto-fill), and uses `given (p = m)` (Step 3) in the
+-- left arm to cite the equality without naming it.
+--
+-- The remaining verbosity (the `Equality.transport_proposition`
+-- block in the left arm) is fundamental: `LessOrEqual.reflexivity(p)`
+-- has type `p ≤ p` with `p` appearing twice, so the user must say
+-- explicitly which side to rewrite. That's information, not noise.
 theorem ClaimDisjunctiveArms (p m : Natural)
         (succP_le_succM : successor(p) ≤ successor(m))
         : p ≤ m :=
-  claim (p = m) ∨ (successor(p) ≤ m)
-      by Natural.less_or_equal_successor_successor_inversion {
+  claim (p = m) ∨ (successor(p) ≤ m) {
     in (p = m):
         Equality.transport_proposition(
             Natural,
@@ -74,5 +82,5 @@ theorem ClaimDisjunctiveArms (p m : Natural)
             p, m, given (p = m),
             LessOrEqual.reflexivity(p))
     in (successor(p) ≤ m):
-        claim by Natural.less_or_equal_predecessor_less_or_equal
+        claim
   }
