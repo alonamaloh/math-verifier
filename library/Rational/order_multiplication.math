@@ -111,10 +111,7 @@ theorem Rational.LessOrEqual.multiply_by_nonneg_right
         (a b c : Rational) (aLeqB : a ≤ b)
         (cNonneg : Rational.LessOrEqual(Rational.zero, c))
         : a * c ≤ b * c :=
-  Equality.transport_proposition(
-      Rational, Rational.IsNonneg,
-      (b - a) * c,
-      b * c - a * c,
+  rewrite(
       Rational.subtract_multiply_distribute(a, b, c),
       Rational.IsNonneg.multiply(
           b - a, c,
@@ -126,17 +123,9 @@ theorem Rational.LessOrEqual.multiply_by_nonneg_left
         (a b c : Rational) (aLeqB : a ≤ b)
         (cNonneg : Rational.LessOrEqual(Rational.zero, c))
         : c * a ≤ c * b :=
-  Equality.transport_proposition(
-      Rational,
-      function (w : Rational) =>
-          Rational.LessOrEqual(w, c * b),
-      a * c, c * a,
+  rewrite(
       Rational.multiply_commutative(a, c),
-      Equality.transport_proposition(
-          Rational,
-          function (w : Rational) =>
-              Rational.LessOrEqual(a * c, w),
-          b * c, c * b,
+      rewrite(
           Rational.multiply_commutative(b, c),
           Rational.LessOrEqual.multiply_by_nonneg_right(a, b, c, aLeqB, cNonneg)))
 
@@ -225,10 +214,7 @@ theorem Rational.halve_less_than_self
     by Rational.halve_positive(epsilon, epsilonPos);
   -- halve(ε) ≤ ε from IsNonneg(ε - halve(ε)) = IsNonneg(halve(ε)).
   claim halveLeqEpsilon : Rational.halve(epsilon) ≤ epsilon
-    by Equality.transport_proposition(
-           Rational, Rational.IsNonneg,
-           Rational.halve(epsilon),
-           epsilon - Rational.halve(epsilon),
+    by rewrite(
            Equality.symmetry(diffEqualsHalve),
            Rational.IsNonneg_of_LessOrEqual_zero(
                Rational.halve(epsilon),
@@ -279,10 +265,7 @@ theorem Rational.absolute_value_IsNonneg (q : Rational)
                  -- |q|_at_rep has numerator Integer.absolute_value(n).
                  -- That's the image of a Natural (= distance(a, b) for n
                  -- = mk(make(a, b))). So Integer.IsNonneg holds.
-                 Equality.transport_proposition(
-                     Integer, Integer.IsNonneg,
-                     (Integer.absolute_value_natural(n) : Integer),
-                     Integer.absolute_value(n),
+                 rewrite(
                      Equality.symmetry(
                          Integer.absolute_value_natural_is_image(n)),
                      Integer.from_natural_is_nonneg(
@@ -544,16 +527,9 @@ theorem Rational.absolute_value_le_succ_natural (q : Rational)
 theorem Rational.add_general_LessOrEqual_left
         (b c d : Rational) (cLeqD : c ≤ d)
         : b + c ≤ b + d :=
-  Equality.transport_proposition(
-      Rational,
-      function (w : Rational) => Rational.LessOrEqual(w, b + d),
-      c + b, b + c,
+  rewrite(
       Rational.add_commutative(c, b),
-      Equality.transport_proposition(
-          Rational,
-          function (w : Rational) =>
-              Rational.LessOrEqual(c + b, w),
-          d + b, b + d,
+      rewrite(
           Rational.add_commutative(d, b),
           Rational.add_preserves_LessOrEqual(c, d, b, cLeqD)))
 
@@ -662,10 +638,7 @@ theorem Rational.multiply_positive_at_representatives
                                 (successor(k_y) : Integer), d_y)))
     by -- The numerator (succ(k_x) : I) · (succ(k_y) : I) =
        -- (succ(k_x) · succ(k_y) : I), IsNonneg.
-       Equality.transport_proposition(
-           Integer, Integer.IsNonneg,
-           (successor(k_x) * successor(k_y) : Integer),
-           (successor(k_x) : Integer) * (successor(k_y) : Integer),
+       rewrite(
            Natural.to_integer.multiply_preserves(
                successor(k_x), successor(k_y)),
            Integer.from_natural_is_nonneg(

@@ -409,24 +409,8 @@ theorem Rational.padic_absolute_value_respect
                                       Equality.symmetry(
                                           Natural.zero_multiply(
                                               successor(d2))),
-                                      Equality.transport_proposition(
-                                          Natural,
-                                          function (m : Natural) =>
-                                              zero * successor(d2)
-                                                = m * successor(d1),
-                                          Integer.absolute_value_natural(n2),
-                                          successor(k2),
-                                          eqAbs2,
-                                          Equality.transport_proposition(
-                                              Natural,
-                                              function (m : Natural) =>
-                                                  m * successor(d2)
-                                                    = Integer.absolute_value_natural(n2)
-                                                        * successor(d1),
-                                              Integer.absolute_value_natural(n1),
-                                              zero,
-                                              eqAbs1,
-                                              naturalCross)));
+                                      rewrite(eqAbs2,
+                                              rewrite(eqAbs1, naturalCross)));
                              -- The above derives:
                              -- zero = succ(k2) * succ(d1), and
                              -- succ(k2) * succ(d1) reduces to
@@ -450,24 +434,8 @@ theorem Rational.padic_absolute_value_respect
                                    : successor(k1) * successor(d2)
                                      = zero
                                by Equality.transitivity(
-                                      Equality.transport_proposition(
-                                          Natural,
-                                          function (m : Natural) =>
-                                              m * successor(d2)
-                                                = zero * successor(d1),
-                                          Integer.absolute_value_natural(n1),
-                                          successor(k1),
-                                          eqAbs1,
-                                          Equality.transport_proposition(
-                                              Natural,
-                                              function (m : Natural) =>
-                                                  Integer.absolute_value_natural(n1)
-                                                    * successor(d2)
-                                                    = m * successor(d1),
-                                              Integer.absolute_value_natural(n2),
-                                              zero,
-                                              eqAbs2,
-                                              naturalCross)),
+                                      rewrite(eqAbs1,
+                                              rewrite(eqAbs2, naturalCross)),
                                       Natural.zero_multiply(
                                           successor(d1)));
                              False.eliminate_proposition(
@@ -487,25 +455,8 @@ theorem Rational.padic_absolute_value_respect
                              claim crossSubst
                                    : successor(k1) * successor(d2)
                                      = successor(k2) * successor(d1)
-                               by Equality.transport_proposition(
-                                      Natural,
-                                      function (m : Natural) =>
-                                          m * successor(d2)
-                                            = successor(k2)
-                                              * successor(d1),
-                                      Integer.absolute_value_natural(n1),
-                                      successor(k1),
-                                      eqAbs1,
-                                      Equality.transport_proposition(
-                                          Natural,
-                                          function (m : Natural) =>
-                                              Integer.absolute_value_natural(n1)
-                                                * successor(d2)
-                                                = m * successor(d1),
-                                          Integer.absolute_value_natural(n2),
-                                          successor(k2),
-                                          eqAbs2,
-                                          naturalCross));
+                               by rewrite(eqAbs1,
+                                          rewrite(eqAbs2, naturalCross));
                              -- Reorganise via commutativity to
                              --   succ(d1) * succ(k2) = succ(d2) * succ(k1).
                              claim succCross
@@ -1258,26 +1209,18 @@ theorem Rational.padic_absolute_value_multiplicative
 theorem Rational.le_add_right_of_nonneg
         (x y : Rational) (yNonneg : Rational.zero ≤ y)
         : x ≤ x + y :=
-  Equality.transport_proposition(
-      Rational,
-      function (m : Rational) => m ≤ x + y,
-      x + Rational.zero, x,
-      Rational.add_zero(x),
-      Rational.LessOrEqual.sum(
-          x, x, Rational.zero, y,
-          Rational.LessOrEqual.reflexive(x),
-          yNonneg))
+  rewrite(Rational.add_zero(x),
+          Rational.LessOrEqual.sum(
+              x, x, Rational.zero, y,
+              Rational.LessOrEqual.reflexive(x),
+              yNonneg))
 
 -- And the symmetric: x ≤ y + x when 0 ≤ y.
 theorem Rational.le_add_left_of_nonneg
         (x y : Rational) (yNonneg : Rational.zero ≤ y)
         : x ≤ y + x :=
-  Equality.transport_proposition(
-      Rational,
-      function (m : Rational) => x ≤ m,
-      x + y, y + x,
-      Rational.add_commutative(x, y),
-      Rational.le_add_right_of_nonneg(x, y, yNonneg))
+  rewrite(Rational.add_commutative(x, y),
+          Rational.le_add_right_of_nonneg(x, y, yNonneg))
 
 -- ----------------------------------------------------------------------
 -- Helper A for the p-adic triangle inequality.
@@ -1319,24 +1262,11 @@ theorem Rational.padic_av_form_le_when_exponent_le
   claim productLe
         : Natural.power(alpha, p) * Natural.power(delta, p)
             ≤ Natural.power(beta, p) * Natural.power(gamma, p)
-    by Equality.transport_proposition(
-           Natural,
-           function (lhsForm : Natural) =>
-               lhsForm
-                 ≤ Natural.power(beta, p) * Natural.power(gamma, p),
-           Natural.power(alpha + delta, p),
-           Natural.power(alpha, p) * Natural.power(delta, p),
-           Natural.power_add(alpha, delta, p),
-           Equality.transport_proposition(
-               Natural,
-               function (rhsForm : Natural) =>
-                   Natural.power(alpha + delta, p) ≤ rhsForm,
-               Natural.power(beta + gamma, p),
-               Natural.power(beta, p) * Natural.power(gamma, p),
-               Natural.power_add(beta, gamma, p),
-               Natural.power_monotone(
-                   alpha + delta, beta + gamma, p, exponentLe,
-                   primePositive)));
+    by rewrite(Natural.power_add(alpha, delta, p),
+               rewrite(Natural.power_add(beta, gamma, p),
+                       Natural.power_monotone(
+                           alpha + delta, beta + gamma, p, exponentLe,
+                           primePositive)));
   -- Natural subtraction witness.
   let ⟨s, witnessEq⟩ := Natural.subtraction_witness(
       Natural.power(alpha, p) * Natural.power(delta, p),
@@ -1592,25 +1522,7 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_nx_zero
                    p, primality,
                    Quotient.mk(RationalRepresentative.make(ny, dy)))));
   -- LHS = RHS, hence LHS ≤ RHS by reflexivity.
-  Equality.transport_proposition(
-      Rational,
-      function (m : Rational) =>
-          Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative, RationalEquivalent,
-                          RationalRepresentative.make(nx, dx))
-              + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                          RationalRepresentative.make(ny, dy)))
-            ≤ m,
-      Rational.padic_absolute_value(
-          p, primality,
-          Quotient.mk(RationalRepresentative.make(ny, dy))),
-      Rational.padic_absolute_value(
-          p, primality,
-          Quotient.mk(RationalRepresentative.make(nx, dx)))
-        + Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative.make(ny, dy))),
+  rewrite(
       Equality.symmetry(rhsEqY),
       Equality.transport_proposition(
           Rational,
@@ -1723,25 +1635,7 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_ny_zero
                Rational.padic_absolute_value(
                    p, primality,
                    Quotient.mk(RationalRepresentative.make(nx, dx)))));
-  Equality.transport_proposition(
-      Rational,
-      function (m : Rational) =>
-          Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative, RationalEquivalent,
-                          RationalRepresentative.make(nx, dx))
-              + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                          RationalRepresentative.make(ny, dy)))
-            ≤ m,
-      Rational.padic_absolute_value(
-          p, primality,
-          Quotient.mk(RationalRepresentative.make(nx, dx))),
-      Rational.padic_absolute_value(
-          p, primality,
-          Quotient.mk(RationalRepresentative.make(nx, dx)))
-        + Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative.make(ny, dy))),
+  rewrite(
       Equality.symmetry(rhsEqX),
       Equality.transport_proposition(
           Rational,
@@ -1801,23 +1695,7 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_sum_zero
              + ny * (successor(dx) : Integer),
            dy + dx * successor(dy),
            eqAbsSumZero);
-  Equality.transport_proposition(
-      Rational,
-      function (m : Rational) =>
-          m
-            ≤ Rational.padic_absolute_value(
-                  p, primality,
-                  Quotient.mk(RationalRepresentative.make(nx, dx)))
-              + Rational.padic_absolute_value(
-                    p, primality,
-                    Quotient.mk(RationalRepresentative.make(ny, dy))),
-      Rational.zero,
-      Rational.padic_absolute_value(
-          p, primality,
-          Quotient.mk(RationalRepresentative, RationalEquivalent,
-                      RationalRepresentative.make(nx, dx))
-          + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                      RationalRepresentative.make(ny, dy))),
+  rewrite(
       Equality.symmetry(lhsIsZero),
       Rational.LessOrEqual_zero_of_IsNonneg(
           Rational.padic_absolute_value(
@@ -1940,15 +1818,7 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
             ≤ Integer.absolute_value_natural(
                   nx * (successor(dy) : Integer)
                   + ny * (successor(dx) : Integer))
-    by Equality.transport_proposition(
-           Natural,
-           function (m : Natural) => successor(zero) ≤ m,
-           successor(kSum),
-           Integer.absolute_value_natural(
-               nx * (successor(dy) : Integer)
-               + ny * (successor(dx) : Integer)),
-           Equality.symmetry(eqAbsSum),
-           succKSumPos);
+    by rewrite(Equality.symmetry(eqAbsSum), succKSumPos);
   -- v_p(|A|_Nat) = v_p(succ(kx)) + v_p(succ(dy)) (via mult on succ-form).
   claim vAFormulaSucc
         : Natural.padic_valuation(
@@ -1985,32 +1855,8 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
           ≤ Natural.padic_valuation(
                 p, Integer.absolute_value_natural(
                        ny * (successor(dx) : Integer)))
-    by Equality.transport_proposition(
-           Natural,
-           function (mRhs : Natural) =>
-               Natural.padic_valuation(
-                   p, Integer.absolute_value_natural(
-                          nx * (successor(dy) : Integer)))
-                 ≤ mRhs,
-           Natural.padic_valuation(p, successor(ky))
-               + Natural.padic_valuation(p, successor(dx)),
-           Natural.padic_valuation(
-               p, Integer.absolute_value_natural(
-                      ny * (successor(dx) : Integer))),
-           Equality.symmetry(vBFormulaSucc),
-           Equality.transport_proposition(
-               Natural,
-               function (mLhs : Natural) =>
-                   mLhs
-                     ≤ Natural.padic_valuation(p, successor(ky))
-                         + Natural.padic_valuation(p, successor(dx)),
-               Natural.padic_valuation(p, successor(kx))
-                   + Natural.padic_valuation(p, successor(dy)),
-               Natural.padic_valuation(
-                   p, Integer.absolute_value_natural(
-                          nx * (successor(dy) : Integer))),
-               Equality.symmetry(vAFormulaSucc),
-               vALeqVB));
+    by rewrite(Equality.symmetry(vBFormulaSucc),
+               rewrite(Equality.symmetry(vAFormulaSucc), vALeqVB));
   -- Ultrametric: v_p(|A|) ≤ v_p(|A+B|).
   claim ultraIneq
         : Natural.padic_valuation(
@@ -2040,33 +1886,7 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
         : Natural.padic_valuation(p, successor(kx))
             + Natural.padic_valuation(p, successor(dy))
           ≤ Natural.padic_valuation(p, successor(kSum))
-    by Equality.transport_proposition(
-           Natural,
-           function (mRhs : Natural) =>
-               Natural.padic_valuation(p, successor(kx))
-                   + Natural.padic_valuation(p, successor(dy))
-                 ≤ mRhs,
-           Natural.padic_valuation(
-               p, Integer.absolute_value_natural(
-                      nx * (successor(dy) : Integer)
-                      + ny * (successor(dx) : Integer))),
-           Natural.padic_valuation(p, successor(kSum)),
-           vSumIsVKSum,
-           Equality.transport_proposition(
-               Natural,
-               function (mLhs : Natural) =>
-                   mLhs
-                     ≤ Natural.padic_valuation(
-                           p, Integer.absolute_value_natural(
-                                  nx * (successor(dy) : Integer)
-                                  + ny * (successor(dx) : Integer))),
-               Natural.padic_valuation(
-                   p, Integer.absolute_value_natural(
-                          nx * (successor(dy) : Integer))),
-               Natural.padic_valuation(p, successor(kx))
-                   + Natural.padic_valuation(p, successor(dy)),
-               vAFormulaSucc,
-               ultraIneq));
+    by rewrite(vSumIsVKSum, rewrite(vAFormulaSucc, ultraIneq));
   -- v_p(succ(dy + dx · succ(dy))) = v_p(succ(dx)) + v_p(succ(dy)).
   -- This uses padic_valuation_multiplicative on succ(dx) and succ(dy),
   -- whose product is definitionally succ(dy + dx · succ(dy)).
@@ -2089,17 +1909,7 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
             + Natural.padic_valuation(p, successor(kx))
           ≤ Natural.padic_valuation(p, successor(dx))
               + Natural.padic_valuation(p, successor(kSum))
-    by Equality.transport_proposition(
-           Natural,
-           function (mLhs : Natural) =>
-               mLhs
-                 ≤ Natural.padic_valuation(p, successor(dx))
-                     + Natural.padic_valuation(p, successor(kSum)),
-           Natural.padic_valuation(p, successor(dx))
-               + (Natural.padic_valuation(p, successor(kx))
-                  + Natural.padic_valuation(p, successor(dy))),
-           Natural.padic_valuation(p, successor(dy + dx * successor(dy)))
-               + Natural.padic_valuation(p, successor(kx)),
+    by rewrite(
            -- Show LHS_form = (vp_dx + (vp_kx + vp_dy)) reversed.
            Equality.transitivity(
                Natural,
@@ -2466,30 +2276,7 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_all_succ
                 function (m : Rational) =>
                     Rational.padic_absolute_value(p, primality, m),
                 sumSwap),
-            Equality.transport_proposition(
-                Rational,
-                function (mRhs : Rational) =>
-                    Rational.padic_absolute_value(
-                        p, primality,
-                        Quotient.mk(RationalRepresentative, RationalEquivalent,
-                                    RationalRepresentative.make(ny, dy))
-                        + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                                    RationalRepresentative.make(nx, dx)))
-                      ≤ mRhs,
-                Rational.padic_absolute_value(
-                    p, primality,
-                    Quotient.mk(RationalRepresentative.make(ny, dy)))
-                  + Rational.padic_absolute_value(
-                        p, primality,
-                        Quotient.mk(RationalRepresentative.make(nx, dx))),
-                Rational.padic_absolute_value(
-                    p, primality,
-                    Quotient.mk(RationalRepresentative.make(nx, dx)))
-                  + Rational.padic_absolute_value(
-                        p, primality,
-                        Quotient.mk(RationalRepresentative.make(ny, dy))),
-                rhsSwap,
-                swappedResult))
+            rewrite(rhsSwap, swappedResult))
       },
       Natural.totality_of_less_or_equal(
           Natural.padic_valuation(p, successor(kx))

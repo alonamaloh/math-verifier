@@ -133,10 +133,7 @@ theorem Natural.divide_positive_when_divides
             successor(zero) ≤ Natural.divide(prime, target),
             Natural.not_less_or_equal_successor_zero(
                 zero,
-                Equality.transport_proposition(
-                    Natural,
-                    function (m : Natural) => successor(zero) ≤ m,
-                    target, zero,
+                rewrite(
                     Equality.transitivity(
                         Equality.symmetry(productEqTarget),
                         Equality.transitivity(
@@ -147,10 +144,7 @@ theorem Natural.divide_positive_when_divides
                     targetPositive)))
     | successor(q') =>
         -- divide = successor(q') ≥ 1. Transport from successor(q') back.
-        Equality.transport_proposition(
-            Natural,
-            function (m : Natural) => successor(zero) ≤ m,
-            successor(q'), Natural.divide(prime, target),
+        rewrite(
             Equality.symmetry(refinedDivideEq),
             Natural.successor_less_or_equal_successor(
                 zero, q', Natural.zero_least(q')))
@@ -181,10 +175,7 @@ theorem Natural.divide_lt_when_divides
            prime, target, targetPositive, moduloZero);
   -- successor(divide) ≤ prime * divide  (since 2 ≤ prime, 1 ≤ divide).
   -- Transport via productEqTarget : prime * divide = target.
-  Equality.transport_proposition(
-      Natural,
-      function (m : Natural) => successor(Natural.divide(prime, target)) ≤ m,
-      prime * Natural.divide(prime, target), target,
+  rewrite(
       productEqTarget,
       Natural.successor_less_or_equal_multiply(
           prime, Natural.divide(prime, target),
@@ -412,11 +403,7 @@ theorem Natural.padic_valuation_strip
               = successor(Natural.padic_valuation(prime, quotient)),
             Natural.not_less_or_equal_successor_zero(
                 zero,
-                Equality.transport_proposition(
-                    Natural,
-                    function (m : Natural) => successor(zero) ≤ m,
-                    prime * quotient, zero, refinedPqEq,
-                    productPositive)))
+                rewrite(refinedPqEq, productPositive)))
     | successor(predPQ) =>
         calc Natural.padic_valuation(prime, prime * quotient)
            = Natural.padic_valuation(prime, successor(predPQ))
@@ -425,12 +412,7 @@ theorem Natural.padic_valuation_strip
                  Natural.divide(prime, successor(predPQ))))
                   by Natural.padic_valuation_step_succ_when_divides(
                          predPQ, prime, successor(predPQ),
-                         Equality.transport_proposition(
-                             Natural,
-                             function (m : Natural) =>
-                                 Natural.modulo(prime, m) = zero,
-                             prime * quotient, successor(predPQ),
-                             refinedPqEq, moduloZero))
+                         rewrite(refinedPqEq, moduloZero))
            = successor(Natural.padic_valuation_step(
                  predPQ, prime, quotient))
                   by congruenceOf(
@@ -453,12 +435,7 @@ theorem Natural.padic_valuation_strip
                              -- quotient ≤ predPQ via succ(quotient) ≤ succ(predPQ).
                              Natural.less_or_equal_successor_successor_descend(
                                  quotient, predPQ,
-                                 Equality.transport_proposition(
-                                     Natural,
-                                     function (m : Natural) =>
-                                         successor(quotient) ≤ m,
-                                     prime * quotient,
-                                     successor(predPQ),
+                                 rewrite(
                                      refinedPqEq,
                                      Natural.successor_less_or_equal_multiply(
                                          prime, quotient,
@@ -479,30 +456,18 @@ theorem Natural.successor_add_preserves_le
           → successor(d) ≤ a
           → successor(d + b) ≤ a + b
   | zero, a, d, succDLeA =>
-      Equality.transport_proposition(
-          Natural,
-          function (m : Natural) => successor(d + zero) ≤ m,
-          a, a + zero,
+      rewrite(
           Equality.symmetry(Natural.add_zero(a)),
-          Equality.transport_proposition(
-              Natural,
-              function (m : Natural) => successor(m) ≤ a,
-              d, d + zero,
+          rewrite(
               Equality.symmetry(Natural.add_zero(d)),
               succDLeA))
   | successor(b'), a, d, succDLeA =>
       -- IH on b' gives succ(d + b') ≤ a + b'. By successor_preserves,
       -- succ(succ(d + b')) ≤ succ(a + b'). Then rewrite both sides via
       -- add_successor symmetry to express in terms of succ(b').
-      Equality.transport_proposition(
-          Natural,
-          function (m : Natural) => successor(d + successor(b')) ≤ m,
-          successor(a + b'), a + successor(b'),
+      rewrite(
           Equality.symmetry(Natural.add_successor(a, b')),
-          Equality.transport_proposition(
-              Natural,
-              function (m : Natural) => m ≤ successor(a + b'),
-              successor(successor(d + b')), successor(d + successor(b')),
+          rewrite(
               congruenceOf(
                   successor,
                   Equality.symmetry(Natural.add_successor(d, b'))),
@@ -594,11 +559,8 @@ theorem Natural.padic_valuation_multiplicative
                 -- IH on (divide(p, a'), b'): need succ(divide + b') ≤ n.
                 claim recursiveSumLeN
                       : successor(Natural.divide(prime, a') + b') ≤ n
-                  by Equality.transport_proposition(
-                         Natural,
-                         function (m : Natural) =>
-                             successor(Natural.divide(prime, a') + b') ≤ m,
-                         a' + b', n, sumEq,
+                  by rewrite(
+                         sumEq,
                          Natural.successor_add_preserves_le(
                              b', a', Natural.divide(prime, a'), succDivideALeA));
                 claim recursedEq
@@ -681,31 +643,18 @@ theorem Natural.padic_valuation_multiplicative
                       -- a' + divide < a' + b' = n; specifically succ(a' + divide) ≤ a' + b'.
                       claim recursiveSumLeN
                             : successor(a' + Natural.divide(prime, b')) ≤ n
-                        by Equality.transport_proposition(
-                               Natural,
-                               function (m : Natural) =>
-                                   successor(a' + Natural.divide(prime, b')) ≤ m,
-                               a' + b', n, sumEq,
+                        by rewrite(
+                               sumEq,
                                -- succ(a' + div) ≤ a' + b' from succ(div) ≤ b'.
                                -- successor_add_preserves_le gives succ(d+x) ≤ a+x
                                -- from succ(d) ≤ a; here d = div, x = a', a = b'.
                                -- We want succ(a' + div) ≤ a' + b'. Use commutative.
-                               Equality.transport_proposition(
-                                   Natural,
-                                   function (m : Natural) =>
-                                       m ≤ a' + b',
-                                   successor(Natural.divide(prime, b') + a'),
-                                   successor(a' + Natural.divide(prime, b')),
+                               rewrite(
                                    congruenceOf(
                                        successor,
                                        Natural.add_commutative(
                                            Natural.divide(prime, b'), a')),
-                                   Equality.transport_proposition(
-                                       Natural,
-                                       function (m : Natural) =>
-                                           successor(Natural.divide(prime, b') + a')
-                                             ≤ m,
-                                       b' + a', a' + b',
+                                   rewrite(
                                        Natural.add_commutative(b', a'),
                                        Natural.successor_add_preserves_le(
                                            a', b', Natural.divide(prime, b'),
@@ -871,11 +820,7 @@ theorem Natural.padic_valuation_power_divides
                        -- succ(q) ≤ p * q = m.
                        claim succQLeM
                              : successor(successor(predQ)) ≤ m
-                         by Equality.transport_proposition(
-                                Natural,
-                                function (n' : Natural) =>
-                                    successor(successor(predQ)) ≤ n',
-                                prime * successor(predQ), m,
+                         by rewrite(
                                 Equality.symmetry(refinedMEq),
                                 Natural.successor_less_or_equal_multiply(
                                     prime, successor(predQ),
@@ -1037,10 +982,7 @@ theorem Natural.power_divides_implies_padic_valuation_ge
                    successor(predK) ≤ Natural.padic_valuation(prime, n),
                    Natural.not_less_or_equal_successor_zero(
                        zero,
-                       Equality.transport_proposition(
-                           Natural,
-                           function (m : Natural) => successor(zero) ≤ m,
-                           n, zero,
+                       rewrite(
                            Equality.transitivity(
                                refinedNEq,
                                Natural.multiply_zero(prime)),
@@ -1096,13 +1038,7 @@ theorem Natural.power_divides_implies_padic_valuation_ge
                         succQPositive, pPredKDividesQ);
                -- v_p(n) = v_p(p * succ(predQ)) = succ(v_p(succ(predQ))) by strip.
                -- So we want succ(predK) ≤ succ(v_p(succ(predQ))).
-               Equality.transport_proposition(
-                   Natural,
-                   function (m : Natural) =>
-                       successor(predK) ≤ m,
-                   successor(
-                       Natural.padic_valuation(prime, successor(predQ))),
-                   Natural.padic_valuation(prime, n),
+               rewrite(
                    Equality.transitivity(
                        Equality.symmetry(
                            Natural.padic_valuation_strip(
@@ -1174,19 +1110,11 @@ theorem Natural.padic_valuation_ultrametric_when_ge
               ≤ Natural.padic_valuation(prime, a))
         : Natural.padic_valuation(prime, b)
           ≤ Natural.padic_valuation(prime, a + b) :=
-  Equality.transport_proposition(
-      Natural,
-      function (m : Natural) =>
-          Natural.padic_valuation(prime, b)
-            ≤ Natural.padic_valuation(prime, m),
-      b + a, a + b,
+  rewrite(
       Natural.add_commutative(b, a),
       Natural.padic_valuation_ultrametric_when_le(
           prime, primeAtLeastTwo, b, a,
-          Equality.transport_proposition(
-              Natural,
-              function (m : Natural) => successor(zero) ≤ m,
-              a + b, b + a,
+          rewrite(
               Natural.add_commutative(a, b),
               sumPositive),
           valuationLe))
@@ -1206,11 +1134,7 @@ theorem Natural.divides_monus
   -- Transport dDividesA along aEqBPlusMonus to get d | (b + monus(a, b)).
   Natural.divides_subtract_from_sum(
       d, b, Natural.monus(a, b),
-      Equality.transport_proposition(
-          Natural,
-          function (m : Natural) => d ∣ m,
-          a, b + Natural.monus(a, b),
-          aEqBPlusMonus, dDividesA),
+      rewrite(aEqBPlusMonus, dDividesA),
       dDividesB)
 }
 
@@ -1317,17 +1241,11 @@ theorem Natural.le_add_preserves_left
         : a + b ≤ c + b := {
   -- From a ≤ c get witness r : c = a + r. Then a + b ≤ a + r + b = c + b.
   let ⟨r, cEqAplusR⟩ := Natural.subtraction_witness(a, c, aLeC);
-  Equality.transport_proposition(
-      Natural,
-      function (m : Natural) => a + b ≤ m + b,
-      a + r, c,
+  rewrite(
       Equality.symmetry(cEqAplusR),
       -- a + b ≤ (a + r) + b. (a + r) + b = a + (r + b) by assoc; same as a + (b + r) by commutativity.
       -- Use less_or_equal_add_right: a + b ≤ (a + b) + r.
-      Equality.transport_proposition(
-          Natural,
-          function (m : Natural) => a + b ≤ m,
-          (a + b) + r, (a + r) + b,
+      rewrite(
           -- (a + b) + r = (a + r) + b via assoc and commutativity.
           calc (a + b) + r
              = a + (b + r)
@@ -1341,15 +1259,9 @@ theorem Natural.le_add_preserves_left
 theorem Natural.le_add_preserves_right
         (a b d : Natural) (bLeD : b ≤ d)
         : a + b ≤ a + d :=
-  Equality.transport_proposition(
-      Natural,
-      function (m : Natural) => m ≤ a + d,
-      b + a, a + b,
+  rewrite(
       Natural.add_commutative(b, a),
-      Equality.transport_proposition(
-          Natural,
-          function (m : Natural) => b + a ≤ m,
-          d + a, a + d,
+      rewrite(
           Natural.add_commutative(d, a),
           Natural.le_add_preserves_left(b, d, a, bLeD)))
 
@@ -1400,17 +1312,11 @@ theorem Natural.divides_distance
       a ≤ b, b ≤ a,
       d ∣ Natural.distance(a, b),
       function (aLeB : a ≤ b) =>
-        Equality.transport_proposition(
-            Natural,
-            function (m : Natural) => d ∣ m,
-            Natural.monus(b, a), Natural.distance(a, b),
+        rewrite(
             Equality.symmetry(Natural.distance_monus_when_ge(a, b, aLeB)),
             Natural.divides_monus(d, b, a, aLeB, dDividesB, dDividesA)),
       function (bLeA : b ≤ a) =>
-        Equality.transport_proposition(
-            Natural,
-            function (m : Natural) => d ∣ m,
-            Natural.monus(a, b), Natural.distance(a, b),
+        rewrite(
             Equality.symmetry(Natural.distance_monus_when_le(b, a, bLeA)),
             Natural.divides_monus(d, a, b, bLeA, dDividesA, dDividesB)),
       Natural.totality_of_less_or_equal(a, b))
@@ -1486,11 +1392,7 @@ theorem Natural.divides_distance_sum
               --                       = distance(a1, a2) + distance(b1, b2).
               claim sumLe : a1 + b1 ≤ a2 + b2
                 by Natural.le_add_le(a1, a2, b1, b2, a1LeA2, b1LeB2);
-              Equality.transport_proposition(
-                  Natural,
-                  function (m : Natural) => d ∣ m,
-                  Natural.distance(a1, a2) + Natural.distance(b1, b2),
-                  Natural.distance(a1 + b1, a2 + b2),
+              rewrite(
                   calc Natural.distance(a1, a2) + Natural.distance(b1, b2)
                      = Natural.monus(a2, a1) + Natural.distance(b1, b2)
                             by congruenceOf(
@@ -1521,27 +1423,16 @@ theorem Natural.divides_distance_sum
             function (b2LeB1 : b2 ≤ b1) =>
               -- Cross direction (a1 ≤ a2, b2 ≤ b1). distance(a1+b1, a2+b2)
               -- = distance(monus(b1, b2), monus(a2, a1)). Then divides_distance.
-              Equality.transport_proposition(
-                  Natural,
-                  function (m : Natural) => d ∣ m,
-                  Natural.distance(
-                      Natural.monus(b1, b2), Natural.monus(a2, a1)),
-                  Natural.distance(a1 + b1, a2 + b2),
+              rewrite(
                   Equality.symmetry(
                       Natural.distance_sum_cross_le_le(
                           a1, a2, b1, b2, a1LeA2, b2LeB1)),
                   Natural.divides_distance(
                       d, Natural.monus(b1, b2), Natural.monus(a2, a1),
-                      Equality.transport_proposition(
-                          Natural,
-                          function (m : Natural) => d ∣ m,
-                          Natural.distance(b1, b2), Natural.monus(b1, b2),
+                      rewrite(
                           Natural.distance_monus_when_le(b2, b1, b2LeB1),
                           dDividesDistanceB),
-                      Equality.transport_proposition(
-                          Natural,
-                          function (m : Natural) => d ∣ m,
-                          Natural.distance(a1, a2), Natural.monus(a2, a1),
+                      rewrite(
                           Natural.distance_monus_when_ge(a1, a2, a1LeA2),
                           dDividesDistanceA))),
             Natural.totality_of_less_or_equal(b1, b2)),
@@ -1553,35 +1444,18 @@ theorem Natural.divides_distance_sum
               -- Cross direction (a2 ≤ a1, b1 ≤ b2). Symmetric to AB case.
               -- distance(a1+b1, a2+b2) = distance(a2+b2, a1+b1) by symmetry.
               -- = distance(monus(b2, b1), monus(a1, a2)).
-              Equality.transport_proposition(
-                  Natural,
-                  function (m : Natural) => d ∣ m,
-                  Natural.distance(a2 + b2, a1 + b1),
-                  Natural.distance(a1 + b1, a2 + b2),
+              rewrite(
                   Natural.distance_symmetric(a2 + b2, a1 + b1),
-                  Equality.transport_proposition(
-                      Natural,
-                      function (m : Natural) => d ∣ m,
-                      Natural.distance(
-                          Natural.monus(b2, b1), Natural.monus(a1, a2)),
-                      Natural.distance(a2 + b2, a1 + b1),
+                  rewrite(
                       Equality.symmetry(
                           Natural.distance_sum_cross_le_le(
                               a2, a1, b2, b1, a2LeA1, b1LeB2)),
                       Natural.divides_distance(
                           d, Natural.monus(b2, b1), Natural.monus(a1, a2),
-                          Equality.transport_proposition(
-                              Natural,
-                              function (m : Natural) => d ∣ m,
-                              Natural.distance(b1, b2),
-                              Natural.monus(b2, b1),
+                          rewrite(
                               Natural.distance_monus_when_ge(b1, b2, b1LeB2),
                               dDividesDistanceB),
-                          Equality.transport_proposition(
-                              Natural,
-                              function (m : Natural) => d ∣ m,
-                              Natural.distance(a1, a2),
-                              Natural.monus(a1, a2),
+                          rewrite(
                               Natural.distance_monus_when_le(a2, a1, a2LeA1),
                               dDividesDistanceA)))),
             function (b2LeB1 : b2 ≤ b1) => {
@@ -1590,11 +1464,7 @@ theorem Natural.divides_distance_sum
               -- same distributivity / divides_add chain as the first case.
               claim sumLe : a2 + b2 ≤ a1 + b1
                 by Natural.le_add_le(a2, a1, b2, b1, a2LeA1, b2LeB1);
-              Equality.transport_proposition(
-                  Natural,
-                  function (m : Natural) => d ∣ m,
-                  Natural.distance(a1, a2) + Natural.distance(b1, b2),
-                  Natural.distance(a1 + b1, a2 + b2),
+              rewrite(
                   calc Natural.distance(a1, a2) + Natural.distance(b1, b2)
                      = Natural.monus(a1, a2) + Natural.distance(b1, b2)
                             by congruenceOf(
@@ -1687,18 +1557,10 @@ theorem Natural.le_multiply_when_factor_at_least_one
     by Natural.monus_zero_implies_decompose(
            successor(zero), p,
            Natural.le_implies_monus_zero(p, successor(zero), pPositive));
-  Equality.transport_proposition(
-      Natural,
-      function (m : Natural) => x ≤ m * x,
-      successor(zero) + Natural.monus(p, successor(zero)),
-      p,
+  rewrite(
       Equality.symmetry(pDecompose),
       -- (1 + monus(p, 1)) * x = x + monus(p, 1) * x. Then x ≤ that.
-      Equality.transport_proposition(
-          Natural,
-          function (m : Natural) => x ≤ m,
-          x + Natural.monus(p, successor(zero)) * x,
-          (successor(zero) + Natural.monus(p, successor(zero))) * x,
+      rewrite(
           calc x + Natural.monus(p, successor(zero)) * x
              = successor(zero) * x + Natural.monus(p, successor(zero)) * x
              = (successor(zero) + Natural.monus(p, successor(zero))) * x,
@@ -1747,11 +1609,7 @@ theorem Natural.power_monotone
       function (r : Natural) => b = a + r,
       Natural.power(a, p) ≤ Natural.power(b, p),
       function (r : Natural) (bEqAplusR : b = a + r) =>
-        Equality.transport_proposition(
-            Natural,
-            function (m : Natural) =>
-                Natural.power(a, p) ≤ Natural.power(m, p),
-            a + r, b,
+        rewrite(
             Equality.symmetry(bEqAplusR),
             Natural.power_monotone_via_r(a, p, pPositive, r)),
       Natural.subtraction_witness(a, b, aLeB))

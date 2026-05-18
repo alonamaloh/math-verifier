@@ -256,11 +256,7 @@ theorem Rational.LessOrEqual.antisymmetric
     by Rational.IsNonneg_and_negate_IsNonneg_implies_zero(
            y - x,
            xLeqY,
-           Equality.transport_proposition(
-               Rational,
-               Rational.IsNonneg,
-               x - y,
-               -(y - x),
+           rewrite(
                Rational.subtract_swap(x, y),
                yLeqX));
   -- y = x from y - x = 0.
@@ -283,11 +279,7 @@ theorem Rational.LessOrEqual.transitive
         (x y z : Rational)
         (xLeqY : x ≤ y) (yLeqZ : y ≤ z)
         : x ≤ z :=
-  Equality.transport_proposition(
-      Rational,
-      Rational.IsNonneg,
-      (z - y) + (y - x),
-      z - x,
+  rewrite(
       -- (z - y) + (y - x) = z - x.
       -- Strategy: (z + -y) + (y + -x) = z + ((-y + y) + -x)
       --         = z + (0 + -x) = z + -x = z - x.
@@ -325,10 +317,7 @@ theorem Rational.LessThan.transitive_left
                       by Equality.symmetry(
                              Rational.LessOrEqual.antisymmetric(x, y,
                                  xLeqY,
-                                 Equality.transport_proposition(
-                                     Rational,
-                                     function (w : Rational) => y ≤ w,
-                                     z, x,
+                                 rewrite(
                                      Equality.symmetry(xEqualsZ),
                                      yLeqZ)))
                = z))
@@ -353,10 +342,7 @@ theorem Rational.LessThan.transitive_right
         xNotY(
             Rational.LessOrEqual.antisymmetric(x, y,
                 xLeqY,
-                Equality.transport_proposition(
-                    Rational,
-                    function (w : Rational) => y ≤ w,
-                    z, x,
+                rewrite(
                     Equality.symmetry(xEqualsZ),
                     yLeqZ))))
 }
@@ -366,11 +352,7 @@ theorem Rational.LessThan.transitive_right
 theorem Rational.add_preserves_LessOrEqual
         (x y z : Rational) (xLeqY : x ≤ y)
         : x + z ≤ y + z :=
-  Equality.transport_proposition(
-      Rational,
-      Rational.IsNonneg,
-      y - x,
-      (y + z) - (x + z),
+  rewrite(
       Equality.symmetry(
           Rational.add_subtract_cancel_right(y, z, x)),
       xLeqY)
@@ -430,19 +412,9 @@ theorem Rational.add_left_preserves_LessThan
 theorem Rational.add_preserves_LessOrEqual_left
         (b h : Rational) (bLeqH : b ≤ h)
         : h + b ≤ h + h :=
-  Equality.transport_proposition(
-      Rational,
-      function (w : Rational) =>
-          Rational.LessOrEqual(w, h + h),
-      b + h, h + b,
+  rewrite(
       Rational.add_commutative(b, h),
-      Equality.transport_proposition(
-          Rational,
-          function (w : Rational) =>
-              Rational.LessOrEqual(b + h, w),
-          h + h, h + h,
-          reflexivity(Rational, h + h),
-          Rational.add_preserves_LessOrEqual(b, h, h, bLeqH)))
+      Rational.add_preserves_LessOrEqual(b, h, h, bLeqH))
 
 -- Combined strict sum: A < H ∧ B < H → A + B < H + H.
 theorem Rational.LessThan.add_strict_strict
