@@ -3583,13 +3583,18 @@ private:
     //   2. Library scan — for each environment Definition/Axiom whose
     //      Pi-chain conclusion has the same spine head as the goal,
     //      try Step 2's autoFillHintForClaim. First success wins.
+    //   3. Transport bridge — when the goal nearly matches something
+    //      provable except for one side of a local equality, rewrite
+    //      via transport_proposition and recurse. One-step only
+    //      (transportBudget defaults to 1) to bound search cost.
     // v1 skips universe-polymorphic candidates (no universe inference
     // yet) and does a linear scan (acceptable at current library size;
     // an indexed lookup is a planned follow-on).
     ExpressionPointer lookupClaimByLibrary(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
-        int line) {
+        int line,
+        int transportBudget = 1) {
         // (1) Local hypothesis: scan last-bound-first.
         int N = static_cast<int>(localBinders.size());
         for (int b = N - 1; b >= 0; --b) {
@@ -3640,12 +3645,79 @@ private:
             }
         }
 
+        // (3) Transport bridge. If the goal nearly matches an
+        // already-provable shape modulo one side of a local equality,
+        // rewrite the goal via transport_proposition and recurse.
+        if (transportBudget > 0) {
+            for (int b = N - 1; b >= 0; --b) {
+                int lift = N - b;
+                ExpressionPointer binderTypeInScope =
+                    liftBoundVariables(
+                        localBinders[b].type, lift, 0);
+                ExpressionPointer reducedBinder = weakHeadNormalForm(
+                    environment_, binderTypeInScope);
+                // Try to decompose as `Equality.{u}(C, lhs, rhs)`.
+                EqualityComponents components;
+                try {
+                    components = extractEqualityComponents(
+                        reducedBinder, "transport bridge", line);
+                } catch (const ElaborateError&) {
+                    continue;
+                }
+                // Try abstracting rhs in the goal — replacement that
+                // takes us to the proof side. (Symmetric direction
+                // could be added; for now we rely on the user
+                // applying Equality.symmetry where needed.)
+                int rhsOccurrences = 0;
+                ExpressionPointer abstractedBody =
+                    abstractStructuralOccurrence(
+                        goalClosed, components.rightEndpoint,
+                        /*currentDepth=*/0, rhsOccurrences);
+                if (rhsOccurrences == 0) continue;
+                // Build the modified goal: substitute the bound hole
+                // with `lhs`. This is what we need to prove
+                // recursively.
+                ExpressionPointer goalAtLhs = substitute(
+                    abstractedBody, 0, components.leftEndpoint);
+                // Recurse with reduced budget.
+                ExpressionPointer proofAtLhs;
+                try {
+                    proofAtLhs = lookupClaimByLibrary(
+                        goalAtLhs, localBinders, line,
+                        transportBudget - 1);
+                } catch (const ElaborateError&) {
+                    continue;
+                } catch (const TypeError&) {
+                    continue;
+                }
+                // Found it. Build the transport call:
+                //   Equality.transport_proposition.{u}(
+                //       C, λ_:C. abstractedBody,
+                //       lhs, rhs, theLocalEquality, proofAtLhs)
+                ExpressionPointer motive = makeLambda(
+                    "_transportHole", components.carrierType,
+                    abstractedBody);
+                ExpressionPointer call = makeConstant(
+                    "Equality.transport_proposition",
+                    {components.carrierUniverseLevel});
+                call = makeApplication(call, components.carrierType);
+                call = makeApplication(call, motive);
+                call = makeApplication(call, components.leftEndpoint);
+                call = makeApplication(call, components.rightEndpoint);
+                call = makeApplication(call,
+                    makeBoundVariable(N - 1 - b));  // the equality
+                call = makeApplication(call, proofAtLhs);
+                return call;
+            }
+        }
+
         throwElaborate(
             "claim `"
             + prettyPrintInLocalScope(goalClosed, localBinders)
-            + "`: no in-scope hypothesis matches structurally, and "
-            "no library theorem with this conclusion shape applies "
-            "— add `by <lemma>` to specify");
+            + "`: no in-scope hypothesis matches structurally, no "
+            "library theorem with this conclusion shape applies, "
+            "and no one-step transport via a local equality "
+            "succeeds — add `by <lemma>` to specify");
     }
 
     // Step 4 of the structured-proof feature. Elaborates

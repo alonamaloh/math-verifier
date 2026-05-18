@@ -57,30 +57,29 @@ theorem ClaimTerminalFromHypothesis (n : Natural)
   claim zero ≤ n
 
 -- (5) The motivating example from the design conversation, written
--- in the most stripped-down form the current feature set supports:
--- no `function` wrapper, no scrutinee name, no `Or.eliminate`
--- positional call, no explicit inversion-lemma citation. The
--- elaborator finds the inversion by conclusion shape (Step 5
--- library lookup, Or-headed), synthesizes `Or.eliminate` from the
--- two arms (Step 4), pulls `succ(p) ≤ m` out of the right arm's
--- anonymous hypothesis to close the right-arm `claim` (Step 5 +
--- Step 2 auto-fill), and uses `given (p = m)` (Step 3) in the
--- left arm to cite the equality without naming it.
---
--- The remaining verbosity (the `Equality.transport_proposition`
--- block in the left arm) is fundamental: `LessOrEqual.reflexivity(p)`
--- has type `p ≤ p` with `p` appearing twice, so the user must say
--- explicitly which side to rewrite. That's information, not noise.
+-- in the most stripped-down form: every step is just `claim`. No
+-- `function` wrapper, no scrutinee name, no `Or.eliminate` positional
+-- call, no explicit lemma citations, no `transport_proposition`
+-- plumbing in the left arm. The prover handles everything:
+--   - Outer disjunction: Step 5 library scan finds
+--     `Natural.less_or_equal_successor_successor_inversion` by
+--     the Or-headed conclusion shape; Step 2 auto-fills the args
+--     from `succP_le_succM` in local scope.
+--   - Step 4 synthesizes `Or.eliminate` from the two `in (P): …`
+--     arms, putting each disjunct as an anonymous hypothesis in
+--     scope for its body.
+--   - Right arm's `claim`: Step 5 library scan finds
+--     `Natural.less_or_equal_predecessor_less_or_equal`; auto-fill
+--     pulls `succ(p) ≤ m` from the right-arm disjunct hypothesis.
+--   - Left arm's `claim`: Step 5's transport bridge fires. With
+--     `p = m` in scope and goal `p ≤ m`, the prover abstracts `m`
+--     at its single occurrence to get `p ≤ p`, recursively finds
+--     `LessOrEqual.reflexivity(p)`, and wraps the result in
+--     `Equality.transport_proposition`.
 theorem ClaimDisjunctiveArms (p m : Natural)
         (succP_le_succM : successor(p) ≤ successor(m))
         : p ≤ m :=
   claim (p = m) ∨ (successor(p) ≤ m) {
-    in (p = m):
-        Equality.transport_proposition(
-            Natural,
-            function (rightEnd : Natural) => p ≤ rightEnd,
-            p, m, given (p = m),
-            LessOrEqual.reflexivity(p))
-    in (successor(p) ≤ m):
-        claim
+    in (p = m): claim
+    in (successor(p) ≤ m): claim
   }
