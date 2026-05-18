@@ -3171,13 +3171,11 @@ private:
                 *byInductionUsing, localBinders, expectedType,
                 expression.line, expression.column);
         }
-        if (std::get_if<SurfaceStructuredClaim>(&expression.node)) {
-            // Step 1 — parser scaffolding only; real elaboration lands
-            // in Step 2. For now we fall through to `sorry` so test
-            // files exercising the parser path can compile and the
-            // build log surfaces the unresolved-claim warning.
-            return elaborateSorry(localBinders, expectedType,
-                                   expression.line, expression.column);
+        if (auto* claim =
+                std::get_if<SurfaceStructuredClaim>(&expression.node)) {
+            return elaborateStructuredClaim(
+                *claim, localBinders, expectedType,
+                expression.line, expression.column);
         }
         throw ElaborateError("unhandled surface expression variant");
     }
@@ -3295,6 +3293,232 @@ private:
                                        std::move(scrutineeKernel));
         (void)column;
         return application;
+    }
+
+    // Step 2 of the structured-proof feature. Elaborates
+    // `claim P [by Hint]` (and the bare-claim trailing form, where
+    // the goal is the surrounding expectedType). Auto-fills the
+    // hint's arguments by unifying its conclusion with the goal and
+    // looking up any leftover binder values in local hypotheses.
+    //
+    // Limitations of v1:
+    // - Disjunctive arms aren't elaborated yet (Step 4).
+    // - `claim P` without `by` isn't elaborated yet (Step 5).
+    // - Inter-slot dependencies: each slot's domain may reference
+    //   outer slots that are bound by unification. Slots not bound
+    //   by unification must be findable in local hypotheses by
+    //   structural-type match.
+    ExpressionPointer elaborateStructuredClaim(
+        const SurfaceStructuredClaim& claim,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "claim at line " + std::to_string(line));
+
+        if (!claim.arms.empty()) {
+            throwElaborate(
+                "disjunctive `claim` arms are recognized by the parser "
+                "but not yet elaborated (structured-proof Step 4)");
+        }
+
+        // Resolve the goal proposition.
+        ExpressionPointer goalClosed;
+        if (claim.proposition) {
+            goalClosed = elaborateExpression(
+                *claim.proposition, localBinders);
+        } else if (expectedType) {
+            goalClosed = expectedType;
+        } else {
+            throwElaborate(
+                "bare `claim` needs an expected type from context "
+                "(none available — wrap the claim in `(claim : T)` "
+                "or provide a proposition: `claim P [by Hint]`)");
+        }
+
+        if (!claim.byHint) {
+            throwElaborate(
+                "`claim` without `by` is recognized by the parser "
+                "but not yet elaborated (structured-proof Step 5)");
+        }
+
+        ExpressionPointer hintTerm =
+            elaborateExpression(*claim.byHint, localBinders);
+        // `inferTypeInLocalContext` returns an OPENED type;
+        // `autoFillHintForClaim` expects closed form throughout
+        // (matchAgainstPattern / instantiateLemmaBinders are
+        // closed-form helpers).
+        ExpressionPointer hintTypeOpened =
+            inferTypeInLocalContext(localBinders, hintTerm);
+        ExpressionPointer hintType = closeOverLocalBinders(
+            hintTypeOpened, localBinders, localBinders.size());
+
+        return autoFillHintForClaim(
+            hintTerm, hintType, goalClosed, localBinders, line);
+    }
+
+    // Walks the Pi chain of `hintType`, unifies the conclusion with
+    // `goalClosed`, fills remaining binders from local hypotheses,
+    // and returns the resulting application of `hintTerm`. All
+    // inputs and outputs are in closed-over-localBinders form.
+    ExpressionPointer autoFillHintForClaim(
+        ExpressionPointer hintTerm,
+        ExpressionPointer hintType,
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int /*line*/) {
+
+        // Reduce the goal so unification has a stable shape (the
+        // goal can be the surrounding expectedType, which may carry
+        // unreduced sugar like `LessOrEqual`-as-Constant).
+        ExpressionPointer goalReduced = weakHeadNormalForm(
+            environment_, goalClosed);
+        ExpressionPointer hintTypeReduced = weakHeadNormalForm(
+            environment_, hintType);
+
+        // Fast path: hintType already matches the goal definitionally.
+        Context openedContext;
+        for (size_t i = 0; i < localBinders.size(); ++i) {
+            ExpressionPointer openedType = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            openedContext.push_back({localBinders[i].name,
+                                      openedType,
+                                      FreeVariableOrigin::Internal});
+        }
+        ExpressionPointer hintTypeOpened = openOverLocalBinders(
+            hintType, localBinders, localBinders.size());
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, localBinders.size());
+        if (isSubtype(environment_, openedContext,
+                      hintTypeOpened, goalOpened)) {
+            return hintTerm;
+        }
+
+        // Peel Pi chain, collecting domains outermost-first.
+        std::vector<ExpressionPointer> domainsOutermostFirst;
+        ExpressionPointer cursor = hintTypeReduced;
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            domainsOutermostFirst.push_back(pi->domain);
+            cursor = pi->codomain;
+        }
+        int totalBinders =
+            static_cast<int>(domainsOutermostFirst.size());
+        if (totalBinders == 0) {
+            // No Pi's and not defeq: nothing more to try.
+            throwElaborate(
+                "the `by` hint's type doesn't match the goal "
+                "(claimed `"
+                + prettyPrintInLocalScope(goalClosed, localBinders)
+                + "`, hint has type `"
+                + prettyPrintInLocalScope(hintType, localBinders)
+                + "`)");
+        }
+        ExpressionPointer tail = cursor;
+
+        // Unify tail against goal. Bindings convention: bindings[i]
+        // is the value for BoundVariable index i in the tail; i = 0
+        // is the innermost binder, i = totalBinders - 1 the
+        // outermost.
+        std::vector<ExpressionPointer> bindings(totalBinders);
+        if (!matchAgainstPattern(tail, goalReduced,
+                                   totalBinders, bindings)) {
+            // Try the unreduced goal too — sometimes the lemma's
+            // tail uses the un-WHNF'd form.
+            std::vector<ExpressionPointer> retryBindings(totalBinders);
+            if (matchAgainstPattern(tail, goalClosed,
+                                     totalBinders, retryBindings)) {
+                bindings = std::move(retryBindings);
+            } else {
+                throwElaborate(
+                    "the `by` hint's conclusion (`"
+                    + prettyPrintInLocalScope(tail, localBinders)
+                    + "`) does not unify with the goal (`"
+                    + prettyPrintInLocalScope(goalClosed, localBinders)
+                    + "`)");
+            }
+        }
+
+        // Fill any binders not determined by unification by
+        // searching local binders for a structurally-equal type.
+        // Process inner-binder-first (bindings[0] is the innermost)
+        // so a slot can depend on outer slots that may already be
+        // bound. Outer-slot positions in `domainsOutermostFirst`
+        // are (totalBinders - 1 - i).
+        for (int innerIndex = 0; innerIndex < totalBinders;
+             ++innerIndex) {
+            if (bindings[innerIndex]) continue;
+            int outermostPosition = totalBinders - 1 - innerIndex;
+            ExpressionPointer domain =
+                domainsOutermostFirst[outermostPosition];
+            // The domain references outer binders. From the
+            // perspective of the domain expression: BV(j) refers to
+            // the binder at outermost position
+            //   outermostPosition - 1 - j
+            // i.e. innerIndex (in our bindings array) =
+            //   totalBinders - 1 - (outermostPosition - 1 - j)
+            //   = innerIndex + 1 + j.
+            // So to use instantiateLemmaBinders (which uses
+            // bindings[BV-index] = value), we build a local
+            // permutation of the right slice.
+            int outerSlotCount = outermostPosition;
+            std::vector<ExpressionPointer> domainBindings(
+                outerSlotCount);
+            bool allOuterBound = true;
+            for (int j = 0; j < outerSlotCount; ++j) {
+                domainBindings[j] = bindings[innerIndex + 1 + j];
+                if (!domainBindings[j]) {
+                    allOuterBound = false;
+                    break;
+                }
+            }
+            if (!allOuterBound) {
+                throwElaborate(
+                    "can't infer the value of one of `by` hint's "
+                    "arguments — the goal doesn't pin it down and "
+                    "an outer argument it depends on is also "
+                    "unbound");
+            }
+            ExpressionPointer expectedSlotType =
+                instantiateLemmaBinders(domain, domainBindings);
+            // Search local binders for one with this type. Each
+            // binder's `.type` is in b-scope closed form (closed
+            // over the binders that were in scope when it was
+            // elaborated). To compare against `expectedSlotType`
+            // (which lives in N-scope closed form), lift its BVs by
+            // (N - b). Last-bound first (rightmost in localBinders)
+            // so the most recent hypothesis wins ties.
+            int N = static_cast<int>(localBinders.size());
+            ExpressionPointer matchedTerm;
+            for (int b = N - 1; b >= 0; --b) {
+                int lift = N - b;
+                ExpressionPointer binderTypeInScope =
+                    liftBoundVariables(localBinders[b].type,
+                                         lift, 0);
+                if (structurallyEqual(binderTypeInScope,
+                                        expectedSlotType)) {
+                    matchedTerm = makeBoundVariable(N - 1 - b);
+                    break;
+                }
+            }
+            if (!matchedTerm) {
+                throwElaborate(
+                    "can't fill `by` hint argument of type `"
+                    + prettyPrintInLocalScope(
+                          expectedSlotType, localBinders)
+                    + "` — no in-scope hypothesis matches it "
+                    "structurally");
+            }
+            bindings[innerIndex] = matchedTerm;
+        }
+
+        // All bindings filled. Build the application: outermost
+        // binder is bindings[totalBinders - 1].
+        ExpressionPointer call = hintTerm;
+        for (int p = 0; p < totalBinders; ++p) {
+            int innerIndex = totalBinders - 1 - p;
+            call = makeApplication(call, bindings[innerIndex]);
+        }
+        return call;
     }
 
     // Elaborates a calc chain to a fold of Equality.transitivity calls.

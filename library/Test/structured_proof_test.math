@@ -1,8 +1,8 @@
--- Step 1 of the structured-proof feature: parser scaffolding for
--- `claim` at expression position. Real elaboration is Step 2; these
--- tests verify only that the parser accepts the new syntax. Each
--- theorem body elaborates to `sorry` for now and emits the standard
--- unresolved-proof warning at verify time.
+-- Structured-proof Step 2: `claim P by Hint` and `claim by Hint`
+-- elaborate by auto-filling the hint's arguments. Step 1's parser
+-- scaffolding covers all forms, but only the `by`-equipped ones
+-- elaborate end-to-end at this point. Bare `claim` / `claim P`
+-- (Step 5 lookup) and disjunctive arms (Step 4) are deferred.
 
 module Test.structured_proof_test
 
@@ -15,32 +15,23 @@ import Natural.peano
 import Natural.arithmetic
 import Natural.order
 
--- (1) Bare terminal claim: discharge the current goal by lookup.
-theorem BareClaim (n : Natural) (h : zero ≤ n) : zero ≤ n :=
-  claim
+-- (1) Fully-applied hint: the hint's type already matches the goal.
+theorem ClaimByFullyApplied (n : Natural) : zero ≤ n :=
+  claim by Natural.zero_least(n)
 
--- (2) Terminal claim with `by`: discharge the goal from a named lemma.
-theorem ClaimByHint (n : Natural) : zero ≤ n :=
-  claim by Natural.zero_le
+-- (2) Bare-identifier hint: the hint's type is `(n : Natural) → zero ≤ n`;
+-- the goal pins down `n`. The elaborator should fill it.
+theorem ClaimByBareIdentifier (n : Natural) : zero ≤ n :=
+  claim by Natural.zero_least
 
--- (3) Non-terminal claim with explicit proposition.
-theorem ClaimWithProposition (n : Natural) : zero ≤ n :=
-  claim zero ≤ n by Natural.zero_le
-
--- (4) Disjunctive claim with arms. Future Step 4 will desugar this
--- into an `Or.eliminate`; for now each piece is just a parser test.
-theorem DisjunctiveClaim (n : Natural) : zero ≤ n :=
-  claim zero = n ∨ zero ≤ n {
-    in (zero = n): claim
-    in (zero ≤ n): claim
-  }
-
--- (5) Disjunctive claim with `by` for the disjunction (Future: lookup
--- finds the inversion lemma) and per-arm bodies.
-theorem DisjunctiveClaimWithHint (p m : Natural)
-        (succP_le_succM : successor(p) ≤ successor(m))
+-- (3) Hint with a hypothesis argument: the hint's type is
+-- `(a b : Natural) (h : succ(a) ≤ b) : a ≤ b`. The goal pins down
+-- `a` and `b`; `h` comes from a local binder.
+theorem ClaimByHintWithHypothesis (p m : Natural)
+        (succPLeM : successor(p) ≤ m)
         : p ≤ m :=
-  claim p = m ∨ successor(p) ≤ m by Natural.less_or_equal_successor_successor_inversion {
-    in (p = m): claim
-    in (successor(p) ≤ m): claim by Natural.less_or_equal_predecessor_less_or_equal
-  }
+  claim by Natural.less_or_equal_predecessor_less_or_equal
+
+-- (4) Non-terminal claim with an explicit proposition.
+theorem ClaimWithProposition (n : Natural) : zero ≤ n :=
+  claim zero ≤ n by Natural.zero_least
