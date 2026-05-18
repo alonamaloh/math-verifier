@@ -3342,9 +3342,8 @@ private:
         }
 
         if (!claim.byHint) {
-            throwElaborate(
-                "`claim` without `by` is recognized by the parser "
-                "but not yet elaborated (structured-proof Step 5)");
+            return lookupClaimByLibrary(
+                goalClosed, localBinders, line);
         }
 
         ExpressionPointer hintTerm =
@@ -3575,6 +3574,78 @@ private:
                 + "'); name one of them explicitly");
         }
         return makeBoundVariable(N - 1 - matchIndex);
+    }
+
+    // Step 5 of the structured-proof feature. `claim P` (no `by`)
+    // resolves the goal by:
+    //   1. Direct hypothesis match — a local binder with the goal's
+    //      type wins immediately.
+    //   2. Library scan — for each environment Definition/Axiom whose
+    //      Pi-chain conclusion has the same spine head as the goal,
+    //      try Step 2's autoFillHintForClaim. First success wins.
+    // v1 skips universe-polymorphic candidates (no universe inference
+    // yet) and does a linear scan (acceptable at current library size;
+    // an indexed lookup is a planned follow-on).
+    ExpressionPointer lookupClaimByLibrary(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        // (1) Local hypothesis: scan last-bound-first.
+        int N = static_cast<int>(localBinders.size());
+        for (int b = N - 1; b >= 0; --b) {
+            int lift = N - b;
+            ExpressionPointer binderTypeInScope =
+                liftBoundVariables(localBinders[b].type, lift, 0);
+            if (structurallyEqual(binderTypeInScope, goalClosed)) {
+                return makeBoundVariable(N - 1 - b);
+            }
+        }
+
+        // (2) Library scan, bucketed by spine head of the conclusion.
+        ExpressionPointer goalReduced = weakHeadNormalForm(
+            environment_, goalClosed);
+        uint64_t goalHash = spineHash(goalReduced);
+        for (const auto& entry : environment_.declarations) {
+            const std::string& name = entry.first;
+            const auto& declaration = entry.second;
+            ExpressionPointer declarationType;
+            size_t universeParamCount = 0;
+            if (auto* def = std::get_if<Definition>(&declaration)) {
+                declarationType = def->type;
+                universeParamCount = def->universeParameters.size();
+            } else if (auto* ax = std::get_if<Axiom>(&declaration)) {
+                declarationType = ax->type;
+                universeParamCount = ax->universeParameters.size();
+            } else {
+                continue;
+            }
+            if (universeParamCount != 0) continue;
+            // Peel Pi's to expose the conclusion's spine.
+            ExpressionPointer tail = declarationType;
+            while (auto* pi = std::get_if<Pi>(&tail->node)) {
+                tail = pi->codomain;
+            }
+            if (spineHash(tail) != goalHash) continue;
+            // Try this candidate. autoFillHintForClaim throws on
+            // mismatch; catch and move on to the next.
+            ExpressionPointer hintTerm = makeConstant(name, {});
+            try {
+                return autoFillHintForClaim(
+                    hintTerm, declarationType, goalClosed,
+                    localBinders, line);
+            } catch (const ElaborateError&) {
+                continue;
+            } catch (const TypeError&) {
+                continue;
+            }
+        }
+
+        throwElaborate(
+            "claim `"
+            + prettyPrintInLocalScope(goalClosed, localBinders)
+            + "`: no in-scope hypothesis matches structurally, and "
+            "no library theorem with this conclusion shape applies "
+            "— add `by <lemma>` to specify");
     }
 
     // Step 4 of the structured-proof feature. Elaborates
