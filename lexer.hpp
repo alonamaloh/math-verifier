@@ -43,6 +43,7 @@ enum class TokenKind {
     KeywordSorry,           // `sorry` — placeholder for an unwritten proof
     KeywordRing,            // `ring` — commutative-ring decision tactic
     KeywordConvention,      // `convention p : T with H` — name-bound implicit binder
+    KeywordGiven,           // `given (P)` — look up the in-scope hypothesis of type P
 
     // Punctuation
     LeftParen, RightParen,

@@ -1407,6 +1407,9 @@ private:
         if (current.kind == TokenKind::KeywordClaim) {
             return parseStructuredClaim();
         }
+        if (current.kind == TokenKind::KeywordGiven) {
+            return parseGiven();
+        }
         if (isIdentifierLike(current.kind)) {
             return parseQualifiedIdentifier();
         }
@@ -1733,6 +1736,17 @@ private:
             || k == TokenKind::KeywordInductive
             || k == TokenKind::KeywordImport
             || k == TokenKind::KeywordModule;
+    }
+
+    // `given (P)` — refer to the unique in-scope hypothesis of type P.
+    // Parens are required; the proposition can be any expression.
+    SurfaceExpressionPointer parseGiven() {
+        Token givenToken = consumeAny();  // 'given'
+        expect(TokenKind::LeftParen, "after 'given'");
+        auto proposition = parseExpression();
+        expect(TokenKind::RightParen, "ending 'given (...)'");
+        return makeSurfaceGiven(std::move(proposition),
+                                 givenToken.line, givenToken.column);
     }
 
     // `in (Proposition): body` — one arm of a structured claim with

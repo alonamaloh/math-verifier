@@ -242,6 +242,15 @@ struct SurfaceStructuredClaimArm {
     int column = 0;
 };
 
+// `given (P)` — refers to the unique in-scope hypothesis of type P.
+// Elaborates to a BoundVariable pointing at the matching local binder
+// (errors on zero matches or ambiguity). Useful inside structured-
+// proof arm bodies to cite the disjunct-hypothesis by its proposition
+// rather than by an internal binder name.
+struct SurfaceGiven {
+    SurfaceExpressionPointer proposition;
+};
+
 // `claim Proposition [labeled (*)] [by Hint] [{ in (...): body  ... }]`
 // — a structured-proof step in mathematician style. Three modes:
 //   - `claim P by Hint`             : prove P from Hint (auto-fills args).
@@ -268,7 +277,7 @@ struct SurfaceExpression {
         SurfaceBinaryOperation, SurfaceUnaryOperation,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer, SurfaceSorry,
         SurfaceRing, SurfaceCalc, SurfaceByInductionUsing,
-        SurfaceStructuredClaim
+        SurfaceStructuredClaim, SurfaceGiven
     > node;
     int line = 0;
     int column = 0;
@@ -404,6 +413,11 @@ inline SurfaceExpressionPointer makeSurfaceByInductionUsing(
                                  std::move(ihName),
                                  std::move(body)},
         line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceGiven(
+    SurfaceExpressionPointer proposition, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceGiven{std::move(proposition)}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceStructuredClaim(
     SurfaceExpressionPointer proposition,

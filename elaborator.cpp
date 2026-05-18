@@ -3177,6 +3177,12 @@ private:
                 *claim, localBinders, expectedType,
                 expression.line, expression.column);
         }
+        if (auto* given =
+                std::get_if<SurfaceGiven>(&expression.node)) {
+            return elaborateGiven(
+                *given, localBinders,
+                expression.line, expression.column);
+        }
         throw ElaborateError("unhandled surface expression variant");
     }
 
@@ -3518,6 +3524,57 @@ private:
             call = makeApplication(call, bindings[innerIndex]);
         }
         return call;
+    }
+
+    // Step 3 of the structured-proof feature. Elaborates `given (P)`
+    // to a BoundVariable pointing at the unique in-scope hypothesis
+    // of type `P`. Errors on zero matches or on ambiguity.
+    ExpressionPointer elaborateGiven(
+        const SurfaceGiven& given,
+        const std::vector<LocalBinder>& localBinders,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "given(...) at line " + std::to_string(line));
+        ExpressionPointer requestedTypeClosed = elaborateExpression(
+            *given.proposition, localBinders);
+        int N = static_cast<int>(localBinders.size());
+        int matchIndex = -1;
+        int duplicateIndex = -1;
+        for (int b = N - 1; b >= 0; --b) {
+            int lift = N - b;
+            ExpressionPointer binderTypeInScope =
+                liftBoundVariables(localBinders[b].type, lift, 0);
+            if (structurallyEqual(binderTypeInScope,
+                                    requestedTypeClosed)) {
+                if (matchIndex == -1) {
+                    matchIndex = b;
+                } else {
+                    duplicateIndex = b;
+                    break;
+                }
+            }
+        }
+        if (matchIndex == -1) {
+            throwElaborate(
+                "given(`"
+                + prettyPrintInLocalScope(
+                      requestedTypeClosed, localBinders)
+                + "`): no in-scope hypothesis matches this "
+                "proposition structurally");
+        }
+        if (duplicateIndex != -1) {
+            throwElaborate(
+                "given(`"
+                + prettyPrintInLocalScope(
+                      requestedTypeClosed, localBinders)
+                + "`): proposition is ambiguous — at least two "
+                "in-scope hypotheses have this type ('"
+                + localBinders[matchIndex].name
+                + "' and '"
+                + localBinders[duplicateIndex].name
+                + "'); name one of them explicitly");
+        }
+        return makeBoundVariable(N - 1 - matchIndex);
     }
 
     // Step 4 of the structured-proof feature. Elaborates
