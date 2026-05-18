@@ -1398,6 +1398,15 @@ private:
             Token ringToken = consumeAny();
             return makeSurfaceRing(ringToken.line, ringToken.column);
         }
+        // `claim` at expression position starts a structured proof.
+        // Checked BEFORE isIdentifierLike, because `claim` is a
+        // contextual keyword (and so would otherwise be treated as a
+        // bare identifier). Block-statement `claim NAME : T [by V];`
+        // is parsed earlier via parseBlockContents and never reaches
+        // here, so the two forms don't collide.
+        if (current.kind == TokenKind::KeywordClaim) {
+            return parseStructuredClaim();
+        }
         if (isIdentifierLike(current.kind)) {
             return parseQualifiedIdentifier();
         }
@@ -1668,6 +1677,80 @@ private:
         return makeSurfaceCalc(std::move(initialExpression),
                                 std::move(steps),
                                 calcToken.line, calcToken.column);
+    }
+
+    // Structured-proof `claim` at expression position. Forms:
+    //   `claim P`                       — prove P by library lookup
+    //   `claim P by Hint`               — prove P from Hint, auto-fill args
+    //   `claim P { in (A): body  in (B): body … }`
+    //                                   — case-split on P (a disjunction)
+    //   `claim by Hint`                 — terminal: discharge current goal
+    //   `claim`                         — terminal: discharge by lookup
+    // Coexists with block-statement `claim NAME : TYPE [by V];` — that
+    // form is handled by parseBlockContents and never reaches here.
+    // Labels (e.g. `(*)`) are a planned later addition.
+    SurfaceExpressionPointer parseStructuredClaim() {
+        Token claimToken = consumeAny();  // 'claim'
+        SurfaceExpressionPointer proposition;
+        SurfaceExpressionPointer byHint;
+        std::vector<SurfaceStructuredClaimArm> arms;
+        // Bare `claim` / `claim by Hint` — terminal, no proposition.
+        if (peek().kind != TokenKind::KeywordBy
+            && !isStructuredClaimTerminator()) {
+            proposition = parseExpression();
+        }
+        if (peek().kind == TokenKind::KeywordBy) {
+            consumeAny();  // 'by'
+            byHint = parseExpression();
+        }
+        if (peek().kind == TokenKind::LeftBrace) {
+            consumeAny();  // '{'
+            while (peek().kind == TokenKind::KeywordIn) {
+                arms.push_back(parseStructuredClaimArm());
+            }
+            expect(TokenKind::RightBrace, "ending claim arms block");
+        }
+        return makeSurfaceStructuredClaim(
+            std::move(proposition), /*label=*/"",
+            std::move(byHint), std::move(arms),
+            claimToken.line, claimToken.column);
+    }
+
+    // True if the next token can only end a bare `claim` (no
+    // proposition). Used to decide whether `claim` is bare or
+    // followed by a proposition expression. Covers block / file
+    // boundaries and `in` (which always introduces a sibling arm,
+    // never an expression).
+    bool isStructuredClaimTerminator() {
+        TokenKind k = peek().kind;
+        return k == TokenKind::Semicolon
+            || k == TokenKind::RightBrace
+            || k == TokenKind::EndOfFile
+            || k == TokenKind::KeywordIn
+            || k == TokenKind::KeywordTheorem
+            || k == TokenKind::KeywordDefinition
+            || k == TokenKind::KeywordAxiom
+            || k == TokenKind::KeywordInductive
+            || k == TokenKind::KeywordImport
+            || k == TokenKind::KeywordModule;
+    }
+
+    // `in (Proposition): body` — one arm of a structured claim with
+    // disjunctive proposition.
+    SurfaceStructuredClaimArm parseStructuredClaimArm() {
+        Token inToken = consumeAny();  // 'in'
+        expect(TokenKind::LeftParen, "after 'in'");
+        auto disjunctType = parseExpression();
+        expect(TokenKind::RightParen,
+               "after disjunct type in 'in (T):'");
+        expect(TokenKind::Colon, "after arm header");
+        auto body = parseExpression();
+        SurfaceStructuredClaimArm arm;
+        arm.disjunctType = std::move(disjunctType);
+        arm.body = std::move(body);
+        arm.line = inToken.line;
+        arm.column = inToken.column;
+        return arm;
     }
 
     // `by_cases on E { case P: body; … }`, or

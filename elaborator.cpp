@@ -3171,6 +3171,14 @@ private:
                 *byInductionUsing, localBinders, expectedType,
                 expression.line, expression.column);
         }
+        if (std::get_if<SurfaceStructuredClaim>(&expression.node)) {
+            // Step 1 — parser scaffolding only; real elaboration lands
+            // in Step 2. For now we fall through to `sorry` so test
+            // files exercising the parser path can compile and the
+            // build log surfaces the unresolved-claim warning.
+            return elaborateSorry(localBinders, expectedType,
+                                   expression.line, expression.column);
+        }
         throw ElaborateError("unhandled surface expression variant");
     }
 

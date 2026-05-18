@@ -228,6 +228,38 @@ struct SurfaceCalc {
     std::vector<SurfaceCalcStep> steps;
 };
 
+// One arm of a structured-proof claim with disjunctive proposition.
+// `in (disjunctType) [labeled (*)]: body` opens an arm where `disjunctType`
+// is in scope as an anonymous hypothesis; the arm's body proves the
+// surrounding goal. Stitched together by the elaborator into the
+// recursor application for the claimed disjunction's inductive type
+// (typically `Or.eliminate`).
+struct SurfaceStructuredClaimArm {
+    SurfaceExpressionPointer disjunctType;
+    std::string label;                 // empty if no `labeled (*)`
+    SurfaceExpressionPointer body;
+    int line = 0;
+    int column = 0;
+};
+
+// `claim Proposition [labeled (*)] [by Hint] [{ in (...): body  ... }]`
+// — a structured-proof step in mathematician style. Three modes:
+//   - `claim P by Hint`             : prove P from Hint (auto-fills args).
+//   - `claim P`                     : prove P by library lookup (Q2-ii).
+//   - `claim P { in (A): … in (B): … }`: case-split (P must be A ∨ B …),
+//                                       arms prove the surrounding goal.
+// In the trailing position of a block, the proposition may be omitted —
+// the claim discharges the current goal:
+//   - `claim by Hint`
+//   - `claim` (lookup only)
+// `labeled (*)` lets later steps cite the result by the label.
+struct SurfaceStructuredClaim {
+    SurfaceExpressionPointer proposition;       // null for bare `claim`
+    std::string label;                          // empty if no label
+    SurfaceExpressionPointer byHint;            // null if no `by`
+    std::vector<SurfaceStructuredClaimArm> arms; // empty if no arms
+};
+
 struct SurfaceExpression {
     std::variant<
         SurfaceIdentifier, SurfaceNumericLiteral,
@@ -235,7 +267,8 @@ struct SurfaceExpression {
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer, SurfaceSorry,
-        SurfaceRing, SurfaceCalc, SurfaceByInductionUsing
+        SurfaceRing, SurfaceCalc, SurfaceByInductionUsing,
+        SurfaceStructuredClaim
     > node;
     int line = 0;
     int column = 0;
@@ -370,6 +403,17 @@ inline SurfaceExpressionPointer makeSurfaceByInductionUsing(
                                  std::move(subjectName),
                                  std::move(ihName),
                                  std::move(body)},
+        line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceStructuredClaim(
+    SurfaceExpressionPointer proposition,
+    std::string label,
+    SurfaceExpressionPointer byHint,
+    std::vector<SurfaceStructuredClaimArm> arms,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceStructuredClaim{std::move(proposition), std::move(label),
+                                std::move(byHint), std::move(arms)},
         line, column});
 }
 // Forward-declared above; full SurfaceCasesClause type lives later in
