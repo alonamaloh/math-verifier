@@ -258,6 +258,30 @@ desugarings). Reverted to keep `main` clean; resume when there's
 time to debug the index plumbing.
 
 
+## Mixed-relation `calc` chains
+
+Mathematicians write things like `calc p ≤ p = m` to chain an
+inequality with an equality. Our current `calc` is monomorphic on
+`=`. Generalising is a real but bounded design problem; deferring
+until a motivating example puts pressure on it (the structured-proof
+work absorbs the small `claim p ≤ p` / `claim p ≤ m` chains for now
+via Step 5's transport bridge).
+
+Composition rules to implement when the time comes:
+
+| Proving | Allowed in the chain                  |
+|---------|---------------------------------------|
+| `=`     | `=` only                              |
+| `≤`     | `≤` and `=`                           |
+| `<`     | `<`, `≤`, and `=`                     |
+| `≥`     | `≥` and `=`                           |
+| `>`     | `>`, `≥`, and `=`                     |
+
+(Strict inequality wins over non-strict, like in math.) Each step's
+auto-prover stays the same; the top-level fold picks the right
+composition lemma per relation pair. Likely needs new infrastructure
+for "the strongest relation that bounds this chain so far" tracking.
+
 ## Opportunistic — smaller items
 
 - **`Quotient.lift_two`.** Sketched in `Logic/quotient.math` but
