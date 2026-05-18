@@ -228,15 +228,14 @@ struct SurfaceCalc {
     std::vector<SurfaceCalcStep> steps;
 };
 
-// One arm of a structured-proof claim with disjunctive proposition.
-// `in (disjunctType) [labeled (*)]: body` opens an arm where `disjunctType`
-// is in scope as an anonymous hypothesis; the arm's body proves the
-// surrounding goal. Stitched together by the elaborator into the
-// recursor application for the claimed disjunction's inductive type
-// (typically `Or.eliminate`).
+// One arm of a `claim by cases` block. `in (T) [as name]: body`
+// opens an arm where a hypothesis of type `T` is in scope while the
+// body proves the surrounding goal. `as name` binds the hypothesis
+// under a user-chosen identifier; otherwise it's anonymous and
+// reachable only via `given (T)` or the Step 5 lookup.
 struct SurfaceStructuredClaimArm {
     SurfaceExpressionPointer disjunctType;
-    std::string label;                 // empty if no `labeled (*)`
+    std::string binderName;            // empty if anonymous
     SurfaceExpressionPointer body;
     int line = 0;
     int column = 0;

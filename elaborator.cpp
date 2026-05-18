@@ -3621,6 +3621,9 @@ private:
             } else if (auto* ax = std::get_if<Axiom>(&declaration)) {
                 declarationType = ax->type;
                 universeParamCount = ax->universeParameters.size();
+            } else if (auto* ctor = std::get_if<Constructor>(&declaration)) {
+                declarationType = ctor->type;
+                universeParamCount = ctor->universeParameters.size();
             } else {
                 continue;
             }
@@ -3802,21 +3805,24 @@ private:
             N - 1 - disjBinderIndex);
 
         // Build each arm's lambda. Body is elaborated under
-        // localBinders + anonymous disjunct binder. The goal is
-        // lifted by 1 to account for the extra binder.
+        // localBinders + the disjunct hypothesis. The hypothesis
+        // takes the user-supplied `as name` if present, else
+        // `_disjunct_hypothesis` (reachable via `given (P)` /
+        // library lookup). The goal is lifted by 1 to account for
+        // the extra binder.
         ExpressionPointer goalLifted =
             liftBoundVariables(goalClosed, 1, 0);
         auto buildArmLambda =
             [&](size_t index, ExpressionPointer domain)
                 -> ExpressionPointer {
+            const SurfaceStructuredClaimArm& arm = claim.arms[index];
+            std::string binderName = arm.binderName.empty()
+                ? "_disjunct_hypothesis" : arm.binderName;
             std::vector<LocalBinder> extendedBinders = localBinders;
-            extendedBinders.push_back(
-                {"_disjunct_hypothesis", domain});
+            extendedBinders.push_back({binderName, domain});
             ExpressionPointer body = elaborateExpression(
-                *claim.arms[index].body, extendedBinders,
-                goalLifted);
-            return makeLambda(
-                "_disjunct_hypothesis", domain, body);
+                *arm.body, extendedBinders, goalLifted);
+            return makeLambda(binderName, domain, body);
         };
         ExpressionPointer leftLambda = buildArmLambda(0, leftDisjunct);
         ExpressionPointer rightLambda = buildArmLambda(1, rightDisjunct);

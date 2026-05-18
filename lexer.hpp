@@ -44,6 +44,7 @@ enum class TokenKind {
     KeywordRing,            // `ring` — commutative-ring decision tactic
     KeywordConvention,      // `convention p : T with H` — name-bound implicit binder
     KeywordGiven,           // `given (P)` — look up the in-scope hypothesis of type P
+    KeywordAs,              // `in (P) as h:` — name the arm's disjunct hypothesis
 
     // Punctuation
     LeftParen, RightParen,

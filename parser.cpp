@@ -1792,18 +1792,31 @@ private:
                                  givenToken.line, givenToken.column);
     }
 
-    // `in (Proposition): body` — one arm of a structured claim with
-    // disjunctive proposition.
+    // `in (Proposition) [as name]: body` — one arm of a `claim by
+    // cases` block. The optional `as name` lets the user bind the
+    // disjunct hypothesis under an identifier (matching how legacy
+    // `function (h : T) =>` handlers named their inputs); without
+    // `as` the hypothesis is anonymous and reachable only via
+    // `given (P)` or Step 5's lookup.
     SurfaceStructuredClaimArm parseStructuredClaimArm() {
         Token inToken = consumeAny();  // 'in'
         expect(TokenKind::LeftParen, "after 'in'");
         auto disjunctType = parseExpression();
         expect(TokenKind::RightParen,
-               "after disjunct type in 'in (T):'");
+               "after disjunct type in 'in (T) …'");
+        std::string binderName;
+        if (peek().kind == TokenKind::KeywordAs) {
+            consumeAny();  // 'as'
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected an identifier after 'as'");
+            }
+            binderName = consumeAny().lexeme;
+        }
         expect(TokenKind::Colon, "after arm header");
         auto body = parseExpression();
         SurfaceStructuredClaimArm arm;
         arm.disjunctType = std::move(disjunctType);
+        arm.binderName = std::move(binderName);
         arm.body = std::move(body);
         arm.line = inToken.line;
         arm.column = inToken.column;

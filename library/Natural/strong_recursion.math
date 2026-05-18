@@ -189,25 +189,20 @@ theorem Natural.less_or_equal_zero_implies_equals_zero (q : Natural)
                 existsProof),
         LessOrEqual.invert(q, zero, quotientLessOrEqualZero))
 
--- Inversion of `successor(p) ≤ successor(otherPredecessor)`: yields `p ≤ otherPredecessor`. Combines
--- le_succ_succ_inversion with le_predecessor_le.
-theorem Natural.less_or_equal_successor_successor_descend (p otherPredecessor : Natural)
-        : successor(p) ≤ successor(otherPredecessor)
-          → p ≤ otherPredecessor :=
-  function (successorLessOrEqual : successor(p) ≤ successor(otherPredecessor)) =>
-    Or.eliminate(
-        p = otherPredecessor,
-        successor(p) ≤ otherPredecessor,
-        p ≤ otherPredecessor,
-        function (equality : p = otherPredecessor) =>
-            Equality.transport_proposition(
-                Natural,
-                function (rightEnd : Natural) => p ≤ rightEnd,
-                p, otherPredecessor, equality,
-                LessOrEqual.reflexivity(p)),
-        function (successorPLessOrEqualOtherPredecessor : successor(p) ≤ otherPredecessor) =>
-            Natural.less_or_equal_predecessor_less_or_equal(p, otherPredecessor, successorPLessOrEqualOtherPredecessor),
-        Natural.less_or_equal_successor_successor_inversion(p, otherPredecessor, successorLessOrEqual))
+-- Inversion of `successor(p) ≤ successor(otherPredecessor)`: yields
+-- `p ≤ otherPredecessor`. Combines le_succ_succ_inversion with
+-- le_predecessor_le. Structured-proof form: the inversion lemma is
+-- found by Or-shape lookup; both arms close via library scan plus
+-- (in the equality arm) a transport-via-equality bridge.
+theorem Natural.less_or_equal_successor_successor_descend
+        (p otherPredecessor : Natural)
+        (succP_le_succM : successor(p) ≤ successor(otherPredecessor))
+        : p ≤ otherPredecessor :=
+  claim (p = otherPredecessor) ∨ (successor(p) ≤ otherPredecessor)
+  claim by cases {
+    in (p = otherPredecessor):              claim
+    in (successor(p) ≤ otherPredecessor):   claim
+  }
 
 -- Strong induction: combine for_all_below with the step at level n.
 theorem Natural.strong_induction
