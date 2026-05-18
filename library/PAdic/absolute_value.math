@@ -391,208 +391,165 @@ theorem Rational.padic_absolute_value_respect
                  by Rational.padic_cross_mult_natural_absolute_value(
                         n1, n2, d1, d2, cross);
                -- with-pattern on |n1| and |n2|.
-               (function (absN1 : Natural)
-                         (eqAbs1Outer
-                             : Integer.absolute_value_natural(n1) = absN1) =>
-                  (function (absN2 : Natural)
-                            (eqAbs2Outer
-                                : Integer.absolute_value_natural(n2) = absN2) =>
-                     (cases absN1 {
-                        | zero =>
-                            function (eqAbs1
-                                        : Integer.absolute_value_natural(n1)
-                                          = zero) =>
-                              (cases absN2 {
-                                 | zero =>
-                                     function (eqAbs2
-                                                 : Integer.absolute_value_natural(n2)
-                                                   = zero) =>
-                                       Equality.transitivity(
-                                           Rational.padic_absolute_value_at_zero(
-                                               p, n1, d1, eqAbs1),
-                                           Equality.symmetry(
-                                               Rational.padic_absolute_value_at_zero(
-                                                   p, n2, d2, eqAbs2)))
-                                 | successor(k2) =>
-                                     function (eqAbs2
-                                                 : Integer.absolute_value_natural(n2)
-                                                   = successor(k2)) => {
-                                       claim contradEq
-                                             : zero
-                                               = successor(k2) * successor(d1)
-                                         by Equality.transitivity(
-                                                Equality.symmetry(
-                                                    Natural.zero_multiply(
-                                                        successor(d2))),
-                                                Equality.transport_proposition(
-                                                    Natural,
-                                                    function (m : Natural) =>
-                                                        zero * successor(d2)
-                                                          = m * successor(d1),
-                                                    Integer.absolute_value_natural(n2),
-                                                    successor(k2),
-                                                    eqAbs2,
-                                                    Equality.transport_proposition(
-                                                        Natural,
-                                                        function (m : Natural) =>
-                                                            m * successor(d2)
-                                                              = Integer.absolute_value_natural(n2)
-                                                                  * successor(d1),
-                                                        Integer.absolute_value_natural(n1),
-                                                        zero,
-                                                        eqAbs1,
-                                                        naturalCross)));
-                                       -- The above derives:
-                                       -- zero = succ(k2) * succ(d1), and
-                                       -- succ(k2) * succ(d1) reduces to
-                                       -- succ(d1 + k2 * succ(d1)).
-                                       False.eliminate_proposition(
-                                           Rational.padic_absolute_value_at_representative(
-                                               p,
-                                               RationalRepresentative.make(n1, d1))
-                                             = Rational.padic_absolute_value_at_representative(
-                                                   p,
-                                                   RationalRepresentative.make(n2, d2)),
-                                           Natural.zero_not_successor(
-                                               d1 + k2 * successor(d1),
-                                               contradEq))
-                                     }
-                               } : Integer.absolute_value_natural(n2) = absN2
-                                   → Rational.padic_absolute_value_at_representative(
-                                         p, RationalRepresentative.make(n1, d1))
-                                     = Rational.padic_absolute_value_at_representative(
-                                           p, RationalRepresentative.make(n2, d2)))(
-                                eqAbs2Outer)
-                        | successor(k1) =>
-                            function (eqAbs1
-                                        : Integer.absolute_value_natural(n1)
-                                          = successor(k1)) =>
-                              (cases absN2 {
-                                 | zero =>
-                                     function (eqAbs2
-                                                 : Integer.absolute_value_natural(n2)
-                                                   = zero) => {
-                                       claim contradEq
-                                             : successor(k1) * successor(d2)
-                                               = zero
-                                         by Equality.transitivity(
-                                                Equality.transport_proposition(
-                                                    Natural,
-                                                    function (m : Natural) =>
-                                                        m * successor(d2)
-                                                          = zero * successor(d1),
-                                                    Integer.absolute_value_natural(n1),
-                                                    successor(k1),
-                                                    eqAbs1,
-                                                    Equality.transport_proposition(
-                                                        Natural,
-                                                        function (m : Natural) =>
-                                                            Integer.absolute_value_natural(n1)
-                                                              * successor(d2)
-                                                              = m * successor(d1),
-                                                        Integer.absolute_value_natural(n2),
-                                                        zero,
-                                                        eqAbs2,
-                                                        naturalCross)),
-                                                Natural.zero_multiply(
-                                                    successor(d1)));
-                                       False.eliminate_proposition(
-                                           Rational.padic_absolute_value_at_representative(
-                                               p,
-                                               RationalRepresentative.make(n1, d1))
-                                             = Rational.padic_absolute_value_at_representative(
-                                                   p,
-                                                   RationalRepresentative.make(n2, d2)),
-                                           Natural.zero_not_successor(
-                                               d2 + k1 * successor(d2),
-                                               Equality.symmetry(contradEq)))
-                                     }
-                                 | successor(k2) =>
-                                     function (eqAbs2
-                                                 : Integer.absolute_value_natural(n2)
-                                                   = successor(k2)) => {
-                                       -- Substitute into naturalCross to get
-                                       --   succ(k1) * succ(d2) = succ(k2) * succ(d1).
-                                       claim crossSubst
-                                             : successor(k1) * successor(d2)
-                                               = successor(k2) * successor(d1)
-                                         by Equality.transport_proposition(
-                                                Natural,
-                                                function (m : Natural) =>
-                                                    m * successor(d2)
-                                                      = successor(k2)
+               cases Integer.absolute_value_natural(n1) with eqAbs1 {
+                  | zero =>
+                      cases Integer.absolute_value_natural(n2) with eqAbs2 {
+                         | zero =>
+                             Equality.transitivity(
+                                 Rational.padic_absolute_value_at_zero(
+                                     p, n1, d1, eqAbs1),
+                                 Equality.symmetry(
+                                     Rational.padic_absolute_value_at_zero(
+                                         p, n2, d2, eqAbs2)))
+                         | successor(k2) => {
+                             claim contradEq
+                                   : zero
+                                     = successor(k2) * successor(d1)
+                               by Equality.transitivity(
+                                      Equality.symmetry(
+                                          Natural.zero_multiply(
+                                              successor(d2))),
+                                      Equality.transport_proposition(
+                                          Natural,
+                                          function (m : Natural) =>
+                                              zero * successor(d2)
+                                                = m * successor(d1),
+                                          Integer.absolute_value_natural(n2),
+                                          successor(k2),
+                                          eqAbs2,
+                                          Equality.transport_proposition(
+                                              Natural,
+                                              function (m : Natural) =>
+                                                  m * successor(d2)
+                                                    = Integer.absolute_value_natural(n2)
                                                         * successor(d1),
-                                                Integer.absolute_value_natural(n1),
-                                                successor(k1),
-                                                eqAbs1,
-                                                Equality.transport_proposition(
-                                                    Natural,
-                                                    function (m : Natural) =>
-                                                        Integer.absolute_value_natural(n1)
-                                                          * successor(d2)
-                                                          = m * successor(d1),
-                                                    Integer.absolute_value_natural(n2),
-                                                    successor(k2),
-                                                    eqAbs2,
-                                                    naturalCross));
-                                       -- Reorganise via commutativity to
-                                       --   succ(d1) * succ(k2) = succ(d2) * succ(k1).
-                                       claim succCross
-                                             : successor(d1) * successor(k2)
-                                               = successor(d2) * successor(k1)
-                                         by calc successor(d1) * successor(k2)
-                                              = successor(k2) * successor(d1)
-                                              = successor(k1) * successor(d2)
-                                              = successor(d2) * successor(k1);
-                                       Equality.transitivity(
-                                           Rational.padic_absolute_value_at_succ(
-                                               p, n1, d1, k1, eqAbs1),
-                                           Equality.transitivity(
-                                               Quotient.sound(
-                                                   RationalRepresentative.make(
-                                                       (Natural.power(
-                                                            Natural.padic_valuation(
-                                                                p, successor(d1)), p)
-                                                            : Integer),
-                                                       Natural.monus(
-                                                           Natural.power(
-                                                               Natural.padic_valuation(
-                                                                   p, successor(k1)), p),
-                                                           successor(zero))),
-                                                   RationalRepresentative.make(
-                                                       (Natural.power(
-                                                            Natural.padic_valuation(
-                                                                p, successor(d2)), p)
-                                                            : Integer),
-                                                       Natural.monus(
-                                                           Natural.power(
-                                                               Natural.padic_valuation(
-                                                                   p, successor(k2)), p),
-                                                           successor(zero))),
-                                                   Rational.padic_quotient_cross_equation(
-                                                       p, primality,
-                                                       d1, d2, k1, k2,
-                                                       succCross)),
-                                               Equality.symmetry(
-                                                   Rational.padic_absolute_value_at_succ(
-                                                       p, n2, d2, k2, eqAbs2))))
-                                     }
-                               } : Integer.absolute_value_natural(n2) = absN2
-                                   → Rational.padic_absolute_value_at_representative(
-                                         p, RationalRepresentative.make(n1, d1))
-                                     = Rational.padic_absolute_value_at_representative(
-                                           p, RationalRepresentative.make(n2, d2)))(
-                                eqAbs2Outer)
-                      } : Integer.absolute_value_natural(n1) = absN1
-                          → Rational.padic_absolute_value_at_representative(
-                                p, RationalRepresentative.make(n1, d1))
-                            = Rational.padic_absolute_value_at_representative(
-                                  p, RationalRepresentative.make(n2, d2)))(
-                       eqAbs1Outer)
-                   )(Integer.absolute_value_natural(n2),
-                     reflexivity(Natural, Integer.absolute_value_natural(n2)))
-                )(Integer.absolute_value_natural(n1),
-                  reflexivity(Natural, Integer.absolute_value_natural(n1)))
+                                              Integer.absolute_value_natural(n1),
+                                              zero,
+                                              eqAbs1,
+                                              naturalCross)));
+                             -- The above derives:
+                             -- zero = succ(k2) * succ(d1), and
+                             -- succ(k2) * succ(d1) reduces to
+                             -- succ(d1 + k2 * succ(d1)).
+                             False.eliminate_proposition(
+                                 Rational.padic_absolute_value_at_representative(
+                                     p,
+                                     RationalRepresentative.make(n1, d1))
+                                   = Rational.padic_absolute_value_at_representative(
+                                         p,
+                                         RationalRepresentative.make(n2, d2)),
+                                 Natural.zero_not_successor(
+                                     d1 + k2 * successor(d1),
+                                     contradEq))
+                           }
+                       }
+                  | successor(k1) =>
+                      cases Integer.absolute_value_natural(n2) with eqAbs2 {
+                         | zero => {
+                             claim contradEq
+                                   : successor(k1) * successor(d2)
+                                     = zero
+                               by Equality.transitivity(
+                                      Equality.transport_proposition(
+                                          Natural,
+                                          function (m : Natural) =>
+                                              m * successor(d2)
+                                                = zero * successor(d1),
+                                          Integer.absolute_value_natural(n1),
+                                          successor(k1),
+                                          eqAbs1,
+                                          Equality.transport_proposition(
+                                              Natural,
+                                              function (m : Natural) =>
+                                                  Integer.absolute_value_natural(n1)
+                                                    * successor(d2)
+                                                    = m * successor(d1),
+                                              Integer.absolute_value_natural(n2),
+                                              zero,
+                                              eqAbs2,
+                                              naturalCross)),
+                                      Natural.zero_multiply(
+                                          successor(d1)));
+                             False.eliminate_proposition(
+                                 Rational.padic_absolute_value_at_representative(
+                                     p,
+                                     RationalRepresentative.make(n1, d1))
+                                   = Rational.padic_absolute_value_at_representative(
+                                         p,
+                                         RationalRepresentative.make(n2, d2)),
+                                 Natural.zero_not_successor(
+                                     d2 + k1 * successor(d2),
+                                     Equality.symmetry(contradEq)))
+                           }
+                         | successor(k2) => {
+                             -- Substitute into naturalCross to get
+                             --   succ(k1) * succ(d2) = succ(k2) * succ(d1).
+                             claim crossSubst
+                                   : successor(k1) * successor(d2)
+                                     = successor(k2) * successor(d1)
+                               by Equality.transport_proposition(
+                                      Natural,
+                                      function (m : Natural) =>
+                                          m * successor(d2)
+                                            = successor(k2)
+                                              * successor(d1),
+                                      Integer.absolute_value_natural(n1),
+                                      successor(k1),
+                                      eqAbs1,
+                                      Equality.transport_proposition(
+                                          Natural,
+                                          function (m : Natural) =>
+                                              Integer.absolute_value_natural(n1)
+                                                * successor(d2)
+                                                = m * successor(d1),
+                                          Integer.absolute_value_natural(n2),
+                                          successor(k2),
+                                          eqAbs2,
+                                          naturalCross));
+                             -- Reorganise via commutativity to
+                             --   succ(d1) * succ(k2) = succ(d2) * succ(k1).
+                             claim succCross
+                                   : successor(d1) * successor(k2)
+                                     = successor(d2) * successor(k1)
+                               by calc successor(d1) * successor(k2)
+                                    = successor(k2) * successor(d1)
+                                    = successor(k1) * successor(d2)
+                                    = successor(d2) * successor(k1);
+                             Equality.transitivity(
+                                 Rational.padic_absolute_value_at_succ(
+                                     p, n1, d1, k1, eqAbs1),
+                                 Equality.transitivity(
+                                     Quotient.sound(
+                                         RationalRepresentative.make(
+                                             (Natural.power(
+                                                  Natural.padic_valuation(
+                                                      p, successor(d1)), p)
+                                                  : Integer),
+                                             Natural.monus(
+                                                 Natural.power(
+                                                     Natural.padic_valuation(
+                                                         p, successor(k1)), p),
+                                                 successor(zero))),
+                                         RationalRepresentative.make(
+                                             (Natural.power(
+                                                  Natural.padic_valuation(
+                                                      p, successor(d2)), p)
+                                                  : Integer),
+                                             Natural.monus(
+                                                 Natural.power(
+                                                     Natural.padic_valuation(
+                                                         p, successor(k2)), p),
+                                                 successor(zero))),
+                                         Rational.padic_quotient_cross_equation(
+                                             p, primality,
+                                             d1, d2, k1, k2,
+                                             succCross)),
+                                     Equality.symmetry(
+                                         Rational.padic_absolute_value_at_succ(
+                                             p, n2, d2, k2, eqAbs2))))
+                           }
+                       }
+                }
              }
           } : (refinedEquiv :
                    RationalEquivalent(
@@ -631,75 +588,59 @@ theorem Rational.padic_absolute_value_nonneg
       function (rep : RationalRepresentative) =>
           (cases rep {
              | RationalRepresentative.make(n, d) =>
-                 (function (absN : Natural)
-                           (eqAbsOuter :
-                               Integer.absolute_value_natural(n) = absN) =>
-                    (cases absN {
-                       | zero =>
-                           function (eqAbs
-                                       : Integer.absolute_value_natural(n)
-                                         = zero) =>
-                             Equality.transport_proposition(
-                                 Rational,
-                                 function (r : Rational) =>
-                                     Rational.zero ≤ r,
-                                 Rational.zero,
-                                 Rational.padic_absolute_value_at_representative(
-                                     p,
-                                     RationalRepresentative.make(n, d)),
-                                 Equality.symmetry(
-                                     Rational.padic_absolute_value_at_zero(
-                                         p, n, d, eqAbs)),
-                                 Rational.LessOrEqual.reflexive(
-                                     Rational.zero))
-                       | successor(k) =>
-                           function (eqAbs
-                                       : Integer.absolute_value_natural(n)
-                                         = successor(k)) =>
-                             Equality.transport_proposition(
-                                 Rational,
-                                 function (r : Rational) =>
-                                     Rational.zero ≤ r,
-                                 Quotient.mk(RationalRepresentative, RationalEquivalent,
-                                             RationalRepresentative.make(
-                                         (Natural.power(
-                                              Natural.padic_valuation(
-                                                  p, successor(d)), p)
-                                              : Integer),
-                                         Natural.monus(
-                                             Natural.power(
-                                                 Natural.padic_valuation(
-                                                     p, successor(k)), p),
-                                             successor(zero)))),
-                                 Rational.padic_absolute_value_at_representative(
-                                     p,
-                                     RationalRepresentative.make(n, d)),
-                                 Equality.symmetry(
-                                     Rational.padic_absolute_value_at_succ(
-                                         p, n, d, k, eqAbs)),
-                                 Rational.LessOrEqual_zero_of_IsNonneg(
-                                     Quotient.mk(RationalRepresentative.make(
-                                             (Natural.power(
-                                                  Natural.padic_valuation(
-                                                      p, successor(d)), p)
-                                                  : Integer),
-                                             Natural.monus(
-                                                 Natural.power(
-                                                     Natural.padic_valuation(
-                                                         p, successor(k)), p),
-                                                 successor(zero)))),
-                                     Integer.from_natural_is_nonneg(
-                                         Natural.power(
+                 cases Integer.absolute_value_natural(n) with eqAbs {
+                    | zero =>
+                        Equality.transport_proposition(
+                            Rational,
+                            function (r : Rational) =>
+                                Rational.zero ≤ r,
+                            Rational.zero,
+                            Rational.padic_absolute_value_at_representative(
+                                p,
+                                RationalRepresentative.make(n, d)),
+                            Equality.symmetry(
+                                Rational.padic_absolute_value_at_zero(
+                                    p, n, d, eqAbs)),
+                            Rational.LessOrEqual.reflexive(
+                                Rational.zero))
+                    | successor(k) =>
+                        Equality.transport_proposition(
+                            Rational,
+                            function (r : Rational) =>
+                                Rational.zero ≤ r,
+                            Quotient.mk(RationalRepresentative, RationalEquivalent,
+                                        RationalRepresentative.make(
+                                    (Natural.power(
+                                         Natural.padic_valuation(
+                                             p, successor(d)), p)
+                                         : Integer),
+                                    Natural.monus(
+                                        Natural.power(
+                                            Natural.padic_valuation(
+                                                p, successor(k)), p),
+                                        successor(zero)))),
+                            Rational.padic_absolute_value_at_representative(
+                                p,
+                                RationalRepresentative.make(n, d)),
+                            Equality.symmetry(
+                                Rational.padic_absolute_value_at_succ(
+                                    p, n, d, k, eqAbs)),
+                            Rational.LessOrEqual_zero_of_IsNonneg(
+                                Quotient.mk(RationalRepresentative.make(
+                                        (Natural.power(
                                              Natural.padic_valuation(
-                                                 p, successor(d)), p))))
-                     } : Integer.absolute_value_natural(n) = absN
-                         → Rational.zero
-                           ≤ Rational.padic_absolute_value_at_representative(
-                                 p,
-                                 RationalRepresentative.make(n, d)))(
-                      eqAbsOuter)
-                  )(Integer.absolute_value_natural(n),
-                    reflexivity(Natural, Integer.absolute_value_natural(n)))
+                                                 p, successor(d)), p)
+                                             : Integer),
+                                        Natural.monus(
+                                            Natural.power(
+                                                Natural.padic_valuation(
+                                                    p, successor(k)), p),
+                                            successor(zero)))),
+                                Integer.from_natural_is_nonneg(
+                                    Natural.power(
+                                        Natural.padic_valuation(
+                                            p, successor(d)), p))))
+                 }
            } : Rational.zero
                ≤ Rational.padic_absolute_value_at_representative(p, rep)),
       q)
@@ -1033,159 +974,141 @@ theorem Rational.padic_absolute_value_multiplicative
                (cases rep_y {
                   | RationalRepresentative.make(ny, dy) => {
                       -- With-pattern on |nx| and |ny|.
-                      (function (absNx : Natural)
-                                (eqAbsNxOuter
-                                    : Integer.absolute_value_natural(nx) = absNx) =>
-                         (function (absNy : Natural)
-                                   (eqAbsNyOuter
-                                       : Integer.absolute_value_natural(ny) = absNy) =>
-                            (cases absNx {
-                               | zero =>
-                                   function (eqAbsNx
-                                               : Integer.absolute_value_natural(nx)
-                                                 = zero) => {
-                                     -- |nx*ny| = |nx| * |ny| = 0 * |ny| = 0.
-                                     claim productAbsZero
-                                           : Integer.absolute_value_natural(nx * ny)
-                                             = zero
-                                       by Equality.transitivity(
-                                              Integer.absolute_value_natural_multiplicative(
-                                                  nx, ny),
-                                              Equality.transitivity(
-                                                  congruenceOf(
-                                                      function (m : Natural) =>
-                                                          m
-                                                          * Integer.absolute_value_natural(
-                                                                ny),
-                                                      eqAbsNx),
-                                                  Natural.zero_multiply(
-                                                      Integer.absolute_value_natural(ny))));
-                                     calc Rational.padic_absolute_value_at_representative(
-                                              p,
-                                              RationalRepresentative.make(
-                                                  nx * ny,
-                                                  dy + dx * successor(dy)))
-                                        = Rational.zero
-                                               by Rational.padic_absolute_value_at_zero(
-                                                      p, nx * ny,
-                                                      dy + dx * successor(dy),
-                                                      productAbsZero)
-                                        = Rational.zero
-                                          * Rational.padic_absolute_value_at_representative(
-                                                p,
-                                                RationalRepresentative.make(ny, dy))
-                                               by Equality.symmetry(
-                                                      Rational.zero_multiply(
-                                                          Rational.padic_absolute_value_at_representative(
-                                                              p,
-                                                              RationalRepresentative.make(
-                                                                  ny, dy))))
-                                        = Rational.padic_absolute_value_at_representative(
-                                              p,
-                                              RationalRepresentative.make(nx, dx))
-                                          * Rational.padic_absolute_value_at_representative(
-                                                p,
-                                                RationalRepresentative.make(ny, dy))
-                                               by congruenceOf(
-                                                      function (m : Rational) =>
-                                                          m
-                                                          * Rational.padic_absolute_value_at_representative(
-                                                                p,
-                                                                RationalRepresentative.make(
-                                                                    ny, dy)),
-                                                      Equality.symmetry(
-                                                          Rational.padic_absolute_value_at_zero(
-                                                              p, nx, dx, eqAbsNx)))
-                                   }
-                               | successor(kx) =>
-                                   function (eqAbsNx
-                                               : Integer.absolute_value_natural(nx)
-                                                 = successor(kx)) =>
-                                     (cases absNy {
-                                        | zero =>
-                                            function (eqAbsNy
-                                                        : Integer.absolute_value_natural(ny)
-                                                          = zero) => {
-                                              -- |nx*ny| = |nx| * |ny| = succ(kx) * 0 = 0.
-                                              claim productAbsZero
-                                                    : Integer.absolute_value_natural(
-                                                          nx * ny)
-                                                      = zero
-                                                by Equality.transitivity(
-                                                       Integer.absolute_value_natural_multiplicative(
-                                                           nx, ny),
-                                                       Equality.transitivity(
-                                                           congruenceOf(
-                                                               function (m : Natural) =>
-                                                                   Integer.absolute_value_natural(
-                                                                       nx)
-                                                                   * m,
-                                                               eqAbsNy),
-                                                           Natural.multiply_zero(
-                                                               Integer.absolute_value_natural(
-                                                                   nx))));
-                                              calc Rational.padic_absolute_value_at_representative(
-                                                       p,
-                                                       RationalRepresentative.make(
-                                                           nx * ny,
-                                                           dy + dx * successor(dy)))
-                                                 = Rational.zero
-                                                        by Rational.padic_absolute_value_at_zero(
-                                                               p, nx * ny,
-                                                               dy + dx * successor(dy),
-                                                               productAbsZero)
-                                                 = Rational.padic_absolute_value_at_representative(
-                                                       p,
-                                                       RationalRepresentative.make(nx, dx))
-                                                   * Rational.zero
-                                                        by Equality.symmetry(
-                                                               Rational.multiply_zero(
-                                                                   Rational.padic_absolute_value_at_representative(
-                                                                       p,
-                                                                       RationalRepresentative.make(
-                                                                           nx, dx))))
-                                                 = Rational.padic_absolute_value_at_representative(
-                                                       p,
-                                                       RationalRepresentative.make(nx, dx))
-                                                   * Rational.padic_absolute_value_at_representative(
-                                                         p,
-                                                         RationalRepresentative.make(
-                                                             ny, dy))
-                                                        by congruenceOf(
-                                                               function (m : Rational) =>
-                                                                   Rational.padic_absolute_value_at_representative(
-                                                                       p,
-                                                                       RationalRepresentative.make(
-                                                                           nx, dx))
-                                                                   * m,
-                                                               Equality.symmetry(
-                                                                   Rational.padic_absolute_value_at_zero(
-                                                                       p, ny, dy, eqAbsNy)))
-                                            }
-                                        | successor(ky) =>
-                                            function (eqAbsNy
-                                                        : Integer.absolute_value_natural(ny)
-                                                          = successor(ky)) => {
-                                              -- |nx*ny| = |nx|*|ny| = succ(kx)*succ(ky)
-                                              -- = succ(ky + kx*succ(ky)) (by kernel reduction).
-                                              claim productAbsSucc
-                                                    : Integer.absolute_value_natural(
-                                                          nx * ny)
-                                                      = successor(ky + kx * successor(ky))
-                                                by Equality.transitivity(
-                                                       Integer.absolute_value_natural_multiplicative(
-                                                           nx, ny),
-                                                       Equality.transitivity(
-                                                           congruenceOf(
-                                                               function (m : Natural) =>
-                                                                   m
-                                                                   * Integer.absolute_value_natural(
-                                                                         ny),
-                                                               eqAbsNx),
-                                                           congruenceOf(
-                                                               function (m : Natural) =>
-                                                                   successor(kx) * m,
-                                                               eqAbsNy)));
+                      cases Integer.absolute_value_natural(nx) with eqAbsNx {
+                         | zero => {
+                             -- |nx*ny| = |nx| * |ny| = 0 * |ny| = 0.
+                             claim productAbsZero
+                                   : Integer.absolute_value_natural(nx * ny)
+                                     = zero
+                               by Equality.transitivity(
+                                      Integer.absolute_value_natural_multiplicative(
+                                          nx, ny),
+                                      Equality.transitivity(
+                                          congruenceOf(
+                                              function (m : Natural) =>
+                                                  m
+                                                  * Integer.absolute_value_natural(
+                                                        ny),
+                                              eqAbsNx),
+                                          Natural.zero_multiply(
+                                              Integer.absolute_value_natural(ny))));
+                             calc Rational.padic_absolute_value_at_representative(
+                                      p,
+                                      RationalRepresentative.make(
+                                          nx * ny,
+                                          dy + dx * successor(dy)))
+                                = Rational.zero
+                                       by Rational.padic_absolute_value_at_zero(
+                                              p, nx * ny,
+                                              dy + dx * successor(dy),
+                                              productAbsZero)
+                                = Rational.zero
+                                  * Rational.padic_absolute_value_at_representative(
+                                        p,
+                                        RationalRepresentative.make(ny, dy))
+                                       by Equality.symmetry(
+                                              Rational.zero_multiply(
+                                                  Rational.padic_absolute_value_at_representative(
+                                                      p,
+                                                      RationalRepresentative.make(
+                                                          ny, dy))))
+                                = Rational.padic_absolute_value_at_representative(
+                                      p,
+                                      RationalRepresentative.make(nx, dx))
+                                  * Rational.padic_absolute_value_at_representative(
+                                        p,
+                                        RationalRepresentative.make(ny, dy))
+                                       by congruenceOf(
+                                              function (m : Rational) =>
+                                                  m
+                                                  * Rational.padic_absolute_value_at_representative(
+                                                        p,
+                                                        RationalRepresentative.make(
+                                                            ny, dy)),
+                                              Equality.symmetry(
+                                                  Rational.padic_absolute_value_at_zero(
+                                                      p, nx, dx, eqAbsNx)))
+                           }
+                         | successor(kx) =>
+                             cases Integer.absolute_value_natural(ny) with eqAbsNy {
+                                | zero => {
+                                    -- |nx*ny| = |nx| * |ny| = succ(kx) * 0 = 0.
+                                    claim productAbsZero
+                                          : Integer.absolute_value_natural(
+                                                nx * ny)
+                                            = zero
+                                      by Equality.transitivity(
+                                             Integer.absolute_value_natural_multiplicative(
+                                                 nx, ny),
+                                             Equality.transitivity(
+                                                 congruenceOf(
+                                                     function (m : Natural) =>
+                                                         Integer.absolute_value_natural(
+                                                             nx)
+                                                         * m,
+                                                     eqAbsNy),
+                                                 Natural.multiply_zero(
+                                                     Integer.absolute_value_natural(
+                                                         nx))));
+                                    calc Rational.padic_absolute_value_at_representative(
+                                             p,
+                                             RationalRepresentative.make(
+                                                 nx * ny,
+                                                 dy + dx * successor(dy)))
+                                       = Rational.zero
+                                              by Rational.padic_absolute_value_at_zero(
+                                                     p, nx * ny,
+                                                     dy + dx * successor(dy),
+                                                     productAbsZero)
+                                       = Rational.padic_absolute_value_at_representative(
+                                             p,
+                                             RationalRepresentative.make(nx, dx))
+                                         * Rational.zero
+                                              by Equality.symmetry(
+                                                     Rational.multiply_zero(
+                                                         Rational.padic_absolute_value_at_representative(
+                                                             p,
+                                                             RationalRepresentative.make(
+                                                                 nx, dx))))
+                                       = Rational.padic_absolute_value_at_representative(
+                                             p,
+                                             RationalRepresentative.make(nx, dx))
+                                         * Rational.padic_absolute_value_at_representative(
+                                               p,
+                                               RationalRepresentative.make(
+                                                   ny, dy))
+                                              by congruenceOf(
+                                                     function (m : Rational) =>
+                                                         Rational.padic_absolute_value_at_representative(
+                                                             p,
+                                                             RationalRepresentative.make(
+                                                                 nx, dx))
+                                                         * m,
+                                                     Equality.symmetry(
+                                                         Rational.padic_absolute_value_at_zero(
+                                                             p, ny, dy, eqAbsNy)))
+                                  }
+                                | successor(ky) => {
+                                    -- |nx*ny| = |nx|*|ny| = succ(kx)*succ(ky)
+                                    -- = succ(ky + kx*succ(ky)) (by kernel reduction).
+                                    claim productAbsSucc
+                                          : Integer.absolute_value_natural(
+                                                nx * ny)
+                                            = successor(ky + kx * successor(ky))
+                                      by Equality.transitivity(
+                                             Integer.absolute_value_natural_multiplicative(
+                                                 nx, ny),
+                                             Equality.transitivity(
+                                                 congruenceOf(
+                                                     function (m : Natural) =>
+                                                         m
+                                                         * Integer.absolute_value_natural(
+                                                               ny),
+                                                     eqAbsNx),
+                                                 congruenceOf(
+                                                     function (m : Natural) =>
+                                                         successor(kx) * m,
+                                                     eqAbsNy)));
                                               calc Rational.padic_absolute_value_at_representative(
                                                        p,
                                                        RationalRepresentative.make(
@@ -1307,39 +1230,9 @@ theorem Rational.padic_absolute_value_multiplicative
                                                                        Rational.padic_absolute_value_at_succ(
                                                                            p, ny, dy, ky,
                                                                            eqAbsNy))))
-                                            }
-                                      } : Integer.absolute_value_natural(ny) = absNy
-                                          → Rational.padic_absolute_value_at_representative(
-                                                p,
-                                                RationalRepresentative.make(
-                                                    nx * ny,
-                                                    dy + dx * successor(dy)))
-                                            = Rational.padic_absolute_value_at_representative(
-                                                  p,
-                                                  RationalRepresentative.make(nx, dx))
-                                              * Rational.padic_absolute_value_at_representative(
-                                                    p,
-                                                    RationalRepresentative.make(ny, dy)))(
-                                       eqAbsNyOuter)
-                             } : Integer.absolute_value_natural(nx) = absNx
-                                 → Rational.padic_absolute_value_at_representative(
-                                       p,
-                                       RationalRepresentative.make(
-                                           nx * ny,
-                                           dy + dx * successor(dy)))
-                                   = Rational.padic_absolute_value_at_representative(
-                                         p,
-                                         RationalRepresentative.make(nx, dx))
-                                     * Rational.padic_absolute_value_at_representative(
-                                           p,
-                                           RationalRepresentative.make(ny, dy)))(
-                              eqAbsNxOuter)
-                          )(Integer.absolute_value_natural(ny),
-                            reflexivity(Natural,
-                                Integer.absolute_value_natural(ny)))
-                       )(Integer.absolute_value_natural(nx),
-                         reflexivity(Natural,
-                             Integer.absolute_value_natural(nx)))
+                                  }
+                              }
+                       }
                     }
                 } : Rational.padic_absolute_value_at_representative(
                         p,
@@ -2620,110 +2513,30 @@ theorem Rational.padic_absolute_value_triangle_at_representatives
               + Rational.padic_absolute_value(
                     p, primality,
                     Quotient.mk(RationalRepresentative.make(ny, dy))) :=
-  (function (absNx : Natural)
-            (eqAbsNxOuter : Integer.absolute_value_natural(nx) = absNx) =>
-     (cases absNx {
-        | zero =>
-            function (eqAbsNxZero : Integer.absolute_value_natural(nx) = zero) =>
-              Rational.padic_absolute_value_triangle_at_reps_when_nx_zero(
-                  p, primality, nx, ny, dx, dy, eqAbsNxZero)
-        | successor(kx) =>
-            function (eqAbsNxSucc
-                          : Integer.absolute_value_natural(nx) = successor(kx)) =>
-              (function (absNy : Natural)
-                        (eqAbsNyOuter
-                            : Integer.absolute_value_natural(ny) = absNy) =>
-                 (cases absNy {
-                    | zero =>
-                        function (eqAbsNyZero
-                                      : Integer.absolute_value_natural(ny) = zero) =>
-                          Rational.padic_absolute_value_triangle_at_reps_when_ny_zero(
-                              p, primality, nx, ny, dx, dy, eqAbsNyZero)
-                    | successor(ky) =>
-                        function (eqAbsNySucc
-                                      : Integer.absolute_value_natural(ny)
-                                        = successor(ky)) =>
-                          (function (absSum : Natural)
-                                    (eqAbsSumOuter
-                                        : Integer.absolute_value_natural(
-                                              nx * (successor(dy) : Integer)
-                                              + ny * (successor(dx) : Integer))
-                                          = absSum) =>
-                             (cases absSum {
-                                | zero =>
-                                    function (eqAbsSumZero
-                                                  : Integer.absolute_value_natural(
-                                                        nx * (successor(dy) : Integer)
-                                                        + ny * (successor(dx) : Integer))
-                                                    = zero) =>
-                                      Rational.padic_absolute_value_triangle_at_reps_when_sum_zero(
-                                          p, primality, nx, ny, dx, dy, eqAbsSumZero)
-                                | successor(kSum) =>
-                                    function (eqAbsSumSucc
-                                                  : Integer.absolute_value_natural(
-                                                        nx * (successor(dy) : Integer)
-                                                        + ny * (successor(dx) : Integer))
-                                                    = successor(kSum)) =>
-                                      Rational.padic_absolute_value_triangle_at_reps_when_all_succ(
-                                          p, primality, nx, ny, dx, dy,
-                                          kx, ky, kSum,
-                                          eqAbsNxSucc, eqAbsNySucc, eqAbsSumSucc)
-                              } : Integer.absolute_value_natural(
-                                      nx * (successor(dy) : Integer)
-                                      + ny * (successor(dx) : Integer))
-                                    = absSum
-                                  → Rational.padic_absolute_value(
-                                        p, primality,
-                                        Quotient.mk(RationalRepresentative, RationalEquivalent,
-                                                    RationalRepresentative.make(nx, dx))
-                                        + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                                                    RationalRepresentative.make(ny, dy)))
-                                      ≤ Rational.padic_absolute_value(
-                                            p, primality,
-                                            Quotient.mk(RationalRepresentative.make(nx, dx)))
-                                          + Rational.padic_absolute_value(
-                                                p, primality,
-                                                Quotient.mk(RationalRepresentative.make(ny, dy))))(
-                              eqAbsSumOuter))(
-                            Integer.absolute_value_natural(
-                                nx * (successor(dy) : Integer)
-                                + ny * (successor(dx) : Integer)),
-                            reflexivity(Natural,
-                                Integer.absolute_value_natural(
-                                    nx * (successor(dy) : Integer)
-                                    + ny * (successor(dx) : Integer))))
-                  } : Integer.absolute_value_natural(ny) = absNy
-                      → Rational.padic_absolute_value(
-                            p, primality,
-                            Quotient.mk(RationalRepresentative, RationalEquivalent,
-                                        RationalRepresentative.make(nx, dx))
-                            + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                                        RationalRepresentative.make(ny, dy)))
-                          ≤ Rational.padic_absolute_value(
-                                p, primality,
-                                Quotient.mk(RationalRepresentative.make(nx, dx)))
-                              + Rational.padic_absolute_value(
-                                    p, primality,
-                                    Quotient.mk(RationalRepresentative.make(ny, dy))))(
-                  eqAbsNyOuter))(
-                Integer.absolute_value_natural(ny),
-                reflexivity(Natural, Integer.absolute_value_natural(ny)))
-      } : Integer.absolute_value_natural(nx) = absNx
-          → Rational.padic_absolute_value(
-                p, primality,
-                Quotient.mk(RationalRepresentative, RationalEquivalent,
-                            RationalRepresentative.make(nx, dx))
-                + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                            RationalRepresentative.make(ny, dy)))
-              ≤ Rational.padic_absolute_value(
-                    p, primality,
-                    Quotient.mk(RationalRepresentative.make(nx, dx)))
-                  + Rational.padic_absolute_value(
-                        p, primality,
-                        Quotient.mk(RationalRepresentative.make(ny, dy))))(
-        eqAbsNxOuter))(
-      Integer.absolute_value_natural(nx),
-      reflexivity(Natural, Integer.absolute_value_natural(nx)))
+  cases Integer.absolute_value_natural(nx) with eqAbsNxSucc {
+     | zero =>
+         Rational.padic_absolute_value_triangle_at_reps_when_nx_zero(
+             p, primality, nx, ny, dx, dy, eqAbsNxSucc)
+     | successor(kx) =>
+         cases Integer.absolute_value_natural(ny) with eqAbsNySucc {
+            | zero =>
+                Rational.padic_absolute_value_triangle_at_reps_when_ny_zero(
+                    p, primality, nx, ny, dx, dy, eqAbsNySucc)
+            | successor(ky) =>
+                cases Integer.absolute_value_natural(
+                          nx * (successor(dy) : Integer)
+                          + ny * (successor(dx) : Integer)) with eqAbsSumSucc {
+                   | zero =>
+                       Rational.padic_absolute_value_triangle_at_reps_when_sum_zero(
+                           p, primality, nx, ny, dx, dy, eqAbsSumSucc)
+                   | successor(kSum) =>
+                       Rational.padic_absolute_value_triangle_at_reps_when_all_succ(
+                           p, primality, nx, ny, dx, dy,
+                           kx, ky, kSum,
+                           eqAbsNxSucc, eqAbsNySucc, eqAbsSumSucc)
+                 }
+          }
+   }
 
 -- Top-level: |x+y|_p ≤ |x|_p + |y|_p for all Rationals x, y. Lift via
 -- Quotient.induct_two.
