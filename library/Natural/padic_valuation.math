@@ -528,12 +528,10 @@ theorem Natural.padic_valuation_multiplicative
                  (a'Positive : successor(zero) ≤ a')
                  (b'Positive : successor(zero) ≤ b')
                  (sumEq : a' + b' = n) =>
-          Or.eliminate(
-              prime ∣ a', prime ∤ a',
-              Natural.padic_valuation(prime, a' * b')
-                = Natural.padic_valuation(prime, a')
-                      + Natural.padic_valuation(prime, b'),
-              function (pDividesA : prime ∣ a') => {
+          claim (prime ∣ a') ∨ (prime ∤ a')
+              by Natural.decides_divides(prime, a')
+          claim by cases {
+            in (prime ∣ a') as pDividesA: {
                 claim moduloAIsZero : Natural.modulo(prime, a') = zero
                   by Natural.divides_implies_modulo_zero(
                          prime, a', primePositive, pDividesA);
@@ -607,8 +605,8 @@ theorem Natural.padic_valuation_multiplicative
                                          divideAPositive)))
                    = Natural.padic_valuation(prime, a')
                      + Natural.padic_valuation(prime, b')
-              },
-              function (notDivA : prime ∤ a') =>
+              }
+            in (prime ∤ a') as notDivA:
                 Or.eliminate(
                     prime ∣ b', prime ∤ b',
                     Natural.padic_valuation(prime, a' * b')
@@ -742,8 +740,8 @@ theorem Natural.padic_valuation_multiplicative
                                            Natural.padic_valuation_when_not_divides(
                                                prime, b', notDivB)))
                     },
-                    Natural.decides_divides(prime, b')),
-              Natural.decides_divides(prime, a')),
+                    Natural.decides_divides(prime, b'))
+          },
       a + b, a, b, aPositive, bPositive, reflexivity(Natural, a + b))
 }
 
@@ -781,11 +779,10 @@ theorem Natural.padic_valuation_power_divides
                      → Natural.divides(
                            Natural.power(Natural.padic_valuation(prime, k), prime),
                            k)) =>
-        Or.eliminate(
-            prime ∣ m, prime ∤ m,
-            Natural.divides(
-                Natural.power(Natural.padic_valuation(prime, m), prime), m),
-            function (pDividesM : prime ∣ m) => {
+        claim (prime ∣ m) ∨ (prime ∤ m)
+            by Natural.decides_divides(prime, m)
+        claim by cases {
+          in (prime ∣ m) as pDividesM: {
               -- m = prime * q. Case on q to handle m = 0 (q = 0) vs the
               -- recursive case (q ≥ 1).
               let ⟨q, mEqPrimeQ⟩ := pDividesM;
@@ -892,8 +889,8 @@ theorem Natural.padic_valuation_power_divides
                    → Natural.divides(
                          Natural.power(Natural.padic_valuation(prime, m), prime),
                          m))(mEqPrimeQ)
-            },
-            function (notDivM : prime ∤ m) =>
+          }
+          in (prime ∤ m) as notDivM:
               -- v_p(m) = 0. p^0 = 1. 1 | m.
               Equality.transport_proposition(
                   Natural,
@@ -903,8 +900,8 @@ theorem Natural.padic_valuation_power_divides
                   Equality.symmetry(
                       Natural.padic_valuation_when_not_divides(
                           prime, m, notDivM)),
-                  Natural.one_divides(m)),
-            Natural.decides_divides(prime, m)))
+                  Natural.one_divides(m))
+        })
 
 -- p^j | p^k when j ≤ k. From j ≤ k get a witness r with k = j + r;
 -- then power(k, p) = power(j + r, p) = power(j, p) * power(r, p).

@@ -51,32 +51,26 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
                 → q ≤ quotientBound
                 → n ≠ d * q)
   | zero =>
-      Or.eliminate(
-          n = d * zero,
-          n ≠ d * zero,
-          Or(∃ (q : Natural). q ≤ zero ∧ n = d * q,
-              (q : Natural)
-                → q ≤ zero
-                → n ≠ d * q),
-          function (nEqualsDTimesZero : n = d * zero) =>
-              Or.introduceLeft(
-                  Exists.introduce(
-                      zero,
-                      And.introduction(
-                          LessOrEqual.reflexivity(zero),
-                          nEqualsDTimesZero))),
-          function (nNotDTimesZero :
-                  n ≠ d * zero) =>
-              Or.introduceRight(
-                  function (q : Natural)
-                      (quotientLessOrEqualZero : q ≤ zero)
-                      (nEqualsDTimesQuotient : n = d * q) =>
-                    nNotDTimesZero(
-                        rewrite(
-                            Natural.less_or_equal_zero_implies_equals_zero(
-                                q, quotientLessOrEqualZero),
-                            nEqualsDTimesQuotient))),
-          Natural.decides_equality(n, d * zero))
+      claim (n = d * zero) ∨ (n ≠ d * zero)
+      claim by cases {
+        in (n = d * zero) as nEqualsDTimesZero:
+            Or.introduceLeft(
+                Exists.introduce(
+                    zero,
+                    And.introduction(
+                        LessOrEqual.reflexivity(zero),
+                        nEqualsDTimesZero)))
+        in (n ≠ d * zero) as nNotDTimesZero:
+            Or.introduceRight(
+                function (q : Natural)
+                    (quotientLessOrEqualZero : q ≤ zero)
+                    (nEqualsDTimesQuotient : n = d * q) =>
+                  nNotDTimesZero(
+                      rewrite(
+                          Natural.less_or_equal_zero_implies_equals_zero(
+                              q, quotientLessOrEqualZero),
+                          nEqualsDTimesQuotient)))
+      }
   | successor(prevBound) =>
       Or.eliminate(
           ∃ (q : Natural). q ≤ prevBound ∧ n = d * q,
@@ -209,95 +203,83 @@ theorem Natural.decides_divides
         : (d n : Natural)
           → d ∣ n ∨ d ∤ n
   | zero, n =>
-      Or.eliminate(
-          n = zero,
-          n ≠ zero,
-          zero ∣ n ∨ zero ∤ n,
-          function (nEqualsZero : n = zero) =>
-              -- divides(0, n) with witness q = 0: need n = 0*0 = 0.
-              Or.introduceLeft(
-                  Exists.introduce(
-                      zero,
-                      nEqualsZero)),
-          function (nNotEqualZero : n ≠ zero) =>
-              Or.introduceRight(
-                  function (divProof : zero ∣ n) =>
-                      Exists.eliminate(
-                          Natural,
-                          function (q : Natural) =>
-                              n = zero * q,
-                          False,
-                          function (q : Natural)
-                              (nEqMulZeroQ :
-                                  n = zero * q) =>
-                              -- multiply(zero, q) reduces to zero
-                              -- definitionally (first-argument rule of
-                              -- multiply), so nEqMulZeroQ : n = zero.
-                              nNotEqualZero(nEqMulZeroQ),
-                          divProof)),
-          Natural.decides_equality(n, zero))
+      claim (n = zero) ∨ (n ≠ zero)
+      claim by cases {
+        in (n = zero) as nEqualsZero:
+            -- divides(0, n) with witness q = 0: need n = 0*0 = 0.
+            Or.introduceLeft(
+                Exists.introduce(
+                    zero,
+                    nEqualsZero))
+        in (n ≠ zero) as nNotEqualZero:
+            Or.introduceRight(
+                function (divProof : zero ∣ n) =>
+                    Exists.eliminate(
+                        Natural,
+                        function (q : Natural) =>
+                            n = zero * q,
+                        False,
+                        function (q : Natural)
+                            (nEqMulZeroQ :
+                                n = zero * q) =>
+                            -- multiply(zero, q) reduces to zero
+                            -- definitionally (first-argument rule of
+                            -- multiply), so nEqMulZeroQ : n = zero.
+                            nNotEqualZero(nEqMulZeroQ),
+                        divProof))
+      }
   | successor(predD), n =>
-      Or.eliminate(
-          Exists(Natural, function (q : Natural) =>
-              And(q ≤ n,
-                  n = successor(predD) * q)),
-          (q : Natural)
-              → q ≤ n
-              → n ≠ successor(predD) * q,
-          successor(predD) ∣ n ∨ successor(predD) ∤ n,
-          function (foundWitness : Exists(Natural,
-                  function (q : Natural) =>
-                      And(q ≤ n,
-                          n = successor(predD) * q))) =>
-              Exists.eliminate(
-                  Natural,
-                  function (q : Natural) =>
-                      And(q ≤ n,
-                          n = successor(predD) * q),
-                  successor(predD) ∣ n ∨ successor(predD) ∤ n,
-                  function (q : Natural)
-                      (combined : And(q ≤ n,
-                                       n = successor(predD) * q)) =>
-                    And.eliminate(
-                        q ≤ n,
-                        n = successor(predD) * q,
-                        successor(predD) ∣ n ∨ successor(predD) ∤ n,
-                        function (_ : q ≤ n)
+      claim (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q)
+          ∨ ((q : Natural) → q ≤ n → n ≠ successor(predD) * q)
+          by Natural.search_quotient_witness_up_to(
+                 successor(predD), n, n)
+      claim by cases {
+        in (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q) as foundWitness:
+            Exists.eliminate(
+                Natural,
+                function (q : Natural) =>
+                    And(q ≤ n,
+                        n = successor(predD) * q),
+                successor(predD) ∣ n ∨ successor(predD) ∤ n,
+                function (q : Natural)
+                    (combined : And(q ≤ n,
+                                     n = successor(predD) * q)) =>
+                  And.eliminate(
+                      q ≤ n,
+                      n = successor(predD) * q,
+                      successor(predD) ∣ n ∨ successor(predD) ∤ n,
+                      function (_ : q ≤ n)
+                          (nEqualsDTimesQuotient :
+                              n = successor(predD) * q) =>
+                        Or.introduceLeft(
+                            Exists.introduce(
+                                q,
+                                nEqualsDTimesQuotient)),
+                      combined),
+                foundWitness)
+        in ((q : Natural) → q ≤ n → n ≠ successor(predD) * q) as noQuotientInRange:
+            Or.introduceRight(
+                function (divProof : successor(predD) ∣ n) =>
+                    Exists.eliminate(
+                        Natural,
+                        function (q : Natural) =>
+                            n = successor(predD) * q,
+                        False,
+                        function (q : Natural)
                             (nEqualsDTimesQuotient :
                                 n = successor(predD) * q) =>
-                          Or.introduceLeft(
-                              Exists.introduce(
-                                  q,
-                                  nEqualsDTimesQuotient)),
-                        combined),
-                  foundWitness),
-          function (noQuotientInRange :
-                  (q : Natural)
-                  → q ≤ n
-                  → n ≠ successor(predD) * q) =>
-              Or.introduceRight(
-                  function (divProof : successor(predD) ∣ n) =>
-                      Exists.eliminate(
-                          Natural,
-                          function (q : Natural) =>
-                              n = successor(predD) * q,
-                          False,
-                          function (q : Natural)
-                              (nEqualsDTimesQuotient :
-                                  n = successor(predD) * q) =>
-                            -- We have q : Natural and n = d·q. Cap
-                            -- lemma gives q ≤ d·q = n, so q ≤ n.
-                            -- Then noQuotientInRange contradicts.
-                            noQuotientInRange(
-                                q,
-                                rewrite(
-                                    Equality.symmetry(nEqualsDTimesQuotient),
-                                    Natural.le_q_d_mult_q(
-                                        successor(predD), q,
-                                        Natural.successor_less_or_equal_successor(
-                                            zero, predD,
-                                            Natural.zero_least(predD)))),
-                                nEqualsDTimesQuotient),
-                          divProof)),
-          Natural.search_quotient_witness_up_to(
-              successor(predD), n, n))
+                          -- We have q : Natural and n = d·q. Cap
+                          -- lemma gives q ≤ d·q = n, so q ≤ n.
+                          -- Then noQuotientInRange contradicts.
+                          noQuotientInRange(
+                              q,
+                              rewrite(
+                                  Equality.symmetry(nEqualsDTimesQuotient),
+                                  Natural.le_q_d_mult_q(
+                                      successor(predD), q,
+                                      Natural.successor_less_or_equal_successor(
+                                          zero, predD,
+                                          Natural.zero_least(predD)))),
+                              nEqualsDTimesQuotient),
+                        divProof))
+      }

@@ -57,19 +57,18 @@ theorem Natural.has_prime_divisor (n : Natural)
             → 2 ≤ smaller
             → ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ smaller)
         (subjectAtLeastTwo : 2 ≤ subject) =>
-      Or.eliminate(
-          Natural.is_prime(subject),
-          ∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject,
-          ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
-          function (subjectIsPrime : Natural.is_prime(subject)) =>
-              Exists.introduce(
-                  subject,
-                  And.introduction(
-                      subjectIsPrime,
-                      Natural.divides_reflexive(subject))),
-          function (properDivisorWitness :
-                  ∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject) =>
-              Exists.eliminate(
+      claim Natural.is_prime(subject)
+          ∨ (∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject)
+          by Natural.prime_or_proper_divisor(subject, subjectAtLeastTwo)
+      claim by cases {
+        in (Natural.is_prime(subject)) as subjectIsPrime:
+            Exists.introduce(
+                subject,
+                And.introduction(
+                    subjectIsPrime,
+                    Natural.divides_reflexive(subject)))
+        in (∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject) as properDivisorWitness:
+            Exists.eliminate(
                   Natural,
                   function (divisor : Natural) =>
                       2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject,
@@ -124,7 +123,7 @@ theorem Natural.has_prime_divisor (n : Natural)
                                         divisorAtLeastTwo)),
                               rest),
                         divisorProofs),
-                  properDivisorWitness),
-          Natural.prime_or_proper_divisor(subject, subjectAtLeastTwo)),
+                  properDivisorWitness)
+      },
     n,
     atLeastTwo)

@@ -2087,116 +2087,103 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_all_succ
               + Rational.padic_absolute_value(
                     p, primality,
                     Quotient.mk(RationalRepresentative.make(ny, dy))) :=
-  Or.eliminate(
-      Natural.padic_valuation(p, successor(kx))
-          + Natural.padic_valuation(p, successor(dy))
-        ≤ Natural.padic_valuation(p, successor(ky))
-            + Natural.padic_valuation(p, successor(dx)),
-      Natural.padic_valuation(p, successor(ky))
-          + Natural.padic_valuation(p, successor(dx))
-        ≤ Natural.padic_valuation(p, successor(kx))
-            + Natural.padic_valuation(p, successor(dy)),
-      Rational.padic_absolute_value(
-          p, primality,
-          Quotient.mk(RationalRepresentative, RationalEquivalent,
-                      RationalRepresentative.make(nx, dx))
-          + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                      RationalRepresentative.make(ny, dy)))
-        ≤ Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative.make(nx, dx)))
-            + Rational.padic_absolute_value(
+  claim Natural.padic_valuation(p, successor(kx))
+            + Natural.padic_valuation(p, successor(dy))
+          ≤ Natural.padic_valuation(p, successor(ky))
+              + Natural.padic_valuation(p, successor(dx))
+        ∨ Natural.padic_valuation(p, successor(ky))
+              + Natural.padic_valuation(p, successor(dx))
+          ≤ Natural.padic_valuation(p, successor(kx))
+              + Natural.padic_valuation(p, successor(dy))
+    by Natural.totality_of_less_or_equal(
+           Natural.padic_valuation(p, successor(kx))
+               + Natural.padic_valuation(p, successor(dy)),
+           Natural.padic_valuation(p, successor(ky))
+               + Natural.padic_valuation(p, successor(dx)))
+  claim by cases {
+    in (Natural.padic_valuation(p, successor(kx))
+            + Natural.padic_valuation(p, successor(dy))
+          ≤ Natural.padic_valuation(p, successor(ky))
+              + Natural.padic_valuation(p, successor(dx))) as vALevB:
+        Rational.padic_absolute_value_triangle_at_reps_wlog_case_a(
+            p, primality, nx, ny, dx, dy, kx, ky, kSum,
+            eqAbsNx, eqAbsNy, eqAbsSum, vALevB)
+    in (Natural.padic_valuation(p, successor(ky))
+            + Natural.padic_valuation(p, successor(dx))
+          ≤ Natural.padic_valuation(p, successor(kx))
+              + Natural.padic_valuation(p, successor(dy))) as vBLevA: {
+      -- eqAbsSum with addends swapped (via Integer.add_commutative).
+      claim eqAbsSumSwapped
+            : Integer.absolute_value_natural(
+                  ny * (successor(dx) : Integer)
+                  + nx * (successor(dy) : Integer))
+              = successor(kSum)
+        by Equality.transitivity(
+               congruenceOf(
+                   Integer.absolute_value_natural,
+                   Integer.add_commutative(
+                       ny * (successor(dx) : Integer),
+                       nx * (successor(dy) : Integer))),
+               eqAbsSum);
+      -- Apply WLOG helper with x, y swapped: get |y+x|_p ≤ |y|_p + |x|_p.
+      claim swappedResult
+            : Rational.padic_absolute_value(
                   p, primality,
-                  Quotient.mk(RationalRepresentative.make(ny, dy))),
-      function (vALevB
-                    : Natural.padic_valuation(p, successor(kx))
-                          + Natural.padic_valuation(p, successor(dy))
-                        ≤ Natural.padic_valuation(p, successor(ky))
-                            + Natural.padic_valuation(p, successor(dx))) =>
-          Rational.padic_absolute_value_triangle_at_reps_wlog_case_a(
-              p, primality, nx, ny, dx, dy, kx, ky, kSum,
-              eqAbsNx, eqAbsNy, eqAbsSum, vALevB),
-      function (vBLevA
-                    : Natural.padic_valuation(p, successor(ky))
-                          + Natural.padic_valuation(p, successor(dx))
-                        ≤ Natural.padic_valuation(p, successor(kx))
-                            + Natural.padic_valuation(p, successor(dy))) => {
-        -- eqAbsSum with addends swapped (via Integer.add_commutative).
-        claim eqAbsSumSwapped
-              : Integer.absolute_value_natural(
-                    ny * (successor(dx) : Integer)
-                    + nx * (successor(dy) : Integer))
-                = successor(kSum)
-          by Equality.transitivity(
-                 congruenceOf(
-                     Integer.absolute_value_natural,
-                     Integer.add_commutative(
-                         ny * (successor(dx) : Integer),
-                         nx * (successor(dy) : Integer))),
-                 eqAbsSum);
-        -- Apply WLOG helper with x, y swapped: get |y+x|_p ≤ |y|_p + |x|_p.
-        claim swappedResult
-              : Rational.padic_absolute_value(
-                    p, primality,
-                    Quotient.mk(RationalRepresentative, RationalEquivalent,
-                                RationalRepresentative.make(ny, dy))
-                    + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                                RationalRepresentative.make(nx, dx)))
-                ≤ Rational.padic_absolute_value(
-                      p, primality,
-                      Quotient.mk(RationalRepresentative.make(ny, dy)))
-                    + Rational.padic_absolute_value(
-                          p, primality,
-                          Quotient.mk(RationalRepresentative.make(nx, dx)))
-          by Rational.padic_absolute_value_triangle_at_reps_wlog_case_a(
-                 p, primality, ny, nx, dy, dx, ky, kx, kSum,
-                 eqAbsNy, eqAbsNx, eqAbsSumSwapped, vBLevA);
-        -- Transport via add_commutative on both sides:
-        --   y + x = x + y, |y|_p + |x|_p = |x|_p + |y|_p.
-        claim sumSwap
-              : Quotient.mk(RationalRepresentative, RationalEquivalent,
-                          RationalRepresentative.make(ny, dy))
+                  Quotient.mk(RationalRepresentative, RationalEquivalent,
+                              RationalRepresentative.make(ny, dy))
                   + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                              RationalRepresentative.make(nx, dx))
-                = Quotient.mk(RationalRepresentative, RationalEquivalent,
-                            RationalRepresentative.make(nx, dx))
-                    + Quotient.mk(RationalRepresentative, RationalEquivalent,
-                                RationalRepresentative.make(ny, dy))
-          by Rational.add_commutative(
-                 Quotient.mk(RationalRepresentative.make(ny, dy)),
-                 Quotient.mk(RationalRepresentative.make(nx, dx)));
-        claim rhsSwap
-              : Rational.padic_absolute_value(
+                              RationalRepresentative.make(nx, dx)))
+              ≤ Rational.padic_absolute_value(
                     p, primality,
                     Quotient.mk(RationalRepresentative.make(ny, dy)))
                   + Rational.padic_absolute_value(
                         p, primality,
                         Quotient.mk(RationalRepresentative.make(nx, dx)))
-                = Rational.padic_absolute_value(
+        by Rational.padic_absolute_value_triangle_at_reps_wlog_case_a(
+               p, primality, ny, nx, dy, dx, ky, kx, kSum,
+               eqAbsNy, eqAbsNx, eqAbsSumSwapped, vBLevA);
+      -- Transport via add_commutative on both sides:
+      --   y + x = x + y, |y|_p + |x|_p = |x|_p + |y|_p.
+      claim sumSwap
+            : Quotient.mk(RationalRepresentative, RationalEquivalent,
+                        RationalRepresentative.make(ny, dy))
+                + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                            RationalRepresentative.make(nx, dx))
+              = Quotient.mk(RationalRepresentative, RationalEquivalent,
+                          RationalRepresentative.make(nx, dx))
+                  + Quotient.mk(RationalRepresentative, RationalEquivalent,
+                              RationalRepresentative.make(ny, dy))
+        by Rational.add_commutative(
+               Quotient.mk(RationalRepresentative.make(ny, dy)),
+               Quotient.mk(RationalRepresentative.make(nx, dx)));
+      claim rhsSwap
+            : Rational.padic_absolute_value(
+                  p, primality,
+                  Quotient.mk(RationalRepresentative.make(ny, dy)))
+                + Rational.padic_absolute_value(
                       p, primality,
                       Quotient.mk(RationalRepresentative.make(nx, dx)))
-                    + Rational.padic_absolute_value(
-                          p, primality,
-                          Quotient.mk(RationalRepresentative.make(ny, dy)))
-          by Rational.add_commutative(
-                 Rational.padic_absolute_value(
-                     p, primality,
-                     Quotient.mk(RationalRepresentative.make(ny, dy))),
-                 Rational.padic_absolute_value(
-                     p, primality,
-                     Quotient.mk(RationalRepresentative.make(nx, dx))));
-        rewrite(
-            congruenceOf(
-                function (m : Rational) =>
-                    Rational.padic_absolute_value(p, primality, m),
-                sumSwap),
-            rewrite(rhsSwap, swappedResult))
-      },
-      Natural.totality_of_less_or_equal(
-          Natural.padic_valuation(p, successor(kx))
-              + Natural.padic_valuation(p, successor(dy)),
-          Natural.padic_valuation(p, successor(ky))
-              + Natural.padic_valuation(p, successor(dx))))
+              = Rational.padic_absolute_value(
+                    p, primality,
+                    Quotient.mk(RationalRepresentative.make(nx, dx)))
+                  + Rational.padic_absolute_value(
+                        p, primality,
+                        Quotient.mk(RationalRepresentative.make(ny, dy)))
+        by Rational.add_commutative(
+               Rational.padic_absolute_value(
+                   p, primality,
+                   Quotient.mk(RationalRepresentative.make(ny, dy))),
+               Rational.padic_absolute_value(
+                   p, primality,
+                   Quotient.mk(RationalRepresentative.make(nx, dx))));
+      rewrite(
+          congruenceOf(
+              function (m : Rational) =>
+                  Rational.padic_absolute_value(p, primality, m),
+              sumSwap),
+          rewrite(rhsSwap, swappedResult))
+    }
+  }
 
 -- Triangle inequality at the Rational representative level. Dispatches
 -- on |nx|, |ny|, and the sum's |·|_Nat via the function-then-cases pattern.
