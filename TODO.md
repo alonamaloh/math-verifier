@@ -20,6 +20,39 @@ chain in roughly the order listed.
 - **More generic abelian-group / ring / field lemmas** as the
   Real and PAdic proofs surface them.
 
+## Wildcard binder name collision in `openOverLocalBinders`
+
+`openOverLocalBinders` opens local binders by their literal name. When
+the local-binder stack contains multiple `_` (wildcard) binders —
+common after `let ⟨_, x⟩ := …;` destructures that throw away one
+component — they all open to `FreeVariable("_", Internal)`, which the
+kernel can't distinguish.
+
+The `Or.eliminate(handleLeft, handleRight, disjunction)` short-form
+desugar trips on this when the call site sits inside such a context:
+the desugar calls `inferTypeInLocalContext` on the disjunction (to
+recover `A` and `B`), the opener collapses two `_` binders into one
+`FV("_")`, and the resulting type is malformed. The 6-arg verbose
+`Or.eliminate(A, B, Goal, hL, hR, disj)` form sidesteps this because
+the elaborator never calls `inferTypeInLocalContext` on a top-level
+arg — it just elaborates each arg against the corresponding Pi
+domain and lets the kernel handle the final type-check (which uses
+its own `makeOpeningName(context)` and so generates unique names).
+
+Trip site: `library/Natural/prime_divides_product.math` —
+`bezout_one_when_prime_coprime` has `let ⟨gDividesP, gDividesA, _⟩
+:= isgcd;` plus `let ⟨_, divisorClassification⟩ := primality;` before
+an `Or.eliminate` whose disjunction depends on those bindings.
+
+Quick attempted fix — rename wildcards to position-based synthetic
+names in `openingNameFor(localBinders, i)`, used in both
+`openOverLocalBinders` and at the context-construction sites — broke
+`library/Natural/strong_recursion.math`, suggesting at least one
+downstream path uses the literal binder name to look up an FV
+created elsewhere. A full fix probably needs auditing every place
+that turns a binder name into an FV name and routing them through
+one helper.
+
 ## Calc auto-prover — smaller open follow-ups
 
 With Phases 1–3 landed (structural hash, `ring` AC-fallback,
