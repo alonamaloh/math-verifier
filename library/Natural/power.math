@@ -56,52 +56,28 @@ theorem Natural.power_succ_form
         : (k p : Natural) → successor(zero) ≤ p
           → ∃ (m : Natural). Natural.power(k, p) = successor(m)
   | zero, p, _ =>
-      Exists.introduce(
-          Natural,
-          function (m : Natural) =>
-              Natural.power(zero, p) = successor(m),
-          zero,
-          reflexivity(Natural, successor(zero)))
-  | successor(j), p, pPositive =>
-      Exists.eliminate(
-          Natural,
-          function (m : Natural) => Natural.power(j, p) = successor(m),
-          ∃ (m : Natural).
-              Natural.power(successor(j), p) = successor(m),
-          function (m : Natural) (powerIsSucc : Natural.power(j, p) = successor(m)) =>
-            Exists.eliminate(
-                Natural,
-                function (predP : Natural) => p = successor(predP),
-                ∃ (mPrime : Natural).
-                    Natural.power(successor(j), p) = successor(mPrime),
-                function (predP : Natural) (pIsSucc : p = successor(predP)) =>
-                  Exists.introduce(
-                      Natural,
-                      function (mPrime : Natural) =>
-                          Natural.power(successor(j), p) = successor(mPrime),
-                      predP + p * m,
-                      calc Natural.power(successor(j), p)
-                         = p * Natural.power(j, p)
-                         = p * successor(m)
-                         = p + p * m
-                         = successor(predP) + p * m
-                         = successor(predP + p * m)),
-                Exists.eliminate(
-                    Natural,
-                    function (c : Natural) => p = successor(zero) + c,
-                    ∃ (predP : Natural). p = successor(predP),
-                    function (c : Natural) (pIs : p = successor(zero) + c) =>
-                      Exists.introduce(
-                          Natural,
-                          function (predP : Natural) => p = successor(predP),
-                          c,
-                          calc p
-                             = successor(zero) + c
-                             = successor(zero + c)
-                             = successor(c)),
-                    Natural.subtraction_witness(
-                        successor(zero), p, pPositive))),
-          Natural.power_succ_form(j, p, pPositive))
+      ⟨zero, reflexivity(Natural, successor(zero))⟩
+  | successor(j), p, pPositive => {
+      -- IH: there's an m with power(j, p) = succ(m).
+      obtain ⟨m, powerIsSucc⟩
+          from Natural.power_succ_form(j, p, pPositive);
+      -- p > 0, so p = successor(zero) + c (which reduces to succ(c)).
+      obtain ⟨c, pEqualsSuccZeroPlusC⟩
+          from Natural.subtraction_witness(
+                   successor(zero), p, pPositive);
+      ⟨c + p * m,
+       calc Natural.power(successor(j), p)
+          = p * Natural.power(j, p)
+          = p * successor(m)
+               by congruenceOf(
+                      function (r : Natural) => p * r, powerIsSucc)
+          = p + p * m
+          = (successor(zero) + c) + p * m
+               by congruenceOf(
+                      function (r : Natural) => r + p * m,
+                      pEqualsSuccZeroPlusC)
+          = successor(c + p * m)⟩
+    }
 
 -- p^k ≥ 1 for p ≥ 1. From the succ form.
 theorem Natural.power_positive
