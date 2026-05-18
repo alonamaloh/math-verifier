@@ -7518,32 +7518,95 @@ private:
         ExpressionPointer termTypeUnreducedClosed = closeOverLocalBinders(
             termTypeUnreduced, localBinders, localBinders.size());
 
-        int occurrenceCount = 0;
-        ExpressionPointer abstractedBody = abstractStructuralOccurrence(
-            termTypeUnreducedClosed, leftEndpoint,
-            /*currentDepth=*/0, occurrenceCount);
+        // Try four combinations of (term type, left endpoint) ×
+        // (unreduced, WHNF) in priority order. WHNF-ing the left
+        // endpoint catches `congruenceOf(λr. P(r), eq)` whose stated
+        // type's lhs is the unreduced beta-redex `Application(λ, x)`
+        // while the term's inferred type carries the beta-reduced
+        // `P(x)`. WHNF-ing the term type catches definitions like
+        // `Rational.IsNonneg(...)` that wrap the underlying claim.
+        auto trySearch = [&](const ExpressionPointer& termTypeClosed,
+                             const ExpressionPointer& lhs)
+            -> std::pair<int, ExpressionPointer> {
+            int count = 0;
+            ExpressionPointer body = abstractStructuralOccurrence(
+                termTypeClosed, lhs, /*currentDepth=*/0, count);
+            return {count, std::move(body)};
+        };
+
+        // Beta-only reduction at the spine head. Required for
+        // `congruenceOf(λr. P(r), eq)`: the equality's stated type
+        // carries the unreduced beta-redex `(λr. P(r))(x)` as its
+        // left endpoint, while the term's inferred type has the
+        // beta-reduced `P(x)`. We can't use weakHeadNormalForm here
+        // because that would δ-unfold any subsequent Constant head
+        // (e.g. `Rational.padic_absolute_value`, which is defined as
+        // a `Quotient.lift`) and lose the user-visible shape we want
+        // to match against the term's type.
+        auto betaReduceHead =
+            [](ExpressionPointer e) -> ExpressionPointer {
+            while (std::holds_alternative<Application>(e->node)) {
+                std::vector<ExpressionPointer> args;
+                ExpressionPointer head = e;
+                while (auto* app = std::get_if<Application>(&head->node)) {
+                    args.push_back(app->argument);
+                    head = app->function;
+                }
+                std::reverse(args.begin(), args.end());
+                if (auto* lambda = std::get_if<Lambda>(&head->node)) {
+                    ExpressionPointer reduced =
+                        substitute(lambda->body, 0, args[0]);
+                    for (size_t i = 1; i < args.size(); ++i) {
+                        reduced = makeApplication(reduced, args[i]);
+                    }
+                    e = reduced;
+                } else {
+                    break;
+                }
+            }
+            return e;
+        };
+
+        ExpressionPointer leftEndpointBetaOpened =
+            betaReduceHead(lemmaComponentsOpened.leftEndpoint);
+        ExpressionPointer leftEndpointWhnf = closeOverLocalBinders(
+            leftEndpointBetaOpened, localBinders, localBinders.size());
+
+        auto [c1, b1] = trySearch(termTypeUnreducedClosed, leftEndpoint);
+        int occurrenceCount = c1;
+        ExpressionPointer abstractedBody = std::move(b1);
+
         if (occurrenceCount != 1) {
-            // Retry with the WHNF'd form. Catches the case where the
-            // rewrite target sits behind a definition that has to be
-            // unfolded to expose it (e.g. propositional aliases that
-            // wrap the type the user actually wants to rewrite into).
+            auto [c2, b2] =
+                trySearch(termTypeUnreducedClosed, leftEndpointWhnf);
+            if (c2 == 1) {
+                occurrenceCount = c2;
+                abstractedBody = std::move(b2);
+            }
+        }
+
+        if (occurrenceCount != 1) {
             ExpressionPointer termTypeWhnf = weakHeadNormalForm(
                 environment_, termTypeUnreduced);
             ExpressionPointer termTypeWhnfClosed = closeOverLocalBinders(
                 termTypeWhnf, localBinders, localBinders.size());
-            int whnfOccurrenceCount = 0;
-            ExpressionPointer whnfAbstractedBody =
-                abstractStructuralOccurrence(
-                    termTypeWhnfClosed, leftEndpoint,
-                    /*currentDepth=*/0, whnfOccurrenceCount);
-            if (whnfOccurrenceCount == 1) {
-                occurrenceCount = whnfOccurrenceCount;
-                abstractedBody = std::move(whnfAbstractedBody);
-            } else if (occurrenceCount == 0) {
-                // Adopt the WHNF result so the error diagnostic shows
-                // the deeper count if it found one.
-                occurrenceCount = whnfOccurrenceCount;
-                abstractedBody = std::move(whnfAbstractedBody);
+            auto [c3, b3] = trySearch(termTypeWhnfClosed, leftEndpoint);
+            if (c3 == 1) {
+                occurrenceCount = c3;
+                abstractedBody = std::move(b3);
+            } else {
+                auto [c4, b4] =
+                    trySearch(termTypeWhnfClosed, leftEndpointWhnf);
+                if (c4 == 1) {
+                    occurrenceCount = c4;
+                    abstractedBody = std::move(b4);
+                } else if (occurrenceCount == 0) {
+                    // Adopt the deepest result so the error diagnostic
+                    // shows whichever count is most informative.
+                    occurrenceCount = c4 != 0 ? c4 : c3;
+                    abstractedBody =
+                        c4 != 0 ? std::move(b4) : std::move(b3);
+                }
             }
         }
         // Use the unreduced form for the diagnostic display.
