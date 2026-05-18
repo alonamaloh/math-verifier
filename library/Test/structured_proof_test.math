@@ -14,6 +14,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Natural.order
+import Natural.strong_recursion
 
 -- (1) Fully-applied hint: the hint's type already matches the goal.
 theorem ClaimByFullyApplied (n : Natural) : zero ≤ n :=
@@ -35,3 +36,24 @@ theorem ClaimByHintWithHypothesis (p m : Natural)
 -- (4) Non-terminal claim with an explicit proposition.
 theorem ClaimWithProposition (n : Natural) : zero ≤ n :=
   claim zero ≤ n by Natural.zero_least
+
+-- (5) Step 4: disjunctive claim with arms. The user-facing shape
+-- discussed in the design conversation. Each arm gets its disjunct
+-- as an anonymous hypothesis (currently bound under the internal
+-- name `_disjunct_hypothesis`; Step 3 will add `the (P)` lookup);
+-- the body proves the surrounding goal. `Or.eliminate` is
+-- synthesized at the kernel.
+theorem ClaimDisjunctiveArms (p m : Natural)
+        (succP_le_succM : successor(p) ≤ successor(m))
+        : p ≤ m :=
+  claim (p = m) ∨ (successor(p) ≤ m)
+      by Natural.less_or_equal_successor_successor_inversion {
+    in (p = m):
+        Equality.transport_proposition(
+            Natural,
+            function (rightEnd : Natural) => p ≤ rightEnd,
+            p, m, _disjunct_hypothesis,
+            LessOrEqual.reflexivity(p))
+    in (successor(p) ≤ m):
+        claim by Natural.less_or_equal_predecessor_less_or_equal
+  }

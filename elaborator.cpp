@@ -3317,9 +3317,8 @@ private:
             "claim at line " + std::to_string(line));
 
         if (!claim.arms.empty()) {
-            throwElaborate(
-                "disjunctive `claim` arms are recognized by the parser "
-                "but not yet elaborated (structured-proof Step 4)");
+            return elaborateClaimDisjunctiveArms(
+                claim, localBinders, expectedType, line);
         }
 
         // Resolve the goal proposition.
@@ -3518,6 +3517,138 @@ private:
             int innerIndex = totalBinders - 1 - p;
             call = makeApplication(call, bindings[innerIndex]);
         }
+        return call;
+    }
+
+    // Step 4 of the structured-proof feature. Elaborates
+    // `claim A ∨ B [by Hint] { in (A): body  in (B): body }` into
+    // an `Or.eliminate(A, B, Goal, λa. body, λb. body, disjProof)`
+    // call. v1 limits: exactly 2 arms (binary disjunction).
+    ExpressionPointer elaborateClaimDisjunctiveArms(
+        const SurfaceStructuredClaim& claim,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line) {
+        Frame frame(*this,
+            "claim arms at line " + std::to_string(line));
+
+        if (!claim.proposition) {
+            throwElaborate(
+                "disjunctive `claim` requires a proposition before "
+                "the arms-block: `claim A ∨ B { … }`");
+        }
+        if (!expectedType) {
+            throwElaborate(
+                "disjunctive `claim` needs the surrounding goal as "
+                "an expected type from context");
+        }
+        if (claim.arms.size() != 2) {
+            throwElaborate(
+                "v1 of disjunctive `claim` handles exactly 2 arms; "
+                "got " + std::to_string(claim.arms.size())
+                + " — n-ary disjunctions are a planned later step");
+        }
+
+        // Elaborate the disjunction proposition; expect Or A B.
+        ExpressionPointer propClosed = elaborateExpression(
+            *claim.proposition, localBinders);
+        ExpressionPointer propReduced = weakHeadNormalForm(
+            environment_, propClosed);
+
+        ExpressionPointer leftDisjunct;
+        ExpressionPointer rightDisjunct;
+        {
+            auto* outerApp =
+                std::get_if<Application>(&propReduced->node);
+            auto* innerApp = outerApp ? std::get_if<Application>(
+                &outerApp->function->node) : nullptr;
+            auto* head = innerApp ? std::get_if<Constant>(
+                &innerApp->function->node) : nullptr;
+            if (!outerApp || !innerApp || !head
+                || head->name != "Or") {
+                throwElaborate(
+                    "disjunctive `claim` expects an `Or A B` "
+                    "proposition; got `"
+                    + prettyPrintInLocalScope(
+                          propClosed, localBinders)
+                    + "`");
+            }
+            leftDisjunct = innerApp->argument;
+            rightDisjunct = outerApp->argument;
+        }
+
+        // Verify each arm's disjunctType matches its position.
+        auto checkArmDisjunct = [&](size_t index,
+                                     ExpressionPointer expected) {
+            ExpressionPointer armDisjunctClosed = elaborateExpression(
+                *claim.arms[index].disjunctType, localBinders);
+            if (!structurallyEqual(armDisjunctClosed, expected)) {
+                throwElaborate(
+                    "arm " + std::to_string(index + 1)
+                    + " expects disjunct `"
+                    + prettyPrintInLocalScope(
+                          armDisjunctClosed, localBinders)
+                    + "` but the proposition's "
+                    + (index == 0 ? "left" : "right")
+                    + " disjunct is `"
+                    + prettyPrintInLocalScope(expected, localBinders)
+                    + "`");
+            }
+        };
+        checkArmDisjunct(0, leftDisjunct);
+        checkArmDisjunct(1, rightDisjunct);
+
+        // Build each arm's lambda. Each arm's body is elaborated in
+        // localBinders + the anonymous disjunct hypothesis. The goal
+        // type is lifted by 1 to account for the extra binder when
+        // it's passed down as expectedType.
+        ExpressionPointer expectedTypeLifted =
+            liftBoundVariables(expectedType, 1, 0);
+
+        auto buildArmLambda =
+            [&](size_t index, ExpressionPointer domain)
+                -> ExpressionPointer {
+            std::vector<LocalBinder> extendedBinders = localBinders;
+            extendedBinders.push_back(
+                {"_disjunct_hypothesis", domain});
+            ExpressionPointer body = elaborateExpression(
+                *claim.arms[index].body, extendedBinders,
+                expectedTypeLifted);
+            return makeLambda(
+                "_disjunct_hypothesis", domain, body);
+        };
+        ExpressionPointer leftLambda = buildArmLambda(0, leftDisjunct);
+        ExpressionPointer rightLambda = buildArmLambda(1, rightDisjunct);
+
+        // Establish the disjunction proof. Use the `by` hint if
+        // present (Step 2 machinery handles arg-fill); Step 5 will
+        // add library lookup for the no-`by` case.
+        ExpressionPointer disjProof;
+        if (claim.byHint) {
+            ExpressionPointer hintTerm = elaborateExpression(
+                *claim.byHint, localBinders);
+            ExpressionPointer hintTypeOpened =
+                inferTypeInLocalContext(localBinders, hintTerm);
+            ExpressionPointer hintTypeClosed = closeOverLocalBinders(
+                hintTypeOpened, localBinders, localBinders.size());
+            disjProof = autoFillHintForClaim(
+                hintTerm, hintTypeClosed, propClosed,
+                localBinders, line);
+        } else {
+            throwElaborate(
+                "disjunctive `claim` without `by` not yet supported "
+                "(structured-proof Step 5)");
+        }
+
+        // Build Or.eliminate(A, B, Goal, leftLambda, rightLambda,
+        // disjProof). Or.eliminate is a non-polymorphic definition.
+        ExpressionPointer call = makeConstant("Or.eliminate", {});
+        call = makeApplication(call, leftDisjunct);
+        call = makeApplication(call, rightDisjunct);
+        call = makeApplication(call, expectedType);
+        call = makeApplication(call, leftLambda);
+        call = makeApplication(call, rightLambda);
+        call = makeApplication(call, disjProof);
         return call;
     }
 
