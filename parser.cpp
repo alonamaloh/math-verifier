@@ -228,11 +228,18 @@ SurfaceExpressionPointer substituteSurfaceName(
         SurfaceExpressionPointer newScrutinee = substituteSurfaceName(
             cases->scrutinee, targetName, replacement);
         std::vector<SurfaceCasesClause> newClauses;
+        // The `with <equalityHypothesisName>` binder is in scope inside
+        // each arm body, so a substitution targeting that name does not
+        // descend into clause bodies.
+        bool eqShadows =
+            !cases->equalityHypothesisName.empty()
+            && cases->equalityHypothesisName == targetName;
         for (const auto& clause : cases->clauses) {
             SurfaceCasesClause newClause;
             newClause.pattern = clause.pattern;
             newClause.body =
-                patternBindsName(*clause.pattern, targetName)
+                (eqShadows
+                 || patternBindsName(*clause.pattern, targetName))
                     ? clause.body
                     : substituteSurfaceName(clause.body,
                                              targetName, replacement);
@@ -240,8 +247,15 @@ SurfaceExpressionPointer substituteSurfaceName(
             newClause.column = clause.column;
             newClauses.push_back(std::move(newClause));
         }
-        return makeSurfaceCases(std::move(newScrutinee),
-                                 std::move(newClauses), line, column);
+        if (cases->equalityHypothesisName.empty()) {
+            return makeSurfaceCases(std::move(newScrutinee),
+                                     std::move(newClauses),
+                                     line, column);
+        }
+        return makeSurfaceCasesWithEqualityHypothesis(
+            std::move(newScrutinee), std::move(newClauses),
+            cases->equalityHypothesisName,
+            line, column);
     }
     if (auto* calc = std::get_if<SurfaceCalc>(&node.node)) {
         auto newInitial = substituteSurfaceName(
@@ -1504,13 +1518,33 @@ private:
     SurfaceExpressionPointer parseCasesExpression() {
         Token casesToken = consumeAny();  // 'cases'
         auto scrutinee = parseExpression();
+        // Optional `with <equalityHypothesisName>`: each arm gets an
+        // additional binder `<name> : <scrutinee> = <constructor pattern>`
+        // in scope, generated via the standard convoy desugaring.
+        std::string equalityHypothesisName;
+        if (peek().kind == TokenKind::KeywordWith) {
+            consumeAny();  // 'with'
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected an equality-hypothesis name after "
+                          "`cases X with`");
+            }
+            Token nameToken = consumeAny();
+            equalityHypothesisName = nameToken.lexeme;
+        }
         expect(TokenKind::LeftBrace, "after cases scrutinee");
         auto clauses = parseCasesClauseBlock(
             /*injectedIhName=*/std::string(),
             /*caseFollowedBy=*/TokenKind::Colon);
         expect(TokenKind::RightBrace, "ending cases expression");
-        return makeSurfaceCases(std::move(scrutinee), std::move(clauses),
-                                 casesToken.line, casesToken.column);
+        if (equalityHypothesisName.empty()) {
+            return makeSurfaceCases(std::move(scrutinee),
+                                     std::move(clauses),
+                                     casesToken.line, casesToken.column);
+        }
+        return makeSurfaceCasesWithEqualityHypothesis(
+            std::move(scrutinee), std::move(clauses),
+            std::move(equalityHypothesisName),
+            casesToken.line, casesToken.column);
     }
 
     // Parses the inside of a `{ … }` of a cases-style block: either a

@@ -168,24 +168,21 @@ one outer pattern-match that pulls in the dependent binders, then an
 inner case-analysis that uses them. Examples: `Integer/basics.math`,
 `Integer/addition.math` use `_after_first` helpers.
 
-## `cases` with hypothesis
+## `cases ... with` — case-split with retained equation
 
 To case-split on an expression and retain an equation between the
-expression and the matched form, use the function-then-apply pattern:
+expression and the matched form, add `with <equalityHypothesisName>`:
 
 ```math
-(function (absX : Natural) (eqAbsX : Integer.absolute_value_natural(x) = absX) =>
-   (cases absX {
-      | zero => function (eqZero : ... = zero) => ...
-      | successor(k) => function (eqSucc : ... = successor(k)) => ...
-    } : Integer.absolute_value_natural(x) = absX → <Goal>)(eqAbsX))
-(Integer.absolute_value_natural(x),
- reflexivity(Natural, Integer.absolute_value_natural(x)))
+cases Integer.absolute_value_natural(x) with refinedEquation {
+  | zero          => ...refinedEquation : Integer.absolute_value_natural(x) = zero...
+  | successor(k)  => ...refinedEquation : Integer.absolute_value_natural(x) = successor(k)...
+}
 ```
 
-This is verbose but currently the only way to retain the equation
-through the case split. (A future tactic could automate this — see
-TODO.md.)
+The elaborator desugars this to the convoy pattern (`function (caseScrutinee : T) (equalityOuter : X = caseScrutinee) => …`) — the user just picks a name. Each arm gets `refinedEquation` in scope with the type refined per branch.
+
+Constructor patterns with arguments (e.g. `successor(predecessor)`) are reconstructed as expressions for the equation type; tuple patterns aren't yet supported.
 
 ## `ring` tactic limitations (v1)
 

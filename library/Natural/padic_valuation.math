@@ -126,44 +126,35 @@ theorem Natural.divide_positive_when_divides
                        prime * Natural.divide(prime, target) + z,
                    Equality.symmetry(moduloZero)),
                Natural.divide_modulo_decompose(prime, target)));
-  (function (divideValue : Natural)
-            (divideEq : Natural.divide(prime, target) = divideValue) =>
-     (cases divideValue {
-        | zero =>
-            function (refinedDivideEq
-                        : Natural.divide(prime, target) = zero) =>
-              -- prime * 0 = 0, so target = 0, contradicting targetPositive.
-              False.eliminate_proposition(
-                  successor(zero) ≤ Natural.divide(prime, target),
-                  Natural.not_less_or_equal_successor_zero(
-                      zero,
-                      Equality.transport_proposition(
-                          Natural,
-                          function (m : Natural) => successor(zero) ≤ m,
-                          target, zero,
-                          Equality.transitivity(
-                              Equality.symmetry(productEqTarget),
-                              Equality.transitivity(
-                                  congruenceOf(
-                                      function (z : Natural) => prime * z,
-                                      refinedDivideEq),
-                                  Natural.multiply_zero(prime))),
-                          targetPositive)))
-        | successor(q') =>
-            function (refinedDivideEq
-                        : Natural.divide(prime, target) = successor(q')) =>
-              -- divide = successor(q') ≥ 1. Transport from successor(q') back.
-              Equality.transport_proposition(
-                  Natural,
-                  function (m : Natural) => successor(zero) ≤ m,
-                  successor(q'), Natural.divide(prime, target),
-                  Equality.symmetry(refinedDivideEq),
-                  Natural.successor_less_or_equal_successor(
-                      zero, q', Natural.zero_least(q')))
-      } : Natural.divide(prime, target) = divideValue
-          → successor(zero) ≤ Natural.divide(prime, target))(divideEq))(
-    Natural.divide(prime, target),
-    reflexivity(Natural, Natural.divide(prime, target)))
+  cases Natural.divide(prime, target) with refinedDivideEq {
+    | zero =>
+        -- prime * 0 = 0, so target = 0, contradicting targetPositive.
+        False.eliminate_proposition(
+            successor(zero) ≤ Natural.divide(prime, target),
+            Natural.not_less_or_equal_successor_zero(
+                zero,
+                Equality.transport_proposition(
+                    Natural,
+                    function (m : Natural) => successor(zero) ≤ m,
+                    target, zero,
+                    Equality.transitivity(
+                        Equality.symmetry(productEqTarget),
+                        Equality.transitivity(
+                            congruenceOf(
+                                function (z : Natural) => prime * z,
+                                refinedDivideEq),
+                            Natural.multiply_zero(prime))),
+                    targetPositive)))
+    | successor(q') =>
+        -- divide = successor(q') ≥ 1. Transport from successor(q') back.
+        Equality.transport_proposition(
+            Natural,
+            function (m : Natural) => successor(zero) ≤ m,
+            successor(q'), Natural.divide(prime, target),
+            Equality.symmetry(refinedDivideEq),
+            Natural.successor_less_or_equal_successor(
+                zero, q', Natural.zero_least(q')))
+  }
 }
 
 -- The quotient is strictly less than the target when prime ≥ 2,

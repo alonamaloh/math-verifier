@@ -89,16 +89,15 @@ applies). Estimated ~2 hours.
 From a full-library audit (2026-05-17). Each item is annotated with
 the directories that motivate it.
 
-1. **Case-on-expression with retained equation.** The function-wrap
+1. **Case-on-expression with retained equation.** ~~The function-wrap
    pattern from `CLAUDE.md` ("`cases` with hypothesis") appears 20+
    times in `Natural/padic_valuation.math`, 8 times in
-   `Natural/divide.math` alone, plus heavy use in
-   `Natural/division.math`, `Natural/cancellation.math`,
-   `Natural/decide_divides.math`, `Logic/constructor_totality.math`,
-   `Integer/absolute_value*.math`. Each is a 6-line wrapper around a
-   one-line idea. Remedy: `match E with eqHyp returning G { | c₁ =>
-   … | c₂ => … }` where `eqHyp : E = c_i` is bound automatically in
-   each arm. **Biggest line-eater across the library.**
+   `Natural/divide.math` alone, plus heavy use elsewhere.~~ **Fixed:**
+   `cases X with <equalityHypothesisName> { | c₁ => … | c₂ => … }`
+   binds `<equalityHypothesisName> : X = c_i` in each arm via the
+   convoy desugaring. Remaining work: sweep the library to apply
+   it to the 50+ function-then-apply sites. (Like the prior
+   `rewrite(eq, term)` sweep, mechanical and per-file.)
 
 2. **`rewrite` only fires inside `calc` steps.** ~~Outside `calc`,
    users fall back to the 6-arg

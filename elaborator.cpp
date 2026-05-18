@@ -2153,9 +2153,16 @@ private:
                 rewrittenClause.column = clause.column;
                 rewrittenClauses.push_back(std::move(rewrittenClause));
             }
-            return makeSurfaceCases(std::move(rewrittenScrutinee),
-                                     std::move(rewrittenClauses),
-                                     node.line, node.column);
+            if (cases->equalityHypothesisName.empty()) {
+                return makeSurfaceCases(std::move(rewrittenScrutinee),
+                                         std::move(rewrittenClauses),
+                                         node.line, node.column);
+            }
+            return makeSurfaceCasesWithEqualityHypothesis(
+                std::move(rewrittenScrutinee),
+                std::move(rewrittenClauses),
+                cases->equalityHypothesisName,
+                node.line, node.column);
         }
         if (auto* calc = std::get_if<SurfaceCalc>(&node.node)) {
             auto rewrittenInitial = rewriteRecursiveCalls(
@@ -5799,6 +5806,232 @@ private:
             scrutinee);
     }
 
+    // Render a `SurfacePattern` back into a `SurfaceExpression` for
+    // use as the right-hand side of the per-arm equation in the
+    // `cases X with equalityHypothesisName { … }` desugaring.
+    // Constructor patterns become applications of the constructor's
+    // name to the bound argument names. Tuple patterns are
+    // disallowed (the convoy doesn't add information on
+    // single-constructor inductives, and the rest of the desugar
+    // would have to re-route through the tuple's lone constructor —
+    // not worth the complexity for the v1 cut).
+    SurfaceExpressionPointer patternToSurfaceExpression(
+        SurfacePatternPointer pattern) {
+        int line = pattern->line;
+        int column = pattern->column;
+        if (auto* bare =
+                std::get_if<SurfacePatternBareName>(&pattern->node)) {
+            return makeSurfaceIdentifier(bare->name, {},
+                                          line, column);
+        }
+        if (auto* constructorPattern =
+                std::get_if<SurfacePatternConstructor>(&pattern->node)) {
+            SurfaceExpressionPointer head = makeSurfaceIdentifier(
+                constructorPattern->constructorName, {}, line, column);
+            if (constructorPattern->arguments.empty()) {
+                return head;
+            }
+            std::vector<SurfaceArgument> arguments;
+            for (const auto& argumentPattern :
+                     constructorPattern->arguments) {
+                SurfaceArgument argument;
+                argument.value =
+                    patternToSurfaceExpression(argumentPattern);
+                arguments.push_back(std::move(argument));
+            }
+            return makeSurfaceApplication(std::move(head),
+                                           std::move(arguments),
+                                           line, column);
+        }
+        throwElaborate(
+            "cases ... with equalityHypothesis: tuple patterns are "
+            "not yet supported in the convoy desugaring; the "
+            "`function`+`cases` form still works as a fallback");
+        return nullptr;  // unreachable
+    }
+
+    // `cases X with equalityHypothesisName { … }` — the "convoy" form.
+    //
+    // Each arm gets an extra binder
+    //   `equalityHypothesisName : X = <constructor pattern>`
+    // in scope. Implements the user's explicit
+    //   `(function (caseScrutineeVariable : T)
+    //              (equalityHypothesisOuter : X = caseScrutineeVariable) =>
+    //      (cases caseScrutineeVariable {
+    //         | ctor(args) => function (equalityHypothesisName : X = ctor(args)) => body
+    //       } : (… : X = caseScrutineeVariable) → Goal)(
+    //          equalityHypothesisOuter))
+    //   (X)(reflexivity(X))`
+    // pattern, but without the user having to write any of it.
+    //
+    // Kernel-level details:
+    //   - The user's expected type `Goal` is passed in CLOSED form
+    //     (BoundVariable indices relative to the surrounding theorem
+    //     binders). We extend localBinders with the two new convoy
+    //     binders and lift Goal accordingly when we drop it into the
+    //     inner Pi.
+    //   - The "constructor pattern as surface expression" is
+    //     reconstructed from each clause's pattern; the names that
+    //     bind constructor arguments inside the pattern reappear as
+    //     references in the equation type, so the elaborator wires
+    //     them up by name during the inner case-arm elaboration.
+    //   - The inner cases is elaborated against an expected type of
+    //     `(_inner : X = caseScrutineeVariable) → Goal`. The standard
+    //     `elaborateCasesExpression` motive-inference picks the
+    //     scrutinee-abstracted motive `λ s. (… : X = s) → Goal` from
+    //     this; each arm then has expected type
+    //     `(… : X = <constructor pattern>) → Goal`, which is exactly
+    //     the surface lambda we wrapped around the user's body.
+    ExpressionPointer elaborateCasesWithEqualityHypothesis(
+        const SurfaceCases& cases,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "cases ... with " + cases.equalityHypothesisName
+            + " at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "cases X with " + cases.equalityHypothesisName
+                + " { … } needs an expected type from context");
+        }
+        // (1) Elaborate the scrutinee X. Get T (closed) and its
+        // universe level.
+        ExpressionPointer scrutineeKernel = elaborateExpression(
+            *cases.scrutinee, localBinders);
+        ExpressionPointer scrutineeTypeOpened = weakHeadNormalForm(
+            environment_,
+            inferTypeInLocalContext(localBinders, scrutineeKernel));
+        ExpressionPointer scrutineeType = closeOverLocalBinders(
+            scrutineeTypeOpened, localBinders, localBinders.size());
+        LevelPointer scrutineeUniverse =
+            typeUniverseOf(localBinders, scrutineeKernel);
+
+        // (2) Names for the two convoy binders. The internal "_" prefix
+        // avoids any chance of colliding with user-visible names; the
+        // user only ever sees `equalityHypothesisName` (theirs).
+        const std::string caseScrutineeName =
+            "_caseScrutineeFor_" + cases.equalityHypothesisName;
+        const std::string outerEqualityName =
+            "_equalityHypothesisOuterFor_"
+            + cases.equalityHypothesisName;
+
+        // (3) Build the equality-type for the OUTER binder in extended
+        // scope. After adding `caseScrutineeName : T` to localBinders,
+        // BoundVariable(0) refers to that binder, and references to the
+        // original local binders shift up by 1.
+        ExpressionPointer scrutineeTypeLiftedOnce =
+            liftBoundVariables(scrutineeType, 1, 0);
+        ExpressionPointer scrutineeKernelLiftedOnce =
+            liftBoundVariables(scrutineeKernel, 1, 0);
+        ExpressionPointer outerEqualityType = makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeConstant("Equality", {scrutineeUniverse}),
+                    scrutineeTypeLiftedOnce),
+                scrutineeKernelLiftedOnce),
+            makeBoundVariable(0));
+
+        std::vector<LocalBinder> extendedLocalBinders = localBinders;
+        extendedLocalBinders.push_back(
+            {caseScrutineeName, scrutineeType});
+        extendedLocalBinders.push_back(
+            {outerEqualityName, outerEqualityType});
+
+        // (4) Construct the synthetic `SurfaceCases` whose scrutinee is
+        // the new binder `caseScrutineeName` and whose arm bodies are
+        // wrapped in
+        //   function (equalityHypothesisName : X = <ctor pattern>) =>
+        //     <original body>
+        // so the equation binder is visible inside the user's body
+        // while the rest of the surface elaboration runs unchanged.
+        std::vector<SurfaceCasesClause> wrappedClauses;
+        for (const auto& clause : cases.clauses) {
+            SurfaceCasesClause wrappedClause;
+            wrappedClause.pattern = clause.pattern;
+            wrappedClause.line = clause.line;
+            wrappedClause.column = clause.column;
+            SurfaceExpressionPointer patternExpression =
+                patternToSurfaceExpression(clause.pattern);
+            // `cases.scrutinee = patternExpression` via the surface
+            // binary-operator builder; the existing elaborator path
+            // turns this into `Equality.{…}(T, X, ctorPattern)`.
+            SurfaceExpressionPointer equationType =
+                makeSurfaceBinaryOperation(
+                    "=", cases.scrutinee, patternExpression,
+                    clause.line, clause.column);
+            SurfaceBinder equationBinder;
+            equationBinder.names = {cases.equalityHypothesisName};
+            equationBinder.type = equationType;
+            equationBinder.isImplicit = false;
+            wrappedClause.body = makeSurfaceLambda(
+                std::move(equationBinder), clause.body,
+                clause.line, clause.column);
+            wrappedClauses.push_back(std::move(wrappedClause));
+        }
+        SurfaceExpressionPointer innerScrutinee = makeSurfaceIdentifier(
+            caseScrutineeName, {}, line, column);
+        SurfaceExpressionPointer syntheticCasesSurface =
+            makeSurfaceCases(std::move(innerScrutinee),
+                              std::move(wrappedClauses), line, column);
+
+        // (5) Expected type for the inner cases, expressed in the
+        // *extended* scope: `(eqInner : X = caseScrutineeVariable) → Goal`.
+        // In closed form at extended depth: X lifted by 2, the
+        // BoundVariable(1) reference to caseScrutineeVariable (depth + 2
+        // means BV(0) is outerEqualityName, BV(1) is caseScrutineeName).
+        ExpressionPointer scrutineeTypeLiftedTwice =
+            liftBoundVariables(scrutineeType, 2, 0);
+        ExpressionPointer scrutineeKernelLiftedTwice =
+            liftBoundVariables(scrutineeKernel, 2, 0);
+        ExpressionPointer innerEqualityType = makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeConstant("Equality", {scrutineeUniverse}),
+                    scrutineeTypeLiftedTwice),
+                scrutineeKernelLiftedTwice),
+            makeBoundVariable(1));
+        // The Pi codomain lives one binder deeper than the extended
+        // scope (i.e. orig + 3 binders total). Goal was closed at
+        // orig, so lift by 3.
+        ExpressionPointer goalLiftedByThree =
+            liftBoundVariables(expectedType, 3, 0);
+        ExpressionPointer innerExpectedType = makePi(
+            "_innerEqualityHypothesisUnused",
+            innerEqualityType, goalLiftedByThree);
+
+        // (6) Elaborate the synthetic cases at the extended scope.
+        ExpressionPointer innerCasesKernel = elaborateExpression(
+            *syntheticCasesSurface, extendedLocalBinders,
+            innerExpectedType);
+
+        // (7) Apply the inner cases to outerEquality (BoundVariable(0)
+        // at extended scope). The result has type `Goal` lifted by 2.
+        ExpressionPointer appliedToOuter = makeApplication(
+            innerCasesKernel, makeBoundVariable(0));
+
+        // (8) Wrap in the two outer Lambdas (closing the convoy
+        // binders).
+        ExpressionPointer wrappedOuterEquality = makeLambda(
+            outerEqualityName, outerEqualityType, appliedToOuter);
+        ExpressionPointer wrappedCaseScrutinee = makeLambda(
+            caseScrutineeName, scrutineeType, wrappedOuterEquality);
+
+        // (9) Apply to (X, reflexivity(T, X)). reflexivity types as
+        // `X = X`; the kernel reduces the outer Lambda's β to align
+        // it with the Pi domain `X = caseScrutineeVariable`.
+        ExpressionPointer reflexivityCall = makeApplication(
+            makeApplication(
+                makeConstant("reflexivity", {scrutineeUniverse}),
+                scrutineeType),
+            scrutineeKernel);
+        ExpressionPointer fullyApplied = makeApplication(
+            makeApplication(wrappedCaseScrutinee, scrutineeKernel),
+            reflexivityCall);
+        return fullyApplied;
+        (void)column;
+    }
+
     // `cases scrutinee { | pattern => body | ... }`. Phase 1 covers
     // non-indexed inductives only. Re-uses the existing
     // `buildCaseLambda` helper by synthesizing a minimal pattern-match
@@ -5808,6 +6041,13 @@ private:
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column) {
+        // The `cases X with equalityHypothesisName { … }` variant
+        // routes through a dedicated convoy desugaring; everything
+        // below is the plain `cases X { … }` path.
+        if (!cases.equalityHypothesisName.empty()) {
+            return elaborateCasesWithEqualityHypothesis(
+                cases, localBinders, expectedType, line, column);
+        }
 
         Frame frame(*this,
             "cases expression at line " + std::to_string(line));

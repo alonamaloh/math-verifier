@@ -171,6 +171,11 @@ struct SurfaceAnonymousTuple {
 struct SurfaceCases {
     SurfaceExpressionPointer scrutinee;
     std::vector<SurfaceCasesClause> clauses;
+    // `cases X with equalityHypothesisName { … }` — when non-empty,
+    // each arm gets an additional binder
+    //   `equalityHypothesisName : X = <constructor pattern>`
+    // in scope, generated via the standard convoy desugaring.
+    std::string equalityHypothesisName;
 };
 
 // `?` — placeholder for a proof the elaborator should fill in. Phase 3
@@ -430,7 +435,18 @@ inline SurfaceExpressionPointer makeSurfaceCases(
     std::vector<SurfaceCasesClause> clauses,
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
-        SurfaceCases{std::move(scrutinee), std::move(clauses)},
+        SurfaceCases{std::move(scrutinee), std::move(clauses), {}},
+        line, column});
+}
+
+inline SurfaceExpressionPointer makeSurfaceCasesWithEqualityHypothesis(
+    SurfaceExpressionPointer scrutinee,
+    std::vector<SurfaceCasesClause> clauses,
+    std::string equalityHypothesisName,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceCases{std::move(scrutinee), std::move(clauses),
+                      std::move(equalityHypothesisName)},
         line, column});
 }
 
