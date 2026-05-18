@@ -3322,8 +3322,8 @@ private:
         Frame frame(*this,
             "claim at line " + std::to_string(line));
 
-        if (!claim.arms.empty()) {
-            return elaborateClaimDisjunctiveArms(
+        if (claim.byCases) {
+            return elaborateClaimByCases(
                 claim, localBinders, expectedType, line);
         }
 
@@ -3720,91 +3720,92 @@ private:
             "succeeds — add `by <lemma>` to specify");
     }
 
-    // Step 4 of the structured-proof feature. Elaborates
-    // `claim A ∨ B [by Hint] { in (A): body  in (B): body }` into
-    // an `Or.eliminate(A, B, Goal, λa. body, λb. body, disjProof)`
-    // call. v1 limits: exactly 2 arms (binary disjunction).
-    ExpressionPointer elaborateClaimDisjunctiveArms(
+    // Elaborates `claim [P] by cases { in (A): body  in (B): body }`.
+    // Strategy:
+    //   1. Determine the goal (proposition P if given, else expected).
+    //   2. Elaborate each arm's disjunctType.
+    //   3. Find an in-scope hypothesis of type `Or armA armB` — that's
+    //      the disjunction we case-split on.
+    //   4. Elaborate each arm body under an anonymous binder of its
+    //      disjunct's type; build the two lambdas.
+    //   5. Emit `Or.eliminate(A, B, Goal, leftLambda, rightLambda,
+    //                          theInScopeDisjunction)`.
+    // v1 limits: exactly 2 arms (binary disjunction).
+    ExpressionPointer elaborateClaimByCases(
         const SurfaceStructuredClaim& claim,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line) {
         Frame frame(*this,
-            "claim arms at line " + std::to_string(line));
+            "claim by cases at line " + std::to_string(line));
 
-        if (!claim.proposition) {
-            throwElaborate(
-                "disjunctive `claim` requires a proposition before "
-                "the arms-block: `claim A ∨ B { … }`");
-        }
-        if (!expectedType) {
-            throwElaborate(
-                "disjunctive `claim` needs the surrounding goal as "
-                "an expected type from context");
-        }
         if (claim.arms.size() != 2) {
             throwElaborate(
-                "v1 of disjunctive `claim` handles exactly 2 arms; "
-                "got " + std::to_string(claim.arms.size())
+                "`by cases` v1 handles exactly 2 arms; got "
+                + std::to_string(claim.arms.size())
                 + " — n-ary disjunctions are a planned later step");
         }
 
-        // Elaborate the disjunction proposition; expect Or A B.
-        ExpressionPointer propClosed = elaborateExpression(
-            *claim.proposition, localBinders);
-        ExpressionPointer propReduced = weakHeadNormalForm(
-            environment_, propClosed);
-
-        ExpressionPointer leftDisjunct;
-        ExpressionPointer rightDisjunct;
-        {
-            auto* outerApp =
-                std::get_if<Application>(&propReduced->node);
-            auto* innerApp = outerApp ? std::get_if<Application>(
-                &outerApp->function->node) : nullptr;
-            auto* head = innerApp ? std::get_if<Constant>(
-                &innerApp->function->node) : nullptr;
-            if (!outerApp || !innerApp || !head
-                || head->name != "Or") {
-                throwElaborate(
-                    "disjunctive `claim` expects an `Or A B` "
-                    "proposition; got `"
-                    + prettyPrintInLocalScope(
-                          propClosed, localBinders)
-                    + "`");
-            }
-            leftDisjunct = innerApp->argument;
-            rightDisjunct = outerApp->argument;
+        // The goal each arm must prove.
+        ExpressionPointer goalClosed;
+        if (claim.proposition) {
+            goalClosed = elaborateExpression(
+                *claim.proposition, localBinders);
+        } else if (expectedType) {
+            goalClosed = expectedType;
+        } else {
+            throwElaborate(
+                "`claim by cases` needs either a proposition or an "
+                "expected type from context");
         }
 
-        // Verify each arm's disjunctType matches its position.
-        auto checkArmDisjunct = [&](size_t index,
-                                     ExpressionPointer expected) {
-            ExpressionPointer armDisjunctClosed = elaborateExpression(
-                *claim.arms[index].disjunctType, localBinders);
-            if (!structurallyEqual(armDisjunctClosed, expected)) {
-                throwElaborate(
-                    "arm " + std::to_string(index + 1)
-                    + " expects disjunct `"
-                    + prettyPrintInLocalScope(
-                          armDisjunctClosed, localBinders)
-                    + "` but the proposition's "
-                    + (index == 0 ? "left" : "right")
-                    + " disjunct is `"
-                    + prettyPrintInLocalScope(expected, localBinders)
-                    + "`");
+        // Elaborate arm disjuncts.
+        ExpressionPointer leftDisjunct = elaborateExpression(
+            *claim.arms[0].disjunctType, localBinders);
+        ExpressionPointer rightDisjunct = elaborateExpression(
+            *claim.arms[1].disjunctType, localBinders);
+
+        // Build the expected disjunction type `Or leftDisjunct
+        // rightDisjunct`. Or is a non-polymorphic Proposition.
+        ExpressionPointer expectedDisjunction = makeApplication(
+            makeApplication(
+                makeConstant("Or", {}), leftDisjunct),
+            rightDisjunct);
+
+        // Find an in-scope hypothesis of that type. Last-bound-first
+        // so the most recent matching disjunction wins.
+        int N = static_cast<int>(localBinders.size());
+        int disjBinderIndex = -1;
+        for (int b = N - 1; b >= 0; --b) {
+            int lift = N - b;
+            ExpressionPointer binderTypeInScope =
+                liftBoundVariables(localBinders[b].type, lift, 0);
+            if (structurallyEqual(
+                    binderTypeInScope, expectedDisjunction)) {
+                disjBinderIndex = b;
+                break;
             }
-        };
-        checkArmDisjunct(0, leftDisjunct);
-        checkArmDisjunct(1, rightDisjunct);
+        }
+        if (disjBinderIndex == -1) {
+            throwElaborate(
+                "`claim by cases`: no in-scope hypothesis of type `"
+                + prettyPrintInLocalScope(
+                      expectedDisjunction, localBinders)
+                + "` — introduce it earlier with a non-terminal "
+                "`claim "
+                + prettyPrintInLocalScope(leftDisjunct, localBinders)
+                + " ∨ "
+                + prettyPrintInLocalScope(rightDisjunct, localBinders)
+                + "`");
+        }
+        ExpressionPointer disjProof = makeBoundVariable(
+            N - 1 - disjBinderIndex);
 
-        // Build each arm's lambda. Each arm's body is elaborated in
-        // localBinders + the anonymous disjunct hypothesis. The goal
-        // type is lifted by 1 to account for the extra binder when
-        // it's passed down as expectedType.
-        ExpressionPointer expectedTypeLifted =
-            liftBoundVariables(expectedType, 1, 0);
-
+        // Build each arm's lambda. Body is elaborated under
+        // localBinders + anonymous disjunct binder. The goal is
+        // lifted by 1 to account for the extra binder.
+        ExpressionPointer goalLifted =
+            liftBoundVariables(goalClosed, 1, 0);
         auto buildArmLambda =
             [&](size_t index, ExpressionPointer domain)
                 -> ExpressionPointer {
@@ -3813,40 +3814,18 @@ private:
                 {"_disjunct_hypothesis", domain});
             ExpressionPointer body = elaborateExpression(
                 *claim.arms[index].body, extendedBinders,
-                expectedTypeLifted);
+                goalLifted);
             return makeLambda(
                 "_disjunct_hypothesis", domain, body);
         };
         ExpressionPointer leftLambda = buildArmLambda(0, leftDisjunct);
         ExpressionPointer rightLambda = buildArmLambda(1, rightDisjunct);
 
-        // Establish the disjunction proof. With a `by` hint, run
-        // Step 2's auto-fill against the proposition. Without one,
-        // fall through to Step 5's library lookup — for the user's
-        // motivating example the inversion lemma is found by
-        // conclusion shape (Or-headed).
-        ExpressionPointer disjProof;
-        if (claim.byHint) {
-            ExpressionPointer hintTerm = elaborateExpression(
-                *claim.byHint, localBinders);
-            ExpressionPointer hintTypeOpened =
-                inferTypeInLocalContext(localBinders, hintTerm);
-            ExpressionPointer hintTypeClosed = closeOverLocalBinders(
-                hintTypeOpened, localBinders, localBinders.size());
-            disjProof = autoFillHintForClaim(
-                hintTerm, hintTypeClosed, propClosed,
-                localBinders, line);
-        } else {
-            disjProof = lookupClaimByLibrary(
-                propClosed, localBinders, line);
-        }
-
-        // Build Or.eliminate(A, B, Goal, leftLambda, rightLambda,
-        // disjProof). Or.eliminate is a non-polymorphic definition.
+        // Or.eliminate(A, B, Goal, leftLambda, rightLambda, disjProof).
         ExpressionPointer call = makeConstant("Or.eliminate", {});
         call = makeApplication(call, leftDisjunct);
         call = makeApplication(call, rightDisjunct);
-        call = makeApplication(call, expectedType);
+        call = makeApplication(call, goalClosed);
         call = makeApplication(call, leftLambda);
         call = makeApplication(call, rightLambda);
         call = makeApplication(call, disjProof);

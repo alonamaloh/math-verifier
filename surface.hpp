@@ -251,22 +251,26 @@ struct SurfaceGiven {
     SurfaceExpressionPointer proposition;
 };
 
-// `claim Proposition [labeled (*)] [by Hint] [{ in (...): body  ... }]`
-// — a structured-proof step in mathematician style. Three modes:
-//   - `claim P by Hint`             : prove P from Hint (auto-fills args).
-//   - `claim P`                     : prove P by library lookup (Q2-ii).
-//   - `claim P { in (A): … in (B): … }`: case-split (P must be A ∨ B …),
-//                                       arms prove the surrounding goal.
-// In the trailing position of a block, the proposition may be omitted —
-// the claim discharges the current goal:
-//   - `claim by Hint`
-//   - `claim` (lookup only)
-// `labeled (*)` lets later steps cite the result by the label.
+// `claim` — a structured-proof step in mathematician style. Forms:
+//   - `claim P`               : assert P (lookup proof from scope).
+//   - `claim P by Hint`       : prove P from Hint (auto-fills args).
+//   - `claim P by cases { in (A): body  in (B): body }`
+//                             : prove P by case-split on an in-scope
+//                               disjunction whose disjuncts match the
+//                               arm headers.
+//   - `claim by Hint`         : discharge current goal from Hint.
+//   - `claim by cases { … }`  : discharge current goal by cases.
+//   - `claim`                 : discharge current goal by lookup.
+// In a structured-proof sequence (multiple claims one after another),
+// each non-terminal claim is wrapped at parse time into a SurfaceLet
+// that introduces its proof as an anonymous binder for the following
+// statements. The final claim becomes the block's value.
 struct SurfaceStructuredClaim {
     SurfaceExpressionPointer proposition;       // null for bare `claim`
     std::string label;                          // empty if no label
     SurfaceExpressionPointer byHint;            // null if no `by`
-    std::vector<SurfaceStructuredClaimArm> arms; // empty if no arms
+    bool byCases = false;                       // `by cases { … }`
+    std::vector<SurfaceStructuredClaimArm> arms; // arms when byCases
 };
 
 struct SurfaceExpression {
@@ -423,11 +427,13 @@ inline SurfaceExpressionPointer makeSurfaceStructuredClaim(
     SurfaceExpressionPointer proposition,
     std::string label,
     SurfaceExpressionPointer byHint,
+    bool byCases,
     std::vector<SurfaceStructuredClaimArm> arms,
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceStructuredClaim{std::move(proposition), std::move(label),
-                                std::move(byHint), std::move(arms)},
+                                std::move(byHint), byCases,
+                                std::move(arms)},
         line, column});
 }
 // Forward-declared above; full SurfaceCasesClause type lives later in

@@ -1403,9 +1403,11 @@ private:
         // contextual keyword (and so would otherwise be treated as a
         // bare identifier). Block-statement `claim NAME : T [by V];`
         // is parsed earlier via parseBlockContents and never reaches
-        // here, so the two forms don't collide.
+        // here, so the two forms don't collide. A claim immediately
+        // followed by another `claim` chains via SurfaceLet so the
+        // proposition of the first is in scope for the rest.
         if (current.kind == TokenKind::KeywordClaim) {
-            return parseStructuredClaim();
+            return parseStructuredClaimSequence();
         }
         if (current.kind == TokenKind::KeywordGiven) {
             return parseGiven();
@@ -1682,41 +1684,82 @@ private:
                                 calcToken.line, calcToken.column);
     }
 
-    // Structured-proof `claim` at expression position. Forms:
-    //   `claim P`                       — prove P by library lookup
-    //   `claim P by Hint`               — prove P from Hint, auto-fill args
-    //   `claim P { in (A): body  in (B): body … }`
-    //                                   — case-split on P (a disjunction)
-    //   `claim by Hint`                 — terminal: discharge current goal
-    //   `claim`                         — terminal: discharge by lookup
+    // One `claim` step. Forms:
+    //   `claim P`                       — prove / introduce P (lookup)
+    //   `claim P by Hint`               — prove P from Hint, args filled
+    //   `claim P by cases { in (A): … in (B): … }`
+    //                                   — prove P by case-split on a
+    //                                     disjunction found in scope
+    //   `claim by Hint`                 — discharge current goal via Hint
+    //   `claim by cases { … }`          — discharge by case-split
+    //   `claim`                         — discharge current goal by lookup
     // Coexists with block-statement `claim NAME : TYPE [by V];` — that
     // form is handled by parseBlockContents and never reaches here.
-    // Labels (e.g. `(*)`) are a planned later addition.
     SurfaceExpressionPointer parseStructuredClaim() {
         Token claimToken = consumeAny();  // 'claim'
         SurfaceExpressionPointer proposition;
         SurfaceExpressionPointer byHint;
+        bool byCases = false;
         std::vector<SurfaceStructuredClaimArm> arms;
-        // Bare `claim` / `claim by Hint` — terminal, no proposition.
+        // Bare `claim` / `claim by …` — terminal-shaped, no proposition.
         if (peek().kind != TokenKind::KeywordBy
             && !isStructuredClaimTerminator()) {
             proposition = parseExpression();
         }
         if (peek().kind == TokenKind::KeywordBy) {
             consumeAny();  // 'by'
-            byHint = parseExpression();
-        }
-        if (peek().kind == TokenKind::LeftBrace) {
-            consumeAny();  // '{'
-            while (peek().kind == TokenKind::KeywordIn) {
-                arms.push_back(parseStructuredClaimArm());
+            if (peek().kind == TokenKind::KeywordCases) {
+                consumeAny();  // 'cases'
+                byCases = true;
+                expect(TokenKind::LeftBrace, "after 'by cases'");
+                while (peek().kind == TokenKind::KeywordIn) {
+                    arms.push_back(parseStructuredClaimArm());
+                }
+                expect(TokenKind::RightBrace,
+                       "ending 'by cases' arms block");
+            } else {
+                byHint = parseExpression();
             }
-            expect(TokenKind::RightBrace, "ending claim arms block");
         }
         return makeSurfaceStructuredClaim(
             std::move(proposition), /*label=*/"",
-            std::move(byHint), std::move(arms),
+            std::move(byHint), byCases, std::move(arms),
             claimToken.line, claimToken.column);
+    }
+
+    // A run of one or more `claim`s. Each non-terminal claim (one that
+    // is followed by another `claim`) is wrapped in a SurfaceLet that
+    // introduces its proof under an auto-generated anonymous binder
+    // name (`_anonymousClaim_<n>`). The final claim becomes the
+    // sequence's value. Anonymous binders are searchable via Step 5's
+    // hypothesis lookup and `given (P)`.
+    SurfaceExpressionPointer parseStructuredClaimSequence() {
+        SurfaceExpressionPointer first = parseStructuredClaim();
+        if (peek().kind != TokenKind::KeywordClaim) {
+            return first;
+        }
+        // First is non-terminal. Must have a proposition for its
+        // type — anonymous let-bindings can't have inferred types
+        // yet.
+        const SurfaceStructuredClaim* claim =
+            std::get_if<SurfaceStructuredClaim>(&first->node);
+        if (!claim || !claim->proposition) {
+            throwHere("a `claim` followed by another `claim` must "
+                      "have an explicit proposition (so it can be "
+                      "introduced as an anonymous local fact)");
+        }
+        int firstLine = first->line;
+        int firstColumn = first->column;
+        SurfaceExpressionPointer proposition = claim->proposition;
+        SurfaceExpressionPointer rest = parseStructuredClaimSequence();
+        std::string anonymousName =
+            "_anonymousClaim_" + std::to_string(anonymousClaimCounter_++);
+        return makeSurfaceLet(
+            std::move(anonymousName),
+            std::move(proposition),
+            std::move(first),
+            std::move(rest),
+            firstLine, firstColumn);
     }
 
     // True if the next token can only end a bare `claim` (no
@@ -2031,6 +2074,7 @@ private:
 
     const std::vector<Token>& tokens_;
     size_t position_ = 0;
+    int anonymousClaimCounter_ = 0;
 };
 
 }  // namespace
