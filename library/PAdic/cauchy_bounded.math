@@ -52,26 +52,22 @@ convention p : Natural with primality : Natural.is_prime(p)
 -- Bridge: Integer.absolute_value(n) = n when IsNonneg(n).
 theorem Integer.absolute_value_of_nonneg (n : Integer)
         (nNonneg : Integer.IsNonneg(n))
-        : Integer.absolute_value(n) = n :=
-  Exists.eliminate(
-      Natural,
-      function (k : Natural) => n = (k : Integer),
-      Integer.absolute_value(n) = n,
-      function (k : Natural) (nEqK : n = (k : Integer)) =>
+        : Integer.absolute_value(n) = n := {
+    obtain ⟨k, nEqK⟩ from nNonneg;
+    Equality.transitivity(
+        Integer,
+        Integer.absolute_value(n),
+        Integer.absolute_value((k : Integer)),
+        n,
+        congruenceOf(Integer.absolute_value, nEqK),
         Equality.transitivity(
             Integer,
-            Integer.absolute_value(n),
             Integer.absolute_value((k : Integer)),
+            (k : Integer),
             n,
-            congruenceOf(Integer.absolute_value, nEqK),
-            Equality.transitivity(
-                Integer,
-                Integer.absolute_value((k : Integer)),
-                (k : Integer),
-                n,
-                Integer.absolute_value_of_natural(k),
-                Equality.symmetry(nEqK))),
-      nNonneg)
+            Integer.absolute_value_of_natural(k),
+            Equality.symmetry(nEqK)))
+}
 
 -- Rational version: |q| = q when IsNonneg(q). Quotient.induct on q;
 -- at rep, IsNonneg(mk(make(n, d))) β-reduces to Integer.IsNonneg(n),
@@ -105,26 +101,15 @@ theorem Rational.absolute_value_of_nonneg (q : Rational)
 -- and the bridge |q| = q.
 theorem Rational.le_succ_natural_when_nonneg
         (q : Rational) (qNonneg : Rational.zero ≤ q)
-        : ∃ (K : Natural). q ≤ (successor(K) : Rational) :=
-  Exists.eliminate(
-      Natural,
-      function (K : Natural) =>
-          Rational.absolute_value(q) ≤ (successor(K) : Rational),
-      ∃ (K : Natural). q ≤ (successor(K) : Rational),
-      function (K : Natural)
-               (absQ_le : Rational.absolute_value(q)
-                            ≤ (successor(K) : Rational)) =>
-        Exists.introduce(
-            Natural,
-            function (Kp : Natural) =>
-                q ≤ (successor(Kp) : Rational),
-            K,
-            rewrite(
-                Rational.absolute_value_of_nonneg(
-                    q,
-                    Rational.IsNonneg_of_LessOrEqual_zero(q, qNonneg)),
-                absQ_le)),
-      Rational.absolute_value_le_succ_natural(q))
+        : ∃ (K : Natural). q ≤ (successor(K) : Rational) := {
+    obtain ⟨K, absQ_le⟩ from Rational.absolute_value_le_succ_natural(q);
+    witness K with
+        rewrite(
+            Rational.absolute_value_of_nonneg(
+                q,
+                Rational.IsNonneg_of_LessOrEqual_zero(q, qNonneg)),
+            absQ_le)
+}
 
 -- ----------------------------------------------------------------------
 -- p-adic Cauchy is eventually naturally bounded.
@@ -137,123 +122,81 @@ theorem Rational.sequence.cauchy_is_padic_naturally_bounded
                 Rational.padic_absolute_value(p, primality, s(m))
                   ≤ (successor(K) : Rational) :=
   -- Step 1: apply sCauchy with ε = 1.
-  Exists.eliminate(
-      Natural,
-      function (N : Natural) =>
-        (m : Natural) → N ≤ m →
-          (n : Natural) → N ≤ n →
-            Rational.padic_absolute_value(p, primality, s(m) - s(n))
-              < Rational.one,
-      ∃ (K : Natural).
-        ∃ (N : Natural).
-          (m : Natural) → N ≤ m →
-            Rational.padic_absolute_value(p, primality, s(m))
-              ≤ (successor(K) : Rational),
-      function (N : Natural)
-               (sCauchy_at_N
-                  : (m : Natural) → N ≤ m →
-                    (n : Natural) → N ≤ n →
-                      Rational.padic_absolute_value(p, primality,
-                          s(m) - s(n))
-                        < Rational.one) =>
-        -- Step 2: get Natural bound K_inner for |s(N)|_p (using the
-        -- nonneg-Archimedean lemma).
-        Exists.eliminate(
-            Natural,
-            function (K_inner : Natural) =>
-                Rational.padic_absolute_value(p, primality, s(N))
-                  ≤ (successor(K_inner) : Rational),
-            ∃ (K : Natural).
-              ∃ (NPrime : Natural).
-                (m : Natural) → NPrime ≤ m →
-                  Rational.padic_absolute_value(p, primality, s(m))
-                    ≤ (successor(K) : Rational),
-            function (K_inner : Natural)
-                     (s_at_N_bound
-                        : Rational.padic_absolute_value(p, primality, s(N))
-                          ≤ (successor(K_inner) : Rational)) =>
-              -- Witness: K := succ(K_inner) (so final bound is
-              -- (succ(succ(K_inner)) : R)), N := N (unchanged).
-              Exists.introduce(
-                  Natural,
-                  function (K : Natural) =>
-                    ∃ (NPrime : Natural).
-                      (m : Natural) → NPrime ≤ m →
-                        Rational.padic_absolute_value(p, primality, s(m))
-                          ≤ (successor(K) : Rational),
-                  successor(K_inner),
-                  Exists.introduce(
-                      Natural,
-                      function (NPrime : Natural) =>
-                        (m : Natural) → NPrime ≤ m →
-                          Rational.padic_absolute_value(p, primality, s(m))
-                            ≤ (successor(successor(K_inner)) : Rational),
-                      N,
-                      function (m : Natural) (N_leq_m : N ≤ m) =>
-                        -- Chain:
-                        -- |s(m)|_p
-                        --   = |s(N) + (s(m) - s(N))|_p   (split_via_anchor)
-                        --   ≤ |s(N)|_p + |s(m) - s(N)|_p (padic triangle)
-                        --   ≤ (succ K_inner : R) + |s(m) - s(N)|_p
-                        --   ≤ (succ K_inner : R) + 1     (|s(m)-s(N)|_p < 1)
-                        --   = (succ (succ K_inner) : R).
-                        Rational.LessOrEqual.transitive(
-                            Rational.padic_absolute_value(
-                                p, primality, s(m)),
-                            (successor(K_inner) : Rational) + Rational.one,
-                            (successor(successor(K_inner)) : Rational),
-                            Rational.LessOrEqual.transitive(
-                                Rational.padic_absolute_value(
-                                    p, primality, s(m)),
-                                Rational.padic_absolute_value(
-                                    p, primality, s(N))
-                                    + Rational.padic_absolute_value(
-                                          p, primality, s(m) - s(N)),
-                                (successor(K_inner) : Rational) + Rational.one,
-                                rewrite(
-                                    Equality.symmetry(
-                                        congruenceOf(
-                                            function (r : Rational) =>
-                                                Rational.padic_absolute_value(
-                                                    p, primality, r),
-                                            Rational.split_via_anchor(
-                                                s(m), s(N)))),
-                                    Rational.padic_absolute_value_triangle(
-                                        p, primality, s(N), s(m) - s(N))),
-                                Rational.LessOrEqual.sum(
-                                    Rational.padic_absolute_value(
-                                        p, primality, s(N)),
-                                    (successor(K_inner) : Rational),
-                                    Rational.padic_absolute_value(
-                                        p, primality, s(m) - s(N)),
-                                    Rational.one,
-                                    s_at_N_bound,
-                                    And.left(
-                                        Rational.LessOrEqual(
-                                            Rational.padic_absolute_value(
-                                                p, primality, s(m) - s(N)),
-                                            Rational.one),
-                                        Not(Rational.padic_absolute_value(
-                                                p, primality, s(m) - s(N))
-                                            = Rational.one),
-                                        sCauchy_at_N(
-                                            m, N_leq_m, N,
-                                            LessOrEqual.reflexivity(N))))),
-                            Equality.transport_proposition(
-                                Rational,
-                                function (w : Rational) =>
-                                    Rational.LessOrEqual(
-                                        (successor(K_inner) : Rational)
-                                            + Rational.one,
-                                        w),
-                                (successor(K_inner) : Rational) + Rational.one,
-                                (successor(successor(K_inner)) : Rational),
-                                Rational.succ_natural_plus_one(K_inner),
-                                Rational.LessOrEqual.reflexive(
-                                    (successor(K_inner) : Rational)
-                                        + Rational.one))))),
-            Rational.le_succ_natural_when_nonneg(
-                Rational.padic_absolute_value(p, primality, s(N)),
-                Rational.padic_absolute_value_nonneg(
-                    p, primality, s(N)))),
-      sIsCauchy(Rational.one, Rational.zero_less_one))
+  {
+    obtain ⟨N, sCauchy_at_N⟩
+        from sIsCauchy(Rational.one, Rational.zero_less_one);
+    -- Step 2: get Natural bound K_inner for |s(N)|_p (using the
+    -- nonneg-Archimedean lemma).
+    obtain ⟨K_inner, s_at_N_bound⟩
+        from Rational.le_succ_natural_when_nonneg(
+            Rational.padic_absolute_value(p, primality, s(N)),
+            Rational.padic_absolute_value_nonneg(
+                p, primality, s(N)));
+    -- Witness: K := succ(K_inner) (so final bound is
+    -- (succ(succ(K_inner)) : R)), N := N (unchanged).
+    witness successor(K_inner) with
+        (witness N with
+            function (m : Natural) (N_leq_m : N ≤ m) =>
+              -- Chain:
+              -- |s(m)|_p
+              --   = |s(N) + (s(m) - s(N))|_p   (split_via_anchor)
+              --   ≤ |s(N)|_p + |s(m) - s(N)|_p (padic triangle)
+              --   ≤ (succ K_inner : R) + |s(m) - s(N)|_p
+              --   ≤ (succ K_inner : R) + 1     (|s(m)-s(N)|_p < 1)
+              --   = (succ (succ K_inner) : R).
+              Rational.LessOrEqual.transitive(
+                  Rational.padic_absolute_value(
+                      p, primality, s(m)),
+                  (successor(K_inner) : Rational) + Rational.one,
+                  (successor(successor(K_inner)) : Rational),
+                  Rational.LessOrEqual.transitive(
+                      Rational.padic_absolute_value(
+                          p, primality, s(m)),
+                      Rational.padic_absolute_value(
+                          p, primality, s(N))
+                          + Rational.padic_absolute_value(
+                                p, primality, s(m) - s(N)),
+                      (successor(K_inner) : Rational) + Rational.one,
+                      rewrite(
+                          Equality.symmetry(
+                              congruenceOf(
+                                  function (r : Rational) =>
+                                      Rational.padic_absolute_value(
+                                          p, primality, r),
+                                  Rational.split_via_anchor(
+                                      s(m), s(N)))),
+                          Rational.padic_absolute_value_triangle(
+                              p, primality, s(N), s(m) - s(N))),
+                      Rational.LessOrEqual.sum(
+                          Rational.padic_absolute_value(
+                              p, primality, s(N)),
+                          (successor(K_inner) : Rational),
+                          Rational.padic_absolute_value(
+                              p, primality, s(m) - s(N)),
+                          Rational.one,
+                          s_at_N_bound,
+                          And.left(
+                              Rational.LessOrEqual(
+                                  Rational.padic_absolute_value(
+                                      p, primality, s(m) - s(N)),
+                                  Rational.one),
+                              Not(Rational.padic_absolute_value(
+                                      p, primality, s(m) - s(N))
+                                  = Rational.one),
+                              sCauchy_at_N(
+                                  m, N_leq_m, N,
+                                  LessOrEqual.reflexivity(N))))),
+                  Equality.transport_proposition(
+                      Rational,
+                      function (w : Rational) =>
+                          Rational.LessOrEqual(
+                              (successor(K_inner) : Rational)
+                                  + Rational.one,
+                              w),
+                      (successor(K_inner) : Rational) + Rational.one,
+                      (successor(successor(K_inner)) : Rational),
+                      Rational.succ_natural_plus_one(K_inner),
+                      Rational.LessOrEqual.reflexive(
+                          (successor(K_inner) : Rational)
+                              + Rational.one))))
+  }

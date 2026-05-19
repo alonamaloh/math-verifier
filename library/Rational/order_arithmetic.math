@@ -74,35 +74,23 @@ theorem Integer.IsNonneg_and_negate_IsNonneg_implies_zero
         (x : Integer)
         (xIsNonneg : Integer.IsNonneg(x))
         (negXIsNonneg : Integer.IsNonneg(-x))
-        : x = Integer.zero :=
-  Exists.eliminate(
-      Natural,
-      function (a : Natural) => x = (a : Integer),
-      x = Integer.zero,
-      function (a : Natural) (xIsImage : x = (a : Integer)) =>
-        Exists.eliminate(
-            Natural,
-            function (k : Natural) => -x = (k : Integer),
-            x = Integer.zero,
-            function (k : Natural) (negXIsImage : -x = (k : Integer)) =>
-              -- x = (a : I); -x = (k : I), so x = -(k : I). Hence
-              -- (a : I) = -(k : I), giving a = 0 ∧ k = 0, so x = 0.
-              And.eliminate(
-                  a = zero, k = zero,
-                  x = Integer.zero,
-                  function (aIsZero : a = zero) (_ : k = zero) =>
-                    calc x
-                       = (a : Integer)
-                       = (zero : Integer)
-                       = Integer.zero,
-                  Integer.image_eq_negate_image_implies_both_zero(
-                      a, k,
-                      calc (a : Integer)
-                         = x
-                         = -(-x)
-                         = -((k : Integer)))),
-            negXIsNonneg),
-      xIsNonneg)
+        : x = Integer.zero := {
+    obtain ⟨a, xIsImage⟩ from xIsNonneg;
+    obtain ⟨k, negXIsImage⟩ from negXIsNonneg;
+    -- x = (a : I); -x = (k : I), so x = -(k : I). Hence
+    -- (a : I) = -(k : I), giving a = 0 ∧ k = 0, so x = 0.
+    obtain ⟨aIsZero, _kIsZero⟩
+        from Integer.image_eq_negate_image_implies_both_zero(
+                 a, k,
+                 calc (a : Integer)
+                    = x
+                    = -(-x)
+                    = -((k : Integer)));
+    calc x
+       = (a : Integer)
+       = (zero : Integer)
+       = Integer.zero
+}
 
 -- ----------------------------------------------------------------------
 -- Rational ≤ reflexivity and transitivity.
@@ -126,27 +114,15 @@ theorem Integer.IsNonneg.add
         (x y : Integer)
         (xIsNonneg : Integer.IsNonneg(x))
         (yIsNonneg : Integer.IsNonneg(y))
-        : Integer.IsNonneg(x + y) :=
-  Exists.eliminate(
-      Natural,
-      function (a : Natural) => x = (a : Integer),
-      Integer.IsNonneg(x + y),
-      function (a : Natural) (xIsImage : x = (a : Integer)) =>
-        Exists.eliminate(
-            Natural,
-            function (b : Natural) => y = (b : Integer),
-            Integer.IsNonneg(x + y),
-            function (b : Natural) (yIsImage : y = (b : Integer)) =>
-              Exists.introduce(
-                  Natural,
-                  function (k : Natural) => x + y = (k : Integer),
-                  a + b,
-                  calc x + y
-                     = (a : Integer) + y
-                     = (a : Integer) + (b : Integer)
-                     = (a + b : Integer)),
-            yIsNonneg),
-      xIsNonneg)
+        : Integer.IsNonneg(x + y) := {
+    obtain ⟨a, xIsImage⟩ from xIsNonneg;
+    obtain ⟨b, yIsImage⟩ from yIsNonneg;
+    witness a + b with
+        (calc x + y
+            = (a : Integer) + y
+            = (a : Integer) + (b : Integer)
+            = (a + b : Integer))
+}
 
 -- Rational IsNonneg.add via Quotient.induct_two.
 theorem Rational.IsNonneg.add (p q : Rational)

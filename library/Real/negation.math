@@ -52,63 +52,41 @@ theorem Real.negate_respects
       CauchyRationalSequence.negate(rep1Prime),
       function (epsilon : Rational)
                (epsilonPositive : Rational.zero < epsilon) =>
-        Exists.eliminate(
-            Natural,
-            function (N : Natural) =>
-              (m : Natural) → N ≤ m →
-                Rational.absolute_value(
-                    CauchyRationalSequence.sequenceFunction(rep1, m)
-                    - CauchyRationalSequence.sequenceFunction(rep1Prime, m))
-                  < epsilon,
-            ∃ (N : Natural).
+        ({
+          obtain ⟨N, origAtN⟩
+              from equivalenceHypothesis(epsilon, epsilonPositive);
+          witness N with
+              function (m : Natural) (N_leq_m : N ≤ m) =>
+                -- Goal: |sf(neg(rep1), m) - sf(neg(rep1Prime), m)| < ε.
+                -- Have: |sf(rep1, m) - sf(rep1Prime, m)| < ε.
+                -- Bridge via sf(neg, m) = -sf(., m), then
+                -- |-x - -y| = |x - y|.
+                rewrite(
+                    Equality.symmetry(
+                        calc Rational.absolute_value(
+                                 CauchyRationalSequence.sequenceFunction(
+                                     CauchyRationalSequence.negate(rep1), m)
+                                 - CauchyRationalSequence.sequenceFunction(
+                                     CauchyRationalSequence.negate(rep1Prime), m))
+                           = Rational.absolute_value(
+                                 -CauchyRationalSequence.sequenceFunction(rep1, m)
+                                 - CauchyRationalSequence.sequenceFunction(
+                                     CauchyRationalSequence.negate(rep1Prime), m))
+                           = Rational.absolute_value(
+                                 -CauchyRationalSequence.sequenceFunction(rep1, m)
+                                 - -CauchyRationalSequence.sequenceFunction(rep1Prime, m))
+                           = Rational.absolute_value(
+                                 CauchyRationalSequence.sequenceFunction(rep1, m)
+                                 - CauchyRationalSequence.sequenceFunction(rep1Prime, m))),
+                    origAtN(m, N_leq_m))
+        } : ∃ (N : Natural).
               (m : Natural) → N ≤ m →
                 Rational.absolute_value(
                     CauchyRationalSequence.sequenceFunction(
                         CauchyRationalSequence.negate(rep1), m)
                     - CauchyRationalSequence.sequenceFunction(
                         CauchyRationalSequence.negate(rep1Prime), m))
-                  < epsilon,
-            function (N : Natural)
-                     (origAtN : (m : Natural) → N ≤ m →
-                       Rational.absolute_value(
-                           CauchyRationalSequence.sequenceFunction(rep1, m)
-                           - CauchyRationalSequence.sequenceFunction(rep1Prime, m))
-                         < epsilon) =>
-              Exists.introduce(
-                  Natural,
-                  function (N' : Natural) =>
-                    (m : Natural) → N' ≤ m →
-                      Rational.absolute_value(
-                          CauchyRationalSequence.sequenceFunction(
-                              CauchyRationalSequence.negate(rep1), m)
-                          - CauchyRationalSequence.sequenceFunction(
-                              CauchyRationalSequence.negate(rep1Prime), m))
-                        < epsilon,
-                  N,
-                  function (m : Natural) (N_leq_m : N ≤ m) =>
-                    -- Goal: |sf(neg(rep1), m) - sf(neg(rep1Prime), m)| < ε.
-                    -- Have: |sf(rep1, m) - sf(rep1Prime, m)| < ε.
-                    -- Bridge via sf(neg, m) = -sf(., m), then
-                    -- |-x - -y| = |x - y|.
-                    rewrite(
-                        Equality.symmetry(
-                            calc Rational.absolute_value(
-                                     CauchyRationalSequence.sequenceFunction(
-                                         CauchyRationalSequence.negate(rep1), m)
-                                     - CauchyRationalSequence.sequenceFunction(
-                                         CauchyRationalSequence.negate(rep1Prime), m))
-                               = Rational.absolute_value(
-                                     -CauchyRationalSequence.sequenceFunction(rep1, m)
-                                     - CauchyRationalSequence.sequenceFunction(
-                                         CauchyRationalSequence.negate(rep1Prime), m))
-                               = Rational.absolute_value(
-                                     -CauchyRationalSequence.sequenceFunction(rep1, m)
-                                     - -CauchyRationalSequence.sequenceFunction(rep1Prime, m))
-                               = Rational.absolute_value(
-                                     CauchyRationalSequence.sequenceFunction(rep1, m)
-                                     - CauchyRationalSequence.sequenceFunction(rep1Prime, m))),
-                        origAtN(m, N_leq_m))),
-            equivalenceHypothesis(epsilon, epsilonPositive)))
+                  < epsilon))
 
 definition Real.negate (x : Real) : Real :=
   Quotient.lift(

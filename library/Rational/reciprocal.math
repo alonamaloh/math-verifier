@@ -113,29 +113,20 @@ theorem Rational.strict_positive_witness_at_representative
         (nIsNonneg : Integer.IsNonneg(n))
         (nNonzero
            : Not(n = Integer.zero))
-        : ∃ (k : Natural). n = (successor(k) : Integer) :=
-  Exists.eliminate(
-      Natural,
-      function (a : Natural) => n = (a : Integer),
-      ∃ (k : Natural). n = (successor(k) : Integer),
-      function (a : Natural) (nIsImage : n = (a : Integer)) =>
-        (cases a {
-           | zero =>
-               -- n = (zero : I) = Integer.zero, contradicts nNonzero.
-               function (refinedHypothesis : n = (zero : Integer)) =>
-                 absurd(nNonzero(
-                            calc n
-                               = (zero : Integer)
-                               = Integer.zero))
-           | successor(predecessor) =>
-               function (refinedHypothesis
-                            : n = (successor(predecessor) : Integer)) =>
-                 Exists.introduce(
-                     Natural,
-                     function (k : Natural) =>
-                         n = (successor(k) : Integer),
-                     predecessor,
-                     refinedHypothesis)
-         } : (refinedHypothesis : n = (a : Integer))
-             → ∃ (k : Natural). n = (successor(k) : Integer))(nIsImage),
-      nIsNonneg)
+        : ∃ (k : Natural). n = (successor(k) : Integer) := {
+    obtain ⟨a, nIsImage⟩ from nIsNonneg;
+    (cases a {
+       | zero =>
+           -- n = (zero : I) = Integer.zero, contradicts nNonzero.
+           function (refinedHypothesis : n = (zero : Integer)) =>
+             absurd(nNonzero(
+                        calc n
+                           = (zero : Integer)
+                           = Integer.zero))
+       | successor(predecessor) =>
+           function (refinedHypothesis
+                        : n = (successor(predecessor) : Integer)) =>
+             witness predecessor with refinedHypothesis
+     } : (refinedHypothesis : n = (a : Integer))
+         → ∃ (k : Natural). n = (successor(k) : Integer))(nIsImage)
+}

@@ -37,21 +37,13 @@ import Rational.absolute_value
 -- If x is IsNonneg (= some Natural's image), then x * succ(d) is too.
 theorem Integer.IsNonneg.multiply_by_positive_natural
         (x : Integer) (d : Natural) (xIsNonneg : Integer.IsNonneg(x))
-        : Integer.IsNonneg(x * (successor(d) : Integer)) :=
-  Exists.eliminate(
-      Natural,
-      function (n : Natural) => x = (n : Integer),
-      Integer.IsNonneg(x * (successor(d) : Integer)),
-      function (n : Natural) (xIsImage : x = (n : Integer)) =>
-          Exists.introduce(
-              Natural,
-              function (k : Natural) =>
-                  x * (successor(d) : Integer) = (k : Integer),
-              n * successor(d),
-              calc x * (successor(d) : Integer)
-                 = (n : Integer) * (successor(d) : Integer)
-                 = (n * successor(d) : Integer)),
-      xIsNonneg)
+        : Integer.IsNonneg(x * (successor(d) : Integer)) := {
+    obtain ⟨n, xIsImage⟩ from xIsNonneg;
+    witness n * successor(d) with
+        (calc x * (successor(d) : Integer)
+            = (n : Integer) * (successor(d) : Integer)
+            = (n * successor(d) : Integer))
+}
 
 -- The Integer-level kernel: B ≤ A and then (A - B) * succ(d) is
 -- non-negative, AND distributes through.
@@ -96,18 +88,12 @@ theorem Integer.IsNonneg.transport_from_natural_form
         : Integer.IsNonneg(
               A * (successor(d) : Integer)
               + -B * (successor(d) : Integer)) :=
-  Exists.introduce(
-      Natural,
-      function (k : Natural) =>
-          A * (successor(d) : Integer)
-          + -B * (successor(d) : Integer)
-          = (k : Integer),
-      n * successor(d),
-      calc A * (successor(d) : Integer)
-           + -B * (successor(d) : Integer)
-         = (A - B) * (successor(d) : Integer)
-         = (n : Integer) * (successor(d) : Integer)
-         = (n * successor(d) : Integer))
+  witness n * successor(d) with
+      (calc A * (successor(d) : Integer)
+            + -B * (successor(d) : Integer)
+          = (A - B) * (successor(d) : Integer)
+          = (n : Integer) * (successor(d) : Integer)
+          = (n * successor(d) : Integer))
 
 -- The representative-level triangle inequality. Both |p+q| and |p|+|q|
 -- on representatives have denominator d := d2 + d1*succ(d2), and the
@@ -139,75 +125,58 @@ theorem Rational.triangle_inequality_at_representatives
   -- From Integer.triangle_inequality_rational_form we have B ≤ A,
   -- i.e., ∃ n. A = B + (n : I). Then A + -B = (n : I), and the
   -- bridge lemma gives IsNonneg of the desired form.
-  Exists.eliminate(
-      Natural,
-      function (n : Natural) =>
-          Integer.absolute_value(n1) * (successor(d2) : Integer)
-          + Integer.absolute_value(n2) * (successor(d1) : Integer)
-          = Integer.absolute_value(
-                n1 * (successor(d2) : Integer)
-                + n2 * (successor(d1) : Integer))
-            + (n : Integer),
-      Integer.IsNonneg(
+  ({
+    obtain ⟨n, witnessHypothesis⟩
+        from Integer.triangle_inequality_rational_form(n1, n2, d1, d2);
+    Integer.IsNonneg.transport_from_natural_form(
+        Integer.absolute_value(n1) * (successor(d2) : Integer)
+            + Integer.absolute_value(n2)
+                * (successor(d1) : Integer),
+        Integer.absolute_value(
+            n1 * (successor(d2) : Integer)
+            + n2 * (successor(d1) : Integer)),
+        d2 + d1 * successor(d2),
+        n,
+        -- A + -B = (n : I). Witness: A = B + (n : I), so
+        -- A + -B = B + (n : I) + -B = (n : I) by ring.
+        calc Integer.absolute_value(n1)
+                 * (successor(d2) : Integer)
+             + Integer.absolute_value(n2)
+                 * (successor(d1) : Integer)
+             + -Integer.absolute_value(
+                   n1 * (successor(d2) : Integer)
+                   + n2 * (successor(d1) : Integer))
+           = Integer.absolute_value(
+                 n1 * (successor(d2) : Integer)
+                 + n2 * (successor(d1) : Integer))
+             + (n : Integer)
+             + -Integer.absolute_value(
+                   n1 * (successor(d2) : Integer)
+                   + n2 * (successor(d1) : Integer))
+           = -Integer.absolute_value(
+                   n1 * (successor(d2) : Integer)
+                   + n2 * (successor(d1) : Integer))
+             + (Integer.absolute_value(
+                    n1 * (successor(d2) : Integer)
+                    + n2 * (successor(d1) : Integer))
+                + (n : Integer))
+           = (-Integer.absolute_value(
+                    n1 * (successor(d2) : Integer)
+                    + n2 * (successor(d1) : Integer))
+              + Integer.absolute_value(
+                    n1 * (successor(d2) : Integer)
+                    + n2 * (successor(d1) : Integer)))
+             + (n : Integer)
+           = Integer.zero + (n : Integer)
+           = (n : Integer))
+  } : Integer.IsNonneg(
           (Integer.absolute_value(n1) * (successor(d2) : Integer)
            + Integer.absolute_value(n2) * (successor(d1) : Integer))
           * (successor(d2 + d1 * successor(d2)) : Integer)
           + -(Integer.absolute_value(
                   n1 * (successor(d2) : Integer)
                   + n2 * (successor(d1) : Integer)))
-            * (successor(d2 + d1 * successor(d2)) : Integer)),
-      function (n : Natural)
-               (witnessHypothesis
-                  : Integer.absolute_value(n1)
-                        * (successor(d2) : Integer)
-                    + Integer.absolute_value(n2)
-                        * (successor(d1) : Integer)
-                    = Integer.absolute_value(
-                          n1 * (successor(d2) : Integer)
-                          + n2 * (successor(d1) : Integer))
-                      + (n : Integer)) =>
-          Integer.IsNonneg.transport_from_natural_form(
-              Integer.absolute_value(n1) * (successor(d2) : Integer)
-                  + Integer.absolute_value(n2)
-                      * (successor(d1) : Integer),
-              Integer.absolute_value(
-                  n1 * (successor(d2) : Integer)
-                  + n2 * (successor(d1) : Integer)),
-              d2 + d1 * successor(d2),
-              n,
-              -- A + -B = (n : I). Witness: A = B + (n : I), so
-              -- A + -B = B + (n : I) + -B = (n : I) by ring.
-              calc Integer.absolute_value(n1)
-                       * (successor(d2) : Integer)
-                   + Integer.absolute_value(n2)
-                       * (successor(d1) : Integer)
-                   + -Integer.absolute_value(
-                         n1 * (successor(d2) : Integer)
-                         + n2 * (successor(d1) : Integer))
-                 = Integer.absolute_value(
-                       n1 * (successor(d2) : Integer)
-                       + n2 * (successor(d1) : Integer))
-                   + (n : Integer)
-                   + -Integer.absolute_value(
-                         n1 * (successor(d2) : Integer)
-                         + n2 * (successor(d1) : Integer))
-                 = -Integer.absolute_value(
-                         n1 * (successor(d2) : Integer)
-                         + n2 * (successor(d1) : Integer))
-                   + (Integer.absolute_value(
-                          n1 * (successor(d2) : Integer)
-                          + n2 * (successor(d1) : Integer))
-                      + (n : Integer))
-                 = (-Integer.absolute_value(
-                          n1 * (successor(d2) : Integer)
-                          + n2 * (successor(d1) : Integer))
-                    + Integer.absolute_value(
-                          n1 * (successor(d2) : Integer)
-                          + n2 * (successor(d1) : Integer)))
-                   + (n : Integer)
-                 = Integer.zero + (n : Integer)
-                 = (n : Integer)),
-      Integer.triangle_inequality_rational_form(n1, n2, d1, d2))
+            * (successor(d2 + d1 * successor(d2)) : Integer)))
 
 -- |x + y| ≤ |x| + |y| on Rational. Lift via Quotient.induct_two.
 theorem Rational.triangle_inequality (x y : Rational)

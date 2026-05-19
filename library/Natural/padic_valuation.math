@@ -886,21 +886,13 @@ theorem Natural.padic_valuation_power_divides
 -- then power(k, p) = power(j + r, p) = power(j, p) * power(r, p).
 theorem Natural.power_divides_power
         (p j k : Natural) (jLeK : j ≤ k)
-        : Natural.divides(Natural.power(j, p), Natural.power(k, p)) :=
-  Exists.eliminate(
-      Natural,
-      function (r : Natural) => k = j + r,
-      Natural.divides(Natural.power(j, p), Natural.power(k, p)),
-      function (r : Natural) (kEqJPlusR : k = j + r) =>
-        Exists.introduce(
-            Natural,
-            function (w : Natural) =>
-                Natural.power(k, p) = Natural.power(j, p) * w,
-            Natural.power(r, p),
-            calc Natural.power(k, p)
-               = Natural.power(j + r, p)
-               = Natural.power(j, p) * Natural.power(r, p)),
-      Natural.subtraction_witness(j, k, jLeK))
+        : Natural.divides(Natural.power(j, p), Natural.power(k, p)) := {
+    obtain ⟨r, kEqJPlusR⟩ from Natural.subtraction_witness(j, k, jLeK);
+    witness Natural.power(r, p) with
+        (calc Natural.power(k, p)
+            = Natural.power(j + r, p)
+            = Natural.power(j, p) * Natural.power(r, p))
+}
 
 -- Combining the above two: if k ≤ v_p(n), then p^k | n.
 theorem Natural.padic_valuation_ge_implies_power_divides
@@ -940,11 +932,7 @@ theorem Natural.power_divides_implies_padic_valuation_ge
                Natural.power(successor(predK), prime),
                n,
                -- p | p^succ(predK) — witness power(predK, p).
-               Exists.introduce(
-                   Natural,
-                   function (w : Natural) =>
-                       Natural.power(successor(predK), prime) = prime * w,
-                   Natural.power(predK, prime),
+               (witness Natural.power(predK, prime) with
                    reflexivity(Natural,
                        Natural.power(successor(predK), prime))),
                succPDivides);
@@ -994,13 +982,7 @@ theorem Natural.power_divides_implies_padic_valuation_ge
                      : Natural.divides(
                            Natural.power(predK, prime),
                            successor(predQ))
-                 by Exists.introduce(
-                        Natural,
-                        function (w' : Natural) =>
-                            successor(predQ)
-                              = Natural.power(predK, prime) * w',
-                        w,
-                        qDividesEq);
+                 by witness w with qDividesEq;
                -- By IH on (predK, succ(predQ)): predK ≤ v_p(succ(predQ)).
                claim ihResult
                      : predK ≤ Natural.padic_valuation(
@@ -1569,16 +1551,12 @@ theorem Natural.power_monotone_via_r
 theorem Natural.power_monotone
         (a b p : Natural) (aLeB : a ≤ b)
         (pPositive : successor(zero) ≤ p)
-        : Natural.power(a, p) ≤ Natural.power(b, p) :=
-  Exists.eliminate(
-      Natural,
-      function (r : Natural) => b = a + r,
-      Natural.power(a, p) ≤ Natural.power(b, p),
-      function (r : Natural) (bEqAplusR : b = a + r) =>
-        rewrite(
-            Equality.symmetry(bEqAplusR),
-            Natural.power_monotone_via_r(a, p, pPositive, r)),
-      Natural.subtraction_witness(a, b, aLeB))
+        : Natural.power(a, p) ≤ Natural.power(b, p) := {
+    obtain ⟨r, bEqAplusR⟩ from Natural.subtraction_witness(a, b, aLeB);
+    rewrite(
+        Equality.symmetry(bEqAplusR),
+        Natural.power_monotone_via_r(a, p, pPositive, r))
+}
 
 -- distance(a, b) = 0 implies a = b. Useful for the |·|_Nat = 0 →
 -- Integer.zero bridge.

@@ -43,48 +43,37 @@ theorem Rational.IsNonneg_forward_helper
             : n1 * (successor(d2) : Integer)
               = n2 * (successor(d1) : Integer))
         (n1IsNonneg : Integer.IsNonneg(n1))
-        : Integer.IsNonneg(n2) :=
-  Exists.eliminate(
-      Natural,
-      function (a : Natural) => n1 = (a : Integer),
-      Integer.IsNonneg(n2),
-      function (a : Natural) (n1IsImage : n1 = (a : Integer)) => ({
-        claim Integer.IsNonneg(n2) ∨ (∃ (k : Natural). n2 = -(k : Integer))
-            by Integer.sign_split(n2)
-        claim by cases {
-          in (Integer.IsNonneg(n2)) as n2IsNonneg: n2IsNonneg
-          in (∃ (k : Natural). n2 = -(k : Integer)) as n2NegEvidence:
-              Exists.eliminate(
-                  Natural,
-                  function (k : Natural) => n2 = -(k : Integer),
-                  Integer.IsNonneg(n2),
-                  function (k : Natural)
-                           (n2EqNegK : n2 = -(k : Integer)) => {
-                    claim mixedEquation
-                          : (a : Integer) * (successor(d2) : Integer)
-                            = -(k : Integer) * (successor(d1) : Integer)
-                      by calc (a : Integer) * (successor(d2) : Integer)
-                            = n1 * (successor(d2) : Integer)
-                            = n2 * (successor(d1) : Integer)
-                            = -(k : Integer) * (successor(d1) : Integer);
-                    claim kIsZero : k = zero
-                      by Integer.natural_eq_negate_natural_implies_both_zero(
-                             a, k, d1, d2, mixedEquation);
-                    claim n2EqZero : n2 = Integer.zero
-                      by Equality.transitivity(
-                             n2EqNegK,
-                             congruenceOf(
-                                 function (x : Natural) =>
-                                     -(x : Integer),
-                                 kIsZero));
-                    rewrite(
-                        Equality.symmetry(n2EqZero),
-                        Integer.zero_is_nonneg)
-                  },
-                  n2NegEvidence)
-        }
-      } : Integer.IsNonneg(n2)),
-      n1IsNonneg)
+        : Integer.IsNonneg(n2) := {
+    obtain ⟨a, n1IsImage⟩ from n1IsNonneg;
+    claim Integer.IsNonneg(n2) ∨ (∃ (k : Natural). n2 = -(k : Integer))
+        by Integer.sign_split(n2)
+    claim by cases {
+      in (Integer.IsNonneg(n2)) as n2IsNonneg: n2IsNonneg
+      in (∃ (k : Natural). n2 = -(k : Integer)) as n2NegEvidence: {
+          obtain ⟨k, n2EqNegK⟩ from n2NegEvidence;
+          claim mixedEquation
+                : (a : Integer) * (successor(d2) : Integer)
+                  = -(k : Integer) * (successor(d1) : Integer)
+            by calc (a : Integer) * (successor(d2) : Integer)
+                  = n1 * (successor(d2) : Integer)
+                  = n2 * (successor(d1) : Integer)
+                  = -(k : Integer) * (successor(d1) : Integer);
+          claim kIsZero : k = zero
+            by Integer.natural_eq_negate_natural_implies_both_zero(
+                   a, k, d1, d2, mixedEquation);
+          claim n2EqZero : n2 = Integer.zero
+            by Equality.transitivity(
+                   n2EqNegK,
+                   congruenceOf(
+                       function (x : Natural) =>
+                           -(x : Integer),
+                       kIsZero));
+          rewrite(
+              Equality.symmetry(n2EqZero),
+              Integer.zero_is_nonneg)
+      }
+    }
+}
 
 -- Respect: via propositional extensionality, forward and backward.
 -- Backward is forward with sides swapped (symmetric equation).

@@ -148,21 +148,14 @@ theorem Integer.negate_add (p q : Integer) : -(p + q) = -p + -q :=
 -- implies (n : I) ≤ (m : I). Witness via Natural.subtraction_witness.
 theorem Natural.to_integer.le_preserves
         (n m : Natural) (nLeqM : n ≤ m)
-        : (n : Integer) ≤ (m : Integer) :=
-  Exists.eliminate(
-      Natural,
-      function (k : Natural) => m = n + k,
-      Integer.LessOrEqual((n : Integer), (m : Integer)),
-      function (k : Natural) (mEqualsNPlusK : m = n + k) =>
-          Exists.introduce(
-              Natural,
-              function (j : Natural) =>
-                  (m : Integer) = (n : Integer) + (j : Integer),
-              k,
-              calc (m : Integer)
-                 = (n + k : Integer)
-                 = (n : Integer) + (k : Integer)),
-      Natural.subtraction_witness(n, m, nLeqM))
+        : (n : Integer) ≤ (m : Integer) := {
+    obtain ⟨k, mEqualsNPlusK⟩
+        from Natural.subtraction_witness(n, m, nLeqM);
+    witness k with
+        (calc (m : Integer)
+            = (n + k : Integer)
+            = (n : Integer) + (k : Integer))
+}
 
 -- |x + y| at representatives reduces directly: mk(a, b) + mk(c, d)
 -- = mk(a + c, b + d), |·| = (distance(a + c, b + d) : I). Stated as
