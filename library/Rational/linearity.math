@@ -1,0 +1,182 @@
+-- Rational/linearity.math
+--
+-- Linearity of the Rational order. With excluded_middle in scope,
+-- every two Rationals are comparable, and ¬(a < b) gives b ≤ a.
+-- These match the standard "totally-ordered field" facts about
+-- Rational and unlock contrapositive-flavored reasoning the
+-- constructive lemmas in `Rational/order_arithmetic.math` don't
+-- provide.
+
+module Rational.linearity
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Integer.basics
+import Integer.embedding
+import Integer.negation
+import Integer.order
+import Integer.sign
+import Integer.absolute_value
+import Rational.basics
+import Rational.addition
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.absolute_value
+
+-- ----------------------------------------------------------------------
+-- Every Rational is either non-negative or its negation is.
+-- Quotient.induct over `value`; at a representative `make(numerator,
+-- denominator)`, IsNonneg reduces to Integer.IsNonneg(numerator).
+-- For -value, it reduces to Integer.IsNonneg(-numerator). Apply
+-- Integer.sign_split(numerator); on the "numerator = -(k : Integer)"
+-- branch, -numerator = (k : Integer), which is non-negative.
+theorem Rational.IsNonneg_or_negate_IsNonneg
+        (value : Rational)
+        : Or(Rational.IsNonneg(value), Rational.IsNonneg(-value)) :=
+  Quotient.induct(
+      function (valueArgument : Rational) =>
+          Or(Rational.IsNonneg(valueArgument),
+             Rational.IsNonneg(-valueArgument)),
+      function (representative : RationalRepresentative) =>
+        (cases representative {
+           | RationalRepresentative.make(numerator, denominator) =>
+               Or.eliminate(
+                   function (numeratorNonneg
+                                 : Integer.IsNonneg(numerator)) =>
+                       Or.introduceLeft(
+                           Rational.IsNonneg(
+                               (Quotient.mk(
+                                    RationalRepresentative.make(
+                                        numerator, denominator))
+                                    : Rational)),
+                           Rational.IsNonneg(
+                               -(Quotient.mk(
+                                     RationalRepresentative.make(
+                                         numerator, denominator))
+                                     : Rational)),
+                           numeratorNonneg),
+                   function (numeratorNegated
+                                 : ∃ (k : Natural).
+                                     numerator = -(k : Integer)) =>
+                       Or.introduceRight(
+                           Rational.IsNonneg(
+                               (Quotient.mk(
+                                    RationalRepresentative.make(
+                                        numerator, denominator))
+                                    : Rational)),
+                           Rational.IsNonneg(
+                               -(Quotient.mk(
+                                     RationalRepresentative.make(
+                                         numerator, denominator))
+                                     : Rational)),
+                           ({
+                             obtain ⟨k, numeratorEqualsNegatedK⟩
+                                 from numeratorNegated;
+                             -- Goal: Integer.IsNonneg(-numerator).
+                             -- numerator = -(k : Integer), so
+                             -- -numerator = -(-(k : Integer)) = (k : Integer).
+                             rewrite(
+                                 Equality.symmetry(
+                                     calc -numerator
+                                        = -(-(k : Integer))
+                                              by congruenceOf(
+                                                     Integer.negate,
+                                                     numeratorEqualsNegatedK)
+                                        = (k : Integer)
+                                              by Integer.negate_negate(
+                                                     (k : Integer))),
+                                 Integer.from_natural_is_nonneg(k))
+                           } : Integer.IsNonneg(-numerator))),
+                   Integer.sign_split(numerator))
+         } : Or(Rational.IsNonneg(
+                    (Quotient.mk(representative) : Rational)),
+                Rational.IsNonneg(
+                    -(Quotient.mk(representative) : Rational)))),
+      value)
+
+-- ----------------------------------------------------------------------
+-- Algebraic helper used by the linearity argument:
+-- `-(right - left) = left - right`. Pure Rational ring identity.
+theorem Rational.negate_subtract
+        (right left : Rational)
+        : -(right - left) = left - right :=
+  calc -(right - left)
+     = -(right + -left)
+     = -right + -(-left)
+            by Rational.negate_add(right, -left)
+     = -right + left
+            by congruenceOf(
+                   function (z : Rational) => -right + z,
+                   Rational.negate_negate(left))
+     = left + -right
+            by Rational.add_commutative(-right, left)
+     = left - right
+
+-- ----------------------------------------------------------------------
+-- Linearity of ≤. From the sign-split on `right - left`, derive
+-- either `left ≤ right` (Rational.IsNonneg(right - left)) or
+-- `right ≤ left` (Rational.IsNonneg(-(right - left)) = IsNonneg(left
+-- - right), via `Rational.negate_subtract`).
+theorem Rational.LessOrEqual.linear
+        (left right : Rational)
+        : Or(left ≤ right, right ≤ left) :=
+  Or.eliminate(
+      function (differenceNonneg : Rational.IsNonneg(right - left)) =>
+          Or.introduceLeft(
+              left ≤ right, right ≤ left,
+              differenceNonneg),
+      function (negatedDifferenceNonneg
+                    : Rational.IsNonneg(-(right - left))) =>
+          Or.introduceRight(
+              left ≤ right, right ≤ left,
+              -- right ≤ left = IsNonneg(left - right). We have
+              -- IsNonneg(-(right - left)) = IsNonneg(left - right)
+              -- via `Rational.negate_subtract`.
+              rewrite(
+                  Rational.negate_subtract(right, left),
+                  negatedDifferenceNonneg)),
+      Rational.IsNonneg_or_negate_IsNonneg(right - left))
+
+-- ----------------------------------------------------------------------
+-- Contrapositive of <: `¬(a < b)` forces `b ≤ a`. With linearity,
+-- either `a ≤ b` or `b ≤ a`. The first case combined with
+-- `¬(a < b) = ¬(a ≤ b ∧ ¬(a = b))` forces `a = b`, hence `b ≤ a`
+-- by reflexivity. The second case is the conclusion directly.
+theorem Rational.not_LessThan_implies_LessOrEqual
+        (a b : Rational) (notLessThan : Not(Rational.LessThan(a, b)))
+        : b ≤ a :=
+  Or.eliminate(
+      Rational.LessOrEqual(a, b), Rational.LessOrEqual(b, a),
+      Rational.LessOrEqual(b, a),
+      function (aLeqB : a ≤ b) =>
+          -- a ≤ b. Show a = b, then b ≤ a by reflexivity. To show a = b:
+          -- case excluded_middle(a = b). If yes, return; if no, build
+          -- (a ≤ b ∧ a ≠ b) = (a < b), contradicting notLessThan.
+          Or.eliminate(
+              a = b, Not(a = b),
+              Rational.LessOrEqual(b, a),
+              function (aEqB : a = b) =>
+                  -- a = b ⇒ b ≤ a. Transport `a ≤ a` along aEqB on
+                  -- the left position with motive `λz. z ≤ a`.
+                  Equality.transport_proposition(
+                      Rational,
+                      function (z : Rational) => z ≤ a,
+                      a, b, aEqB,
+                      Rational.LessOrEqual.reflexive(a)),
+              function (aNotEqB : Not(a = b)) =>
+                  False.eliminate_proposition(
+                      b ≤ a,
+                      notLessThan(
+                          And.introduction(
+                              a ≤ b, Not(a = b),
+                              aLeqB, aNotEqB))),
+              Logic.excluded_middle(a = b)),
+      function (bLeqA : b ≤ a) => bLeqA,
+      Rational.LessOrEqual.linear(a, b))
