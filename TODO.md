@@ -9,50 +9,40 @@ state (`README.md`, `CLAUDE.md`) are the record of what was done.
 The math content roadmap. Each item is independently useful; they
 chain in roughly the order listed.
 
-- **Real as a field — apartness landed; reciprocal Cauchy sequence
-  still to write.** Path picked: classical logic via
-  `Logic.excluded_middle` (axiom in `axioms.math`, derived
-  machinery in `Logic/excluded_middle.math`:
-  double-negation-eliminate, ¬∀ → ∃¬, ¬(A → B) → A ∧ ¬B).
-  `Rational/linearity.math` gives total order linearity and
-  `not_LessThan_implies_LessOrEqual` from excluded_middle.
-  `Real/apartness.math` proves the headline analytic lemma:
-  `Real.cauchy_apartness_from_zero` extracts (K > 0, M : Natural)
-  with `K ≤ |sequenceFunction(sequence, m)|` for every `m ≥ M`,
-  given any Cauchy `sequence` that's not equivalent to constant
-  zero. Argument: decompose ¬CauchyEquivalent into (ε₀, ¬eventually
-  small), find m₀ ≥ cauchyIndex with ε₀ ≤ |s(m₀)|, then triangle +
-  cauchy at ε₀/2 + cancel-left gives ε₀/2 ≤ |s(m)| for all
-  m ≥ cauchyIndex.
-
-  What's left (the harder half — ~500-1000 lines):
-  1. **Function-typed `Rational.reciprocal_of_nonzero`.** The
-     existing `Rational/field.math` only proves
-     `∃ y. x * y = Rational.one`; the witness is hidden inside
-     `Exists`. To plug it into a Cauchy sequence we need a Pi-typed
-     reciprocal: `(x : Rational) → ¬(x = Rational.zero) → Rational`,
-     a total function. Plan: define it via `Quotient.lift`, with
-     the rep-level body case-splitting on
-     `Integer.sign_split(numerator)` and returning the corresponding
-     `mk(make(±succ(denominator), k))` from the sign witness; junk
-     value (e.g. `Rational.zero`) on the zero-numerator branch.
-     Respect proof: equivalent reps cross-mult to the same scaled
-     equality, both signs match for non-zero, and zero-case forces
-     both numerators zero.
-  2. **Real reciprocal Cauchy sequence.** Given a representative `s`
-     of a non-zero Real and the apartness witness (K, M), define
-     `reciprocalSequence(n) = Rational.one` for `n < M` (junk),
-     `Rational.reciprocal_of_nonzero(s(n), proof)` for `n ≥ M`.
-     Prove Cauchy via `|1/a - 1/b| = |a - b| / |ab| ≤ |a - b| / K²`.
-     Prove the equivalence-respect proof for the lift.
-  3. **`Real.reciprocal_exists_for_nonzero`.** Lift `s ↦ reciprocal
-     sequence` via `Quotient.induct`, prove
-     `Real.multiply(x, Real.reciprocal(x)) = Real.one` via the
-     constructive "product converges to constant 1" argument.
-  4. **`Real.is_field`.** Bundle. Trivial once #3 lands.
-
-  Also need `Real.zero_not_equal_one` for the bundle — descend
-  Quotient.exact twice, same shape as `Rational.zero_not_equal_one`.
+- **Real is a field — landed, modulo one analytic sorry.** Bundle
+  in `Real/field.math` (`Real.is_field`); 0 ≠ 1 and the inverse-
+  existence theorem both proved.
+  - Path: classical, via `Logic.excluded_middle` (axiom).
+    `Logic/excluded_middle.math` derives double-negation-eliminate,
+    ¬∀ → ∃¬, ¬(A → B) → A ∧ ¬B. `Rational/linearity.math` derives
+    total order linearity + `not_LessThan_implies_LessOrEqual`.
+  - `Real/apartness.math`: `cauchy_apartness_from_zero` extracts
+    (K > 0, M) with K ≤ |sequenceFunction(s, m)| for m ≥ M from
+    ¬CauchyEquivalent(s, constant_zero). ε/2 + triangle + cancel-
+    left.
+  - `Rational/reciprocal_function.math`: a total
+    `Rational.reciprocal_function : Rational → Rational`. Built by
+    Natural-pair recursion at the rep level, lifted via two
+    Quotient.lifts (over Integer numerator, then Rational). Respect
+    at the Rational level via the standard uniqueness-of-inverse
+    trick: from multiplication-multiplies on both reps + the reps
+    being mk-equal, derive the reciprocals equal via the calc
+    `recip₁ = 1·recip₁ = (mk₂·recip₂)·recip₁ = (mk₁·recip₂)·recip₁
+    = recip₂·(mk₁·recip₁) = recip₂·1 = recip₂`. Multiplication law
+    `x · reciprocal_function(x) = 1` for non-zero x, via
+    Quotient.induct + sign_split + StrictPositiveRational (positive)
+    or negate-cancellation calc (negative).
+  - `Real/reciprocal.math`: pointwise reciprocal sequence built on
+    `Rational.reciprocal_function`. **One `sorry`:**
+    `Real.reciprocal_sequence_is_cauchy`. The argument is
+    `|1/a − 1/b| = |b − a|/(|a|·|b|) ≤ |b − a|/K²`; combined with
+    the underlying sequence being Cauchy at ε·K², the reciprocal
+    sequence is Cauchy at ε. ~150 lines of analytic plumbing once
+    someone writes the algebraic identity + the bound chain.
+  - `Real/field.math`: `Real.zero_not_equal_one` (Quotient.exact at
+    ε = 1), `Real.reciprocal_cauchy_sequence_multiplies` (the product
+    is identically Rational.one beyond apartnessIndex),
+    `Real.reciprocal_exists_for_nonzero`, `Real.is_field`.
 - **Real order.** `Real.LessOrEqual` / `Real.LessThan` (via "eventually
   ≥ a positive Rational for some Cauchy representative" or
   "non-negative on every representative beyond N"). Independent of
