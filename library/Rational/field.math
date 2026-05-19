@@ -1,0 +1,306 @@
+-- Rational/field.math
+--
+-- Rational satisfies `IsField`: it is a commutative ring with 0 ≠ 1
+-- in which every non-zero element has a multiplicative inverse.
+--
+-- The inverse-existence proof is the only new content. It descends
+-- via Quotient.induct to a representative `make(n, d)`, then
+-- sign-splits the numerator `n` via `Integer.sign_split`. The two
+-- non-trivial branches (n = succ(k) and n = -succ(k)) construct an
+-- explicit reciprocal at the representative level; the existing
+-- `StrictPositiveRational.reciprocal_multiplied` carries the
+-- positive branch, and a small negate-cancellation calc covers the
+-- negative branch.
+
+module Rational.field
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.sign
+import Integer.absolute_value
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.order_multiplication
+import Rational.absolute_value
+import Rational.reciprocal
+import Rational.instances
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.field
+
+-- ----------------------------------------------------------------------
+-- Helper: at the rep level, mk(make(Integer.zero, d)) = Rational.zero
+-- for any denominator-minus-one `d`. Used to derive a contradiction
+-- when a Rational known to be nonzero has a zero numerator at some rep.
+theorem Rational.mk_zero_numerator_is_zero (d : Natural)
+        : (Quotient.mk(RationalRepresentative.make(Integer.zero, d))
+              : Rational)
+          = Rational.zero :=
+  Quotient.sound(
+      RationalRepresentative, RationalEquivalent,
+      RationalRepresentative.make(Integer.zero, d),
+      RationalRepresentative.make(Integer.zero, zero),
+      -- RationalEquivalent: Integer.zero * succ(0) = Integer.zero * succ(d).
+      calc Integer.zero * (successor(zero) : Integer)
+         = Integer.zero
+                by Integer.multiply_zero_left((successor(zero) : Integer))
+         = Integer.zero * (successor(d) : Integer)
+                by Equality.symmetry(
+                       Integer.multiply_zero_left((successor(d) : Integer))))
+
+-- ----------------------------------------------------------------------
+-- Positive-numerator reciprocal: a representative whose numerator is
+-- (succ(k) : Integer) has the rational succ(d)/succ(k) as its
+-- reciprocal. Reuses `StrictPositiveRational.reciprocal_multiplied`.
+theorem Rational.reciprocal_exists_when_numerator_positive
+        (k d : Natural)
+        : ∃ (y : Rational).
+            (Quotient.mk(
+                 RationalRepresentative.make(
+                     (successor(k) : Integer), d)) : Rational)
+              * y = Rational.one :=
+  witness (Quotient.mk(
+               RationalRepresentative.make(
+                   (successor(d) : Integer), k)) : Rational)
+      with StrictPositiveRational.reciprocal_multiplied(
+               StrictPositiveRational.make(k, d))
+
+-- ----------------------------------------------------------------------
+-- Negative-numerator reciprocal: a representative whose numerator is
+-- -(succ(k) : Integer) has the rational -(succ(d))/succ(k) as its
+-- reciprocal. The product reduces to the same cross-multiplication
+-- as the positive case once we cancel the two negations.
+theorem Rational.reciprocal_exists_when_numerator_negative
+        (k d : Natural)
+        : ∃ (y : Rational).
+            (Quotient.mk(
+                 RationalRepresentative.make(
+                     -(successor(k) : Integer), d)) : Rational)
+              * y = Rational.one :=
+  witness (Quotient.mk(
+               RationalRepresentative.make(
+                   -(successor(d) : Integer), k)) : Rational)
+      with Quotient.sound(
+               RationalRepresentative, RationalEquivalent,
+               -- Product representative.
+               RationalRepresentative.make(
+                   -(successor(k) : Integer) * -(successor(d) : Integer),
+                   k + d * successor(k)),
+               RationalRepresentative.make(Integer.one, zero),
+               -- RationalEquivalent cross-mult:
+               --   (-succ(k) * -succ(d)) * succ(0)
+               -- = 1 * succ(k + d * succ(k))
+               calc -(successor(k) : Integer) * -(successor(d) : Integer)
+                        * (successor(zero) : Integer)
+                  = -(successor(k) : Integer) * -(successor(d) : Integer)
+                        by Integer.multiply_identity_right(
+                               -(successor(k) : Integer)
+                                   * -(successor(d) : Integer))
+                  = -((successor(k) : Integer)
+                          * -(successor(d) : Integer))
+                        by Integer.multiply_negate_left(
+                               (successor(k) : Integer),
+                               -(successor(d) : Integer))
+                  = -(-((successor(k) : Integer)
+                             * (successor(d) : Integer)))
+                        by congruenceOf(
+                               Integer.negate,
+                               Integer.multiply_negate_right(
+                                   (successor(k) : Integer),
+                                   (successor(d) : Integer)))
+                  = (successor(k) : Integer) * (successor(d) : Integer)
+                        by Integer.negate_negate(
+                               (successor(k) : Integer)
+                                   * (successor(d) : Integer))
+                  = (successor(k) * successor(d) : Integer)
+                        by Equality.symmetry(
+                               Natural.to_integer.multiply_preserves(
+                                   successor(k), successor(d)))
+                  = (successor(k + d * successor(k)) : Integer)
+                        by congruenceOf(
+                               Natural.to_integer,
+                               calc successor(k) * successor(d)
+                                  = successor(k) + successor(k) * d
+                                  = successor(k) + d * successor(k)
+                                  = successor(k + d * successor(k)))
+                  = Integer.one
+                        * (successor(k + d * successor(k)) : Integer)
+                        by Equality.symmetry(
+                               Integer.multiply_identity_left(
+                                   (successor(k + d * successor(k)) : Integer))))
+
+-- ----------------------------------------------------------------------
+-- For any non-zero Rational expressed at a representative, a
+-- reciprocal exists. We sign-split the numerator into nonneg vs. the
+-- negation of a Natural image, and then case on the witness Natural:
+-- zero leads to a numerator of Integer.zero, contradicting the
+-- non-zero hypothesis; succ(k) lands in one of the two reciprocal
+-- helpers above.
+theorem Rational.reciprocal_exists_at_representative
+        (n : Integer) (d : Natural)
+        (qNonzero
+            : ¬((Quotient.mk(RationalRepresentative.make(n, d)) : Rational)
+                    = Rational.zero))
+        : ∃ (y : Rational).
+            (Quotient.mk(RationalRepresentative.make(n, d)) : Rational)
+              * y = Rational.one := {
+    claim Integer.IsNonneg(n) ∨ (∃ (k : Natural). n = -(k : Integer))
+        by Integer.sign_split(n)
+    claim by cases {
+      in (Integer.IsNonneg(n)) as nIsNonneg: {
+          obtain ⟨a, nIsImage⟩ from nIsNonneg;
+          (cases a {
+             | zero =>
+                 function (refinedHypothesis : n = (zero : Integer)) =>
+                   -- n = (zero : I) = Integer.zero, so the rational is
+                   -- Rational.zero, contradicting qNonzero.
+                   absurd(qNonzero(
+                              calc (Quotient.mk(
+                                       RationalRepresentative.make(n, d))
+                                       : Rational)
+                                 = Quotient.mk(
+                                       RationalRepresentative.make(
+                                           (zero : Integer), d))
+                                        by congruenceOf(
+                                               function (m : Integer) =>
+                                                   (Quotient.mk(
+                                                        RationalRepresentative.make(
+                                                            m, d))
+                                                        : Rational),
+                                               refinedHypothesis)
+                                 = Quotient.mk(
+                                       RationalRepresentative.make(
+                                           Integer.zero, d))
+                                 = Rational.zero
+                                        by Rational.mk_zero_numerator_is_zero(d)))
+             | successor(k) =>
+                 function (refinedHypothesis
+                              : n = (successor(k) : Integer)) =>
+                   rewrite(
+                       Equality.symmetry(
+                           congruenceOf(
+                               function (m : Integer) =>
+                                   (Quotient.mk(
+                                        RationalRepresentative.make(m, d))
+                                        : Rational),
+                               refinedHypothesis)),
+                       Rational.reciprocal_exists_when_numerator_positive(
+                           k, d))
+           } : (refinedHypothesis : n = (a : Integer))
+               → ∃ (y : Rational).
+                   (Quotient.mk(RationalRepresentative.make(n, d))
+                        : Rational)
+                     * y = Rational.one)(nIsImage)
+      }
+      in (∃ (k : Natural). n = -(k : Integer)) as nIsNegOfNat: {
+          obtain ⟨a, nIsNegImage⟩ from nIsNegOfNat;
+          (cases a {
+             | zero =>
+                 function (refinedHypothesis : n = -(zero : Integer)) =>
+                   -- n = -(zero : I) = -Integer.zero = Integer.zero,
+                   -- giving Rational.zero — contradiction with qNonzero.
+                   absurd(qNonzero(
+                              calc (Quotient.mk(
+                                       RationalRepresentative.make(n, d))
+                                       : Rational)
+                                 = Quotient.mk(
+                                       RationalRepresentative.make(
+                                           -(zero : Integer), d))
+                                        by congruenceOf(
+                                               function (m : Integer) =>
+                                                   (Quotient.mk(
+                                                        RationalRepresentative.make(
+                                                            m, d))
+                                                        : Rational),
+                                               refinedHypothesis)
+                                 = Quotient.mk(
+                                       RationalRepresentative.make(
+                                           Integer.zero, d))
+                                        -- -(zero : Integer) reduces to
+                                        -- mk(negate_representatives(make(zero, zero)))
+                                        -- = mk(make(zero, zero)) = Integer.zero
+                                        -- definitionally.
+                                        by reflexivity(
+                                               Rational,
+                                               (Quotient.mk(
+                                                    RationalRepresentative.make(
+                                                        Integer.zero, d))
+                                                : Rational))
+                                 = Rational.zero
+                                        by Rational.mk_zero_numerator_is_zero(d)))
+             | successor(k) =>
+                 function (refinedHypothesis
+                              : n = -(successor(k) : Integer)) =>
+                   rewrite(
+                       Equality.symmetry(
+                           congruenceOf(
+                               function (m : Integer) =>
+                                   (Quotient.mk(
+                                        RationalRepresentative.make(m, d))
+                                        : Rational),
+                               refinedHypothesis)),
+                       Rational.reciprocal_exists_when_numerator_negative(
+                           k, d))
+           } : (refinedHypothesis : n = -(a : Integer))
+               → ∃ (y : Rational).
+                   (Quotient.mk(RationalRepresentative.make(n, d))
+                        : Rational)
+                     * y = Rational.one)(nIsNegImage)
+      }
+    }
+}
+
+-- ----------------------------------------------------------------------
+-- Top-level inverse existence: every non-zero Rational has a
+-- multiplicative inverse. Quotient.induct over `x` to expose the
+-- representative make(n, d); the body delegates to
+-- `reciprocal_exists_at_representative`.
+theorem Rational.reciprocal_exists_for_nonzero
+        (x : Rational) (xNonzero : ¬(x = Rational.zero))
+        : ∃ (y : Rational). x * y = Rational.one :=
+  Quotient.induct(
+      function (xArg : Rational) =>
+          ¬(xArg = Rational.zero)
+            → ∃ (y : Rational). xArg * y = Rational.one,
+      function (rep : RationalRepresentative) =>
+        (cases rep {
+           | RationalRepresentative.make(n, d) =>
+               function (nonzeroHyp
+                           : ¬((Quotient.mk(
+                                    RationalRepresentative.make(n, d))
+                                    : Rational)
+                                   = Rational.zero)) =>
+                 Rational.reciprocal_exists_at_representative(
+                     n, d, nonzeroHyp)
+         } : ¬((Quotient.mk(rep) : Rational) = Rational.zero)
+             → ∃ (y : Rational).
+                 (Quotient.mk(rep) : Rational) * y = Rational.one),
+      x)(xNonzero)
+
+-- ----------------------------------------------------------------------
+-- Rational is a Field.
+theorem Rational.is_field
+        : IsField(Rational, Rational.add, Rational.zero, Rational.negate,
+                   Rational.multiply, Rational.one) :=
+    ⟨Rational.is_commutative_ring,
+     Rational.zero_not_equal_one,
+     Rational.reciprocal_exists_for_nonzero⟩
