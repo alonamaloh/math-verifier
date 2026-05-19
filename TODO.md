@@ -9,27 +9,50 @@ state (`README.md`, `CLAUDE.md`) are the record of what was done.
 The math content roadmap. Each item is independently useful; they
 chain in roughly the order listed.
 
-- **Real as a field — blocked on apartness.** Real is now a
-  commutative ring (`Real/{ring,algebra,instances}.math`), and
-  `IsField` exists (`Algebra/field.math`) with Rational as the
-  first instance (`Rational/field.math`). Lifting that to Real
-  requires building a reciprocal sequence for any non-zero Real,
-  which in turn requires extracting a positive Rational lower bound
-  on `|s(m)|` from "x ≠ Real.zero" — i.e., upgrading inequality to
-  apartness. Constructively that's not free (Markov / LEM is
-  needed in general), so the proof can't go through as written
-  against the current `IsField` predicate without either:
-  (a) adding a classical-reasoning axiom (LEM or Markov for
-      decidable propositions over Naturals);
-  (b) introducing a `Real.Apart(x, y)` predicate and reformulating
-      `IsField` to take apartness instead of `¬(x = zero)`; or
-  (c) deciding that Real's field structure is stated as an axiom,
-      paid for once.
-  The reciprocal-of-bounded-away-from-zero machinery itself
-  (apartness in hand → Cauchy reciprocal sequence + respect proof
-  + multiplication-cancels-to-one) is ordinary analysis and
-  ~500-1000 lines of mechanical work once the apartness step is
-  unblocked.
+- **Real as a field — apartness landed; reciprocal Cauchy sequence
+  still to write.** Path picked: classical logic via
+  `Logic.excluded_middle` (axiom in `axioms.math`, derived
+  machinery in `Logic/excluded_middle.math`:
+  double-negation-eliminate, ¬∀ → ∃¬, ¬(A → B) → A ∧ ¬B).
+  `Rational/linearity.math` gives total order linearity and
+  `not_LessThan_implies_LessOrEqual` from excluded_middle.
+  `Real/apartness.math` proves the headline analytic lemma:
+  `Real.cauchy_apartness_from_zero` extracts (K > 0, M : Natural)
+  with `K ≤ |sequenceFunction(sequence, m)|` for every `m ≥ M`,
+  given any Cauchy `sequence` that's not equivalent to constant
+  zero. Argument: decompose ¬CauchyEquivalent into (ε₀, ¬eventually
+  small), find m₀ ≥ cauchyIndex with ε₀ ≤ |s(m₀)|, then triangle +
+  cauchy at ε₀/2 + cancel-left gives ε₀/2 ≤ |s(m)| for all
+  m ≥ cauchyIndex.
+
+  What's left (the harder half — ~500-1000 lines):
+  1. **Function-typed `Rational.reciprocal_of_nonzero`.** The
+     existing `Rational/field.math` only proves
+     `∃ y. x * y = Rational.one`; the witness is hidden inside
+     `Exists`. To plug it into a Cauchy sequence we need a Pi-typed
+     reciprocal: `(x : Rational) → ¬(x = Rational.zero) → Rational`,
+     a total function. Plan: define it via `Quotient.lift`, with
+     the rep-level body case-splitting on
+     `Integer.sign_split(numerator)` and returning the corresponding
+     `mk(make(±succ(denominator), k))` from the sign witness; junk
+     value (e.g. `Rational.zero`) on the zero-numerator branch.
+     Respect proof: equivalent reps cross-mult to the same scaled
+     equality, both signs match for non-zero, and zero-case forces
+     both numerators zero.
+  2. **Real reciprocal Cauchy sequence.** Given a representative `s`
+     of a non-zero Real and the apartness witness (K, M), define
+     `reciprocalSequence(n) = Rational.one` for `n < M` (junk),
+     `Rational.reciprocal_of_nonzero(s(n), proof)` for `n ≥ M`.
+     Prove Cauchy via `|1/a - 1/b| = |a - b| / |ab| ≤ |a - b| / K²`.
+     Prove the equivalence-respect proof for the lift.
+  3. **`Real.reciprocal_exists_for_nonzero`.** Lift `s ↦ reciprocal
+     sequence` via `Quotient.induct`, prove
+     `Real.multiply(x, Real.reciprocal(x)) = Real.one` via the
+     constructive "product converges to constant 1" argument.
+  4. **`Real.is_field`.** Bundle. Trivial once #3 lands.
+
+  Also need `Real.zero_not_equal_one` for the bundle — descend
+  Quotient.exact twice, same shape as `Rational.zero_not_equal_one`.
 - **Real order.** `Real.LessOrEqual` / `Real.LessThan` (via "eventually
   ≥ a positive Rational for some Cauchy representative" or
   "non-negative on every representative beyond N"). Independent of
