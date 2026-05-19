@@ -214,15 +214,51 @@ granted.
 Blocked on PAdic's `(p, primality)` becoming implicit so the
 seminorm parameter can carry its own implicits.
 
-## `by ring` v2 — distributivity
+## `ring` / `field` tactics — open follow-ups
 
-The current `ring` tactic handles pure-sum or pure-product
-rearrangement only. Distributivity (`a*(b+c) = a*b + a*c`) requires
-polynomial normalization. This is a 1–2 day project once Phase 3 of
-the auto-prover lands, since the same canonical-form infrastructure
-applies. Best deferred until enough algebra content (Real field,
-Rational triangle inequality, the CauchyCompletion above) drives the
-design against real use cases.
+Ring v2 (distributivity, AC, 0/1 identity, negation, ±1
+cancellation) and the field tactic (`field(h1, h2, …)` with user-
+provided nonzero hypotheses, per-monomial reciprocal contraction)
+have landed. Remaining items, none urgent:
+
+- **Mod-(2⁶⁴ − 59) value-fingerprint prefilter.** Evaluate LHS and
+  RHS in `Z/(2⁶⁴ − 59)` with non-arithmetic nodes seeded by their
+  subtree hash (treat `+`, `-`, `*`, `/` as the field ops, every
+  other node as an opaque value = its hash mod the prime). If both
+  sides successfully evaluate (no division by zero in the
+  evaluator) and the values differ, the goal is *provably* not a
+  field identity (false-positive rate ≈ degree / 2⁶⁴, negligible)
+  — emit the error immediately without running the symbolic
+  decision. If a denominator hashes to 0, fall through to the
+  symbolic path *and* flag it as a likely missing nonzero hypothesis.
+  Worth: ~microseconds per `field` call, saves the user a slow
+  failure round-trip in interactive mode. Not worth in pure batch
+  verification (we already pay the symbolic cost on equality, which
+  is the common case). Park until an interactive front-end lands.
+
+- **Coefficient > ±1.** Ring v2 currently rejects a canonical-form
+  monomial with `|coeff| > 1` (e.g., `a + a = 2 · a`). Adopt the
+  `1 + 1 + … + 1` shape the canonical emitter already builds; the
+  proof emitter needs to recognise it and emit the right number of
+  identity/distributivity steps.
+
+- **Cross-pair cancellation in field.** Field currently does only
+  per-monomial reciprocal cancellation. If a like-term collision
+  arises after distribution (two monomials with the same
+  signature, opposite sign, where one factor differs by a
+  reciprocal pair), they don't get combined. Extend by running
+  ring v2's like-term cancellation pass after the reciprocal
+  contraction.
+
+- **`negate_zero` for the empty-polynomial branch of
+  `proveNegateMerge`.** Needs a `<carrier>.negate_zero` axiom no
+  carrier currently provides; trivial library addition unlocks it.
+
+- **Subtract via δ.** Works today because `Rational.subtract`
+  unfolds to `add(_, negate(_))` under δ. If a future carrier
+  defines `subtract` as a primitive (not via the unfolding shape),
+  the bridge in `proveEqualsCanonical_impl` for `subtract` breaks.
+  Worth a regression test once any such carrier appears.
 
 ## Parallel verification
 
