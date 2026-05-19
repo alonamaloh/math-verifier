@@ -8980,6 +8980,180 @@ private:
         return currentProof;
     }
 
+    // =====================================================================
+    // Mod-(2^64 - 59) value fingerprint
+    //
+    // Diagnostic used by `ring` / `field` when symbolic decision fails:
+    // evaluate both sides as elements of GF(p) for p = 2^64 - 59, with
+    // each "opaque atom" replaced by its 64-bit subtree hash. If the
+    // values disagree, the identity is (with overwhelming probability)
+    // not a polynomial / field identity at all — the user's math is
+    // wrong, not the tactic's. If the values agree, the goal is almost
+    // certainly true and the symbolic failure points at a tactic
+    // limitation (or a missing hypothesis).
+    //
+    // False-positive rate (agreeing on an unequal identity) is bounded
+    // by Schwartz-Zippel: roughly `degree / p`, well under 2^-50 for
+    // any sensible goal. False negatives (disagreeing on an equal
+    // identity) require a 64-bit hash collision and are equally rare.
+    //
+    // Division by zero in the evaluator (a denominator's fingerprint
+    // happens to be 0) returns nullopt and we say so clearly rather
+    // than misleading the user with a false claim.
+    // =====================================================================
+
+    static constexpr uint64_t kFingerprintModulus =
+        18446744073709551557ull;  // 2^64 - 59 (prime)
+
+    uint64_t fingerprintAdd(uint64_t leftValue, uint64_t rightValue) const {
+        // Both inputs are < p < 2^64, so sum fits in unsigned 64 with
+        // at most one wraparound. Reduce mod p with a single conditional.
+        uint64_t sum = leftValue + rightValue;
+        // Overflow OR sum >= p both want reduction by p.
+        if (sum < leftValue || sum >= kFingerprintModulus) {
+            sum -= kFingerprintModulus;
+        }
+        return sum;
+    }
+
+    uint64_t fingerprintSubtract(
+        uint64_t leftValue, uint64_t rightValue) const {
+        return leftValue >= rightValue
+            ? leftValue - rightValue
+            : leftValue + (kFingerprintModulus - rightValue);
+    }
+
+    uint64_t fingerprintNegate(uint64_t value) const {
+        return value == 0 ? 0 : kFingerprintModulus - value;
+    }
+
+    uint64_t fingerprintMultiply(
+        uint64_t leftValue, uint64_t rightValue) const {
+        // 64-bit × 64-bit needs 128 bits; rely on the compiler's
+        // __int128 (clang / gcc on every platform this project targets).
+        return (uint64_t)(((__uint128_t)leftValue
+                            * (__uint128_t)rightValue)
+                           % (__uint128_t)kFingerprintModulus);
+    }
+
+    uint64_t fingerprintModularPower(
+        uint64_t base, uint64_t exponent) const {
+        uint64_t result = 1;
+        uint64_t current = base % kFingerprintModulus;
+        while (exponent > 0) {
+            if (exponent & 1ull) {
+                result = fingerprintMultiply(result, current);
+            }
+            current = fingerprintMultiply(current, current);
+            exponent >>= 1;
+        }
+        return result;
+    }
+
+    // Modular inverse via Fermat's little theorem: a^(p-2) mod p.
+    // Returns nullopt iff a == 0 (no inverse, division by zero).
+    std::optional<uint64_t> fingerprintModularInverse(uint64_t value) const {
+        if (value % kFingerprintModulus == 0) return std::nullopt;
+        return fingerprintModularPower(value, kFingerprintModulus - 2);
+    }
+
+    // Recursively evaluate an expression as an element of GF(p), with
+    // opaque atoms replaced by their cached subtree hash. Returns
+    // nullopt on division by zero (a `<C>.reciprocal_function` applied
+    // to something whose fingerprint is 0).
+    std::optional<uint64_t> evaluateFingerprint(
+        ExpressionPointer expression,
+        const std::string& carrierName) const {
+        const std::string addName       = carrierName + ".add";
+        const std::string subtractName  = carrierName + ".subtract";
+        const std::string multiplyName  = carrierName + ".multiply";
+        const std::string negateName    = carrierName + ".negate";
+        const std::string zeroName      = carrierName + ".zero";
+        const std::string oneName       = carrierName + ".one";
+        const std::string reciprocalName
+            = carrierName + ".reciprocal_function";
+        // Constants.
+        if (auto* head = std::get_if<Constant>(&expression->node)) {
+            if (head->name == zeroName) return uint64_t{0};
+            if (head->name == oneName) return uint64_t{1};
+        }
+        // Binary operators (peel two Application layers).
+        if (auto* outer = std::get_if<Application>(&expression->node)) {
+            if (auto* inner =
+                    std::get_if<Application>(&outer->function->node)) {
+                if (auto* head =
+                        std::get_if<Constant>(&inner->function->node)) {
+                    if (head->name == addName
+                        || head->name == subtractName
+                        || head->name == multiplyName) {
+                        auto leftValue = evaluateFingerprint(
+                            inner->argument, carrierName);
+                        auto rightValue = evaluateFingerprint(
+                            outer->argument, carrierName);
+                        if (!leftValue || !rightValue) return std::nullopt;
+                        if (head->name == addName) {
+                            return fingerprintAdd(*leftValue, *rightValue);
+                        }
+                        if (head->name == subtractName) {
+                            return fingerprintSubtract(
+                                *leftValue, *rightValue);
+                        }
+                        return fingerprintMultiply(*leftValue, *rightValue);
+                    }
+                }
+            }
+            // Unary operators (one Application layer).
+            if (auto* head =
+                    std::get_if<Constant>(&outer->function->node)) {
+                if (head->name == negateName) {
+                    auto value = evaluateFingerprint(
+                        outer->argument, carrierName);
+                    if (!value) return std::nullopt;
+                    return fingerprintNegate(*value);
+                }
+                if (head->name == reciprocalName) {
+                    auto value = evaluateFingerprint(
+                        outer->argument, carrierName);
+                    if (!value) return std::nullopt;
+                    return fingerprintModularInverse(*value);
+                }
+            }
+        }
+        // Otherwise: opaque atom. Use the cached subtree hash mod p.
+        return expression->hash % kFingerprintModulus;
+    }
+
+    // Build the "(fingerprint mod (2^64 - 59): …)" diagnostic suffix
+    // to append onto a ring/field failure. Always returns a string —
+    // even when the evaluator gives up, the user learns something.
+    std::string buildFingerprintDiagnostic(
+        ExpressionPointer leftEndpoint,
+        ExpressionPointer rightEndpoint,
+        const std::string& carrierName) const {
+        auto leftValue =
+            evaluateFingerprint(leftEndpoint, carrierName);
+        auto rightValue =
+            evaluateFingerprint(rightEndpoint, carrierName);
+        if (!leftValue || !rightValue) {
+            return "\n(fingerprint mod (2^64 - 59): division by zero "
+                   "during evaluation — either a denominator that "
+                   "needs a nonzero hypothesis, or a 1-in-2^64 hash "
+                   "collision; can't diagnose either way)";
+        }
+        if (*leftValue == *rightValue) {
+            return "\n(fingerprint mod (2^64 - 59): LHS = RHS = "
+                 + std::to_string(*leftValue)
+                 + " — the identity is almost certainly true; this "
+                   "looks like a tactic limitation, not a real "
+                   "mathematical mismatch)";
+        }
+        return "\n(fingerprint mod (2^64 - 59): LHS = "
+             + std::to_string(*leftValue) + ", RHS = "
+             + std::to_string(*rightValue)
+             + " — the identity is FALSE as a polynomial / field "
+               "identity; the goal as stated is not provable)";
+    }
+
     // v2 of the ring tactic. Called as a fallback when v1 (pure-AC)
     // can't close the goal. Returns the proof on success; throws
     // otherwise. `expectedType` is the equality goal.
@@ -9019,7 +9193,9 @@ private:
             throwElaborate(
                 "`ring`: the two sides do not have equal polynomial "
                 "canonical forms over `" + carrierName + "` — they "
-                "are not equal as commutative-ring expressions");
+                "are not equal as commutative-ring expressions"
+                + buildFingerprintDiagnostic(
+                      leftEndpoint, rightEndpoint, carrierName));
         }
         // Coefficient guard: v2's proof emitter only supports
         // coefficients in {-1, 0, +1}. Drop into a clear error if a
@@ -9031,7 +9207,9 @@ private:
                     "with coefficient " + std::to_string(entry.second)
                     + " — v2 only handles coefficients in {-1, +1} for "
                     "now (collected like-terms with larger multipliers "
-                    "are a follow-up)");
+                    "are a follow-up)"
+                    + buildFingerprintDiagnostic(
+                          leftEndpoint, rightEndpoint, carrierName));
             }
         }
         // Resolve carrier-specific axiom names. Names that aren't
@@ -10116,7 +10294,10 @@ private:
                 "`field`: after clearing reciprocals, the two sides "
                 "still don't agree as polynomials — the goal is not a "
                 "valid field identity (or the hypothesis set is "
-                "insufficient)");
+                "insufficient)"
+                + buildFingerprintDiagnostic(
+                      goal.leftEndpoint, goal.rightEndpoint,
+                      carrierName));
         }
         // Coefficient guard: ±1 throughout.
         for (const auto& entry : leftContracted) {
