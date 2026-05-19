@@ -129,19 +129,16 @@ theorem Natural.divide_positive_when_divides
   cases Natural.divide(prime, target) with refinedDivideEq {
     | zero =>
         -- prime * 0 = 0, so target = 0, contradicting targetPositive.
-        False.eliminate_proposition(
-            successor(zero) ≤ Natural.divide(prime, target),
-            Natural.not_less_or_equal_successor_zero(
-                zero,
-                rewrite(
+        absurd(
+            rewrite(
+                Equality.transitivity(
+                    Equality.symmetry(productEqTarget),
                     Equality.transitivity(
-                        Equality.symmetry(productEqTarget),
-                        Equality.transitivity(
-                            congruenceOf(
-                                function (z : Natural) => prime * z,
-                                refinedDivideEq),
-                            Natural.multiply_zero(prime))),
-                    targetPositive)))
+                        congruenceOf(
+                            function (z : Natural) => prime * z,
+                            refinedDivideEq),
+                        Natural.multiply_zero(prime))),
+                targetPositive))
     | successor(q') =>
         -- divide = successor(q') ≥ 1. Transport from successor(q') back.
         rewrite(
@@ -223,28 +220,20 @@ theorem Natural.padic_valuation_step_fuel_stable
           (cases f1 {
              | zero =>
                  function (refinedNLeF1 : n ≤ zero) =>
-                   False.eliminate_proposition(
-                       Natural.padic_valuation_step(zero, prime, n)
-                         = Natural.padic_valuation_step(f2, prime, n),
-                       Natural.not_less_or_equal_successor_zero(
-                           zero,
-                           LessOrEqual.transitive(
-                               successor(zero), n, zero,
-                               refinedNLeF1, nPositive)))
+                   absurd(
+                       LessOrEqual.transitive(
+                           successor(zero), n, zero,
+                           refinedNLeF1, nPositive))
              | successor(f1') =>
                  function (refinedNLeF1 : n ≤ successor(f1')) =>
                    -- Case on f2 next.
                    (cases f2 {
                       | zero =>
                           function (refinedNLeF2 : n ≤ zero) =>
-                            False.eliminate_proposition(
-                                Natural.padic_valuation_step(successor(f1'), prime, n)
-                                  = Natural.padic_valuation_step(zero, prime, n),
-                                Natural.not_less_or_equal_successor_zero(
-                                    zero,
-                                    LessOrEqual.transitive(
-                                        successor(zero), n, zero,
-                                        refinedNLeF2, nPositive)))
+                            absurd(
+                                LessOrEqual.transitive(
+                                    successor(zero), n, zero,
+                                    refinedNLeF2, nPositive))
                       | successor(f2') =>
                           function (refinedNLeF2 : n ≤ successor(f2')) =>
                             -- Both fuels are successors. Case on modulo.
@@ -336,16 +325,13 @@ theorem Natural.padic_valuation_when_not_divides
   (cases target {
      | zero =>
          function (refinedNotDivides : ¬ Natural.divides(prime, zero)) =>
-           False.eliminate_proposition(
-               Natural.padic_valuation(prime, zero) = zero,
-               refinedNotDivides(Natural.divides_zero(prime)))
+           absurd(refinedNotDivides(Natural.divides_zero(prime)))
      | successor(predT) =>
          function (refinedNotDivides
                      : ¬ Natural.divides(prime, successor(predT))) =>
            cases Natural.modulo(prime, successor(predT)) with refinedModuloEq {
              | zero =>
-                 False.eliminate_proposition(
-                     Natural.padic_valuation(prime, successor(predT)) = zero,
+                 absurd(
                      refinedNotDivides(
                          Natural.modulo_zero_implies_divides(
                              prime, successor(predT), refinedModuloEq)))
@@ -398,12 +384,7 @@ theorem Natural.padic_valuation_strip
   -- Case-split on prime * quotient to expose successor structure for step_succ_when_divides.
   cases prime * quotient with refinedPqEq {
     | zero =>
-        False.eliminate_proposition(
-            Natural.padic_valuation(prime, prime * quotient)
-              = successor(Natural.padic_valuation(prime, quotient)),
-            Natural.not_less_or_equal_successor_zero(
-                zero,
-                rewrite(refinedPqEq, productPositive)))
+        absurd(rewrite(refinedPqEq, productPositive))
     | successor(predPQ) =>
         calc Natural.padic_valuation(prime, prime * quotient)
            = Natural.padic_valuation(prime, successor(predPQ))
@@ -973,15 +954,12 @@ theorem Natural.power_divides_implies_padic_valuation_ge
       (cases q {
          | zero =>
              function (refinedNEq : n = prime * zero) =>
-               False.eliminate_proposition(
-                   successor(predK) ≤ Natural.padic_valuation(prime, n),
-                   Natural.not_less_or_equal_successor_zero(
-                       zero,
-                       rewrite(
-                           Equality.transitivity(
-                               refinedNEq,
-                               Natural.multiply_zero(prime)),
-                           nPositive)))
+               absurd(
+                   rewrite(
+                       Equality.transitivity(
+                           refinedNEq,
+                           Natural.multiply_zero(prime)),
+                       nPositive))
          | successor(predQ) =>
              function (refinedNEq : n = prime * successor(predQ)) => {
                claim succQPositive
@@ -1205,10 +1183,7 @@ theorem Natural.distance_monus_when_le
       (cases a {
          | zero =>
              function (refinedLe : successor(predB) ≤ zero) =>
-               False.eliminate_proposition(
-                   Natural.distance(zero, successor(predB))
-                     = Natural.monus(zero, successor(predB)),
-                   Natural.not_less_or_equal_successor_zero(predB, refinedLe))
+               absurd(refinedLe)
          | successor(predA) =>
              function (refinedLe : successor(predB) ≤ successor(predA)) =>
                -- distance(succ(predA), succ(predB)) reduces to
@@ -1616,9 +1591,7 @@ theorem Natural.distance_zero_implies_equal
          | zero =>
              function (refinedEq
                          : Natural.distance(successor(k), zero) = zero) =>
-               False.eliminate_proposition(
-                   successor(k) = zero,
-                   Natural.successor_not_zero(k, refinedEq))
+               absurd(refinedEq)
          | successor(m) =>
              function (refinedEq
                          : Natural.distance(successor(k), successor(m)) = zero) =>

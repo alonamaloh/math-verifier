@@ -252,9 +252,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
 theorem Natural.geq_one_when_not_zero
         : (d : Natural) → d ≠ zero → 1 ≤ d
   | zero, notZero =>
-      False.eliminate_proposition(
-          1 ≤ zero,
-          notZero(reflexivity(zero)))
+      absurd(notZero(reflexivity(zero)))
   | successor(predD), _ =>
       Natural.successor_less_or_equal_successor(
           zero, predD, Natural.zero_least(predD))
@@ -264,9 +262,7 @@ theorem Natural.geq_two_when_not_zero_or_one
         : (d : Natural)
           → d ≠ zero → d ≠ 1 → 2 ≤ d
   | zero, notZero, _ =>
-      False.eliminate_proposition(
-          2 ≤ zero,
-          notZero(reflexivity(zero)))
+      absurd(notZero(reflexivity(zero)))
   | successor(predD), _, notOne =>
       Natural.successor_less_or_equal_successor(
           1, predD,
@@ -287,29 +283,27 @@ theorem Natural.equals_when_less_or_equal_and_not_less_than (a b : Natural)
     in (a = b) as equality:
         equality
     in (∃ (bPredecessor : Natural). b = successor(bPredecessor) ∧ a ≤ bPredecessor) as existsProof:
-        False.eliminate_proposition(
-            a = b,
-            Exists.eliminate(
-                Natural,
-                function (bPredecessor : Natural) =>
-                    b = successor(bPredecessor) ∧ a ≤ bPredecessor,
-                False,
-                function (bPredecessor : Natural)
-                    (combined : b = successor(bPredecessor) ∧ a ≤ bPredecessor) =>
-                  And.eliminate(
-                      b = successor(bPredecessor),
-                      a ≤ bPredecessor,
-                      False,
-                      function (bEqualsSuccessor :
-                              b = successor(bPredecessor))
-                          (aLessOrEqualBPredecessor : a ≤ bPredecessor) =>
-                        notSuccessorALessOrEqualB(
-                            rewrite(
-                                Equality.symmetry(bEqualsSuccessor),
-                                Natural.successor_less_or_equal_successor(
-                                    a, bPredecessor, aLessOrEqualBPredecessor))),
-                      combined),
-                existsProof))
+        absurd(Exists.eliminate(
+            Natural,
+            function (bPredecessor : Natural) =>
+                b = successor(bPredecessor) ∧ a ≤ bPredecessor,
+            False,
+            function (bPredecessor : Natural)
+                (combined : b = successor(bPredecessor) ∧ a ≤ bPredecessor) =>
+              And.eliminate(
+                  b = successor(bPredecessor),
+                  a ≤ bPredecessor,
+                  False,
+                  function (bEqualsSuccessor :
+                          b = successor(bPredecessor))
+                      (aLessOrEqualBPredecessor : a ≤ bPredecessor) =>
+                    notSuccessorALessOrEqualB(
+                        rewrite(
+                            Equality.symmetry(bEqualsSuccessor),
+                            Natural.successor_less_or_equal_successor(
+                                a, bPredecessor, aLessOrEqualBPredecessor))),
+                  combined),
+            existsProof))
   }
 
 -- Helper: classify a divisor of `successor(predecessorOfN)` given that we
@@ -332,25 +326,23 @@ theorem Natural.classify_divisor_when_no_proper
     in (divisor = zero) as divisorIsZero:
         -- divisor = 0 → divides(0, successor(predecessorOfN)) means
         -- successor(predecessorOfN) = 0, but successor ≠ zero.
-        False.eliminate_proposition(
-            Or(divisor = 1, divisor = successor(predecessorOfN)),
-            Exists.eliminate(
-                Natural,
-                function (q : Natural) =>
-                    successor(predecessorOfN) = divisor * q,
-                False,
-                function (q : Natural)
-                    (equality : successor(predecessorOfN) = divisor * q) =>
-                    Natural.successor_not_zero(
-                        predecessorOfN,
+        absurd(Exists.eliminate(
+            Natural,
+            function (q : Natural) =>
+                successor(predecessorOfN) = divisor * q,
+            False,
+            function (q : Natural)
+                (equality : successor(predecessorOfN) = divisor * q) =>
+                Natural.successor_not_zero(
+                    predecessorOfN,
+                    Equality.transitivity(
+                        equality,
                         Equality.transitivity(
-                            equality,
-                            Equality.transitivity(
-                                rewrite(divisorIsZero),
-                                -- 0 * q = 0 (definitional via
-                                -- multiply's first-case rule).
-                                reflexivity(zero)))),
-                divDivides))
+                            rewrite(divisorIsZero),
+                            -- 0 * q = 0 (definitional via
+                            -- multiply's first-case rule).
+                            reflexivity(zero)))),
+            divDivides))
     in (divisor ≠ zero) as divisorNotZero:
         Or.eliminate(
               divisor = 1,
@@ -373,22 +365,19 @@ theorem Natural.classify_divisor_when_no_proper
                               successor(divisor) ≤ successor(predecessorOfN)) =>
                           -- successor(divisor) ≤ successor(predecessorOfN) iff divisor ≤ predecessorOfN.
                           -- Then noProperDivisor applies if divisor ≥ 2.
-                          False.eliminate_proposition(
-                              Or(divisor = 1,
-                                  divisor = successor(predecessorOfN)),
-                              noProperDivisor(
-                                  divisor,
-                                  -- Need 2 ≤ divisor.
-                                  -- divisor is neither 0 nor 1.
-                                  -- Pattern-match-style: this is exactly
-                                  -- the role of `decides_equality` results,
-                                  -- but we need to get the inequality.
-                                  Natural.geq_two_when_not_zero_or_one(
-                                      divisor, divisorNotZero, divisorNotOne),
-                                  Natural.less_or_equal_successor_successor_descend(
-                                      divisor, predecessorOfN,
-                                      successorDivisorLessOrEqualSuccessorPredecessorOfN),
-                                  divDivides)),
+                          absurd(noProperDivisor(
+                              divisor,
+                              -- Need 2 ≤ divisor.
+                              -- divisor is neither 0 nor 1.
+                              -- Pattern-match-style: this is exactly
+                              -- the role of `decides_equality` results,
+                              -- but we need to get the inequality.
+                              Natural.geq_two_when_not_zero_or_one(
+                                  divisor, divisorNotZero, divisorNotOne),
+                              Natural.less_or_equal_successor_successor_descend(
+                                  divisor, predecessorOfN,
+                                  successorDivisorLessOrEqualSuccessorPredecessorOfN),
+                              divDivides)),
                       function (notSuccessorDivisorLessOrEqualSuccessorPredecessorOfN :
                               successor(divisor) ≰ successor(predecessorOfN)) =>
                           -- divisor ≤ successor(predecessorOfN) from divides_le_or_zero.
@@ -403,11 +392,7 @@ theorem Natural.classify_divisor_when_no_proper
                                       divisor ≤ successor(predecessorOfN),
                                       function (successorPredecessorEqualsZero :
                                               successor(predecessorOfN) = zero) =>
-                                          False.eliminate_proposition(
-                                              divisor ≤ successor(predecessorOfN),
-                                              Natural.successor_not_zero(
-                                                  predecessorOfN,
-                                                  successorPredecessorEqualsZero)),
+                                          absurd(successorPredecessorEqualsZero),
                                       function (divisorLessOrEqual : divisor ≤ successor(predecessorOfN)) =>
                                           divisorLessOrEqual,
                                       Natural.divides_less_or_equal_or_zero(
@@ -427,11 +412,7 @@ theorem Natural.prime_or_proper_divisor
                 Exists(Natural, function (divisor : Natural) =>
                     2 ≤ divisor ∧ successor(divisor) ≤ n ∧ divisor ∣ n))
   | zero, atLeastTwo =>
-      False.eliminate_proposition(
-          Or(Natural.is_prime(zero),
-              Exists(Natural, function (divisor : Natural) =>
-                  2 ≤ divisor ∧ successor(divisor) ≤ zero ∧ divisor ∣ zero)),
-          Natural.not_less_or_equal_successor_zero(1, atLeastTwo))
+      absurd(atLeastTwo)
   | successor(predecessorOfN), atLeastTwo =>
       claim (∃ (divisor : Natural). 2 ≤ divisor ∧ divisor ≤ predecessorOfN ∧ divisor ∣ successor(predecessorOfN))
           ∨ ((divisor : Natural) → 2 ≤ divisor → divisor ≤ predecessorOfN → divisor ∤ successor(predecessorOfN))

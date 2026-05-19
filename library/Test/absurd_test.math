@@ -1,0 +1,52 @@
+-- `absurd(witness)` — discharges any goal from a contradictory
+-- witness. Recognized shapes:
+--   * False directly,
+--   * `successor(K) ≤ zero`,
+--   * `successor(K) = zero` and `zero = successor(K)`.
+
+module Test.absurd_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.strong_recursion
+
+-- (1) Witness is itself of type False.
+theorem absurdDirect (witnessOfFalse : False) : Natural :=
+  absurd(witnessOfFalse)
+
+-- (2) `successor(k) ≤ zero` is impossible — absurd recognizes the
+-- shape and applies `Natural.not_less_or_equal_successor_zero`.
+theorem absurdSuccLeZero (k : Natural)
+        (impossible : successor(k) ≤ zero)
+        : Natural :=
+  absurd(impossible)
+
+-- (3) `successor(k) = zero` — absurd applies
+-- `Natural.successor_not_zero`.
+theorem absurdSuccEqZero (k : Natural)
+        (impossible : successor(k) = zero)
+        : Natural :=
+  absurd(impossible)
+
+-- (4) `zero = successor(k)` — applies `Natural.zero_not_successor`.
+theorem absurdZeroEqSucc (k : Natural)
+        (impossible : zero = successor(k))
+        : Natural :=
+  absurd(impossible)
+
+-- (5) Goal isn't a Type — works on Proposition-valued goals too.
+theorem absurdPropositionGoal (k : Natural)
+        (impossible : successor(k) ≤ zero)
+        : 1 = 2 :=
+  absurd(impossible)
+
+-- (6) In a case body: simulates the real use site where one branch
+-- of a destructure is impossible. The destructure refines the type
+-- of `dPositive` so it becomes the impossible shape.
+theorem absurdInCaseArm : (d : Natural) → 1 ≤ d → Natural
+  | zero,         dPositive => absurd(dPositive)
+  | successor(_), _          => zero

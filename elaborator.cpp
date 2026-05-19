@@ -2974,6 +2974,12 @@ private:
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
+                if (name == "absurd" && argumentCount == 1) {
+                    return desugarAbsurd(
+                        positionalArguments[0],
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
                 // Quotient operations with implicit `T, R` inference.
                 // Each user-facing form takes the explicit value args
                 // only; the carrier and equivalence are recovered from
@@ -9194,6 +9200,224 @@ private:
             composed = std::move(call);
         }
         return composed;
+    }
+
+    // ---- absurd ---------------------------------------------------------
+    //
+    // `absurd(witness)` — discharges any goal from a contradictory
+    // witness. Recognized shapes for `witness`'s type:
+    //   * `False`                                  — used directly.
+    //   * `successor(K) ≤ zero`                    — applies
+    //                                                Natural.not_less_or_equal_successor_zero.
+    //   * `successor(K) = zero` / `zero = successor(K)` — applies
+    //                                                Natural.successor_not_zero /
+    //                                                Natural.zero_not_successor.
+    // Then emits `False.eliminate_proposition(GOAL, falseProof)` where
+    // GOAL comes from the expected type at the call site. Adding more
+    // shapes is mechanical — register the pattern + matching lemma name
+    // below.
+    ExpressionPointer desugarAbsurd(
+        SurfaceExpressionPointer witnessSurface,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "absurd at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "absurd needs an expected type from context — use it "
+                "in a position with a known goal");
+        }
+
+        ExpressionPointer witnessKernel =
+            elaborateExpression(*witnessSurface, localBinders);
+        ExpressionPointer witnessTypeOpened = weakHeadNormalForm(
+            environment_,
+            inferTypeInLocalContext(localBinders, witnessKernel));
+        ExpressionPointer witnessType = closeOverLocalBinders(
+            witnessTypeOpened, localBinders, localBinders.size());
+
+        ExpressionPointer falseProof;
+
+        // Shape: witness is already a proof of False.
+        if (auto* constant =
+                std::get_if<Constant>(&witnessType->node)) {
+            if (constant->name == "False") {
+                falseProof = witnessKernel;
+            }
+        }
+
+        // Shape: `LessOrEqual(successor(K), zero)`. The type is built
+        // as `App(App(LessOrEqual, successor(K)), zero)`. Both
+        // endpoints are WHNF'd so that definitional reductions like
+        // `successor(k) + b → successor(k + b)` expose the
+        // constructor.
+        if (!falseProof) {
+            auto* outerApp =
+                std::get_if<Application>(&witnessType->node);
+            if (outerApp) {
+                ExpressionPointer rhsNormalised = weakHeadNormalForm(
+                    environment_, outerApp->argument);
+                auto* zeroConstant = std::get_if<Constant>(
+                    &rhsNormalised->node);
+                bool rhsIsZero = zeroConstant
+                    && zeroConstant->name == "zero";
+                auto* innerApp = std::get_if<Application>(
+                    &outerApp->function->node);
+                if (rhsIsZero && innerApp) {
+                    auto* head = std::get_if<Constant>(
+                        &innerApp->function->node);
+                    if (head && head->name == "LessOrEqual") {
+                        ExpressionPointer lhsNormalised =
+                            weakHeadNormalForm(
+                                environment_, innerApp->argument);
+                        auto* succApp = std::get_if<Application>(
+                            &lhsNormalised->node);
+                        if (succApp) {
+                            auto* succHead = std::get_if<Constant>(
+                                &succApp->function->node);
+                            if (succHead
+                                && succHead->name == "successor") {
+                                ExpressionPointer kValue =
+                                    succApp->argument;
+                                ExpressionPointer call = makeConstant(
+                                    "Natural.not_less_or_equal_successor_zero",
+                                    {});
+                                call = makeApplication(
+                                    std::move(call), kValue);
+                                call = makeApplication(
+                                    std::move(call), witnessKernel);
+                                falseProof = std::move(call);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Shapes: `successor(K) = zero` or `zero = successor(K)` on
+        // `Natural`. We extract via extractEqualityComponents and
+        // dispatch based on which side is `successor(_)`.
+        if (!falseProof) {
+            EqualityComponents components;
+            bool hasComponents = false;
+            try {
+                components = extractEqualityComponents(
+                    witnessType, "absurd", line);
+                hasComponents = true;
+            } catch (const ElaborateError&) {
+                hasComponents = false;
+            }
+            if (hasComponents) {
+                auto* carrierConstant = std::get_if<Constant>(
+                    &components.carrierType->node);
+                bool carrierIsNatural = carrierConstant
+                    && carrierConstant->name == "Natural";
+                auto isSuccessor = [&](ExpressionPointer expression,
+                                       ExpressionPointer& inner)
+                                       -> bool {
+                    ExpressionPointer normalised =
+                        weakHeadNormalForm(environment_, expression);
+                    auto* application = std::get_if<Application>(
+                        &normalised->node);
+                    if (!application) return false;
+                    auto* head = std::get_if<Constant>(
+                        &application->function->node);
+                    if (!head || head->name != "successor") {
+                        return false;
+                    }
+                    inner = application->argument;
+                    return true;
+                };
+                auto isZero = [&](ExpressionPointer expression)
+                                  -> bool {
+                    ExpressionPointer normalised =
+                        weakHeadNormalForm(environment_, expression);
+                    auto* constant = std::get_if<Constant>(
+                        &normalised->node);
+                    return constant && constant->name == "zero";
+                };
+                ExpressionPointer kValue;
+                if (carrierIsNatural
+                    && isSuccessor(components.leftEndpoint, kValue)
+                    && isZero(components.rightEndpoint)) {
+                    ExpressionPointer call = makeConstant(
+                        "Natural.successor_not_zero", {});
+                    call = makeApplication(std::move(call), kValue);
+                    call = makeApplication(std::move(call),
+                                            witnessKernel);
+                    falseProof = std::move(call);
+                } else if (carrierIsNatural
+                    && isZero(components.leftEndpoint)
+                    && isSuccessor(components.rightEndpoint,
+                                    kValue)) {
+                    ExpressionPointer call = makeConstant(
+                        "Natural.zero_not_successor", {});
+                    call = makeApplication(std::move(call), kValue);
+                    call = makeApplication(std::move(call),
+                                            witnessKernel);
+                    falseProof = std::move(call);
+                }
+            }
+        }
+
+        if (!falseProof) {
+            throwElaborate(
+                "absurd: argument's type is not `False` and doesn't "
+                "match a recognized contradiction shape "
+                "(supported: succ(K) ≤ zero, succ(K) = zero, "
+                "zero = succ(K)). Use `False.eliminate_proposition` "
+                "directly if you already have a False proof from "
+                "some other source.");
+        }
+
+        // Dispatch between `False.eliminate_proposition` (for goals in
+        // Proposition) and `False.eliminate.{u}` (for goals in
+        // Type u = Sort u+1). The goal's universe level is the level
+        // of the Sort returned by inferType(expectedType).
+        Context openedContext;
+        for (size_t i = 0; i < localBinders.size(); ++i) {
+            ExpressionPointer openedType = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            openedContext.push_back(
+                {localBinders[i].name, openedType,
+                 FreeVariableOrigin::Internal});
+        }
+        ExpressionPointer goalSort = weakHeadNormalForm(
+            environment_,
+            inferType(environment_, openedContext,
+                       openOverLocalBinders(
+                           expectedType, localBinders,
+                           localBinders.size())));
+        auto* sortNode = std::get_if<Sort>(&goalSort->node);
+        if (!sortNode) {
+            throwElaborate(
+                "absurd: internal — goal type's kind isn't a Sort");
+        }
+        std::optional<int> levelConstant =
+            levelAsConstant(sortNode->level);
+
+        if (levelConstant && *levelConstant == 0) {
+            ExpressionPointer call = makeConstant(
+                "False.eliminate_proposition", {});
+            call = makeApplication(std::move(call), expectedType);
+            call = makeApplication(std::move(call),
+                                    std::move(falseProof));
+            return call;
+        }
+        if (!levelConstant) {
+            throwElaborate(
+                "absurd: goal's universe isn't a concrete level — "
+                "v1 only dispatches against Proposition or "
+                "Type N for explicit N");
+        }
+        // Type N case: pass N as the universe arg to False.eliminate.
+        ExpressionPointer call = makeConstant(
+            "False.eliminate",
+            {makeLevelConst(*levelConstant - 1)});
+        call = makeApplication(std::move(call), expectedType);
+        call = makeApplication(std::move(call), std::move(falseProof));
+        return call;
     }
 
     // Pick the unique overload candidate that matches the user-supplied
