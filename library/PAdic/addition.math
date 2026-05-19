@@ -141,7 +141,9 @@ theorem PAdicCauchySequence.sequenceFunction_add
 
 -- Inner respect: with x fixed, λ y. mk(add(x, y)) respects
 -- PAdicEquivalent. Uses the SAME ε (no halving): |(x_m + y_m) - (x_m + y'_m)|
--- collapses to |y_m - y'_m| via add_subtract_cancel_left.
+-- collapses to |y_m - y'_m|. Bridge each sf(add(rep_x, rep_•), m) to
+-- sf(rep_x, m) + sf(rep_•, m) via sequenceFunction_add, then ring on
+-- the abstract sequenceFunction terms cancels.
 theorem PAdic.add_after_first_respects
         (rep_x rep_y rep_yPrime : PAdicCauchySequence(p, primality))
         (yEquiv : PAdicEquivalent(p, primality, rep_y, rep_yPrime))
@@ -163,43 +165,26 @@ theorem PAdic.add_after_first_respects
               function (m : Natural) (N_leq_m : N ≤ m) =>
                 rewrite(
                     Equality.symmetry(
-                        calc Rational.padic_absolute_value(
-                                 p, primality,
-                                 PAdicCauchySequence.sequenceFunction(
-                                     p, primality,
-                                     PAdicCauchySequence.add(
-                                         p, primality, rep_x, rep_y), m)
-                                 - PAdicCauchySequence.sequenceFunction(
-                                     p, primality,
-                                     PAdicCauchySequence.add(
-                                         p, primality, rep_x, rep_yPrime), m))
-                           = Rational.padic_absolute_value(
-                                 p, primality,
-                                 PAdicCauchySequence.sequenceFunction(
-                                     p, primality, rep_x, m)
-                                 + PAdicCauchySequence.sequenceFunction(
-                                       p, primality, rep_y, m)
-                                 - PAdicCauchySequence.sequenceFunction(
-                                     p, primality,
-                                     PAdicCauchySequence.add(
-                                         p, primality, rep_x, rep_yPrime), m))
-                           = Rational.padic_absolute_value(
-                                 p, primality,
-                                 PAdicCauchySequence.sequenceFunction(
-                                     p, primality, rep_x, m)
-                                 + PAdicCauchySequence.sequenceFunction(
-                                       p, primality, rep_y, m)
-                                 - (PAdicCauchySequence.sequenceFunction(
-                                        p, primality, rep_x, m)
-                                    + PAdicCauchySequence.sequenceFunction(
-                                          p, primality, rep_yPrime, m)))
-                           = Rational.padic_absolute_value(
-                                 p, primality,
-                                 PAdicCauchySequence.sequenceFunction(
-                                     p, primality, rep_y, m)
-                                 - PAdicCauchySequence.sequenceFunction(
-                                     p, primality, rep_yPrime, m))),
-                    yEquiv_at_N(m, N_leq_m))
+                        PAdicCauchySequence.sequenceFunction_add(
+                            p, primality, rep_x, rep_yPrime, m)),
+                    rewrite(
+                        Equality.symmetry(
+                            PAdicCauchySequence.sequenceFunction_add(
+                                p, primality, rep_x, rep_y, m)),
+                        rewrite(
+                            (ring : PAdicCauchySequence.sequenceFunction(
+                                        p, primality, rep_y, m)
+                                    - PAdicCauchySequence.sequenceFunction(
+                                        p, primality, rep_yPrime, m)
+                                    = (PAdicCauchySequence.sequenceFunction(
+                                           p, primality, rep_x, m)
+                                       + PAdicCauchySequence.sequenceFunction(
+                                           p, primality, rep_y, m))
+                                      - (PAdicCauchySequence.sequenceFunction(
+                                             p, primality, rep_x, m)
+                                         + PAdicCauchySequence.sequenceFunction(
+                                             p, primality, rep_yPrime, m))),
+                            yEquiv_at_N(m, N_leq_m))))
         } : ∃ (N : Natural).
               (m : Natural) → N ≤ m →
                 Rational.padic_absolute_value(
@@ -258,6 +243,9 @@ theorem PAdic.add_respects
                 PAdic.add_after_first_respects(p, primality, rep_xPrime),
                 y),
       function (rep_y : PAdicCauchySequence(p, primality)) =>
+        -- Mirror of add_after_first_respects with the SECOND component
+        -- shared instead of the first; the same sequenceFunction_add
+        -- bridge + ring cancel.
         Quotient.sound(
             PAdicCauchySequence(p, primality),
             PAdicEquivalent(p, primality),
@@ -271,43 +259,26 @@ theorem PAdic.add_respects
                     function (m : Natural) (N_leq_m : N ≤ m) =>
                       rewrite(
                           Equality.symmetry(
-                              calc Rational.padic_absolute_value(
-                                       p, primality,
-                                       PAdicCauchySequence.sequenceFunction(
-                                           p, primality,
-                                           PAdicCauchySequence.add(
-                                               p, primality, rep_x, rep_y), m)
-                                       - PAdicCauchySequence.sequenceFunction(
-                                           p, primality,
-                                           PAdicCauchySequence.add(
-                                               p, primality, rep_xPrime, rep_y), m))
-                                 = Rational.padic_absolute_value(
-                                       p, primality,
-                                       PAdicCauchySequence.sequenceFunction(
-                                           p, primality, rep_x, m)
-                                       + PAdicCauchySequence.sequenceFunction(
-                                             p, primality, rep_y, m)
-                                       - PAdicCauchySequence.sequenceFunction(
-                                           p, primality,
-                                           PAdicCauchySequence.add(
-                                               p, primality, rep_xPrime, rep_y), m))
-                                 = Rational.padic_absolute_value(
-                                       p, primality,
-                                       PAdicCauchySequence.sequenceFunction(
-                                           p, primality, rep_x, m)
-                                       + PAdicCauchySequence.sequenceFunction(
-                                             p, primality, rep_y, m)
-                                       - (PAdicCauchySequence.sequenceFunction(
+                              PAdicCauchySequence.sequenceFunction_add(
+                                  p, primality, rep_xPrime, rep_y, m)),
+                          rewrite(
+                              Equality.symmetry(
+                                  PAdicCauchySequence.sequenceFunction_add(
+                                      p, primality, rep_x, rep_y, m)),
+                              rewrite(
+                                  (ring : PAdicCauchySequence.sequenceFunction(
+                                              p, primality, rep_x, m)
+                                          - PAdicCauchySequence.sequenceFunction(
                                               p, primality, rep_xPrime, m)
-                                          + PAdicCauchySequence.sequenceFunction(
-                                                p, primality, rep_y, m)))
-                                 = Rational.padic_absolute_value(
-                                       p, primality,
-                                       PAdicCauchySequence.sequenceFunction(
-                                           p, primality, rep_x, m)
-                                       - PAdicCauchySequence.sequenceFunction(
-                                             p, primality, rep_xPrime, m))),
-                          xEquiv_at_N(m, N_leq_m))
+                                          = (PAdicCauchySequence.sequenceFunction(
+                                                 p, primality, rep_x, m)
+                                             + PAdicCauchySequence.sequenceFunction(
+                                                 p, primality, rep_y, m))
+                                            - (PAdicCauchySequence.sequenceFunction(
+                                                   p, primality, rep_xPrime, m)
+                                               + PAdicCauchySequence.sequenceFunction(
+                                                   p, primality, rep_y, m))),
+                                  xEquiv_at_N(m, N_leq_m))))
               } : ∃ (N : Natural).
                     (m : Natural) → N ≤ m →
                       Rational.padic_absolute_value(

@@ -183,6 +183,9 @@ theorem PAdicCauchySequence.sequenceFunction_negate
   | PAdicCauchySequence.make(s, _), m =>
       reflexivity(Rational, -s(m))
 
+-- Bridge each sequenceFunction(negate(rep), m) to -sequenceFunction(rep, m)
+-- via sequenceFunction_negate, then one application of
+-- padic_absolute_value_of_subtract_of_negates collapses the bound.
 theorem PAdic.negate_respects
         (rep1 rep1Prime : PAdicCauchySequence(p, primality))
         (equivalenceHypothesis
@@ -209,30 +212,21 @@ theorem PAdic.negate_respects
               function (m : Natural) (N_leq_m : N ≤ m) =>
                 rewrite(
                     Equality.symmetry(
-                        calc Rational.padic_absolute_value(p, primality,
-                                 PAdicCauchySequence.sequenceFunction(
-                                     p, primality,
-                                     PAdicCauchySequence.negate(p, primality, rep1), m)
-                                 - PAdicCauchySequence.sequenceFunction(
-                                     p, primality,
-                                     PAdicCauchySequence.negate(p, primality, rep1Prime), m))
-                           = Rational.padic_absolute_value(p, primality,
-                                 -PAdicCauchySequence.sequenceFunction(
-                                      p, primality, rep1, m)
-                                 - PAdicCauchySequence.sequenceFunction(
-                                     p, primality,
-                                     PAdicCauchySequence.negate(p, primality, rep1Prime), m))
-                           = Rational.padic_absolute_value(p, primality,
-                                 -PAdicCauchySequence.sequenceFunction(
-                                      p, primality, rep1, m)
-                                 - -PAdicCauchySequence.sequenceFunction(
-                                       p, primality, rep1Prime, m))
-                           = Rational.padic_absolute_value(p, primality,
-                                 PAdicCauchySequence.sequenceFunction(
-                                     p, primality, rep1, m)
-                                 - PAdicCauchySequence.sequenceFunction(
-                                       p, primality, rep1Prime, m))),
-                    origAtN(m, N_leq_m))
+                        PAdicCauchySequence.sequenceFunction_negate(
+                            p, primality, rep1Prime, m)),
+                    rewrite(
+                        Equality.symmetry(
+                            PAdicCauchySequence.sequenceFunction_negate(
+                                p, primality, rep1, m)),
+                        rewrite(
+                            Equality.symmetry(
+                                Rational.padic_absolute_value_of_subtract_of_negates(
+                                    p, primality,
+                                    PAdicCauchySequence.sequenceFunction(
+                                        p, primality, rep1, m),
+                                    PAdicCauchySequence.sequenceFunction(
+                                        p, primality, rep1Prime, m))),
+                            origAtN(m, N_leq_m))))
         } : ∃ (N : Natural).
               (m : Natural) → N ≤ m →
                 Rational.padic_absolute_value(p, primality,
