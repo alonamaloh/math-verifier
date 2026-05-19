@@ -147,6 +147,8 @@ private:
         std::string description;
         std::vector<LocalBinder> contextSnapshot;  // copy at push time
         ExpressionPointer expectedType;             // may be null
+        int line = 0;                                // 0 = unknown
+        int column = 0;                              // 0 = unknown
     };
 
     struct Frame {
@@ -154,7 +156,8 @@ private:
         Frame(Elaborator& target, std::string description)
             : elaborator(target) {
             elaborator.contextFrames_.push_back(
-                FrameSnapshot{std::move(description), {}, nullptr});
+                FrameSnapshot{std::move(description), {}, nullptr,
+                               0, 0});
         }
         Frame(Elaborator& target, std::string description,
               const std::vector<LocalBinder>& localBinders,
@@ -162,7 +165,17 @@ private:
             : elaborator(target) {
             elaborator.contextFrames_.push_back(
                 FrameSnapshot{std::move(description),
-                               localBinders, expectedType});
+                               localBinders, expectedType, 0, 0});
+        }
+        Frame(Elaborator& target, std::string description,
+              const std::vector<LocalBinder>& localBinders,
+              ExpressionPointer expectedType,
+              int line, int column)
+            : elaborator(target) {
+            elaborator.contextFrames_.push_back(
+                FrameSnapshot{std::move(description),
+                               localBinders, expectedType,
+                               line, column});
         }
         ~Frame() { elaborator.contextFrames_.pop_back(); }
         Frame(const Frame&) = delete;
@@ -319,7 +332,21 @@ private:
     }
 
     [[noreturn]] void throwElaborate(const std::string& message) const {
-        throw ElaborateError(formatErrorWithContext(message));
+        // Pick up the most recent (innermost) frame that has a known
+        // source position; that's the best anchor for an editor to
+        // highlight.
+        int line = 0;
+        int column = 0;
+        for (auto iter = contextFrames_.rbegin();
+             iter != contextFrames_.rend(); ++iter) {
+            if (iter->line != 0) {
+                line = iter->line;
+                column = iter->column;
+                break;
+            }
+        }
+        throw ElaborateError(
+            formatErrorWithContext(message), line, column);
     }
 
     // Wraps a kernel TypeError with the elaborator's context stack and
@@ -4383,10 +4410,10 @@ private:
         const SurfaceCalc& calc,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
+        int line, int column) {
         Frame frame(*this,
             "calc block at line " + std::to_string(line),
-            localBinders, expectedType);
+            localBinders, expectedType, line, column);
         ExpressionPointer previousKernel = elaborateExpression(
             *calc.initialExpression, localBinders);
         ExpressionPointer carrierTypeOpen =
@@ -4408,7 +4435,8 @@ private:
                 // `previousKernel = next`. We don't yet know `next`,
                 // but `previousKernel` is the left endpoint and the
                 // user usually wants to see what they're stepping from.
-                previousKernel);
+                previousKernel,
+                step.line, /*column*/ 0);
             ExpressionPointer nextKernel = elaborateExpression(
                 *step.nextExpression, localBinders, carrierType);
             ExpressionPointer stepEqualityType = makeApplication(
@@ -5965,9 +5993,9 @@ private:
     ExpressionPointer elaborateRing(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
+        int line, int column) {
         Frame frame(*this, "ring at line " + std::to_string(line),
-                    localBinders, expectedType);
+                    localBinders, expectedType, line, column);
         if (!expectedType) {
             throwElaborate(
                 "`ring` needs an expected type from context — use it "
@@ -9895,9 +9923,9 @@ private:
         const SurfaceField& fieldTactic,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
+        int line, int column) {
         Frame frame(*this, "field at line " + std::to_string(line),
-                    localBinders, expectedType);
+                    localBinders, expectedType, line, column);
         if (!expectedType) {
             throwElaborate(
                 "`field` needs an expected type from context — use it "

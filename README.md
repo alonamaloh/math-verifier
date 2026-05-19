@@ -29,6 +29,20 @@ make -j 16 library     # verify all .math files in library/
 ./kernel               # unit tests (kernel + elaborator)
 ```
 
+## Editor integration
+
+Errors are printed in the canonical compiler format
+`<file>:<line>:<column>: <kind> error: <message>` followed by an
+indented breadcrumb stack with the local context and goal at each
+frame, so any editor's problem-matcher / compilation-mode picks them up.
+
+- `docs/editor/watch.md` — running the build in a tight loop with
+  `fswatch` or `entr`.
+- `docs/editor/vscode.md` — a `.vscode/tasks.json` recipe with a
+  problem matcher that surfaces failures in the Problems panel.
+- `docs/editor/emacs.md` — `compilation-mode` + a save-triggered
+  rebuild via `dir-locals`.
+
 ## Layout
 
 ```

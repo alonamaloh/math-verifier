@@ -9,7 +9,15 @@
 #include <string>
 
 struct ElaborateError : std::runtime_error {
+    // Position of the innermost frame at the time the error was thrown,
+    // when available. 0 means "unknown" — most call sites do know the
+    // position, but a few internal frames don't. Used by the driver to
+    // emit the canonical `FILE:LINE:COL:` prefix editors recognise.
+    int line = 0;
+    int column = 0;
     using std::runtime_error::runtime_error;
+    ElaborateError(const std::string& message, int line_, int column_)
+        : std::runtime_error(message), line(line_), column(column_) {}
 };
 
 // Elaborates a single surface expression to a kernel expression in the

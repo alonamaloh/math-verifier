@@ -5213,19 +5213,22 @@ int verifyWithCache(const std::string& sourcePath,
                   << error.what() << "\n";
         return 1;
     } catch (const ParseError& error) {
-        std::cerr << "parse error in " << sourcePath << ": "
+        std::cerr << sourcePath << ":1:1: parse error: "
                   << error.what() << "\n";
         return 1;
     } catch (const ElaborateError& error) {
-        std::cerr << "elaborate error in " << sourcePath << ": "
+        std::cerr << sourcePath << ":"
+                  << (error.line > 0 ? error.line : 1) << ":"
+                  << (error.column > 0 ? error.column : 1)
+                  << ": elaborate error: "
                   << error.what() << "\n";
         return 1;
     } catch (const TypeError& error) {
-        std::cerr << "type error in " << sourcePath << ": "
+        std::cerr << sourcePath << ":1:1: type error: "
                   << error.what() << "\n";
         return 1;
     } catch (const std::exception& error) {
-        std::cerr << "error in " << sourcePath << ": "
+        std::cerr << sourcePath << ":1:1: error: "
                   << error.what() << "\n";
         return 1;
     }
@@ -5430,19 +5433,22 @@ int verifyFiles(const std::vector<std::string>& filenames) {
             moduleName = module.moduleName;
             elaborateModule(module, environment, importedModules);
         } catch (const LexError& error) {
-            std::cerr << "lex error in " << filename << ": "
+            std::cerr << filename << ":1:1: lex error: "
                       << error.what() << "\n";
             return 1;
         } catch (const ParseError& error) {
-            std::cerr << "parse error in " << filename << ": "
+            std::cerr << filename << ":1:1: parse error: "
                       << error.what() << "\n";
             return 1;
         } catch (const ElaborateError& error) {
-            std::cerr << "elaborate error in " << filename << ": "
+            std::cerr << filename << ":"
+                      << (error.line > 0 ? error.line : 1) << ":"
+                      << (error.column > 0 ? error.column : 1)
+                      << ": elaborate error: "
                       << error.what() << "\n";
             return 1;
         } catch (const TypeError& error) {
-            std::cerr << "type error in " << filename << ": "
+            std::cerr << filename << ":1:1: type error: "
                       << error.what() << "\n";
             return 1;
         } catch (const std::exception& error) {
