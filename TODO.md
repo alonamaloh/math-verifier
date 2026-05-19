@@ -221,26 +221,53 @@ cancellation) and the field tactic (`field(h1, h2, …)` with user-
 provided nonzero hypotheses, per-monomial reciprocal contraction)
 have landed. Remaining items, none urgent:
 
-- **Mod-(2⁶⁴ − 59) value-fingerprint prefilter.** Evaluate LHS and
-  RHS in `Z/(2⁶⁴ − 59)` with non-arithmetic nodes seeded by their
-  subtree hash (treat `+`, `-`, `*`, `/` as the field ops, every
-  other node as an opaque value = its hash mod the prime). If both
-  sides successfully evaluate (no division by zero in the
-  evaluator) and the values differ, the goal is *provably* not a
-  field identity (false-positive rate ≈ degree / 2⁶⁴, negligible)
-  — emit the error immediately without running the symbolic
-  decision. If a denominator hashes to 0, fall through to the
-  symbolic path *and* flag it as a likely missing nonzero hypothesis.
-  Worth: ~microseconds per `field` call, saves the user a slow
-  failure round-trip in interactive mode. Not worth in pure batch
-  verification (we already pay the symbolic cost on equality, which
-  is the common case). Park until an interactive front-end lands.
+- **Mod-(2⁶⁴ − 59) value-fingerprint prefilter.** Failure-mode
+  variant landed (a parenthetical appended to ring/field error
+  messages telling the user whether the identity is plausibly true
+  or provably false). The remaining piece is the *prefilter* —
+  evaluate the fingerprint *before* the symbolic decision so a
+  matching fingerprint lets the proof emitter skip straight to
+  proof construction, and a mismatched fingerprint short-circuits
+  to a clear error without running the symbolic path. Worth ~µs per
+  call; payoff is mainly in interactive mode. Park until an
+  interactive front-end lands.
 
-- **Coefficient > ±1.** Ring v2 currently rejects a canonical-form
-  monomial with `|coeff| > 1` (e.g., `a + a = 2 · a`). Adopt the
-  `1 + 1 + … + 1` shape the canonical emitter already builds; the
-  proof emitter needs to recognise it and emit the right number of
-  identity/distributivity steps.
+- **Ring v3 — coefficients as ring elements (DEFERRED until binary
+  literals).** Ring v2 only handles canonical coefficients in
+  `{-1, +1}`. The clean design for v3 is:
+    * The polynomial is `map<signature, coefficient-expression>` —
+      coefficients become kernel terms (`<C>.add`, `<C>.multiply`,
+      literal-coercion chains) rather than `int`. Naked atoms get
+      implicit coefficient `<C>.one`.
+    * Normalisation distributes first, then splits each product into
+      `(closed-prefix coefficient × free-variable atom suffix)`.
+      Closed pieces (literal chains, `one`/`zero`, sums of
+      coefficients) land in the coefficient slot; pieces containing
+      a free variable from the goal context become atoms.
+    * Combining same-signature monomials: one calc step using
+      `distributivity_right` backwards — `c · m + d · m = (c + d) · m`.
+      *O(1) regardless of literal size, vs. v2's O(n) for the
+      `(1 + 1 + … + 1)` plan.*
+    * Coefficient equality decided by kernel def-eq. The kernel
+      already reduces `successor^4999(zero) + successor(zero) =
+      successor^5000(zero)` via the `Natural.add` recursor.
+
+  **Why this is deferred:** the kernel's def-eq on successor-chain
+  literals is *O(N²)* (measured: `4999 + 1 = 5000` by reflexivity
+  takes ~5.5s; `2000 + 1 = 2001` takes ~400ms). So v3 as designed
+  would inherit unusable cost for any non-tiny literal. The
+  prerequisite is a binary literal representation:
+    * Add a `BinaryNat` inductive (or kernel-primitive) with
+      log-depth arithmetic.
+    * Make numeric literals desugar to `BinaryNat` (or a coercion to
+      the user's carrier via `BinaryNat`).
+    * Prove correspondence with the existing `Natural`.
+  Once binary literals land, v3 becomes ~600-1000 lines and the
+  cost is polynomial in literal length.
+
+  In the meantime: v2's coefficient guard fires with a clear error,
+  and the fingerprint diagnostic correctly tells the user "true
+  identity, tactic limitation" so they're not misled.
 
 - **Cross-pair cancellation in field.** Field currently does only
   per-monomial reciprocal cancellation. If a like-term collision
