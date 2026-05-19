@@ -61,26 +61,17 @@ theorem RationalEquivalent.reflexive
           n * (successor(d) : Integer))
 
 -- ----------------------------------------------------------------------
--- Symmetry is just symmetry of Integer equality. The destructure
--- chain matches `IntegerEquivalent.symmetric` from Integer/basics.math.
-
-theorem RationalEquivalent.symmetric_after_first
-        (n1 : Integer) (d1 : Natural)
-        : (other : RationalRepresentative)
-          → RationalEquivalent(
-                RationalRepresentative.make(n1, d1), other)
-          → RationalEquivalent(
-                other, RationalRepresentative.make(n1, d1))
-  | RationalRepresentative.make(n2, d2), equivalenceHypothesis =>
-      Equality.symmetry(equivalenceHypothesis)
+-- Symmetry is just symmetry of Integer equality after destructuring
+-- both representatives.
 
 theorem RationalEquivalent.symmetric
         : (x y : RationalRepresentative)
           → RationalEquivalent(x, y)
           → RationalEquivalent(y, x)
-  | RationalRepresentative.make(n1, d1), y, equivalenceHypothesis =>
-      RationalEquivalent.symmetric_after_first(
-          n1, d1, y, equivalenceHypothesis)
+  | RationalRepresentative.make(n1, d1),
+    RationalRepresentative.make(n2, d2),
+    equivalenceHypothesis =>
+      Equality.symmetry(equivalenceHypothesis)
 
 -- ----------------------------------------------------------------------
 -- Transitivity: cross-multiply, reshape so a common `succ(d2)` factor
@@ -124,41 +115,8 @@ theorem RationalEquivalent.transitive_natural
         cancellableEquation)
 }
 
--- Destructure chain for transitivity, matching the
--- `IntegerEquivalent.transitive` pattern.
-
-theorem RationalEquivalent.transitive_after_xy
-        (n1 : Integer) (d1 : Natural)
-        (n2 : Integer) (d2 : Natural)
-        : (z : RationalRepresentative)
-          → RationalEquivalent(
-                RationalRepresentative.make(n1, d1),
-                RationalRepresentative.make(n2, d2))
-          → RationalEquivalent(
-                RationalRepresentative.make(n2, d2), z)
-          → RationalEquivalent(
-                RationalRepresentative.make(n1, d1), z)
-  | RationalRepresentative.make(n3, d3),
-    firstHypothesis,
-    secondHypothesis =>
-      RationalEquivalent.transitive_natural(
-          n1, d1, n2, d2, n3, d3,
-          firstHypothesis, secondHypothesis)
-
-theorem RationalEquivalent.transitive_after_x
-        (n1 : Integer) (d1 : Natural)
-        : (y z : RationalRepresentative)
-          → RationalEquivalent(
-                RationalRepresentative.make(n1, d1), y)
-          → RationalEquivalent(y, z)
-          → RationalEquivalent(
-                RationalRepresentative.make(n1, d1), z)
-  | RationalRepresentative.make(n2, d2),
-    z,
-    firstHypothesis,
-    secondHypothesis =>
-      RationalEquivalent.transitive_after_xy(
-          n1, d1, n2, d2, z, firstHypothesis, secondHypothesis)
+-- Destructure all three representatives in one row; both hypotheses
+-- refine to the Integer-level form for direct hand-off to `_natural`.
 
 theorem RationalEquivalent.transitive
         : (x y z : RationalRepresentative)
@@ -166,10 +124,12 @@ theorem RationalEquivalent.transitive
           → RationalEquivalent(y, z)
           → RationalEquivalent(x, z)
   | RationalRepresentative.make(n1, d1),
-    y, z,
+    RationalRepresentative.make(n2, d2),
+    RationalRepresentative.make(n3, d3),
     firstHypothesis, secondHypothesis =>
-      RationalEquivalent.transitive_after_x(
-          n1, d1, y, z, firstHypothesis, secondHypothesis)
+      RationalEquivalent.transitive_natural(
+          n1, d1, n2, d2, n3, d3,
+          firstHypothesis, secondHypothesis)
 
 -- ----------------------------------------------------------------------
 -- The Rational type and canonical constants.

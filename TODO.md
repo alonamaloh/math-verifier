@@ -289,15 +289,15 @@ for "the strongest relation that bounds this chain so far" tracking.
   mismatch through the nested polymorphic lifts. Manual two-step
   lifts (Integer.add pattern) work fine. Revisit when the universe-
   handling code in the elaborator is more robust.
-- **Multi-pattern fix.** Relocate function-argument bindings inside
-  inner cases so the helper chains in `Integer/basics.math`,
-  `Integer/addition.math`, etc. collapse. Concrete victims to revisit:
-  `Integer.add_respects_first` and the analogous
-  `Integer.add_respects_second` family in `Integer/addition.math`
-  each spread across THREE theorems (`_natural` / `_after_first_…` /
-  the top-level) because the elaborator's pattern-match desugar only
-  refines the OUTER scrutinee. With multi-pattern refinement these
-  collapse into one theorem each.
+- **Multi-pattern fix — DONE.** Inner constructor patterns now emit
+  a recursor chain whose motives abstract the destructured position +
+  every later position binder, so dependent equality hypotheses refine
+  under the destructure. The `_after_first…` helper chains in Integer/
+  Rational/PAdic addition/multiplication/negation/basics/cancellation
+  collapsed into single theorems. v1 limitation: inner inductives must
+  be single-constructor, non-indexed, non-recursive (parameterised
+  OK). Multi-constructor inner positions would need cross-row coverage
+  analysis.
 - **PAdic `(p, primality)` → implicit args.** Mechanical migration;
   blocks `operator (+) on (PAdic, PAdic)` and the
   CauchyCompletion abstraction. The implicit-args machinery already

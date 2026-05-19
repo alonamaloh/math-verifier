@@ -41,27 +41,19 @@ theorem IntegerEquivalent.reflexive
       Natural.add_commutative(a, b)
 
 -- Symmetry: (a, b) ~ (c, d) implies (c, d) ~ (a, b). From `a + d = b
--- + c` derive `c + b = d + a` by reshuffling via commutativity. Uses
--- a thin helper because hypothesis types do not refine across nested
--- constructor patterns (the elaborator's recursor-style desugaring
--- doesn't relocate function-argument bindings inside the inner case).
-theorem IntegerEquivalent.symmetric_after_first (a b : Natural)
-        : (y : IntegerRepresentative)
-          → IntegerEquivalent(IntegerRepresentative.make(a, b), y)
-          → IntegerEquivalent(y, IntegerRepresentative.make(a, b))
-  | IntegerRepresentative.make(c, d), aPlusDEqualsBPlusC =>
+-- + c` derive `c + b = d + a` by reshuffling via commutativity.
+theorem IntegerEquivalent.symmetric
+        : (x y : IntegerRepresentative)
+          → IntegerEquivalent(x, y)
+          → IntegerEquivalent(y, x)
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d),
+    aPlusDEqualsBPlusC =>
       Equality.transitivity(
           Natural.add_commutative(c, b),
           Equality.transitivity(
               Equality.symmetry(aPlusDEqualsBPlusC),
               Natural.add_commutative(a, d)))
-
-theorem IntegerEquivalent.symmetric
-        : (x y : IntegerRepresentative)
-          → IntegerEquivalent(x, y)
-          → IntegerEquivalent(y, x)
-  | IntegerRepresentative.make(a, b), y, eqProof =>
-      IntegerEquivalent.symmetric_after_first(a, b, y, eqProof)
 
 -- Transitivity: the Natural-component arithmetic kernel. From
 -- `a + d = b + c` and `c + f = d + e`, derive `a + f = b + e`.
@@ -96,34 +88,19 @@ theorem IntegerEquivalent.transitive_natural
   Natural.add_cancel_right(a + f, b + e, c + d, cancellationReady)
 }
 
--- Transitivity, pattern-match chain: destructure x first, then y,
--- then z, threading the components down to `transitive_natural`.
--- (Same elaborator limitation as IntegerEquivalent.symmetric.)
-theorem IntegerEquivalent.transitive_after_xy
-        (a b c d : Natural)
-        : (z : IntegerRepresentative)
-          → IntegerEquivalent(IntegerRepresentative.make(a, b),
-                              IntegerRepresentative.make(c, d))
-          → IntegerEquivalent(IntegerRepresentative.make(c, d), z)
-          → IntegerEquivalent(IntegerRepresentative.make(a, b), z)
-  | IntegerRepresentative.make(e, f), hyp1, hyp2 =>
-      IntegerEquivalent.transitive_natural(a, b, c, d, e, f, hyp1, hyp2)
-
-theorem IntegerEquivalent.transitive_after_x (a b : Natural)
-        : (y z : IntegerRepresentative)
-          → IntegerEquivalent(IntegerRepresentative.make(a, b), y)
-          → IntegerEquivalent(y, z)
-          → IntegerEquivalent(IntegerRepresentative.make(a, b), z)
-  | IntegerRepresentative.make(c, d), z, hyp1, hyp2 =>
-      IntegerEquivalent.transitive_after_xy(a, b, c, d, z, hyp1, hyp2)
-
+-- Transitivity: destructure all three representatives in one pattern
+-- row; both equivalence hypotheses refine to the Natural-level form
+-- expected by `transitive_natural`.
 theorem IntegerEquivalent.transitive
         : (x y z : IntegerRepresentative)
           → IntegerEquivalent(x, y)
           → IntegerEquivalent(y, z)
           → IntegerEquivalent(x, z)
-  | IntegerRepresentative.make(a, b), y, z, hyp1, hyp2 =>
-      IntegerEquivalent.transitive_after_x(a, b, y, z, hyp1, hyp2)
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d),
+    IntegerRepresentative.make(e, f),
+    hyp1, hyp2 =>
+      IntegerEquivalent.transitive_natural(a, b, c, d, e, f, hyp1, hyp2)
 
 -- The Integer type itself: equivalence classes of IntegerRepresentative.
 definition Integer : Type(0) :=

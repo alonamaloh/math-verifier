@@ -104,26 +104,10 @@ theorem Rational.add_respects_first_integer
      = (n1Prime * (successor(d2) : Integer) + n2 * (successor(d1Prime) : Integer)) * (successor(d1) * successor(d2) : Integer)
 
 -- ----------------------------------------------------------------------
--- The first-argument respect proof at representative level. The
--- destructure chain mirrors `Integer.add_respects_first_after_first`:
--- destructure the outer scrutinee first, then destructure the
--- remaining two in the helper.
-
-theorem Rational.add_respects_first_after_first
-        (n1 : Integer) (d1 : Natural)
-        : (rep1Prime rep2 : RationalRepresentative)
-          → RationalEquivalent(
-                RationalRepresentative.make(n1, d1), rep1Prime)
-          → RationalEquivalent(
-                Rational.add_representatives(
-                    RationalRepresentative.make(n1, d1), rep2),
-                Rational.add_representatives(rep1Prime, rep2))
-  | RationalRepresentative.make(n1Prime, d1Prime),
-    RationalRepresentative.make(n2, d2),
-    equivalenceHypothesis =>
-      Rational.add_respects_first_integer(
-          n1, n1Prime, n2, d1, d1Prime, d2,
-          equivalenceHypothesis)
+-- The first-argument respect proof at representative level. All three
+-- representatives plus the equivalence hypothesis destructure in one
+-- row; inner-pattern refinement gives the hypothesis its Integer-level
+-- form for direct hand-off to `_integer`.
 
 theorem Rational.add_respects_first
         : (rep1 rep1Prime rep2 : RationalRepresentative)
@@ -132,9 +116,12 @@ theorem Rational.add_respects_first
                 Rational.add_representatives(rep1, rep2),
                 Rational.add_representatives(rep1Prime, rep2))
   | RationalRepresentative.make(n1, d1),
-    rep1Prime, rep2, equivalenceHypothesis =>
-      Rational.add_respects_first_after_first(
-          n1, d1, rep1Prime, rep2, equivalenceHypothesis)
+    RationalRepresentative.make(n1Prime, d1Prime),
+    RationalRepresentative.make(n2, d2),
+    equivalenceHypothesis =>
+      Rational.add_respects_first_integer(
+          n1, n1Prime, n2, d1, d1Prime, d2,
+          equivalenceHypothesis)
 
 -- ----------------------------------------------------------------------
 -- The second-argument respect kernel. Symmetric to the first-argument
@@ -177,40 +164,9 @@ theorem Rational.add_respects_second_integer
                    equivalenceHypothesis)
      = (n1 * (successor(d2Prime) : Integer) + n2Prime * (successor(d1) : Integer)) * (successor(d1) * successor(d2) : Integer)
 
--- Destructure chain for the second-arg respect proof.
-
-theorem Rational.add_respects_second_after_first_second
-        (n1 : Integer) (d1 : Natural)
-        (n2 : Integer) (d2 : Natural)
-        : (rep2Prime : RationalRepresentative)
-          → RationalEquivalent(
-                RationalRepresentative.make(n2, d2), rep2Prime)
-          → RationalEquivalent(
-                Rational.add_representatives(
-                    RationalRepresentative.make(n1, d1),
-                    RationalRepresentative.make(n2, d2)),
-                Rational.add_representatives(
-                    RationalRepresentative.make(n1, d1), rep2Prime))
-  | RationalRepresentative.make(n2Prime, d2Prime),
-    equivalenceHypothesis =>
-      Rational.add_respects_second_integer(
-          n1, n2, n2Prime, d1, d2, d2Prime,
-          equivalenceHypothesis)
-
-theorem Rational.add_respects_second_after_first
-        (n1 : Integer) (d1 : Natural)
-        : (rep2 rep2Prime : RationalRepresentative)
-          → RationalEquivalent(rep2, rep2Prime)
-          → RationalEquivalent(
-                Rational.add_representatives(
-                    RationalRepresentative.make(n1, d1), rep2),
-                Rational.add_representatives(
-                    RationalRepresentative.make(n1, d1), rep2Prime))
-  | RationalRepresentative.make(n2, d2),
-    rep2Prime,
-    equivalenceHypothesis =>
-      Rational.add_respects_second_after_first_second(
-          n1, d1, n2, d2, rep2Prime, equivalenceHypothesis)
+-- Destructure rep1, rep2, rep2Prime and the equivalence hypothesis
+-- in one row; inner-pattern refinement gives the hypothesis its
+-- Integer-level form.
 
 theorem Rational.add_respects_second
         : (rep1 rep2 rep2Prime : RationalRepresentative)
@@ -219,9 +175,12 @@ theorem Rational.add_respects_second
                 Rational.add_representatives(rep1, rep2),
                 Rational.add_representatives(rep1, rep2Prime))
   | RationalRepresentative.make(n1, d1),
-    rep2, rep2Prime, equivalenceHypothesis =>
-      Rational.add_respects_second_after_first(
-          n1, d1, rep2, rep2Prime, equivalenceHypothesis)
+    RationalRepresentative.make(n2, d2),
+    RationalRepresentative.make(n2Prime, d2Prime),
+    equivalenceHypothesis =>
+      Rational.add_respects_second_integer(
+          n1, n2, n2Prime, d1, d2, d2Prime,
+          equivalenceHypothesis)
 
 -- ----------------------------------------------------------------------
 -- The lift itself: Rational.add as two nested Quotient.lifts, exactly

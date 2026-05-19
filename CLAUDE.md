@@ -161,12 +161,31 @@ historical reasons; migration is a planned cleanup.
 
 ## Multi-pattern bindings
 
-The elaborator does NOT fully support multi-pattern pattern-match
-definitions where binders depend on the destructure (see TODO.md
-"Multi-pattern fix"). When you need this, use a helper-chain pattern:
-one outer pattern-match that pulls in the dependent binders, then an
-inner case-analysis that uses them. Examples: `Integer/basics.math`,
-`Integer/addition.math` use `_after_first` helpers.
+Constructor patterns at non-scrutinee positions of a pattern-match
+definition properly refine the types of later-bound function args
+(including dependent equality hypotheses). Write all destructures in
+one row:
+
+```math
+theorem IntegerEquivalent.symmetric
+        : (x y : IntegerRepresentative)
+          → IntegerEquivalent(x, y)
+          → IntegerEquivalent(y, x)
+  | IntegerRepresentative.make(a, b),
+    IntegerRepresentative.make(c, d),
+    aPlusDEqualsBPlusC =>
+      …
+```
+
+The elaborator emits a nested recursor chain whose motives abstract
+the destructured position AND every later position binder, so a
+hypothesis like `aPlusDEqualsBPlusC` arrives in its refined
+Natural-level form. v1 supports inner constructor patterns on
+single-constructor non-indexed non-recursive (parameterised OK)
+inductives — covers `IntegerRepresentative.make`,
+`RationalRepresentative.make`, `PAdicCauchySequence.make`. Multi-
+constructor inner positions would need per-row coverage analysis
+that isn't yet wired up.
 
 ## `cases ... with` — case-split with retained equation
 

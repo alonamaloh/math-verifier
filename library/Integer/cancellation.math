@@ -85,25 +85,25 @@ theorem Integer.cancellation_natural
 }
 
 -- ----------------------------------------------------------------------
--- At representatives, with the first one already destructured. (The
--- elaborator's pattern-match desugaring refines only the outermost
--- scrutinee's bindings, so multi-rep destructures go via a helper
--- chain — same pattern as Integer/basics.math.)
+-- At representatives: destructure both, recover the Natural-level
+-- equivalence from the multiplied equality via Quotient.exact, then
+-- hand it to the Natural-level cancellation kernel.
 
-theorem Integer.multiply_cancel_right_at_representatives_after_first
-        (k : Natural) (p1 q1 : Natural)
-        : (representativeY : IntegerRepresentative)
+theorem Integer.multiply_cancel_right_at_representatives
+        (k : Natural)
+        : (representativeX representativeY : IntegerRepresentative)
           → Integer.multiply(
-                    Quotient.mk(IntegerRepresentative.make(p1, q1)),
+                    Quotient.mk(representativeX),
                     (successor(k) : Integer))
             = Integer.multiply(
                     Quotient.mk(representativeY),
                     (successor(k) : Integer))
           → Quotient.mk(IntegerRepresentative,
-                                 IntegerEquivalent,
-                                 IntegerRepresentative.make(p1, q1))
+                                 IntegerEquivalent, representativeX)
             = Quotient.mk(representativeY)
-  | IntegerRepresentative.make(p2, q2), multipliedEquality => {
+  | IntegerRepresentative.make(p1, q1),
+    IntegerRepresentative.make(p2, q2),
+    multipliedEquality => {
       -- The hypothesis's type reduces (via the lift compute rule +
       -- multiply_representatives pattern match) to the equality of
       -- two specific mk(make(...)) values. Use Quotient.exact to
@@ -140,26 +140,6 @@ theorem Integer.multiply_cancel_right_at_representatives_after_first
           IntegerRepresentative.make(p2, q2),
           originalEquivalence)
   }
-
--- At representatives: destructure the first one, then delegate to
--- the after_first helper.
-theorem Integer.multiply_cancel_right_at_representatives
-        (k : Natural)
-        : (representativeX representativeY : IntegerRepresentative)
-          → Integer.multiply(
-                    Quotient.mk(representativeX),
-                    (successor(k) : Integer))
-            = Integer.multiply(
-                    Quotient.mk(representativeY),
-                    (successor(k) : Integer))
-          → Quotient.mk(IntegerRepresentative,
-                                 IntegerEquivalent, representativeX)
-            = Quotient.mk(representativeY)
-  | IntegerRepresentative.make(p1, q1),
-    representativeY,
-    multipliedEquality =>
-      Integer.multiply_cancel_right_at_representatives_after_first(
-          k, p1, q1, representativeY, multipliedEquality)
 
 -- ----------------------------------------------------------------------
 -- Main theorem: lift the at-representatives version through
