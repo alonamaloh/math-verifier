@@ -1,0 +1,89 @@
+-- Logic/excluded_middle.math
+--
+-- Classical machinery derived from `Logic.excluded_middle`. Once
+-- excluded middle is in scope, the standard double-negation /
+-- quantifier-swap identities follow immediately and are convenient
+-- to have under their math names rather than re-derived at every
+-- use site.
+
+module Logic.excluded_middle
+
+import Logic.basics
+import Logic.exists
+import axioms
+
+-- ----------------------------------------------------------------------
+-- Double-negation elimination: `¬¬proposition → proposition`. Case on
+-- excluded_middle: the positive branch returns the proof; the
+-- negative branch is absurd from `notNotProposition(notProposition)`.
+theorem Logic.double_negation_eliminate
+        (proposition : Proposition)
+        (notNotProposition : Not(Not(proposition)))
+        : proposition :=
+  Or.eliminate(
+      function (proof : proposition) => proof,
+      function (notProposition : Not(proposition)) =>
+          False.eliminate_proposition(
+              proposition, notNotProposition(notProposition)),
+      Logic.excluded_middle(proposition))
+
+-- ----------------------------------------------------------------------
+-- Negation distributes across implication: `¬(antecedent → consequent)
+-- → antecedent ∧ ¬consequent`. Classical — relies on excluded_middle
+-- to extract the antecedent witness from the assumption that the
+-- whole implication fails.
+theorem Logic.not_implies_implies_and_not
+        (antecedent consequent : Proposition)
+        (notImplication : Not(antecedent → consequent))
+        : And(antecedent, Not(consequent)) :=
+  Or.eliminate(
+      -- Case excluded_middle(antecedent) = antecedent: pair with
+      -- ¬consequent derived from notImplication and λ_. consequent-
+      -- assumption. Going the other way: from antecedent, we'd need
+      -- ¬consequent. Derive that classically too.
+      function (antecedentHolds : antecedent) =>
+          And.introduction(
+              antecedent, Not(consequent),
+              antecedentHolds,
+              function (consequentHolds : consequent) =>
+                  notImplication(
+                      function (_ : antecedent) => consequentHolds)),
+      -- Case excluded_middle(antecedent) = ¬antecedent: notImplication
+      -- applied to the vacuous proof (antecedent → False → consequent)
+      -- yields absurdity.
+      function (notAntecedent : Not(antecedent)) =>
+          False.eliminate_proposition(
+              And(antecedent, Not(consequent)),
+              notImplication(
+                  function (antecedentHolds : antecedent) =>
+                      False.eliminate_proposition(
+                          consequent,
+                          notAntecedent(antecedentHolds)))),
+      Logic.excluded_middle(antecedent))
+
+-- ----------------------------------------------------------------------
+-- `¬(∀ x. predicate(x)) → ∃ x. ¬predicate(x)`. Standard classical
+-- swap. Prove the conclusion by double-negation elimination: assume
+-- the negation of the conclusion (`∀ x. ¬¬predicate(x)`), use DNE
+-- pointwise to recover `∀ x. predicate(x)`, contradict `notForall`.
+theorem Logic.not_forall_implies_exists_not
+        (Domain : Type(0))
+        (predicate : Domain → Proposition)
+        (notForall : Not((x : Domain) → predicate(x)))
+        : ∃ (x : Domain). Not(predicate(x)) :=
+  Logic.double_negation_eliminate(
+      ∃ (x : Domain). Not(predicate(x)),
+      function (notExistsCounterexample
+                    : Not(∃ (x : Domain). Not(predicate(x)))) =>
+          notForall(
+              function (x : Domain) =>
+                  Logic.double_negation_eliminate(
+                      predicate(x),
+                      function (notPredicateAtX : Not(predicate(x))) =>
+                          notExistsCounterexample(
+                              Exists.introduce(
+                                  Domain,
+                                  function (y : Domain) =>
+                                      Not(predicate(y)),
+                                  x,
+                                  notPredicateAtX)))))
