@@ -5956,12 +5956,16 @@ private:
         } else if (try_axioms(buildAxioms("add"))) {
             axioms = buildAxioms("add");
         } else {
-            throwElaborate(
-                "`ring`: could not solve the goal with either `"
-                + carrierName + ".multiply`-axioms or `"
-                + carrierName + ".add`-axioms; v1 handles pure-product "
-                "or pure-sum rearrangement only (no distributivity / "
-                "mixed forms)");
+            // v1 (pure-AC for one operator) can't close the goal.
+            // Fall through to v2, which normalises both sides to a
+            // sum-of-monomials canonical form (handles distributivity,
+            // 0/1 identity, negation, and like-term cancellation
+            // within ±1 coefficient).
+            return elaborateRingV2(
+                /*localBinders*/{},
+                goal.leftEndpoint, goal.rightEndpoint,
+                goal.carrierType, goal.carrierUniverseLevel,
+                carrierName, line);
         }
         if (leftFactors.size() != rightFactors.size()) {
             throwElaborate(
@@ -6503,6 +6507,420 @@ private:
             carrierUniverseLevel, carrierType,
             original, leftAssocOriginal, canonical,
             reassocProof, sortProof);
+    }
+
+    // =====================================================================
+    // Ring v2 — polynomial canonicalisation
+    //
+    // Decision procedure that extends v1 with distributivity, identity
+    // (0 and 1), and negation. Both sides of `e1 = e2` are normalised
+    // to a sum-of-monomials over opaque atoms; the atoms are keyed by
+    // subtree hash (so we compare by hash, not by structural equality).
+    //
+    // A `monomialSignature` is the lex-sorted vector of factor hashes
+    // appearing in a monomial (with multiplicity). A polynomial is a
+    // `std::map<monomialSignature, signed coefficient>`, with the zero
+    // coefficient entries omitted.
+    //
+    // v2 of v2 (this version) restricts coefficients to {-1, 0, +1}.
+    // Goals that, after distributivity, collect a like-term coefficient
+    // outside that range (e.g. `a + a = 2 · a`) bail back to the v1
+    // path's error message — they're handled by a future v3.
+    //
+    // Proof generation is staged: this first commit lands the
+    // normaliser + the decision path. If the polynomials agree but the
+    // proof emitter isn't yet ready, the tactic emits a clear error so
+    // we never silently regress.
+    // =====================================================================
+
+    struct RingV2Context {
+        std::string carrierName;           // e.g. "Rational"
+        ExpressionPointer carrierType;      // Constant("Rational")
+        LevelPointer carrierUniverseLevel;  // for Equality.* applications
+
+        std::string addName;                // "<carrier>.add"
+        std::string multiplyName;           // "<carrier>.multiply"
+        std::string negateName;             // "<carrier>.negate"
+        std::string zeroName;               // "<carrier>.zero"
+        std::string oneName;                // "<carrier>.one"
+
+        // Atom table: hash → kernel expression. Filled lazily while
+        // normalising. We trust 64-bit hashes — the canonicalisation is
+        // sound even on a collision (different terms would happen to be
+        // treated as the same atom, which would cause the polynomial
+        // comparison to spuriously succeed for unequal goals — but the
+        // proof emitter would then fail to produce a kernel-valid
+        // proof, which the kernel catches at verification time).
+        std::unordered_map<uint64_t, ExpressionPointer> atoms;
+    };
+
+    // A polynomial as map<signature, coefficient>, signature = sorted
+    // vector of atom hashes (with multiplicity), coefficient = signed
+    // integer.
+    using RingMonomialSignature = std::vector<uint64_t>;
+    using RingPolynomial = std::map<RingMonomialSignature, int>;
+
+    // Drop zero-coefficient entries (caller is expected to call this
+    // after any arithmetic that can produce a zero).
+    void ringPolynomialCompact(RingPolynomial& polynomial) {
+        for (auto iter = polynomial.begin(); iter != polynomial.end(); ) {
+            if (iter->second == 0) {
+                iter = polynomial.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
+    }
+
+    // polynomial += other, in place.
+    void ringPolynomialAccumulate(
+        RingPolynomial& polynomial,
+        const RingPolynomial& other) {
+        for (const auto& entry : other) {
+            polynomial[entry.first] += entry.second;
+        }
+        ringPolynomialCompact(polynomial);
+    }
+
+    // polynomial -= other, in place.
+    void ringPolynomialSubtract(
+        RingPolynomial& polynomial,
+        const RingPolynomial& other) {
+        for (const auto& entry : other) {
+            polynomial[entry.first] -= entry.second;
+        }
+        ringPolynomialCompact(polynomial);
+    }
+
+    // Negate every coefficient.
+    void ringPolynomialNegate(RingPolynomial& polynomial) {
+        for (auto& entry : polynomial) {
+            entry.second = -entry.second;
+        }
+    }
+
+    // result := left · right (full pointwise distribute).
+    RingPolynomial ringPolynomialMultiply(
+        const RingPolynomial& left, const RingPolynomial& right) {
+        RingPolynomial result;
+        for (const auto& leftEntry : left) {
+            for (const auto& rightEntry : right) {
+                // Merged signature = sorted concat of the two factor
+                // lists. Both inputs are sorted, so a merge keeps it
+                // sorted in linear time.
+                RingMonomialSignature mergedSignature;
+                mergedSignature.reserve(
+                    leftEntry.first.size() + rightEntry.first.size());
+                std::merge(
+                    leftEntry.first.begin(), leftEntry.first.end(),
+                    rightEntry.first.begin(), rightEntry.first.end(),
+                    std::back_inserter(mergedSignature));
+                result[mergedSignature] += leftEntry.second
+                                            * rightEntry.second;
+            }
+        }
+        ringPolynomialCompact(result);
+        return result;
+    }
+
+    // Construct the polynomial representing `1` (single constant
+    // monomial with empty factor list and coefficient 1).
+    RingPolynomial ringPolynomialOne() {
+        RingPolynomial polynomial;
+        polynomial[RingMonomialSignature{}] = 1;
+        return polynomial;
+    }
+
+    // Construct the polynomial representing a single atom (one monomial
+    // with one factor and coefficient 1). Side effect: register the atom
+    // in `context.atoms` keyed by its hash.
+    RingPolynomial ringPolynomialAtom(
+        RingV2Context& context, ExpressionPointer atom) {
+        uint64_t atomHash = atom->hash;
+        auto insertion = context.atoms.emplace(atomHash, atom);
+        (void)insertion;  // first writer wins; subsequent hits reuse
+                            // the existing pointer (assumed
+                            // structurally equal modulo hash collision)
+        RingPolynomial polynomial;
+        polynomial[RingMonomialSignature{atomHash}] = 1;
+        return polynomial;
+    }
+
+    // Recognise `<context.opName>(left, right)` and produce (left,
+    // right). Returns true on a match.
+    bool matchBinaryRingOp(
+        ExpressionPointer expression,
+        const std::string& opName,
+        ExpressionPointer& leftOut,
+        ExpressionPointer& rightOut) {
+        auto* outerApp =
+            std::get_if<Application>(&expression->node);
+        if (!outerApp) return false;
+        auto* innerApp =
+            std::get_if<Application>(&outerApp->function->node);
+        if (!innerApp) return false;
+        auto* head =
+            std::get_if<Constant>(&innerApp->function->node);
+        if (!head || head->name != opName) return false;
+        leftOut = innerApp->argument;
+        rightOut = outerApp->argument;
+        return true;
+    }
+
+    // Recognise `<context.negateName>(inner)` and produce `inner`.
+    bool matchUnaryRingNegate(
+        ExpressionPointer expression,
+        const std::string& negateName,
+        ExpressionPointer& innerOut) {
+        auto* outerApp =
+            std::get_if<Application>(&expression->node);
+        if (!outerApp) return false;
+        auto* head =
+            std::get_if<Constant>(&outerApp->function->node);
+        if (!head || head->name != negateName) return false;
+        innerOut = outerApp->argument;
+        return true;
+    }
+
+    // True if `expression` is `<carrier>.zero` (head Constant whose
+    // name matches `context.zeroName`).
+    bool matchRingZero(ExpressionPointer expression,
+                          const std::string& zeroName) {
+        auto* head = std::get_if<Constant>(&expression->node);
+        return head != nullptr && head->name == zeroName;
+    }
+
+    // True if `expression` is `<carrier>.one`.
+    bool matchRingOne(ExpressionPointer expression,
+                         const std::string& oneName) {
+        auto* head = std::get_if<Constant>(&expression->node);
+        return head != nullptr && head->name == oneName;
+    }
+
+    // Convert a kernel expression to a RingPolynomial, registering
+    // opaque subterms as atoms along the way. Recursive: add /
+    // multiply / negate are unfolded; zero and one are bottomed out;
+    // everything else is an atom.
+    RingPolynomial normaliseToRingPolynomial(
+        ExpressionPointer expression, RingV2Context& context) {
+        // zero — empty polynomial.
+        if (matchRingZero(expression, context.zeroName)) {
+            return RingPolynomial{};
+        }
+        // one — single empty-factor monomial.
+        if (matchRingOne(expression, context.oneName)) {
+            return ringPolynomialOne();
+        }
+        // add — recurse + accumulate.
+        ExpressionPointer left;
+        ExpressionPointer right;
+        if (matchBinaryRingOp(expression, context.addName,
+                                 left, right)) {
+            RingPolynomial polynomial =
+                normaliseToRingPolynomial(left, context);
+            RingPolynomial rightPolynomial =
+                normaliseToRingPolynomial(right, context);
+            ringPolynomialAccumulate(polynomial, rightPolynomial);
+            return polynomial;
+        }
+        // multiply — recurse + multiply.
+        if (matchBinaryRingOp(expression, context.multiplyName,
+                                 left, right)) {
+            RingPolynomial leftPolynomial =
+                normaliseToRingPolynomial(left, context);
+            RingPolynomial rightPolynomial =
+                normaliseToRingPolynomial(right, context);
+            return ringPolynomialMultiply(
+                leftPolynomial, rightPolynomial);
+        }
+        // negate — recurse + flip.
+        ExpressionPointer inner;
+        if (matchUnaryRingNegate(expression, context.negateName,
+                                    inner)) {
+            RingPolynomial polynomial =
+                normaliseToRingPolynomial(inner, context);
+            ringPolynomialNegate(polynomial);
+            return polynomial;
+        }
+        // Otherwise: an opaque atom.
+        return ringPolynomialAtom(context, expression);
+    }
+
+    // Build the kernel expression for `1 + 1 + ... + 1` with N copies
+    // of `<context.oneName>`, left-associated.  N must be >= 1.
+    ExpressionPointer buildRingCoefficientExpression(
+        int count, const RingV2Context& context) {
+        ExpressionPointer one = makeConstant(context.oneName);
+        if (count == 1) return one;
+        ExpressionPointer accumulator = one;
+        for (int i = 1; i < count; ++i) {
+            ExpressionPointer onePlus = makeConstant(context.oneName);
+            accumulator = buildRingOp(context.addName,
+                                        std::move(accumulator),
+                                        std::move(onePlus));
+        }
+        return accumulator;
+    }
+
+    // Build the kernel expression for one monomial in canonical form.
+    // Coefficient must be non-zero. Factors is the sorted signature.
+    // The shape is:
+    //    coefficientExpr * (factor_0 * factor_1 * ... * factor_{n-1})
+    // with the inner product left-associated. If |coefficient| == 1,
+    // we drop the `coefficientExpr *` prefix (with a `negate` wrap if
+    // the coefficient is negative). If the factor list is empty, the
+    // monomial is just `coefficientExpr` (possibly negated).
+    ExpressionPointer buildCanonicalMonomial(
+        const RingMonomialSignature& factors,
+        int coefficient,
+        const RingV2Context& context) {
+        const int magnitude = coefficient > 0 ? coefficient : -coefficient;
+        ExpressionPointer factorProduct;
+        if (!factors.empty()) {
+            std::vector<ExpressionPointer> atomTerms;
+            atomTerms.reserve(factors.size());
+            for (uint64_t factorHash : factors) {
+                auto found = context.atoms.find(factorHash);
+                if (found == context.atoms.end()) {
+                    throwElaborate(
+                        "ring v2: internal error — atom hash missing "
+                        "from atom table");
+                }
+                atomTerms.push_back(found->second);
+            }
+            factorProduct = assembleLeftAssociatedProduct(
+                context.multiplyName, atomTerms);
+        }
+        ExpressionPointer monomial;
+        if (magnitude == 1) {
+            // No explicit coefficient. If no factors, the monomial is
+            // just `one`.
+            monomial = factorProduct ? factorProduct
+                                      : makeConstant(context.oneName);
+        } else {
+            ExpressionPointer coefficientExpr =
+                buildRingCoefficientExpression(magnitude, context);
+            monomial = factorProduct
+                ? buildRingOp(context.multiplyName,
+                                std::move(coefficientExpr),
+                                std::move(factorProduct))
+                : std::move(coefficientExpr);
+        }
+        if (coefficient < 0) {
+            ExpressionPointer negate = makeConstant(context.negateName);
+            monomial = makeApplication(std::move(negate),
+                                          std::move(monomial));
+        }
+        return monomial;
+    }
+
+    // Build the canonical-form kernel expression for a polynomial.
+    // Empty polynomial → `zero`. Single monomial → that monomial.
+    // Multiple monomials → left-associated sum in std::map order
+    // (i.e., ordered by lex of factor signature, which is determined
+    // by subtree hashes — so the order is stable but unspecified).
+    ExpressionPointer buildCanonicalPolynomial(
+        const RingPolynomial& polynomial,
+        const RingV2Context& context) {
+        if (polynomial.empty()) {
+            return makeConstant(context.zeroName);
+        }
+        std::vector<ExpressionPointer> monomials;
+        monomials.reserve(polynomial.size());
+        for (const auto& entry : polynomial) {
+            monomials.push_back(buildCanonicalMonomial(
+                entry.first, entry.second, context));
+        }
+        ExpressionPointer accumulator = monomials[0];
+        for (size_t i = 1; i < monomials.size(); ++i) {
+            accumulator = buildRingOp(context.addName,
+                                        std::move(accumulator),
+                                        monomials[i]);
+        }
+        return accumulator;
+    }
+
+    // Compare two polynomials for equality (canonical-form match).
+    bool ringPolynomialsAgree(
+        const RingPolynomial& left, const RingPolynomial& right) {
+        if (left.size() != right.size()) return false;
+        auto leftIter = left.begin();
+        auto rightIter = right.begin();
+        while (leftIter != left.end()) {
+            if (leftIter->first != rightIter->first) return false;
+            if (leftIter->second != rightIter->second) return false;
+            ++leftIter;
+            ++rightIter;
+        }
+        return true;
+    }
+
+    // v2 of the ring tactic. Called as a fallback when v1 (pure-AC)
+    // can't close the goal. Returns the proof on success; throws
+    // otherwise. `expectedType` is the equality goal.
+    //
+    // First commit: implements the decision step only. If both sides
+    // normalise to the same polynomial, throw a deliberate "proof
+    // generator not yet wired" error with the canonical form printed,
+    // so the test can confirm the decision is correct. (The proof
+    // emitter lands in the next commit.)
+    ExpressionPointer elaborateRingV2(
+        const std::vector<LocalBinder>& /*localBinders*/,
+        ExpressionPointer leftEndpoint,
+        ExpressionPointer rightEndpoint,
+        ExpressionPointer carrierType,
+        LevelPointer carrierUniverseLevel,
+        const std::string& carrierName,
+        int line) {
+        RingV2Context context;
+        context.carrierName = carrierName;
+        context.carrierType = carrierType;
+        context.carrierUniverseLevel = carrierUniverseLevel;
+        context.addName       = carrierName + ".add";
+        context.multiplyName  = carrierName + ".multiply";
+        context.negateName    = carrierName + ".negate";
+        context.zeroName      = carrierName + ".zero";
+        context.oneName       = carrierName + ".one";
+        // Sanity-check the carrier supports the v2 vocabulary. We only
+        // require add + multiply at the moment — zero, one, and negate
+        // are optional (a goal that doesn't mention them won't need
+        // them).
+        if (environment_.lookup(context.addName) == nullptr
+            || environment_.lookup(context.multiplyName) == nullptr) {
+            throwElaborate(
+                "`ring` (v2): carrier `" + carrierName
+                + "` does not have both `.add` and `.multiply` in scope");
+        }
+        RingPolynomial leftPolynomial =
+            normaliseToRingPolynomial(leftEndpoint, context);
+        RingPolynomial rightPolynomial =
+            normaliseToRingPolynomial(rightEndpoint, context);
+        if (!ringPolynomialsAgree(leftPolynomial, rightPolynomial)) {
+            throwElaborate(
+                "`ring`: the two sides do not have equal polynomial "
+                "canonical forms over `" + carrierName + "` — they "
+                "are not equal as commutative-ring expressions");
+        }
+        // Coefficient guard: v2's proof emitter only supports
+        // coefficients in {-1, 0, +1}. Drop into a clear error if a
+        // larger coefficient survives (e.g., `a + a` collected to 2·a).
+        for (const auto& entry : leftPolynomial) {
+            if (entry.second != -1 && entry.second != 1) {
+                throwElaborate(
+                    "`ring` (v2): the canonical form has a monomial "
+                    "with coefficient " + std::to_string(entry.second)
+                    + " — v2 only handles coefficients in {-1, +1} for "
+                    "now (collected like-terms with larger multipliers "
+                    "are a follow-up)");
+            }
+        }
+        // For this first commit: decision-only. Throw a recognisable
+        // error so the test confirms we got here.
+        (void)line;
+        throwElaborate(
+            "`ring` (v2): decision step succeeded; the proof emitter "
+            "is not yet wired up. (This is the staged-rollout error — "
+            "ignore it once the next commit lands.)");
     }
 
     // `sorry` — desugars to either `Internal.sorry_proposition(<P>)`
