@@ -9,9 +9,8 @@ state (`README.md`, `CLAUDE.md`) are the record of what was done.
 The math content roadmap. Each item is independently useful; they
 chain in roughly the order listed.
 
-- **Real is a field — landed, modulo one analytic sorry.** Bundle
-  in `Real/field.math` (`Real.is_field`); 0 ≠ 1 and the inverse-
-  existence theorem both proved.
+- **Real is a field — fully proved.** `Real.is_field` in
+  `Real/field.math`. No sorry anywhere in the dependency chain.
   - Path: classical, via `Logic.excluded_middle` (axiom).
     `Logic/excluded_middle.math` derives double-negation-eliminate,
     ¬∀ → ∃¬, ¬(A → B) → A ∧ ¬B. `Rational/linearity.math` derives
@@ -23,22 +22,21 @@ chain in roughly the order listed.
   - `Rational/reciprocal_function.math`: a total
     `Rational.reciprocal_function : Rational → Rational`. Built by
     Natural-pair recursion at the rep level, lifted via two
-    Quotient.lifts (over Integer numerator, then Rational). Respect
-    at the Rational level via the standard uniqueness-of-inverse
-    trick: from multiplication-multiplies on both reps + the reps
-    being mk-equal, derive the reciprocals equal via the calc
-    `recip₁ = 1·recip₁ = (mk₂·recip₂)·recip₁ = (mk₁·recip₂)·recip₁
-    = recip₂·(mk₁·recip₁) = recip₂·1 = recip₂`. Multiplication law
-    `x · reciprocal_function(x) = 1` for non-zero x, via
-    Quotient.induct + sign_split + StrictPositiveRational (positive)
-    or negate-cancellation calc (negative).
-  - `Real/reciprocal.math`: pointwise reciprocal sequence built on
-    `Rational.reciprocal_function`. **One `sorry`:**
-    `Real.reciprocal_sequence_is_cauchy`. The argument is
-    `|1/a − 1/b| = |b − a|/(|a|·|b|) ≤ |b − a|/K²`; combined with
-    the underlying sequence being Cauchy at ε·K², the reciprocal
-    sequence is Cauchy at ε. ~150 lines of analytic plumbing once
-    someone writes the algebraic identity + the bound chain.
+    Quotient.lifts. Respect via uniqueness-of-inverse calc.
+    Multiplication law `x · reciprocal_function(x) = 1` for nonzero
+    x via Quotient.induct + sign_split.
+  - `Real/reciprocal.math`: the pointwise reciprocal sequence built
+    on `Rational.reciprocal_function`, plus the analytic IsCauchy
+    proof. Helpers proved locally:
+    `Rational.reciprocal_function_subtract_identity` (the algebraic
+    identity `1/a - 1/b = (b - a) · (1/a · 1/b)`),
+    `Rational.LessThan.multiply_cancel_right` (strict cancellation,
+    via excluded_middle on `x = y` + LessOrEqual.linear on the other
+    branch). The IsCauchy proof: identity → multiply by s(m)·s(n)
+    → absolute value gives `|ra - rb| · |s(m)| · |s(n)| = |s(n)
+    - s(m)|`; chain `K·K ≤ |s(m)|·|s(n)|` (two
+    multiply_by_nonneg_right steps) with the Cauchy bound at
+    ε·K·K, then strict-cancel K·K.
   - `Real/field.math`: `Real.zero_not_equal_one` (Quotient.exact at
     ε = 1), `Real.reciprocal_cauchy_sequence_multiplies` (the product
     is identically Rational.one beyond apartnessIndex),
