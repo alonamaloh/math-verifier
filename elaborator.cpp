@@ -12339,6 +12339,47 @@ private:
     // Lambda binder. Counts matches so the caller can require exactly
     // one. `target` is shifted as we descend into binders so structural
     // comparison stays correct.
+
+    // Deep beta-only reduction: rewrites every (λx. body)(arg) redex
+    // anywhere in the expression — never δ-unfolds Constants, so
+    // user-visible names stay intact. Used as a fallback combo by
+    // `rewrite(eq, term)` to catch redexes hiding inside the term's
+    // type — e.g. `sequenceFunction(λn. …, m)` from Quotient.lift
+    // bodies in real-analysis proofs, where the user's stated motive
+    // sees the β-reduced form but the inferred type doesn't.
+    ExpressionPointer deepBetaReduce(ExpressionPointer expression) {
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            ExpressionPointer function =
+                deepBetaReduce(application->function);
+            ExpressionPointer argument =
+                deepBetaReduce(application->argument);
+            if (auto* lambda = std::get_if<Lambda>(&function->node)) {
+                return deepBetaReduce(
+                    substitute(lambda->body, 0, argument));
+            }
+            return makeApplication(std::move(function),
+                                    std::move(argument));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return makeLambda(lambda->displayHint,
+                deepBetaReduce(lambda->domain),
+                deepBetaReduce(lambda->body));
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return makePi(pi->displayHint,
+                deepBetaReduce(pi->domain),
+                deepBetaReduce(pi->codomain));
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            return makeLet(let->displayHint,
+                deepBetaReduce(let->type),
+                deepBetaReduce(let->value),
+                deepBetaReduce(let->body));
+        }
+        return expression;
+    }
+
     ExpressionPointer abstractStructuralOccurrence(
         ExpressionPointer expression,
         ExpressionPointer target,
@@ -12461,13 +12502,17 @@ private:
         ExpressionPointer termTypeUnreducedClosed = closeOverLocalBinders(
             termTypeUnreduced, localBinders, localBinders.size());
 
-        // Try four combinations of (term type, left endpoint) ×
-        // (unreduced, WHNF) in priority order. WHNF-ing the left
-        // endpoint catches `congruenceOf(λr. P(r), eq)` whose stated
-        // type's lhs is the unreduced beta-redex `Application(λ, x)`
-        // while the term's inferred type carries the beta-reduced
-        // `P(x)`. WHNF-ing the term type catches definitions like
-        // `Rational.IsNonneg(...)` that wrap the underlying claim.
+        // Try six combinations of (term type, left endpoint) ×
+        // (unreduced, head-beta/WHNF, deep-beta) in priority order.
+        // WHNF-ing the left endpoint catches `congruenceOf(λr. P(r),
+        // eq)` whose stated type's lhs is the unreduced beta-redex
+        // `Application(λ, x)` while the term's inferred type carries
+        // the beta-reduced `P(x)`. WHNF-ing the term type catches
+        // definitions like `Rational.IsNonneg(...)` that wrap the
+        // underlying claim. Deep-beta-reducing the term type catches
+        // internal redexes (e.g. `sequenceFunction(λn. …, m)` from
+        // Quotient.lift bodies in real analysis) that WHNF leaves
+        // alone because it only reduces at the head.
         auto trySearch = [&](const ExpressionPointer& termTypeClosed,
                              const ExpressionPointer& lhs)
             -> std::pair<int, ExpressionPointer> {
@@ -12549,6 +12594,28 @@ private:
                     occurrenceCount = c4 != 0 ? c4 : c3;
                     abstractedBody =
                         c4 != 0 ? std::move(b4) : std::move(b3);
+                }
+            }
+        }
+        if (occurrenceCount != 1) {
+            ExpressionPointer termTypeDeepBeta =
+                deepBetaReduce(termTypeUnreduced);
+            ExpressionPointer termTypeDeepBetaClosed = closeOverLocalBinders(
+                termTypeDeepBeta, localBinders, localBinders.size());
+            auto [c5, b5] = trySearch(termTypeDeepBetaClosed, leftEndpoint);
+            if (c5 == 1) {
+                occurrenceCount = c5;
+                abstractedBody = std::move(b5);
+            } else {
+                auto [c6, b6] =
+                    trySearch(termTypeDeepBetaClosed, leftEndpointWhnf);
+                if (c6 == 1) {
+                    occurrenceCount = c6;
+                    abstractedBody = std::move(b6);
+                } else if (occurrenceCount == 0) {
+                    occurrenceCount = c6 != 0 ? c6 : c5;
+                    abstractedBody =
+                        c6 != 0 ? std::move(b6) : std::move(b5);
                 }
             }
         }
