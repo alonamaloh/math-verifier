@@ -126,15 +126,14 @@ theorem Natural.divides_self_multiple (n m : Natural)
 theorem Natural.divides_multiple_left (d k m : Natural)
         (h : d ∣ m)
         : d ∣ k * m := {
-  let ⟨q, equation⟩ := h;
+  obtain ⟨q, mEqualsDTimesQ⟩ from h;
   ⟨k * q,
-    Equality.transitivity(
-      rewrite(equation),
-      Equality.transitivity(
-        Equality.symmetry(Natural.multiply_associative(k, d, q)),
-        Equality.transitivity(
-          rewrite(Natural.multiply_commutative(k, d)),
-          Natural.multiply_associative(d, k, q))))⟩
+    calc k * m
+       = k * (d * q)      by rewrite(mEqualsDTimesQ)
+       = (k * d) * q      by Equality.symmetry(
+                                Natural.multiply_associative(k, d, q))
+       = (d * k) * q      by rewrite(Natural.multiply_commutative(k, d))
+       = d * (k * q)      by Natural.multiply_associative(d, k, q)⟩
 }
 
 -- Divisibility is preserved by addition: if d | a and d | b, then
@@ -143,16 +142,16 @@ theorem Natural.divides_multiple_left (d k m : Natural)
 theorem Natural.divides_add (d a b : Natural)
         (dDividesA : d ∣ a) (dDividesB : d ∣ b)
         : d ∣ (a + b) := {
-  let ⟨q1, aEqualsDTimesQ1⟩ := dDividesA;
-  let ⟨q2, bEqualsDTimesQ2⟩ := dDividesB;
+  obtain ⟨q1, aEqualsDTimesQ1⟩ from dDividesA;
+  obtain ⟨q2, bEqualsDTimesQ2⟩ from dDividesB;
   ⟨q1 + q2,
-    -- a + b = d*q1 + d*q2 = d*(q1+q2).
-    Equality.transitivity(
-        rewrite(aEqualsDTimesQ1),
-        Equality.transitivity(
-            rewrite(bEqualsDTimesQ2),
-            Equality.symmetry(
-                Natural.multiply_distributes_left_over_add(d, q1, q2))))⟩
+    calc a + b
+       = d * q1 + b           by rewrite(aEqualsDTimesQ1)
+       = d * q1 + d * q2      by rewrite(bEqualsDTimesQ2)
+       = d * (q1 + q2)
+            by Equality.symmetry(
+                   Natural.multiply_distributes_left_over_add(
+                       d, q1, q2))⟩
 }
 
 
