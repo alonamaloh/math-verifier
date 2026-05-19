@@ -1,9 +1,60 @@
 #include "printer.hpp"
 
 #include <algorithm>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
+
+namespace {
+
+// Operator precedences used when collapsing known function calls into
+// infix / prefix notation. Higher = binds tighter. Caller passes its
+// own precedence; child wraps in parens iff `child < parent`.
+constexpr int kPrecedenceRelation       = 1;  // = ≤ <
+constexpr int kPrecedenceAdditive       = 2;  // + -
+constexpr int kPrecedenceMultiplicative = 3;  // *
+constexpr int kPrecedencePrefix         = 4;  // unary -
+
+struct BinaryOperatorInfo {
+    const char* symbol;
+    int precedence;
+};
+
+// Detect the conventional `<Carrier>.<op>` shape used throughout the
+// library so the printer can render `Real.add a b` as `a + b`. We
+// match by suffix rather than consulting a registry — every carrier
+// in the library uses the same names. False positives (a user-defined
+// `Foo.add` that isn't addition) are syntactic prettification only —
+// it never changes the kernel's view of the term.
+std::optional<BinaryOperatorInfo>
+classifyBinaryOperator(const std::string& name) {
+    auto endsWith = [&](const char* suffix) -> bool {
+        std::string s(suffix);
+        return name.size() >= s.size()
+            && name.compare(name.size() - s.size(), s.size(), s) == 0;
+    };
+    if (endsWith(".add"))
+        return BinaryOperatorInfo{"+", kPrecedenceAdditive};
+    if (endsWith(".subtract"))
+        return BinaryOperatorInfo{"-", kPrecedenceAdditive};
+    if (endsWith(".multiply"))
+        return BinaryOperatorInfo{"*", kPrecedenceMultiplicative};
+    if (endsWith(".LessOrEqual"))
+        return BinaryOperatorInfo{"≤", kPrecedenceRelation};
+    if (endsWith(".LessThan"))
+        return BinaryOperatorInfo{"<", kPrecedenceRelation};
+    return std::nullopt;
+}
+
+bool isPrefixNegate(const std::string& name) {
+    constexpr const char* suffix = ".negate";
+    constexpr std::size_t suffixSize = 7;
+    return name.size() >= suffixSize
+        && name.compare(name.size() - suffixSize, suffixSize, suffix) == 0;
+}
+
+} // namespace
 
 namespace {
 
@@ -118,6 +169,63 @@ void writeAtPrecedence(std::ostringstream& output,
         return;
     }
     if (auto* application = std::get_if<Application>(&expression->node)) {
+        // Try infix / prefix rendering for the well-known operator
+        // shapes before falling through to the bare `f x y` form.
+        //
+        // Equality.{u}(T, x, y) → x = y. Three application layers.
+        if (auto* mid =
+                std::get_if<Application>(&application->function->node)) {
+            if (auto* base =
+                    std::get_if<Application>(&mid->function->node)) {
+                if (auto* head =
+                        std::get_if<Constant>(&base->function->node)) {
+                    if (head->name == "Equality") {
+                        bool wrap = precedence > kPrecedenceRelation;
+                        if (wrap) output << "(";
+                        writeAtPrecedence(output, mid->argument, stack,
+                                          kPrecedenceRelation + 1);
+                        output << " = ";
+                        writeAtPrecedence(output, application->argument,
+                                          stack,
+                                          kPrecedenceRelation + 1);
+                        if (wrap) output << ")";
+                        return;
+                    }
+                }
+            }
+        }
+        // <Carrier>.OP(x, y) → x SYMBOL y. Two application layers.
+        if (auto* inner =
+                std::get_if<Application>(&application->function->node)) {
+            if (auto* head =
+                    std::get_if<Constant>(&inner->function->node)) {
+                if (auto info = classifyBinaryOperator(head->name)) {
+                    bool wrap = precedence > info->precedence;
+                    if (wrap) output << "(";
+                    writeAtPrecedence(output, inner->argument, stack,
+                                      info->precedence);
+                    output << " " << info->symbol << " ";
+                    writeAtPrecedence(output, application->argument,
+                                      stack, info->precedence + 1);
+                    if (wrap) output << ")";
+                    return;
+                }
+            }
+        }
+        // <Carrier>.negate(x) → -x. One application layer.
+        if (auto* head =
+                std::get_if<Constant>(&application->function->node)) {
+            if (isPrefixNegate(head->name)) {
+                bool wrap = precedence > kPrecedencePrefix;
+                if (wrap) output << "(";
+                output << "-";
+                writeAtPrecedence(output, application->argument, stack,
+                                  kPrecedencePrefix + 1);
+                if (wrap) output << ")";
+                return;
+            }
+        }
+        // Fall through: bare function-application rendering.
         bool needsParentheses = precedence > 1;
         if (needsParentheses) output << "(";
         writeAtPrecedence(output, application->function, stack, 1);
