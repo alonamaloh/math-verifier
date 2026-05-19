@@ -31,4 +31,5 @@ ExpressionPointer elaborateExpression(const SurfaceExpression& expression,
 // fully-qualified `Equality(A, x, y)` form rather than `a = b`).
 void elaborateModule(const SurfaceModule& module,
                      Environment& environment,
-                     std::vector<std::string>& importedModules);
+                     std::vector<std::string>& importedModules,
+                     bool reportRedundantBy = false);

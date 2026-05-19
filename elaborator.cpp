@@ -73,6 +73,12 @@ public:
         : environment_(environment),
           importedModules_(importedModules) {}
 
+    // When true, every `by <proof>` annotation on a calc step is
+    // also tried with the auto-prover; if the auto-prover closes the
+    // step on its own, a warning fires. Drives the
+    // `--check-redundant-by` CLI flag.
+    void setReportRedundantBy(bool flag) { reportRedundantBy_ = flag; }
+
     void runModule(const SurfaceModule& module) {
         moduleName_ = module.moduleName;
         // Seed the rewrite-lemma index from theorems loaded via .mathv
@@ -3882,6 +3888,29 @@ private:
             if (step.stepProof) {
                 stepProofKernel = elaborateExpression(
                     *step.stepProof, localBinders, stepEqualityType);
+                // `--check-redundant-by`: speculatively run the
+                // auto-prover and report a warning if it would also
+                // close this step. Pure helper, no side effects.
+                if (reportRedundantBy_) {
+                    ExpressionPointer autoAttempt;
+                    try {
+                        autoAttempt = autoProveCalcStep(
+                            localBinders, previousKernel, nextKernel,
+                            carrierType, carrierLevel,
+                            stepEqualityType,
+                            step.line, step.column);
+                    } catch (const ElaborateError&) {
+                        autoAttempt = nullptr;
+                    } catch (const TypeError&) {
+                        autoAttempt = nullptr;
+                    }
+                    if (autoAttempt) {
+                        std::cerr << "warning: " << moduleName_
+                            << ":" << step.line << ":" << step.column
+                            << ": redundant `by` on calc step — "
+                            "auto-prover closes it without help\n";
+                    }
+                }
             } else {
                 // No `by <proof>` — run the auto-prover. v0: try
                 // reflexivity (definitional equality) only. Future
@@ -9923,6 +9952,7 @@ private:
     Environment& environment_;
     std::vector<std::string>& importedModules_;
     std::string moduleName_;
+    bool reportRedundantBy_ = false;
     std::string currentDeclarationName_;
     // Conventions registered via `convention p [q ...] : T [with …];`
     // declarations. Keyed by name. When a subsequent declaration's
@@ -9990,7 +10020,9 @@ ExpressionPointer elaborateExpression(const SurfaceExpression& expression,
 
 void elaborateModule(const SurfaceModule& module,
                      Environment& environment,
-                     std::vector<std::string>& importedModules) {
+                     std::vector<std::string>& importedModules,
+                     bool reportRedundantBy) {
     Elaborator elaborator(environment, importedModules);
+    elaborator.setReportRedundantBy(reportRedundantBy);
     elaborator.runModule(module);
 }
