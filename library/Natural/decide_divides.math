@@ -195,30 +195,18 @@ theorem Natural.decides_divides
         : (d n : Natural)
           → d ∣ n ∨ d ∤ n
   | zero, n =>
-      claim (n = zero) ∨ (n ≠ zero)
+      claim (n = 0) ∨ (n ≠ 0)
       claim by cases {
-        in (n = zero) as nEqualsZero:
-            -- divides(0, n) with witness q = 0: need n = 0*0 = 0.
-            Or.introduceLeft(
-                Exists.introduce(
-                    zero,
-                    nEqualsZero))
-        in (n ≠ zero) as nNotEqualZero:
-            Or.introduceRight(
-                function (divProof : zero ∣ n) =>
-                    Exists.eliminate(
-                        Natural,
-                        function (q : Natural) =>
-                            n = zero * q,
-                        False,
-                        function (q : Natural)
-                            (nEqMulZeroQ :
-                                n = zero * q) =>
-                            -- multiply(zero, q) reduces to zero
-                            -- definitionally (first-argument rule of
-                            -- multiply), so nEqMulZeroQ : n = zero.
-                            nNotEqualZero(nEqMulZeroQ),
-                        divProof))
+        in (n = 0) as nEqualsZero:
+            -- 0 ∣ n with witness q = 0: 0 · 0 = 0 = n.
+            Or.introduceLeft(⟨0, nEqualsZero⟩)
+        in (n ≠ 0) as nNotEqualZero:
+            -- A divisibility witness would give n = 0 · q = 0,
+            -- contradicting nNotEqualZero.
+            Or.introduceRight(function (divProof : 0 ∣ n) => {
+              obtain ⟨q, nEqMulZeroQ⟩ from divProof;
+              nNotEqualZero(nEqMulZeroQ)
+            })
       }
   | successor(predD), n =>
       claim (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q)
@@ -226,52 +214,27 @@ theorem Natural.decides_divides
           by Natural.search_quotient_witness_up_to(
                  successor(predD), n, n)
       claim by cases {
-        in (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q) as foundWitness:
-            Exists.eliminate(
-                Natural,
-                function (q : Natural) =>
-                    And(q ≤ n,
-                        n = successor(predD) * q),
-                successor(predD) ∣ n ∨ successor(predD) ∤ n,
-                function (q : Natural)
-                    (combined : And(q ≤ n,
-                                     n = successor(predD) * q)) =>
-                  And.eliminate(
-                      q ≤ n,
-                      n = successor(predD) * q,
-                      successor(predD) ∣ n ∨ successor(predD) ∤ n,
-                      function (_ : q ≤ n)
-                          (nEqualsDTimesQuotient :
-                              n = successor(predD) * q) =>
-                        Or.introduceLeft(
-                            Exists.introduce(
-                                q,
-                                nEqualsDTimesQuotient)),
-                      combined),
-                foundWitness)
-        in ((q : Natural) → q ≤ n → n ≠ successor(predD) * q) as noQuotientInRange:
+        in (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q)
+            as foundWitness:
+            -- Witness found; that's the divisor.
+            { obtain ⟨q, _, nEqualsDTimesQuotient⟩ from foundWitness;
+              Or.introduceLeft(⟨q, nEqualsDTimesQuotient⟩) }
+        in ((q : Natural) → q ≤ n → n ≠ successor(predD) * q)
+            as noQuotientInRange:
+            -- A divisibility witness gives some q with n = d · q.
+            -- The cap lemma forces q ≤ d · q = n; then
+            -- noQuotientInRange contradicts.
             Or.introduceRight(
-                function (divProof : successor(predD) ∣ n) =>
-                    Exists.eliminate(
-                        Natural,
-                        function (q : Natural) =>
-                            n = successor(predD) * q,
-                        False,
-                        function (q : Natural)
-                            (nEqualsDTimesQuotient :
-                                n = successor(predD) * q) =>
-                          -- We have q : Natural and n = d·q. Cap
-                          -- lemma gives q ≤ d·q = n, so q ≤ n.
-                          -- Then noQuotientInRange contradicts.
-                          noQuotientInRange(
-                              q,
-                              rewrite(
-                                  Equality.symmetry(nEqualsDTimesQuotient),
-                                  Natural.le_q_d_mult_q(
-                                      successor(predD), q,
-                                      Natural.successor_less_or_equal_successor(
-                                          zero, predD,
-                                          Natural.zero_least(predD)))),
-                              nEqualsDTimesQuotient),
-                        divProof))
+                function (divProof : successor(predD) ∣ n) => {
+              obtain ⟨q, nEqualsDTimesQuotient⟩ from divProof;
+              claim qLeN : q ≤ n
+                  by rewrite(
+                         Equality.symmetry(nEqualsDTimesQuotient),
+                         Natural.le_q_d_mult_q(
+                             successor(predD), q,
+                             Natural.successor_less_or_equal_successor(
+                                 0, predD,
+                                 Natural.zero_least(predD))));
+              noQuotientInRange(q, qLeN, nEqualsDTimesQuotient)
+            })
       }
