@@ -203,16 +203,34 @@ The elaborator desugars this to the convoy pattern (`function (caseScrutinee : T
 
 Constructor patterns with arguments (e.g. `successor(predecessor)`) are reconstructed as expressions for the equation type; tuple patterns aren't yet supported.
 
-## `ring` tactic limitations (v1)
+## `ring` — try it first
 
-`by ring` handles pure-sum or pure-product rearrangement but NOT
-distributivity (it can't bridge `a*(b+c)` and `a*b+a*c`). For ring
-identities that need distributivity, write a `calc` block with
-explicit `Rational.distributivity_left/right`, `add_commutative`,
-`add_associative`, `multiply_commutative`, etc. steps.
+`ring` (currently v2: polynomial normalisation, distributivity,
+commutativity, associativity, ±1 coefficients) handles essentially
+every commutative-ring identity you'd write by hand in a calc block.
+The default for any equality between ring expressions on Natural,
+Integer, Rational, Real, or PAdic is `:= ring` (top-level) or
+`(ring : LHS = RHS)` (as a `rewrite` equation). Reach for explicit
+`add_commutative` / `add_associative` / `congruenceOf` ONLY after
+ring fails with a real limitation:
 
-A `by ring` v2 with polynomial normalization is on TODO.md but
-deferred until enough algebra content drives the design.
+- **Coefficient > ±1.** `x + x = 2 * x` and `-(a/2) + -(a/2) = -a`
+  hit this — error: "monomial with coefficient ±k, v2 only handles
+  coefficients in {-1, +1}". Workaround: a manual calc using
+  `negate_add` / domain-specific halving lemmas (`halve_doubled`).
+- **Empty-polynomial cancellation.** `0 = x - x` fails with
+  "proveAddMerge total-cancellation case not implemented". Use
+  `Equality.symmetry(Rational.add_negate_right(x))` directly.
+- **`ring` requires the carrier's `.add`, `.multiply`, and ring laws
+  in scope.** For Real proofs, that typically means importing
+  `Real.addition`, `Real.multiplication`, `Real.negation`, `Real.ring`,
+  AND `Real.algebra` (which provides `multiply_associative` etc.).
+  If `ring` says "carrier X is missing axiom Y", add the import.
+
+When the goal is `(ring : Foo = Bar)` and you intend to `rewrite` with
+it, double-check the direction: `rewrite(eq, term)` looks for the LHS
+of `eq` in `term`'s type. Putting it the wrong way round gives the
+"left endpoint does not appear (structurally) in term's type" error.
 
 ## `rewrite(lemma)` / `rewrite(lemma, term)`
 
@@ -232,6 +250,139 @@ occurrence of `a` in `term`'s inferred type. Use this wherever the
 6-arg `Equality.transport_proposition(...)` was the only option
 (outside calc — `≤`/`∣` witness contexts, `Or.introduceRight(...)`
 arguments, etc.).
+
+The matcher tries six combos: (term type × LHS) × (unreduced,
+head-WHNF, deep-β). If you get "left endpoint does not appear
+(structurally) in term's type" and you're confident the equality is
+true, check the equation direction first; then check whether the LHS
+appears modulo a definitional unfold not covered by WHNF.
+
+## Proof style — write proofs that read like math
+
+The overriding goal is that a proof reads like what a mathematician
+would write in a textbook, with the kernel doing the typechecking. A
+human should be able to scan the proof and follow the argument
+without parsing CIC bureaucracy. The optimization target is
+**readability**, not terseness.
+
+Concretely:
+
+- **No abbreviations.** Both in identifiers (see the Naming section
+  above — `representative`, not `rep`, in declared names) and in
+  binders within proofs. Verbosity that aids comprehension is a
+  feature, not a cost — `halvedEpsilonPositive`, not `hep`.
+
+- **Math-like phrasing.** Compose the proof out of named
+  mathematical steps. A reader should see "triangle inequality on
+  (a − b) and b", "subtract |b| from both sides", "case split on
+  the sign of (|a| − |b|)" — not a wall of `congruenceOf` /
+  `transport_proposition` calls.
+
+- **Length is fine if it's pedagogical.** Don't golf. A 40-line
+  proof that explains each step in mathematical language is better
+  than a 10-line proof that requires unwinding three nested
+  `Quotient.lift` calls in your head to follow. Inline comments
+  describing the strategy ("`|x| = |(a−b)+b| ≤ |a−b| + |b|` then
+  subtract `|b|`") earn their keep.
+
+- **`calc` is encouraged.** It mirrors how a mathematician writes
+  an equation chain. Use it whenever you can name each intermediate
+  form. Even a two-step calc is usually clearer than the equivalent
+  `Equality.transitivity(...)`.
+
+- **Sequence-of-claims style is encouraged.** When a proof has
+  several distinct subgoals, write them as a sequence of `claim
+  <name> : <type> by <proof>` lines and then assemble the result
+  from the named claims. This makes the structure of the argument
+  legible and lets a reader skim the claims to see the shape before
+  reading the inner proofs.
+
+The remaining subsections are about *CIC noise* — bureaucracy that
+the kernel demands but a mathematician would never write. Those
+should be hidden behind named helpers; the rules below collect the
+ones that come up most often. None of these rules trade away
+readability — they only remove ceremony.
+
+### `<order>.weaken` over `And.left` on a `<` hypothesis
+
+`Rational.LessThan(x, y)` unfolds to `And(LessOrEqual(x, y),
+Not(x = y))`. With `h : x < y` and a goal needing `x ≤ y`, prefer
+
+```math
+Rational.LessThan.weaken(x, y, h)         -- 1 line
+```
+
+over
+
+```math
+And.left(Rational.LessOrEqual(x, y), Not(x = y), h)   -- 3-5 lines
+```
+
+Same for `Rational.LessThan.distinct(x, y, h) : ¬(x = y)` vs
+`And.right(...)`. Helpers live in `Rational/order_arithmetic.math`
+alongside `LessOrEqual.negate`, `LessThan.negate`,
+`negate_LessThan_zero_of_positive`, `LessOrEqual_zero_of_negate_IsNonneg`.
+
+### Pattern-match at constructor reps for Quotient-lifted proofs
+
+The bad shape (~80 lines): `Quotient.induct_two` whose at-rep body
+threads bridge lemmas (`sequenceFunction_add`, etc.) through a calc
+chain to reach a pointwise Rational fact.
+
+The good shape (~20 lines): a separate `*_at_make` theorem that
+pattern-matches the reps to expose the underlying sequences, plus a
+top-level `Quotient.induct[_two|_three]` lift. When the rep is in
+constructor form, the kernel's β/ι reduces every
+`sequenceFunction(add(make(sx, _), make(sy, _)), n)` to
+`sx(n) + sy(n)` and the bridge proofs become reflexivity.
+
+```math
+theorem Foo_at_make
+        : (rep_x rep_y : CauchyRationalSequence) → … (Quotient.mk rep_x) … (Quotient.mk rep_y) …
+  | CauchyRationalSequence.make(sx, sx_cauchy),
+    CauchyRationalSequence.make(sy, sy_cauchy) =>
+      Quotient.sound(…, …, function (n : Natural) => Rational.foo(sx(n), sy(n)))
+
+theorem Foo (x y : Real) : … :=
+  Quotient.induct_two(motive, Foo_at_make, x, y)
+```
+
+Caveat: when the at-make body needs to refer to a rep AGAIN
+(typically when passing it to `Quotient.sound` or
+`equivalent_when_sequenceFunction_equal`), the pattern wildcards must
+each have a fresh NAME (`sx_cauchy`, `sy_cauchy`). Using `_` makes
+the kernel re-bind a single fresh variable and the Cauchy proofs
+collapse to the wrong type.
+
+### Avoid auxiliary `CauchyXxx` definitions for one-off proofs
+
+A standalone `definition CauchyRationalSequence.foo_residual : … →
+CauchyRationalSequence` plus a `sequenceFunction_foo_residual`
+bridge lemma is almost always a red flag — pattern-matching at make
+inside an `at_make` theorem subsumes it without the auxiliary
+definition. A previous draft of the triangle-inequality proof spent
+200 lines on this pattern; the at-make refactor took 40.
+
+### `let` does not ζ-reduce across calc steps
+
+```math
+let halvedEpsilon : Rational := Rational.halve(epsilon);
+…
+calc -halvedEpsilon + -halvedEpsilon
+   = -(halvedEpsilon + halvedEpsilon)
+       by Equality.symmetry(
+              Rational.negate_add(halvedEpsilon, halvedEpsilon))
+   = -epsilon
+       by congruenceOf(Rational.negate,
+              Rational.halve_doubled(epsilon))
+```
+
+The calc fails at the second step: the kernel sees
+`Rational.halve_doubled(epsilon) : Rational.halve(epsilon) +
+Rational.halve(epsilon) = epsilon` and won't ζ-unfold
+`halvedEpsilon` to align the types. Don't use `let` for value
+abbreviations — write the long names out, or factor the repeated
+expression into its own top-level theorem.
 
 ## File organization
 
