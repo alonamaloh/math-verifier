@@ -65,38 +65,29 @@ theorem Natural.divides_after_remove_one_witness_successor
             : secondSummand = divisor * predQ
         by Natural.add_cancel_left(
                divisor, secondSummand, divisor * predQ, cancelable);
-    Exists.introduce(
-        Natural,
-        function (q : Natural) => secondSummand = divisor * q,
-        predQ,
-        secondEqualsMultiple)
+    witness predQ with secondEqualsMultiple
 }
 
 theorem Natural.divides_after_remove_one
         (divisor secondSummand : Natural)
         (divisorDividesEnlargedSum : divisor ∣ (divisor + secondSummand))
-        : divisor ∣ secondSummand :=
-  Exists.eliminate(
-      Natural,
-      function (q : Natural) => divisor + secondSummand = divisor * q,
-      divisor ∣ secondSummand,
-      function (q : Natural)
-               (equation : divisor + secondSummand = divisor * q) =>
-          (cases q {
-            | zero =>
-                function (zeroEquation :
-                            divisor + secondSummand = divisor * zero) =>
-                  Natural.divides_after_remove_one_witness_zero(
-                      divisor, secondSummand, zeroEquation)
-            | successor(predQ) =>
-                function (successorEquation :
-                            divisor + secondSummand
-                            = divisor * successor(predQ)) =>
-                  Natural.divides_after_remove_one_witness_successor(
-                      divisor, secondSummand, predQ, successorEquation)
-          } : (divisor + secondSummand = divisor * q) → divisor ∣ secondSummand)(
-              equation),
-      divisorDividesEnlargedSum)
+        : divisor ∣ secondSummand := {
+  obtain ⟨q, equation⟩ from divisorDividesEnlargedSum;
+  (cases q {
+    | zero =>
+        function (zeroEquation :
+                    divisor + secondSummand = divisor * zero) =>
+          Natural.divides_after_remove_one_witness_zero(
+              divisor, secondSummand, zeroEquation)
+    | successor(predQ) =>
+        function (successorEquation :
+                    divisor + secondSummand
+                    = divisor * successor(predQ)) =>
+          Natural.divides_after_remove_one_witness_successor(
+              divisor, secondSummand, predQ, successorEquation)
+  } : (divisor + secondSummand = divisor * q) → divisor ∣ secondSummand)(
+      equation)
+}
 
 -- ----------------------------------------------------------------------
 -- "Peel q copies of divisor": iterate the one-divisor peel by induction
@@ -136,17 +127,12 @@ theorem Natural.divides_subtract_from_sum
         (divisor firstSummand secondSummand : Natural)
         (dividesSum : divisor ∣ (firstSummand + secondSummand))
         (dividesFirst : divisor ∣ firstSummand)
-        : divisor ∣ secondSummand :=
-  Exists.eliminate(
-      Natural,
-      function (q : Natural) => firstSummand = divisor * q,
-      divisor ∣ secondSummand,
-      function (q : Natural)
-               (firstEquation : firstSummand = divisor * q) =>
-          Natural.divides_after_remove_multiple(
-              divisor, q, secondSummand,
-              rewrite(firstEquation, dividesSum)),
-      dividesFirst)
+        : divisor ∣ secondSummand := {
+  obtain ⟨q, firstEquation⟩ from dividesFirst;
+  Natural.divides_after_remove_multiple(
+      divisor, q, secondSummand,
+      rewrite(firstEquation, dividesSum))
+}
 
 -- ----------------------------------------------------------------------
 -- is_gcd remainder lift: from `first = quotient · second + remainder`

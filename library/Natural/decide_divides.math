@@ -80,35 +80,13 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
                 → q ≤ successor(prevBound)
                 → n ≠ d * q),
           -- Found earlier: propagate, boosting the bound proof.
-          function (foundEarlier : ∃ (q : Natural). q ≤ prevBound ∧ n = d * q) =>
-              Exists.eliminate(
-                  Natural,
-                  function (q : Natural) =>
-                      q ≤ prevBound ∧ n = d * q,
-                  Or(∃ (q : Natural). q ≤ successor(prevBound) ∧ n = d * q,
-                      (q : Natural)
-                        → q ≤ successor(prevBound)
-                        → n ≠ d * q),
-                  function (q : Natural)
-                      (combined : q ≤ prevBound ∧ n = d * q) =>
-                    And.eliminate(
-                        q ≤ prevBound,
-                        n = d * q,
-                        Or(∃ (qInner : Natural). qInner ≤ successor(prevBound) ∧ n = d * qInner,
-                            (qInner : Natural)
-                              → qInner ≤ successor(prevBound)
-                              → n ≠ d * qInner),
-                        function (qLePrevBound : q ≤ prevBound)
-                            (nEqualsDTimesQuotient : n = d * q) =>
-                          Or.introduceLeft(
-                              Exists.introduce(
-                                  q,
-                                  And.introduction(
-                                      LessOrEqual.step(
-                                          q, prevBound, qLePrevBound),
-                                      nEqualsDTimesQuotient))),
-                        combined),
-                  foundEarlier),
+          function (foundEarlier : ∃ (q : Natural). q ≤ prevBound ∧ n = d * q) => {
+            obtain ⟨q, qLePrevBound, nEqualsDTimesQuotient⟩ from foundEarlier;
+            Or.introduceLeft(
+                witness q with
+                    ⟨LessOrEqual.step(q, prevBound, qLePrevBound),
+                     nEqualsDTimesQuotient⟩)
+          },
           -- Not found in [0, prevBound]: check q = successor(prevBound).
           function (noneEarlier :
                   (q : Natural)
@@ -146,38 +124,21 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
                                           quotientEqualsSuccessorPrevious,
                                           nEqualsDTimesQuotient))
                               in (∃ (bPredecessor : Natural). successor(prevBound) =
-                                                  successor(bPredecessor) ∧ q ≤ bPredecessor) as existsProof:
-                                  Exists.eliminate(
-                                      Natural,
-                                      function (bPredecessor : Natural) =>
-                                          successor(prevBound) =
-                                                  successor(bPredecessor) ∧ q ≤ bPredecessor,
-                                      False,
-                                      function (bPredecessor : Natural)
-                                          (combined : successor(prevBound) =
-                                                              successor(bPredecessor) ∧ q ≤ bPredecessor) =>
-                                        And.eliminate(
-                                            successor(prevBound) =
-                                                successor(bPredecessor),
-                                            q ≤ bPredecessor,
-                                            False,
-                                            function (successorEquals :
-                                                    successor(prevBound) =
-                                                        successor(bPredecessor))
-                                                (quotientLessOrEqualBPredecessor :
-                                                    q ≤ bPredecessor) =>
-                                                noneEarlier(
-                                                    q,
-                                                    rewrite(
-                                                        Equality.symmetry(
-                                                            Natural.successor_injective(
-                                                                prevBound,
-                                                                bPredecessor,
-                                                                successorEquals)),
-                                                        quotientLessOrEqualBPredecessor),
-                                                    nEqualsDTimesQuotient),
-                                            combined),
-                                      existsProof)
+                                                  successor(bPredecessor) ∧ q ≤ bPredecessor) as existsProof: {
+                                  obtain ⟨bPredecessor, successorEquals,
+                                          quotientLessOrEqualBPredecessor⟩
+                                      from existsProof;
+                                  noneEarlier(
+                                      q,
+                                      rewrite(
+                                          Equality.symmetry(
+                                              Natural.successor_injective(
+                                                  prevBound,
+                                                  bPredecessor,
+                                                  successorEquals)),
+                                          quotientLessOrEqualBPredecessor),
+                                      nEqualsDTimesQuotient)
+                              }
                             }
                           })
             }

@@ -50,25 +50,10 @@ theorem Natural.not_less_or_equal_successor_zero (k : Natural)
     claim by cases {
       in (successor(k) = zero) as successorKEqualsZero:
           Natural.successor_not_zero(k, successorKEqualsZero)
-      in (∃ (bPredecessor : Natural). zero = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor) as existsProof:
-          Exists.eliminate(
-              Natural,
-              function (bPredecessor : Natural) =>
-                  zero = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor,
-              False,
-              function (bPredecessor : Natural)
-                  (combined : zero = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor) =>
-                And.eliminate(
-                    zero = successor(bPredecessor),
-                    successor(k) ≤ bPredecessor,
-                    False,
-                    function (zeroEqualsSucc :
-                            zero = successor(bPredecessor))
-                        (_ : successor(k) ≤ bPredecessor) =>
-                        Natural.zero_not_successor(
-                            bPredecessor, zeroEqualsSucc),
-                    combined),
-              existsProof)
+      in (∃ (bPredecessor : Natural). zero = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor) as existsProof: {
+          obtain ⟨bPredecessor, zeroEqualsSucc, _⟩ from existsProof;
+          absurd(zeroEqualsSucc)
+      }
     }
 
 -- Inversion specifically for `successor(k) ≤ successor(m)`: either `k = m` or
@@ -87,33 +72,20 @@ theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
           Or.introduceLeft(
               Natural.successor_injective(k, m, successorKEqualsSuccessorM))
       in (∃ (bPredecessor : Natural). successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor) as existsProof:
-          Exists.eliminate(
-              Natural,
-              function (bPredecessor : Natural) =>
-                  successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor,
-              k = m ∨ successor(k) ≤ m,
-              function (bPredecessor : Natural)
-                  (combined : successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor) =>
-                And.eliminate(
-                    successor(m) = successor(bPredecessor),
-                    successor(k) ≤ bPredecessor,
-                    k = m ∨ successor(k) ≤ m,
-                    function (successorMEqualsSuccessorBPredecessor :
-                            successor(m) = successor(bPredecessor))
-                        (successorKLessOrEqualBPredecessor :
-                            successor(k) ≤ bPredecessor) =>
-                        -- We have m = bPredecessor by injectivity,
-                        -- and successor(k) ≤ bPredecessor. Transport
-                        -- successorKLessOrEqualBPredecessor along the symmetry of
-                        -- successor_injective to get successor(k) ≤ m.
-                        Or.introduceRight(
-                            rewrite(
-                                Equality.symmetry(
-                                    Natural.successor_injective(
-                                        m, bPredecessor, successorMEqualsSuccessorBPredecessor)),
-                                successorKLessOrEqualBPredecessor)),
-                    combined),
-              existsProof)
+          {
+            obtain ⟨bPredecessor,
+                    successorMEqualsSuccessorBPredecessor,
+                    successorKLessOrEqualBPredecessor⟩
+                from existsProof;
+            -- m = bPredecessor by injectivity; transport successor(k) ≤
+            -- bPredecessor back to successor(k) ≤ m.
+            Or.introduceRight(
+                rewrite(
+                    Equality.symmetry(
+                        Natural.successor_injective(
+                            m, bPredecessor, successorMEqualsSuccessorBPredecessor)),
+                    successorKLessOrEqualBPredecessor))
+          }
     }
 
 -- forAllBelow n : for every k < n, P holds. Ordinary induction on n.
@@ -165,24 +137,10 @@ theorem Natural.less_or_equal_zero_implies_equals_zero (q : Natural)
     claim by cases {
       in (q = zero) as quotientEqualsZero:
           quotientEqualsZero
-      in (∃ (bPredecessor : Natural). zero = successor(bPredecessor) ∧ q ≤ bPredecessor) as existsProof:
-          Exists.eliminate(
-              Natural,
-              function (bPredecessor : Natural) =>
-                  zero = successor(bPredecessor) ∧ q ≤ bPredecessor,
-              q = zero,
-              function (bPredecessor : Natural)
-                  (combined : zero = successor(bPredecessor) ∧ q ≤ bPredecessor) =>
-                And.eliminate(
-                    zero = successor(bPredecessor),
-                    q ≤ bPredecessor,
-                    q = zero,
-                    function (zeroEqualsSuccessor :
-                            zero = successor(bPredecessor))
-                        (_ : q ≤ bPredecessor) =>
-                        absurd(zeroEqualsSuccessor),
-                    combined),
-              existsProof)
+      in (∃ (bPredecessor : Natural). zero = successor(bPredecessor) ∧ q ≤ bPredecessor) as existsProof: {
+          obtain ⟨bPredecessor, zeroEqualsSuccessor, qLeBPredecessor⟩ from existsProof;
+          absurd(zeroEqualsSuccessor)
+      }
     }
 
 -- Inversion of `successor(p) ≤ successor(otherPredecessor)`: yields

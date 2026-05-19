@@ -71,29 +71,16 @@ theorem Integer.LessOrEqual.reflexive (x : Integer) : x ≤ x :=
 -- With y = x + a and z = y + b:  z = (x + a) + b = x + (a + b).
 theorem Integer.LessOrEqual.transitive (x y z : Integer)
         (xLessOrEqualY : x ≤ y) (yLessOrEqualZ : y ≤ z)
-        : x ≤ z :=
-  Exists.eliminate(
-      Natural,
-      function (a : Natural) => y = x + (a : Integer),
-      x ≤ z,
-      function (a : Natural) (yEqualsXPlusA : y = x + (a : Integer)) =>
-          Exists.eliminate(
-              Natural,
-              function (b : Natural) => z = y + (b : Integer),
-              x ≤ z,
-              function (b : Natural)
-                       (zEqualsYPlusB : z = y + (b : Integer)) =>
-                  Exists.introduce(
-                      Natural,
-                      function (k : Natural) => z = x + (k : Integer),
-                      a + b,
-                      calc z
-                         = y + (b : Integer)
-                         = (x + (a : Integer)) + (b : Integer)
-                         = x + ((a : Integer) + (b : Integer))
-                         = x + (a + b : Integer)),
-              yLessOrEqualZ),
-      xLessOrEqualY)
+        : x ≤ z := {
+  obtain ⟨a, yEqualsXPlusA⟩ from xLessOrEqualY;
+  obtain ⟨b, zEqualsYPlusB⟩ from yLessOrEqualZ;
+  witness a + b with
+      calc z
+         = y + (b : Integer)
+         = (x + (a : Integer)) + (b : Integer)
+         = x + ((a : Integer) + (b : Integer))
+         = x + (a + b : Integer)
+}
 
 -- ----------------------------------------------------------------------
 -- Order vs. addition.
@@ -103,27 +90,16 @@ theorem Integer.LessOrEqual.transitive (x y z : Integer)
 -- commutativity. Witness: same n.
 theorem Integer.add_preserves_less_or_equal (x y z : Integer)
         (xLessOrEqualY : x ≤ y)
-        : x + z ≤ y + z :=
-  Exists.eliminate(
-      Natural,
-      function (n : Natural) => y = x + (n : Integer),
-      x + z ≤ y + z,
-      function (n : Natural) (yEqualsXPlusN : y = x + (n : Integer)) =>
-          Exists.introduce(
-              Natural,
-              function (k : Natural) =>
-                  y + z = (x + z) + (k : Integer),
-              n,
-              calc y + z
-                 = (x + (n : Integer)) + z
-                 = (x + z) + (n : Integer)),
-      xLessOrEqualY)
+        : x + z ≤ y + z := {
+  obtain ⟨n, yEqualsXPlusN⟩ from xLessOrEqualY;
+  witness n with
+      calc y + z
+         = (x + (n : Integer)) + z
+         = (x + z) + (n : Integer)
+}
 
 -- Every Natural's image is ≥ 0.
 theorem Integer.zero_less_or_equal_from_natural (n : Natural)
         : Integer.zero ≤ (n : Integer) :=
-  Exists.introduce(
-      Natural,
-      function (k : Natural) => (n : Integer) = Integer.zero + (k : Integer),
-      n,
-      Equality.symmetry(Integer.add_identity_left((n : Integer))))
+  witness n with
+      Equality.symmetry(Integer.add_identity_left((n : Integer)))

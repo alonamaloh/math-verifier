@@ -27,28 +27,16 @@ import Natural.order
 theorem Natural.subtraction_witness (b a : Natural)
         : b ≤ a → ∃ (c : Natural). a = b + c
   | LessOrEqual.reflexivity(commonValue) =>
-      Exists.introduce(
-          Natural,
-          function (c : Natural) => commonValue = commonValue + c,
-          zero,
-          Equality.symmetry(Natural.add_zero(commonValue)))
-  | LessOrEqual.step(smaller, predecessorOfA, subProof) =>
-      Exists.eliminate(
-          Natural,
-          function (cPrime : Natural) => predecessorOfA = smaller + cPrime,
-          ∃ (c : Natural). successor(predecessorOfA) = smaller + c,
-          function (cPrime : Natural)
-                   (predEquality : predecessorOfA = smaller + cPrime) =>
-              Exists.introduce(
-                  Natural,
-                  function (c : Natural) =>
-                      successor(predecessorOfA) = smaller + c,
-                  successor(cPrime),
-                  Equality.transitivity(
-                      congruenceOf(successor, predEquality),
-                      Equality.symmetry(
-                          Natural.add_successor(smaller, cPrime)))),
-          Natural.subtraction_witness(smaller, predecessorOfA, subProof))
+      witness zero with Equality.symmetry(Natural.add_zero(commonValue))
+  | LessOrEqual.step(smaller, predecessorOfA, subProof) => {
+      obtain ⟨cPrime, predEquality⟩
+          from Natural.subtraction_witness(smaller, predecessorOfA, subProof);
+      witness successor(cPrime) with
+          Equality.transitivity(
+              congruenceOf(successor, predEquality),
+              Equality.symmetry(
+                  Natural.add_successor(smaller, cPrime)))
+    }
 
 -- Totality: for any a, b, either a ≤ b or b ≤ a. The successor case
 -- on a needs a recursive call passed in as a hypothesis (mirroring

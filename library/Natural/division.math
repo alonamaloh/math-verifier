@@ -113,68 +113,19 @@ theorem Natural.divide_with_remainder_recurse_case
             : dividend = divisor + smallerDividend)
         (smallerWitness
             : Natural.has_quotient_remainder(divisor, smallerDividend))
-        : Natural.has_quotient_remainder(divisor, dividend) :=
-  Exists.eliminate(
-      Natural,
-      function (recursedQuotient : Natural) =>
-          ∃ (remainder : Natural).
-              smallerDividend = recursedQuotient * divisor + remainder
-              ∧ successor(remainder) ≤ divisor,
-      Natural.has_quotient_remainder(divisor, dividend),
-      function (recursedQuotient : Natural)
-               (innerExists :
-                   ∃ (remainder : Natural).
-                       smallerDividend
-                           = recursedQuotient * divisor + remainder
-                       ∧ successor(remainder) ≤ divisor) =>
-          Exists.eliminate(
-              Natural,
-              function (recursedRemainder : Natural) =>
-                  smallerDividend
-                      = recursedQuotient * divisor + recursedRemainder
-                  ∧ successor(recursedRemainder) ≤ divisor,
-              Natural.has_quotient_remainder(divisor, dividend),
-              function (recursedRemainder : Natural)
-                       (combined :
-                           smallerDividend
-                               = recursedQuotient * divisor + recursedRemainder
-                           ∧ successor(recursedRemainder) ≤ divisor) =>
-                  And.eliminate(
-                      smallerDividend
-                          = recursedQuotient * divisor + recursedRemainder,
-                      successor(recursedRemainder) ≤ divisor,
-                      Natural.has_quotient_remainder(divisor, dividend),
-                      function (smallerDecomposition :
-                                    smallerDividend
-                                    = recursedQuotient * divisor
-                                      + recursedRemainder)
-                               (remainderBelowDivisor :
-                                    successor(recursedRemainder) ≤ divisor) =>
-                          Exists.introduce(
-                              Natural,
-                              function (quotient : Natural) =>
-                                  ∃ (remainder : Natural).
-                                      dividend = quotient * divisor + remainder
-                                      ∧ successor(remainder) ≤ divisor,
-                              successor(recursedQuotient),
-                              Exists.introduce(
-                                  Natural,
-                                  function (remainder : Natural) =>
-                                      dividend
-                                          = successor(recursedQuotient)
-                                            * divisor + remainder
-                                      ∧ successor(remainder) ≤ divisor,
-                                  recursedRemainder,
-                                  And.introduction(
-                                      Natural.divide_with_remainder_recurse_step(
-                                          divisor, dividend, smallerDividend,
-                                          recursedQuotient, recursedRemainder,
-                                          dividendEqualsDivisorPlusSmaller,
-                                          smallerDecomposition),
-                                      remainderBelowDivisor))),
-                      combined),
-              innerExists),
-      smallerWitness)
+        : Natural.has_quotient_remainder(divisor, dividend) := {
+    obtain ⟨recursedQuotient, recursedRemainder,
+            smallerDecomposition, remainderBelowDivisor⟩
+        from smallerWitness;
+    witness successor(recursedQuotient) with
+        ⟨recursedRemainder,
+         Natural.divide_with_remainder_recurse_step(
+             divisor, dividend, smallerDividend,
+             recursedQuotient, recursedRemainder,
+             dividendEqualsDivisorPlusSmaller,
+             smallerDecomposition),
+         remainderBelowDivisor⟩
+}
 
 -- Base case: dividend < divisor. Take quotient = 0 and remainder =
 -- dividend. The equation `dividend = 0 · divisor + dividend` reduces
@@ -184,22 +135,8 @@ theorem Natural.divide_with_remainder_base_case
         (divisor dividend : Natural)
         (dividendBelowDivisor : successor(dividend) ≤ divisor)
         : Natural.has_quotient_remainder(divisor, dividend) :=
-  Exists.introduce(
-      Natural,
-      function (quotient : Natural) =>
-          ∃ (remainder : Natural).
-              dividend = quotient * divisor + remainder
-              ∧ successor(remainder) ≤ divisor,
-      zero,
-      Exists.introduce(
-          Natural,
-          function (remainder : Natural) =>
-              dividend = zero * divisor + remainder
-              ∧ successor(remainder) ≤ divisor,
-          dividend,
-          And.introduction(
-              reflexivity(dividend),
-              dividendBelowDivisor)))
+  witness zero with
+      ⟨dividend, reflexivity(dividend), dividendBelowDivisor⟩
 
 -- Strong-induction step. With the IH covering every k < dividend,
 -- and the trichotomy between dividend and divisor, dispatch to the
@@ -217,31 +154,25 @@ theorem Natural.divide_with_remainder_step
     in (successor(dividend) ≤ divisor) as dividendBelowDivisor:
         Natural.divide_with_remainder_base_case(
             divisor, dividend, dividendBelowDivisor)
-    in (divisor ≤ dividend) as divisorBelowOrEqualDividend:
-        Exists.eliminate(
-            Natural,
-            function (smallerDividend : Natural) =>
-                dividend = divisor + smallerDividend,
-            Natural.has_quotient_remainder(divisor, dividend),
-            function (smallerDividend : Natural)
-                     (dividendEqualsDivisorPlusSmaller :
-                         dividend = divisor + smallerDividend) =>
-                Natural.divide_with_remainder_recurse_case(
-                    divisor, dividend, smallerDividend,
-                    dividendEqualsDivisorPlusSmaller,
-                    inductionHypothesis(
-                        smallerDividend,
-                        rewrite(
-                            Equality.transitivity(
-                                Natural.add_commutative(
-                                    smallerDividend, divisor),
-                                Equality.symmetry(
-                                    dividendEqualsDivisorPlusSmaller)),
-                            Natural.successor_less_or_equal_add_at_least_one(
-                                smallerDividend, divisor,
-                                positiveDivisor)))),
-            Natural.subtraction_witness(
-                divisor, dividend, divisorBelowOrEqualDividend))
+    in (divisor ≤ dividend) as divisorBelowOrEqualDividend: {
+        obtain ⟨smallerDividend, dividendEqualsDivisorPlusSmaller⟩
+            from Natural.subtraction_witness(
+                divisor, dividend, divisorBelowOrEqualDividend);
+        Natural.divide_with_remainder_recurse_case(
+            divisor, dividend, smallerDividend,
+            dividendEqualsDivisorPlusSmaller,
+            inductionHypothesis(
+                smallerDividend,
+                rewrite(
+                    Equality.transitivity(
+                        Natural.add_commutative(
+                            smallerDividend, divisor),
+                        Equality.symmetry(
+                            dividendEqualsDivisorPlusSmaller)),
+                    Natural.successor_less_or_equal_add_at_least_one(
+                        smallerDividend, divisor,
+                        positiveDivisor))))
+    }
   }
 
 -- Main theorem: division-with-remainder.

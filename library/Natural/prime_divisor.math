@@ -62,68 +62,21 @@ theorem Natural.has_prime_divisor (n : Natural)
           by Natural.prime_or_proper_divisor(subject, subjectAtLeastTwo)
       claim by cases {
         in (Natural.is_prime(subject)) as subjectIsPrime:
-            Exists.introduce(
-                subject,
-                And.introduction(
-                    subjectIsPrime,
-                    Natural.divides_reflexive(subject)))
-        in (∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject) as properDivisorWitness:
-            Exists.eliminate(
-                  Natural,
-                  function (divisor : Natural) =>
-                      2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject,
-                  ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
-                  function (divisor : Natural)
-                      (divisorProofs :
-                          2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject) =>
-                    And.eliminate(
-                        2 ≤ divisor,
-                        successor(divisor) ≤ subject ∧ divisor ∣ subject,
-                        ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
-                        function (divisorAtLeastTwo : 2 ≤ divisor)
-                            (rest :
-                                successor(divisor) ≤ subject ∧ divisor ∣ subject) =>
-                          And.eliminate(
-                              successor(divisor) ≤ subject,
-                              divisor ∣ subject,
-                              ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
-                              function (divisorBelowSubject :
-                                      successor(divisor) ≤ subject)
-                                  (divisorDividesSubject :
-                                      divisor ∣ subject) =>
-                                Exists.eliminate(
-                                    Natural,
-                                    function (prime : Natural) =>
-                                        Natural.is_prime(prime) ∧ prime ∣ divisor,
-                                    ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
-                                    function (prime : Natural)
-                                        (primeProofs :
-                                            Natural.is_prime(prime) ∧ prime ∣ divisor) =>
-                                      And.eliminate(
-                                          Natural.is_prime(prime),
-                                          prime ∣ divisor,
-                                          ∃ (p : Natural). Natural.is_prime(p) ∧ p ∣ subject,
-                                          function (primeIsPrime :
-                                                  Natural.is_prime(prime))
-                                              (primeDividesDivisor :
-                                                  prime ∣ divisor) =>
-                                            Exists.introduce(
-                                                prime,
-                                                And.introduction(
-                                                    primeIsPrime,
-                                                    Natural.divides_transitive(
-                                                        prime, divisor,
-                                                        subject,
-                                                        primeDividesDivisor,
-                                                        divisorDividesSubject))),
-                                          primeProofs),
-                                    inductionHypothesis(
-                                        divisor,
-                                        divisorBelowSubject,
-                                        divisorAtLeastTwo)),
-                              rest),
-                        divisorProofs),
-                  properDivisorWitness)
+            witness subject
+                with ⟨subjectIsPrime, Natural.divides_reflexive(subject)⟩
+        in (∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject) as properDivisorWitness: {
+            obtain ⟨divisor, divisorAtLeastTwo,
+                    divisorBelowSubject, divisorDividesSubject⟩
+                from properDivisorWitness;
+            obtain ⟨prime, primeIsPrime, primeDividesDivisor⟩
+                from inductionHypothesis(
+                         divisor, divisorBelowSubject, divisorAtLeastTwo);
+            witness prime with
+                ⟨primeIsPrime,
+                 Natural.divides_transitive(
+                     prime, divisor, subject,
+                     primeDividesDivisor, divisorDividesSubject)⟩
+        }
       },
     n,
     atLeastTwo)

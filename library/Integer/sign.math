@@ -78,46 +78,26 @@ theorem Integer.sign_split_at_representative
         : Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)) :=
   claim LessOrEqual(a, b) ∨ LessOrEqual(b, a)
   claim by cases {
-    in (LessOrEqual(a, b)) as aLeqB:
-        Exists.eliminate(
-            Natural,
-            function (k : Natural) => b = a + k,
-            Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)),
-            function (k : Natural) (witnessEquation : b = a + k) =>
-                Or.introduceRight(
-                    Integer.MkIsNonneg(a, b),
-                    Integer.MkIsNegated(a, b),
-                    Exists.introduce(
-                        Natural,
-                        function (j : Natural) =>
-                            Quotient.mk(IntegerRepresentative,
-                                         IntegerEquivalent,
-                                         IntegerRepresentative.make(a, b))
-                            = -(j : Integer),
-                        k,
-                        Integer.from_reverse_subtraction_witness(
-                            a, b, k, witnessEquation))),
-            Natural.subtraction_witness(a, b, aLeqB))
-    in (LessOrEqual(b, a)) as bLeqA:
-        Exists.eliminate(
-            Natural,
-            function (k : Natural) => a = b + k,
-            Or(Integer.MkIsNonneg(a, b), Integer.MkIsNegated(a, b)),
-            function (k : Natural) (witnessEquation : a = b + k) =>
-                Or.introduceLeft(
-                    Integer.MkIsNonneg(a, b),
-                    Integer.MkIsNegated(a, b),
-                    Exists.introduce(
-                        Natural,
-                        function (j : Natural) =>
-                            Quotient.mk(IntegerRepresentative,
-                                         IntegerEquivalent,
-                                         IntegerRepresentative.make(a, b))
-                            = (j : Integer),
-                        k,
-                        Integer.from_subtraction_witness(
-                            a, b, k, witnessEquation))),
-            Natural.subtraction_witness(b, a, bLeqA))
+    in (LessOrEqual(a, b)) as aLeqB: {
+        obtain ⟨k, witnessEquation⟩
+            from Natural.subtraction_witness(a, b, aLeqB);
+        Or.introduceRight(
+            Integer.MkIsNonneg(a, b),
+            Integer.MkIsNegated(a, b),
+            witness k with
+                Integer.from_reverse_subtraction_witness(
+                    a, b, k, witnessEquation))
+    }
+    in (LessOrEqual(b, a)) as bLeqA: {
+        obtain ⟨k, witnessEquation⟩
+            from Natural.subtraction_witness(b, a, bLeqA);
+        Or.introduceLeft(
+            Integer.MkIsNonneg(a, b),
+            Integer.MkIsNegated(a, b),
+            witness k with
+                Integer.from_subtraction_witness(
+                    a, b, k, witnessEquation))
+    }
   }
 
 -- The sign-split motive on Integers.
@@ -258,55 +238,45 @@ theorem Integer.absolute_value_multiply_by_positive_natural
   claim Integer.IsNonneg(x) ∨ (∃ (k : Natural). x = -(k : Integer))
       by Integer.sign_split(x)
   claim by cases {
-    in (Integer.IsNonneg(x)) as xIsNonneg:
-        Exists.eliminate(
-            Natural,
-            function (a : Natural) => x = (a : Integer),
-            Integer.absolute_value(x * (successor(d) : Integer))
-              = Integer.absolute_value(x) * (successor(d) : Integer),
-            function (a : Natural) (xIsImage : x = (a : Integer)) =>
-              -- |x * succ(d)| = |(a : I) * (succ(d) : I)|
-              -- = |(a * succ(d) : I)| = (a * succ(d) : I)
-              -- = (a : I) * (succ(d) : I) = |x| * (succ(d) : I).
-              calc Integer.absolute_value(
-                       x * (successor(d) : Integer))
-                 = Integer.absolute_value(
-                       (a : Integer) * (successor(d) : Integer))
-                 = Integer.absolute_value(
-                       (a * successor(d) : Integer))
-                 = (a * successor(d) : Integer)
-                 = (a : Integer) * (successor(d) : Integer)
-                 = Integer.absolute_value((a : Integer))
-                   * (successor(d) : Integer)
-                 = Integer.absolute_value(x) * (successor(d) : Integer),
-            xIsNonneg)
-    in (∃ (k : Natural). x = -(k : Integer)) as xNegEvidence:
-        Exists.eliminate(
-            Natural,
-            function (k : Natural) => x = -(k : Integer),
-            Integer.absolute_value(x * (successor(d) : Integer))
-              = Integer.absolute_value(x) * (successor(d) : Integer),
-            function (k : Natural) (xEqNegK : x = -(k : Integer)) =>
-              -- |x * succ(d)| = |-(k : I) * (succ(d) : I)|
-              -- = |-((k : I) * (succ(d) : I))| = |(k * succ(d) : I)|
-              -- = (k * succ(d) : I) = (k : I) * (succ(d) : I)
-              -- = |(k : I)| * (succ(d) : I) = |-(k : I)| * (succ(d) : I)
-              -- = |x| * (succ(d) : I).
-              calc Integer.absolute_value(
-                       x * (successor(d) : Integer))
-                 = Integer.absolute_value(
-                       -(k : Integer) * (successor(d) : Integer))
-                 = Integer.absolute_value(
-                       -((k : Integer) * (successor(d) : Integer)))
-                 = Integer.absolute_value(
-                       (k : Integer) * (successor(d) : Integer))
-                 = Integer.absolute_value((k * successor(d) : Integer))
-                 = (k * successor(d) : Integer)
-                 = (k : Integer) * (successor(d) : Integer)
-                 = Integer.absolute_value((k : Integer))
-                   * (successor(d) : Integer)
-                 = Integer.absolute_value(-(k : Integer))
-                   * (successor(d) : Integer)
-                 = Integer.absolute_value(x) * (successor(d) : Integer),
-            xNegEvidence)
+    in (Integer.IsNonneg(x)) as xIsNonneg: {
+        obtain ⟨a, xIsImage⟩ from xIsNonneg;
+        -- |x * succ(d)| = |(a : I) * (succ(d) : I)|
+        -- = |(a * succ(d) : I)| = (a * succ(d) : I)
+        -- = (a : I) * (succ(d) : I) = |x| * (succ(d) : I).
+        calc Integer.absolute_value(
+                 x * (successor(d) : Integer))
+           = Integer.absolute_value(
+                 (a : Integer) * (successor(d) : Integer))
+           = Integer.absolute_value(
+                 (a * successor(d) : Integer))
+           = (a * successor(d) : Integer)
+           = (a : Integer) * (successor(d) : Integer)
+           = Integer.absolute_value((a : Integer))
+             * (successor(d) : Integer)
+           = Integer.absolute_value(x) * (successor(d) : Integer)
+    }
+    in (∃ (k : Natural). x = -(k : Integer)) as xNegEvidence: {
+        obtain ⟨k, xEqNegK⟩ from xNegEvidence;
+        -- |x * succ(d)| = |-(k : I) * (succ(d) : I)|
+        -- = |-((k : I) * (succ(d) : I))| = |(k * succ(d) : I)|
+        -- = (k * succ(d) : I) = (k : I) * (succ(d) : I)
+        -- = |(k : I)| * (succ(d) : I) = |-(k : I)| * (succ(d) : I)
+        -- = |x| * (succ(d) : I).
+        calc Integer.absolute_value(
+                 x * (successor(d) : Integer))
+           = Integer.absolute_value(
+                 -(k : Integer) * (successor(d) : Integer))
+           = Integer.absolute_value(
+                 -((k : Integer) * (successor(d) : Integer)))
+           = Integer.absolute_value(
+                 (k : Integer) * (successor(d) : Integer))
+           = Integer.absolute_value((k * successor(d) : Integer))
+           = (k * successor(d) : Integer)
+           = (k : Integer) * (successor(d) : Integer)
+           = Integer.absolute_value((k : Integer))
+             * (successor(d) : Integer)
+           = Integer.absolute_value(-(k : Integer))
+             * (successor(d) : Integer)
+           = Integer.absolute_value(x) * (successor(d) : Integer)
+    }
   }

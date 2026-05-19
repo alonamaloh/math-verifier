@@ -565,13 +565,9 @@ theorem Natural.divides_implies_modulo_zero
         (divisor dividend : Natural)
         (divisorPositive : successor(zero) ≤ divisor)
         (dividesProof : Natural.divides(divisor, dividend))
-        : Natural.modulo(divisor, dividend) = zero :=
-  Exists.eliminate(
-      Natural,
-      function (q : Natural) => dividend = divisor * q,
-      Natural.modulo(divisor, dividend) = zero,
-      function (q : Natural) (dividendEq : dividend = divisor * q) =>
-        Equality.transport_proposition(
+        : Natural.modulo(divisor, dividend) = zero := {
+  obtain ⟨q, dividendEq⟩ from dividesProof;
+  Equality.transport_proposition(
             Natural,
             function (m : Natural) =>
                 Natural.modulo_step(m, divisor, m) = zero,
@@ -607,8 +603,8 @@ theorem Natural.divides_implies_modulo_zero
                                                          divisorPositive)))),
                             Natural.less_or_equal_add_right(
                                 successor(zero) * q,
-                                Natural.monus(divisor, successor(zero)) * q)))))),
-      dividesProof)
+                                Natural.monus(divisor, successor(zero)) * q))))))
+}
 
 -- If modulo(d, n) = 0, then d divides n. The decomposition gives
 -- d * divide(d, n) + 0 = n, i.e., n = d * divide(d, n).
@@ -616,13 +612,10 @@ theorem Natural.modulo_zero_implies_divides
         (divisor dividend : Natural)
         (moduloZero : Natural.modulo(divisor, dividend) = zero)
         : Natural.divides(divisor, dividend) :=
-  Exists.introduce(
-      Natural,
-      function (q : Natural) => dividend = divisor * q,
-      Natural.divide(divisor, dividend),
+  witness Natural.divide(divisor, dividend) with
       Equality.symmetry(
           calc divisor * Natural.divide(divisor, dividend)
              = divisor * Natural.divide(divisor, dividend) + zero
              = divisor * Natural.divide(divisor, dividend)
                    + Natural.modulo(divisor, dividend)
-             = dividend))
+             = dividend)
