@@ -143,106 +143,59 @@ theorem CauchyEquivalent.transitive
         (bEquivc : CauchyEquivalent(b, c))
         : CauchyEquivalent(a, c) :=
   function (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) =>
-    Exists.eliminate(
-        Natural,
-        function (N_ab : Natural) =>
-          (m : Natural) → N_ab ≤ m →
-            Rational.absolute_value(
-                CauchyRationalSequence.sequenceFunction(a, m)
-                - CauchyRationalSequence.sequenceFunction(b, m))
-              < Rational.halve(epsilon),
-        ∃ (N : Natural).
-          (m : Natural) → N ≤ m →
-            Rational.absolute_value(
-                CauchyRationalSequence.sequenceFunction(a, m)
-                - CauchyRationalSequence.sequenceFunction(c, m))
-              < epsilon,
-        function (N_ab : Natural)
-                 (abBound
-                    : (m : Natural) → N_ab ≤ m →
+           (epsilonPositive : Rational.zero < epsilon) => {
+    obtain ⟨N_ab, abBound⟩
+        from aEquivb(Rational.halve(epsilon),
+                     Rational.halve_positive(epsilon, epsilonPositive));
+    obtain ⟨N_bc, bcBound⟩
+        from bEquivc(Rational.halve(epsilon),
+                     Rational.halve_positive(epsilon, epsilonPositive));
+    witness Natural.maximum(N_ab, N_bc) with
+        function (m : Natural)
+                 (m_ge_max : Natural.maximum(N_ab, N_bc) ≤ m) =>
+          Rational.LessThan.transitive_left(
+              Rational.absolute_value(
+                  CauchyRationalSequence.sequenceFunction(a, m)
+                  - CauchyRationalSequence.sequenceFunction(c, m)),
+              Rational.absolute_value(
+                  CauchyRationalSequence.sequenceFunction(a, m)
+                  - CauchyRationalSequence.sequenceFunction(b, m))
+                  + Rational.absolute_value(
+                        CauchyRationalSequence.sequenceFunction(b, m)
+                        - CauchyRationalSequence.sequenceFunction(c, m)),
+              epsilon,
+              -- Step 1: ≤ via triangle + subtract_chain.
+              rewrite(
+                  congruenceOf(
+                      Rational.absolute_value,
+                      Rational.subtract_chain(
+                          CauchyRationalSequence.sequenceFunction(a, m),
+                          CauchyRationalSequence.sequenceFunction(b, m),
+                          CauchyRationalSequence.sequenceFunction(c, m))),
+                  Rational.triangle_inequality(
+                      CauchyRationalSequence.sequenceFunction(a, m)
+                      - CauchyRationalSequence.sequenceFunction(b, m),
+                      CauchyRationalSequence.sequenceFunction(b, m)
+                      - CauchyRationalSequence.sequenceFunction(c, m))),
+              -- Step 2: < via add_strict_strict + halve_doubled.
+              rewrite(
+                  Rational.halve_doubled(epsilon),
+                  Rational.LessThan.add_strict_strict(
                       Rational.absolute_value(
                           CauchyRationalSequence.sequenceFunction(a, m)
-                          - CauchyRationalSequence.sequenceFunction(b, m))
-                        < Rational.halve(epsilon)) =>
-          Exists.eliminate(
-              Natural,
-              function (N_bc : Natural) =>
-                (m : Natural) → N_bc ≤ m →
-                  Rational.absolute_value(
-                      CauchyRationalSequence.sequenceFunction(b, m)
-                      - CauchyRationalSequence.sequenceFunction(c, m))
-                    < Rational.halve(epsilon),
-              ∃ (N : Natural).
-                (m : Natural) → N ≤ m →
-                  Rational.absolute_value(
-                      CauchyRationalSequence.sequenceFunction(a, m)
-                      - CauchyRationalSequence.sequenceFunction(c, m))
-                    < epsilon,
-              function (N_bc : Natural)
-                       (bcBound
-                          : (m : Natural) → N_bc ≤ m →
-                            Rational.absolute_value(
-                                CauchyRationalSequence.sequenceFunction(b, m)
-                                - CauchyRationalSequence.sequenceFunction(c, m))
-                              < Rational.halve(epsilon)) =>
-                Exists.introduce(
-                    Natural,
-                    function (N : Natural) =>
-                      (m : Natural) → N ≤ m →
-                        Rational.absolute_value(
-                            CauchyRationalSequence.sequenceFunction(a, m)
-                            - CauchyRationalSequence.sequenceFunction(c, m))
-                          < epsilon,
-                    Natural.maximum(N_ab, N_bc),
-                    function (m : Natural)
-                             (m_ge_max : Natural.maximum(N_ab, N_bc) ≤ m) =>
-                      Rational.LessThan.transitive_left(
-                          Rational.absolute_value(
-                              CauchyRationalSequence.sequenceFunction(a, m)
-                              - CauchyRationalSequence.sequenceFunction(c, m)),
-                          Rational.absolute_value(
-                              CauchyRationalSequence.sequenceFunction(a, m)
-                              - CauchyRationalSequence.sequenceFunction(b, m))
-                              + Rational.absolute_value(
-                                    CauchyRationalSequence.sequenceFunction(b, m)
-                                    - CauchyRationalSequence.sequenceFunction(c, m)),
-                          epsilon,
-                          -- Step 1: ≤ via triangle + subtract_chain.
-                          rewrite(
-                              congruenceOf(
-                                  Rational.absolute_value,
-                                  Rational.subtract_chain(
-                                      CauchyRationalSequence.sequenceFunction(a, m),
-                                      CauchyRationalSequence.sequenceFunction(b, m),
-                                      CauchyRationalSequence.sequenceFunction(c, m))),
-                              Rational.triangle_inequality(
-                                  CauchyRationalSequence.sequenceFunction(a, m)
-                                  - CauchyRationalSequence.sequenceFunction(b, m),
-                                  CauchyRationalSequence.sequenceFunction(b, m)
-                                  - CauchyRationalSequence.sequenceFunction(c, m))),
-                          -- Step 2: < via add_strict_strict + halve_doubled.
-                          rewrite(
-                              Rational.halve_doubled(epsilon),
-                              Rational.LessThan.add_strict_strict(
-                                  Rational.absolute_value(
-                                      CauchyRationalSequence.sequenceFunction(a, m)
-                                      - CauchyRationalSequence.sequenceFunction(b, m)),
-                                  Rational.absolute_value(
-                                      CauchyRationalSequence.sequenceFunction(b, m)
-                                      - CauchyRationalSequence.sequenceFunction(c, m)),
-                                  Rational.halve(epsilon),
-                                  abBound(m,
-                                      LessOrEqual.transitive(
-                                          N_ab, Natural.maximum(N_ab, N_bc), m,
-                                          m_ge_max,
-                                          Natural.left_le_max(N_ab, N_bc))),
-                                  bcBound(m,
-                                      LessOrEqual.transitive(
-                                          N_bc, Natural.maximum(N_ab, N_bc), m,
-                                          m_ge_max,
-                                          Natural.right_le_max(N_ab, N_bc))))))),
-              bEquivc(Rational.halve(epsilon),
-                  Rational.halve_positive(epsilon, epsilonPositive))),
-        aEquivb(Rational.halve(epsilon),
-            Rational.halve_positive(epsilon, epsilonPositive)))
+                          - CauchyRationalSequence.sequenceFunction(b, m)),
+                      Rational.absolute_value(
+                          CauchyRationalSequence.sequenceFunction(b, m)
+                          - CauchyRationalSequence.sequenceFunction(c, m)),
+                      Rational.halve(epsilon),
+                      abBound(m,
+                          LessOrEqual.transitive(
+                              N_ab, Natural.maximum(N_ab, N_bc), m,
+                              m_ge_max,
+                              Natural.left_le_max(N_ab, N_bc))),
+                      bcBound(m,
+                          LessOrEqual.transitive(
+                              N_bc, Natural.maximum(N_ab, N_bc), m,
+                              m_ge_max,
+                              Natural.right_le_max(N_ab, N_bc))))))
+  }

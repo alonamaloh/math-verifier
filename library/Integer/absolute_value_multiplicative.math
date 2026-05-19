@@ -134,80 +134,38 @@ theorem Integer.absolute_value_multiplicative (x y : Integer)
   claim Integer.IsNonneg(x) ∨ (∃ (k : Natural). x = -(k : Integer))
       by Integer.sign_split(x)
   claim by cases {
-    in (Integer.IsNonneg(x)) as xNonneg:
-        Exists.eliminate(
-            Natural,
-            function (a : Natural) => x = (a : Integer),
-            Integer.absolute_value(x * y)
-              = Integer.absolute_value(x) * Integer.absolute_value(y),
-            function (a : Natural) (xIsImage : x = (a : Integer)) => ({
-              claim Integer.IsNonneg(y) ∨ (∃ (k : Natural). y = -(k : Integer))
-                  by Integer.sign_split(y)
-              claim by cases {
-                in (Integer.IsNonneg(y)) as yNonneg:
-                    Exists.eliminate(
-                        Natural,
-                        function (b : Natural) => y = (b : Integer),
-                        Integer.absolute_value(x * y)
-                          = Integer.absolute_value(x)
-                              * Integer.absolute_value(y),
-                        function (b : Natural)
-                                 (yIsImage : y = (b : Integer)) =>
-                          Integer.absolute_value_multiplicative_both_nonneg(
-                              x, y, a, b, xIsImage, yIsImage),
-                        yNonneg)
-                in (∃ (k : Natural). y = -(k : Integer)) as yNeg:
-                    Exists.eliminate(
-                        Natural,
-                        function (b : Natural) => y = -(b : Integer),
-                        Integer.absolute_value(x * y)
-                          = Integer.absolute_value(x)
-                              * Integer.absolute_value(y),
-                        function (b : Natural)
-                                 (yIsNegImage : y = -(b : Integer)) =>
-                          Integer.absolute_value_multiplicative_pos_neg(
-                              x, y, a, b, xIsImage, yIsNegImage),
-                        yNeg)
-              }
-            } : Integer.absolute_value(x * y)
-                = Integer.absolute_value(x) * Integer.absolute_value(y)),
-            xNonneg)
-    in (∃ (k : Natural). x = -(k : Integer)) as xNeg:
-        Exists.eliminate(
-            Natural,
-            function (a : Natural) => x = -(a : Integer),
-            Integer.absolute_value(x * y)
-              = Integer.absolute_value(x) * Integer.absolute_value(y),
-            function (a : Natural) (xIsNegImage : x = -(a : Integer)) => ({
-              claim Integer.IsNonneg(y) ∨ (∃ (k : Natural). y = -(k : Integer))
-                  by Integer.sign_split(y)
-              claim by cases {
-                in (Integer.IsNonneg(y)) as yNonneg:
-                    Exists.eliminate(
-                        Natural,
-                        function (b : Natural) => y = (b : Integer),
-                        Integer.absolute_value(x * y)
-                          = Integer.absolute_value(x)
-                              * Integer.absolute_value(y),
-                        function (b : Natural)
-                                 (yIsImage : y = (b : Integer)) =>
-                          Integer.absolute_value_multiplicative_neg_pos(
-                              x, y, a, b, xIsNegImage, yIsImage),
-                        yNonneg)
-                in (∃ (k : Natural). y = -(k : Integer)) as yNeg:
-                    Exists.eliminate(
-                        Natural,
-                        function (b : Natural) => y = -(b : Integer),
-                        Integer.absolute_value(x * y)
-                          = Integer.absolute_value(x)
-                              * Integer.absolute_value(y),
-                        function (b : Natural)
-                                 (yIsNegImage : y = -(b : Integer)) =>
-                          Integer.absolute_value_multiplicative_both_neg(
-                              x, y, a, b, xIsNegImage, yIsNegImage),
-                        yNeg)
-              }
-            } : Integer.absolute_value(x * y)
-                = Integer.absolute_value(x) * Integer.absolute_value(y)),
-            xNeg)
+    in (Integer.IsNonneg(x)) as xNonneg: {
+        obtain ⟨a, xIsImage⟩ from xNonneg;
+        claim Integer.IsNonneg(y) ∨ (∃ (k : Natural). y = -(k : Integer))
+            by Integer.sign_split(y)
+        claim by cases {
+          in (Integer.IsNonneg(y)) as yNonneg: {
+              obtain ⟨b, yIsImage⟩ from yNonneg;
+              Integer.absolute_value_multiplicative_both_nonneg(
+                  x, y, a, b, xIsImage, yIsImage)
+          }
+          in (∃ (k : Natural). y = -(k : Integer)) as yNeg: {
+              obtain ⟨b, yIsNegImage⟩ from yNeg;
+              Integer.absolute_value_multiplicative_pos_neg(
+                  x, y, a, b, xIsImage, yIsNegImage)
+          }
+        }
+    }
+    in (∃ (k : Natural). x = -(k : Integer)) as xNeg: {
+        obtain ⟨a, xIsNegImage⟩ from xNeg;
+        claim Integer.IsNonneg(y) ∨ (∃ (k : Natural). y = -(k : Integer))
+            by Integer.sign_split(y)
+        claim by cases {
+          in (Integer.IsNonneg(y)) as yNonneg: {
+              obtain ⟨b, yIsImage⟩ from yNonneg;
+              Integer.absolute_value_multiplicative_neg_pos(
+                  x, y, a, b, xIsNegImage, yIsImage)
+          }
+          in (∃ (k : Natural). y = -(k : Integer)) as yNeg: {
+              obtain ⟨b, yIsNegImage⟩ from yNeg;
+              Integer.absolute_value_multiplicative_both_neg(
+                  x, y, a, b, xIsNegImage, yIsNegImage)
+          }
+        }
+    }
   }
