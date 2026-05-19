@@ -46,6 +46,7 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"coercion",      TokenKind::KeywordCoercion},
         {"sorry",         TokenKind::KeywordSorry},
         {"ring",          TokenKind::KeywordRing},
+        {"field",         TokenKind::KeywordField},
         {"convention",    TokenKind::KeywordConvention},
         {"given",         TokenKind::KeywordGiven},
         {"as",            TokenKind::KeywordAs},
@@ -355,6 +356,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::KeywordCoercion:      return "'coercion'";
         case TokenKind::KeywordSorry:         return "'sorry'";
         case TokenKind::KeywordRing:          return "'ring'";
+        case TokenKind::KeywordField:         return "'field'";
         case TokenKind::KeywordConvention:    return "'convention'";
         case TokenKind::KeywordGiven:         return "'given'";
         case TokenKind::KeywordAs:            return "'as'";

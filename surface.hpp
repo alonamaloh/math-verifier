@@ -196,6 +196,14 @@ struct SurfaceSorry { };
 // associativity / commutativity / distributivity lemmas.
 struct SurfaceRing { };
 
+// `field(h1, h2, ...)` — closes an equality goal in a field by clearing
+// `reciprocal_function(t)` occurrences with the user-supplied nonzero
+// hypotheses `h_i : ¬(t_i = zero)`, then deferring to `ring` on the
+// cleared expression. Built on top of ring v2.
+struct SurfaceField {
+    std::vector<SurfaceExpressionPointer> nonzeroHypotheses;
+};
+
 // `by_induction on scrutinee using inductionLemma with subjectName,
 // ihName { body }`. The elaborator constructs the motive by
 // abstracting the surrounding expected type over the scrutinee
@@ -279,7 +287,7 @@ struct SurfaceExpression {
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer, SurfaceSorry,
-        SurfaceRing, SurfaceCalc, SurfaceByInductionUsing,
+        SurfaceRing, SurfaceField, SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven
     > node;
     int line = 0;
@@ -393,6 +401,12 @@ inline SurfaceExpressionPointer makeSurfaceSorry(int line, int column) {
 inline SurfaceExpressionPointer makeSurfaceRing(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceRing{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceField(
+    std::vector<SurfaceExpressionPointer> nonzeroHypotheses,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceField{std::move(nonzeroHypotheses)}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceCalc(
     SurfaceExpressionPointer initialExpression,

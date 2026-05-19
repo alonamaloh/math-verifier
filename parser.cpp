@@ -31,6 +31,7 @@ bool isContextualKeyword(TokenKind kind) {
         case TokenKind::KeywordContradiction:
         case TokenKind::KeywordSorry:
         case TokenKind::KeywordRing:
+        case TokenKind::KeywordField:
         case TokenKind::KeywordOperator:
         case TokenKind::KeywordOverload:
         case TokenKind::KeywordCoercion:
@@ -1409,6 +1410,33 @@ private:
         if (current.kind == TokenKind::KeywordRing) {
             Token ringToken = consumeAny();
             return makeSurfaceRing(ringToken.line, ringToken.column);
+        }
+        if (current.kind == TokenKind::KeywordField) {
+            Token fieldToken = consumeAny();
+            // `field` REQUIRES an argument list of nonzero hypotheses.
+            // The argument list is parsed exactly like a function call.
+            if (peek().kind != TokenKind::LeftParen) {
+                throwHere(
+                    "`field` requires a parenthesized argument list of "
+                    "nonzero hypotheses (e.g. `field(aNonzero, bNonzero)`)");
+            }
+            consumeAny();  // '('
+            if (peek().kind == TokenKind::RightParen) {
+                throwHere(
+                    "`field()` with no arguments is not allowed — supply "
+                    "one nonzero hypothesis per `reciprocal_function` "
+                    "argument appearing in the goal");
+            }
+            std::vector<SurfaceExpressionPointer> hypotheses;
+            hypotheses.push_back(parseExpression());
+            while (peek().kind == TokenKind::Comma) {
+                consumeAny();
+                hypotheses.push_back(parseExpression());
+            }
+            expect(TokenKind::RightParen,
+                   "ending `field` argument list");
+            return makeSurfaceField(std::move(hypotheses),
+                                     fieldToken.line, fieldToken.column);
         }
         // `claim` at expression position starts a structured proof.
         // Checked BEFORE isIdentifierLike, because `claim` is a

@@ -3608,6 +3608,11 @@ private:
             return elaborateRing(localBinders, expectedType,
                                   expression.line, expression.column);
         }
+        if (auto* fieldTactic =
+                std::get_if<SurfaceField>(&expression.node)) {
+            return elaborateField(*fieldTactic, localBinders, expectedType,
+                                   expression.line, expression.column);
+        }
         if (auto* calc = std::get_if<SurfaceCalc>(&expression.node)) {
             return elaborateCalc(*calc, localBinders, expectedType,
                                   expression.line, expression.column);
@@ -8971,6 +8976,1158 @@ private:
             std::move(leftProof), std::move(rightProofSymm));
         (void)line;
         return finalProof;
+    }
+
+    // =====================================================================
+    // `field(h1, h2, ...)` — extends ring v2 with the side relation
+    // `t_i * reciprocal_function(t_i) = 1` for each user-supplied
+    // hypothesis `h_i : ¬(t_i = Rational.zero)`.
+    //
+    // Strategy: normalise both sides via ring v2 treating
+    // `reciprocal_function(t_i)` and `t_i` as opaque atoms. In each
+    // monomial of the canonical polynomial, count matched (t_i, r_i)
+    // pairs and contract them (each contraction drops one t_i and one
+    // r_i from the monomial's factor signature). After contraction the
+    // polynomials of both sides should agree; if not, the goal is not a
+    // field identity (or the user supplied insufficient hypotheses).
+    //
+    // The proof is built as a five-segment chain:
+    //
+    //   LHS = ring_canonical(LHS)
+    //       = field_canonical(LHS)         -- via per-monomial contraction
+    //       = field_canonical(RHS)         -- reflexivity (literally equal)
+    //       = ring_canonical(RHS)          -- symmetric of contraction
+    //       = RHS
+    //
+    // Each per-monomial contraction proof rearranges the monomial's
+    // factor list via ring v1 AC machinery, then applies
+    // `reciprocal_function_multiplies` plus `multiply_one` to remove
+    // each (t_i, r_i) pair from the tail.
+    // =====================================================================
+
+    // A registered (t_i, r_i) pair from the user's nonzero hypotheses.
+    struct FieldReciprocalPair {
+        ExpressionPointer baseAtom;        // t_i kernel expression
+        ExpressionPointer reciprocalAtom;  // reciprocal_function(t_i)
+        ExpressionPointer multipliesProof; // proof : t_i * reciprocal_function(t_i) = 1
+        uint64_t baseHash;
+        uint64_t reciprocalHash;
+    };
+
+    // Contract a sorted monomial signature using the supplied pairs.
+    // Returns the new signature with up to `min(#t, #r)` of each pair
+    // removed. Side-effect: writes the number of pairs cancelled per
+    // pair index into `pairsRemovedOut`.
+    RingMonomialSignature contractMonomialSignature(
+        const RingMonomialSignature& signature,
+        const std::vector<FieldReciprocalPair>& pairs,
+        std::vector<int>& pairsRemovedOut) {
+        // Count occurrences of each atom hash in the signature.
+        std::unordered_map<uint64_t, int> counts;
+        for (uint64_t hash : signature) ++counts[hash];
+        pairsRemovedOut.assign(pairs.size(), 0);
+        // For each pair, contract.
+        for (size_t i = 0; i < pairs.size(); ++i) {
+            int baseCount = counts[pairs[i].baseHash];
+            int reciprocalCount = counts[pairs[i].reciprocalHash];
+            int toRemove = std::min(baseCount, reciprocalCount);
+            if (toRemove > 0) {
+                counts[pairs[i].baseHash] -= toRemove;
+                counts[pairs[i].reciprocalHash] -= toRemove;
+                pairsRemovedOut[i] = toRemove;
+            }
+        }
+        // Rebuild signature from counts. Preserve the order of distinct
+        // hashes from the original signature (deduplicating).
+        RingMonomialSignature result;
+        result.reserve(signature.size());
+        std::unordered_map<uint64_t, int> emitted;
+        for (uint64_t hash : signature) {
+            int targetCount = counts[hash];
+            int& alreadyEmitted = emitted[hash];
+            if (alreadyEmitted < targetCount) {
+                result.push_back(hash);
+                ++alreadyEmitted;
+            }
+        }
+        // The signature must remain sorted (since `RingMonomialSignature`
+        // is sorted by hash). The original signature was sorted; rebuild
+        // by walking sorted-hash to count.
+        std::sort(result.begin(), result.end());
+        return result;
+    }
+
+    // Build a polynomial from a `ring_canonical_polynomial` by applying
+    // contractions monomial-by-monomial. Aggregates like terms (same
+    // signature) by summing coefficients. Out-of-band: the per-monomial
+    // contraction record (signature → list-of-pair-removals) is filled
+    // in `contractionRecords` for the proof emitter.
+    struct FieldMonomialContraction {
+        RingMonomialSignature originalSignature;
+        int originalCoefficient;
+        RingMonomialSignature contractedSignature;
+        std::vector<int> pairsRemoved;  // by pair index
+    };
+    RingPolynomial buildContractedPolynomial(
+        const RingPolynomial& original,
+        const std::vector<FieldReciprocalPair>& pairs,
+        std::vector<FieldMonomialContraction>& contractionRecords) {
+        RingPolynomial contracted;
+        contractionRecords.clear();
+        for (const auto& entry : original) {
+            std::vector<int> pairsRemoved;
+            RingMonomialSignature newSig =
+                contractMonomialSignature(entry.first, pairs, pairsRemoved);
+            contracted[newSig] += entry.second;
+            contractionRecords.push_back({
+                entry.first, entry.second,
+                newSig, std::move(pairsRemoved)});
+        }
+        ringPolynomialCompact(contracted);
+        return contracted;
+    }
+
+    // Build a proof
+    //   (factor_0 * ... * factor_{n-1})
+    //     = (factor'_0 * ... * factor'_{n-k-1})
+    // where the right side is the left side with the indicated
+    // (baseAtom, reciprocalAtom) pairs removed.  `factorList` is the
+    // monomial's full factor list (in canonical order, repeated per
+    // multiplicity).  `pairs` is the registry; `pairsRemoved[i]`
+    // indicates how many copies of pair i should be removed.
+    //
+    // Strategy:
+    //   1. Compute the surviving factor list by removing pair members
+    //      from the back to front (this matches the canonical iteration
+    //      order, which is hash-sorted).
+    //   2. Build the "rearranged" factor list = survivingFactors ++
+    //      [t_1, r_1, t_1, r_1, ...] (one (t, r) pair per cancellation).
+    //   3. Prove `factorList-product = rearranged-product` via
+    //      `proveProductEqualsSorted` (ring v1 AC, ANY permutation).
+    //   4. Cancel pairs from the tail: each step uses
+    //        ((prefix * t) * r) = prefix * (t * r)     (multiply_associative)
+    //        prefix * (t * r) = prefix * 1             (congr + multiplies_proof)
+    //        prefix * 1 = prefix                       (multiply_one)
+    //   5. Repeat until all pairs are cancelled.
+    //
+    // Returns the proof.  Requires factorList.size() > 0.
+    ExpressionPointer buildFactorContractionProof(
+        const std::vector<ExpressionPointer>& factorList,
+        const std::vector<FieldReciprocalPair>& pairs,
+        const std::vector<int>& pairsRemoved,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        const std::string& multiplyName = context.multiplyName;
+        ExpressionPointer carrierType = context.carrierType;
+        LevelPointer universeLevel = context.carrierUniverseLevel;
+        if (factorList.empty()) {
+            throwElaborate(
+                "`field`: factor list empty in contraction proof "
+                "(internal error)");
+        }
+        // Step 1: build surviving factor list.
+        //
+        // Remove instances of (t_i, r_i) from factorList — we remove
+        // pairsRemoved[i] copies of t_i and pairsRemoved[i] copies of
+        // r_i. Use a multiset count.
+        std::vector<bool> keep(factorList.size(), true);
+        std::vector<size_t> removedTIndices;       // indices in factorList of removed t_i's
+        std::vector<size_t> removedRIndices;       // indices in factorList of removed r_i's
+        std::vector<size_t> pairIndexForRemovedT;  // pair index per removed t (parallel to removedTIndices)
+        for (size_t pi = 0; pi < pairs.size(); ++pi) {
+            int toRemove = pairsRemoved[pi];
+            if (toRemove <= 0) continue;
+            int removed = 0;
+            for (size_t fi = 0; fi < factorList.size() && removed < toRemove; ++fi) {
+                if (!keep[fi]) continue;
+                if (factorList[fi]->hash == pairs[pi].baseHash) {
+                    keep[fi] = false;
+                    removedTIndices.push_back(fi);
+                    pairIndexForRemovedT.push_back(pi);
+                    ++removed;
+                }
+            }
+            if (removed < toRemove) {
+                throwElaborate(
+                    "`field`: requested removal of more `t` copies than "
+                    "present (internal error)");
+            }
+            removed = 0;
+            for (size_t fi = 0; fi < factorList.size() && removed < toRemove; ++fi) {
+                if (!keep[fi]) continue;
+                if (factorList[fi]->hash == pairs[pi].reciprocalHash) {
+                    keep[fi] = false;
+                    removedRIndices.push_back(fi);
+                    ++removed;
+                }
+            }
+            if (removed < toRemove) {
+                throwElaborate(
+                    "`field`: requested removal of more `r` copies than "
+                    "present (internal error)");
+            }
+        }
+        // Build the surviving factor list and the rearranged list.
+        std::vector<ExpressionPointer> survivors;
+        for (size_t fi = 0; fi < factorList.size(); ++fi) {
+            if (keep[fi]) survivors.push_back(factorList[fi]);
+        }
+        // The rearranged list: survivors first, then for each removed
+        // pair the (t, r) pair appended.
+        std::vector<ExpressionPointer> rearranged = survivors;
+        // Walk removedTIndices in order; each corresponds to a pair.
+        for (size_t k = 0; k < removedTIndices.size(); ++k) {
+            size_t pi = pairIndexForRemovedT[k];
+            rearranged.push_back(pairs[pi].baseAtom);
+            rearranged.push_back(pairs[pi].reciprocalAtom);
+        }
+        if (rearranged.size() != factorList.size()) {
+            throwElaborate(
+                "`field`: rearranged factor count mismatch (internal error)");
+        }
+        // Step 3: prove factorList-product = rearranged-product.
+        RingAxiomNames multiplyAxioms{
+            multiplyName, axiomNames.multiplyAssociative,
+            axiomNames.multiplyCommutative};
+        ExpressionPointer originalProduct =
+            assembleLeftAssociatedProduct(multiplyName, factorList);
+        ExpressionPointer rearrangedProduct =
+            assembleLeftAssociatedProduct(multiplyName, rearranged);
+        ExpressionPointer reassocProof;
+        if (factorList.size() == 1) {
+            // Single factor, no cancellations should be possible
+            // (a single factor can be either t or r alone, not both).
+            if (removedTIndices.size() != 0) {
+                throwElaborate(
+                    "`field`: single-factor monomial with pair removal "
+                    "(internal error)");
+            }
+            return buildReflexivity(universeLevel, carrierType, originalProduct);
+        } else {
+            reassocProof = proveProductEqualsSorted(
+                originalProduct, factorList, rearranged,
+                multiplyAxioms, carrierType, universeLevel, /*line*/0);
+        }
+        // Step 4: cancel pairs from the tail.
+        // Current form: rearrangedProduct =
+        //     (((survivors-product) * t_1) * r_1) * t_2 * r_2 * ... * t_k * r_k
+        // (all left-associated). We peel right-to-left.
+        //
+        // If there are zero removed pairs, we should match survivors == rearranged
+        // == factorList exactly, and reassocProof : factorList-product = survivors-product.
+        if (removedTIndices.empty()) {
+            return reassocProof;
+        }
+        // Need: at least one survivor (so the cancellation has a prefix
+        // to land in). If there are zero survivors, the contracted form
+        // is `1`, but we still need to handle the cancellation against
+        // `1`. We handle this by using the survivor list including a
+        // synthetic `1` at the front when needed.
+        //
+        // Concretely: if survivors is empty, the original factor list
+        // was entirely (t, r) pairs. Then we need to prove that
+        // `t_1 * r_1 * ... * t_k * r_k = 1`. We use a sequence of
+        // collapses, starting with `(t_1 * r_1) = 1` (the innermost pair)
+        // and lifting outward.
+        ExpressionPointer survivorsProduct;
+        bool noSurvivors = survivors.empty();
+        ExpressionPointer oneConst = makeConstant(context.oneName);
+        if (noSurvivors) {
+            // We'll start with the trick: rearranged-product =
+            // 1 * (t_1 * r_1 * ... * t_k * r_k). Hmm, but rearranged-product
+            // is just t_1 * r_1 * ... * t_k * r_k (no leading 1). We'd
+            // need to insert a 1 — that's a `one_multiply` reverse.
+            //
+            // Cleanest: prove the equality by induction-style:
+            //   first pair: t_1 * r_1 = 1, by multipliesProof of the matching pair.
+            //   subsequent pairs (k > 1): we have current form
+            //     (((t_1 * r_1) * t_2) * r_2) * ... * t_k * r_k
+            //     associativity collapse: (... * t_k) * r_k = ... * (t_k * r_k)
+            //     simplify (t_k * r_k) → 1
+            //     simplify (... * 1) → ...
+            //   recurse.
+            //
+            // Since there are at least 2 factors in `rearranged`, and the
+            // first 2 are a (t, r) pair, the base case can be: leave
+            // the (t_1, r_1) prefix intact while we collapse pairs to the
+            // right; at the very end, collapse the last remaining pair
+            // (t_1, r_1) to 1.
+            //
+            // Simpler implementation: do exactly the same cancellation
+            // loop as the survivor case, but treat the first (t_1, r_1)
+            // pair as a "synthetic survivor" — i.e. start by collapsing
+            // pairs 2..k, leaving prefix = t_1 * r_1. Then a final step
+            // collapses (t_1 * r_1) = 1.
+            //
+            // Implementation: start `currentForm = rearrangedProduct =
+            //  (((t_1*r_1)*t_2)*r_2)*...*t_k*r_k`. Collapse pairs from
+            // the right.
+            survivorsProduct =
+                assembleLeftAssociatedProduct(multiplyName,
+                    {pairs[pairIndexForRemovedT[0]].baseAtom,
+                     pairs[pairIndexForRemovedT[0]].reciprocalAtom});
+        } else if (survivors.size() == 1) {
+            survivorsProduct = survivors[0];
+        } else {
+            survivorsProduct = assembleLeftAssociatedProduct(
+                multiplyName, survivors);
+        }
+        // The `currentForm` represents the kernel-level current shape.
+        ExpressionPointer currentForm = rearrangedProduct;
+        ExpressionPointer chainProof = reassocProof;
+        // We need `multiply_associative`, `multiply_one`/`one_multiply`,
+        // and the cancellation lemma (the `multipliesProof` per pair).
+        demandAxiomName(axiomNames.multiplyOneRight,
+                          "multiply_one/multiply_identity_right",
+                          context.carrierName);
+        demandAxiomName(axiomNames.multiplyAssociative,
+                          "multiply_associative", context.carrierName);
+        // Track remaining (t, r) suffix: how many pairs still need to
+        // be cancelled. Walk right-to-left.
+        // The number of pairs total:
+        size_t totalPairs = removedTIndices.size();
+        // After cancellation k pairs, current form is:
+        //   prefix * (remaining_pairs_t1) * (remaining_pairs_r1) * ...
+        // We index pairs in REVERSE order of cancellation, from the
+        // rightmost (last appended) to the leftmost.
+        for (size_t step = 0; step < totalPairs; ++step) {
+            // The rightmost remaining pair index in pairIndexForRemovedT
+            // is `totalPairs - 1 - step`. Get t and r.
+            size_t pairListIdx = totalPairs - 1 - step;
+            // The "prefix" (left of the trailing (t, r) pair) is:
+            //   if noSurvivors and this is the last (innermost) pair:
+            //     no prefix — `currentForm` is exactly `t * r`
+            //   else:
+            //     prefix is whatever sits to the left of the last (t, r)
+            //
+            // Build prefix as a left-associated product of the relevant
+            // pieces.
+            std::vector<ExpressionPointer> prefixPieces;
+            if (!noSurvivors) {
+                for (const auto& s : survivors) prefixPieces.push_back(s);
+            }
+            // Append remaining pairs (those still to be cancelled,
+            // before this step's pair).
+            for (size_t earlier = 0; earlier < pairListIdx; ++earlier) {
+                size_t epi = pairIndexForRemovedT[earlier];
+                prefixPieces.push_back(pairs[epi].baseAtom);
+                prefixPieces.push_back(pairs[epi].reciprocalAtom);
+            }
+            size_t curPairIdx = pairIndexForRemovedT[pairListIdx];
+            ExpressionPointer tExpr = pairs[curPairIdx].baseAtom;
+            ExpressionPointer rExpr = pairs[curPairIdx].reciprocalAtom;
+            ExpressionPointer multipliesProof =
+                pairs[curPairIdx].multipliesProof;
+            // Case A: prefix is empty. currentForm == t * r.
+            if (prefixPieces.empty()) {
+                // currentForm should equal `t * r`. Apply multiplies
+                // proof to get `1`.
+                ExpressionPointer tTimesR = buildRingOp(
+                    multiplyName, tExpr, rExpr);
+                if (!structurallyEqual(currentForm, tTimesR)) {
+                    throwElaborate(
+                        "`field`: cancellation step expected `t*r` "
+                        "form but got different shape (internal error)");
+                }
+                // currentForm = t * r, multipliesProof : t * r = 1.
+                chainProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    originalProduct, currentForm, oneConst,
+                    chainProof, multipliesProof);
+                currentForm = oneConst;
+                continue;
+            }
+            // Case B: prefix non-empty. currentForm has shape
+            //   ((prefix-product) * t) * r
+            // (because all factors are left-associated, and this pair
+            // is at the very end).
+            ExpressionPointer prefixProduct;
+            if (prefixPieces.size() == 1) {
+                prefixProduct = prefixPieces[0];
+            } else {
+                prefixProduct = assembleLeftAssociatedProduct(
+                    multiplyName, prefixPieces);
+            }
+            // Expected currentForm = ((prefixProduct) * t) * r.
+            ExpressionPointer expectedShape = buildRingOp(
+                multiplyName,
+                buildRingOp(multiplyName, prefixProduct, tExpr),
+                rExpr);
+            if (!structurallyEqual(currentForm, expectedShape)) {
+                throwElaborate(
+                    "`field`: cancellation step expected "
+                    "`(prefix * t) * r` form (internal error)");
+            }
+            // Step B.1: associativity:
+            //   (prefixProduct * t) * r = prefixProduct * (t * r)
+            ExpressionPointer assocProof = makeConstant(
+                axiomNames.multiplyAssociative);
+            assocProof = makeApplication(assocProof, prefixProduct);
+            assocProof = makeApplication(assocProof, tExpr);
+            assocProof = makeApplication(assocProof, rExpr);
+            ExpressionPointer formA = buildRingOp(
+                multiplyName, prefixProduct,
+                buildRingOp(multiplyName, tExpr, rExpr));
+            // Step B.2: congruence with λz. prefix * z, substitute
+            //   t * r ← 1 via multipliesProof.
+            ExpressionPointer prefixLifted =
+                liftBoundVariables(prefixProduct, 1, 0);
+            ExpressionPointer lambdaBody = buildRingOp(
+                multiplyName, prefixLifted, makeBoundVariable(0));
+            ExpressionPointer lambda = makeLambda(
+                "_field_cancel_z", carrierType, lambdaBody);
+            ExpressionPointer tTimesR = buildRingOp(
+                multiplyName, tExpr, rExpr);
+            ExpressionPointer congrB = buildEqualityCongruenceSameCarrier(
+                universeLevel, carrierType, lambda,
+                tTimesR, oneConst, multipliesProof);
+            ExpressionPointer formB = buildRingOp(
+                multiplyName, prefixProduct, oneConst);
+            // Step B.3: multiply_one(prefixProduct) : prefix * 1 = prefix.
+            ExpressionPointer multOneProof = makeConstant(
+                axiomNames.multiplyOneRight);
+            multOneProof = makeApplication(multOneProof, prefixProduct);
+            // Compose: currentForm = formA = formB = prefixProduct.
+            ExpressionPointer stepAB = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                currentForm, formA, formB,
+                assocProof, congrB);
+            ExpressionPointer stepABC = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                currentForm, formB, prefixProduct,
+                stepAB, multOneProof);
+            // Chain with `originalProduct = currentForm`.
+            chainProof = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                originalProduct, currentForm, prefixProduct,
+                chainProof, stepABC);
+            currentForm = prefixProduct;
+        }
+        // After all cancellations, currentForm should equal
+        // survivorsProduct (or, if noSurvivors and we cancelled all
+        // pairs, `oneConst`).
+        ExpressionPointer expectedFinal;
+        if (noSurvivors) {
+            expectedFinal = oneConst;
+        } else if (survivors.size() == 1) {
+            expectedFinal = survivors[0];
+        } else {
+            expectedFinal = assembleLeftAssociatedProduct(
+                multiplyName, survivors);
+        }
+        if (!structurallyEqual(currentForm, expectedFinal)) {
+            throwElaborate(
+                "`field`: cancellation ended at unexpected form "
+                "(internal error)");
+        }
+        return chainProof;
+    }
+
+    // Build kernel proof of `monomialCanonicalKernel = contractedCanonicalKernel`,
+    // where `monomialCanonicalKernel` is the canonical form of an
+    // original monomial (signature, coefficient) and
+    // `contractedCanonicalKernel` is the canonical form of the
+    // contracted monomial (after removing the indicated pairs).
+    // The two coefficients must be equal in magnitude (no like-term
+    // collisions at the per-monomial level — those are handled by the
+    // caller).
+    //
+    // The proof is built on the factor-product level (without the
+    // outer sign-wrap) and then lifted through the negate (if the
+    // coefficient is -1) via congruence.
+    ExpressionPointer buildMonomialContractionProof(
+        const RingMonomialSignature& originalSignature,
+        int coefficient,
+        const RingMonomialSignature& contractedSignature,
+        const std::vector<int>& pairsRemoved,
+        const std::vector<FieldReciprocalPair>& pairs,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        ExpressionPointer carrierType = context.carrierType;
+        LevelPointer universeLevel = context.carrierUniverseLevel;
+        // No pair removals: nothing to do.
+        bool anyRemoval = false;
+        for (int n : pairsRemoved) if (n > 0) { anyRemoval = true; break; }
+        ExpressionPointer monomialKernel = buildCanonicalMonomial(
+            originalSignature, coefficient, context);
+        if (!anyRemoval) {
+            return buildReflexivity(universeLevel, carrierType, monomialKernel);
+        }
+        ExpressionPointer contractedKernel = buildCanonicalMonomial(
+            contractedSignature, coefficient, context);
+        // Build the factor list (kernel terms) for the original
+        // monomial. The signature is sorted by hash; look up each.
+        std::vector<ExpressionPointer> originalFactors;
+        originalFactors.reserve(originalSignature.size());
+        for (uint64_t h : originalSignature) {
+            auto it = context.atoms.find(h);
+            if (it == context.atoms.end()) {
+                throwElaborate(
+                    "`field`: atom hash missing during contraction "
+                    "(internal error)");
+            }
+            originalFactors.push_back(it->second);
+        }
+        // Build the contracted factor list.
+        std::vector<ExpressionPointer> contractedFactors;
+        contractedFactors.reserve(contractedSignature.size());
+        for (uint64_t h : contractedSignature) {
+            auto it = context.atoms.find(h);
+            if (it == context.atoms.end()) {
+                throwElaborate(
+                    "`field`: atom hash missing during contraction "
+                    "(internal error)");
+            }
+            contractedFactors.push_back(it->second);
+        }
+        // Factor-product proof: original-product = contracted-product.
+        // Use buildFactorContractionProof.
+        if (originalFactors.empty()) {
+            throwElaborate(
+                "`field`: empty original factor list with removals "
+                "(internal error)");
+        }
+        ExpressionPointer factorProof = buildFactorContractionProof(
+            originalFactors, pairs, pairsRemoved, context, axiomNames);
+        // Now lift through the coefficient/sign wrap.
+        // buildCanonicalMonomial structure:
+        //   magnitude 1 + non-empty factors: monomial = factor-product.
+        //   magnitude 1 + empty factors:     monomial = `one`.
+        // Coefficient < 0 wraps in negate.
+        //
+        // Our case: anyRemoval == true means original had >= 2 factors
+        // (at least one (t, r) pair). So originalFactors non-empty,
+        // monomialKernel = factor-product or -factor-product.
+        // The contracted may have empty factor list (everything cancelled).
+        //
+        // Case 1: coefficient = +1, both non-empty.
+        //   monomialKernel = original-factor-product.
+        //   contractedKernel = contracted-factor-product.
+        //   Proof = factorProof.
+        // Case 2: coefficient = +1, contracted factors empty.
+        //   monomialKernel = original-factor-product.
+        //   contractedKernel = `one`.
+        //   factorProof : original-product = `one`. ✓
+        // Case 3: coefficient = -1, both non-empty.
+        //   monomialKernel = -(original-factor-product).
+        //   contractedKernel = -(contracted-factor-product).
+        //   Apply congruence λz. -z to factorProof.
+        // Case 4: coefficient = -1, contracted empty.
+        //   monomialKernel = -(original-factor-product).
+        //   contractedKernel = -(one).
+        //   Apply congruence λz. -z.
+        if (coefficient == 1) {
+            // monomialKernel is the original factor product (or `one`
+            // if empty original factors — but we asserted non-empty).
+            // The contracted kernel is contracted-factor-product (or
+            // `one` if empty). buildFactorContractionProof returns the
+            // proof at the factor-product level, which matches.
+            //
+            // However: buildCanonicalMonomial(empty, +1) returns `one`,
+            // and our contracted-factor-product when empty is also `one`
+            // since assembleLeftAssociatedProduct isn't called on empty.
+            // We need to verify the shapes match what buildCanonicalMonomial
+            // produces.
+            //
+            // Verify by comparing structurally.
+            ExpressionPointer originalProduct =
+                assembleLeftAssociatedProduct(
+                    context.multiplyName, originalFactors);
+            ExpressionPointer contractedProduct;
+            if (contractedFactors.empty()) {
+                contractedProduct = makeConstant(context.oneName);
+            } else if (contractedFactors.size() == 1) {
+                contractedProduct = contractedFactors[0];
+            } else {
+                contractedProduct = assembleLeftAssociatedProduct(
+                    context.multiplyName, contractedFactors);
+            }
+            // buildFactorContractionProof returns proof of
+            //   originalProduct = contractedProduct
+            // (or = oneConst if everything cancelled). Match.
+            if (!structurallyEqual(monomialKernel, originalProduct)) {
+                throwElaborate(
+                    "`field`: monomial kernel mismatch (coeff +1) "
+                    "(internal error)");
+            }
+            if (!structurallyEqual(contractedKernel, contractedProduct)) {
+                throwElaborate(
+                    "`field`: contracted kernel mismatch (coeff +1) "
+                    "(internal error)");
+            }
+            return factorProof;
+        }
+        // coefficient == -1.
+        ExpressionPointer originalProduct =
+            assembleLeftAssociatedProduct(
+                context.multiplyName, originalFactors);
+        ExpressionPointer contractedProduct;
+        if (contractedFactors.empty()) {
+            contractedProduct = makeConstant(context.oneName);
+        } else if (contractedFactors.size() == 1) {
+            contractedProduct = contractedFactors[0];
+        } else {
+            contractedProduct = assembleLeftAssociatedProduct(
+                context.multiplyName, contractedFactors);
+        }
+        // Lambda: λz. negate(z).
+        ExpressionPointer lambdaBody = buildRingNegate(
+            context.negateName, makeBoundVariable(0));
+        ExpressionPointer lambda = makeLambda(
+            "_field_neg_z", carrierType, lambdaBody);
+        ExpressionPointer negCongr = buildEqualityCongruenceSameCarrier(
+            universeLevel, carrierType, lambda,
+            originalProduct, contractedProduct, factorProof);
+        return negCongr;
+    }
+
+    // Build kernel proof of `canonical(P) = canonical(P_contracted)`
+    // where P_contracted is the polynomial obtained from P by
+    // contracting each monomial individually.  This assumes no
+    // collisions: each contracted monomial has a unique signature in
+    // P_contracted, and coefficients are unchanged. The proof works
+    // by walking the canonical sum left-to-right and applying
+    // per-monomial congruences.
+    ExpressionPointer buildPolynomialContractionProof(
+        const RingPolynomial& originalPoly,
+        const RingPolynomial& contractedPoly,
+        const std::vector<FieldMonomialContraction>& contractionRecords,
+        const std::vector<FieldReciprocalPair>& pairs,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        ExpressionPointer carrierType = context.carrierType;
+        LevelPointer universeLevel = context.carrierUniverseLevel;
+        // No-collision assumption: contractedPoly has the same number
+        // of monomials as the original (since each original monomial
+        // maps to a unique contracted signature, with the same coefficient).
+        if (originalPoly.size() != contractedPoly.size()) {
+            throwElaborate(
+                "`field`: contracted polynomial has like-term "
+                "collisions across distinct original monomials — not "
+                "yet supported by the field tactic. (This happens "
+                "when the equation requires combining contracted "
+                "monomials.)");
+        }
+        // Edge case: empty polynomial.
+        if (originalPoly.empty()) {
+            // canonical of empty = zero. Reflexivity.
+            return buildReflexivity(universeLevel, carrierType,
+                                      makeConstant(context.zeroName));
+        }
+        // Build per-monomial kernels and per-monomial contraction proofs.
+        // Iterate originalPoly in canonical order (std::map order on signature).
+        std::vector<ExpressionPointer> originalMonomialKernels;
+        std::vector<ExpressionPointer> contractedMonomialKernels;
+        std::vector<ExpressionPointer> perMonomialProofs;
+        // Build a lookup: original sig → contraction record.
+        std::map<RingMonomialSignature, size_t> recordIndex;
+        for (size_t i = 0; i < contractionRecords.size(); ++i) {
+            recordIndex[contractionRecords[i].originalSignature] = i;
+        }
+        for (const auto& entry : originalPoly) {
+            auto it = recordIndex.find(entry.first);
+            if (it == recordIndex.end()) {
+                throwElaborate(
+                    "`field`: contraction record missing for original "
+                    "signature (internal error)");
+            }
+            const FieldMonomialContraction& rec =
+                contractionRecords[it->second];
+            ExpressionPointer originalKernel = buildCanonicalMonomial(
+                rec.originalSignature, rec.originalCoefficient, context);
+            ExpressionPointer contractedKernel = buildCanonicalMonomial(
+                rec.contractedSignature, rec.originalCoefficient, context);
+            ExpressionPointer proof = buildMonomialContractionProof(
+                rec.originalSignature, rec.originalCoefficient,
+                rec.contractedSignature, rec.pairsRemoved, pairs,
+                context, axiomNames);
+            originalMonomialKernels.push_back(originalKernel);
+            contractedMonomialKernels.push_back(contractedKernel);
+            perMonomialProofs.push_back(proof);
+        }
+        // canonical(originalPoly) is left-assoc sum of originalMonomialKernels.
+        // We need a proof that it equals left-assoc sum of contractedMonomialKernels.
+        //
+        // We chain n proofs (one per monomial), each being a congruence
+        // step that rewrites the i-th monomial's slot in the sum.
+        //
+        // BUT — the canonical of contracted may iterate in a DIFFERENT
+        // order from the original (the std::map signature order may
+        // shuffle after contraction). We need to handle that: after
+        // per-position rewrites, the result is
+        //   left_assoc(contractedMonomialKernels_in_original_order)
+        // but `canonical(contractedPoly)` is
+        //   left_assoc(contractedMonomialKernels_in_canonical_order).
+        // These may differ in summand order.
+        //
+        // To bridge: apply ring v1 AC on the additive operator to sort
+        // the summands.
+        //
+        // Step 1: per-position rewrites → contracted-monomials-in-original-order.
+        // Step 2: AC sort → canonical(contractedPoly).
+        ExpressionPointer originalCanonical =
+            assembleLeftAssociatedSum(context.addName, originalMonomialKernels);
+        ExpressionPointer afterPerPos =
+            assembleLeftAssociatedSum(context.addName, contractedMonomialKernels);
+        // Per-position rewrite chain.
+        ExpressionPointer chainProof;
+        if (originalMonomialKernels.size() == 1) {
+            chainProof = perMonomialProofs[0];
+        } else {
+            // Build chain: for each i, congruence with a motive that
+            // surgically replaces the i-th summand in the left-assoc
+            // chain.
+            //
+            // The current form after k rewrites is:
+            //   contracted_0 + contracted_1 + ... + contracted_{k-1}
+            //     + original_k + original_{k+1} + ... + original_{n-1}
+            // (all left-associated). To rewrite the k-th slot we use
+            // congruenceOf(λz. ..., perMonomialProofs[k]).
+            ExpressionPointer currentForm = originalCanonical;
+            ExpressionPointer currentProof = buildReflexivity(
+                universeLevel, carrierType, originalCanonical);
+            size_t n = originalMonomialKernels.size();
+            for (size_t k = 0; k < n; ++k) {
+                // Build the motive: λz. <left-assoc with z in slot k>.
+                // The pieces: contracted_0..contracted_{k-1}, then z,
+                // then original_{k+1}..original_{n-1}.
+                std::vector<ExpressionPointer> liftedPrefix;
+                for (size_t i = 0; i < k; ++i) {
+                    liftedPrefix.push_back(
+                        liftBoundVariables(
+                            contractedMonomialKernels[i], 1, 0));
+                }
+                std::vector<ExpressionPointer> liftedSuffix;
+                for (size_t i = k + 1; i < n; ++i) {
+                    liftedSuffix.push_back(
+                        liftBoundVariables(
+                            originalMonomialKernels[i], 1, 0));
+                }
+                // Build the motive expression.
+                ExpressionPointer motive;
+                if (k == 0) {
+                    motive = makeBoundVariable(0);
+                } else if (liftedPrefix.size() == 1) {
+                    motive = buildRingOp(
+                        context.addName, liftedPrefix[0],
+                        makeBoundVariable(0));
+                } else {
+                    ExpressionPointer prefixSum =
+                        assembleLeftAssociatedSum(
+                            context.addName, liftedPrefix);
+                    motive = buildRingOp(
+                        context.addName, prefixSum,
+                        makeBoundVariable(0));
+                }
+                for (const auto& s : liftedSuffix) {
+                    motive = buildRingOp(
+                        context.addName, motive, s);
+                }
+                ExpressionPointer lambda = makeLambda(
+                    "_field_poly_z", carrierType, motive);
+                // The "new form" after rewriting slot k.
+                std::vector<ExpressionPointer> newSummands;
+                for (size_t i = 0; i < k; ++i) {
+                    newSummands.push_back(contractedMonomialKernels[i]);
+                }
+                newSummands.push_back(contractedMonomialKernels[k]);
+                for (size_t i = k + 1; i < n; ++i) {
+                    newSummands.push_back(originalMonomialKernels[i]);
+                }
+                ExpressionPointer newForm =
+                    assembleLeftAssociatedSum(
+                        context.addName, newSummands);
+                ExpressionPointer congrProof =
+                    buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambda,
+                        originalMonomialKernels[k],
+                        contractedMonomialKernels[k],
+                        perMonomialProofs[k]);
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    originalCanonical, currentForm, newForm,
+                    currentProof, congrProof);
+                currentForm = newForm;
+            }
+            chainProof = currentProof;
+        }
+        // Now we have proof: originalCanonical = afterPerPos
+        // (i.e. left-assoc sum of contractedMonomialKernels in
+        // original-order).
+        ExpressionPointer canonicalContracted =
+            buildCanonicalPolynomial(contractedPoly, context);
+        if (structurallyEqual(afterPerPos, canonicalContracted)) {
+            return chainProof;
+        }
+        // Need to reorder via ring v1 AC on add.
+        std::vector<ExpressionPointer> contractedMonomialKernelsCanonical;
+        for (const auto& entry : contractedPoly) {
+            contractedMonomialKernelsCanonical.push_back(
+                buildCanonicalMonomial(entry.first, entry.second, context));
+        }
+        RingAxiomNames addAxioms{
+            context.addName, axiomNames.addAssociative,
+            axiomNames.addCommutative};
+        // Sort `contractedMonomialKernels` (original order) into
+        // `contractedMonomialKernelsCanonical` (canonical order) — same
+        // multiset of monomials, different orders.
+        ExpressionPointer sortProof = proveProductEqualsSorted(
+            afterPerPos, contractedMonomialKernels,
+            contractedMonomialKernelsCanonical,
+            addAxioms, carrierType, universeLevel, /*line*/0);
+        return buildEqualityTransitivity(
+            universeLevel, carrierType,
+            originalCanonical, afterPerPos, canonicalContracted,
+            chainProof, sortProof);
+    }
+
+    // Walk a kernel expression and accumulate every `reciprocal_function`
+    // application's argument into `argumentsOut` (deduplicating by hash).
+    void collectReciprocalArguments(
+        ExpressionPointer expression,
+        const std::string& reciprocalFunctionName,
+        std::unordered_map<uint64_t, ExpressionPointer>& argumentsOut) {
+        if (auto* app = std::get_if<Application>(&expression->node)) {
+            if (auto* head =
+                    std::get_if<Constant>(&app->function->node)) {
+                if (head->name == reciprocalFunctionName) {
+                    argumentsOut.emplace(
+                        app->argument->hash, app->argument);
+                    // Continue into the argument too (nested
+                    // reciprocals would be unusual but possible).
+                }
+            }
+            collectReciprocalArguments(
+                app->function, reciprocalFunctionName, argumentsOut);
+            collectReciprocalArguments(
+                app->argument, reciprocalFunctionName, argumentsOut);
+            return;
+        }
+        if (auto* lam = std::get_if<Lambda>(&expression->node)) {
+            collectReciprocalArguments(
+                lam->domain, reciprocalFunctionName, argumentsOut);
+            collectReciprocalArguments(
+                lam->body, reciprocalFunctionName, argumentsOut);
+            return;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            collectReciprocalArguments(
+                pi->domain, reciprocalFunctionName, argumentsOut);
+            collectReciprocalArguments(
+                pi->codomain, reciprocalFunctionName, argumentsOut);
+            return;
+        }
+        // Other variants: no children to walk.
+    }
+
+    // `field(h1, h2, ..., hn)` — closes a Rational (or any field with a
+    // `reciprocal_function`) equality using `ring` plus the
+    // `reciprocal_function_multiplies` law and the user-supplied
+    // nonzero hypotheses.
+    ExpressionPointer elaborateField(
+        const SurfaceField& fieldTactic,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this, "field at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "`field` needs an expected type from context — use it "
+                "as the body of a theorem with a declared equality "
+                "conclusion");
+        }
+        // Open the expected type over local binders so that local
+        // variables appear as FreeVariables — this lets us match
+        // against hypothesis types (which arrive opened).
+        ExpressionPointer expectedTypeOpened = openOverLocalBinders(
+            expectedType, localBinders, localBinders.size());
+        EqualityComponents goal =
+            extractEqualityComponents(expectedTypeOpened, "field", line);
+        std::string carrierName = headConstantName(goal.carrierType);
+        // Set up the ring v2 context.
+        RingV2Context context;
+        context.carrierName = carrierName;
+        context.carrierType = goal.carrierType;
+        context.carrierUniverseLevel = goal.carrierUniverseLevel;
+        context.addName       = carrierName + ".add";
+        context.multiplyName  = carrierName + ".multiply";
+        context.negateName    = carrierName + ".negate";
+        context.subtractName  = carrierName + ".subtract";
+        context.zeroName      = carrierName + ".zero";
+        context.oneName       = carrierName + ".one";
+        if (environment_.lookup(context.addName) == nullptr
+            || environment_.lookup(context.multiplyName) == nullptr) {
+            throwElaborate(
+                "`field`: carrier `" + carrierName
+                + "` does not have both `.add` and `.multiply` in scope");
+        }
+        std::string reciprocalFunctionName =
+            carrierName + ".reciprocal_function";
+        std::string reciprocalMultipliesName =
+            carrierName + ".reciprocal_function_multiplies";
+        if (environment_.lookup(reciprocalFunctionName) == nullptr) {
+            throwElaborate(
+                "`field`: carrier `" + carrierName
+                + "` does not have `reciprocal_function` in scope");
+        }
+        if (environment_.lookup(reciprocalMultipliesName) == nullptr) {
+            throwElaborate(
+                "`field`: carrier `" + carrierName
+                + "` does not have `reciprocal_function_multiplies` in scope");
+        }
+        // Collect reciprocal_function arguments from both sides.
+        std::unordered_map<uint64_t, ExpressionPointer> recipArgsMap;
+        collectReciprocalArguments(
+            goal.leftEndpoint, reciprocalFunctionName, recipArgsMap);
+        collectReciprocalArguments(
+            goal.rightEndpoint, reciprocalFunctionName, recipArgsMap);
+        // Elaborate user hypotheses. Each h_i should have type
+        // ¬(t_i = zero) ≡ (t_i = zero) → False.
+        std::vector<FieldReciprocalPair> pairs;
+        std::vector<bool> matchedArguments;
+        std::vector<uint64_t> recipArgHashes;
+        std::vector<ExpressionPointer> recipArgKernels;
+        for (const auto& kv : recipArgsMap) {
+            recipArgHashes.push_back(kv.first);
+            recipArgKernels.push_back(kv.second);
+        }
+        matchedArguments.assign(recipArgHashes.size(), false);
+        for (const auto& hypothesisSurface :
+                 fieldTactic.nonzeroHypotheses) {
+            ExpressionPointer hypothesisKernel = elaborateExpression(
+                *hypothesisSurface, localBinders);
+            // Open the hypothesis kernel so it lives in the same
+            // FreeVariable namespace as our opened goal.
+            ExpressionPointer hypothesisKernelOpened = openOverLocalBinders(
+                hypothesisKernel, localBinders, localBinders.size());
+            // Infer type: should be (t = zero) → False.
+            ExpressionPointer hypothesisType;
+            try {
+                hypothesisType = weakHeadNormalForm(environment_,
+                    inferTypeInLocalContext(localBinders, hypothesisKernel));
+            } catch (const TypeError& kernelError) {
+                rethrowKernelError(kernelError);
+            }
+            // Walk hypothesisType: expect Pi(_ : Equality(carrier, t, zero), _, False).
+            // Surface form `¬(t = zero)` is `(t = zero) → False`,
+            // which kernel-side is Pi(_ : Equality(carrier, t, zero), False).
+            auto* piNode = std::get_if<Pi>(&hypothesisType->node);
+            if (!piNode) {
+                throwElaborate(
+                    "`field`: hypothesis is not a `¬(t = Rational.zero)` "
+                    "(not a function type)");
+            }
+            ExpressionPointer domain = weakHeadNormalForm(
+                environment_, piNode->domain);
+            EqualityComponents domainComponents;
+            try {
+                domainComponents = extractEqualityComponents(
+                    domain, "field hypothesis", line);
+            } catch (const ElaborateError&) {
+                throwElaborate(
+                    "`field`: hypothesis domain is not an equality");
+            }
+            // Check carrier matches.
+            if (!structurallyEqual(
+                    domainComponents.carrierType, goal.carrierType)) {
+                throwElaborate(
+                    "`field`: hypothesis carrier doesn't match goal "
+                    "carrier");
+            }
+            // Check the RHS of the equality is `zero`. We accept the
+            // bare Constant before WHNF (definitions unfold under
+            // delta-reduction, so `Rational.zero` would reduce away;
+            // the user almost always writes the literal name).
+            ExpressionPointer rhsRaw = domainComponents.rightEndpoint;
+            auto* rhsConst = std::get_if<Constant>(&rhsRaw->node);
+            if (!rhsConst || rhsConst->name != context.zeroName) {
+                throwElaborate(
+                    "`field`: hypothesis is not of shape `¬(t = "
+                    + context.zeroName + ")`");
+            }
+            // Locate which recipArg matches.
+            ExpressionPointer baseAtom = domainComponents.leftEndpoint;
+            uint64_t baseHash = baseAtom->hash;
+            // Find recipArg with same hash.
+            size_t matchedIndex = recipArgHashes.size();
+            for (size_t i = 0; i < recipArgHashes.size(); ++i) {
+                if (recipArgHashes[i] == baseHash) {
+                    matchedIndex = i;
+                    break;
+                }
+            }
+            if (matchedIndex == recipArgHashes.size()) {
+                // Hypothesis doesn't correspond to any
+                // reciprocal_function call. Tolerate (ignore).
+                continue;
+            }
+            if (matchedArguments[matchedIndex]) continue;  // duplicate
+            matchedArguments[matchedIndex] = true;
+            // Build the reciprocal_function(t) kernel.
+            ExpressionPointer reciprocalAtom = makeApplication(
+                makeConstant(reciprocalFunctionName), baseAtom);
+            // Build proof `multipliesProof : t * reciprocal_function(t) = 1`.
+            // Call: reciprocal_function_multiplies(t, hypothesisKernel).
+            // Use the opened hypothesis kernel so it composes with the
+            // opened goal terms.
+            ExpressionPointer multipliesProof = makeConstant(
+                reciprocalMultipliesName);
+            multipliesProof = makeApplication(multipliesProof, baseAtom);
+            multipliesProof = makeApplication(multipliesProof,
+                                                hypothesisKernelOpened);
+            FieldReciprocalPair pair;
+            pair.baseAtom = baseAtom;
+            pair.reciprocalAtom = reciprocalAtom;
+            pair.multipliesProof = multipliesProof;
+            pair.baseHash = baseHash;
+            pair.reciprocalHash = reciprocalAtom->hash;
+            pairs.push_back(pair);
+        }
+        // Check we matched all reciprocal_function arguments.
+        for (size_t i = 0; i < recipArgHashes.size(); ++i) {
+            if (!matchedArguments[i]) {
+                throwElaborate(
+                    "`field`: no nonzero hypothesis supplied for one "
+                    "of the `reciprocal_function` arguments — pass a "
+                    "hypothesis `¬(t = " + context.zeroName + ")` for "
+                    "every distinct `t` appearing inside "
+                    "`reciprocal_function(t)` on either side of the "
+                    "goal");
+            }
+        }
+        // Normalize both sides to ring polynomials.
+        RingPolynomial leftPolynomial =
+            normaliseToRingPolynomial(goal.leftEndpoint, context);
+        RingPolynomial rightPolynomial =
+            normaliseToRingPolynomial(goal.rightEndpoint, context);
+        // Make sure that for each (t_i, r_i) pair we have the atoms
+        // registered in the context atom table — they must have been
+        // registered by the normalization above (assuming both atoms
+        // appear in at least one side). Pre-register them here to be safe.
+        for (const auto& p : pairs) {
+            context.atoms.emplace(p.baseHash, p.baseAtom);
+            context.atoms.emplace(p.reciprocalHash, p.reciprocalAtom);
+        }
+        // Contract polynomials.
+        std::vector<FieldMonomialContraction> leftContractionRecords;
+        RingPolynomial leftContracted = buildContractedPolynomial(
+            leftPolynomial, pairs, leftContractionRecords);
+        std::vector<FieldMonomialContraction> rightContractionRecords;
+        RingPolynomial rightContracted = buildContractedPolynomial(
+            rightPolynomial, pairs, rightContractionRecords);
+        if (!ringPolynomialsAgree(leftContracted, rightContracted)) {
+            throwElaborate(
+                "`field`: after clearing reciprocals, the two sides "
+                "still don't agree as polynomials — the goal is not a "
+                "valid field identity (or the hypothesis set is "
+                "insufficient)");
+        }
+        // Coefficient guard: ±1 throughout.
+        for (const auto& entry : leftContracted) {
+            if (entry.second != -1 && entry.second != 1) {
+                throwElaborate(
+                    "`field`: the canonical form has a monomial with "
+                    "coefficient " + std::to_string(entry.second)
+                    + " — the underlying ring v2 only handles "
+                    "coefficients in {-1, +1}");
+            }
+        }
+        for (const auto& entry : leftPolynomial) {
+            if (entry.second != -1 && entry.second != 1) {
+                throwElaborate(
+                    "`field`: the LHS polynomial has a monomial with "
+                    "coefficient " + std::to_string(entry.second)
+                    + " — the underlying ring v2 only handles "
+                    "coefficients in {-1, +1}");
+            }
+        }
+        for (const auto& entry : rightPolynomial) {
+            if (entry.second != -1 && entry.second != 1) {
+                throwElaborate(
+                    "`field`: the RHS polynomial has a monomial with "
+                    "coefficient " + std::to_string(entry.second)
+                    + " — the underlying ring v2 only handles "
+                    "coefficients in {-1, +1}");
+            }
+        }
+        // Resolve axiom names.
+        RingV2AxiomNames axiomNames =
+            resolveRingV2AxiomNames(carrierName);
+        demandAxiomName(axiomNames.addAssociative,
+                          "add_associative", carrierName);
+        demandAxiomName(axiomNames.addCommutative,
+                          "add_commutative", carrierName);
+        demandAxiomName(axiomNames.multiplyAssociative,
+                          "multiply_associative", carrierName);
+        demandAxiomName(axiomNames.multiplyCommutative,
+                          "multiply_commutative", carrierName);
+        // Step 1: LHS = ring-canonical(LHS) via proveEqualsCanonical.
+        RingPolynomial leftPolyOut, rightPolyOut;
+        ExpressionPointer leftRingProof = proveEqualsCanonical(
+            goal.leftEndpoint, context, axiomNames, leftPolyOut);
+        ExpressionPointer rightRingProof = proveEqualsCanonical(
+            goal.rightEndpoint, context, axiomNames, rightPolyOut);
+        ExpressionPointer leftRingCanonical =
+            buildCanonicalPolynomial(leftPolynomial, context);
+        ExpressionPointer rightRingCanonical =
+            buildCanonicalPolynomial(rightPolynomial, context);
+        // Step 2: ring-canonical(LHS) = field-canonical(LHS) via
+        //         buildPolynomialContractionProof.
+        ExpressionPointer leftContractedCanonical =
+            buildCanonicalPolynomial(leftContracted, context);
+        ExpressionPointer rightContractedCanonical =
+            buildCanonicalPolynomial(rightContracted, context);
+        ExpressionPointer leftContractionProof =
+            buildPolynomialContractionProof(
+                leftPolynomial, leftContracted,
+                leftContractionRecords, pairs, context, axiomNames);
+        ExpressionPointer rightContractionProof =
+            buildPolynomialContractionProof(
+                rightPolynomial, rightContracted,
+                rightContractionRecords, pairs, context, axiomNames);
+        // Step 3: field-canonical(LHS) = field-canonical(RHS). The two
+        // canonical kernels must be structurally equal (the polynomials
+        // are equal, and buildCanonicalPolynomial is deterministic).
+        if (!structurallyEqual(leftContractedCanonical,
+                                  rightContractedCanonical)) {
+            throwElaborate(
+                "`field`: field-canonical kernels differ even though "
+                "polynomials agreed (internal error)");
+        }
+        // Step 4: symmetric of step 2 for RHS.
+        ExpressionPointer rightContractionProofSym = buildEqualitySymmetry(
+            goal.carrierUniverseLevel, goal.carrierType,
+            rightRingCanonical, rightContractedCanonical,
+            rightContractionProof);
+        // Step 5: symmetric of step 1 for RHS.
+        ExpressionPointer rightRingProofSym = buildEqualitySymmetry(
+            goal.carrierUniverseLevel, goal.carrierType,
+            goal.rightEndpoint, rightRingCanonical,
+            rightRingProof);
+        // Compose chain: LHS = leftRingCanonical = leftContractedCanonical
+        //   = rightRingCanonical = RHS.
+        ExpressionPointer chain12 = buildEqualityTransitivity(
+            goal.carrierUniverseLevel, goal.carrierType,
+            goal.leftEndpoint, leftRingCanonical,
+            leftContractedCanonical,
+            leftRingProof, leftContractionProof);
+        // leftContractedCanonical and rightContractedCanonical are
+        // structurally equal, so we can chain via either kernel as the
+        // bridge.
+        ExpressionPointer chain1234 = buildEqualityTransitivity(
+            goal.carrierUniverseLevel, goal.carrierType,
+            goal.leftEndpoint, leftContractedCanonical,
+            rightRingCanonical,
+            chain12, rightContractionProofSym);
+        ExpressionPointer chain12345 = buildEqualityTransitivity(
+            goal.carrierUniverseLevel, goal.carrierType,
+            goal.leftEndpoint, rightRingCanonical, goal.rightEndpoint,
+            chain1234, rightRingProofSym);
+        // The proof is built in OPENED form (over local-binder
+        // FreeVariables). Close it before returning so the caller's
+        // BoundVariable-form expectedType matches.
+        return closeOverLocalBinders(
+            chain12345, localBinders, localBinders.size());
     }
 
     // `sorry` — desugars to either `Internal.sorry_proposition(<P>)`

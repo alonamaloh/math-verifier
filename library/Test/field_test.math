@@ -1,0 +1,72 @@
+-- Test the `field` tactic — extends ring v2 with handling for
+-- `Rational.reciprocal_function` (and any other carrier's
+-- `reciprocal_function` + `reciprocal_function_multiplies`).
+
+module Test.field_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.order_multiplication
+import Rational.reciprocal_function
+
+-- (1) Headline test: `1/a - 1/b = (b - a) * (1/a * 1/b)`.
+theorem field_reciprocal_subtract (a b : Rational)
+        (aNonzero : ¬(a = Rational.zero))
+        (bNonzero : ¬(b = Rational.zero))
+        : Rational.reciprocal_function(a) - Rational.reciprocal_function(b)
+          = (b - a) * (Rational.reciprocal_function(a)
+                       * Rational.reciprocal_function(b))
+  := field(aNonzero, bNonzero)
+
+-- (2) Symmetric form: order of hypotheses doesn't matter.
+theorem field_reciprocal_subtract_swapped (a b : Rational)
+        (aNonzero : ¬(a = Rational.zero))
+        (bNonzero : ¬(b = Rational.zero))
+        : Rational.reciprocal_function(a) - Rational.reciprocal_function(b)
+          = (b - a) * (Rational.reciprocal_function(a)
+                       * Rational.reciprocal_function(b))
+  := field(bNonzero, aNonzero)
+
+-- (3) Single-reciprocal identity: `a * (1/a) = 1`.
+theorem field_simple_cancel (a : Rational)
+        (aNonzero : ¬(a = Rational.zero))
+        : a * Rational.reciprocal_function(a) = Rational.one
+  := field(aNonzero)
+
+-- (4) Commuted single-reciprocal: `(1/a) * a = 1`.
+theorem field_simple_cancel_swapped (a : Rational)
+        (aNonzero : ¬(a = Rational.zero))
+        : Rational.reciprocal_function(a) * a = Rational.one
+  := field(aNonzero)
+
+-- (5) Sum of fractions: `(1/a) + (1/b) = (a + b) * (1/a * 1/b)`.
+theorem field_sum_of_fractions (a b : Rational)
+        (aNonzero : ¬(a = Rational.zero))
+        (bNonzero : ¬(b = Rational.zero))
+        : Rational.reciprocal_function(a) + Rational.reciprocal_function(b)
+          = (a + b) * (Rational.reciprocal_function(a)
+                       * Rational.reciprocal_function(b))
+  := field(aNonzero, bNonzero)
+
+-- (6) Double reciprocal cancels with a square: `a * a * (1/a) * (1/a) = 1`.
+theorem field_square_cancel (a : Rational)
+        (aNonzero : ¬(a = Rational.zero))
+        : a * a * Rational.reciprocal_function(a)
+              * Rational.reciprocal_function(a) = Rational.one
+  := field(aNonzero)
+
+-- (7) Fraction times its denominator equals the numerator:
+-- `(x * (1/a)) * a = x`.
+theorem field_clear_fraction (x a : Rational)
+        (aNonzero : ¬(a = Rational.zero))
+        : (x * Rational.reciprocal_function(a)) * a = x
+  := field(aNonzero)

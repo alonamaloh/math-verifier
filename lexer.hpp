@@ -42,6 +42,7 @@ enum class TokenKind {
     KeywordSet,             // `set n := E;` — transparent local definition
     KeywordSorry,           // `sorry` — placeholder for an unwritten proof
     KeywordRing,            // `ring` — commutative-ring decision tactic
+    KeywordField,           // `field` — field decision tactic (ring + reciprocal_function)
     KeywordConvention,      // `convention p : T with H` — name-bound implicit binder
     KeywordGiven,           // `given (P)` — look up the in-scope hypothesis of type P
     KeywordAs,              // `in (P) as h:` — name the arm's disjunct hypothesis
