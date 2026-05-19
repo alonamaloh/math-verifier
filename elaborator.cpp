@@ -6541,6 +6541,7 @@ private:
         std::string addName;                // "<carrier>.add"
         std::string multiplyName;           // "<carrier>.multiply"
         std::string negateName;             // "<carrier>.negate"
+        std::string subtractName;           // "<carrier>.subtract"
         std::string zeroName;               // "<carrier>.zero"
         std::string oneName;                // "<carrier>.one"
 
@@ -6732,6 +6733,19 @@ private:
                 normaliseToRingPolynomial(right, context);
             return ringPolynomialMultiply(
                 leftPolynomial, rightPolynomial);
+        }
+        // subtract — recurse + subtract. The carrier's `subtract` is
+        // defined as `x + -y`, so this is delta-equivalent to the
+        // add/negate path; we handle it directly so the surface syntax
+        // `a - b` works without the user having to expand it.
+        if (matchBinaryRingOp(expression, context.subtractName,
+                                 left, right)) {
+            RingPolynomial leftPolynomial =
+                normaliseToRingPolynomial(left, context);
+            RingPolynomial rightPolynomial =
+                normaliseToRingPolynomial(right, context);
+            ringPolynomialSubtract(leftPolynomial, rightPolynomial);
+            return leftPolynomial;
         }
         // negate — recurse + flip.
         ExpressionPointer inner;
@@ -7154,6 +7168,32 @@ private:
                     canonicalNegated,
                     congrProof, mergeProof);
                 return fullProof;
+            }
+        }
+        // Match subtract(left, right) — bridge to add(left, negate(right))
+        // via reflexivity (the carrier's `subtract` is defined as
+        // `x + -y`, so the kernel collapses them under δ).
+        {
+            ExpressionPointer left, right;
+            if (matchBinaryRingOp(expression, context.subtractName,
+                                     left, right)) {
+                ExpressionPointer equivalent = buildRingOp(
+                    context.addName,
+                    left,
+                    buildRingNegate(context.negateName, right));
+                ExpressionPointer equivalentProof =
+                    proveEqualsCanonical(
+                        equivalent, context, axiomNames,
+                        polynomialOut);
+                ExpressionPointer canonical =
+                    buildCanonicalPolynomial(polynomialOut, context);
+                ExpressionPointer bridge =
+                    buildReflexivity(universeLevel, carrierType,
+                                       expression);
+                return buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    expression, equivalent, canonical,
+                    bridge, equivalentProof);
             }
         }
         // Match add(left, right).
@@ -8858,6 +8898,7 @@ private:
         context.addName       = carrierName + ".add";
         context.multiplyName  = carrierName + ".multiply";
         context.negateName    = carrierName + ".negate";
+        context.subtractName  = carrierName + ".subtract";
         context.zeroName      = carrierName + ".zero";
         context.oneName       = carrierName + ".one";
         // Sanity-check the carrier supports the v2 vocabulary. We only
