@@ -475,3 +475,542 @@ definition Rational.reciprocal_at_integer
       Rational.reciprocal_at_integer_rep_respect(denominatorPredecessor),
       integerNumerator)
 
+-- ----------------------------------------------------------------------
+-- Multiplication-cancels at the integer level: for non-zero `n`,
+-- mk(make(n, d)) * reciprocal_at_integer(n, d) = Rational.one. Sign-
+-- splits `n` via Integer.sign_split; the positive branch reuses
+-- StrictPositiveRational.reciprocal_multiplied, the negative branch
+-- carries the explicit negate-cancellation calc.
+
+theorem Rational.reciprocal_at_integer_multiplies
+        (n : Integer) (denominatorPredecessor : Natural)
+        (mkNonzero
+            : ¬((Quotient.mk(
+                     RationalRepresentative.make(n, denominatorPredecessor))
+                     : Rational)
+                    = Rational.zero))
+        : (Quotient.mk(
+               RationalRepresentative.make(n, denominatorPredecessor))
+               : Rational)
+            * Rational.reciprocal_at_integer(n, denominatorPredecessor)
+          = Rational.one := {
+    claim Integer.IsNonneg(n) ∨ (∃ (k : Natural). n = -(k : Integer))
+        by Integer.sign_split(n)
+    claim by cases {
+      in (Integer.IsNonneg(n)) as nIsNonneg: {
+          obtain ⟨a, nIsImage⟩ from nIsNonneg;
+          (cases a {
+             | zero =>
+                 function (refinedHypothesis : n = (zero : Integer)) =>
+                   -- n = (zero : I) = Integer.zero, so mk(make(n, d)) = Rational.zero,
+                   -- contradicting mkNonzero.
+                   absurd(mkNonzero(
+                              calc (Quotient.mk(
+                                       RationalRepresentative.make(
+                                           n, denominatorPredecessor))
+                                       : Rational)
+                                 = Quotient.mk(
+                                       RationalRepresentative.make(
+                                           (zero : Integer),
+                                           denominatorPredecessor))
+                                        by congruenceOf(
+                                               function (m : Integer) =>
+                                                   (Quotient.mk(
+                                                        RationalRepresentative.make(
+                                                            m,
+                                                            denominatorPredecessor))
+                                                        : Rational),
+                                               refinedHypothesis)
+                                 = Quotient.mk(
+                                       RationalRepresentative.make(
+                                           Integer.zero,
+                                           denominatorPredecessor))
+                                 = Rational.zero
+                                        by Rational.mk_zero_numerator_is_zero(
+                                               denominatorPredecessor)))
+             | successor(predecessor) =>
+                 function (refinedHypothesis
+                              : n = (successor(predecessor) : Integer)) =>
+                   -- n = succ(predecessor) : I. Chain through congruence
+                   -- on both factors, then StrictPositive multiplication.
+                   calc (Quotient.mk(
+                             RationalRepresentative.make(
+                                 n, denominatorPredecessor))
+                             : Rational)
+                            * Rational.reciprocal_at_integer(
+                                  n, denominatorPredecessor)
+                      = (Quotient.mk(
+                             RationalRepresentative.make(
+                                 (successor(predecessor) : Integer),
+                                 denominatorPredecessor))
+                             : Rational)
+                            * Rational.reciprocal_at_integer(
+                                  (successor(predecessor) : Integer),
+                                  denominatorPredecessor)
+                             by congruenceOf(
+                                    function (m : Integer) =>
+                                        (Quotient.mk(
+                                             RationalRepresentative.make(
+                                                 m,
+                                                 denominatorPredecessor))
+                                             : Rational)
+                                        * Rational.reciprocal_at_integer(
+                                              m,
+                                              denominatorPredecessor),
+                                    refinedHypothesis)
+                      = Rational.one
+                             by StrictPositiveRational.reciprocal_multiplied(
+                                    StrictPositiveRational.make(
+                                        predecessor,
+                                        denominatorPredecessor))
+           } : (refinedHypothesis : n = (a : Integer))
+               → (Quotient.mk(
+                      RationalRepresentative.make(
+                          n, denominatorPredecessor))
+                      : Rational)
+                   * Rational.reciprocal_at_integer(
+                         n, denominatorPredecessor)
+                 = Rational.one)(nIsImage)
+      }
+      in (∃ (k : Natural). n = -(k : Integer)) as nIsNegated: {
+          obtain ⟨a, nIsNegatedImage⟩ from nIsNegated;
+          (cases a {
+             | zero =>
+                 function (refinedHypothesis : n = -(zero : Integer)) =>
+                   -- n = -(zero : I) = -Integer.zero. mk(make(n, d))
+                   -- is Rational.zero — contradiction.
+                   absurd(mkNonzero(
+                              calc (Quotient.mk(
+                                       RationalRepresentative.make(
+                                           n, denominatorPredecessor))
+                                       : Rational)
+                                 = Quotient.mk(
+                                       RationalRepresentative.make(
+                                           -(zero : Integer),
+                                           denominatorPredecessor))
+                                        by congruenceOf(
+                                               function (m : Integer) =>
+                                                   (Quotient.mk(
+                                                        RationalRepresentative.make(
+                                                            m,
+                                                            denominatorPredecessor))
+                                                        : Rational),
+                                               refinedHypothesis)
+                                 = Quotient.mk(
+                                       RationalRepresentative.make(
+                                           Integer.zero,
+                                           denominatorPredecessor))
+                                        by reflexivity(
+                                               Rational,
+                                               (Quotient.mk(
+                                                    RationalRepresentative.make(
+                                                        Integer.zero,
+                                                        denominatorPredecessor))
+                                                : Rational))
+                                 = Rational.zero
+                                        by Rational.mk_zero_numerator_is_zero(
+                                               denominatorPredecessor)))
+             | successor(predecessor) =>
+                 function (refinedHypothesis
+                              : n = -(successor(predecessor) : Integer)) =>
+                   -- n = -(succ(predecessor) : I). Chain congruence on n,
+                   -- then the negate-cancellation Quotient.sound calc.
+                   calc (Quotient.mk(
+                             RationalRepresentative.make(
+                                 n, denominatorPredecessor))
+                             : Rational)
+                            * Rational.reciprocal_at_integer(
+                                  n, denominatorPredecessor)
+                      = (Quotient.mk(
+                             RationalRepresentative.make(
+                                 -(successor(predecessor) : Integer),
+                                 denominatorPredecessor))
+                             : Rational)
+                            * Rational.reciprocal_at_integer(
+                                  -(successor(predecessor) : Integer),
+                                  denominatorPredecessor)
+                             by congruenceOf(
+                                    function (m : Integer) =>
+                                        (Quotient.mk(
+                                             RationalRepresentative.make(
+                                                 m,
+                                                 denominatorPredecessor))
+                                             : Rational)
+                                        * Rational.reciprocal_at_integer(
+                                              m,
+                                              denominatorPredecessor),
+                                    refinedHypothesis)
+                      = Rational.one
+                             by Quotient.sound(
+                           RationalRepresentative, RationalEquivalent,
+                           RationalRepresentative.make(
+                               -(successor(predecessor) : Integer)
+                                   * -(successor(denominatorPredecessor) : Integer),
+                               predecessor
+                                   + denominatorPredecessor
+                                     * successor(predecessor)),
+                           RationalRepresentative.make(Integer.one, zero),
+                           calc -(successor(predecessor) : Integer)
+                                    * -(successor(denominatorPredecessor) : Integer)
+                                    * (successor(zero) : Integer)
+                              = -(successor(predecessor) : Integer)
+                                    * -(successor(denominatorPredecessor) : Integer)
+                                   by Integer.multiply_identity_right(
+                                          -(successor(predecessor) : Integer)
+                                              * -(successor(denominatorPredecessor) : Integer))
+                              = -((successor(predecessor) : Integer)
+                                      * -(successor(denominatorPredecessor) : Integer))
+                                   by Integer.multiply_negate_left(
+                                          (successor(predecessor) : Integer),
+                                          -(successor(denominatorPredecessor) : Integer))
+                              = -(-((successor(predecessor) : Integer)
+                                         * (successor(denominatorPredecessor) : Integer)))
+                                   by congruenceOf(
+                                          Integer.negate,
+                                          Integer.multiply_negate_right(
+                                              (successor(predecessor) : Integer),
+                                              (successor(denominatorPredecessor) : Integer)))
+                              = (successor(predecessor) : Integer)
+                                    * (successor(denominatorPredecessor) : Integer)
+                                   by Integer.negate_negate(
+                                          (successor(predecessor) : Integer)
+                                              * (successor(denominatorPredecessor) : Integer))
+                              = (successor(predecessor)
+                                     * successor(denominatorPredecessor)
+                                     : Integer)
+                                   by Equality.symmetry(
+                                          Natural.to_integer.multiply_preserves(
+                                              successor(predecessor),
+                                              successor(denominatorPredecessor)))
+                              = (successor(predecessor
+                                                + denominatorPredecessor
+                                                  * successor(predecessor))
+                                     : Integer)
+                                   by congruenceOf(
+                                          Natural.to_integer,
+                                          calc successor(predecessor)
+                                                   * successor(denominatorPredecessor)
+                                             = successor(predecessor)
+                                                 + successor(predecessor)
+                                                   * denominatorPredecessor
+                                             = successor(predecessor)
+                                                 + denominatorPredecessor
+                                                   * successor(predecessor)
+                                             = successor(
+                                                   predecessor
+                                                   + denominatorPredecessor
+                                                     * successor(predecessor)))
+                              = Integer.one
+                                    * (successor(predecessor
+                                                     + denominatorPredecessor
+                                                       * successor(predecessor))
+                                        : Integer)
+                                   by Equality.symmetry(
+                                          Integer.multiply_identity_left(
+                                              (successor(predecessor
+                                                             + denominatorPredecessor
+                                                               * successor(predecessor))
+                                                : Integer))))
+           } : (refinedHypothesis : n = -(a : Integer))
+               → (Quotient.mk(
+                      RationalRepresentative.make(
+                          n, denominatorPredecessor))
+                      : Rational)
+                   * Rational.reciprocal_at_integer(
+                         n, denominatorPredecessor)
+                 = Rational.one)(nIsNegatedImage)
+      }
+    }
+}
+
+-- ----------------------------------------------------------------------
+-- mk(make(n, d)) = Rational.zero ↔ n = Integer.zero. The forward
+-- direction is via Quotient.exact: equivalence becomes
+-- `n * succ(zero) = Integer.zero * succ(d)`, which reduces to
+-- n = Integer.zero on the LHS and Integer.zero on the RHS.
+
+theorem Rational.mk_zero_implies_integer_zero
+        (n : Integer) (denominatorPredecessor : Natural)
+        (mkIsZero
+            : (Quotient.mk(
+                   RationalRepresentative.make(n, denominatorPredecessor))
+                   : Rational)
+                = Rational.zero)
+        : n = Integer.zero := {
+    claim crossEquation
+          : n * (successor(zero) : Integer)
+            = Integer.zero * (successor(denominatorPredecessor) : Integer)
+        by Quotient.exact(
+               RationalRepresentative, RationalEquivalent,
+               RationalEquivalent.reflexive,
+               RationalEquivalent.symmetric,
+               RationalEquivalent.transitive,
+               RationalRepresentative.make(n, denominatorPredecessor),
+               RationalRepresentative.make(Integer.zero, zero),
+               mkIsZero);
+    calc n
+       = n * Integer.one
+              by Equality.symmetry(Integer.multiply_identity_right(n))
+       = n * (successor(zero) : Integer)
+       = Integer.zero
+                * (successor(denominatorPredecessor) : Integer)
+              by crossEquation
+       = Integer.zero
+              by Integer.multiply_zero_left(
+                     (successor(denominatorPredecessor) : Integer))
+}
+
+-- ----------------------------------------------------------------------
+-- reciprocal_at_integer(Integer.zero, d) = Rational.zero. Reduces
+-- definitionally to reciprocal_at_natural_pair(zero, zero, d) =
+-- Rational.zero by the lift's iota.
+theorem Rational.reciprocal_at_integer_zero
+        (denominatorPredecessor : Natural)
+        : Rational.reciprocal_at_integer(
+              Integer.zero, denominatorPredecessor)
+          = Rational.zero :=
+  reflexivity(Rational, Rational.zero)
+
+-- ----------------------------------------------------------------------
+-- The rep-level shim: just defers to reciprocal_at_integer.
+definition Rational.reciprocal_function_at_rational_rep
+        : RationalRepresentative → Rational
+  | RationalRepresentative.make(numerator, denominatorPredecessor) =>
+      Rational.reciprocal_at_integer(numerator, denominatorPredecessor)
+
+-- ----------------------------------------------------------------------
+-- Respect at the rational-rep level. Multi-pattern destructures both
+-- reps to expose (n, d). Case-splits on whether mk(make(n1, d1)) is
+-- Rational.zero; the zero branch reduces both reciprocals to
+-- Rational.zero by the helpers above; the non-zero branch uses
+-- uniqueness of multiplicative inverse via reciprocal_at_integer_multiplies.
+
+theorem Rational.reciprocal_function_at_rational_rep_respect
+        : (firstRep secondRep : RationalRepresentative)
+          → RationalEquivalent(firstRep, secondRep)
+          → Rational.reciprocal_function_at_rational_rep(firstRep)
+            = Rational.reciprocal_function_at_rational_rep(secondRep)
+  | RationalRepresentative.make(n1, d1),
+    RationalRepresentative.make(n2, d2),
+    equivalenceHypothesis =>
+      Or.eliminate(
+          (Quotient.mk(RationalRepresentative.make(n1, d1)) : Rational)
+              = Rational.zero,
+          ¬((Quotient.mk(RationalRepresentative.make(n1, d1)) : Rational)
+                = Rational.zero),
+          Rational.reciprocal_at_integer(n1, d1)
+              = Rational.reciprocal_at_integer(n2, d2),
+          -- Zero branch: both reciprocals reduce to Rational.zero.
+          function (mkFirstIsZero
+                        : (Quotient.mk(RationalRepresentative.make(n1, d1))
+                               : Rational)
+                            = Rational.zero) => {
+            claim n1IsZero : n1 = Integer.zero
+              by Rational.mk_zero_implies_integer_zero(
+                     n1, d1, mkFirstIsZero);
+            claim mkSecondIsZero
+                  : (Quotient.mk(RationalRepresentative.make(n2, d2))
+                         : Rational)
+                      = Rational.zero
+              by Equality.transitivity(
+                     Rational,
+                     (Quotient.mk(RationalRepresentative.make(n2, d2))
+                          : Rational),
+                     (Quotient.mk(RationalRepresentative.make(n1, d1))
+                          : Rational),
+                     Rational.zero,
+                     Equality.symmetry(
+                         Quotient.sound(
+                             RationalRepresentative, RationalEquivalent,
+                             RationalRepresentative.make(n1, d1),
+                             RationalRepresentative.make(n2, d2),
+                             equivalenceHypothesis)),
+                     mkFirstIsZero);
+            claim n2IsZero : n2 = Integer.zero
+              by Rational.mk_zero_implies_integer_zero(
+                     n2, d2, mkSecondIsZero);
+            calc Rational.reciprocal_at_integer(n1, d1)
+               = Rational.reciprocal_at_integer(Integer.zero, d1)
+                      by congruenceOf(
+                             function (m : Integer) =>
+                                 Rational.reciprocal_at_integer(m, d1),
+                             n1IsZero)
+               = Rational.zero
+                      by Rational.reciprocal_at_integer_zero(d1)
+               = Rational.reciprocal_at_integer(Integer.zero, d2)
+                      by Equality.symmetry(
+                             Rational.reciprocal_at_integer_zero(d2))
+               = Rational.reciprocal_at_integer(n2, d2)
+                      by congruenceOf(
+                             function (m : Integer) =>
+                                 Rational.reciprocal_at_integer(m, d2),
+                             Equality.symmetry(n2IsZero))
+          },
+          -- Non-zero branch: uniqueness of inverse via multiplication.
+          function (mkFirstIsNonzero
+                        : ¬((Quotient.mk(
+                                 RationalRepresentative.make(n1, d1))
+                                 : Rational)
+                                = Rational.zero)) => {
+            -- Build mkSecondIsNonzero from equivalence.
+            claim mkSecondIsNonzero
+                  : ¬((Quotient.mk(
+                           RationalRepresentative.make(n2, d2))
+                           : Rational)
+                          = Rational.zero)
+              by function (mkSecondIsZero
+                               : (Quotient.mk(
+                                      RationalRepresentative.make(n2, d2))
+                                      : Rational)
+                                   = Rational.zero) =>
+                   mkFirstIsNonzero(
+                       Equality.transitivity(
+                           Rational,
+                           (Quotient.mk(
+                                RationalRepresentative.make(n1, d1))
+                                : Rational),
+                           (Quotient.mk(
+                                RationalRepresentative.make(n2, d2))
+                                : Rational),
+                           Rational.zero,
+                           Quotient.sound(
+                               RationalRepresentative, RationalEquivalent,
+                               RationalRepresentative.make(n1, d1),
+                               RationalRepresentative.make(n2, d2),
+                               equivalenceHypothesis),
+                           mkSecondIsZero));
+            claim firstMultiplies
+                  : (Quotient.mk(RationalRepresentative.make(n1, d1))
+                         : Rational)
+                      * Rational.reciprocal_at_integer(n1, d1)
+                    = Rational.one
+              by Rational.reciprocal_at_integer_multiplies(
+                     n1, d1, mkFirstIsNonzero);
+            claim secondMultiplies
+                  : (Quotient.mk(RationalRepresentative.make(n2, d2))
+                         : Rational)
+                      * Rational.reciprocal_at_integer(n2, d2)
+                    = Rational.one
+              by Rational.reciprocal_at_integer_multiplies(
+                     n2, d2, mkSecondIsNonzero);
+            claim mksEqual
+                  : (Quotient.mk(RationalRepresentative.make(n1, d1))
+                         : Rational)
+                    = (Quotient.mk(RationalRepresentative.make(n2, d2))
+                           : Rational)
+              by Quotient.sound(
+                     RationalRepresentative, RationalEquivalent,
+                     RationalRepresentative.make(n1, d1),
+                     RationalRepresentative.make(n2, d2),
+                     equivalenceHypothesis);
+            -- Uniqueness chain:
+            -- reciprocal(n1, d1)
+            --   = 1 * reciprocal(n1, d1)
+            --   = (mk2 * reciprocal(n2, d2)) * reciprocal(n1, d1)
+            --   = (mk1 * reciprocal(n2, d2)) * reciprocal(n1, d1)   [mks equal]
+            --   = reciprocal(n2, d2) * (mk1 * reciprocal(n1, d1))   [comm + assoc]
+            --   = reciprocal(n2, d2) * 1
+            --   = reciprocal(n2, d2)
+            calc Rational.reciprocal_at_integer(n1, d1)
+               = Rational.one * Rational.reciprocal_at_integer(n1, d1)
+                      by Equality.symmetry(
+                             Rational.one_multiply(
+                                 Rational.reciprocal_at_integer(n1, d1)))
+               = ((Quotient.mk(RationalRepresentative.make(n2, d2))
+                       : Rational)
+                       * Rational.reciprocal_at_integer(n2, d2))
+                   * Rational.reciprocal_at_integer(n1, d1)
+                      by congruenceOf(
+                             function (z : Rational) =>
+                                 z * Rational.reciprocal_at_integer(n1, d1),
+                             Equality.symmetry(secondMultiplies))
+               = ((Quotient.mk(RationalRepresentative.make(n1, d1))
+                       : Rational)
+                       * Rational.reciprocal_at_integer(n2, d2))
+                   * Rational.reciprocal_at_integer(n1, d1)
+                      by congruenceOf(
+                             function (z : Rational) =>
+                                 (z * Rational.reciprocal_at_integer(n2, d2))
+                                 * Rational.reciprocal_at_integer(n1, d1),
+                             Equality.symmetry(mksEqual))
+               = Rational.reciprocal_at_integer(n2, d2)
+                   * ((Quotient.mk(RationalRepresentative.make(n1, d1))
+                          : Rational)
+                       * Rational.reciprocal_at_integer(n1, d1))
+                      by (calc ((Quotient.mk(RationalRepresentative.make(n1, d1))
+                                     : Rational)
+                                   * Rational.reciprocal_at_integer(n2, d2))
+                               * Rational.reciprocal_at_integer(n1, d1)
+                             = (Rational.reciprocal_at_integer(n2, d2)
+                                  * (Quotient.mk(RationalRepresentative.make(n1, d1))
+                                         : Rational))
+                               * Rational.reciprocal_at_integer(n1, d1)
+                                    by congruenceOf(
+                                           function (z : Rational) =>
+                                               z * Rational.reciprocal_at_integer(n1, d1),
+                                           Rational.multiply_commutative(
+                                               (Quotient.mk(RationalRepresentative.make(n1, d1))
+                                                    : Rational),
+                                               Rational.reciprocal_at_integer(n2, d2)))
+                             = Rational.reciprocal_at_integer(n2, d2)
+                               * ((Quotient.mk(RationalRepresentative.make(n1, d1))
+                                      : Rational)
+                                   * Rational.reciprocal_at_integer(n1, d1))
+                                    by Rational.multiply_associative(
+                                           Rational.reciprocal_at_integer(n2, d2),
+                                           (Quotient.mk(RationalRepresentative.make(n1, d1))
+                                                : Rational),
+                                           Rational.reciprocal_at_integer(n1, d1)))
+               = Rational.reciprocal_at_integer(n2, d2) * Rational.one
+                      by congruenceOf(
+                             function (z : Rational) =>
+                                 Rational.reciprocal_at_integer(n2, d2) * z,
+                             firstMultiplies)
+               = Rational.reciprocal_at_integer(n2, d2)
+                      by Rational.multiply_one(
+                             Rational.reciprocal_at_integer(n2, d2))
+          },
+          Logic.excluded_middle(
+              (Quotient.mk(RationalRepresentative.make(n1, d1)) : Rational)
+                  = Rational.zero))
+
+-- ----------------------------------------------------------------------
+-- The headline definition: a total Rational → Rational function.
+-- Quotient.lift over the Rational; the body destructures `make(n, d)`
+-- to call reciprocal_at_integer, with the rational-level respect
+-- proof.
+
+definition Rational.reciprocal_function (x : Rational) : Rational :=
+  Quotient.lift(
+      RationalRepresentative, RationalEquivalent, Rational,
+      Rational.reciprocal_function_at_rational_rep,
+      Rational.reciprocal_function_at_rational_rep_respect,
+      x)
+
+-- ----------------------------------------------------------------------
+-- Multiplication correctness: for non-zero x, x * reciprocal_function(x)
+-- = Rational.one. Quotient.induct over x; the rep-level case reduces
+-- to reciprocal_at_integer_multiplies.
+
+theorem Rational.reciprocal_function_multiplies
+        (x : Rational) (xNonzero : ¬(x = Rational.zero))
+        : x * Rational.reciprocal_function(x) = Rational.one :=
+  Quotient.induct(
+      function (xArg : Rational) =>
+          ¬(xArg = Rational.zero)
+            → xArg * Rational.reciprocal_function(xArg) = Rational.one,
+      function (rep : RationalRepresentative) =>
+        (cases rep {
+           | RationalRepresentative.make(n, d) =>
+               function (mkNonzero
+                             : ¬((Quotient.mk(
+                                      RationalRepresentative.make(n, d))
+                                      : Rational)
+                                     = Rational.zero)) =>
+                 Rational.reciprocal_at_integer_multiplies(n, d, mkNonzero)
+         } : ¬((Quotient.mk(rep) : Rational) = Rational.zero)
+             → (Quotient.mk(rep) : Rational)
+                 * Rational.reciprocal_function(Quotient.mk(rep))
+               = Rational.one),
+      x)(xNonzero)
+
