@@ -93,3 +93,154 @@ theorem Group.inverse_involution
             inverse(x), x,
             inverseLeftAxiom(x)))
 }
+
+-- The inverse of the identity is the identity. `op(e, e) = e` by
+-- `identity_left`, then `right_inverse_unique` with a = e, b = e
+-- gives `e = inverse(e)`.
+theorem Group.inverse_identity
+        (carrier : Type(0))
+        (operation : carrier → carrier → carrier)
+        (identity : carrier)
+        (inverse : carrier → carrier)
+        (groupProof : IsGroup(carrier, operation, identity, inverse))
+        : inverse(identity) = identity := {
+    let ⟨monoidProof, _, _⟩ := groupProof;
+    let ⟨_, identityLeft, _⟩ := monoidProof;
+    Equality.symmetry(
+        Group.right_inverse_unique(
+            carrier, operation, identity, inverse, groupProof,
+            identity, identity,
+            identityLeft(identity)))
+}
+
+-- Left cancellation: `op(a, b) = op(a, c)` → `b = c`. Apply
+-- inverse(a) on the left, then collapse via associativity +
+-- inverse_left + identity_left.
+theorem Group.cancel_left
+        (carrier : Type(0))
+        (operation : carrier → carrier → carrier)
+        (identity : carrier)
+        (inverse : carrier → carrier)
+        (groupProof : IsGroup(carrier, operation, identity, inverse))
+        (a b c : carrier)
+        (equation : operation(a, b) = operation(a, c))
+        : b = c := {
+    let ⟨monoidProof, inverseLeftAxiom, _⟩ := groupProof;
+    let ⟨associativity, identityLeft, _⟩ := monoidProof;
+    calc b
+       = operation(identity, b)
+              by Equality.symmetry(identityLeft(b))
+       = operation(operation(inverse(a), a), b)
+              by rewrite(inverseLeftAxiom(a))
+       = operation(inverse(a), operation(a, b))
+              by associativity(inverse(a), a, b)
+       = operation(inverse(a), operation(a, c))
+              by rewrite(equation)
+       = operation(operation(inverse(a), a), c)
+              by Equality.symmetry(associativity(inverse(a), a, c))
+       = operation(identity, c)
+              by rewrite(inverseLeftAxiom(a))
+       = c
+              by identityLeft(c)
+}
+
+-- Right cancellation: `op(b, a) = op(c, a)` → `b = c`. Mirror of
+-- the left version, using `inverse_right` and `identity_right`.
+theorem Group.cancel_right
+        (carrier : Type(0))
+        (operation : carrier → carrier → carrier)
+        (identity : carrier)
+        (inverse : carrier → carrier)
+        (groupProof : IsGroup(carrier, operation, identity, inverse))
+        (a b c : carrier)
+        (equation : operation(b, a) = operation(c, a))
+        : b = c := {
+    let ⟨monoidProof, _, inverseRightAxiom⟩ := groupProof;
+    let ⟨associativity, _, identityRight⟩ := monoidProof;
+    calc b
+       = operation(b, identity)
+              by Equality.symmetry(identityRight(b))
+       = operation(b, operation(a, inverse(a)))
+              by rewrite(inverseRightAxiom(a))
+       = operation(operation(b, a), inverse(a))
+              by Equality.symmetry(associativity(b, a, inverse(a)))
+       = operation(operation(c, a), inverse(a))
+              by rewrite(equation)
+       = operation(c, operation(a, inverse(a)))
+              by associativity(c, a, inverse(a))
+       = operation(c, identity)
+              by rewrite(inverseRightAxiom(a))
+       = c
+              by identityRight(c)
+}
+
+-- `inverse(op(a, b)) = op(inverse(b), inverse(a))`. Standard group
+-- fact: the inverse of a product is the product of the inverses in
+-- reverse order. Apply `right_inverse_unique` to
+-- `op(op(a, b), op(inverse(b), inverse(a))) = identity`, which a
+-- short calc establishes from associativity + inverse axioms.
+theorem Group.inverse_operation
+        (carrier : Type(0))
+        (operation : carrier → carrier → carrier)
+        (identity : carrier)
+        (inverse : carrier → carrier)
+        (groupProof : IsGroup(carrier, operation, identity, inverse))
+        (a b : carrier)
+        : inverse(operation(a, b))
+          = operation(inverse(b), inverse(a)) := {
+    let ⟨monoidProof, _, inverseRightAxiom⟩ := groupProof;
+    let ⟨associativity, identityLeft, _⟩ := monoidProof;
+    Equality.symmetry(
+        Group.right_inverse_unique(
+            carrier, operation, identity, inverse, groupProof,
+            operation(a, b),
+            operation(inverse(b), inverse(a)),
+            calc operation(operation(a, b),
+                            operation(inverse(b), inverse(a)))
+               = operation(a, operation(b,
+                       operation(inverse(b), inverse(a))))
+                      by associativity(a, b,
+                             operation(inverse(b), inverse(a)))
+               = operation(a, operation(operation(b, inverse(b)),
+                                          inverse(a)))
+                      by congruenceOf(
+                             function (z : carrier) =>
+                                 operation(a, z),
+                             Equality.symmetry(
+                                 associativity(b, inverse(b),
+                                                 inverse(a))))
+               = operation(a, operation(identity, inverse(a)))
+                      by congruenceOf(
+                             function (z : carrier) =>
+                                 operation(a, operation(z, inverse(a))),
+                             inverseRightAxiom(b))
+               = operation(a, inverse(a))
+                      by congruenceOf(
+                             function (z : carrier) =>
+                                 operation(a, z),
+                             identityLeft(inverse(a)))
+               = identity
+                      by inverseRightAxiom(a)))
+}
+
+-- In an abelian group, `inverse(op(a, b)) = op(inverse(a), inverse(b))`.
+-- Compose `inverse_operation` with commutativity on the result.
+theorem AbelianGroup.inverse_operation
+        (carrier : Type(0))
+        (operation : carrier → carrier → carrier)
+        (identity : carrier)
+        (inverse : carrier → carrier)
+        (abelianProof
+            : IsAbelianGroup(carrier, operation, identity, inverse))
+        (a b : carrier)
+        : inverse(operation(a, b))
+          = operation(inverse(a), inverse(b)) := {
+    let ⟨groupProof, commutativity⟩ := abelianProof;
+    calc inverse(operation(a, b))
+       = operation(inverse(b), inverse(a))
+              by Group.inverse_operation(
+                     carrier, operation, identity, inverse,
+                     groupProof, a, b)
+       = operation(inverse(a), inverse(b))
+              by commutativity(inverse(b), inverse(a))
+}

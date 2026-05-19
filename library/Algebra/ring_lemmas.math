@@ -1,0 +1,209 @@
+-- Algebra/ring_lemmas.math
+--
+-- Generic lemmas that hold for every ring. Proved once against the
+-- `IsRing` predicate; usable on any specific ring by passing the
+-- corresponding instance proof. Same payoff as `Algebra.group_lemmas`:
+-- a fact like `0 · x = 0` or `(-a) · b = -(a · b)` doesn't need to
+-- be re-proved for Integer, Rational, Real, PAdic.
+
+module Algebra.ring_lemmas
+
+import Logic.basics
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+
+-- ----------------------------------------------------------------------
+-- Zero absorbs multiplication on the left: `multiply(zero, x) = zero`.
+--
+-- Proof: `multiply(zero, x) + multiply(zero, x) = multiply(zero + zero, x)
+-- = multiply(zero, x)`. The additive group cancels `multiply(zero, x)`
+-- against `multiply(zero, x) + multiply(zero, x) = multiply(zero, x) + zero`,
+-- leaving `multiply(zero, x) = zero`.
+theorem Ring.zero_multiply
+        (carrier : Type(0))
+        (add : carrier → carrier → carrier)
+        (zero : carrier)
+        (negate : carrier → carrier)
+        (multiply : carrier → carrier → carrier)
+        (one : carrier)
+        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
+        (x : carrier)
+        : multiply(zero, x) = zero := {
+    let ⟨abelianAdd, _, _, distributivityRight⟩ := ringProof;
+    let ⟨addGroupProof, _⟩ := abelianAdd;
+    let ⟨addMonoidProof, _, _⟩ := addGroupProof;
+    let ⟨_, addIdentityLeft, addIdentityRight⟩ := addMonoidProof;
+    -- (1) multiply(zero, x) + multiply(zero, x) = multiply(zero + zero, x)
+    --                                            = multiply(zero, x).
+    claim absorbingSum
+          : add(multiply(zero, x), multiply(zero, x)) = multiply(zero, x)
+        by calc add(multiply(zero, x), multiply(zero, x))
+              = multiply(add(zero, zero), x)
+                     by Equality.symmetry(
+                            distributivityRight(zero, zero, x))
+              = multiply(zero, x)
+                     by congruenceOf(
+                            function (z : carrier) => multiply(z, x),
+                            addIdentityLeft(zero));
+    -- (2) Same value also equals add(multiply(zero, x), zero) by add_zero.
+    claim secondForm
+          : multiply(zero, x) = add(multiply(zero, x), zero)
+        by Equality.symmetry(addIdentityRight(multiply(zero, x)));
+    -- Combine: add(0·x, 0·x) = add(0·x, 0) ⇒ 0·x = 0 by cancel_left.
+    Group.cancel_left(
+        carrier, add, zero, negate, addGroupProof,
+        multiply(zero, x), multiply(zero, x), zero,
+        Equality.transitivity(
+            carrier,
+            add(multiply(zero, x), multiply(zero, x)),
+            multiply(zero, x),
+            add(multiply(zero, x), zero),
+            absorbingSum,
+            secondForm))
+}
+
+-- Zero absorbs multiplication on the right: `multiply(x, zero) = zero`.
+-- Same proof shape using `distributivity_left`.
+theorem Ring.multiply_zero
+        (carrier : Type(0))
+        (add : carrier → carrier → carrier)
+        (zero : carrier)
+        (negate : carrier → carrier)
+        (multiply : carrier → carrier → carrier)
+        (one : carrier)
+        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
+        (x : carrier)
+        : multiply(x, zero) = zero := {
+    let ⟨abelianAdd, _, distributivityLeft, _⟩ := ringProof;
+    let ⟨addGroupProof, _⟩ := abelianAdd;
+    let ⟨addMonoidProof, _, _⟩ := addGroupProof;
+    let ⟨_, addIdentityLeft, addIdentityRight⟩ := addMonoidProof;
+    claim absorbingSum
+          : add(multiply(x, zero), multiply(x, zero)) = multiply(x, zero)
+        by calc add(multiply(x, zero), multiply(x, zero))
+              = multiply(x, add(zero, zero))
+                     by Equality.symmetry(
+                            distributivityLeft(x, zero, zero))
+              = multiply(x, zero)
+                     by congruenceOf(
+                            function (z : carrier) => multiply(x, z),
+                            addIdentityLeft(zero));
+    claim secondForm
+          : multiply(x, zero) = add(multiply(x, zero), zero)
+        by Equality.symmetry(addIdentityRight(multiply(x, zero)));
+    Group.cancel_left(
+        carrier, add, zero, negate, addGroupProof,
+        multiply(x, zero), multiply(x, zero), zero,
+        Equality.transitivity(
+            carrier,
+            add(multiply(x, zero), multiply(x, zero)),
+            multiply(x, zero),
+            add(multiply(x, zero), zero),
+            absorbingSum,
+            secondForm))
+}
+
+-- `multiply(negate(a), b) = negate(multiply(a, b))`. Recognise
+-- `multiply(negate(a), b)` as the additive inverse of `multiply(a, b)`:
+-- `multiply(negate(a), b) + multiply(a, b) = multiply(negate(a) + a, b)
+-- = multiply(zero, b) = zero`. Then `right_inverse_unique` in the
+-- additive group identifies it with `negate(multiply(a, b))`.
+theorem Ring.multiply_negate_left
+        (carrier : Type(0))
+        (add : carrier → carrier → carrier)
+        (zero : carrier)
+        (negate : carrier → carrier)
+        (multiply : carrier → carrier → carrier)
+        (one : carrier)
+        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
+        (a b : carrier)
+        : multiply(negate(a), b) = negate(multiply(a, b)) := {
+    let ⟨abelianAdd, _, _, distributivityRight⟩ := ringProof;
+    let ⟨addGroupProof, _⟩ := abelianAdd;
+    let ⟨_, inverseLeftAxiom, _⟩ := addGroupProof;
+    -- Show add(multiply(negate(a), b), multiply(a, b)) = zero, then
+    -- left_inverse_unique gives multiply(negate(a), b) = negate(multiply(a, b)).
+    Group.left_inverse_unique(
+        carrier, add, zero, negate, addGroupProof,
+        multiply(a, b), multiply(negate(a), b),
+        calc add(multiply(negate(a), b), multiply(a, b))
+           = multiply(add(negate(a), a), b)
+                  by Equality.symmetry(
+                         distributivityRight(negate(a), a, b))
+           = multiply(zero, b)
+                  by congruenceOf(
+                         function (z : carrier) => multiply(z, b),
+                         inverseLeftAxiom(a))
+           = zero
+                  by Ring.zero_multiply(
+                         carrier, add, zero, negate, multiply, one,
+                         ringProof, b))
+}
+
+-- `multiply(a, negate(b)) = negate(multiply(a, b))`. Mirror of the
+-- left version using `distributivity_left` and `inverse_right`.
+theorem Ring.multiply_negate_right
+        (carrier : Type(0))
+        (add : carrier → carrier → carrier)
+        (zero : carrier)
+        (negate : carrier → carrier)
+        (multiply : carrier → carrier → carrier)
+        (one : carrier)
+        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
+        (a b : carrier)
+        : multiply(a, negate(b)) = negate(multiply(a, b)) := {
+    let ⟨abelianAdd, _, distributivityLeft, _⟩ := ringProof;
+    let ⟨addGroupProof, _⟩ := abelianAdd;
+    let ⟨_, inverseLeftAxiom, _⟩ := addGroupProof;
+    Group.left_inverse_unique(
+        carrier, add, zero, negate, addGroupProof,
+        multiply(a, b), multiply(a, negate(b)),
+        calc add(multiply(a, negate(b)), multiply(a, b))
+           = multiply(a, add(negate(b), b))
+                  by Equality.symmetry(
+                         distributivityLeft(a, negate(b), b))
+           = multiply(a, zero)
+                  by congruenceOf(
+                         function (z : carrier) => multiply(a, z),
+                         inverseLeftAxiom(b))
+           = zero
+                  by Ring.multiply_zero(
+                         carrier, add, zero, negate, multiply, one,
+                         ringProof, a))
+}
+
+-- `multiply(negate(a), negate(b)) = multiply(a, b)`. Apply
+-- `multiply_negate_left` and then `multiply_negate_right` to peel both
+-- negations into a double negation of the product; the additive
+-- inverse is involutive.
+theorem Ring.negate_multiply_negate
+        (carrier : Type(0))
+        (add : carrier → carrier → carrier)
+        (zero : carrier)
+        (negate : carrier → carrier)
+        (multiply : carrier → carrier → carrier)
+        (one : carrier)
+        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
+        (a b : carrier)
+        : multiply(negate(a), negate(b)) = multiply(a, b) := {
+    let ⟨abelianAdd, _, _, _⟩ := ringProof;
+    let ⟨addGroupProof, _⟩ := abelianAdd;
+    calc multiply(negate(a), negate(b))
+       = negate(multiply(a, negate(b)))
+              by Ring.multiply_negate_left(
+                     carrier, add, zero, negate, multiply, one,
+                     ringProof, a, negate(b))
+       = negate(negate(multiply(a, b)))
+              by congruenceOf(
+                     negate,
+                     Ring.multiply_negate_right(
+                         carrier, add, zero, negate, multiply, one,
+                         ringProof, a, b))
+       = multiply(a, b)
+              by Group.inverse_involution(
+                     carrier, add, zero, negate, addGroupProof,
+                     multiply(a, b))
+}
