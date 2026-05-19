@@ -1,0 +1,477 @@
+-- Rational/reciprocal_function.math
+--
+-- A total reciprocal function `Rational → Rational`, with junk
+-- value `Rational.zero` at zero. Correct (i.e., `x · reciprocal(x)
+-- = Rational.one`) for every non-zero input. The function is built
+-- by Natural-pair recursion at the representative level and lifted
+-- to `Rational` via two Quotient.lifts (over the integer numerator,
+-- then over the Rational). The respect proofs use shift-and-reduce
+-- helpers to collapse equivalent natural pairs to a canonical form
+-- (one of `(n, n)`, `(n + succ k, n)`, `(n, n + succ k)`).
+--
+-- This unlocks Real-as-Field: the Real reciprocal Cauchy sequence
+-- builds on a function-typed pointwise reciprocal, which
+-- `Rational.reciprocal_exists_for_nonzero` (propositional ∃)
+-- alone can't provide.
+
+module Rational.reciprocal_function
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.subtraction
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.order
+import Integer.sign
+import Integer.absolute_value
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.absolute_value
+import Rational.reciprocal
+import Rational.field
+
+-- ----------------------------------------------------------------------
+-- Rep-level recursion: the natural-pair reciprocal.
+--
+-- `reciprocal_at_natural_pair(a, b, denominatorPredecessor)` is the
+-- reciprocal of the rational whose representative is `make((a - b : I),
+-- denominatorPredecessor)`. Junk value `Rational.zero` when a = b
+-- (i.e., the rational is zero); positive `mk(make(succ d, k))` when
+-- a > b (= b + succ k); negative `mk(make(-(succ d), k))` when b > a.
+
+definition Rational.reciprocal_at_natural_pair
+        : Natural → Natural → Natural → Rational
+  | zero, b, denominatorPredecessor =>
+      cases b {
+        | zero =>
+            Rational.zero
+        | successor(predecessorB) =>
+            Quotient.mk(
+                RationalRepresentative.make(
+                    -(successor(denominatorPredecessor) : Integer),
+                    predecessorB))
+      }
+  | successor(predecessorA), b, denominatorPredecessor =>
+      cases b {
+        | zero =>
+            Quotient.mk(
+                RationalRepresentative.make(
+                    (successor(denominatorPredecessor) : Integer),
+                    predecessorA))
+        | successor(predecessorB) =>
+            Rational.reciprocal_at_natural_pair(
+                predecessorA, predecessorB, denominatorPredecessor)
+      }
+
+-- ----------------------------------------------------------------------
+-- Three closed-form characterizations: at self, at a positive shift,
+-- and at a negative shift. Each by Natural induction on the leading
+-- argument.
+
+theorem Rational.reciprocal_at_natural_pair_self
+        : (anchorValue denominatorPredecessor : Natural)
+          → Rational.reciprocal_at_natural_pair(
+                anchorValue, anchorValue, denominatorPredecessor)
+            = Rational.zero
+  | zero, _ => reflexivity(Rational, Rational.zero)
+  | successor(predecessor), denominatorPredecessor =>
+      Rational.reciprocal_at_natural_pair_self(
+          predecessor, denominatorPredecessor)
+
+theorem Rational.reciprocal_at_natural_pair_positive_shift
+        : (anchorValue shiftPredecessor denominatorPredecessor : Natural)
+          → Rational.reciprocal_at_natural_pair(
+                anchorValue + successor(shiftPredecessor),
+                anchorValue,
+                denominatorPredecessor)
+            = (Quotient.mk(
+                   RationalRepresentative.make(
+                       (successor(denominatorPredecessor) : Integer),
+                       shiftPredecessor))
+               : Rational)
+  | zero, shiftPredecessor, denominatorPredecessor =>
+      -- a = 0, so a + succ(shiftPred) = succ(shiftPred). The
+      -- pattern reduces to (succ(shiftPred), 0, d), which returns
+      -- mk(make(succ d : I, shiftPred)) by the first nonzero case.
+      reflexivity(
+          Rational,
+          (Quotient.mk(
+               RationalRepresentative.make(
+                   (successor(denominatorPredecessor) : Integer),
+                   shiftPredecessor))
+           : Rational))
+  | successor(predecessor), shiftPredecessor, denominatorPredecessor =>
+      -- (succ(predecessor) + succ(shiftPred), succ(predecessor), d)
+      -- reduces by the recursive case to
+      -- (predecessor + succ(shiftPred), predecessor, d). Apply IH.
+      Rational.reciprocal_at_natural_pair_positive_shift(
+          predecessor, shiftPredecessor, denominatorPredecessor)
+
+theorem Rational.reciprocal_at_natural_pair_negative_shift
+        : (anchorValue shiftPredecessor denominatorPredecessor : Natural)
+          → Rational.reciprocal_at_natural_pair(
+                anchorValue,
+                anchorValue + successor(shiftPredecessor),
+                denominatorPredecessor)
+            = (Quotient.mk(
+                   RationalRepresentative.make(
+                       -(successor(denominatorPredecessor) : Integer),
+                       shiftPredecessor))
+               : Rational)
+  | zero, shiftPredecessor, denominatorPredecessor =>
+      reflexivity(
+          Rational,
+          (Quotient.mk(
+               RationalRepresentative.make(
+                   -(successor(denominatorPredecessor) : Integer),
+                   shiftPredecessor))
+           : Rational))
+  | successor(predecessor), shiftPredecessor, denominatorPredecessor =>
+      Rational.reciprocal_at_natural_pair_negative_shift(
+          predecessor, shiftPredecessor, denominatorPredecessor)
+
+-- ----------------------------------------------------------------------
+-- Respect at the natural-pair level: integer-equivalent pairs give
+-- equal reciprocal values.
+
+theorem Rational.reciprocal_at_natural_pair_respect
+        (firstA firstB secondA secondB denominatorPredecessor : Natural)
+        (equivalenceHypothesis : firstA + secondB = firstB + secondA)
+        : Rational.reciprocal_at_natural_pair(
+              firstA, firstB, denominatorPredecessor)
+          = Rational.reciprocal_at_natural_pair(
+                secondA, secondB, denominatorPredecessor) :=
+  -- Trichotomy on (firstA, firstB) via Natural.totality_of_less_or_equal.
+  Or.eliminate(
+      firstA ≤ firstB, firstB ≤ firstA,
+      Rational.reciprocal_at_natural_pair(
+          firstA, firstB, denominatorPredecessor)
+        = Rational.reciprocal_at_natural_pair(
+              secondA, secondB, denominatorPredecessor),
+      function (firstALeqFirstB : firstA ≤ firstB) => {
+        obtain ⟨gap, firstBEqualsFirstAPlusGap⟩
+            from Natural.subtraction_witness(
+                     firstA, firstB, firstALeqFirstB);
+        -- Case on gap, with the equation firstB = firstA + gap
+        -- refined per branch via the convoy pattern.
+        (cases gap {
+           | zero =>
+               function (refinedFirstBEquation : firstB = firstA + zero) => {
+                 claim firstAEqualsFirstB
+                       : firstA = firstB
+                   by Equality.transitivity(
+                          Natural,
+                          firstA,
+                          firstA + zero,
+                          firstB,
+                          Equality.symmetry(Natural.add_zero(firstA)),
+                          Equality.symmetry(refinedFirstBEquation));
+                 claim secondBEqualsSecondA
+                       : secondB = secondA
+                   by {
+                     claim sumEquation
+                           : firstB + secondB = firstB + secondA
+                       by Equality.transitivity(
+                              Natural,
+                              firstB + secondB,
+                              firstA + secondB,
+                              firstB + secondA,
+                              congruenceOf(
+                                  function (n : Natural) =>
+                                      n + secondB,
+                                  Equality.symmetry(firstAEqualsFirstB)),
+                              equivalenceHypothesis);
+                     Natural.add_cancel_left(
+                         firstB, secondB, secondA, sumEquation)
+                   };
+                 calc Rational.reciprocal_at_natural_pair(
+                          firstA, firstB, denominatorPredecessor)
+                    = Rational.reciprocal_at_natural_pair(
+                          firstB, firstB, denominatorPredecessor)
+                         by congruenceOf(
+                                function (n : Natural) =>
+                                    Rational.reciprocal_at_natural_pair(
+                                        n, firstB, denominatorPredecessor),
+                                firstAEqualsFirstB)
+                    = Rational.zero
+                         by Rational.reciprocal_at_natural_pair_self(
+                                firstB, denominatorPredecessor)
+                    = Rational.reciprocal_at_natural_pair(
+                          secondA, secondA, denominatorPredecessor)
+                         by Equality.symmetry(
+                                Rational.reciprocal_at_natural_pair_self(
+                                    secondA, denominatorPredecessor))
+                    = Rational.reciprocal_at_natural_pair(
+                          secondA, secondB, denominatorPredecessor)
+                         by congruenceOf(
+                                function (n : Natural) =>
+                                    Rational.reciprocal_at_natural_pair(
+                                        secondA, n, denominatorPredecessor),
+                                Equality.symmetry(secondBEqualsSecondA))
+               }
+           | successor(gapPredecessor) =>
+               function (refinedFirstBEquation
+                             : firstB = firstA + successor(gapPredecessor)) => {
+                 claim secondBExpansion
+                       : secondB = secondA + successor(gapPredecessor)
+                   by {
+                     claim sumEquation
+                           : firstA + secondB
+                             = firstA + (secondA + successor(gapPredecessor))
+                       by calc firstA + secondB
+                             = firstB + secondA
+                                  by equivalenceHypothesis
+                             = (firstA + successor(gapPredecessor)) + secondA
+                                  by congruenceOf(
+                                         function (n : Natural) => n + secondA,
+                                         refinedFirstBEquation)
+                             = firstA + (successor(gapPredecessor) + secondA)
+                                  by Natural.add_associative(
+                                         firstA, successor(gapPredecessor),
+                                         secondA)
+                             = firstA + (secondA + successor(gapPredecessor))
+                                  by congruenceOf(
+                                         function (n : Natural) => firstA + n,
+                                         Natural.add_commutative(
+                                             successor(gapPredecessor),
+                                             secondA));
+                     Natural.add_cancel_left(
+                         firstA, secondB,
+                         secondA + successor(gapPredecessor),
+                         sumEquation)
+                   };
+                 calc Rational.reciprocal_at_natural_pair(
+                          firstA, firstB, denominatorPredecessor)
+                    = Rational.reciprocal_at_natural_pair(
+                          firstA, firstA + successor(gapPredecessor),
+                          denominatorPredecessor)
+                         by congruenceOf(
+                                function (n : Natural) =>
+                                    Rational.reciprocal_at_natural_pair(
+                                        firstA, n, denominatorPredecessor),
+                                refinedFirstBEquation)
+                    = (Quotient.mk(
+                           RationalRepresentative.make(
+                               -(successor(denominatorPredecessor) : Integer),
+                               gapPredecessor))
+                       : Rational)
+                         by Rational.reciprocal_at_natural_pair_negative_shift(
+                                firstA, gapPredecessor,
+                                denominatorPredecessor)
+                    = Rational.reciprocal_at_natural_pair(
+                          secondA, secondA + successor(gapPredecessor),
+                          denominatorPredecessor)
+                         by Equality.symmetry(
+                                Rational.reciprocal_at_natural_pair_negative_shift(
+                                    secondA, gapPredecessor,
+                                    denominatorPredecessor))
+                    = Rational.reciprocal_at_natural_pair(
+                          secondA, secondB, denominatorPredecessor)
+                         by congruenceOf(
+                                function (n : Natural) =>
+                                    Rational.reciprocal_at_natural_pair(
+                                        secondA, n, denominatorPredecessor),
+                                Equality.symmetry(secondBExpansion))
+               }
+         } : (refinedFirstBEquation : firstB = firstA + gap)
+             → Rational.reciprocal_at_natural_pair(
+                   firstA, firstB, denominatorPredecessor)
+               = Rational.reciprocal_at_natural_pair(
+                     secondA, secondB, denominatorPredecessor))(
+            firstBEqualsFirstAPlusGap)
+      },
+      function (firstBLeqFirstA : firstB ≤ firstA) => {
+        obtain ⟨gap, firstAEqualsFirstBPlusGap⟩
+            from Natural.subtraction_witness(
+                     firstB, firstA, firstBLeqFirstA);
+        (cases gap {
+           | zero =>
+               function (refinedFirstAEquation : firstA = firstB + zero) => {
+                 claim firstBEqualsFirstA
+                       : firstB = firstA
+                   by Equality.transitivity(
+                          Natural,
+                          firstB,
+                          firstB + zero,
+                          firstA,
+                          Equality.symmetry(Natural.add_zero(firstB)),
+                          Equality.symmetry(refinedFirstAEquation));
+                 claim secondAEqualsSecondB
+                       : secondA = secondB
+                   by {
+                     claim sumEquation
+                           : firstA + secondB = firstA + secondA
+                       by Equality.transitivity(
+                              Natural,
+                              firstA + secondB,
+                              firstB + secondA,
+                              firstA + secondA,
+                              equivalenceHypothesis,
+                              congruenceOf(
+                                  function (n : Natural) => n + secondA,
+                                  firstBEqualsFirstA));
+                     Equality.symmetry(
+                         Natural.add_cancel_left(
+                             firstA, secondB, secondA, sumEquation))
+                   };
+                 calc Rational.reciprocal_at_natural_pair(
+                          firstA, firstB, denominatorPredecessor)
+                    = Rational.reciprocal_at_natural_pair(
+                          firstA, firstA, denominatorPredecessor)
+                         by congruenceOf(
+                                function (n : Natural) =>
+                                    Rational.reciprocal_at_natural_pair(
+                                        firstA, n, denominatorPredecessor),
+                                firstBEqualsFirstA)
+                    = Rational.zero
+                         by Rational.reciprocal_at_natural_pair_self(
+                                firstA, denominatorPredecessor)
+                    = Rational.reciprocal_at_natural_pair(
+                          secondB, secondB, denominatorPredecessor)
+                         by Equality.symmetry(
+                                Rational.reciprocal_at_natural_pair_self(
+                                    secondB, denominatorPredecessor))
+                    = Rational.reciprocal_at_natural_pair(
+                          secondA, secondB, denominatorPredecessor)
+                         by congruenceOf(
+                                function (n : Natural) =>
+                                    Rational.reciprocal_at_natural_pair(
+                                        n, secondB, denominatorPredecessor),
+                                Equality.symmetry(secondAEqualsSecondB))
+               }
+           | successor(gapPredecessor) =>
+               function (refinedFirstAEquation
+                             : firstA = firstB + successor(gapPredecessor)) => {
+                 claim secondAExpansion
+                       : secondA = secondB + successor(gapPredecessor)
+                   by {
+                     claim sumEquation
+                           : firstB + secondA
+                             = firstB + (secondB + successor(gapPredecessor))
+                       by calc firstB + secondA
+                             = firstA + secondB
+                                  by Equality.symmetry(
+                                         equivalenceHypothesis)
+                             = (firstB + successor(gapPredecessor)) + secondB
+                                  by congruenceOf(
+                                         function (n : Natural) => n + secondB,
+                                         refinedFirstAEquation)
+                             = firstB + (successor(gapPredecessor) + secondB)
+                                  by Natural.add_associative(
+                                         firstB, successor(gapPredecessor),
+                                         secondB)
+                             = firstB + (secondB + successor(gapPredecessor))
+                                  by congruenceOf(
+                                         function (n : Natural) => firstB + n,
+                                         Natural.add_commutative(
+                                             successor(gapPredecessor),
+                                             secondB));
+                     Natural.add_cancel_left(
+                         firstB, secondA,
+                         secondB + successor(gapPredecessor),
+                         sumEquation)
+                   };
+                 calc Rational.reciprocal_at_natural_pair(
+                          firstA, firstB, denominatorPredecessor)
+                    = Rational.reciprocal_at_natural_pair(
+                          firstB + successor(gapPredecessor), firstB,
+                          denominatorPredecessor)
+                         by congruenceOf(
+                                function (n : Natural) =>
+                                    Rational.reciprocal_at_natural_pair(
+                                        n, firstB, denominatorPredecessor),
+                                refinedFirstAEquation)
+                    = (Quotient.mk(
+                           RationalRepresentative.make(
+                               (successor(denominatorPredecessor) : Integer),
+                               gapPredecessor))
+                       : Rational)
+                         by Rational.reciprocal_at_natural_pair_positive_shift(
+                                firstB, gapPredecessor,
+                                denominatorPredecessor)
+                    = Rational.reciprocal_at_natural_pair(
+                          secondB + successor(gapPredecessor), secondB,
+                          denominatorPredecessor)
+                         by Equality.symmetry(
+                                Rational.reciprocal_at_natural_pair_positive_shift(
+                                    secondB, gapPredecessor,
+                                    denominatorPredecessor))
+                    = Rational.reciprocal_at_natural_pair(
+                          secondA, secondB, denominatorPredecessor)
+                         by congruenceOf(
+                                function (n : Natural) =>
+                                    Rational.reciprocal_at_natural_pair(
+                                        n, secondB, denominatorPredecessor),
+                                Equality.symmetry(secondAExpansion))
+               }
+         } : (refinedFirstAEquation : firstA = firstB + gap)
+             → Rational.reciprocal_at_natural_pair(
+                   firstA, firstB, denominatorPredecessor)
+               = Rational.reciprocal_at_natural_pair(
+                     secondA, secondB, denominatorPredecessor))(
+            firstAEqualsFirstBPlusGap)
+      },
+      Natural.totality_of_less_or_equal(firstA, firstB))
+
+-- ----------------------------------------------------------------------
+-- Integer-rep level reciprocal: case-analyzes the integer rep to
+-- the underlying natural pair.
+definition Rational.reciprocal_at_integer_rep
+        (denominatorPredecessor : Natural)
+        : IntegerRepresentative → Rational
+  | IntegerRepresentative.make(numeratorPositive, numeratorNegative) =>
+      Rational.reciprocal_at_natural_pair(
+          numeratorPositive, numeratorNegative,
+          denominatorPredecessor)
+
+-- Respect at the integer-rep level. Multi-pattern destructures both
+-- reps to expose the natural pairs, then defers to the natural-pair
+-- respect proof.
+theorem Rational.reciprocal_at_integer_rep_respect
+        (denominatorPredecessor : Natural)
+        : (firstRepresentative secondRepresentative
+              : IntegerRepresentative)
+          → IntegerEquivalent(firstRepresentative,
+                                secondRepresentative)
+          → Rational.reciprocal_at_integer_rep(
+                denominatorPredecessor, firstRepresentative)
+            = Rational.reciprocal_at_integer_rep(
+                  denominatorPredecessor, secondRepresentative)
+  | IntegerRepresentative.make(firstA, firstB),
+    IntegerRepresentative.make(secondA, secondB),
+    equationFirstASecondB =>
+      Rational.reciprocal_at_natural_pair_respect(
+          firstA, firstB, secondA, secondB,
+          denominatorPredecessor,
+          equationFirstASecondB)
+
+-- ----------------------------------------------------------------------
+-- Lift over the integer numerator: `Rational.reciprocal_at_integer(n,
+-- denominatorPredecessor)` produces the reciprocal as a Rational. Uses
+-- the natural-pair function plus the natural-pair respect proof.
+
+definition Rational.reciprocal_at_integer
+        (integerNumerator : Integer) (denominatorPredecessor : Natural)
+        : Rational :=
+  Quotient.lift(
+      IntegerRepresentative, IntegerEquivalent, Rational,
+      Rational.reciprocal_at_integer_rep(denominatorPredecessor),
+      Rational.reciprocal_at_integer_rep_respect(denominatorPredecessor),
+      integerNumerator)
+
