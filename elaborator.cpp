@@ -138,11 +138,31 @@ private:
     // before any non-trivial elaboration step; the destructor will run
     // even on exception unwinding, so we don't need explicit pops.
 
+    // Each context frame records what the elaborator was doing AND, when
+    // the caller can supply them, the proof context (local binders) and
+    // the goal (expected type) at the point the frame was pushed.
+    // Errors dump both alongside the breadcrumb so the user sees both
+    // "where" and "what was being proved" at every level of the stack.
+    struct FrameSnapshot {
+        std::string description;
+        std::vector<LocalBinder> contextSnapshot;  // copy at push time
+        ExpressionPointer expectedType;             // may be null
+    };
+
     struct Frame {
         Elaborator& elaborator;
         Frame(Elaborator& target, std::string description)
             : elaborator(target) {
-            elaborator.contextFrames_.push_back(std::move(description));
+            elaborator.contextFrames_.push_back(
+                FrameSnapshot{std::move(description), {}, nullptr});
+        }
+        Frame(Elaborator& target, std::string description,
+              const std::vector<LocalBinder>& localBinders,
+              ExpressionPointer expectedType)
+            : elaborator(target) {
+            elaborator.contextFrames_.push_back(
+                FrameSnapshot{std::move(description),
+                               localBinders, expectedType});
         }
         ~Frame() { elaborator.contextFrames_.pop_back(); }
         Frame(const Frame&) = delete;
@@ -249,11 +269,50 @@ private:
         // Most-recent frame first (innermost work), then progressively
         // outer frames. Each frame on its own line indented under the
         // last so the breadcrumb reads top-to-bottom from outer cause
-        // to inner failure.
+        // to inner failure. For frames carrying a context snapshot
+        // and/or a goal, dump those one indent deeper.
         for (auto iterator = contextFrames_.rbegin();
              iterator != contextFrames_.rend(); ++iterator) {
-            result += *iterator;
-            result += "\n  ";
+            result += iterator->description;
+            result += "\n";
+            // Context dump (suppressed when the snapshot is empty —
+            // top-level frames before any binder is pushed don't add
+            // anything by saying "(no binders)").
+            if (!iterator->contextSnapshot.empty()) {
+                result += "    context:\n";
+                for (size_t i = 0;
+                     i < iterator->contextSnapshot.size(); ++i) {
+                    const auto& binder = iterator->contextSnapshot[i];
+                    // Type may reference earlier binders (de Bruijn);
+                    // open those names so the printout reads as the
+                    // user wrote them.
+                    std::string printedType;
+                    try {
+                        printedType = prettyPrintInLocalScope(
+                            binder.type, iterator->contextSnapshot, i);
+                    } catch (...) {
+                        // Pretty-printing must never amplify the
+                        // primary error. Fall back to a marker.
+                        printedType = "<un-printable>";
+                    }
+                    result += "      " + binder.name + " : "
+                            + printedType + "\n";
+                }
+            }
+            // Goal dump (only when supplied — most internal frames
+            // don't have a meaningful local goal to report).
+            if (iterator->expectedType) {
+                std::string printedGoal;
+                try {
+                    printedGoal = prettyPrintInLocalScope(
+                        iterator->expectedType,
+                        iterator->contextSnapshot);
+                } catch (...) {
+                    printedGoal = "<un-printable>";
+                }
+                result += "    goal: " + printedGoal + "\n";
+            }
+            result += "  ";
         }
         result += message;
         return result;
@@ -4323,10 +4382,11 @@ private:
     ExpressionPointer elaborateCalc(
         const SurfaceCalc& calc,
         const std::vector<LocalBinder>& localBinders,
-        ExpressionPointer /*expectedType*/,
+        ExpressionPointer expectedType,
         int line, int /*column*/) {
         Frame frame(*this,
-            "calc block at line " + std::to_string(line));
+            "calc block at line " + std::to_string(line),
+            localBinders, expectedType);
         ExpressionPointer previousKernel = elaborateExpression(
             *calc.initialExpression, localBinders);
         ExpressionPointer carrierTypeOpen =
@@ -4342,7 +4402,13 @@ private:
             const auto& step = calc.steps[k];
             Frame stepFrame(*this,
                 "calc step " + std::to_string(k + 1)
-                + " at line " + std::to_string(step.line));
+                + " at line " + std::to_string(step.line),
+                localBinders,
+                // Goal for this step is the equality
+                // `previousKernel = next`. We don't yet know `next`,
+                // but `previousKernel` is the left endpoint and the
+                // user usually wants to see what they're stepping from.
+                previousKernel);
             ExpressionPointer nextKernel = elaborateExpression(
                 *step.nextExpression, localBinders, carrierType);
             ExpressionPointer stepEqualityType = makeApplication(
@@ -5897,10 +5963,11 @@ private:
     // `ring` — close an `e1 = e2` goal in a commutative ring.
     // v1: handles pure-multiplication rearrangement.
     ExpressionPointer elaborateRing(
-        const std::vector<LocalBinder>& /*localBinders*/,
+        const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int /*column*/) {
-        Frame frame(*this, "ring at line " + std::to_string(line));
+        Frame frame(*this, "ring at line " + std::to_string(line),
+                    localBinders, expectedType);
         if (!expectedType) {
             throwElaborate(
                 "`ring` needs an expected type from context — use it "
@@ -9829,7 +9896,8 @@ private:
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int /*column*/) {
-        Frame frame(*this, "field at line " + std::to_string(line));
+        Frame frame(*this, "field at line " + std::to_string(line),
+                    localBinders, expectedType);
         if (!expectedType) {
             throwElaborate(
                 "`field` needs an expected type from context — use it "
@@ -14731,7 +14799,7 @@ private:
     // and pops on destruction; `throwElaborate` (and the kernel-error
     // catch path) prepends the frames to the diagnostic so the user
     // sees a breadcrumb trail from their source line to the failure.
-    std::vector<std::string> contextFrames_;
+    std::vector<FrameSnapshot> contextFrames_;
     // Ordered list of universe parameters of the current declaration —
     // ordered so we can auto-fill universe arguments at self-reference
     // sites (the user writes `Equality(A, x, x)` inside reflexivity's
