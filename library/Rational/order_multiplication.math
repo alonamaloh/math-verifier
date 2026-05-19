@@ -96,11 +96,7 @@ theorem Rational.subtract_multiply_distribute (a b c : Rational)
   calc (b - a) * c
      = (b + -a) * c
      = b * c + -a * c
-            by Rational.distributivity_right(b, -a, c)
      = b * c + -(a * c)
-            by congruenceOf(
-                   function (z : Rational) => b * c + z,
-                   Rational.multiply_negate_left(a, c))
      = b * c - a * c
 
 -- ----------------------------------------------------------------------
@@ -199,15 +195,7 @@ theorem Rational.halve_less_than_self
                             Rational.halve_doubled(epsilon)))
           = Rational.halve(epsilon)
               + (Rational.halve(epsilon) + -Rational.halve(epsilon))
-                 by Rational.add_associative(
-                        Rational.halve(epsilon),
-                        Rational.halve(epsilon),
-                        -Rational.halve(epsilon))
           = Rational.halve(epsilon) + Rational.zero
-                 by congruenceOf(
-                        function (w : Rational) =>
-                            Rational.halve(epsilon) + w,
-                        Rational.add_negate_right(Rational.halve(epsilon)))
           = Rational.halve(epsilon);
   -- halve(ε) > 0 from halve_positive.
   claim halvePositive : Rational.zero < Rational.halve(epsilon)
@@ -237,9 +225,6 @@ theorem Rational.halve_less_than_self
                  calc Rational.halve(epsilon)
                     = epsilon - Rational.halve(epsilon)
                     = epsilon - epsilon
-                           by congruenceOf(
-                                  function (w : Rational) => epsilon - w,
-                                  halveEqEps)
                     = Rational.zero
                            by Rational.add_negate_right(epsilon)));
   And.introduction(
@@ -292,26 +277,12 @@ theorem Integer.succ_minus_natural (K : Natural)
   claim succ_eq : successor(K) = K + successor(zero)
     by calc successor(K)
           = successor(K + zero)
-          = K + successor(zero)
-                 by Equality.symmetry(
-                        Natural.add_successor(K, zero));
+          = K + successor(zero);
   calc (successor(K) : Integer) + -(K : Integer)
      = ((K + successor(zero)) : Integer) + -(K : Integer)
-            by congruenceOf(
-                   function (m : Natural) =>
-                       (m : Integer) + -(K : Integer),
-                   succ_eq)
      = ((K : Integer) + (successor(zero) : Integer)) + -(K : Integer)
-            by congruenceOf(
-                   function (z : Integer) => z + -(K : Integer),
-                   Natural.to_integer.add_preserves(K, successor(zero)))
      = (successor(zero) : Integer) + ((K : Integer) + -(K : Integer))
-            by ring
      = (successor(zero) : Integer) + Integer.zero
-            by congruenceOf(
-                   function (z : Integer) =>
-                       (successor(zero) : Integer) + z,
-                   Integer.add_negate_right((K : Integer)))
      = (successor(zero) : Integer)
      = Integer.one
 }
@@ -328,39 +299,18 @@ theorem Integer.scaled_succ_minus_natural_simplifies
   calc (successor(K) : Integer) * (successor(d) : Integer)
            + -(K : Integer)
      = (successor(K) * successor(d) : Integer) + -(K : Integer)
-            by congruenceOf(
-                   function (z : Integer) => z + -(K : Integer),
-                   Equality.symmetry(
-                       Natural.to_integer.multiply_preserves(
-                           successor(K), successor(d))))
      -- succ(K) · succ(d) = succ(K) + succ(K)·d (multiply_successor).
      = (successor(K) + successor(K) * d : Integer) + -(K : Integer)
-            by congruenceOf(
-                   function (m : Natural) =>
-                       (m : Integer) + -(K : Integer),
-                   Natural.multiply_successor(successor(K), d))
      -- Split the Integer image of a sum: (a + b : I) = (a : I) + (b : I).
      = ((successor(K) : Integer) + (successor(K) * d : Integer))
            + -(K : Integer)
-            by congruenceOf(
-                   function (z : Integer) => z + -(K : Integer),
-                   Natural.to_integer.add_preserves(
-                       successor(K), successor(K) * d))
      -- Regroup so the -K combines with succ(K).
      = ((successor(K) : Integer) + -(K : Integer))
            + (successor(K) * d : Integer)
-            by ring
      -- succ(K) - K = 1. Via Integer.succ_minus_natural (below).
      = Integer.one + (successor(K) * d : Integer)
-            by congruenceOf(
-                   function (z : Integer) =>
-                       z + (successor(K) * d : Integer),
-                   Integer.succ_minus_natural(K))
      -- Combine 1 + (succ(K)·d : I) = (succ(succ(K) · d) : I).
      = (successor(zero) + successor(K) * d : Integer)
-            by Equality.symmetry(
-                   Natural.to_integer.add_preserves(
-                       successor(zero), successor(K) * d))
      = (successor(successor(K) * d) : Integer)
      -- successor(K) · d = K · d + d (multiply_successor on first arg, then commute).
      = (successor(K * d + d) : Integer)
@@ -418,10 +368,6 @@ theorem Rational.succ_natural_minus_natural_form_at_rep
          -- Apply the Integer simplification lemma.
          = (successor(K * d + d) : Integer)
               * (successor(d) : Integer)
-                by congruenceOf(
-                       function (z : Integer) =>
-                           z * (successor(d) : Integer),
-                       Integer.scaled_succ_minus_natural_simplifies(K, d))
          -- Bridge succ(d) on the right side to succ(d + 0·succ(d)).
          -- d = d + 0 (Natural.add_zero in reverse). Then succ(d) = succ(d + 0)
          -- and 0·succ(d) = 0, so succ(d + 0·succ(d)) = succ(d + 0) = succ(d).
@@ -433,11 +379,7 @@ theorem Rational.succ_natural_minus_natural_form_at_rep
                            (successor(K * d + d) : Integer) * (successor(m) : Integer),
                        calc d
                           = d + zero
-                          = d + zero * successor(d)
-                                 by congruenceOf(
-                                        function (w : Natural) => d + w,
-                                        Equality.symmetry(
-                                            Natural.zero_multiply(successor(d))))))
+                          = d + zero * successor(d)))
 
 -- |q|-at-rep ≤ (succ(K) : R) form, expressed via the explicit
 -- difference equation above.
@@ -665,10 +607,7 @@ theorem Rational.multiply_positive_at_representatives
              Equality.transitivity(
                  calc successor(k_x + successor(k_x) * k_y)
                     = successor(k_x) + successor(k_x) * k_y
-                    = successor(k_x) * successor(k_y)
-                           by Equality.symmetry(
-                                  Natural.multiply_successor(
-                                      successor(k_x), k_y)),
+                    = successor(k_x) * successor(k_y),
                  -- succ(k_x) · succ(k_y) = 0 from the Quotient.exact chain.
                  -- LHS_integer = (succ(k_x) · succ(k_y) : I), and we derive
                  -- this equals Integer.zero, hence Natural-level zero.
@@ -678,8 +617,6 @@ theorem Rational.multiply_positive_at_representatives
                      calc (successor(k_x) * successor(k_y) : Integer)
                         = (successor(k_x) : Integer)
                               * (successor(k_y) : Integer)
-                               by Natural.to_integer.multiply_preserves(
-                                      successor(k_x), successor(k_y))
                         = (successor(k_x) : Integer)
                               * (successor(k_y) : Integer)
                               * (successor(zero) : Integer)
@@ -707,11 +644,7 @@ theorem Rational.multiply_positive_at_representatives
                                       RationalRepresentative.make(
                                           Integer.zero, zero),
                                       Equality.symmetry(zeroEqProduct))
-                        = Integer.zero
-                               by Integer.multiply_zero_left(
-                                      (successor(d_y + d_x
-                                                 * successor(d_y))
-                                          : Integer)))));
+                        = Integer.zero)));
   And.introduction(
       Rational.LessOrEqual(
           Rational.zero,
@@ -866,8 +799,6 @@ theorem Rational.multiply_positive_positive
                                                               calc Integer.zero
                                                                      * (successor(d_y) : Integer)
                                                                  = Integer.zero
-                                                                        by Integer.multiply_zero_left(
-                                                                               (successor(d_y) : Integer))
                                                                  = n_y
                                                                  = n_y
                                                                      * (successor(zero) : Integer)
@@ -931,8 +862,6 @@ theorem Rational.multiply_positive_positive
                                                         calc Integer.zero
                                                                * (successor(d_x) : Integer)
                                                            = Integer.zero
-                                                                  by Integer.multiply_zero_left(
-                                                                         (successor(d_x) : Integer))
                                                            = n_x
                                                            = n_x
                                                                * (successor(zero) : Integer)
