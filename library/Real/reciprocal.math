@@ -1,0 +1,88 @@
+-- Real/reciprocal.math
+--
+-- The reciprocal Cauchy rational sequence for a Real that's apart
+-- from zero, plus a proof that the product converges to one. Built
+-- on Rational.reciprocal_function (a total reciprocal) and the
+-- apartness extraction in Real/apartness.math.
+--
+-- The IsCauchy proof of the reciprocal sequence is a standard
+-- analysis argument: for a, b ≥ K > 0,
+-- |1/a − 1/b| = |b − a| / (|a| · |b|) ≤ |b − a| / K². Combined with
+-- the original sequence being Cauchy at ε · K², the reciprocal
+-- sequence is Cauchy at ε. The body of `reciprocal_sequence_is_cauchy`
+-- below is left as `sorry`; the surrounding scaffolding is in place
+-- so that filling in the analytic argument is purely local work.
+
+module Real.reciprocal
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.maximum
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.absolute_value
+import Rational.reciprocal_function
+import Real.sequence
+import Real.basics
+import Real.apartness
+
+-- ----------------------------------------------------------------------
+-- The reciprocal sequence: pointwise total reciprocal.
+definition Real.reciprocal_sequence
+        (underlyingSequence : Rational.sequence.Sequence)
+        : Rational.sequence.Sequence :=
+  function (index : Natural) =>
+    Rational.reciprocal_function(underlyingSequence(index))
+
+-- ----------------------------------------------------------------------
+-- The Cauchy proof. For `m, n ≥ max(apartnessIndex, cauchyIndex(ε · K²))`,
+-- the identity |1/a − 1/b| = |b − a| / (|a| · |b|) plus |a|, |b| ≥ K
+-- gives the bound |1/a − 1/b| ≤ |b − a| / K² < ε. Left as sorry —
+-- the scaffolding is in place; this is the analytic gap that
+-- finishes Real-as-Field.
+theorem Real.reciprocal_sequence_is_cauchy
+        (underlyingSequence : Rational.sequence.Sequence)
+        (underlyingIsCauchy
+            : Rational.sequence.IsCauchy(underlyingSequence))
+        (lowerBound : Rational)
+        (lowerBoundPositive : Rational.zero < lowerBound)
+        (apartnessIndex : Natural)
+        (apartness
+            : (m : Natural) → apartnessIndex ≤ m →
+                lowerBound ≤ Rational.absolute_value(
+                                 underlyingSequence(m)))
+        : Rational.sequence.IsCauchy(
+              Real.reciprocal_sequence(underlyingSequence)) :=
+  sorry
+
+-- ----------------------------------------------------------------------
+-- Package the reciprocal sequence with its Cauchy proof.
+definition Real.reciprocal_cauchy_sequence
+        (underlyingSequence : Rational.sequence.Sequence)
+        (underlyingIsCauchy
+            : Rational.sequence.IsCauchy(underlyingSequence))
+        (lowerBound : Rational)
+        (lowerBoundPositive : Rational.zero < lowerBound)
+        (apartnessIndex : Natural)
+        (apartness
+            : (m : Natural) → apartnessIndex ≤ m →
+                lowerBound ≤ Rational.absolute_value(
+                                 underlyingSequence(m)))
+        : CauchyRationalSequence :=
+  CauchyRationalSequence.make(
+      Real.reciprocal_sequence(underlyingSequence),
+      Real.reciprocal_sequence_is_cauchy(
+          underlyingSequence, underlyingIsCauchy,
+          lowerBound, lowerBoundPositive,
+          apartnessIndex, apartness))

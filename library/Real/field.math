@@ -1,0 +1,347 @@
+-- Real/field.math
+--
+-- Real satisfies `IsField`: a commutative ring + 0 ≠ 1 + every
+-- non-zero element has a multiplicative inverse.
+--
+-- The inverse-existence theorem chains three pieces:
+--   1. `Real.cauchy_apartness_from_zero` (Real/apartness.math) —
+--      from `¬(x = Real.zero)`, extract a positive lower bound on
+--      `|sequenceFunction(s, m)|` holding eventually.
+--   2. `Real.reciprocal_cauchy_sequence` (Real/reciprocal.math) —
+--      the pointwise reciprocal sequence, packaged with its
+--      IsCauchy proof.
+--   3. The product `s · reciprocal` is CauchyEquivalent to constant
+--      one: beyond the apartness index, every term of the product
+--      sequence is exactly Rational.one (since
+--      `Rational.reciprocal_function_multiplies`).
+
+module Real.field
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.absolute_value
+import Rational.positive
+import Rational.reciprocal_function
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.apartness
+import Real.reciprocal
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.field
+
+-- ----------------------------------------------------------------------
+-- Helper: a Rational with positive absolute value is non-zero.
+-- Contrapositive: if q = 0 then |q| = 0, contradicting 0 < |q|.
+theorem Rational.nonzero_of_absolute_value_positive
+        (q : Rational)
+        (absolutePositive : Rational.zero < Rational.absolute_value(q))
+        : ¬(q = Rational.zero) :=
+  function (qIsZero : q = Rational.zero) =>
+    -- |q| = |Rational.zero| = Rational.zero. Then 0 < 0 contradicts
+    -- the strict inequality's non-equal component.
+    And.right(
+        Rational.LessOrEqual(
+            Rational.zero, Rational.absolute_value(q)),
+        Not(Rational.zero = Rational.absolute_value(q)),
+        absolutePositive)(
+        Equality.symmetry(
+            calc Rational.absolute_value(q)
+               = Rational.absolute_value(Rational.zero)
+                      by congruenceOf(
+                             Rational.absolute_value,
+                             qIsZero)
+               = Rational.zero
+                      by Rational.absolute_value_zero))
+
+-- ----------------------------------------------------------------------
+-- 0 ≠ 1 on Real. Extract CauchyEquivalent via Quotient.exact; apply
+-- at ε = Rational.one to get |0 - 1| < 1, which reduces to 1 < 1 —
+-- contradicts the strict inequality's non-equal component.
+theorem Real.zero_not_equal_one : ¬(Real.zero = Real.one) :=
+  function (zeroEqualsOne : Real.zero = Real.one) => {
+    claim cauchyEquivalence
+          : CauchyEquivalent(
+                Rational.to_cauchy_constant(Rational.zero),
+                Rational.to_cauchy_constant(Rational.one))
+      by Quotient.exact(
+             CauchyRationalSequence, CauchyEquivalent,
+             CauchyEquivalent.reflexive,
+             CauchyEquivalent.symmetric,
+             CauchyEquivalent.transitive,
+             Rational.to_cauchy_constant(Rational.zero),
+             Rational.to_cauchy_constant(Rational.one),
+             zeroEqualsOne);
+    obtain ⟨witnessIndex, atWitnessIndex⟩
+        from cauchyEquivalence(
+                 Rational.one, Rational.zero_less_one);
+    claim oneEqualsAbsDiff
+          : Rational.one
+            = Rational.absolute_value(
+                  CauchyRationalSequence.sequenceFunction(
+                      Rational.to_cauchy_constant(Rational.zero),
+                      witnessIndex)
+                  - CauchyRationalSequence.sequenceFunction(
+                        Rational.to_cauchy_constant(Rational.one),
+                        witnessIndex))
+      by calc Rational.one
+            = Rational.absolute_value(-Rational.one)
+                   by Equality.symmetry(
+                          calc Rational.absolute_value(-Rational.one)
+                             = Rational.absolute_value(Rational.one)
+                                    by Rational.absolute_value_negate(
+                                           Rational.one)
+                             = Rational.one)
+            = Rational.absolute_value(
+                  Rational.zero - Rational.one)
+                   by congruenceOf(
+                          Rational.absolute_value,
+                          Equality.symmetry(
+                              calc Rational.zero - Rational.one
+                                 = Rational.zero + -Rational.one
+                                 = -Rational.one
+                                        by Rational.zero_add(
+                                               -Rational.one)))
+            = Rational.absolute_value(
+                  CauchyRationalSequence.sequenceFunction(
+                      Rational.to_cauchy_constant(Rational.zero),
+                      witnessIndex)
+                  - CauchyRationalSequence.sequenceFunction(
+                        Rational.to_cauchy_constant(Rational.one),
+                        witnessIndex));
+    claim oneLessThanOne : Rational.one < Rational.one
+      by rewrite(
+             Equality.symmetry(oneEqualsAbsDiff),
+             atWitnessIndex(
+                 witnessIndex,
+                 LessOrEqual.reflexivity(witnessIndex)));
+    And.right(
+        Rational.LessOrEqual(Rational.one, Rational.one),
+        Not(Rational.one = Rational.one),
+        oneLessThanOne)(
+        reflexivity(Rational, Rational.one))
+  }
+
+-- ----------------------------------------------------------------------
+-- Multiplication-equals-one for the reciprocal Cauchy sequence.
+-- Beyond `apartnessIndex`, the product s(m) * reciprocal_function(s(m))
+-- equals Rational.one by `reciprocal_function_multiplies`, so the
+-- product sequence is identically Rational.one from `apartnessIndex`
+-- onward — trivially CauchyEquivalent to the constant-one sequence.
+theorem Real.reciprocal_cauchy_sequence_multiplies
+        (underlyingSequence : Rational.sequence.Sequence)
+        (underlyingIsCauchy
+            : Rational.sequence.IsCauchy(underlyingSequence))
+        (lowerBound : Rational)
+        (lowerBoundPositive : Rational.zero < lowerBound)
+        (apartnessIndex : Natural)
+        (apartness
+            : (m : Natural) → apartnessIndex ≤ m →
+                lowerBound
+                  ≤ Rational.absolute_value(
+                        underlyingSequence(m)))
+        (originalSequencePacked : CauchyRationalSequence)
+        (originalIsTheSame
+            : CauchyRationalSequence.sequenceFunction(
+                  originalSequencePacked)
+              = underlyingSequence)
+        : CauchyEquivalent(
+              CauchyRationalSequence.multiply(
+                  originalSequencePacked,
+                  Real.reciprocal_cauchy_sequence(
+                      underlyingSequence, underlyingIsCauchy,
+                      lowerBound, lowerBoundPositive,
+                      apartnessIndex, apartness)),
+              Rational.to_cauchy_constant(Rational.one)) :=
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) =>
+    witness apartnessIndex with
+        function (m : Natural) (apartnessIndexLeqM : apartnessIndex ≤ m) =>
+          -- Goal: |sf(multiply(orig, recip), m) - sf(constant_one, m)| < ε.
+          -- sf(constant_one, m) = Rational.one.
+          -- sf(multiply(orig, recip), m) = sf(orig, m) * sf(recip, m)
+          --                            = underlyingSequence(m)
+          --                              * reciprocal_function(underlyingSequence(m))
+          --                            = Rational.one   [by reciprocal_function_multiplies,
+          --                                                since |seq(m)| ≥ K > 0 forces seq(m) ≠ 0]
+          -- So the difference is Rational.one - Rational.one = Rational.zero,
+          -- with |Rational.zero| = Rational.zero < ε.
+          rewrite(
+              Equality.symmetry(
+                  calc Rational.absolute_value(
+                           CauchyRationalSequence.sequenceFunction(
+                               CauchyRationalSequence.multiply(
+                                   originalSequencePacked,
+                                   Real.reciprocal_cauchy_sequence(
+                                       underlyingSequence, underlyingIsCauchy,
+                                       lowerBound, lowerBoundPositive,
+                                       apartnessIndex, apartness)),
+                               m)
+                           - CauchyRationalSequence.sequenceFunction(
+                                 Rational.to_cauchy_constant(Rational.one),
+                                 m))
+                     = Rational.absolute_value(
+                           CauchyRationalSequence.sequenceFunction(
+                               originalSequencePacked, m)
+                           * CauchyRationalSequence.sequenceFunction(
+                                 Real.reciprocal_cauchy_sequence(
+                                     underlyingSequence, underlyingIsCauchy,
+                                     lowerBound, lowerBoundPositive,
+                                     apartnessIndex, apartness),
+                                 m)
+                           - Rational.one)
+                            by congruenceOf(
+                                   function (q : Rational) =>
+                                       Rational.absolute_value(
+                                           q - Rational.one),
+                                   CauchyRationalSequence.sequenceFunction_multiply(
+                                       originalSequencePacked,
+                                       Real.reciprocal_cauchy_sequence(
+                                           underlyingSequence, underlyingIsCauchy,
+                                           lowerBound, lowerBoundPositive,
+                                           apartnessIndex, apartness),
+                                       m))
+                     = Rational.absolute_value(
+                           underlyingSequence(m)
+                           * Rational.reciprocal_function(
+                                 underlyingSequence(m))
+                           - Rational.one)
+                            by congruenceOf(
+                                   function (q : Rational) =>
+                                       Rational.absolute_value(
+                                           q
+                                           * CauchyRationalSequence.sequenceFunction(
+                                                 Real.reciprocal_cauchy_sequence(
+                                                     underlyingSequence,
+                                                     underlyingIsCauchy,
+                                                     lowerBound,
+                                                     lowerBoundPositive,
+                                                     apartnessIndex,
+                                                     apartness),
+                                                 m)
+                                           - Rational.one),
+                                   congruenceOf(
+                                       function (s : Rational.sequence.Sequence) =>
+                                           s(m),
+                                       originalIsTheSame))
+                     = Rational.absolute_value(Rational.one - Rational.one)
+                            by congruenceOf(
+                                   function (q : Rational) =>
+                                       Rational.absolute_value(
+                                           q - Rational.one),
+                                   Rational.reciprocal_function_multiplies(
+                                       underlyingSequence(m),
+                                       Rational.nonzero_of_absolute_value_positive(
+                                           underlyingSequence(m),
+                                           Rational.LessThan.transitive_right(
+                                               Rational.zero,
+                                               lowerBound,
+                                               Rational.absolute_value(
+                                                   underlyingSequence(m)),
+                                               lowerBoundPositive,
+                                               apartness(m, apartnessIndexLeqM)))))
+                     = Rational.absolute_value(Rational.zero)
+                            by congruenceOf(
+                                   Rational.absolute_value,
+                                   Rational.add_negate_right(Rational.one))
+                     = Rational.zero
+                            by Rational.absolute_value_zero),
+              epsilonPositive)
+
+-- ----------------------------------------------------------------------
+-- Inverse-existence: for every non-zero Real x, there exists y with
+-- x * y = Real.one. Quotient.induct over x; at the rep level, use
+-- apartness to get a lower bound, build the reciprocal CauchyRational
+-- sequence, and use the multiplication-converges-to-one lemma.
+theorem Real.reciprocal_exists_for_nonzero
+        (x : Real) (xNonzero : ¬(x = Real.zero))
+        : ∃ (y : Real). x * y = Real.one :=
+  Quotient.induct(
+      function (xArg : Real) =>
+          ¬(xArg = Real.zero)
+            → ∃ (y : Real). xArg * y = Real.one,
+      function (rep : CauchyRationalSequence) =>
+        function (mkRepNonzero
+                      : ¬((Quotient.mk(rep) : Real) = Real.zero)) =>
+          ({
+          -- Apartness: ¬(mk(rep) = mk(constant_zero)) → ¬CauchyEquivalent(rep, constant_zero).
+          claim notEquivalentToZero
+                : ¬CauchyEquivalent(
+                      rep,
+                      Rational.to_cauchy_constant(Rational.zero))
+            by function (equiv
+                             : CauchyEquivalent(
+                                   rep,
+                                   Rational.to_cauchy_constant(
+                                       Rational.zero))) =>
+                 mkRepNonzero(
+                     Quotient.sound(
+                         CauchyRationalSequence, CauchyEquivalent,
+                         rep,
+                         Rational.to_cauchy_constant(Rational.zero),
+                         equiv));
+          obtain ⟨lowerBound, apartnessTail⟩
+              from Real.cauchy_apartness_from_zero(
+                       rep, notEquivalentToZero);
+          obtain ⟨apartnessIndex, andBundle⟩ from apartnessTail;
+          let ⟨lowerBoundPositive, apartness⟩ := andBundle;
+          witness (Quotient.mk(
+                       Real.reciprocal_cauchy_sequence(
+                           CauchyRationalSequence.sequenceFunction(rep),
+                           CauchyRationalSequence.isCauchy(rep),
+                           lowerBound, lowerBoundPositive,
+                           apartnessIndex, apartness))
+                    : Real) with
+              Quotient.sound(
+                  CauchyRationalSequence, CauchyEquivalent,
+                  CauchyRationalSequence.multiply(
+                      rep,
+                      Real.reciprocal_cauchy_sequence(
+                          CauchyRationalSequence.sequenceFunction(rep),
+                          CauchyRationalSequence.isCauchy(rep),
+                          lowerBound, lowerBoundPositive,
+                          apartnessIndex, apartness)),
+                  Rational.to_cauchy_constant(Rational.one),
+                  Real.reciprocal_cauchy_sequence_multiplies(
+                      CauchyRationalSequence.sequenceFunction(rep),
+                      CauchyRationalSequence.isCauchy(rep),
+                      lowerBound, lowerBoundPositive,
+                      apartnessIndex, apartness,
+                      rep,
+                      reflexivity(
+                          Rational.sequence.Sequence,
+                          CauchyRationalSequence.sequenceFunction(rep))))
+        } : ∃ (y : Real). (Quotient.mk(rep) : Real) * y = Real.one),
+      x)(xNonzero)
+
+-- ----------------------------------------------------------------------
+-- Real is a Field.
+theorem Real.is_field
+        : IsField(Real, Real.add, Real.zero, Real.negate,
+                   Real.multiply, Real.one) :=
+    ⟨Real.is_commutative_ring,
+     Real.zero_not_equal_one,
+     Real.reciprocal_exists_for_nonzero⟩
