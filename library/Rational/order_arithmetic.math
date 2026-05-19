@@ -267,15 +267,27 @@ theorem Rational.LessOrEqual.transitive
 -- ----------------------------------------------------------------------
 -- Strict transitivity and additive monotonicity.
 
+-- Drop the strict part: x < y → x ≤ y. Saves spelling out the And
+-- members at every use site (`And.left(LessOrEqual(x, y), Not(x = y),
+-- xLessThanY)` collapses to `Rational.LessThan.weaken(x, y, xLessThanY)`).
+theorem Rational.LessThan.weaken
+        (x y : Rational) (xLessThanY : x < y) : x ≤ y :=
+  And.left(Rational.LessOrEqual(x, y), Not(x = y), xLessThanY)
+
+-- Extract the distinctness part: x < y → ¬(x = y).
+theorem Rational.LessThan.distinct
+        (x y : Rational) (xLessThanY : x < y) : Not(x = y) :=
+  And.right(Rational.LessOrEqual(x, y), Not(x = y), xLessThanY)
+
 -- Weak-then-strict: x ≤ y ∧ y < z → x < z.
 theorem Rational.LessThan.transitive_left
         (x y z : Rational)
         (xLeqY : x ≤ y) (yLessThanZ : y < z)
         : x < z := {
   claim yLeqZ : y ≤ z
-    by And.left(Rational.LessOrEqual(y, z), Not(y = z), yLessThanZ);
+    by Rational.LessThan.weaken(y, z, yLessThanZ);
   claim yNotZ : Not(y = z)
-    by And.right(Rational.LessOrEqual(y, z), Not(y = z), yLessThanZ);
+    by Rational.LessThan.distinct(y, z, yLessThanZ);
   And.introduction(
       Rational.LessOrEqual(x, z),
       Not(x = z),
@@ -301,9 +313,9 @@ theorem Rational.LessThan.transitive_right
         (xLessThanY : x < y) (yLeqZ : y ≤ z)
         : x < z := {
   claim xLeqY : x ≤ y
-    by And.left(Rational.LessOrEqual(x, y), Not(x = y), xLessThanY);
+    by Rational.LessThan.weaken(x, y, xLessThanY);
   claim xNotY : Not(x = y)
-    by And.right(Rational.LessOrEqual(x, y), Not(x = y), xLessThanY);
+    by Rational.LessThan.distinct(x, y, xLessThanY);
   And.introduction(
       Rational.LessOrEqual(x, z),
       Not(x = z),
@@ -350,9 +362,9 @@ theorem Rational.add_preserves_LessThan
         (x y z : Rational) (xLessY : x < y)
         : x + z < y + z := {
   claim xLeqY : x ≤ y
-    by And.left(Rational.LessOrEqual(x, y), Not(x = y), xLessY);
+    by Rational.LessThan.weaken(x, y, xLessY);
   claim xNotY : Not(x = y)
-    by And.right(Rational.LessOrEqual(x, y), Not(x = y), xLessY);
+    by Rational.LessThan.distinct(x, y, xLessY);
   And.introduction(
       Rational.LessOrEqual(x + z, y + z),
       Not(x + z = y + z),
@@ -391,6 +403,48 @@ theorem Rational.LessThan.add_strict_strict
       Rational.add_preserves_LessThan(a, h, b, aLessH),
       -- h + b ≤ h + h from b ≤ h.
       Rational.add_preserves_LessOrEqual_left(b, h,
-          And.left(
-              Rational.LessOrEqual(b, h), Not(b = h),
-              bLessH)))
+          Rational.LessThan.weaken(b, h, bLessH)))
+
+-- 0 < x → -x < 0. Used wherever an ε-argument needs the symmetric
+-- "-ε < 0" form (e.g. to bound something from below by -ε via 0).
+theorem Rational.negate_LessThan_zero_of_positive
+        (x : Rational) (xPositive : Rational.zero < x)
+        : -x < Rational.zero :=
+  -- Add -x to both sides of 0 < x: 0 + -x < x + -x, i.e., -x < 0.
+  rewrite(
+      Rational.add_negate_right(x),
+      rewrite(
+          Rational.zero_add(-x),
+          Rational.add_preserves_LessThan(
+              Rational.zero, x, -x, xPositive)))
+
+-- Order reverses under negation: x ≤ y → -y ≤ -x. The IsNonneg
+-- definitions of both sides reduce to the same `IsNonneg(y - x)`
+-- modulo `y - x = -x - -y`, which is pure ring.
+theorem Rational.LessOrEqual.negate
+        (x y : Rational) (xLeqY : x ≤ y) : -y ≤ -x :=
+  rewrite((ring : y - x = -x - -y), xLeqY)
+
+-- Strict order reverses under negation: x < y → -y < -x.
+theorem Rational.LessThan.negate
+        (x y : Rational) (xLessY : x < y) : -y < -x :=
+  And.introduction(
+      -y ≤ -x, Not(-y = -x),
+      Rational.LessOrEqual.negate(x, y,
+          Rational.LessThan.weaken(x, y, xLessY)),
+      function (negYEqNegX : -y = -x) =>
+        -- y = -(-y) = -(-x) = x, contradicting x ≠ y.
+        Rational.LessThan.distinct(x, y, xLessY)(
+            Equality.symmetry(
+                calc y = -(-y)
+                          by Equality.symmetry(Rational.negate_negate(y))
+                     = -(-x)
+                          by congruenceOf(Rational.negate, negYEqNegX)
+                     = x   by Rational.negate_negate(x))))
+
+-- IsNonneg(-x) → x ≤ 0. Dual to LessOrEqual_zero_of_IsNonneg.
+theorem Rational.LessOrEqual_zero_of_negate_IsNonneg
+        (x : Rational) (negXIsNonneg : Rational.IsNonneg(-x))
+        : x ≤ Rational.zero :=
+  -- x ≤ 0 = IsNonneg(0 - x) = IsNonneg(-x).
+  rewrite((ring : -x = Rational.zero - x), negXIsNonneg)
