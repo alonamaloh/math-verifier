@@ -1,23 +1,29 @@
 -- Real/reciprocal.math
 --
 -- The reciprocal Cauchy rational sequence for a Real that's apart
--- from zero, plus a proof that the product converges to one. Built
--- on Rational.reciprocal_function (a total reciprocal) and the
--- apartness extraction in Real/apartness.math.
+-- from zero, plus the IsCauchy proof. Built on
+-- `Rational.reciprocal_function` (a total reciprocal) and the
+-- apartness extraction in `Real/apartness.math`.
 --
--- The IsCauchy proof of the reciprocal sequence is a standard
--- analysis argument: for a, b ≥ K > 0,
--- |1/a − 1/b| = |b − a| / (|a| · |b|) ≤ |b − a| / K². Combined with
--- the original sequence being Cauchy at ε · K², the reciprocal
--- sequence is Cauchy at ε. The body of `reciprocal_sequence_is_cauchy`
--- below is left as `sorry`; the surrounding scaffolding is in place
--- so that filling in the analytic argument is purely local work.
+-- The IsCauchy proof goes through the algebraic identity
+-- `1/a - 1/b = (b - a) * (1/a * 1/b)` (provable in any commutative
+-- ring with multiplicative inverses), which after multiplying by
+-- s(m)·s(n) becomes `|ra - rb| · |s(m)| · |s(n)| = |s(n) - s(m)|`.
+-- With `K ≤ |s(m)|, |s(n)|`, the LHS factor is `≥ K · K`, and a
+-- Cauchy bound on the original sequence at `ε · (K · K)` cancels
+-- the K² to give the reciprocal sequence Cauchy at ε.
+--
+-- The cancellation step needs a strict-cancellation lemma
+-- `Rational.LessThan.multiply_cancel_right`, which is proved
+-- locally in this file via `Rational.LessOrEqual.linear` +
+-- antisymmetry on the `y ≤ x` branch.
 
 module Real.reciprocal
 
 import Logic.basics
 import Logic.exists
 import Logic.quotient
+import Logic.excluded_middle
 import Equality.basics
 import Natural.basics
 import Natural.peano
@@ -31,7 +37,12 @@ import Rational.negation
 import Rational.ring
 import Rational.algebra
 import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
 import Rational.absolute_value
+import Rational.triangle
+import Rational.positive
+import Rational.linearity
 import Rational.reciprocal_function
 import Real.sequence
 import Real.basics
@@ -46,11 +57,225 @@ definition Real.reciprocal_sequence
     Rational.reciprocal_function(underlyingSequence(index))
 
 -- ----------------------------------------------------------------------
+-- Algebraic helper: the reciprocal-subtraction identity. For nonzero
+-- `a, b`, the difference `1/a - 1/b` factors as `(b - a) * (1/a · 1/b)`.
+-- Pure ring manipulation using `reciprocal_function_multiplies`.
+theorem Rational.reciprocal_function_subtract_identity
+        (a b : Rational)
+        (aNonzero : ¬(a = Rational.zero))
+        (bNonzero : ¬(b = Rational.zero))
+        : Rational.reciprocal_function(a) - Rational.reciprocal_function(b)
+          = (b - a) * (Rational.reciprocal_function(a)
+                           * Rational.reciprocal_function(b)) :=
+  calc Rational.reciprocal_function(a) - Rational.reciprocal_function(b)
+     = Rational.reciprocal_function(a) * Rational.one
+         - Rational.reciprocal_function(b)
+            by congruenceOf(
+                   function (w : Rational) =>
+                       w - Rational.reciprocal_function(b),
+                   Equality.symmetry(
+                       Rational.multiply_one(
+                           Rational.reciprocal_function(a))))
+     = Rational.reciprocal_function(a) * Rational.one
+         - Rational.reciprocal_function(b) * Rational.one
+            by congruenceOf(
+                   function (w : Rational) =>
+                       Rational.reciprocal_function(a) * Rational.one - w,
+                   Equality.symmetry(
+                       Rational.multiply_one(
+                           Rational.reciprocal_function(b))))
+     = Rational.reciprocal_function(a)
+           * (b * Rational.reciprocal_function(b))
+         - Rational.reciprocal_function(b)
+             * (a * Rational.reciprocal_function(a))
+            by (calc Rational.reciprocal_function(a) * Rational.one
+                        - Rational.reciprocal_function(b) * Rational.one
+                  = Rational.reciprocal_function(a)
+                        * (b * Rational.reciprocal_function(b))
+                      - Rational.reciprocal_function(b) * Rational.one
+                       by congruenceOf(
+                              function (w : Rational) =>
+                                  Rational.reciprocal_function(a) * w
+                                  - Rational.reciprocal_function(b)
+                                      * Rational.one,
+                              Equality.symmetry(
+                                  Rational.reciprocal_function_multiplies(
+                                      b, bNonzero)))
+                  = Rational.reciprocal_function(a)
+                        * (b * Rational.reciprocal_function(b))
+                      - Rational.reciprocal_function(b)
+                          * (a * Rational.reciprocal_function(a))
+                       by congruenceOf(
+                              function (w : Rational) =>
+                                  Rational.reciprocal_function(a)
+                                      * (b * Rational.reciprocal_function(b))
+                                  - Rational.reciprocal_function(b) * w,
+                              Equality.symmetry(
+                                  Rational.reciprocal_function_multiplies(
+                                      a, aNonzero))))
+     = b * (Rational.reciprocal_function(a)
+                * Rational.reciprocal_function(b))
+         - a * (Rational.reciprocal_function(a)
+                    * Rational.reciprocal_function(b))
+            by (calc Rational.reciprocal_function(a)
+                        * (b * Rational.reciprocal_function(b))
+                      - Rational.reciprocal_function(b)
+                          * (a * Rational.reciprocal_function(a))
+                  = Rational.reciprocal_function(a) * b
+                        * Rational.reciprocal_function(b)
+                      - Rational.reciprocal_function(b)
+                          * (a * Rational.reciprocal_function(a))
+                       by congruenceOf(
+                              function (w : Rational) =>
+                                  w - Rational.reciprocal_function(b)
+                                          * (a
+                                                * Rational.reciprocal_function(
+                                                      a)),
+                              Equality.symmetry(
+                                  Rational.multiply_associative(
+                                      Rational.reciprocal_function(a),
+                                      b,
+                                      Rational.reciprocal_function(b))))
+                  = b * Rational.reciprocal_function(a)
+                        * Rational.reciprocal_function(b)
+                      - Rational.reciprocal_function(b)
+                          * (a * Rational.reciprocal_function(a))
+                       by congruenceOf(
+                              function (w : Rational) =>
+                                  w * Rational.reciprocal_function(b)
+                                  - Rational.reciprocal_function(b)
+                                        * (a
+                                              * Rational.reciprocal_function(
+                                                    a)),
+                              Rational.multiply_commutative(
+                                  Rational.reciprocal_function(a), b))
+                  = b * (Rational.reciprocal_function(a)
+                             * Rational.reciprocal_function(b))
+                      - Rational.reciprocal_function(b)
+                          * (a * Rational.reciprocal_function(a))
+                       by congruenceOf(
+                              function (w : Rational) =>
+                                  w
+                                  - Rational.reciprocal_function(b)
+                                        * (a
+                                              * Rational.reciprocal_function(
+                                                    a)),
+                              Rational.multiply_associative(
+                                  b,
+                                  Rational.reciprocal_function(a),
+                                  Rational.reciprocal_function(b)))
+                  = b * (Rational.reciprocal_function(a)
+                             * Rational.reciprocal_function(b))
+                      - Rational.reciprocal_function(b) * a
+                          * Rational.reciprocal_function(a)
+                       by congruenceOf(
+                              function (w : Rational) =>
+                                  b * (Rational.reciprocal_function(a)
+                                           * Rational.reciprocal_function(b))
+                                  - w,
+                              Equality.symmetry(
+                                  Rational.multiply_associative(
+                                      Rational.reciprocal_function(b),
+                                      a,
+                                      Rational.reciprocal_function(a))))
+                  = b * (Rational.reciprocal_function(a)
+                             * Rational.reciprocal_function(b))
+                      - a * Rational.reciprocal_function(b)
+                          * Rational.reciprocal_function(a)
+                       by congruenceOf(
+                              function (w : Rational) =>
+                                  b * (Rational.reciprocal_function(a)
+                                           * Rational.reciprocal_function(b))
+                                  - w * Rational.reciprocal_function(a),
+                              Rational.multiply_commutative(
+                                  Rational.reciprocal_function(b), a))
+                  = b * (Rational.reciprocal_function(a)
+                             * Rational.reciprocal_function(b))
+                      - a * (Rational.reciprocal_function(b)
+                                 * Rational.reciprocal_function(a))
+                       by congruenceOf(
+                              function (w : Rational) =>
+                                  b * (Rational.reciprocal_function(a)
+                                           * Rational.reciprocal_function(b))
+                                  - w,
+                              Rational.multiply_associative(
+                                  a,
+                                  Rational.reciprocal_function(b),
+                                  Rational.reciprocal_function(a)))
+                  = b * (Rational.reciprocal_function(a)
+                             * Rational.reciprocal_function(b))
+                      - a * (Rational.reciprocal_function(a)
+                                 * Rational.reciprocal_function(b))
+                       by congruenceOf(
+                              function (w : Rational) =>
+                                  b * (Rational.reciprocal_function(a)
+                                           * Rational.reciprocal_function(b))
+                                  - a * w,
+                              Rational.multiply_commutative(
+                                  Rational.reciprocal_function(b),
+                                  Rational.reciprocal_function(a))))
+     = (b - a) * (Rational.reciprocal_function(a)
+                      * Rational.reciprocal_function(b))
+            by Equality.symmetry(
+                   Rational.subtract_multiply_distribute(
+                       a, b,
+                       Rational.reciprocal_function(a)
+                           * Rational.reciprocal_function(b)))
+
+-- ----------------------------------------------------------------------
+-- Strict-multiplication right cancellation: if `x * c < y * c` and
+-- `0 < c`, then `x < y`. Linearity supplies the case-split:
+-- the `y ≤ x` branch combined with `multiply_by_nonneg_right` gives
+-- `y * c ≤ x * c`, antisymmetric with `x * c ≤ y * c` from the
+-- hypothesis — but `x * c ≠ y * c` from the strict hypothesis, so
+-- this branch is absurd. The `x ≤ y` branch needs `x ≠ y`, which
+-- follows from `x = y → x * c = y * c` contradicting the strict
+-- hypothesis.
+theorem Rational.LessThan.multiply_cancel_right
+        (x y c : Rational)
+        (cPositive : Rational.zero < c)
+        (xCLessThanYC : x * c < y * c)
+        : x < y :=
+  Or.eliminate(
+      Rational.LessOrEqual(x, y), Rational.LessOrEqual(y, x),
+      x < y,
+      function (xLeqY : x ≤ y) =>
+        And.introduction(
+            Rational.LessOrEqual(x, y), Not(x = y),
+            xLeqY,
+            function (xEqY : x = y) =>
+              And.right(
+                  Rational.LessOrEqual(x * c, y * c),
+                  Not(x * c = y * c),
+                  xCLessThanYC)(
+                  congruenceOf(
+                      function (w : Rational) => w * c,
+                      xEqY))),
+      function (yLeqX : y ≤ x) =>
+        False.eliminate_proposition(
+            x < y,
+            And.right(
+                Rational.LessOrEqual(x * c, y * c),
+                Not(x * c = y * c),
+                xCLessThanYC)(
+                Rational.LessOrEqual.antisymmetric(
+                    x * c, y * c,
+                    And.left(
+                        Rational.LessOrEqual(x * c, y * c),
+                        Not(x * c = y * c),
+                        xCLessThanYC),
+                    Rational.LessOrEqual.multiply_by_nonneg_right(
+                        y, x, c, yLeqX,
+                        And.left(
+                            Rational.LessOrEqual(Rational.zero, c),
+                            Not(Rational.zero = c),
+                            cPositive))))),
+      Rational.LessOrEqual.linear(x, y))
+
+-- ----------------------------------------------------------------------
 -- The Cauchy proof. For `m, n ≥ max(apartnessIndex, cauchyIndex(ε · K²))`,
 -- the identity |1/a − 1/b| = |b − a| / (|a| · |b|) plus |a|, |b| ≥ K
--- gives the bound |1/a − 1/b| ≤ |b − a| / K² < ε. Left as sorry —
--- the scaffolding is in place; this is the analytic gap that
--- finishes Real-as-Field.
+-- gives the bound |1/a − 1/b| ≤ |b − a| / K² < ε.
 theorem Real.reciprocal_sequence_is_cauchy
         (underlyingSequence : Rational.sequence.Sequence)
         (underlyingIsCauchy
@@ -64,7 +289,558 @@ theorem Real.reciprocal_sequence_is_cauchy
                                  underlyingSequence(m)))
         : Rational.sequence.IsCauchy(
               Real.reciprocal_sequence(underlyingSequence)) :=
-  sorry
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) => {
+    -- The scaled threshold ε · (K · K) is positive.
+    claim lowerBoundSquaredPositive
+          : Rational.zero < lowerBound * lowerBound
+      by Rational.multiply_positive_positive(
+             lowerBound, lowerBound,
+             lowerBoundPositive, lowerBoundPositive);
+    claim scaledEpsilonPositive
+          : Rational.zero < epsilon * (lowerBound * lowerBound)
+      by Rational.multiply_positive_positive(
+             epsilon, lowerBound * lowerBound,
+             epsilonPositive, lowerBoundSquaredPositive);
+    -- Apply Cauchy at ε · (K · K).
+    obtain ⟨cauchyIndex, cauchyAtScaledEpsilon⟩
+        from underlyingIsCauchy(
+                 epsilon * (lowerBound * lowerBound),
+                 scaledEpsilonPositive);
+    -- N := max(apartnessIndex, cauchyIndex). Both apartness and Cauchy
+    -- apply beyond N.
+    witness Natural.maximum(apartnessIndex, cauchyIndex) with
+        function (m : Natural)
+                 (NLeqM : Natural.maximum(apartnessIndex, cauchyIndex) ≤ m)
+                 (n : Natural)
+                 (NLeqN : Natural.maximum(apartnessIndex, cauchyIndex) ≤ n) =>
+          {
+            -- Index bookkeeping: apartnessIndex ≤ m, apartnessIndex ≤ n,
+            -- cauchyIndex ≤ m, cauchyIndex ≤ n.
+            claim apartnessIndexLeqM : apartnessIndex ≤ m
+              by LessOrEqual.transitive(
+                     apartnessIndex,
+                     Natural.maximum(apartnessIndex, cauchyIndex),
+                     m,
+                     NLeqM,
+                     Natural.left_le_max(apartnessIndex, cauchyIndex));
+            claim apartnessIndexLeqN : apartnessIndex ≤ n
+              by LessOrEqual.transitive(
+                     apartnessIndex,
+                     Natural.maximum(apartnessIndex, cauchyIndex),
+                     n,
+                     NLeqN,
+                     Natural.left_le_max(apartnessIndex, cauchyIndex));
+            claim cauchyIndexLeqM : cauchyIndex ≤ m
+              by LessOrEqual.transitive(
+                     cauchyIndex,
+                     Natural.maximum(apartnessIndex, cauchyIndex),
+                     m,
+                     NLeqM,
+                     Natural.right_le_max(apartnessIndex, cauchyIndex));
+            claim cauchyIndexLeqN : cauchyIndex ≤ n
+              by LessOrEqual.transitive(
+                     cauchyIndex,
+                     Natural.maximum(apartnessIndex, cauchyIndex),
+                     n,
+                     NLeqN,
+                     Natural.right_le_max(apartnessIndex, cauchyIndex));
+            -- Apartness applied at m, n.
+            claim lowerBoundLeqAbsSM
+                  : lowerBound
+                      ≤ Rational.absolute_value(underlyingSequence(m))
+              by apartness(m, apartnessIndexLeqM);
+            claim lowerBoundLeqAbsSN
+                  : lowerBound
+                      ≤ Rational.absolute_value(underlyingSequence(n))
+              by apartness(n, apartnessIndexLeqN);
+            -- s(m), s(n) are nonzero.
+            claim absSMPositive
+                  : Rational.zero
+                      < Rational.absolute_value(underlyingSequence(m))
+              by Rational.LessThan.transitive_right(
+                     Rational.zero,
+                     lowerBound,
+                     Rational.absolute_value(underlyingSequence(m)),
+                     lowerBoundPositive,
+                     lowerBoundLeqAbsSM);
+            claim absSNPositive
+                  : Rational.zero
+                      < Rational.absolute_value(underlyingSequence(n))
+              by Rational.LessThan.transitive_right(
+                     Rational.zero,
+                     lowerBound,
+                     Rational.absolute_value(underlyingSequence(n)),
+                     lowerBoundPositive,
+                     lowerBoundLeqAbsSN);
+            claim sMNonzero : ¬(underlyingSequence(m) = Rational.zero)
+              by function (sMZero : underlyingSequence(m) = Rational.zero) =>
+                   And.right(
+                       Rational.LessOrEqual(
+                           Rational.zero,
+                           Rational.absolute_value(underlyingSequence(m))),
+                       Not(Rational.zero
+                           = Rational.absolute_value(underlyingSequence(m))),
+                       absSMPositive)(
+                       Equality.symmetry(
+                           calc Rational.absolute_value(
+                                    underlyingSequence(m))
+                              = Rational.absolute_value(Rational.zero)
+                                   by congruenceOf(
+                                          Rational.absolute_value,
+                                          sMZero)
+                              = Rational.zero
+                                   by Rational.absolute_value_zero));
+            claim sNNonzero : ¬(underlyingSequence(n) = Rational.zero)
+              by function (sNZero : underlyingSequence(n) = Rational.zero) =>
+                   And.right(
+                       Rational.LessOrEqual(
+                           Rational.zero,
+                           Rational.absolute_value(underlyingSequence(n))),
+                       Not(Rational.zero
+                           = Rational.absolute_value(underlyingSequence(n))),
+                       absSNPositive)(
+                       Equality.symmetry(
+                           calc Rational.absolute_value(
+                                    underlyingSequence(n))
+                              = Rational.absolute_value(Rational.zero)
+                                   by congruenceOf(
+                                          Rational.absolute_value,
+                                          sNZero)
+                              = Rational.zero
+                                   by Rational.absolute_value_zero));
+            -- The Cauchy bound: |s(n) - s(m)| < ε · (K · K).
+            claim cauchyBound
+                  : Rational.absolute_value(
+                        underlyingSequence(n) - underlyingSequence(m))
+                    < epsilon * (lowerBound * lowerBound)
+              by cauchyAtScaledEpsilon(
+                     n, cauchyIndexLeqN, m, cauchyIndexLeqM);
+            -- The algebraic identity at the reciprocals.
+            claim recipIdentity
+                  : Rational.reciprocal_function(underlyingSequence(m))
+                      - Rational.reciprocal_function(underlyingSequence(n))
+                    = (underlyingSequence(n) - underlyingSequence(m))
+                          * (Rational.reciprocal_function(
+                                 underlyingSequence(m))
+                                 * Rational.reciprocal_function(
+                                       underlyingSequence(n)))
+              by Rational.reciprocal_function_subtract_identity(
+                     underlyingSequence(m),
+                     underlyingSequence(n),
+                     sMNonzero, sNNonzero);
+            -- (ra - rb) * (s(m) * s(n)) = s(n) - s(m). Apply absolute_value
+            -- below to get |ra - rb| * (|s(m)| * |s(n)|) = |s(n) - s(m)|.
+            claim recipIdentityScaled
+                  : (Rational.reciprocal_function(underlyingSequence(m))
+                         - Rational.reciprocal_function(underlyingSequence(n)))
+                        * (underlyingSequence(m) * underlyingSequence(n))
+                    = underlyingSequence(n) - underlyingSequence(m)
+              by calc (Rational.reciprocal_function(underlyingSequence(m))
+                           - Rational.reciprocal_function(
+                                 underlyingSequence(n)))
+                          * (underlyingSequence(m) * underlyingSequence(n))
+                    = ((underlyingSequence(n) - underlyingSequence(m))
+                           * (Rational.reciprocal_function(
+                                  underlyingSequence(m))
+                                  * Rational.reciprocal_function(
+                                        underlyingSequence(n))))
+                          * (underlyingSequence(m) * underlyingSequence(n))
+                         by congruenceOf(
+                                function (w : Rational) =>
+                                    w
+                                        * (underlyingSequence(m)
+                                               * underlyingSequence(n)),
+                                recipIdentity)
+                    = (underlyingSequence(n) - underlyingSequence(m))
+                          * ((Rational.reciprocal_function(
+                                  underlyingSequence(m))
+                                  * Rational.reciprocal_function(
+                                        underlyingSequence(n)))
+                                 * (underlyingSequence(m)
+                                        * underlyingSequence(n)))
+                         by Rational.multiply_associative(
+                                underlyingSequence(n) - underlyingSequence(m),
+                                Rational.reciprocal_function(
+                                    underlyingSequence(m))
+                                    * Rational.reciprocal_function(
+                                          underlyingSequence(n)),
+                                underlyingSequence(m) * underlyingSequence(n))
+                    = (underlyingSequence(n) - underlyingSequence(m))
+                          * ((underlyingSequence(m)
+                                  * Rational.reciprocal_function(
+                                        underlyingSequence(m)))
+                                 * (underlyingSequence(n)
+                                        * Rational.reciprocal_function(
+                                              underlyingSequence(n))))
+                         by congruenceOf(
+                                function (w : Rational) =>
+                                    (underlyingSequence(n)
+                                         - underlyingSequence(m))
+                                        * w,
+                                -- (ra · rb) · (a · b) = (a · ra) · (b · rb)
+                                calc (Rational.reciprocal_function(
+                                          underlyingSequence(m))
+                                          * Rational.reciprocal_function(
+                                                underlyingSequence(n)))
+                                          * (underlyingSequence(m)
+                                                 * underlyingSequence(n))
+                                    = Rational.reciprocal_function(
+                                          underlyingSequence(m))
+                                          * (Rational.reciprocal_function(
+                                                 underlyingSequence(n))
+                                                 * (underlyingSequence(m)
+                                                        * underlyingSequence(
+                                                              n)))
+                                         by Rational.multiply_associative(
+                                                Rational.reciprocal_function(
+                                                    underlyingSequence(m)),
+                                                Rational.reciprocal_function(
+                                                    underlyingSequence(n)),
+                                                underlyingSequence(m)
+                                                    * underlyingSequence(n))
+                                    = Rational.reciprocal_function(
+                                          underlyingSequence(m))
+                                          * ((Rational.reciprocal_function(
+                                                  underlyingSequence(n))
+                                                  * underlyingSequence(m))
+                                                 * underlyingSequence(n))
+                                         by congruenceOf(
+                                                function (w : Rational) =>
+                                                    Rational.reciprocal_function(
+                                                        underlyingSequence(m))
+                                                        * w,
+                                                Equality.symmetry(
+                                                    Rational.multiply_associative(
+                                                        Rational.reciprocal_function(
+                                                            underlyingSequence(
+                                                                n)),
+                                                        underlyingSequence(m),
+                                                        underlyingSequence(
+                                                            n))))
+                                    = Rational.reciprocal_function(
+                                          underlyingSequence(m))
+                                          * ((underlyingSequence(m)
+                                                  * Rational.reciprocal_function(
+                                                        underlyingSequence(n)))
+                                                 * underlyingSequence(n))
+                                         by congruenceOf(
+                                                function (w : Rational) =>
+                                                    Rational.reciprocal_function(
+                                                        underlyingSequence(m))
+                                                        * (w
+                                                               * underlyingSequence(
+                                                                     n)),
+                                                Rational.multiply_commutative(
+                                                    Rational.reciprocal_function(
+                                                        underlyingSequence(n)),
+                                                    underlyingSequence(m)))
+                                    = Rational.reciprocal_function(
+                                          underlyingSequence(m))
+                                          * (underlyingSequence(m)
+                                                 * (Rational.reciprocal_function(
+                                                        underlyingSequence(n))
+                                                        * underlyingSequence(
+                                                              n)))
+                                         by congruenceOf(
+                                                function (w : Rational) =>
+                                                    Rational.reciprocal_function(
+                                                        underlyingSequence(m))
+                                                        * w,
+                                                Rational.multiply_associative(
+                                                    underlyingSequence(m),
+                                                    Rational.reciprocal_function(
+                                                        underlyingSequence(n)),
+                                                    underlyingSequence(n)))
+                                    = Rational.reciprocal_function(
+                                          underlyingSequence(m))
+                                          * (underlyingSequence(m)
+                                                 * (underlyingSequence(n)
+                                                        * Rational.reciprocal_function(
+                                                              underlyingSequence(
+                                                                  n))))
+                                         by congruenceOf(
+                                                function (w : Rational) =>
+                                                    Rational.reciprocal_function(
+                                                        underlyingSequence(m))
+                                                        * (underlyingSequence(
+                                                               m)
+                                                               * w),
+                                                Rational.multiply_commutative(
+                                                    Rational.reciprocal_function(
+                                                        underlyingSequence(n)),
+                                                    underlyingSequence(n)))
+                                    = (Rational.reciprocal_function(
+                                          underlyingSequence(m))
+                                          * underlyingSequence(m))
+                                          * (underlyingSequence(n)
+                                                 * Rational.reciprocal_function(
+                                                       underlyingSequence(n)))
+                                         by Equality.symmetry(
+                                                Rational.multiply_associative(
+                                                    Rational.reciprocal_function(
+                                                        underlyingSequence(m)),
+                                                    underlyingSequence(m),
+                                                    underlyingSequence(n)
+                                                        * Rational.reciprocal_function(
+                                                              underlyingSequence(
+                                                                  n))))
+                                    = (underlyingSequence(m)
+                                          * Rational.reciprocal_function(
+                                                underlyingSequence(m)))
+                                          * (underlyingSequence(n)
+                                                 * Rational.reciprocal_function(
+                                                       underlyingSequence(n)))
+                                         by congruenceOf(
+                                                function (w : Rational) =>
+                                                    w
+                                                        * (underlyingSequence(
+                                                               n)
+                                                               * Rational.reciprocal_function(
+                                                                     underlyingSequence(
+                                                                         n))),
+                                                Rational.multiply_commutative(
+                                                    Rational.reciprocal_function(
+                                                        underlyingSequence(m)),
+                                                    underlyingSequence(m))))
+                    = (underlyingSequence(n) - underlyingSequence(m))
+                          * (Rational.one * Rational.one)
+                         by congruenceOf(
+                                function (w : Rational) =>
+                                    (underlyingSequence(n)
+                                         - underlyingSequence(m)) * w,
+                                calc (underlyingSequence(m)
+                                          * Rational.reciprocal_function(
+                                                underlyingSequence(m)))
+                                          * (underlyingSequence(n)
+                                                 * Rational.reciprocal_function(
+                                                       underlyingSequence(n)))
+                                    = Rational.one
+                                          * (underlyingSequence(n)
+                                                 * Rational.reciprocal_function(
+                                                       underlyingSequence(n)))
+                                         by congruenceOf(
+                                                function (w : Rational) =>
+                                                    w
+                                                        * (underlyingSequence(
+                                                               n)
+                                                               * Rational.reciprocal_function(
+                                                                     underlyingSequence(
+                                                                         n))),
+                                                Rational.reciprocal_function_multiplies(
+                                                    underlyingSequence(m),
+                                                    sMNonzero))
+                                    = Rational.one * Rational.one
+                                         by congruenceOf(
+                                                function (w : Rational) =>
+                                                    Rational.one * w,
+                                                Rational.reciprocal_function_multiplies(
+                                                    underlyingSequence(n),
+                                                    sNNonzero)))
+                    = (underlyingSequence(n) - underlyingSequence(m))
+                          * Rational.one
+                         by congruenceOf(
+                                function (w : Rational) =>
+                                    (underlyingSequence(n)
+                                         - underlyingSequence(m)) * w,
+                                Rational.multiply_one(Rational.one))
+                    = underlyingSequence(n) - underlyingSequence(m)
+                         by Rational.multiply_one(
+                                underlyingSequence(n)
+                                    - underlyingSequence(m));
+            -- Take absolute value to get
+            --   |ra - rb| * (|s(m)| * |s(n)|) = |s(n) - s(m)|.
+            claim absRecipScaledEquation
+                  : Rational.absolute_value(
+                        Rational.reciprocal_function(underlyingSequence(m))
+                          - Rational.reciprocal_function(
+                                underlyingSequence(n)))
+                        * (Rational.absolute_value(underlyingSequence(m))
+                               * Rational.absolute_value(
+                                     underlyingSequence(n)))
+                    = Rational.absolute_value(
+                          underlyingSequence(n) - underlyingSequence(m))
+              by calc Rational.absolute_value(
+                          Rational.reciprocal_function(underlyingSequence(m))
+                            - Rational.reciprocal_function(
+                                  underlyingSequence(n)))
+                          * (Rational.absolute_value(underlyingSequence(m))
+                                 * Rational.absolute_value(
+                                       underlyingSequence(n)))
+                    = Rational.absolute_value(
+                          Rational.reciprocal_function(underlyingSequence(m))
+                            - Rational.reciprocal_function(
+                                  underlyingSequence(n)))
+                          * Rational.absolute_value(
+                                underlyingSequence(m)
+                                    * underlyingSequence(n))
+                         by congruenceOf(
+                                function (w : Rational) =>
+                                    Rational.absolute_value(
+                                        Rational.reciprocal_function(
+                                            underlyingSequence(m))
+                                          - Rational.reciprocal_function(
+                                                underlyingSequence(n)))
+                                        * w,
+                                Equality.symmetry(
+                                    Rational.absolute_value_multiplicative(
+                                        underlyingSequence(m),
+                                        underlyingSequence(n))))
+                    = Rational.absolute_value(
+                          (Rational.reciprocal_function(underlyingSequence(m))
+                             - Rational.reciprocal_function(
+                                   underlyingSequence(n)))
+                              * (underlyingSequence(m)
+                                     * underlyingSequence(n)))
+                         by Equality.symmetry(
+                                Rational.absolute_value_multiplicative(
+                                    Rational.reciprocal_function(
+                                        underlyingSequence(m))
+                                      - Rational.reciprocal_function(
+                                            underlyingSequence(n)),
+                                    underlyingSequence(m)
+                                        * underlyingSequence(n)))
+                    = Rational.absolute_value(
+                          underlyingSequence(n) - underlyingSequence(m))
+                         by congruenceOf(
+                                Rational.absolute_value,
+                                recipIdentityScaled);
+            -- |ra - rb| ≥ 0 (absolute value).
+            claim absRecipDiffNonneg
+                  : Rational.zero
+                      ≤ Rational.absolute_value(
+                            Rational.reciprocal_function(
+                                underlyingSequence(m))
+                              - Rational.reciprocal_function(
+                                    underlyingSequence(n)))
+              by Rational.zero_le_absolute_value(
+                     Rational.reciprocal_function(underlyingSequence(m))
+                         - Rational.reciprocal_function(
+                               underlyingSequence(n)));
+            -- K * K ≤ |s(m)| * |s(n)|. We have K ≤ |s(m)| and K ≤ |s(n)|.
+            -- K * K ≤ |s(m)| * K  [multiply_by_nonneg_right with cNonneg = K ≥ 0]
+            -- |s(m)| * K ≤ |s(m)| * |s(n)|  [multiply_by_nonneg_left with cNonneg = |s(m)| ≥ 0]
+            claim lowerBoundNonneg
+                  : Rational.LessOrEqual(Rational.zero, lowerBound)
+              by And.left(
+                     Rational.LessOrEqual(Rational.zero, lowerBound),
+                     Not(Rational.zero = lowerBound),
+                     lowerBoundPositive);
+            claim absSMNonneg
+                  : Rational.LessOrEqual(
+                        Rational.zero,
+                        Rational.absolute_value(underlyingSequence(m)))
+              by Rational.zero_le_absolute_value(underlyingSequence(m));
+            claim kSquaredLeqProd
+                  : lowerBound * lowerBound
+                      ≤ Rational.absolute_value(underlyingSequence(m))
+                          * Rational.absolute_value(underlyingSequence(n))
+              by Rational.LessOrEqual.transitive(
+                     lowerBound * lowerBound,
+                     Rational.absolute_value(underlyingSequence(m))
+                         * lowerBound,
+                     Rational.absolute_value(underlyingSequence(m))
+                         * Rational.absolute_value(underlyingSequence(n)),
+                     Rational.LessOrEqual.multiply_by_nonneg_right(
+                         lowerBound,
+                         Rational.absolute_value(underlyingSequence(m)),
+                         lowerBound,
+                         lowerBoundLeqAbsSM,
+                         lowerBoundNonneg),
+                     Rational.LessOrEqual.multiply_by_nonneg_left(
+                         lowerBound,
+                         Rational.absolute_value(underlyingSequence(n)),
+                         Rational.absolute_value(underlyingSequence(m)),
+                         lowerBoundLeqAbsSN,
+                         absSMNonneg));
+            -- |ra - rb| * (K * K) ≤ |ra - rb| * (|s(m)| * |s(n)|)
+            -- (multiply on the left by nonneg |ra - rb|).
+            claim recipDiffScaledLeq
+                  : Rational.absolute_value(
+                        Rational.reciprocal_function(underlyingSequence(m))
+                          - Rational.reciprocal_function(
+                                underlyingSequence(n)))
+                        * (lowerBound * lowerBound)
+                    ≤ Rational.absolute_value(
+                          Rational.reciprocal_function(underlyingSequence(m))
+                            - Rational.reciprocal_function(
+                                  underlyingSequence(n)))
+                          * (Rational.absolute_value(underlyingSequence(m))
+                                 * Rational.absolute_value(
+                                       underlyingSequence(n)))
+              by Rational.LessOrEqual.multiply_by_nonneg_left(
+                     lowerBound * lowerBound,
+                     Rational.absolute_value(underlyingSequence(m))
+                         * Rational.absolute_value(underlyingSequence(n)),
+                     Rational.absolute_value(
+                         Rational.reciprocal_function(underlyingSequence(m))
+                           - Rational.reciprocal_function(
+                                 underlyingSequence(n))),
+                     kSquaredLeqProd,
+                     absRecipDiffNonneg);
+            -- Replace |ra - rb| * (|s(m)| * |s(n)|) with |s(n) - s(m)|.
+            claim recipDiffScaledLeqAbsSubtract
+                  : Rational.absolute_value(
+                        Rational.reciprocal_function(underlyingSequence(m))
+                          - Rational.reciprocal_function(
+                                underlyingSequence(n)))
+                        * (lowerBound * lowerBound)
+                    ≤ Rational.absolute_value(
+                          underlyingSequence(n) - underlyingSequence(m))
+              by Equality.transport_proposition(
+                     Rational,
+                     function (w : Rational) =>
+                         Rational.absolute_value(
+                             Rational.reciprocal_function(
+                                 underlyingSequence(m))
+                               - Rational.reciprocal_function(
+                                     underlyingSequence(n)))
+                             * (lowerBound * lowerBound)
+                             ≤ w,
+                     Rational.absolute_value(
+                         Rational.reciprocal_function(underlyingSequence(m))
+                           - Rational.reciprocal_function(
+                                 underlyingSequence(n)))
+                         * (Rational.absolute_value(underlyingSequence(m))
+                                * Rational.absolute_value(
+                                      underlyingSequence(n))),
+                     Rational.absolute_value(
+                         underlyingSequence(n) - underlyingSequence(m)),
+                     absRecipScaledEquation,
+                     recipDiffScaledLeq);
+            -- Combine with strict Cauchy bound.
+            claim recipDiffScaledLessThan
+                  : Rational.absolute_value(
+                        Rational.reciprocal_function(underlyingSequence(m))
+                          - Rational.reciprocal_function(
+                                underlyingSequence(n)))
+                        * (lowerBound * lowerBound)
+                    < epsilon * (lowerBound * lowerBound)
+              by Rational.LessThan.transitive_left(
+                     Rational.absolute_value(
+                         Rational.reciprocal_function(underlyingSequence(m))
+                           - Rational.reciprocal_function(
+                                 underlyingSequence(n)))
+                         * (lowerBound * lowerBound),
+                     Rational.absolute_value(
+                         underlyingSequence(n) - underlyingSequence(m)),
+                     epsilon * (lowerBound * lowerBound),
+                     recipDiffScaledLeqAbsSubtract,
+                     cauchyBound);
+            -- Cancel (K · K) on both sides.
+            -- The reciprocal sequence value at m equals
+            -- reciprocal_function(s(m)), by Real.reciprocal_sequence's
+            -- definition.
+            Rational.LessThan.multiply_cancel_right(
+                Rational.absolute_value(
+                    Real.reciprocal_sequence(underlyingSequence)(m)
+                      - Real.reciprocal_sequence(underlyingSequence)(n)),
+                epsilon,
+                lowerBound * lowerBound,
+                lowerBoundSquaredPositive,
+                recipDiffScaledLessThan)
+          }
+  }
 
 -- ----------------------------------------------------------------------
 -- Package the reciprocal sequence with its Cauchy proof.
