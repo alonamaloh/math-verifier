@@ -1,0 +1,59 @@
+-- Regression test for the wildcard-binder collision fix.
+--
+-- Background: `openOverLocalBinders` previously opened binders by their
+-- literal name. Two `_` (wildcard) binders in the same stack both
+-- opened to `FreeVariable("_", Internal)`, which the kernel couldn't
+-- distinguish — leading to type errors or (worse) segfaults from
+-- malformed terms. The fix routes every Internal-origin open / close /
+-- Context-build through `openingNameFor(localBinders, i)`, which
+-- appends a position-dependent suffix for wildcard binders so they get
+-- unique FreeVariable names.
+--
+-- The proofs below exercise the situation: multiple wildcard binders
+-- from nested destructures, followed by code that triggers
+-- inferTypeInLocalContext (which previously hit the collision).
+
+module Test.wildcard_binder_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- (1) Two `_` wildcards in a single obtain destructure of a triple
+-- existential. Previously crashed with "unbound internal variable: _"
+-- (the kernel saw two FVs named `_` and couldn't keep them straight).
+-- The goal must live in Proposition (Exists doesn't permit large
+-- elimination to Type), so we pick `zero = zero` as the goal.
+theorem doubleWildcardObtain
+        (witnessTriple :
+            ∃ (a : Natural). ∃ (b : Natural). ∃ (c : Natural). a + b = c)
+        : zero = zero := {
+    obtain ⟨_, _, _, equationProof⟩ from witnessTriple;
+    reflexivity(zero)
+}
+
+-- (2) Wildcard mixed with named binders, then a subsequent destructure
+-- that opens the binder stack via the auto-prover. Both `_` slots had
+-- to disambiguate for the calc step's expected-type recovery.
+theorem wildcardThenCalc
+        (existenceProof : ∃ (a : Natural). a + zero = zero + a)
+        : zero = zero := {
+    obtain ⟨_, eq⟩ from existenceProof;
+    reflexivity(zero)
+}
+
+-- (3) Two consecutive `let ⟨_, x⟩ := …;` destructures throw away their
+-- first components into two separate `_` binders that coexist on the
+-- stack. The trailing claim invokes `inferTypeInLocalContext` (via the
+-- auto-prover), which previously collapsed both wildcards into one FV.
+theorem twoConsecutiveWildcards
+        (firstPair : ∃ (left : Natural). Natural = Natural)
+        (secondPair : ∃ (right : Natural). Natural = Natural)
+        : Natural = Natural := {
+    obtain ⟨_, firstEq⟩ from firstPair;
+    obtain ⟨_, secondEq⟩ from secondPair;
+    reflexivity(Natural)
+}

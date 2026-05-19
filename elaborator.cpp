@@ -21,6 +21,25 @@ struct LocalBinder {
     ExpressionPointer type;
 };
 
+// Returns the FreeVariable name used when opening / closing the binder
+// at `localBinders[index]` (Internal origin). Wildcards (`_`) get a
+// position-dependent suffix so multiple `_` binders in the same stack
+// don't collapse to the same FreeVariable. Every site that opens an
+// Internal-origin FV for a local binder OR constructs a Context entry
+// for one MUST go through this helper — otherwise opens and closes get
+// out of sync (`closeBinder` searches by literal name) and inferType
+// fails to find type info for the FV in its context. The user-visible
+// binder name in `localBinders[i].name` stays unchanged; only the FV
+// naming is rewritten here.
+inline std::string openingNameFor(
+    const std::vector<LocalBinder>& localBinders, size_t index) {
+    const std::string& original = localBinders[index].name;
+    if (original == "_") {
+        return "_wildcard_" + std::to_string(index);
+    }
+    return original;
+}
+
 // Spine-head hash used to bucket rewrite lemmas in the calc auto-prover's
 // lemma index (Phase 3). We walk the Application spine to its head and
 // hash just that head's identifying tag (Constant name, or a leaf-shape
@@ -217,7 +236,8 @@ private:
         const std::vector<LocalBinder>& localBinders,
         size_t count) const {
         for (size_t i = count; i > 0; --i) {
-            term = openBinder(term, localBinders[i - 1].name,
+            term = openBinder(term,
+                              openingNameFor(localBinders, i - 1),
                               FreeVariableOrigin::Internal);
         }
         return term;
@@ -1347,7 +1367,7 @@ private:
                 ExpressionPointer openedType = openOverLocalBinders(
                     outerBinderStack[i].type, outerBinderStack, i);
                 outerBinderContext.push_back(
-                    {outerBinderStack[i].name, openedType,
+                    {openingNameFor(outerBinderStack, i), openedType,
                      FreeVariableOrigin::Internal});
             }
             ExpressionPointer motiveType =
@@ -1943,7 +1963,7 @@ private:
             for (size_t i = 0; i < bodyStack.size(); ++i) {
                 ExpressionPointer openedType = openOverLocalBinders(
                     bodyStack[i].type, bodyStack, i);
-                bodyContext.push_back({bodyStack[i].name, openedType,
+                bodyContext.push_back({openingNameFor(bodyStack, i), openedType,
                                           FreeVariableOrigin::Internal});
             }
             if (!isDefinitionallyEqual(environment_, bodyContext,
@@ -2270,7 +2290,7 @@ private:
                 ExpressionPointer openedType = openOverLocalBinders(
                     bodyStack[i].type, bodyStack, i);
                 openedContext.push_back(
-                    {bodyStack[i].name, openedType,
+                    {openingNameFor(bodyStack, i), openedType,
                      FreeVariableOrigin::Internal});
             }
             ExpressionPointer motiveType =
@@ -3367,7 +3387,8 @@ private:
                             openOverLocalBinders(localBinders[i].type,
                                                   localBinders, i);
                         coercionContext.push_back(
-                            {localBinders[i].name, openedBinderType,
+                            {openingNameFor(localBinders, i),
+                             openedBinderType,
                              FreeVariableOrigin::Internal});
                     }
                     if (isDefinitionallyEqual(environment_, coercionContext,
@@ -3833,7 +3854,7 @@ private:
         for (size_t i = 0; i < localBinders.size(); ++i) {
             ExpressionPointer openedType = openOverLocalBinders(
                 localBinders[i].type, localBinders, i);
-            openedContext.push_back({localBinders[i].name,
+            openedContext.push_back({openingNameFor(localBinders, i),
                                       openedType,
                                       FreeVariableOrigin::Internal});
         }
@@ -4381,7 +4402,7 @@ private:
             for (size_t i = 0; i < localBinders.size(); ++i) {
                 ExpressionPointer openedType = openOverLocalBinders(
                     localBinders[i].type, localBinders, i);
-                stepContext.push_back({localBinders[i].name, openedType,
+                stepContext.push_back({openingNameFor(localBinders, i), openedType,
                                           FreeVariableOrigin::Internal});
             }
             if (!isDefinitionallyEqual(environment_, stepContext,
@@ -4594,7 +4615,7 @@ private:
         for (size_t i = 0; i < localBinders.size(); ++i) {
             ExpressionPointer openedType = openOverLocalBinders(
                 localBinders[i].type, localBinders, i);
-            openedContext.push_back({localBinders[i].name, openedType,
+            openedContext.push_back({openingNameFor(localBinders, i), openedType,
                                        FreeVariableOrigin::Internal});
         }
         ExpressionPointer previousOpened = openOverLocalBinders(
@@ -5145,7 +5166,7 @@ private:
         for (size_t i = 0; i < localBinders.size(); ++i) {
             ExpressionPointer openedType = openOverLocalBinders(
                 localBinders[i].type, localBinders, i);
-            openedContext.push_back({localBinders[i].name, openedType,
+            openedContext.push_back({openingNameFor(localBinders, i), openedType,
                                        FreeVariableOrigin::Internal});
         }
         // Hypothesis match.
@@ -5212,7 +5233,7 @@ private:
         for (size_t i = 0; i < localBinders.size(); ++i) {
             ExpressionPointer openedType = openOverLocalBinders(
                 localBinders[i].type, localBinders, i);
-            openedContext.push_back({localBinders[i].name, openedType,
+            openedContext.push_back({openingNameFor(localBinders, i), openedType,
                                        FreeVariableOrigin::Internal});
         }
         for (int i = static_cast<int>(localBinders.size()) - 1;
@@ -5606,7 +5627,7 @@ private:
         for (size_t i = 0; i < localBinders.size(); ++i) {
             ExpressionPointer openedType = openOverLocalBinders(
                 localBinders[i].type, localBinders, i);
-            openedContext.push_back({localBinders[i].name, openedType,
+            openedContext.push_back({openingNameFor(localBinders, i), openedType,
                                        FreeVariableOrigin::Internal});
         }
         // Walk binders looking for one whose type is `P → False` for
@@ -6510,7 +6531,7 @@ private:
             for (size_t i = 0; i < localBinders.size(); ++i) {
                 ExpressionPointer openedType = openOverLocalBinders(
                     localBinders[i].type, localBinders, i);
-                openedContext.push_back({localBinders[i].name,
+                openedContext.push_back({openingNameFor(localBinders, i),
                                           openedType,
                                           FreeVariableOrigin::Internal});
             }
@@ -7285,7 +7306,7 @@ private:
                 ExpressionPointer openedType = openOverLocalBinders(
                     localBinders[i].type, localBinders, i);
                 openedContext.push_back(
-                    {localBinders[i].name, openedType,
+                    {openingNameFor(localBinders, i), openedType,
                      FreeVariableOrigin::Internal});
             }
             ExpressionPointer motiveType =
@@ -9108,7 +9129,7 @@ private:
                 ExpressionPointer openedType = openOverLocalBinders(
                     localBinders[i].type, localBinders, i);
                 context.push_back(
-                    {localBinders[i].name, openedType,
+                    {openingNameFor(localBinders, i), openedType,
                      FreeVariableOrigin::Internal});
             }
             ExpressionPointer leftOpened = openOverLocalBinders(
@@ -9380,7 +9401,7 @@ private:
             ExpressionPointer openedType = openOverLocalBinders(
                 localBinders[i].type, localBinders, i);
             openedContext.push_back(
-                {localBinders[i].name, openedType,
+                {openingNameFor(localBinders, i), openedType,
                  FreeVariableOrigin::Internal});
         }
         ExpressionPointer goalSort = weakHeadNormalForm(
@@ -10389,7 +10410,8 @@ private:
         const std::vector<LocalBinder>& localBinders,
         size_t count) {
         for (size_t i = count; i > 0; --i) {
-            term = openBinder(term, localBinders[i - 1].name,
+            term = openBinder(term,
+                              openingNameFor(localBinders, i - 1),
                               FreeVariableOrigin::Internal);
         }
         return term;
@@ -10405,7 +10427,8 @@ private:
         const std::vector<LocalBinder>& localBinders,
         size_t count) {
         for (size_t i = 0; i < count; ++i) {
-            term = closeBinder(term, localBinders[i].name,
+            term = closeBinder(term,
+                                openingNameFor(localBinders, i),
                                 FreeVariableOrigin::Internal);
         }
         return term;
@@ -10782,7 +10805,7 @@ private:
         for (size_t i = 0; i < localBinders.size(); ++i) {
             ExpressionPointer openedType = openOverLocalBinders(
                 localBinders[i].type, localBinders, i);
-            context.push_back({localBinders[i].name, openedType,
+            context.push_back({openingNameFor(localBinders, i), openedType,
                                 FreeVariableOrigin::Internal});
         }
         return inferType(environment_, context, openedTerm);
