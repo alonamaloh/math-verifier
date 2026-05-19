@@ -712,55 +712,32 @@ theorem Real.multiply_after_first_respects_at_rep_inner
 }
 
 -- multiply_after_first_respects: rep_x fixed, y varies.
+-- Multi-pattern destructure on all three reps so the bound on s_x is
+-- accessible (cauchy_is_naturally_bounded needs the underlying
+-- sequence). The inner ε-N bound is supplied by _at_rep_inner.
 theorem Real.multiply_after_first_respects
         : (rep_x rep_y rep_yPrime : CauchyRationalSequence)
           → CauchyEquivalent(rep_y, rep_yPrime)
           → (Quotient.mk(CauchyRationalSequence.multiply(rep_x, rep_y)) : Real)
             = Quotient.mk(CauchyRationalSequence.multiply(rep_x, rep_yPrime))
-  | CauchyRationalSequence.make(s_x, sCauchy_x), rep_y, rep_yPrime, yEquiv =>
-      (cases rep_y {
-         | CauchyRationalSequence.make(s_y, sCauchy_y) =>
-             function (outerRefinedYEquiv
-                         : CauchyEquivalent(
-                               CauchyRationalSequence.make(s_y, sCauchy_y),
-                               rep_yPrime)) =>
-               (cases rep_yPrime {
-                  | CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime) =>
-                      function (refinedYEquiv
-                                  : CauchyEquivalent(
-                                        CauchyRationalSequence.make(s_y, sCauchy_y),
-                                        CauchyRationalSequence.make(
-                                            s_yPrime, sCauchy_yPrime))) =>
-                        Quotient.sound(
-                            CauchyRationalSequence.multiply(
-                                CauchyRationalSequence.make(s_x, sCauchy_x),
-                                CauchyRationalSequence.make(s_y, sCauchy_y)),
-                            CauchyRationalSequence.multiply(
-                                CauchyRationalSequence.make(s_x, sCauchy_x),
-                                CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime)),
-                            function (epsilon : Rational)
-                                     (epsilonPositive : Rational.zero < epsilon) =>
-                              Real.multiply_after_first_respects_at_rep_inner(
-                                  s_x, sCauchy_x, s_y, s_yPrime,
-                                  sCauchy_y, sCauchy_yPrime,
-                                  refinedYEquiv,
-                                  epsilon, epsilonPositive))
-                } : (refinedYEquiv : CauchyEquivalent(
-                                         CauchyRationalSequence.make(s_y, sCauchy_y),
-                                         rep_yPrime))
-                    → (Quotient.mk(CauchyRationalSequence.multiply(
-                                       CauchyRationalSequence.make(s_x, sCauchy_x),
-                                       CauchyRationalSequence.make(s_y, sCauchy_y))) : Real)
-                      = Quotient.mk(CauchyRationalSequence.multiply(
-                                         CauchyRationalSequence.make(s_x, sCauchy_x),
-                                         rep_yPrime)))(outerRefinedYEquiv)
-       } : (refinedYEquiv : CauchyEquivalent(rep_y, rep_yPrime))
-           → (Quotient.mk(CauchyRationalSequence.multiply(
-                              CauchyRationalSequence.make(s_x, sCauchy_x),
-                              rep_y)) : Real)
-             = Quotient.mk(CauchyRationalSequence.multiply(
-                                CauchyRationalSequence.make(s_x, sCauchy_x),
-                                rep_yPrime)))(yEquiv)
+  | CauchyRationalSequence.make(s_x, sCauchy_x),
+    CauchyRationalSequence.make(s_y, sCauchy_y),
+    CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime),
+    refinedYEquiv =>
+      Quotient.sound(
+          CauchyRationalSequence.multiply(
+              CauchyRationalSequence.make(s_x, sCauchy_x),
+              CauchyRationalSequence.make(s_y, sCauchy_y)),
+          CauchyRationalSequence.multiply(
+              CauchyRationalSequence.make(s_x, sCauchy_x),
+              CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime)),
+          function (epsilon : Rational)
+                   (epsilonPositive : Rational.zero < epsilon) =>
+            Real.multiply_after_first_respects_at_rep_inner(
+                s_x, sCauchy_x, s_y, s_yPrime,
+                sCauchy_y, sCauchy_yPrime,
+                refinedYEquiv,
+                epsilon, epsilonPositive))
 
 -- Symmetric inner-chain helper for multiply_respects_at_rep_y: y is
 -- bounded, x varies via xEquiv.
@@ -798,72 +775,33 @@ theorem Real.multiply_respects_at_rep_y_inner
   }
 
 -- Helper for multiply_respects: shows the at-rep-y version of the
--- product equivalence given xEquiv. The argument shape is symmetric to
+-- product equivalence given xEquiv. Argument shape is symmetric to
 -- multiply_after_first_respects but with the bound on the y-side.
+-- Multi-pattern destructure on all three reps; inner ε-N bound is
+-- supplied by _at_rep_y_inner.
 theorem Real.multiply_respects_at_rep_y
-        (rep_x rep_xPrime rep_y : CauchyRationalSequence)
-        (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
-        : (Quotient.mk(CauchyRationalSequence.multiply(rep_x, rep_y)) : Real)
-          = Quotient.mk(CauchyRationalSequence.multiply(rep_xPrime, rep_y)) :=
-  -- The strategy: at the rep level, multiply(rep_x, rep_y)'s sequence
-  -- is λn. s_x(n) * s_y(n), and we need:
-  --   λn. s_x(n) * s_y(n)  ≡  λn. s_xPrime(n) * s_y(n).
-  -- Bound |s_y(n)| ≤ (succ K : R) eventually. Apply xEquiv with δ
-  -- such that (succ K) * δ ≤ halve(ε). Conclude
-  -- |s_x(n)*s_y(n) - s_xPrime(n)*s_y(n)| = |(s_x(n) - s_xPrime(n)) * s_y(n)|
-  --                                     = |s_x(n) - s_xPrime(n)| * |s_y(n)|
-  --                                     ≤ |s_x(n) - s_xPrime(n)| * (succ K)
-  --                                     ≤ δ * (succ K) ≤ halve(ε) < ε.
-  -- Pattern-match rep_y, rep_x, rep_xPrime. Each nested cases takes a
-  -- function that takes the refined xEquiv after refining rep_x/rep_xPrime.
-  (cases rep_y {
-     | CauchyRationalSequence.make(s_y, sCauchy_y) =>
-         (cases rep_x {
-            | CauchyRationalSequence.make(s_x, sCauchy_x) =>
-                function (innerXEquiv
-                            : CauchyEquivalent(
-                                  CauchyRationalSequence.make(s_x, sCauchy_x),
-                                  rep_xPrime)) =>
-                  (cases rep_xPrime {
-                     | CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime) =>
-                         function (refinedXEquiv
-                                     : CauchyEquivalent(
-                                           CauchyRationalSequence.make(s_x, sCauchy_x),
-                                           CauchyRationalSequence.make(
-                                               s_xPrime, sCauchy_xPrime))) =>
-                           Quotient.sound(
-                               CauchyRationalSequence.multiply(
-                                   CauchyRationalSequence.make(s_x, sCauchy_x),
-                                   CauchyRationalSequence.make(s_y, sCauchy_y)),
-                               CauchyRationalSequence.multiply(
-                                   CauchyRationalSequence.make(
-                                       s_xPrime, sCauchy_xPrime),
-                                   CauchyRationalSequence.make(s_y, sCauchy_y)),
-                               function (epsilon : Rational)
-                                        (epsilonPositive : Rational.zero < epsilon) =>
-                                 Real.multiply_respects_at_rep_y_inner(
-                                     s_x, sCauchy_x, s_xPrime, sCauchy_xPrime,
-                                     s_y, sCauchy_y,
-                                     refinedXEquiv,
-                                     epsilon, epsilonPositive))
-                   } : (refinedXEquiv : CauchyEquivalent(
-                                            CauchyRationalSequence.make(s_x, sCauchy_x),
-                                            rep_xPrime))
-                       → (Quotient.mk(CauchyRationalSequence.multiply(
-                                          CauchyRationalSequence.make(s_x, sCauchy_x),
-                                          CauchyRationalSequence.make(s_y, sCauchy_y))) : Real)
-                         = Quotient.mk(CauchyRationalSequence.multiply(
-                                            rep_xPrime,
-                                            CauchyRationalSequence.make(s_y, sCauchy_y))))(innerXEquiv)
-          } : (innerXEquiv : CauchyEquivalent(rep_x, rep_xPrime))
-              → (Quotient.mk(CauchyRationalSequence.multiply(
-                                 rep_x,
-                                 CauchyRationalSequence.make(s_y, sCauchy_y))) : Real)
-                = Quotient.mk(CauchyRationalSequence.multiply(
-                                   rep_xPrime,
-                                   CauchyRationalSequence.make(s_y, sCauchy_y))))(xEquiv)
-   } : (Quotient.mk(CauchyRationalSequence.multiply(rep_x, rep_y)) : Real)
-       = Quotient.mk(CauchyRationalSequence.multiply(rep_xPrime, rep_y)))
+        : (rep_x rep_xPrime rep_y : CauchyRationalSequence)
+          → CauchyEquivalent(rep_x, rep_xPrime)
+          → (Quotient.mk(CauchyRationalSequence.multiply(rep_x, rep_y)) : Real)
+            = Quotient.mk(CauchyRationalSequence.multiply(rep_xPrime, rep_y))
+  | CauchyRationalSequence.make(s_x, sCauchy_x),
+    CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime),
+    CauchyRationalSequence.make(s_y, sCauchy_y),
+    refinedXEquiv =>
+      Quotient.sound(
+          CauchyRationalSequence.multiply(
+              CauchyRationalSequence.make(s_x, sCauchy_x),
+              CauchyRationalSequence.make(s_y, sCauchy_y)),
+          CauchyRationalSequence.multiply(
+              CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime),
+              CauchyRationalSequence.make(s_y, sCauchy_y)),
+          function (epsilon : Rational)
+                   (epsilonPositive : Rational.zero < epsilon) =>
+            Real.multiply_respects_at_rep_y_inner(
+                s_x, sCauchy_x, s_xPrime, sCauchy_xPrime,
+                s_y, sCauchy_y,
+                refinedXEquiv,
+                epsilon, epsilonPositive))
 
 -- Symmetric inner-chain helper for multiply_respects_at_rep_y: y is
 -- bounded, x varies via xEquiv.

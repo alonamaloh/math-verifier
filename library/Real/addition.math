@@ -131,6 +131,8 @@ theorem CauchyRationalSequence.sequenceFunction_add
 -- Inner respect: with x fixed, λ y. mk(add(x, y)) respects
 -- CauchyEquivalent. The proof uses the SAME ε (no halving) because
 -- the shared rep_x cancels: |(x_m + y_m) - (x_m + y'_m)| = |y_m - y'_m|.
+-- Bridge each sf(add(rep_x, rep_•), m) to sf(rep_x, m) + sf(rep_•, m)
+-- via sequenceFunction_add, then a single ring step does the cancel.
 theorem Real.add_after_first_respects
         (rep_x rep_y rep_yPrime : CauchyRationalSequence)
         (yEquiv : CauchyEquivalent(rep_y, rep_yPrime))
@@ -145,33 +147,28 @@ theorem Real.add_after_first_respects
           obtain ⟨N, yEquiv_at_N⟩ from yEquiv(epsilon, epsilonPositive);
           witness N with
               function (m : Natural) (N_leq_m : N ≤ m) =>
-                -- Transport via the bridge:
-                -- |sf(add(rep_x, rep_y), m) - sf(add(rep_x, rep_y'), m)|
-                -- = |sf(rep_x, m) + sf(rep_y, m) - (sf(rep_x, m) + sf(rep_y', m))|
-                -- = |sf(rep_y, m) - sf(rep_y', m)|.
                 rewrite(
                     Equality.symmetry(
-                        calc Rational.absolute_value(
-                                 CauchyRationalSequence.sequenceFunction(
-                                     CauchyRationalSequence.add(rep_x, rep_y), m)
-                                 - CauchyRationalSequence.sequenceFunction(
-                                     CauchyRationalSequence.add(rep_x, rep_yPrime), m))
-                           = Rational.absolute_value(
-                                 CauchyRationalSequence.sequenceFunction(rep_x, m)
-                                 + CauchyRationalSequence.sequenceFunction(rep_y, m)
-                                 - CauchyRationalSequence.sequenceFunction(
-                                     CauchyRationalSequence.add(rep_x, rep_yPrime), m))
-                           = Rational.absolute_value(
-                                 CauchyRationalSequence.sequenceFunction(rep_x, m)
-                                 + CauchyRationalSequence.sequenceFunction(rep_y, m)
-                                 - (CauchyRationalSequence.sequenceFunction(rep_x, m)
-                                    + CauchyRationalSequence.sequenceFunction(
-                                          rep_yPrime, m)))
-                           = Rational.absolute_value(
-                                 CauchyRationalSequence.sequenceFunction(rep_y, m)
-                                 - CauchyRationalSequence.sequenceFunction(
-                                     rep_yPrime, m))),
-                    yEquiv_at_N(m, N_leq_m))
+                        CauchyRationalSequence.sequenceFunction_add(
+                            rep_x, rep_yPrime, m)),
+                    rewrite(
+                        Equality.symmetry(
+                            CauchyRationalSequence.sequenceFunction_add(
+                                rep_x, rep_y, m)),
+                        rewrite(
+                            (ring : CauchyRationalSequence.sequenceFunction(
+                                        rep_y, m)
+                                    - CauchyRationalSequence.sequenceFunction(
+                                        rep_yPrime, m)
+                                    = (CauchyRationalSequence.sequenceFunction(
+                                           rep_x, m)
+                                       + CauchyRationalSequence.sequenceFunction(
+                                           rep_y, m))
+                                      - (CauchyRationalSequence.sequenceFunction(
+                                             rep_x, m)
+                                         + CauchyRationalSequence.sequenceFunction(
+                                             rep_yPrime, m))),
+                            yEquiv_at_N(m, N_leq_m))))
         } : ∃ (N : Natural).
               (m : Natural) → N ≤ m →
                 Rational.absolute_value(
@@ -211,10 +208,9 @@ theorem Real.add_respects
               Real.add_after_first_respects(rep_xPrime),
               y),
       function (rep_y : CauchyRationalSequence) =>
-        -- Goal: mk(add(rep_x, rep_y)) = mk(add(rep_xPrime, rep_y)).
-        -- By Quotient.sound, need CauchyEquivalent(add(rep_x, rep_y),
-        -- add(rep_xPrime, rep_y)).
-        -- Same N as xEquiv, transport via the right-cancel cancellation.
+        -- Mirror of add_after_first_respects with the SECOND component
+        -- shared instead of the first; the same sequenceFunction_add
+        -- bridge + ring cancel.
         Quotient.sound(
             CauchyRationalSequence, CauchyEquivalent,
             CauchyRationalSequence.add(rep_x, rep_y),
@@ -227,28 +223,26 @@ theorem Real.add_respects
                     function (m : Natural) (N_leq_m : N ≤ m) =>
                       rewrite(
                           Equality.symmetry(
-                              calc Rational.absolute_value(
-                                       CauchyRationalSequence.sequenceFunction(
-                                           CauchyRationalSequence.add(rep_x, rep_y), m)
-                                       - CauchyRationalSequence.sequenceFunction(
-                                           CauchyRationalSequence.add(rep_xPrime, rep_y), m))
-                                 = Rational.absolute_value(
-                                       CauchyRationalSequence.sequenceFunction(rep_x, m)
-                                       + CauchyRationalSequence.sequenceFunction(rep_y, m)
-                                       - CauchyRationalSequence.sequenceFunction(
-                                           CauchyRationalSequence.add(rep_xPrime, rep_y), m))
-                                 = Rational.absolute_value(
-                                       CauchyRationalSequence.sequenceFunction(rep_x, m)
-                                       + CauchyRationalSequence.sequenceFunction(rep_y, m)
-                                       - (CauchyRationalSequence.sequenceFunction(
+                              CauchyRationalSequence.sequenceFunction_add(
+                                  rep_xPrime, rep_y, m)),
+                          rewrite(
+                              Equality.symmetry(
+                                  CauchyRationalSequence.sequenceFunction_add(
+                                      rep_x, rep_y, m)),
+                              rewrite(
+                                  (ring : CauchyRationalSequence.sequenceFunction(
+                                              rep_x, m)
+                                          - CauchyRationalSequence.sequenceFunction(
                                               rep_xPrime, m)
-                                          + CauchyRationalSequence.sequenceFunction(
-                                                rep_y, m)))
-                                 = Rational.absolute_value(
-                                       CauchyRationalSequence.sequenceFunction(rep_x, m)
-                                       - CauchyRationalSequence.sequenceFunction(
-                                             rep_xPrime, m))),
-                          xEquiv_at_N(m, N_leq_m))
+                                          = (CauchyRationalSequence.sequenceFunction(
+                                                 rep_x, m)
+                                             + CauchyRationalSequence.sequenceFunction(
+                                                 rep_y, m))
+                                            - (CauchyRationalSequence.sequenceFunction(
+                                                   rep_xPrime, m)
+                                               + CauchyRationalSequence.sequenceFunction(
+                                                   rep_y, m))),
+                                  xEquiv_at_N(m, N_leq_m))))
               } : ∃ (N : Natural).
                     (m : Natural) → N ≤ m →
                       Rational.absolute_value(
