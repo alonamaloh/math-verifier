@@ -1553,50 +1553,13 @@ private:
                 + "' in definition '" + declaration.name + "'");
         }
 
-        // Desugar non-bare patterns in non-scrutinee positions: replace
-        // each with a fresh bare name and wrap the body in a `cases
-        // freshName { originalPattern => body }`. This lets users write
-        // `| Foo.make(a, b), Bar.make(c, d) => …` even though the
-        // recursor-style elaboration below only handles a constructor
-        // pattern in the first position. The wrapping order is
-        // last-to-first so the innermost `cases` is the latest pattern
-        // — pattern-bound names in each position remain in scope for
-        // the original body.
-        SurfacePatternCase desugaredCase = *matchedCase;
-        {
-            SurfaceExpressionPointer wrappedBody = desugaredCase.body;
-            for (size_t reverseIndex =
-                     desugaredCase.patterns.size();
-                 reverseIndex > 1; --reverseIndex) {
-                size_t patternIndex = reverseIndex - 1;
-                const SurfacePattern& pattern =
-                    *desugaredCase.patterns[patternIndex];
-                if (std::get_if<SurfacePatternBareName>(&pattern.node)) {
-                    continue;
-                }
-                std::string freshName =
-                    "_patternMatchArg_" + std::to_string(patternIndex);
-                int line = pattern.line;
-                int column = pattern.column;
-                SurfaceCasesClause clause;
-                clause.pattern = desugaredCase.patterns[patternIndex];
-                clause.body = wrappedBody;
-                clause.line = line;
-                clause.column = column;
-                std::vector<SurfaceCasesClause> clauses;
-                clauses.push_back(std::move(clause));
-                SurfaceExpressionPointer scrutinee = makeSurfaceIdentifier(
-                    freshName, {}, line, column);
-                wrappedBody = makeSurfaceCases(
-                    std::move(scrutinee),
-                    std::move(clauses),
-                    line, column);
-                desugaredCase.patterns[patternIndex] =
-                    makeSurfacePatternBareName(freshName, line, column);
-            }
-            desugaredCase.body = std::move(wrappedBody);
-            matchedCase = &desugaredCase;
-        }
+        // Non-bare patterns in non-scrutinee positions are handled below
+        // (after the lambda binders are built) by emitting a chain of
+        // inner recursor applications via `buildBodyForCase`. Each such
+        // inner recursor uses a motive that abstracts both its scrutinee
+        // and all later-bound function-arg binders, so dependent types
+        // (e.g. an equality hypothesis whose type mentions the scrutinee)
+        // refine correctly under the destructure.
 
         // Extract the destructured argument names from the pattern.
         std::vector<std::string> destructuredNames;
@@ -1761,11 +1724,7 @@ private:
         //   Then the remaining function arguments (in order), using
         //   names from matchedCase->patterns[1..n-1] (must be
         //   bare-name patterns).
-        struct LambdaBinder {
-            std::string name;
-            ExpressionPointer type;
-        };
-        std::vector<LambdaBinder> lambdaBinders;
+        std::vector<LocalBinder> lambdaBinders;
         std::map<std::string, std::string> recursiveArgToHypothesis;
         // Position of each destructured constructor argument inside
         // lambdaBinders (the loop interleaves induction hypotheses for
@@ -1911,34 +1870,37 @@ private:
         // courtesy of the motive's beta reduction). The codomain
         // descends inside the binder we just bound — so references
         // to it as `Bound(0)` line up with our growing lambdaBinders.
+        // Non-bare patterns at these positions get a synthetic binder
+        // name here; `buildBodyForCase` (below) then emits a nested
+        // recursor that destructures them with a properly-abstracting
+        // motive (so dependent later-arg types refine correctly).
         std::vector<size_t> otherFunctionArgumentPositions;
         for (size_t i = 1; i < matchedCase->patterns.size(); ++i) {
             const SurfacePattern& pattern = *matchedCase->patterns[i];
-            auto* bareName = std::get_if<SurfacePatternBareName>(
-                &pattern.node);
-            if (!bareName) {
-                throw ElaborateError(
-                    "non-scrutinee pattern positions must be variable "
-                    "patterns (e.g. 'm' or '_')");
-            }
             auto* pi = std::get_if<Pi>(&motiveAtCase->node);
             if (!pi) {
                 throw ElaborateError(
                     "pattern case for '" + constructorName + "' has too "
                     "many positions for the function signature");
             }
+            std::string positionName;
+            if (auto* bareName = std::get_if<SurfacePatternBareName>(
+                    &pattern.node)) {
+                positionName = bareName->name;
+            } else if (std::get_if<SurfacePatternConstructor>(
+                           &pattern.node)) {
+                positionName =
+                    "_innerScrutinee_" + std::to_string(i);
+            } else {
+                throw ElaborateError(
+                    "non-scrutinee pattern positions must be variable "
+                    "or constructor patterns");
+            }
             otherFunctionArgumentPositions.push_back(lambdaBinders.size());
-            lambdaBinders.push_back({bareName->name, pi->domain});
+            lambdaBinders.push_back({positionName, pi->domain});
             motiveAtCase = pi->codomain;
             binderDepth++;
         }
-
-        // Translate the body: rewrite recursive calls. The user types
-        // out the outer binders in any recursive call, so we tell the
-        // rewriter to skip past them before looking for the scrutinee.
-        SurfaceExpressionPointer rewrittenBody = rewriteRecursiveCalls(
-            matchedCase->body, declaration.name, recursiveArgToHypothesis,
-            static_cast<int>(outerBinderStack.size()));
 
         // The expected body type is what's left of the motive after
         // all the non-scrutinee Pi peels.
@@ -1949,9 +1911,23 @@ private:
         for (const auto& binder : lambdaBinders) {
             bodyStack.push_back({binder.name, binder.type});
         }
-        ExpressionPointer bodyKernel =
-            elaborateExpression(*rewrittenBody, bodyStack,
-                                 expectedBodyType);
+
+        // If any non-scrutinee position has a constructor pattern,
+        // `buildBodyForCase` emits a chain of inner recursor calls
+        // whose motives properly abstract later-bound dependent args.
+        // Otherwise it's a thin wrapper around elaborateExpression.
+        std::vector<size_t> positionToBinderIndex =
+            otherFunctionArgumentPositions;
+        ExpressionPointer bodyKernel = buildBodyForCase(
+            *matchedCase,
+            /*patternIndex=*/1,
+            positionToBinderIndex,
+            lambdaBinders,
+            bodyStack,
+            expectedBodyType,
+            static_cast<int>(outerBinderStack.size()),
+            recursiveArgToHypothesis,
+            declaration.name);
 
         // Early type-check: verify the body's inferred type matches
         // the expected one. This catches a mismatch HERE — with the
@@ -1999,6 +1975,438 @@ private:
                                      std::move(caseLambda));
         }
         return caseLambda;
+    }
+
+    // Builds the body for one outer case of a pattern-match definition,
+    // walking the user's pattern positions from `patternIndex` onwards.
+    //
+    //   * Bare-name positions are already regular case-lambda binders;
+    //     we just skip past them.
+    //   * Constructor patterns at non-scrutinee positions need to be
+    //     destructured AND have all later-bound function-arg types
+    //     refined under the destructure. We do this by emitting an
+    //     inner recursor on that position, with a motive that abstracts
+    //     both the position's variable AND all later position variables.
+    //     The recursor's case lambda binds the constructor's value args
+    //     plus a fresh re-binding of each later position (with refined
+    //     types), and recursively calls back into this function for the
+    //     next position.
+    //
+    // V1 restrictions for inner constructor patterns: the inner inductive
+    // must be non-parameterised, non-indexed, single-constructor, and
+    // non-recursive. (Real call sites — `IntegerRepresentative.make` —
+    // satisfy all four; multi-constructor inner patterns would need
+    // cross-row coverage analysis that isn't yet wired up.)
+    ExpressionPointer buildBodyForCase(
+        const SurfacePatternCase& matchedCase,
+        size_t patternIndex,
+        std::vector<size_t> positionToBinderIndex,
+        std::vector<LocalBinder> currentLambdaBinders,
+        std::vector<LocalBinder> bodyStack,
+        ExpressionPointer expectedType,
+        int outerBinderCount,
+        const std::map<std::string, std::string>&
+            recursiveArgToHypothesis,
+        const std::string& declarationName) {
+
+        size_t numPatterns = matchedCase.patterns.size();
+        size_t nextCtorPos = numPatterns;
+        for (size_t i = patternIndex; i < numPatterns; ++i) {
+            if (std::get_if<SurfacePatternConstructor>(
+                    &matchedCase.patterns[i]->node)) {
+                nextCtorPos = i;
+                break;
+            }
+        }
+        if (nextCtorPos == numPatterns) {
+            // No remaining inner-constructor patterns — elaborate the
+            // user body with the current expected type. Rewriting
+            // recursive calls happens here (not at intermediate
+            // recursor levels) because the user body is what mentions
+            // recursive calls by name.
+            SurfaceExpressionPointer rewrittenBody = rewriteRecursiveCalls(
+                matchedCase.body, declarationName,
+                recursiveArgToHypothesis, outerBinderCount);
+            return elaborateExpression(*rewrittenBody, bodyStack,
+                                       expectedType);
+        }
+
+        const auto& ctorPattern =
+            std::get<SurfacePatternConstructor>(
+                matchedCase.patterns[nextCtorPos]->node);
+        size_t relativeIndex = nextCtorPos - patternIndex;
+        size_t scrutineeBinderIdx =
+            positionToBinderIndex[relativeIndex];
+
+        int currentBinderCount =
+            static_cast<int>(currentLambdaBinders.size());
+        int scrutineeDB =
+            currentBinderCount - 1
+            - static_cast<int>(scrutineeBinderIdx);
+
+        // Collect de Bruijn indices and original-type snapshots for
+        // each position strictly after `nextCtorPos`. These get
+        // abstracted into the motive, re-bound (with refined types)
+        // inside the case lambda, and then applied as arguments to
+        // the inner recursor.
+        std::vector<int> laterDBs;
+        std::vector<ExpressionPointer> laterTypesBs;
+        std::vector<std::string> laterNames;
+        for (size_t k = relativeIndex + 1;
+             k < positionToBinderIndex.size(); ++k) {
+            size_t binderIdx = positionToBinderIndex[k];
+            int dbjn = currentBinderCount - 1
+                     - static_cast<int>(binderIdx);
+            laterDBs.push_back(dbjn);
+            ExpressionPointer t = shift(
+                currentLambdaBinders[binderIdx].type,
+                currentBinderCount - static_cast<int>(binderIdx));
+            laterTypesBs.push_back(t);
+            laterNames.push_back(
+                currentLambdaBinders[binderIdx].name);
+        }
+
+        // Scrutinee type, shifted from its insertion scope to
+        // bodyStack scope.
+        ExpressionPointer scrutineeTypeBs = shift(
+            currentLambdaBinders[scrutineeBinderIdx].type,
+            currentBinderCount
+                - static_cast<int>(scrutineeBinderIdx));
+
+        // Resolve the inner inductive and verify v1 restrictions.
+        ExpressionPointer cursor = weakHeadNormalForm(
+            environment_, scrutineeTypeBs);
+        std::vector<ExpressionPointer> inductiveArgs;
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            inductiveArgs.insert(inductiveArgs.begin(),
+                                  application->argument);
+            cursor = weakHeadNormalForm(
+                environment_, application->function);
+        }
+        auto* indConstant = std::get_if<Constant>(&cursor->node);
+        if (!indConstant) {
+            throw ElaborateError(
+                "inner constructor pattern at position "
+                + std::to_string(nextCtorPos)
+                + ": scrutinee type's head is not an inductive "
+                "constant");
+        }
+        const std::string& innerInductiveName = indConstant->name;
+        const Declaration* innerInductiveDecl =
+            environment_.lookup(innerInductiveName);
+        const Inductive* innerInductive = innerInductiveDecl
+            ? std::get_if<Inductive>(innerInductiveDecl) : nullptr;
+        if (!innerInductive) {
+            throw ElaborateError(
+                "inner constructor pattern at position "
+                + std::to_string(nextCtorPos) + ": '"
+                + innerInductiveName + "' is not an inductive type");
+        }
+        if (static_cast<int>(inductiveArgs.size())
+                != innerInductive->numParameters) {
+            // We extract parameter values from `inductiveArgs` (the
+            // applications walked off the scrutinee's type head). Any
+            // extras would be index values; v1 doesn't yet support
+            // indexed inner inductives.
+            throw ElaborateError(
+                "inner constructor pattern at position "
+                + std::to_string(nextCtorPos) + ": inductive '"
+                + innerInductiveName
+                + "' is indexed; v1 supports only non-indexed inner "
+                "inductives");
+        }
+        std::vector<ExpressionPointer> innerParameterValues(
+            inductiveArgs.begin(),
+            inductiveArgs.begin() + innerInductive->numParameters);
+        if (innerInductive->constructorNames.size() != 1) {
+            throw ElaborateError(
+                "inner constructor pattern at position "
+                + std::to_string(nextCtorPos) + ": inductive '"
+                + innerInductiveName + "' has "
+                + std::to_string(
+                    innerInductive->constructorNames.size())
+                + " constructors; v1 supports inner constructor "
+                "patterns only on single-constructor inductives");
+        }
+        const std::string& expectedCtorName =
+            innerInductive->constructorNames[0];
+        if (ctorPattern.constructorName != expectedCtorName) {
+            throw ElaborateError(
+                "inner constructor pattern at position "
+                + std::to_string(nextCtorPos)
+                + ": expected constructor '" + expectedCtorName
+                + "' (the only constructor of '"
+                + innerInductiveName + "'), got '"
+                + ctorPattern.constructorName + "'");
+        }
+
+        // Constructor info — extract value-arg types and verify
+        // non-recursiveness.
+        const Declaration* ctorDecl =
+            environment_.lookup(expectedCtorName);
+        const Constructor* ctorInfo = ctorDecl
+            ? std::get_if<Constructor>(ctorDecl) : nullptr;
+        if (!ctorInfo) {
+            throw ElaborateError(
+                "constructor lookup failed for '"
+                + expectedCtorName + "'");
+        }
+        std::vector<ExpressionPointer> ctorArgTypes;
+        {
+            // Peel parameter Pis one at a time, substituting each
+            // parameter value into the codomain (same pattern as the
+            // outer-case decomposition). This keeps types of value
+            // args coherent when parameter values reference other
+            // local binders.
+            ExpressionPointer ctorCursor = ctorInfo->type;
+            for (const auto& paramValue : innerParameterValues) {
+                auto* pi = std::get_if<Pi>(&ctorCursor->node);
+                if (!pi) {
+                    throw ElaborateError(
+                        "internal: constructor '" + expectedCtorName
+                        + "' has fewer parameter Pis than expected");
+                }
+                ctorCursor =
+                    substitute(pi->codomain, 0, paramValue);
+            }
+            // The recursive-flag check below uses the ORIGINAL type's
+            // value-arg heads — after parameter substitution, an arg
+            // whose type happens to have the inductive as its head
+            // (e.g. a parameter of type `T → T` substituted into an
+            // arg slot) would look spuriously recursive.
+            ExpressionPointer originalCursor = ctorInfo->type;
+            for (size_t p = 0; p < innerParameterValues.size(); ++p) {
+                auto* pi = std::get_if<Pi>(&originalCursor->node);
+                if (!pi) break;
+                originalCursor = pi->codomain;
+            }
+            while (auto* pi = std::get_if<Pi>(&ctorCursor->node)) {
+                auto* originalPi =
+                    std::get_if<Pi>(&originalCursor->node);
+                if (originalPi) {
+                    ExpressionPointer head = originalPi->domain;
+                    while (auto* application =
+                               std::get_if<Application>(&head->node)) {
+                        head = application->function;
+                    }
+                    if (auto* c =
+                            std::get_if<Constant>(&head->node)) {
+                        if (c->name == innerInductiveName) {
+                            throw ElaborateError(
+                                "inner constructor pattern at "
+                                "position "
+                                + std::to_string(nextCtorPos)
+                                + ": constructor '" + expectedCtorName
+                                + "' is recursive; v1 supports inner "
+                                "constructor patterns only on "
+                                "non-recursive constructors");
+                        }
+                    }
+                    originalCursor = originalPi->codomain;
+                }
+                ctorArgTypes.push_back(pi->domain);
+                ctorCursor = pi->codomain;
+            }
+        }
+        if (ctorPattern.arguments.size() != ctorArgTypes.size()) {
+            throw ElaborateError(
+                "inner constructor pattern at position "
+                + std::to_string(nextCtorPos) + ": pattern binds "
+                + std::to_string(ctorPattern.arguments.size())
+                + " name(s) but constructor '" + expectedCtorName
+                + "' takes " + std::to_string(ctorArgTypes.size())
+                + " value argument(s)");
+        }
+        std::vector<std::string> ctorArgNames;
+        for (const auto& argPat : ctorPattern.arguments) {
+            auto* bareName = std::get_if<SurfacePatternBareName>(
+                &argPat->node);
+            if (!bareName) {
+                throw ElaborateError(
+                    "inner constructor pattern at position "
+                    + std::to_string(nextCtorPos)
+                    + ": nested patterns are not supported");
+            }
+            ctorArgNames.push_back(bareName->name);
+        }
+
+        // Build the motive's abstraction list (outermost-first):
+        // scrutinee + all later positions.
+        std::vector<int> abstractionList;
+        abstractionList.push_back(scrutineeDB);
+        for (int db : laterDBs) {
+            abstractionList.push_back(db);
+        }
+        ExpressionPointer motiveBody = abstractOverBoundVariables(
+            expectedType, abstractionList);
+
+        // Wrap the motive body in Pis (for later positions, innermost
+        // first) and finally an outer Lambda for the scrutinee. Each
+        // Pi's domain is the corresponding position's type, abstracted
+        // over the binders already in place above this Pi.
+        ExpressionPointer motiveChainBody = motiveBody;
+        int laterCount = static_cast<int>(laterTypesBs.size());
+        for (int k = laterCount; k >= 1; --k) {
+            std::vector<int> subAbstraction(
+                abstractionList.begin(),
+                abstractionList.begin() + k);
+            ExpressionPointer pInDomain = abstractOverBoundVariables(
+                laterTypesBs[k - 1], subAbstraction);
+            motiveChainBody = makePi(laterNames[k - 1],
+                                       pInDomain, motiveChainBody);
+        }
+        std::string scrutineeName =
+            currentLambdaBinders[scrutineeBinderIdx].name;
+        ExpressionPointer motive = makeLambda(
+            scrutineeName, scrutineeTypeBs, motiveChainBody);
+
+        // Determine the motive's universe level (needed if the inner
+        // recursor takes a motive-level universe argument).
+        LevelPointer motiveLevel;
+        {
+            Context openedContext;
+            for (size_t i = 0; i < bodyStack.size(); ++i) {
+                ExpressionPointer openedType = openOverLocalBinders(
+                    bodyStack[i].type, bodyStack, i);
+                openedContext.push_back(
+                    {bodyStack[i].name, openedType,
+                     FreeVariableOrigin::Internal});
+            }
+            ExpressionPointer motiveType =
+                inferType(environment_, openedContext,
+                           openOverLocalBinders(
+                               motive, bodyStack, bodyStack.size()));
+            ExpressionPointer motiveCursor = motiveType;
+            while (auto* pi = std::get_if<Pi>(&motiveCursor->node)) {
+                motiveCursor = pi->codomain;
+            }
+            auto* sortNode =
+                std::get_if<Sort>(&motiveCursor->node);
+            if (!sortNode) {
+                throw ElaborateError(
+                    "internal: inner-recursor motive's type doesn't "
+                    "end in a Sort");
+            }
+            motiveLevel = sortNode->level;
+        }
+
+        std::string recursorName =
+            innerInductiveName + "_recursor";
+        const Declaration* recursorDecl =
+            environment_.lookup(recursorName);
+        const Recursor* recursorInfo = recursorDecl
+            ? std::get_if<Recursor>(recursorDecl) : nullptr;
+        if (!recursorInfo) {
+            throw ElaborateError(
+                "recursor '" + recursorName + "' not in environment");
+        }
+        bool recursorHasMotiveLevel =
+            recursorInfo->universeParameters.size()
+            > innerInductive->universeParameters.size();
+        std::vector<LevelPointer> recursorUniverseArguments =
+            indConstant->universeArguments;
+        if (recursorHasMotiveLevel) {
+            recursorUniverseArguments.push_back(motiveLevel);
+        }
+
+        // Build the case lambda. Step 1: bind the constructor's value
+        // args; step 2: derive the post-beta motive type and peel its
+        // Pi chain to bind the re-bound later positions; step 3:
+        // recurse for the body inside that scope.
+        std::vector<LocalBinder> caseLambdaBinders;
+        std::vector<LocalBinder> caseBodyStack = bodyStack;
+        for (size_t k = 0; k < ctorArgTypes.size(); ++k) {
+            caseLambdaBinders.push_back(
+                {ctorArgNames[k], ctorArgTypes[k]});
+            caseBodyStack.push_back(
+                {ctorArgNames[k], ctorArgTypes[k]});
+        }
+        // ctor_app : the constructor applied to (parameters, then
+        // its just-bound value args), in caseBodyStack scope. Parameter
+        // values lived in bodyStack scope; shift by ctorArgTypes.size()
+        // to put them in caseBodyStack scope (which has the ctor-arg
+        // binders above bodyStack).
+        ExpressionPointer ctorApp = makeConstant(
+            expectedCtorName, indConstant->universeArguments);
+        for (const auto& paramValue : innerParameterValues) {
+            ctorApp = makeApplication(
+                ctorApp,
+                shift(paramValue,
+                       static_cast<int>(ctorArgTypes.size())));
+        }
+        for (size_t k = 0; k < ctorArgTypes.size(); ++k) {
+            int ctorArgDB =
+                static_cast<int>(ctorArgTypes.size()) - 1
+                - static_cast<int>(k);
+            ctorApp = makeApplication(
+                ctorApp, makeBoundVariable(ctorArgDB));
+        }
+        // Beta-reduce motive(ctor_app). The motive's body lives in
+        // scope [bodyStack..., L_p] (its Lambda binder); shift by
+        // ctorArgTypes.size() with cutoff 1 so bodyStack refs move
+        // into caseBodyStack but L_p (Bound 0) stays as the
+        // substitution target.
+        ExpressionPointer shiftedMotiveBody = shift(
+            motiveChainBody,
+            static_cast<int>(ctorArgTypes.size()),
+            /*cutoff=*/1);
+        ExpressionPointer caseBodyType =
+            substitute(shiftedMotiveBody, 0, ctorApp);
+
+        std::vector<size_t> newPositionToBinderIndex;
+        for (size_t k = 0; k < laterTypesBs.size(); ++k) {
+            auto* pi = std::get_if<Pi>(&caseBodyType->node);
+            if (!pi) {
+                throw ElaborateError(
+                    "internal: inner-recursor case body type is "
+                    "missing a Pi for position "
+                    + std::to_string(nextCtorPos + 1 + k));
+            }
+            newPositionToBinderIndex.push_back(
+                caseLambdaBinders.size());
+            caseLambdaBinders.push_back(
+                {laterNames[k], pi->domain});
+            caseBodyStack.push_back(
+                {laterNames[k], pi->domain});
+            caseBodyType = pi->codomain;
+        }
+
+        ExpressionPointer innerBody = buildBodyForCase(
+            matchedCase,
+            nextCtorPos + 1,
+            newPositionToBinderIndex,
+            caseLambdaBinders,
+            caseBodyStack,
+            caseBodyType,
+            outerBinderCount,
+            recursiveArgToHypothesis,
+            declarationName);
+
+        ExpressionPointer caseLambdaExpr = innerBody;
+        for (auto it = caseLambdaBinders.rbegin();
+             it != caseLambdaBinders.rend(); ++it) {
+            caseLambdaExpr = makeLambda(
+                it->name, it->type, std::move(caseLambdaExpr));
+        }
+
+        // Inner recursor application: parameters, motive, case
+        // lambda, scrutinee ref, then later position refs (which
+        // "unpack" the motive's Pi chain back into the expectedType).
+        ExpressionPointer applied = makeConstant(
+            recursorName, recursorUniverseArguments);
+        for (const auto& paramValue : innerParameterValues) {
+            applied = makeApplication(applied, paramValue);
+        }
+        applied = makeApplication(applied, motive);
+        applied = makeApplication(applied, caseLambdaExpr);
+        applied = makeApplication(applied,
+                                   makeBoundVariable(scrutineeDB));
+        for (int db : laterDBs) {
+            applied = makeApplication(applied,
+                                       makeBoundVariable(db));
+        }
+        return applied;
     }
 
     // Walks a surface expression and replaces calls of the form
