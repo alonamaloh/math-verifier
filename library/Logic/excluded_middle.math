@@ -29,18 +29,18 @@ theorem Logic.double_negation_eliminate
 
 -- ----------------------------------------------------------------------
 -- Negation distributes across implication: `¬(antecedent → consequent)
--- → antecedent ∧ ¬consequent`. Classical — relies on excluded_middle
--- to extract the antecedent witness from the assumption that the
--- whole implication fails.
+-- → antecedent ∧ ¬consequent`. Classical — case-split on
+-- excluded_middle(antecedent):
+--   * antecedent holds: pair it with `¬consequent`, derived because
+--     any proof of consequent would satisfy the implication via the
+--     constant function, contradicting notImplication.
+--   * antecedent fails: notImplication applied to the vacuous
+--     ⊥-implication (antecedent → False → consequent) is absurd.
 theorem Logic.not_implies_implies_and_not
         (antecedent consequent : Proposition)
         (notImplication : Not(antecedent → consequent))
         : And(antecedent, Not(consequent)) :=
   Or.eliminate(
-      -- Case excluded_middle(antecedent) = antecedent: pair with
-      -- ¬consequent derived from notImplication and λ_. consequent-
-      -- assumption. Going the other way: from antecedent, we'd need
-      -- ¬consequent. Derive that classically too.
       function (antecedentHolds : antecedent) =>
           And.introduction(
               antecedent, Not(consequent),
@@ -48,9 +48,6 @@ theorem Logic.not_implies_implies_and_not
               function (consequentHolds : consequent) =>
                   notImplication(
                       function (_ : antecedent) => consequentHolds)),
-      -- Case excluded_middle(antecedent) = ¬antecedent: notImplication
-      -- applied to the vacuous proof (antecedent → False → consequent)
-      -- yields absurdity.
       function (notAntecedent : Not(antecedent)) =>
           False.eliminate_proposition(
               And(antecedent, Not(consequent)),
@@ -63,9 +60,10 @@ theorem Logic.not_implies_implies_and_not
 
 -- ----------------------------------------------------------------------
 -- `¬(∀ x. predicate(x)) → ∃ x. ¬predicate(x)`. Standard classical
--- swap. Prove the conclusion by double-negation elimination: assume
--- the negation of the conclusion (`∀ x. ¬¬predicate(x)`), use DNE
--- pointwise to recover `∀ x. predicate(x)`, contradict `notForall`.
+-- swap. By double-negation elimination it suffices to derive False
+-- from `¬∃ x. ¬predicate(x)` and `notForall`: at each x apply DNE
+-- pointwise (the ¬∃ kills any ¬predicate(x) witness), reconstructing
+-- `∀ x. predicate(x)`, which contradicts `notForall`.
 theorem Logic.not_forall_implies_exists_not
         (Domain : Type(0))
         (predicate : Domain → Proposition)
