@@ -1,0 +1,62 @@
+-- `simplify(L1, L2, …, Ln)` — chained-rewrite tactic.
+--
+-- Given an `a = b` calc step (or theorem goal), simplify repeatedly
+-- looks for any subterm of the running LHS that matches the left side
+-- of any supplied lemma, rewrites it to the right side, and continues
+-- until the result is definitionally equal to the target. Each lemma
+-- is a polymorphic equality; its Pi binders are treated as
+-- first-order metavariables, and matching is linear (a metavariable
+-- that appears twice in the pattern must match the same subterm).
+
+module Test.simplify_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- (1) A single rewrite: `a * 0 → 0` via `Natural.multiply_zero`.
+-- The lemma has one Pi binder; simplify instantiates it at `a` by
+-- matching the LHS pattern against the subterm `a * zero`.
+theorem singleRewrite (a : Natural) : a * zero + a = a :=
+  calc a * zero + a
+     = zero + a                                 by simplify(Natural.multiply_zero)
+     = a                                        by Natural.zero_add(a)
+
+-- (2) Two distinct lemmas applied in one step: rewrite `a * zero` to
+-- `zero` (via `multiply_zero`), and rewrite `zero + a` to `a` (via
+-- `zero_add`). Both fire in sequence; simplify discovers the second
+-- match after the first rewrite changes the term.
+theorem chainedRewrites (a : Natural) : a * zero + a = a :=
+  calc a * zero + a
+     = a                                        by simplify(
+                                                       Natural.multiply_zero,
+                                                       Natural.zero_add)
+
+-- (3) Multiple Pi binders: `a * successor(b) → a + a * b`. The lemma
+-- binds two variables (`a` and `b`); both get filled in from the
+-- match.
+theorem twoBinderRewrite (a b : Natural)
+        : a * successor(b) + zero = a + a * b :=
+  calc a * successor(b) + zero
+     = a + a * b                                by simplify(
+                                                       Natural.multiply_successor,
+                                                       Natural.add_zero)
+
+-- (4) Linear pattern check: `Natural.add_zero` has LHS `a + zero`
+-- (one binder). Inside the larger expression `(b + zero) + zero`,
+-- two distinct occurrences trigger the rewrite — both at different
+-- bindings of `a`.
+theorem repeatedLemma (b : Natural)
+        : (b + zero) + zero = b :=
+  calc (b + zero) + zero
+     = b                                        by simplify(
+                                                       Natural.add_zero)
+
+-- (5) Reflexive case: the LHS already equals the RHS. simplify emits
+-- `reflexivity` directly.
+theorem reflexiveCase (a : Natural) : a + zero = a + zero :=
+  calc a + zero
+     = a + zero                                 by simplify(
+                                                       Natural.add_zero)

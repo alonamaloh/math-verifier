@@ -2968,6 +2968,12 @@ private:
                         localBinders,
                         expression.line, expression.column);
                 }
+                if (name == "simplify" && argumentCount >= 1) {
+                    return desugarSimplify(
+                        positionalArguments,
+                        localBinders, expectedType,
+                        expression.line, expression.column);
+                }
                 // Quotient operations with implicit `T, R` inference.
                 // Each user-facing form takes the explicit value args
                 // only; the carrier and equivalence are recovered from
@@ -8761,6 +8767,433 @@ private:
         call = makeApplication(std::move(call), std::move(effectiveRight));
         call = makeApplication(std::move(call), std::move(effectiveLemma));
         return call;
+    }
+
+    // ---- simplify --------------------------------------------------------
+    //
+    // `simplify(L1, L2, …, Ln)` in calc context: discharges the current
+    // step's `a = b` by repeatedly rewriting `a` (or arbitrary subterms of
+    // it) using any of the supplied lemmas, until the resulting term is
+    // definitionally equal to `b`. Each lemma is a polymorphic equality:
+    // `(p1 : T1) → … → (pk : Tk) → Equality.{u}(C, LHS, RHS)`. simplify
+    // picks the first subterm of the current term that any lemma's LHS
+    // pattern unifies with (Pi binders treated as metavariables), then
+    // applies that lemma's RHS at the matched site via `Equality.congruence`
+    // — same shape as `rewrite(L)` but with the lemma instantiated
+    // automatically.
+    //
+    // V1 limitations:
+    //   * Pattern matching is first-order: linear, no higher-order vars,
+    //     no descent under binders. The lemma's LHS may not itself contain
+    //     a Lambda/Pi/Let; the search through the goal also does not enter
+    //     binders.
+    //   * Only forward direction (LHS → RHS). The user must pass a
+    //     symmetric lemma if they need a reverse rewrite.
+    //   * Termination is bounded by a fixed iteration limit; non-confluent
+    //     rule sets (e.g. naked commutativity) can hit the bound.
+
+    // First-order match. `pattern` lives in a scope with `numPatternBinders`
+    // leading Pi binders (the lemma's universal quantifiers); pattern uses
+    // BoundVariable(0..numPatternBinders-1) to refer to them. Higher-indexed
+    // BoundVariables refer to scope above the lemma's type — for a
+    // top-level lemma these don't occur.
+    //
+    // On success, `bindings[i]` is the term substituted for the i-th
+    // pattern binder. Bindings are populated as the match descends; if a
+    // metavariable appears twice in the pattern, the second occurrence is
+    // required to match the term already recorded (linearity).
+    bool tryFirstOrderMatch(
+        ExpressionPointer pattern,
+        ExpressionPointer term,
+        int numPatternBinders,
+        std::vector<ExpressionPointer>& bindings) {
+        if (auto* boundVar =
+                std::get_if<BoundVariable>(&pattern->node)) {
+            int idx = boundVar->deBruijnIndex;
+            if (idx < numPatternBinders) {
+                if (bindings[idx]) {
+                    return structurallyEqual(bindings[idx], term);
+                }
+                bindings[idx] = term;
+                return true;
+            }
+            // Reference outside the lemma's universal quantifiers — must
+            // be a literal match against an outer BoundVariable in the
+            // term (after adjusting for the binder offset).
+            auto* termVar =
+                std::get_if<BoundVariable>(&term->node);
+            if (!termVar) return false;
+            return termVar->deBruijnIndex == idx - numPatternBinders;
+        }
+        if (auto* application =
+                std::get_if<Application>(&pattern->node)) {
+            auto* termApp =
+                std::get_if<Application>(&term->node);
+            if (!termApp) return false;
+            return tryFirstOrderMatch(application->function,
+                                       termApp->function,
+                                       numPatternBinders, bindings)
+                && tryFirstOrderMatch(application->argument,
+                                       termApp->argument,
+                                       numPatternBinders, bindings);
+        }
+        if (std::get_if<Constant>(&pattern->node)
+            || std::get_if<Sort>(&pattern->node)
+            || std::get_if<FreeVariable>(&pattern->node)) {
+            return structurallyEqual(pattern, term);
+        }
+        // Pi/Lambda/Let — v1 doesn't match under binders.
+        return false;
+    }
+
+    // Substitute the pattern's metavariables with their matched
+    // expressions. `pattern` may reference Bound(0..numPatternBinders-1)
+    // (substituted) and Bound(k >= numPatternBinders) (shifted down by
+    // numPatternBinders to refer to the surrounding outer scope).
+    ExpressionPointer instantiatePattern(
+        ExpressionPointer pattern,
+        const std::vector<ExpressionPointer>& bindings,
+        int numPatternBinders,
+        int currentDepth = 0) {
+        if (auto* boundVar =
+                std::get_if<BoundVariable>(&pattern->node)) {
+            int idx = boundVar->deBruijnIndex;
+            if (idx < currentDepth) {
+                return pattern;  // bound locally inside the pattern
+            }
+            int effective = idx - currentDepth;
+            if (effective < numPatternBinders) {
+                ExpressionPointer binding = bindings[effective];
+                if (currentDepth > 0) {
+                    binding = shift(binding, currentDepth);
+                }
+                return binding;
+            }
+            return makeBoundVariable(
+                idx - numPatternBinders);
+        }
+        if (auto* application =
+                std::get_if<Application>(&pattern->node)) {
+            return makeApplication(
+                instantiatePattern(application->function, bindings,
+                                    numPatternBinders, currentDepth),
+                instantiatePattern(application->argument, bindings,
+                                    numPatternBinders, currentDepth));
+        }
+        if (auto* pi = std::get_if<Pi>(&pattern->node)) {
+            return makePi(pi->displayHint,
+                instantiatePattern(pi->domain, bindings,
+                                    numPatternBinders, currentDepth),
+                instantiatePattern(pi->codomain, bindings,
+                                    numPatternBinders, currentDepth + 1));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&pattern->node)) {
+            return makeLambda(lambda->displayHint,
+                instantiatePattern(lambda->domain, bindings,
+                                    numPatternBinders, currentDepth),
+                instantiatePattern(lambda->body, bindings,
+                                    numPatternBinders, currentDepth + 1));
+        }
+        if (auto* let = std::get_if<Let>(&pattern->node)) {
+            return makeLet(let->displayHint,
+                instantiatePattern(let->type, bindings,
+                                    numPatternBinders, currentDepth),
+                instantiatePattern(let->value, bindings,
+                                    numPatternBinders, currentDepth),
+                instantiatePattern(let->body, bindings,
+                                    numPatternBinders, currentDepth + 1));
+        }
+        // Constant / Sort / FreeVariable — pure leaves.
+        return pattern;
+    }
+
+    // A prepared simplify lemma: its kernel-level reference plus the
+    // shape data needed to match-and-apply.
+    struct SimplifyLemma {
+        ExpressionPointer lemmaReference;     // kernel value: the lemma
+        int numBinders;                        // count of universal Pis
+        std::vector<ExpressionPointer> binderTypes;  // domain of each Pi
+        ExpressionPointer carrier;             // T in Equality.{u}(T, …, …)
+        ExpressionPointer leftPattern;         // LHS, Bound(0..n-1) = metas
+        ExpressionPointer rightPattern;        // RHS, same convention
+        LevelPointer carrierUniverseLevel;
+    };
+
+    // Walk `term` looking for the first subterm (Application spine,
+    // leaving binders alone) where any lemma's LHS pattern matches. On
+    // success, returns the lemma's index and populates `bindings`. The
+    // returned `matchedSubterm` is the subterm where the match landed.
+    bool findFirstSimplifyMatch(
+        ExpressionPointer term,
+        const std::vector<SimplifyLemma>& lemmas,
+        size_t& matchedLemmaIndex,
+        std::vector<ExpressionPointer>& bindings,
+        ExpressionPointer& matchedSubterm) {
+        for (size_t i = 0; i < lemmas.size(); ++i) {
+            std::vector<ExpressionPointer> attempt(
+                lemmas[i].numBinders, nullptr);
+            if (tryFirstOrderMatch(lemmas[i].leftPattern, term,
+                                    lemmas[i].numBinders, attempt)) {
+                bool complete = true;
+                for (const auto& b : attempt) {
+                    if (!b) { complete = false; break; }
+                }
+                if (complete) {
+                    matchedLemmaIndex = i;
+                    bindings = std::move(attempt);
+                    matchedSubterm = term;
+                    return true;
+                }
+            }
+        }
+        if (auto* application =
+                std::get_if<Application>(&term->node)) {
+            if (findFirstSimplifyMatch(application->function, lemmas,
+                                         matchedLemmaIndex, bindings,
+                                         matchedSubterm)) {
+                return true;
+            }
+            return findFirstSimplifyMatch(application->argument, lemmas,
+                                            matchedLemmaIndex, bindings,
+                                            matchedSubterm);
+        }
+        // Don't descend into Pi/Lambda/Let bodies in v1 — the captured
+        // binders would make any match references invalid in the outer
+        // proof. Constants/Sorts/Bound/FreeVariable are leaves.
+        return false;
+    }
+
+    // Prepare the kernel-level proof witness for one rewrite step.
+    // `goalCarrier` is the carrier of the calc step's equality; `current`
+    // is the term we're rewriting (LHS of the residual `current = target`
+    // step); `newCurrent` is the result after this rewrite. The returned
+    // expression has type `Equality.{v}(goalCarrier, current, newCurrent)`.
+    ExpressionPointer buildSingleSimplifyStep(
+        const SimplifyLemma& lemma,
+        const std::vector<ExpressionPointer>& bindings,
+        ExpressionPointer current,
+        ExpressionPointer matchedSubterm,
+        ExpressionPointer newCurrent,
+        ExpressionPointer goalCarrier,
+        LevelPointer goalCarrierUniverseLevel,
+        ExpressionPointer instantiatedRight) {
+        // Instantiated lemma value: lemma applied to each bound argument
+        // in declaration order.
+        ExpressionPointer instantiatedLemma = lemma.lemmaReference;
+        for (int i = lemma.numBinders - 1; i >= 0; --i) {
+            instantiatedLemma = makeApplication(
+                std::move(instantiatedLemma), bindings[i]);
+        }
+        ExpressionPointer instantiatedCarrier =
+            instantiatePattern(lemma.carrier, bindings,
+                                lemma.numBinders);
+        // Abstract the matched subterm out of `current`, building the
+        // motive lambda for Equality.congruence.
+        int occurrenceCount = 0;
+        ExpressionPointer abstractedBody = abstractStructuralOccurrence(
+            current, matchedSubterm, 0, occurrenceCount);
+        if (occurrenceCount == 0) {
+            throw ElaborateError(
+                "simplify: internal — matched subterm not located "
+                "structurally after match");
+        }
+        // Multiple matches: rewrite still produces a valid proof
+        // (Equality.congruence will replace every Bound(0) in the
+        // motive simultaneously), so we don't need to fail here.
+        ExpressionPointer motiveLambda = makeLambda(
+            "_simplifyHole", instantiatedCarrier,
+            std::move(abstractedBody));
+        // Equality.congruence's `x` and `y` are the lemma's endpoints
+        // (matchedSubterm and instantiatedRight). The motive carries
+        // the surrounding context: `motive(x) = matchedSubterm`-shaped
+        // = current; `motive(y) = instantiatedRight`-shaped = newCurrent.
+        ExpressionPointer call = makeConstant(
+            "Equality.congruence",
+            {lemma.carrierUniverseLevel, goalCarrierUniverseLevel});
+        call = makeApplication(std::move(call), instantiatedCarrier);
+        call = makeApplication(std::move(call), goalCarrier);
+        call = makeApplication(std::move(call), std::move(motiveLambda));
+        call = makeApplication(std::move(call), matchedSubterm);
+        call = makeApplication(std::move(call), instantiatedRight);
+        call = makeApplication(std::move(call),
+                                std::move(instantiatedLemma));
+        (void)current;
+        (void)newCurrent;
+        return call;
+    }
+
+    ExpressionPointer desugarSimplify(
+        const std::vector<SurfaceExpressionPointer>& lemmaSurfaces,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "simplify at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "simplify needs an expected type from context — use it "
+                "in a calc step or as the body of a theorem with a "
+                "declared equality conclusion");
+        }
+        EqualityComponents goal =
+            extractEqualityComponents(expectedType, "simplify (goal)",
+                                       line);
+
+        // Prepare each lemma: elaborate to a kernel reference, close
+        // its inferred type over localBinders (so references to outer
+        // binders end up as BoundVariables — required for matching
+        // against the closed-form goal), peel the Pi chain, then
+        // extract the underlying Equality. Closing first ensures the
+        // Pi binders end up at Bound(0..numBinders-1) (the matcher's
+        // metavariable range) while localBinders refs land at higher
+        // indices, where the matcher treats them as outer references.
+        std::vector<SimplifyLemma> lemmas;
+        lemmas.reserve(lemmaSurfaces.size());
+        for (const auto& lemmaSurface : lemmaSurfaces) {
+            SimplifyLemma prepared;
+            prepared.lemmaReference =
+                elaborateExpression(*lemmaSurface, localBinders);
+            ExpressionPointer lemmaTypeOpened = weakHeadNormalForm(
+                environment_,
+                inferTypeInLocalContext(localBinders,
+                                          prepared.lemmaReference));
+            ExpressionPointer lemmaTypeClosed = closeOverLocalBinders(
+                lemmaTypeOpened, localBinders, localBinders.size());
+            int numBinders = 0;
+            ExpressionPointer cursor = lemmaTypeClosed;
+            while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+                prepared.binderTypes.push_back(pi->domain);
+                cursor = pi->codomain;
+                ++numBinders;
+            }
+            prepared.numBinders = numBinders;
+            EqualityComponents components =
+                extractEqualityComponents(cursor, "simplify (lemma)",
+                                           line);
+            prepared.carrier = components.carrierType;
+            prepared.leftPattern = components.leftEndpoint;
+            prepared.rightPattern = components.rightEndpoint;
+            prepared.carrierUniverseLevel =
+                components.carrierUniverseLevel;
+            lemmas.push_back(std::move(prepared));
+        }
+
+        // Iterate. At each step, look for any matching subterm; on
+        // success, build the rewrite proof step and update the running
+        // `current` value. Stop when `current` is definitionally equal
+        // to the target, or when no lemma fires. `intermediates[i]` is
+        // the running term BEFORE proofSteps[i]; intermediates.back()
+        // is the final term after all steps.
+        ExpressionPointer originalLeft = goal.leftEndpoint;
+        ExpressionPointer current = goal.leftEndpoint;
+        ExpressionPointer target = goal.rightEndpoint;
+        std::vector<ExpressionPointer> proofSteps;
+        std::vector<ExpressionPointer> intermediates;
+        intermediates.push_back(current);
+        const int iterationLimit = 200;
+
+        // Build a context for definitional-equality checks, using the
+        // localBinders (opened over fresh internal FreeVariables).
+        auto checkDefinitionallyEqual =
+            [&](ExpressionPointer left,
+                ExpressionPointer right) -> bool {
+            Context context;
+            for (size_t i = 0; i < localBinders.size(); ++i) {
+                ExpressionPointer openedType = openOverLocalBinders(
+                    localBinders[i].type, localBinders, i);
+                context.push_back(
+                    {localBinders[i].name, openedType,
+                     FreeVariableOrigin::Internal});
+            }
+            ExpressionPointer leftOpened = openOverLocalBinders(
+                left, localBinders, localBinders.size());
+            ExpressionPointer rightOpened = openOverLocalBinders(
+                right, localBinders, localBinders.size());
+            return isDefinitionallyEqual(environment_, context,
+                                          leftOpened, rightOpened);
+        };
+
+        for (int iteration = 0; iteration < iterationLimit; ++iteration) {
+            if (checkDefinitionallyEqual(current, target)) break;
+
+            size_t matchedLemmaIndex = 0;
+            std::vector<ExpressionPointer> bindings;
+            ExpressionPointer matchedSubterm;
+            if (!findFirstSimplifyMatch(current, lemmas,
+                                          matchedLemmaIndex, bindings,
+                                          matchedSubterm)) {
+                throwElaborate(
+                    "simplify: no lemma's left-hand side matches a "
+                    "subterm of the current goal, and the goal is not "
+                    "yet equal to its target — the rule set is "
+                    "insufficient for this step");
+            }
+            const SimplifyLemma& matched = lemmas[matchedLemmaIndex];
+            ExpressionPointer instantiatedRight = instantiatePattern(
+                matched.rightPattern, bindings, matched.numBinders);
+            // Replace the matched subterm with `instantiatedRight`. We
+            // do this structurally — `abstractStructuralOccurrence`
+            // would replace EVERY occurrence; we want the rewrite to
+            // happen at the same set of positions that the proof step
+            // covers (also "every occurrence"), so this is consistent.
+            int occurrenceCount = 0;
+            ExpressionPointer holed = abstractStructuralOccurrence(
+                current, matchedSubterm, 0, occurrenceCount);
+            ExpressionPointer newCurrent =
+                substitute(holed, 0, instantiatedRight);
+            ExpressionPointer step = buildSingleSimplifyStep(
+                matched, bindings, current, matchedSubterm,
+                newCurrent, goal.carrierType,
+                goal.carrierUniverseLevel, instantiatedRight);
+            proofSteps.push_back(std::move(step));
+            current = std::move(newCurrent);
+            intermediates.push_back(current);
+        }
+
+        if (!checkDefinitionallyEqual(current, target)) {
+            throwElaborate(
+                "simplify: hit iteration limit before reaching the "
+                "target; the rule set may be non-confluent (e.g. "
+                "naked commutativity)");
+        }
+
+        // Compose the proof. If no rewrites fired, the LHS was already
+        // definitionally equal to the RHS — emit reflexivity at the
+        // calc step's LHS (well-typed because expectedType is opaque
+        // up to definitional equality).
+        if (proofSteps.empty()) {
+            ExpressionPointer reflexivityCall = makeConstant(
+                "reflexivity",
+                {goal.carrierUniverseLevel});
+            reflexivityCall = makeApplication(
+                std::move(reflexivityCall), goal.carrierType);
+            reflexivityCall = makeApplication(
+                std::move(reflexivityCall), goal.leftEndpoint);
+            return reflexivityCall;
+        }
+        // Chain transitivities left-fold style. We tracked the
+        // intermediate terms as we went, so we don't need to extract
+        // them from the proof types (which would arrive in opened
+        // form and require re-closing). The signature is
+        //   Equality.transitivity.{u} (T : Type u) (x y z : T)
+        //       (xEqY : Equality(T, x, y))
+        //       (yEqZ : Equality(T, y, z))
+        //   : Equality(T, x, z).
+        ExpressionPointer composed = proofSteps[0];
+        for (size_t i = 1; i < proofSteps.size(); ++i) {
+            ExpressionPointer call = makeConstant(
+                "Equality.transitivity",
+                {goal.carrierUniverseLevel});
+            call = makeApplication(std::move(call), goal.carrierType);
+            call = makeApplication(std::move(call), originalLeft);
+            call = makeApplication(std::move(call), intermediates[i]);
+            call = makeApplication(std::move(call),
+                                    intermediates[i + 1]);
+            call = makeApplication(std::move(call), composed);
+            call = makeApplication(std::move(call), proofSteps[i]);
+            composed = std::move(call);
+        }
+        return composed;
     }
 
     // Pick the unique overload candidate that matches the user-supplied
