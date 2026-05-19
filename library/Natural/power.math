@@ -53,18 +53,17 @@ theorem Natural.power_add
 -- Subtraction-witness extractor for `1 ≤ p^k`: provides a Natural m
 -- with p^k = succ(m). Useful for showing strict positivity.
 theorem Natural.power_succ_form
-        : (k p : Natural) → successor(zero) ≤ p
+        : (k p : Natural) → 1 ≤ p
           → ∃ (m : Natural). Natural.power(k, p) = successor(m)
   | zero, p, _ =>
-      ⟨zero, reflexivity(Natural, successor(zero))⟩
+      ⟨zero, reflexivity(Natural, 1)⟩
   | successor(j), p, pPositive => {
       -- IH: there's an m with power(j, p) = succ(m).
       obtain ⟨m, powerIsSucc⟩
           from Natural.power_succ_form(j, p, pPositive);
-      -- p > 0, so p = successor(zero) + c (which reduces to succ(c)).
-      obtain ⟨c, pEqualsSuccZeroPlusC⟩
-          from Natural.subtraction_witness(
-                   successor(zero), p, pPositive);
+      -- p ≥ 1, so p = 1 + c for some c (and `1 + c` reduces to succ(c)).
+      obtain ⟨c, pEqualsOnePlusC⟩
+          from Natural.subtraction_witness(1, p, pPositive);
       ⟨c + p * m,
        calc Natural.power(successor(j), p)
           = p * Natural.power(j, p)
@@ -72,21 +71,21 @@ theorem Natural.power_succ_form
                by congruenceOf(
                       function (r : Natural) => p * r, powerIsSucc)
           = p + p * m
-          = (successor(zero) + c) + p * m
+          = (1 + c) + p * m
                by congruenceOf(
                       function (r : Natural) => r + p * m,
-                      pEqualsSuccZeroPlusC)
+                      pEqualsOnePlusC)
           = successor(c + p * m)⟩
     }
 
 -- p^k ≥ 1 for p ≥ 1. From the succ form.
 theorem Natural.power_positive
-        (k p : Natural) (pPositive : successor(zero) ≤ p)
-        : successor(zero) ≤ Natural.power(k, p) :=
+        (k p : Natural) (pPositive : 1 ≤ p)
+        : 1 ≤ Natural.power(k, p) :=
   Exists.eliminate(
       Natural,
       function (m : Natural) => Natural.power(k, p) = successor(m),
-      successor(zero) ≤ Natural.power(k, p),
+      1 ≤ Natural.power(k, p),
       function (m : Natural) (eq : Natural.power(k, p) = successor(m)) =>
         rewrite(
             Equality.symmetry(eq),
