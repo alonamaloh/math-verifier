@@ -1,0 +1,320 @@
+-- Real/algebra.math
+--
+-- Multiplicative ring laws and distributivity for Real. Each lifts
+-- from the corresponding pointwise Rational law via Quotient.induct(
+-- _two) + the equivalent_when_sequenceFunction_equal helper.
+
+module Real.algebra
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.absolute_value
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+
+-- ----------------------------------------------------------------------
+-- Multiply is commutative on Real.
+theorem Real.multiply_commutative
+        (x y : Real)
+        : Real.multiply(x, y) = Real.multiply(y, x) :=
+  Quotient.induct_two(
+      function (xArg yArg : Real) =>
+          Real.multiply(xArg, yArg) = Real.multiply(yArg, xArg),
+      function (rep_x rep_y : CauchyRationalSequence) =>
+        Quotient.sound(
+            CauchyRationalSequence, CauchyEquivalent,
+            CauchyRationalSequence.multiply(rep_x, rep_y),
+            CauchyRationalSequence.multiply(rep_y, rep_x),
+            CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
+                CauchyRationalSequence.multiply(rep_x, rep_y),
+                CauchyRationalSequence.multiply(rep_y, rep_x),
+                function (n : Natural) =>
+                  calc CauchyRationalSequence.sequenceFunction(
+                           CauchyRationalSequence.multiply(rep_x, rep_y), n)
+                     = CauchyRationalSequence.sequenceFunction(rep_x, n)
+                       * CauchyRationalSequence.sequenceFunction(rep_y, n)
+                            by CauchyRationalSequence.sequenceFunction_multiply(
+                                   rep_x, rep_y, n)
+                     = CauchyRationalSequence.sequenceFunction(rep_y, n)
+                       * CauchyRationalSequence.sequenceFunction(rep_x, n)
+                            by Rational.multiply_commutative(
+                                   CauchyRationalSequence.sequenceFunction(rep_x, n),
+                                   CauchyRationalSequence.sequenceFunction(rep_y, n))
+                     = CauchyRationalSequence.sequenceFunction(
+                           CauchyRationalSequence.multiply(rep_y, rep_x), n)
+                            by Equality.symmetry(
+                                   CauchyRationalSequence.sequenceFunction_multiply(
+                                       rep_y, rep_x, n)))),
+      x, y)
+
+-- Multiply is associative on Real.
+theorem Real.multiply_associative
+        (x y z : Real)
+        : Real.multiply(Real.multiply(x, y), z)
+          = Real.multiply(x, Real.multiply(y, z)) :=
+  Quotient.induct(
+      function (xArg : Real) =>
+          (yArg : Real) → (zArg : Real) →
+              Real.multiply(Real.multiply(xArg, yArg), zArg)
+                = Real.multiply(xArg, Real.multiply(yArg, zArg)),
+      function (rep_x : CauchyRationalSequence) =>
+        function (yArg : Real) (zArg : Real) =>
+          Quotient.induct_two(
+              function (yArg' : Real) (zArg' : Real) =>
+                  Real.multiply(
+                      Real.multiply((Quotient.mk(rep_x) : Real), yArg'),
+                      zArg')
+                    = Real.multiply((Quotient.mk(rep_x) : Real),
+                                    Real.multiply(yArg', zArg')),
+              function (rep_y rep_z : CauchyRationalSequence) =>
+                Quotient.sound(
+                    CauchyRationalSequence, CauchyEquivalent,
+                    CauchyRationalSequence.multiply(
+                        CauchyRationalSequence.multiply(rep_x, rep_y),
+                        rep_z),
+                    CauchyRationalSequence.multiply(
+                        rep_x,
+                        CauchyRationalSequence.multiply(rep_y, rep_z)),
+                    CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
+                        CauchyRationalSequence.multiply(
+                            CauchyRationalSequence.multiply(rep_x, rep_y),
+                            rep_z),
+                        CauchyRationalSequence.multiply(
+                            rep_x,
+                            CauchyRationalSequence.multiply(rep_y, rep_z)),
+                        function (n : Natural) =>
+                          calc CauchyRationalSequence.sequenceFunction(
+                                   CauchyRationalSequence.multiply(
+                                       CauchyRationalSequence.multiply(rep_x, rep_y),
+                                       rep_z), n)
+                             = CauchyRationalSequence.sequenceFunction(
+                                   CauchyRationalSequence.multiply(rep_x, rep_y), n)
+                               * CauchyRationalSequence.sequenceFunction(rep_z, n)
+                                    by CauchyRationalSequence.sequenceFunction_multiply(
+                                           CauchyRationalSequence.multiply(rep_x, rep_y),
+                                           rep_z, n)
+                             = (CauchyRationalSequence.sequenceFunction(rep_x, n)
+                                * CauchyRationalSequence.sequenceFunction(rep_y, n))
+                               * CauchyRationalSequence.sequenceFunction(rep_z, n)
+                                    by congruenceOf(
+                                           function (r : Rational) =>
+                                               r * CauchyRationalSequence.sequenceFunction(
+                                                       rep_z, n),
+                                           CauchyRationalSequence.sequenceFunction_multiply(
+                                               rep_x, rep_y, n))
+                             = CauchyRationalSequence.sequenceFunction(rep_x, n)
+                               * (CauchyRationalSequence.sequenceFunction(rep_y, n)
+                                  * CauchyRationalSequence.sequenceFunction(rep_z, n))
+                                    by Rational.multiply_associative(
+                                           CauchyRationalSequence.sequenceFunction(rep_x, n),
+                                           CauchyRationalSequence.sequenceFunction(rep_y, n),
+                                           CauchyRationalSequence.sequenceFunction(rep_z, n))
+                             = CauchyRationalSequence.sequenceFunction(rep_x, n)
+                               * CauchyRationalSequence.sequenceFunction(
+                                     CauchyRationalSequence.multiply(rep_y, rep_z), n)
+                                    by congruenceOf(
+                                           function (r : Rational) =>
+                                               CauchyRationalSequence.sequenceFunction(
+                                                   rep_x, n) * r,
+                                           Equality.symmetry(
+                                               CauchyRationalSequence.sequenceFunction_multiply(
+                                                   rep_y, rep_z, n)))
+                             = CauchyRationalSequence.sequenceFunction(
+                                   CauchyRationalSequence.multiply(
+                                       rep_x,
+                                       CauchyRationalSequence.multiply(rep_y, rep_z)), n)
+                                    by Equality.symmetry(
+                                           CauchyRationalSequence.sequenceFunction_multiply(
+                                               rep_x,
+                                               CauchyRationalSequence.multiply(rep_y, rep_z),
+                                               n)))),
+              yArg, zArg),
+      x)(y, z)
+
+-- 1 * x = x on Real.
+theorem Real.one_multiply
+        (x : Real)
+        : Real.multiply(Real.one, x) = x :=
+  Quotient.induct(
+      function (xArg : Real) =>
+          Real.multiply(Real.one, xArg) = xArg,
+      function (rep_x : CauchyRationalSequence) =>
+        Quotient.sound(
+            CauchyRationalSequence, CauchyEquivalent,
+            CauchyRationalSequence.multiply(
+                Rational.to_cauchy_constant(Rational.one), rep_x),
+            rep_x,
+            CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
+                CauchyRationalSequence.multiply(
+                    Rational.to_cauchy_constant(Rational.one), rep_x),
+                rep_x,
+                function (n : Natural) =>
+                  calc CauchyRationalSequence.sequenceFunction(
+                           CauchyRationalSequence.multiply(
+                               Rational.to_cauchy_constant(Rational.one),
+                               rep_x), n)
+                     = CauchyRationalSequence.sequenceFunction(
+                           Rational.to_cauchy_constant(Rational.one), n)
+                       * CauchyRationalSequence.sequenceFunction(rep_x, n)
+                            by CauchyRationalSequence.sequenceFunction_multiply(
+                                   Rational.to_cauchy_constant(Rational.one),
+                                   rep_x, n)
+                     = Rational.one
+                       * CauchyRationalSequence.sequenceFunction(rep_x, n)
+                     = CauchyRationalSequence.sequenceFunction(rep_x, n)
+                            by Rational.one_multiply(
+                                   CauchyRationalSequence.sequenceFunction(
+                                       rep_x, n)))),
+      x)
+
+-- x * 1 = x via multiply_commutative + one_multiply.
+theorem Real.multiply_one
+        (x : Real)
+        : Real.multiply(x, Real.one) = x :=
+  Equality.transitivity(
+      Real,
+      Real.multiply(x, Real.one),
+      Real.multiply(Real.one, x),
+      x,
+      Real.multiply_commutative(x, Real.one),
+      Real.one_multiply(x))
+
+-- Distributivity: x * (y + z) = x * y + x * z.
+theorem Real.distributivity_left
+        (x y z : Real)
+        : Real.multiply(x, Real.add(y, z))
+          = Real.add(Real.multiply(x, y), Real.multiply(x, z)) :=
+  Quotient.induct(
+      function (xArg : Real) =>
+          (yArg : Real) → (zArg : Real) →
+              Real.multiply(xArg, Real.add(yArg, zArg))
+                = Real.add(Real.multiply(xArg, yArg),
+                           Real.multiply(xArg, zArg)),
+      function (rep_x : CauchyRationalSequence) =>
+        function (yArg : Real) (zArg : Real) =>
+          Quotient.induct_two(
+              function (yArg' : Real) (zArg' : Real) =>
+                  Real.multiply((Quotient.mk(rep_x) : Real),
+                                Real.add(yArg', zArg'))
+                    = Real.add(
+                          Real.multiply((Quotient.mk(rep_x) : Real), yArg'),
+                          Real.multiply((Quotient.mk(rep_x) : Real), zArg')),
+              function (rep_y rep_z : CauchyRationalSequence) =>
+                Quotient.sound(
+                    CauchyRationalSequence, CauchyEquivalent,
+                    CauchyRationalSequence.multiply(rep_x,
+                        CauchyRationalSequence.add(rep_y, rep_z)),
+                    CauchyRationalSequence.add(
+                        CauchyRationalSequence.multiply(rep_x, rep_y),
+                        CauchyRationalSequence.multiply(rep_x, rep_z)),
+                    CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
+                        CauchyRationalSequence.multiply(rep_x,
+                            CauchyRationalSequence.add(rep_y, rep_z)),
+                        CauchyRationalSequence.add(
+                            CauchyRationalSequence.multiply(rep_x, rep_y),
+                            CauchyRationalSequence.multiply(rep_x, rep_z)),
+                        function (n : Natural) =>
+                          calc CauchyRationalSequence.sequenceFunction(
+                                   CauchyRationalSequence.multiply(rep_x,
+                                       CauchyRationalSequence.add(rep_y, rep_z)),
+                                   n)
+                             = CauchyRationalSequence.sequenceFunction(rep_x, n)
+                               * CauchyRationalSequence.sequenceFunction(
+                                     CauchyRationalSequence.add(rep_y, rep_z), n)
+                                    by CauchyRationalSequence.sequenceFunction_multiply(
+                                           rep_x,
+                                           CauchyRationalSequence.add(rep_y, rep_z),
+                                           n)
+                             = CauchyRationalSequence.sequenceFunction(rep_x, n)
+                               * (CauchyRationalSequence.sequenceFunction(rep_y, n)
+                                  + CauchyRationalSequence.sequenceFunction(rep_z, n))
+                                    by congruenceOf(
+                                           function (r : Rational) =>
+                                               CauchyRationalSequence.sequenceFunction(
+                                                   rep_x, n) * r,
+                                           CauchyRationalSequence.sequenceFunction_add(
+                                               rep_y, rep_z, n))
+                             = CauchyRationalSequence.sequenceFunction(rep_x, n)
+                               * CauchyRationalSequence.sequenceFunction(rep_y, n)
+                               + CauchyRationalSequence.sequenceFunction(rep_x, n)
+                                 * CauchyRationalSequence.sequenceFunction(rep_z, n)
+                                    by Rational.distributivity_left(
+                                           CauchyRationalSequence.sequenceFunction(rep_x, n),
+                                           CauchyRationalSequence.sequenceFunction(rep_y, n),
+                                           CauchyRationalSequence.sequenceFunction(rep_z, n))
+                             = CauchyRationalSequence.sequenceFunction(
+                                   CauchyRationalSequence.multiply(rep_x, rep_y), n)
+                               + CauchyRationalSequence.sequenceFunction(rep_x, n)
+                                 * CauchyRationalSequence.sequenceFunction(rep_z, n)
+                                    by congruenceOf(
+                                           function (r : Rational) =>
+                                               r + CauchyRationalSequence.sequenceFunction(
+                                                       rep_x, n)
+                                                   * CauchyRationalSequence.sequenceFunction(
+                                                         rep_z, n),
+                                           Equality.symmetry(
+                                               CauchyRationalSequence.sequenceFunction_multiply(
+                                                   rep_x, rep_y, n)))
+                             = CauchyRationalSequence.sequenceFunction(
+                                   CauchyRationalSequence.multiply(rep_x, rep_y), n)
+                               + CauchyRationalSequence.sequenceFunction(
+                                     CauchyRationalSequence.multiply(rep_x, rep_z), n)
+                                    by congruenceOf(
+                                           function (r : Rational) =>
+                                               CauchyRationalSequence.sequenceFunction(
+                                                   CauchyRationalSequence.multiply(
+                                                       rep_x, rep_y), n) + r,
+                                           Equality.symmetry(
+                                               CauchyRationalSequence.sequenceFunction_multiply(
+                                                   rep_x, rep_z, n)))
+                             = CauchyRationalSequence.sequenceFunction(
+                                   CauchyRationalSequence.add(
+                                       CauchyRationalSequence.multiply(rep_x, rep_y),
+                                       CauchyRationalSequence.multiply(rep_x, rep_z)),
+                                   n)
+                                    by Equality.symmetry(
+                                           CauchyRationalSequence.sequenceFunction_add(
+                                               CauchyRationalSequence.multiply(rep_x, rep_y),
+                                               CauchyRationalSequence.multiply(rep_x, rep_z),
+                                               n)))),
+              yArg, zArg),
+      x)(y, z)
+
+-- Distributivity (right): (x + y) * z = x * z + y * z. Reduces to
+-- multiply_commutative + distributivity_left.
+theorem Real.distributivity_right
+        (x y z : Real)
+        : Real.multiply(Real.add(x, y), z)
+          = Real.add(Real.multiply(x, z), Real.multiply(y, z)) :=
+  calc Real.multiply(Real.add(x, y), z)
+     = Real.multiply(z, Real.add(x, y))
+          by Real.multiply_commutative(Real.add(x, y), z)
+     = Real.add(Real.multiply(z, x), Real.multiply(z, y))
+          by Real.distributivity_left(z, x, y)
+     = Real.add(Real.multiply(x, z), Real.multiply(z, y))
+          by congruenceOf(
+                 function (r : Real) =>
+                     Real.add(r, Real.multiply(z, y)),
+                 Real.multiply_commutative(z, x))
+     = Real.add(Real.multiply(x, z), Real.multiply(y, z))
+          by congruenceOf(
+                 function (r : Real) =>
+                     Real.add(Real.multiply(x, z), r),
+                 Real.multiply_commutative(z, y))

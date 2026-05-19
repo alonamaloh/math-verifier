@@ -1,0 +1,72 @@
+-- Real/instances.math
+--
+-- Witnesses that Real satisfies the standard algebraic abstractions:
+-- an abelian group under (+, 0, −) and a commutative ring under
+-- (+, ·, 0, 1). Each instance is just a tuple of the already-proved
+-- identities — no new mathematical content, just packaging.
+
+module Real.instances
+
+import Logic.basics
+import Equality.basics
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+
+-- Real is a monoid under (+, 0).
+theorem Real.add_is_monoid
+        : IsMonoid(Real, Real.add, Real.zero) :=
+    ⟨Real.add_associative,
+     Real.zero_add,
+     Real.add_zero⟩
+
+-- Real is a commutative monoid under (+, 0).
+theorem Real.add_is_commutative_monoid
+        : IsCommutativeMonoid(Real, Real.add, Real.zero) :=
+    ⟨Real.add_is_monoid, Real.add_commutative⟩
+
+-- Real is a group under (+, 0, −).
+theorem Real.add_is_group
+        : IsGroup(Real, Real.add, Real.zero, Real.negate) :=
+    ⟨Real.add_is_monoid,
+     Real.add_negate_left,
+     Real.add_negate_right⟩
+
+-- Real is an abelian group under (+, 0, −).
+theorem Real.add_is_abelian_group
+        : IsAbelianGroup(Real, Real.add, Real.zero, Real.negate) :=
+    ⟨Real.add_is_group, Real.add_commutative⟩
+
+-- Real is a monoid under (·, 1).
+theorem Real.multiply_is_monoid
+        : IsMonoid(Real, Real.multiply, Real.one) :=
+    ⟨Real.multiply_associative,
+     Real.one_multiply,
+     Real.multiply_one⟩
+
+-- Real is a commutative monoid under (·, 1).
+theorem Real.multiply_is_commutative_monoid
+        : IsCommutativeMonoid(Real, Real.multiply, Real.one) :=
+    ⟨Real.multiply_is_monoid, Real.multiply_commutative⟩
+
+-- Real is a ring under (+, 0, −, ·, 1).
+theorem Real.is_ring
+        : IsRing(Real, Real.add, Real.zero, Real.negate,
+                  Real.multiply, Real.one) :=
+    ⟨Real.add_is_abelian_group,
+     Real.multiply_is_monoid,
+     Real.distributivity_left,
+     Real.distributivity_right⟩
+
+-- Real is a commutative ring.
+theorem Real.is_commutative_ring
+        : IsCommutativeRing(Real, Real.add, Real.zero, Real.negate,
+                             Real.multiply, Real.one) :=
+    ⟨Real.is_ring, Real.multiply_commutative⟩
