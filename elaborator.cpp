@@ -3363,8 +3363,30 @@ private:
         ExpressionPointer hintType = closeOverLocalBinders(
             hintTypeOpened, localBinders, localBinders.size());
 
-        return autoFillHintForClaim(
+        ExpressionPointer result = autoFillHintForClaim(
             hintTerm, hintType, goalClosed, localBinders, line);
+
+        // `--check-redundant-by`: speculatively try the no-`by`
+        // Step 5 lookup. If it would also discharge the same goal,
+        // warn that the hint is redundant.
+        if (reportRedundantBy_) {
+            ExpressionPointer autoAttempt;
+            try {
+                autoAttempt = lookupClaimByLibrary(
+                    goalClosed, localBinders, line);
+            } catch (const ElaborateError&) {
+                autoAttempt = nullptr;
+            } catch (const TypeError&) {
+                autoAttempt = nullptr;
+            }
+            if (autoAttempt) {
+                std::cerr << "warning: " << moduleName_
+                    << ":" << line
+                    << ": redundant `by` on `claim` — Step 5 "
+                    "lookup closes the goal without help\n";
+            }
+        }
+        return result;
     }
 
     // Walks the Pi chain of `hintType`, unifies the conclusion with

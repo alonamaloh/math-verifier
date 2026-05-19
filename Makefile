@@ -68,6 +68,15 @@ library: $(LIBRARY_MATHV_FILES)
 
 tests: library $(TEST_MATHV_FILES)
 
+# Optional verification flags. Set `CHECK_REDUNDANT_BY=1` on the make
+# command line to ask the verifier to warn about `by` annotations that
+# the auto-prover could close on its own. Doesn't affect cache contents;
+# warnings just go to stderr.
+VERIFY_FLAGS :=
+ifeq ($(CHECK_REDUNDANT_BY),1)
+VERIFY_FLAGS += --check-redundant-by
+endif
+
 # Recipe for a .mathv. The pattern rule provides the .math prerequisite;
 # explicit .mathv prerequisites come from the included dependency file
 # (built from `kernel deps`). The kernel binary is an order-only prereq —
@@ -76,7 +85,7 @@ tests: library $(TEST_MATHV_FILES)
 # old caches and force a rebuild explicitly).
 $(BUILD_DIR)/%.mathv: %.math | kernel
 	@mkdir -p $(dir $@)
-	./kernel verify --source $< --output $@ --deps $(filter %.mathv,$^)
+	./kernel verify --source $< --output $@ --deps $(filter %.mathv,$^) $(VERIFY_FLAGS)
 
 -include $(BUILD_DIR)/library-depends.mk
 
