@@ -9,16 +9,39 @@ state (`README.md`, `CLAUDE.md`) are the record of what was done.
 The math content roadmap. Each item is independently useful; they
 chain in roughly the order listed.
 
-- **Integer → Rational embedding.** `Integer.to_rational(n) :=
-  mk(make(n, 0))`. Extends the cast registry so ascription
-  `(x : Rational)` on an `Integer` auto-applies this.
-- **`Field` predicate** plus a non-zero-implies-invertible witness.
-  Rational becomes a `Field` instance.
-- **Real as a field.** Cauchy-sequence construction is mostly in
-  place (`Real/{basics, addition, multiplication, negation,
-  cauchy_bounded}.math`); needs the field instance and order.
+- **Real as a field — blocked on apartness.** Real is now a
+  commutative ring (`Real/{ring,algebra,instances}.math`), and
+  `IsField` exists (`Algebra/field.math`) with Rational as the
+  first instance (`Rational/field.math`). Lifting that to Real
+  requires building a reciprocal sequence for any non-zero Real,
+  which in turn requires extracting a positive Rational lower bound
+  on `|s(m)|` from "x ≠ Real.zero" — i.e., upgrading inequality to
+  apartness. Constructively that's not free (Markov / LEM is
+  needed in general), so the proof can't go through as written
+  against the current `IsField` predicate without either:
+  (a) adding a classical-reasoning axiom (LEM or Markov for
+      decidable propositions over Naturals);
+  (b) introducing a `Real.Apart(x, y)` predicate and reformulating
+      `IsField` to take apartness instead of `¬(x = zero)`; or
+  (c) deciding that Real's field structure is stated as an axiom,
+      paid for once.
+  The reciprocal-of-bounded-away-from-zero machinery itself
+  (apartness in hand → Cauchy reciprocal sequence + respect proof
+  + multiplication-cancels-to-one) is ordinary analysis and
+  ~500-1000 lines of mechanical work once the apartness step is
+  unblocked.
+- **Real order.** `Real.LessOrEqual` / `Real.LessThan` (via "eventually
+  ≥ a positive Rational for some Cauchy representative" or
+  "non-negative on every representative beyond N"). Independent of
+  the field issue; useful on its own and a prerequisite for any
+  monotonicity lemma. Same apartness wrinkle if you want strict <.
 - **More generic abelian-group / ring / field lemmas** as the
-  Real and PAdic proofs surface them.
+  Real and PAdic proofs surface them. Foundation in
+  `Algebra/{group_lemmas,ring_lemmas}.math` covers
+  `inverse_identity`, `inverse_operation`, `cancel_left/right`,
+  `zero_multiply`, `multiply_zero`, `multiply_negate_left/right`,
+  `negate_multiply_negate`. Add more here as concrete-carrier
+  proofs find themselves wanting them.
 
 ## Calc auto-prover — smaller open follow-ups
 
