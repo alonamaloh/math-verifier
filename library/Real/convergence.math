@@ -1,0 +1,465 @@
+-- Real/convergence.math
+--
+-- ε–N convergence of sequences of Reals (indexed by Naturals, taking
+-- Real values), the predicate "is convergent", uniqueness of limits,
+-- and the supporting "no positive ε bounds |x| ⇒ x is zero" lemma.
+-- Throughout, we use a Rational ε (with the coercion Rational ↪ Real
+-- to compare against `Real.absolute_value(s(n) - L)`) — matching how
+-- `Rational.sequence.IsEventuallyNonneg` is shaped.
+
+module Real.convergence
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.maximum
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.order
+import Rational.order_arithmetic
+import Rational.absolute_value
+import Rational.halve
+import Rational.positive
+import Rational.triangle
+import Rational.triangle_more
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.order
+import Real.absolute_value
+
+-- ----------------------------------------------------------------------
+-- ε–N convergence: `s : Natural → Real` converges to `limit : Real`
+-- iff for every positive Rational ε, eventually every term of `s` is
+-- within ε of the limit (with ε embedded into Real for the comparison).
+
+definition Real.SequenceConverges
+        (s : Natural → Real) (limit : Real) : Proposition :=
+  (epsilon : Rational) → Rational.zero < epsilon →
+    ∃ (N : Natural).
+      (m : Natural) → N ≤ m →
+        Real.absolute_value(s(m) - limit) < (epsilon : Real)
+
+-- A sequence is convergent iff some Real is its limit.
+definition Real.SequenceConvergent (s : Natural → Real) : Proposition :=
+  ∃ (limit : Real). Real.SequenceConverges(s, limit)
+
+-- ----------------------------------------------------------------------
+-- "If |x| < ε for every positive ε, then x = 0" — the analytic
+-- antisymmetry lemma underlying limit uniqueness.
+--
+-- We prove this at the rep level via Quotient.induct on x. After
+-- substituting `x = Quotient.mk(s_rep)`, the goal becomes
+-- `Quotient.mk(s_rep) = Real.zero`, which by Quotient.sound reduces to
+-- `CauchyEquivalent(s_rep, constant_zero)` — exactly the rep-level
+-- statement that the sequence of absolute values of s_rep goes to zero.
+-- The hypothesis, evaluated at any positive ε and unwrapped through
+-- Real.LessThan.weaken + the Quotient.lift β-reductions of
+-- Real.absolute_value, Real.subtract, Real.IsNonneg, gives us
+-- `∀δ > 0. ∃ N. ∀ m ≥ N. |sf(s_rep, m)| < ε + δ`. Pick ε = δ = halve(δ_outer)
+-- and the bound becomes `|sf(s_rep, m)| < δ_outer`.
+
+-- First a small rep-level helper: from the hypothesis applied at a
+-- positive Rational ε, extract the rep-level "for every inner δ > 0
+-- eventually |sf(s_rep, m)| < ε + δ" statement.
+theorem Real.cauchy_almost_zero_from_absolute_bound
+        : (s_rep : CauchyRationalSequence)
+          → (epsilon : Rational) → (Rational.zero < epsilon)
+          → Real.absolute_value((Quotient.mk(s_rep) : Real))
+                < (epsilon : Real)
+          → (delta : Rational) → Rational.zero < delta →
+              ∃ (N : Natural).
+                (m : Natural) → N ≤ m →
+                  -delta < epsilon
+                            - Rational.absolute_value(
+                                  CauchyRationalSequence.sequenceFunction(
+                                      s_rep, m))
+  | CauchyRationalSequence.make(s, sCauchy),
+    epsilon, epsilonPositive, absLessThan,
+    delta, deltaPositive =>
+      -- After pattern-matching on s_rep, every Quotient.lift β-reduces:
+      --   Real.absolute_value(mk(make(s, _))) = mk(abs(make(s, _)))
+      --     = mk(make(λn. |s(n)|, _))
+      --   (ε : Real) = mk(make(λn. ε, _))
+      --   (ε : Real) - |x| = mk(make(λn. ε + -|s(n)|, _))
+      -- Real.IsNonneg of this is IsEventuallyNonneg(λn. ε - |s(n)|),
+      -- i.e., the desired ∀δ > 0. ∃ N. ∀ m ≥ N. -δ < ε - |s(n)|.
+      And.left(
+          Real.IsNonneg((epsilon : Real)
+                        - Real.absolute_value((Quotient.mk(
+                              CauchyRationalSequence.make(s, sCauchy)) : Real))),
+          Not(Real.absolute_value((Quotient.mk(
+                  CauchyRationalSequence.make(s, sCauchy)) : Real))
+              = (epsilon : Real)),
+          absLessThan)(
+          delta, deltaPositive)
+
+-- Rep-level helper: a CauchyRationalSequence whose absolute-value
+-- sequence is bounded below ε + δ for every choice of positive ε and δ
+-- is equivalent (in the Cauchy quotient) to the constant-zero
+-- sequence. The witness: at outer δ_outer, apply the hypothesis at
+-- ε = halve(δ_outer) and inner δ = halve(δ_outer), giving
+-- |s(m)| < halve(δ_outer) + halve(δ_outer) = δ_outer.
+theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
+        : (s_rep : CauchyRationalSequence)
+          → ((epsilon : Rational) → Rational.zero < epsilon
+              → (delta : Rational) → Rational.zero < delta →
+                  ∃ (N : Natural).
+                    (m : Natural) → N ≤ m →
+                      -delta < epsilon
+                                - Rational.absolute_value(
+                                      CauchyRationalSequence.sequenceFunction(
+                                          s_rep, m)))
+          → CauchyEquivalent(s_rep, Rational.to_cauchy_constant(Rational.zero))
+  | CauchyRationalSequence.make(s, _),
+    almostZero =>
+      function (epsilon_outer : Rational)
+               (epsilon_outerPositive : Rational.zero < epsilon_outer) => {
+        claim halvedPositive : Rational.zero < Rational.halve(epsilon_outer)
+          by Rational.halve_positive(epsilon_outer, epsilon_outerPositive);
+        obtain ⟨N, boundAtN⟩
+            from almostZero(
+                     Rational.halve(epsilon_outer), halvedPositive,
+                     Rational.halve(epsilon_outer), halvedPositive);
+        witness N with
+            function (m : Natural) (N_leq_m : N ≤ m) => {
+              -- boundAtN(m, N_leq_m)
+              --   : -halve(ε) < halve(ε) - |s(m)|
+              -- Rearrange: |s(m)| < halve(ε) + halve(ε) = ε.
+              claim rawBound
+                    : -Rational.halve(epsilon_outer)
+                      < Rational.halve(epsilon_outer)
+                        - Rational.absolute_value(s(m))
+                by boundAtN(m, N_leq_m);
+              -- Add |s(m)| + halve(ε) to both sides:
+              --   |s(m)| < halve(ε) + halve(ε).
+              -- Goal at the end: |s(m) - 0| < ε. Since s(m) - 0 = s(m),
+              -- it suffices to bound |s(m)| < ε.
+              -- From -halve(ε) < halve(ε) - |s(m)|, add (|s(m)| +
+              -- halve(ε)) to both sides. The LHS reduces to |s(m)| by
+              -- ring; the RHS reduces to halve(ε) + halve(ε), which is
+              -- ε by halve_doubled. We do the RHS rewrite manually
+              -- (split into the two halve(ε)'s) since `ring` doesn't
+              -- yet handle coefficient-2 monomials.
+              claim shiftedBound
+                    : Rational.absolute_value(s(m))
+                      < Rational.halve(epsilon_outer)
+                        + Rational.halve(epsilon_outer)
+                by rewrite(
+                       (ring : -Rational.halve(epsilon_outer)
+                                + (Rational.absolute_value(s(m))
+                                   + Rational.halve(epsilon_outer))
+                              = Rational.absolute_value(s(m))),
+                       rewrite(
+                           calc (Rational.halve(epsilon_outer)
+                                  - Rational.absolute_value(s(m)))
+                                  + (Rational.absolute_value(s(m))
+                                     + Rational.halve(epsilon_outer))
+                              = (Rational.halve(epsilon_outer)
+                                  + -Rational.absolute_value(s(m)))
+                                  + (Rational.absolute_value(s(m))
+                                     + Rational.halve(epsilon_outer))
+                              = Rational.halve(epsilon_outer)
+                                + (-Rational.absolute_value(s(m))
+                                   + (Rational.absolute_value(s(m))
+                                      + Rational.halve(epsilon_outer)))
+                              = Rational.halve(epsilon_outer)
+                                + ((-Rational.absolute_value(s(m))
+                                     + Rational.absolute_value(s(m)))
+                                    + Rational.halve(epsilon_outer))
+                              = Rational.halve(epsilon_outer)
+                                + (Rational.zero
+                                   + Rational.halve(epsilon_outer))
+                                     by congruenceOf(
+                                            function (z : Rational) =>
+                                                Rational.halve(epsilon_outer)
+                                                + (z + Rational.halve(epsilon_outer)),
+                                            Rational.add_negate_left(
+                                                Rational.absolute_value(s(m))))
+                              = Rational.halve(epsilon_outer)
+                                + Rational.halve(epsilon_outer),
+                           Rational.add_preserves_LessThan(
+                               -Rational.halve(epsilon_outer),
+                               Rational.halve(epsilon_outer)
+                                 - Rational.absolute_value(s(m)),
+                               Rational.absolute_value(s(m))
+                                 + Rational.halve(epsilon_outer),
+                               rawBound)));
+              -- halve(ε) + halve(ε) = ε.
+              claim absBound
+                    : Rational.absolute_value(s(m)) < epsilon_outer
+                by rewrite(
+                       Rational.halve_doubled(epsilon_outer),
+                       shiftedBound);
+              -- |s(m) - 0| = |s(m)| < ε.
+              rewrite(
+                  congruenceOf(
+                      Rational.absolute_value,
+                      Equality.symmetry(
+                          calc s(m) - Rational.zero
+                             = s(m) + -Rational.zero
+                             = s(m) + Rational.zero
+                             = s(m))),
+                  absBound)
+            }
+      }
+
+-- The headline lemma at the Real level: from `∀ε > 0. |x| < (ε : Real)`,
+-- conclude `x = Real.zero`. Lift via Quotient.induct.
+theorem Real.eq_of_absolute_value_less_than_all_positive
+        (x : Real)
+        (hypothesis : (epsilon : Rational) → Rational.zero < epsilon →
+                          Real.absolute_value(x) < (epsilon : Real))
+        : x = Real.zero :=
+  Quotient.induct(
+      function (xArg : Real) =>
+          ((epsilon : Rational) → Rational.zero < epsilon →
+              Real.absolute_value(xArg) < (epsilon : Real))
+          → xArg = Real.zero,
+      function (s_rep : CauchyRationalSequence) =>
+        function (atRep : (epsilon : Rational) → Rational.zero < epsilon →
+                              Real.absolute_value((Quotient.mk(s_rep) : Real))
+                                < (epsilon : Real)) =>
+          -- Conclude (Quotient.mk(s_rep) : Real) = Real.zero via
+          -- Quotient.sound, using equivalent_zero_of_absolute_value_almost_zero
+          -- to turn the hypothesis into a Cauchy-equivalence proof.
+          Quotient.sound(
+              CauchyRationalSequence, CauchyEquivalent,
+              s_rep,
+              Rational.to_cauchy_constant(Rational.zero),
+              CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero(
+                  s_rep,
+                  function (epsilon : Rational)
+                           (epsilonPositive : Rational.zero < epsilon) =>
+                    Real.cauchy_almost_zero_from_absolute_bound(
+                        s_rep,
+                        epsilon, epsilonPositive,
+                        atRep(epsilon, epsilonPositive)))),
+      x)(hypothesis)
+
+-- ----------------------------------------------------------------------
+-- `x - y = 0 → x = y` on Real. A small ring corollary: add y to both
+-- sides.
+theorem Real.eq_of_sub_eq_zero
+        (x y : Real) (hypothesis : x - y = Real.zero)
+        : x = y :=
+  calc x
+     = (x - y) + y          by Equality.symmetry((ring : (x - y) + y = x))
+     = Real.zero + y        by congruenceOf(
+                                   function (z : Real) => z + y,
+                                   hypothesis)
+     = y                    by Real.zero_add(y)
+
+-- ----------------------------------------------------------------------
+-- Limit uniqueness: if `s` converges to both L1 and L2, then L1 = L2.
+--
+-- Standard ε–N argument: for arbitrary positive Rational ε, split
+-- in half to get halvedEpsilon = halve(ε); pick N1 (from s ↦ L1 at
+-- halvedEpsilon) and N2 (s ↦ L2 at halvedEpsilon); take m = max(N1, N2);
+-- then by triangle inequality,
+--   |L1 - L2| = |(L1 - s(m)) + (s(m) - L2)|
+--             ≤ |L1 - s(m)| + |s(m) - L2|
+--             < halvedEpsilon + halvedEpsilon
+--             = ε.
+-- Since this holds for every positive Rational ε, eq_of_absolute_value_-
+-- less_than_all_positive gives L1 - L2 = Real.zero; eq_of_sub_eq_zero
+-- finishes.
+--
+-- The whole argument is staged as a sequence of `claim` lines for
+-- readability. We do the bulk of the analytic work at the rep level
+-- (claim-by-claim through the at_make helper for the central
+-- triangle/halving step), since stating `|L1 - L2| < (ε : Real)` and
+-- composing it through Real-level <-arithmetic would require several
+-- Real-level order lemmas we don't currently have.
+
+-- At constructor reps: the pointwise `|L1(m) - s(m) + (s(m) - L2(m))|
+--   ≤ |L1(m) - s(m)| + |s(m) - L2(m)|` argument over the underlying
+-- Cauchy rational sequences. This is the analytic heart, written
+-- once and reused inside the Real-level uniqueness proof via lift.
+-- Here `s : Natural → Real` is held abstract; only `L1`, `L2` are
+-- destructured to reps.
+
+theorem Real.SequenceConverges.unique_at_make
+        (s : Natural → Real)
+        (rep_L1 rep_L2 : CauchyRationalSequence)
+        (convergesToL1
+            : Real.SequenceConverges(s, (Quotient.mk(rep_L1) : Real)))
+        (convergesToL2
+            : Real.SequenceConverges(s, (Quotient.mk(rep_L2) : Real)))
+        : (Quotient.mk(rep_L1) : Real) = Quotient.mk(rep_L2) := {
+      -- It suffices to show L1 - L2 = 0. Apply
+      -- eq_of_absolute_value_less_than_all_positive to (L1 - L2).
+      claim differenceIsZero
+            : (Quotient.mk(rep_L1) : Real) - (Quotient.mk(rep_L2) : Real)
+              = Real.zero
+        by Real.eq_of_absolute_value_less_than_all_positive(
+               (Quotient.mk(rep_L1) : Real) - (Quotient.mk(rep_L2) : Real),
+               function (epsilon : Rational)
+                        (epsilonPositive : Rational.zero < epsilon) => {
+                 -- Pick m = max(N1, N2) where N1, N2 are the ε/2
+                 -- convergence indices. Then |L1 - s(m)| < ε/2 and
+                 -- |s(m) - L2| < ε/2, so by triangle
+                 --   |L1 - L2| ≤ |L1 - s(m)| + |s(m) - L2|
+                 --            < ε/2 + ε/2 = ε.
+                 claim halvedEpsilonPositive
+                       : Rational.zero < Rational.halve(epsilon)
+                   by Rational.halve_positive(epsilon, epsilonPositive);
+                 obtain ⟨N1, boundFromL1⟩
+                     from convergesToL1(
+                              Rational.halve(epsilon),
+                              halvedEpsilonPositive);
+                 obtain ⟨N2, boundFromL2⟩
+                     from convergesToL2(
+                              Rational.halve(epsilon),
+                              halvedEpsilonPositive);
+                 -- Step 1. Specialise both bounds at m = max(N1, N2).
+                 claim boundAtL1
+                       : Real.absolute_value(
+                             s(Natural.maximum(N1, N2))
+                             - (Quotient.mk(rep_L1) : Real))
+                         < (Rational.halve(epsilon) : Real)
+                   by boundFromL1(
+                          Natural.maximum(N1, N2),
+                          Natural.left_le_max(N1, N2));
+                 claim boundAtL2
+                       : Real.absolute_value(
+                             s(Natural.maximum(N1, N2))
+                             - (Quotient.mk(rep_L2) : Real))
+                         < (Rational.halve(epsilon) : Real)
+                   by boundFromL2(
+                          Natural.maximum(N1, N2),
+                          Natural.right_le_max(N1, N2));
+                 -- Step 2. Rewrite the L1 bound via |s - L| = |L - s|.
+                 claim swappedBoundAtL1
+                       : Real.absolute_value(
+                             (Quotient.mk(rep_L1) : Real)
+                             - s(Natural.maximum(N1, N2)))
+                         < (Rational.halve(epsilon) : Real)
+                   by rewrite(
+                          Real.absolute_value_subtract_swap(
+                              s(Natural.maximum(N1, N2)),
+                              (Quotient.mk(rep_L1) : Real)),
+                          boundAtL1);
+                 -- Step 3. Sum the two strict bounds:
+                 --   |L1 - s(m)| + |s(m) - L2| < halve(ε) + halve(ε).
+                 claim sumOfBounds
+                       : Real.absolute_value(
+                             (Quotient.mk(rep_L1) : Real)
+                             - s(Natural.maximum(N1, N2)))
+                         + Real.absolute_value(
+                               s(Natural.maximum(N1, N2))
+                               - (Quotient.mk(rep_L2) : Real))
+                         < (Rational.halve(epsilon) : Real)
+                           + (Rational.halve(epsilon) : Real)
+                   by Real.LessThan.add_strict_strict(
+                          Real.absolute_value(
+                              (Quotient.mk(rep_L1) : Real)
+                              - s(Natural.maximum(N1, N2))),
+                          Real.absolute_value(
+                              s(Natural.maximum(N1, N2))
+                              - (Quotient.mk(rep_L2) : Real)),
+                          (Rational.halve(epsilon) : Real),
+                          (Rational.halve(epsilon) : Real),
+                          swappedBoundAtL1,
+                          boundAtL2);
+                 -- Step 4. halve(ε) + halve(ε) = ε at Real level.
+                 -- Via the embedding-homomorphism + halve_doubled.
+                 claim halvedDoubleEqualsEpsilon
+                       : (Rational.halve(epsilon) : Real)
+                         + (Rational.halve(epsilon) : Real)
+                         = (epsilon : Real)
+                   by calc (Rational.halve(epsilon) : Real)
+                           + (Rational.halve(epsilon) : Real)
+                      = ((Rational.halve(epsilon)
+                          + Rational.halve(epsilon)) : Real)
+                             by Equality.symmetry(
+                                    Rational.to_real_add(
+                                        Rational.halve(epsilon),
+                                        Rational.halve(epsilon)))
+                      = (epsilon : Real)
+                             by congruenceOf(
+                                    Rational.to_real,
+                                    Rational.halve_doubled(epsilon));
+                 -- Step 5. The triangle-inequality step:
+                 --   |L1 - L2| = |(L1 - s(m)) + (s(m) - L2)|
+                 --             ≤ |L1 - s(m)| + |s(m) - L2|.
+                 claim triangleStep
+                       : Real.absolute_value(
+                             (Quotient.mk(rep_L1) : Real)
+                             - (Quotient.mk(rep_L2) : Real))
+                         ≤ Real.absolute_value(
+                               (Quotient.mk(rep_L1) : Real)
+                               - s(Natural.maximum(N1, N2)))
+                           + Real.absolute_value(
+                                 s(Natural.maximum(N1, N2))
+                                 - (Quotient.mk(rep_L2) : Real))
+                   by rewrite(
+                          -- Rewrite |L1 - L2| as
+                          --   |(L1 - s(m)) + (s(m) - L2)| via
+                          -- (L1 - s(m)) + (s(m) - L2) = L1 - L2 by ring
+                          -- (Real now has negate_add).
+                          congruenceOf(
+                              Real.absolute_value,
+                              (ring : ((Quotient.mk(rep_L1) : Real)
+                                       - s(Natural.maximum(N1, N2)))
+                                      + (s(Natural.maximum(N1, N2))
+                                         - (Quotient.mk(rep_L2) : Real))
+                                    = (Quotient.mk(rep_L1) : Real)
+                                      - (Quotient.mk(rep_L2) : Real))),
+                          Real.triangle_inequality(
+                              (Quotient.mk(rep_L1) : Real)
+                              - s(Natural.maximum(N1, N2)),
+                              s(Natural.maximum(N1, N2))
+                              - (Quotient.mk(rep_L2) : Real)));
+                 -- Step 6. Chain ≤ with < then rewrite the bound to ε.
+                 rewrite(
+                     halvedDoubleEqualsEpsilon,
+                     Real.LessThan.transitive_left(
+                         Real.absolute_value(
+                             (Quotient.mk(rep_L1) : Real)
+                             - (Quotient.mk(rep_L2) : Real)),
+                         Real.absolute_value(
+                             (Quotient.mk(rep_L1) : Real)
+                             - s(Natural.maximum(N1, N2)))
+                         + Real.absolute_value(
+                               s(Natural.maximum(N1, N2))
+                               - (Quotient.mk(rep_L2) : Real)),
+                         (Rational.halve(epsilon) : Real)
+                         + (Rational.halve(epsilon) : Real),
+                         triangleStep,
+                         sumOfBounds))
+               });
+      Real.eq_of_sub_eq_zero(
+          (Quotient.mk(rep_L1) : Real),
+          (Quotient.mk(rep_L2) : Real),
+          differenceIsZero)
+    }
+
+-- Real-level uniqueness, via Quotient.induct_two on the two limits.
+theorem Real.SequenceConverges.unique
+        (s : Natural → Real)
+        (L1 L2 : Real)
+        (convergesToL1 : Real.SequenceConverges(s, L1))
+        (convergesToL2 : Real.SequenceConverges(s, L2))
+        : L1 = L2 :=
+  Quotient.induct_two(
+      function (L1Arg L2Arg : Real) =>
+          Real.SequenceConverges(s, L1Arg)
+          → Real.SequenceConverges(s, L2Arg)
+          → L1Arg = L2Arg,
+      Real.SequenceConverges.unique_at_make(s),
+      L1, L2)(convergesToL1)(convergesToL2)
