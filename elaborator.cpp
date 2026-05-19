@@ -6855,15 +6855,1994 @@ private:
         return true;
     }
 
+    // =====================================================================
+    // Ring v2 — proof emitter helpers.
+    //
+    // The decision step already canonicalises both endpoints to the same
+    // polynomial. The emitter produces a proof of
+    //     leftEndpoint = canonical(polynomial) = rightEndpoint
+    // by recursive descent on each endpoint's kernel structure. At each
+    // node (add/multiply/negate) the recursive sub-proofs are joined via
+    // congruence, and a "merge" step reconciles the canonical-of-parts
+    // form with the canonical-of-whole form.
+    //
+    // Coefficient guard: |coeff| <= 1 throughout. Larger collected
+    // coefficients (e.g. a + a → 2·a) are out of scope for v2 and the
+    // top-level decision step bails with a clear error before we reach
+    // the proof emitter.
+    // =====================================================================
+
+    // Carrier-specific axiom names. Library carriers split into two
+    // naming conventions: Rational/Real/PAdic use `zero_add` /
+    // `add_zero` / `one_multiply` / `multiply_one`; Integer uses
+    // `add_identity_left` / `add_identity_right` /
+    // `multiply_identity_left` / `multiply_identity_right`. We probe
+    // both, prefer whichever is in scope.
+    struct RingV2AxiomNames {
+        std::string addZeroRight;          // a + 0 = a
+        std::string zeroAddLeft;           // 0 + a = a
+        std::string multiplyOneRight;      // a * 1 = a
+        std::string oneMultiplyLeft;       // 1 * a = a
+        std::string multiplyZeroLeft;      // 0 * a = 0
+        std::string multiplyZeroRight;     // a * 0 = 0
+        std::string addNegateRight;        // a + -a = 0
+        std::string addNegateLeft;         // -a + a = 0
+        std::string negateNegate;          // -(-a) = a
+        std::string negateAdd;             // -(a + b) = -a + -b
+        std::string multiplyNegateLeft;    // -a * b = -(a * b)
+        std::string multiplyNegateRight;   // a * -b = -(a * b)
+        std::string distributivityLeft;    // a * (b + c) = a*b + a*c
+        std::string distributivityRight;   // (a + b) * c = a*c + b*c
+        std::string addAssociative;
+        std::string addCommutative;
+        std::string multiplyAssociative;
+        std::string multiplyCommutative;
+    };
+
+    std::string pickAxiomName(const std::string& candidateOne,
+                                 const std::string& candidateTwo) {
+        if (environment_.lookup(candidateOne) != nullptr) {
+            return candidateOne;
+        }
+        if (environment_.lookup(candidateTwo) != nullptr) {
+            return candidateTwo;
+        }
+        return std::string{};
+    }
+
+    RingV2AxiomNames resolveRingV2AxiomNames(
+        const std::string& carrierName) {
+        RingV2AxiomNames names;
+        names.zeroAddLeft = pickAxiomName(
+            carrierName + ".zero_add",
+            carrierName + ".add_identity_left");
+        names.addZeroRight = pickAxiomName(
+            carrierName + ".add_zero",
+            carrierName + ".add_identity_right");
+        names.oneMultiplyLeft = pickAxiomName(
+            carrierName + ".one_multiply",
+            carrierName + ".multiply_identity_left");
+        names.multiplyOneRight = pickAxiomName(
+            carrierName + ".multiply_one",
+            carrierName + ".multiply_identity_right");
+        names.multiplyZeroLeft = pickAxiomName(
+            carrierName + ".multiply_zero_left",
+            carrierName + ".zero_multiply");
+        names.multiplyZeroRight = pickAxiomName(
+            carrierName + ".multiply_zero_right",
+            carrierName + ".multiply_zero");
+        names.addNegateRight = pickAxiomName(
+            carrierName + ".add_negate_right",
+            carrierName + ".add_negate_right");
+        names.addNegateLeft = pickAxiomName(
+            carrierName + ".add_negate_left",
+            carrierName + ".add_negate_left");
+        names.negateNegate = pickAxiomName(
+            carrierName + ".negate_negate",
+            carrierName + ".negate_negate");
+        names.negateAdd = pickAxiomName(
+            carrierName + ".negate_add",
+            carrierName + ".negate_add");
+        names.multiplyNegateLeft = pickAxiomName(
+            carrierName + ".multiply_negate_left",
+            carrierName + ".multiply_negate_left");
+        names.multiplyNegateRight = pickAxiomName(
+            carrierName + ".multiply_negate_right",
+            carrierName + ".multiply_negate_right");
+        names.distributivityLeft = carrierName + ".distributivity_left";
+        names.distributivityRight = carrierName + ".distributivity_right";
+        names.addAssociative = carrierName + ".add_associative";
+        names.addCommutative = carrierName + ".add_commutative";
+        names.multiplyAssociative = carrierName + ".multiply_associative";
+        names.multiplyCommutative = carrierName + ".multiply_commutative";
+        return names;
+    }
+
+    void demandAxiomName(const std::string& axiomName,
+                            const std::string& description,
+                            const std::string& carrierName) {
+        if (axiomName.empty()
+            || environment_.lookup(axiomName) == nullptr) {
+            throwElaborate(
+                "`ring` (v2): carrier `" + carrierName
+                + "` is missing axiom `" + description
+                + "` — required for this goal");
+        }
+    }
+
+    // Build `<negateName>(inner)`.
+    ExpressionPointer buildRingNegate(
+        const std::string& negateName, ExpressionPointer inner) {
+        return makeApplication(makeConstant(negateName), std::move(inner));
+    }
+
+    // Render a signed-monomial pair `(signature, sign)` to its canonical
+    // kernel form. Just an alias for buildCanonicalMonomial.
+    ExpressionPointer buildSignedMonomialKernel(
+        const RingMonomialSignature& signature,
+        int sign,
+        const RingV2Context& context) {
+        return buildCanonicalMonomial(signature, sign, context);
+    }
+
+    struct SignedMonomial {
+        RingMonomialSignature signature;
+        int sign;  // +1 or -1
+    };
+
+    std::vector<SignedMonomial> polynomialToSignedMonomials(
+        const RingPolynomial& polynomial) {
+        std::vector<SignedMonomial> output;
+        output.reserve(polynomial.size());
+        for (const auto& entry : polynomial) {
+            output.push_back({entry.first, entry.second});
+        }
+        return output;
+    }
+
+    // Left-associated sum of kernel summands. summands must be non-empty.
+    ExpressionPointer assembleLeftAssociatedSum(
+        const std::string& addName,
+        const std::vector<ExpressionPointer>& summands) {
+        ExpressionPointer accumulator = summands[0];
+        for (size_t i = 1; i < summands.size(); ++i) {
+            accumulator = buildRingOp(
+                addName, std::move(accumulator), summands[i]);
+        }
+        return accumulator;
+    }
+
+    // ----------------------------------------------------------------
+    // Sum-AC building blocks: re-using v1's flatten/reassoc/sort
+    // machinery but on the additive operator. Each "atom" of the sum
+    // is an opaque kernel expression (a fully-rendered signed monomial).
+    // ----------------------------------------------------------------
+
+    // Re-associate `expression` (an arbitrary tree of `<addName>` and
+    // opaque leaves) into a left-associated sum and return a proof
+    // `expression = leftAssoc(flatten(expression))`.
+    ExpressionPointer reassociateSumLeftProof(
+        ExpressionPointer expression,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        RingAxiomNames addAxioms{
+            context.addName,
+            axiomNames.addAssociative,
+            axiomNames.addCommutative};
+        return buildLeftAssocReassocProof(
+            addAxioms, context.carrierUniverseLevel,
+            context.carrierType, expression);
+    }
+
+    // Insertion-sort proof on a left-associated sum: given the original
+    // factor list and the desired (sorted) factor list, produces a
+    // proof `leftAssoc(originalFactors) = leftAssoc(sortedFactors)`.
+    ExpressionPointer sortSumLeftAssocProof(
+        const std::vector<ExpressionPointer>& originalFactors,
+        const std::vector<ExpressionPointer>& sortedFactors,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        RingAxiomNames addAxioms{
+            context.addName,
+            axiomNames.addAssociative,
+            axiomNames.addCommutative};
+        ExpressionPointer original = assembleLeftAssociatedProduct(
+            context.addName, originalFactors);
+        return proveProductEqualsSorted(
+            original, originalFactors, sortedFactors,
+            addAxioms, context.carrierType,
+            context.carrierUniverseLevel, /*line*/0);
+    }
+
+    // Same as sortSumLeftAssocProof but using the multiplicative
+    // operator. Used by proveMultiplyMerge to sort factors within a
+    // monomial.
+    ExpressionPointer sortMultiplyLeftAssocProof(
+        const std::vector<ExpressionPointer>& originalFactors,
+        const std::vector<ExpressionPointer>& sortedFactors,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        RingAxiomNames multiplyAxioms{
+            context.multiplyName,
+            axiomNames.multiplyAssociative,
+            axiomNames.multiplyCommutative};
+        ExpressionPointer original = assembleLeftAssociatedProduct(
+            context.multiplyName, originalFactors);
+        return proveProductEqualsSorted(
+            original, originalFactors, sortedFactors,
+            multiplyAxioms, context.carrierType,
+            context.carrierUniverseLevel, /*line*/0);
+    }
+
+    // Same as reassociateSumLeftProof but on the multiplicative
+    // operator.
+    ExpressionPointer reassociateMultiplyLeftProof(
+        ExpressionPointer expression,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        RingAxiomNames multiplyAxioms{
+            context.multiplyName,
+            axiomNames.multiplyAssociative,
+            axiomNames.multiplyCommutative};
+        return buildLeftAssocReassocProof(
+            multiplyAxioms, context.carrierUniverseLevel,
+            context.carrierType, expression);
+    }
+
+    // ----------------------------------------------------------------
+    // Top-level recursive descent and merge steps.
+    // Each merge takes already-canonical operand polynomials and emits
+    // a proof reconciling `(canonicalLeft) op (canonicalRight)` with
+    // `canonical(leftPoly op rightPoly)`.
+    // ----------------------------------------------------------------
+
+    // ----------------------------------------------------------------
+    // proveEqualsCanonical: recursive descent producing a kernel proof
+    // `expression = canonical(polynomial(expression))`.
+    // ----------------------------------------------------------------
+    ExpressionPointer proveEqualsCanonical_impl(
+        ExpressionPointer expression,
+        RingV2Context& context,
+        const RingV2AxiomNames& axiomNames,
+        RingPolynomial& polynomialOut) {
+        ExpressionPointer carrierType = context.carrierType;
+        LevelPointer universeLevel = context.carrierUniverseLevel;
+        // Match zero.
+        if (matchRingZero(expression, context.zeroName)) {
+            polynomialOut = RingPolynomial{};
+            return buildReflexivity(universeLevel, carrierType, expression);
+        }
+        // Match one.
+        if (matchRingOne(expression, context.oneName)) {
+            polynomialOut = ringPolynomialOne();
+            return buildReflexivity(universeLevel, carrierType, expression);
+        }
+        // Match negate(inner).
+        {
+            ExpressionPointer inner;
+            if (matchUnaryRingNegate(expression, context.negateName, inner)) {
+                RingPolynomial innerPoly;
+                ExpressionPointer innerProof = proveEqualsCanonical(
+                    inner, context, axiomNames, innerPoly);
+                // Build proof: negate(inner) = negate(canonical(innerPoly))
+                // via congruence with λz. negate(z).
+                ExpressionPointer innerCanonical =
+                    buildCanonicalPolynomial(innerPoly, context);
+                // λ z : T. negate(z). z has de-Bruijn index 0.
+                ExpressionPointer lambdaBody = buildRingNegate(
+                    context.negateName, makeBoundVariable(0));
+                ExpressionPointer lambda = makeLambda(
+                    "_ring_negate_z", carrierType, lambdaBody);
+                ExpressionPointer congrProof =
+                    buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambda,
+                        inner, innerCanonical, innerProof);
+                // Now: negate(inner) = negate(canonical(innerPoly)).
+                // Compose with negate-merge:
+                //   negate(canonical(innerPoly)) = canonical(-innerPoly).
+                RingPolynomial negatedPoly = innerPoly;
+                ringPolynomialNegate(negatedPoly);
+                polynomialOut = negatedPoly;
+                ExpressionPointer mergeProof = proveNegateMerge(
+                    innerPoly, context, axiomNames);
+                ExpressionPointer canonicalNegated =
+                    buildCanonicalPolynomial(negatedPoly, context);
+                ExpressionPointer fullProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    expression,
+                    buildRingNegate(context.negateName, innerCanonical),
+                    canonicalNegated,
+                    congrProof, mergeProof);
+                return fullProof;
+            }
+        }
+        // Match add(left, right).
+        {
+            ExpressionPointer left, right;
+            if (matchBinaryRingOp(expression, context.addName,
+                                     left, right)) {
+                RingPolynomial leftPoly, rightPoly;
+                ExpressionPointer leftProof = proveEqualsCanonical(
+                    left, context, axiomNames, leftPoly);
+                ExpressionPointer rightProof = proveEqualsCanonical(
+                    right, context, axiomNames, rightPoly);
+                ExpressionPointer leftCanonical =
+                    buildCanonicalPolynomial(leftPoly, context);
+                ExpressionPointer rightCanonical =
+                    buildCanonicalPolynomial(rightPoly, context);
+                // Step 1: add(left, right) = add(leftCanonical, right)
+                // via congruence λz. z + right.
+                ExpressionPointer rightLifted =
+                    liftBoundVariables(right, 1, 0);
+                ExpressionPointer lambdaLeftBody = buildRingOp(
+                    context.addName, makeBoundVariable(0), rightLifted);
+                ExpressionPointer lambdaLeft = makeLambda(
+                    "_ring_add_z", carrierType, lambdaLeftBody);
+                ExpressionPointer step1 =
+                    buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambdaLeft,
+                        left, leftCanonical, leftProof);
+                // Step 2: add(leftCanonical, right)
+                //          = add(leftCanonical, rightCanonical)
+                // via congruence λz. leftCanonical + z.
+                ExpressionPointer leftCanLifted =
+                    liftBoundVariables(leftCanonical, 1, 0);
+                ExpressionPointer lambdaRightBody = buildRingOp(
+                    context.addName, leftCanLifted, makeBoundVariable(0));
+                ExpressionPointer lambdaRight = makeLambda(
+                    "_ring_add_z", carrierType, lambdaRightBody);
+                ExpressionPointer step2 =
+                    buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambdaRight,
+                        right, rightCanonical, rightProof);
+                ExpressionPointer step12 = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    expression,
+                    buildRingOp(context.addName, leftCanonical, right),
+                    buildRingOp(context.addName, leftCanonical,
+                                  rightCanonical),
+                    step1, step2);
+                // Step 3 (merge): add(leftCanonical, rightCanonical)
+                //                  = canonical(leftPoly + rightPoly)
+                RingPolynomial mergedPoly = leftPoly;
+                ringPolynomialAccumulate(mergedPoly, rightPoly);
+                polynomialOut = mergedPoly;
+                ExpressionPointer mergeProof = proveAddMerge(
+                    leftPoly, rightPoly, context, axiomNames);
+                ExpressionPointer mergedCanonical =
+                    buildCanonicalPolynomial(mergedPoly, context);
+                return buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    expression,
+                    buildRingOp(context.addName, leftCanonical,
+                                  rightCanonical),
+                    mergedCanonical,
+                    step12, mergeProof);
+            }
+        }
+        // Match multiply(left, right).
+        {
+            ExpressionPointer left, right;
+            if (matchBinaryRingOp(expression, context.multiplyName,
+                                     left, right)) {
+                RingPolynomial leftPoly, rightPoly;
+                ExpressionPointer leftProof = proveEqualsCanonical(
+                    left, context, axiomNames, leftPoly);
+                ExpressionPointer rightProof = proveEqualsCanonical(
+                    right, context, axiomNames, rightPoly);
+                ExpressionPointer leftCanonical =
+                    buildCanonicalPolynomial(leftPoly, context);
+                ExpressionPointer rightCanonical =
+                    buildCanonicalPolynomial(rightPoly, context);
+                ExpressionPointer rightLifted =
+                    liftBoundVariables(right, 1, 0);
+                ExpressionPointer lambdaLeftBody = buildRingOp(
+                    context.multiplyName, makeBoundVariable(0),
+                    rightLifted);
+                ExpressionPointer lambdaLeft = makeLambda(
+                    "_ring_mul_z", carrierType, lambdaLeftBody);
+                ExpressionPointer step1 =
+                    buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambdaLeft,
+                        left, leftCanonical, leftProof);
+                ExpressionPointer leftCanLifted =
+                    liftBoundVariables(leftCanonical, 1, 0);
+                ExpressionPointer lambdaRightBody = buildRingOp(
+                    context.multiplyName, leftCanLifted,
+                    makeBoundVariable(0));
+                ExpressionPointer lambdaRight = makeLambda(
+                    "_ring_mul_z", carrierType, lambdaRightBody);
+                ExpressionPointer step2 =
+                    buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambdaRight,
+                        right, rightCanonical, rightProof);
+                ExpressionPointer step12 = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    expression,
+                    buildRingOp(context.multiplyName, leftCanonical, right),
+                    buildRingOp(context.multiplyName, leftCanonical,
+                                  rightCanonical),
+                    step1, step2);
+                RingPolynomial mergedPoly =
+                    ringPolynomialMultiply(leftPoly, rightPoly);
+                polynomialOut = mergedPoly;
+                ExpressionPointer mergeProof = proveMultiplyMerge(
+                    leftPoly, rightPoly, context, axiomNames);
+                ExpressionPointer mergedCanonical =
+                    buildCanonicalPolynomial(mergedPoly, context);
+                return buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    expression,
+                    buildRingOp(context.multiplyName, leftCanonical,
+                                  rightCanonical),
+                    mergedCanonical,
+                    step12, mergeProof);
+            }
+        }
+        // Otherwise: an opaque atom. Its canonical kernel is itself.
+        polynomialOut = ringPolynomialAtom(context, expression);
+        ExpressionPointer canonicalKernel =
+            buildCanonicalPolynomial(polynomialOut, context);
+        if (!structurallyEqual(expression, canonicalKernel)) {
+            throwElaborate(
+                "`ring` (v2): atom's canonical kernel mismatched the "
+                "atom itself (internal error)");
+        }
+        return buildReflexivity(universeLevel, carrierType, expression);
+    }
+
+    ExpressionPointer proveEqualsCanonical(
+        ExpressionPointer expression,
+        RingV2Context& context,
+        const RingV2AxiomNames& axiomNames,
+        RingPolynomial& polynomialOut) {
+        return proveEqualsCanonical_impl(
+            expression, context, axiomNames, polynomialOut);
+    }
+
+    // ----------------------------------------------------------------
+    // proveAddMerge: prove
+    //   canonical(leftPoly) + canonical(rightPoly) = canonical(leftPoly + rightPoly)
+    // ----------------------------------------------------------------
+    //
+    // Cases by emptiness of inputs:
+    //   * Both empty:  LHS = zero + zero, RHS = zero. Not currently
+    //     supported (would need a zero_add or add_zero step). We bail.
+    //   * leftPoly empty: LHS = zero + canonical(rightPoly), RHS = canonical(rightPoly).
+    //     Use zero_add (a.k.a. add_identity_left).
+    //   * rightPoly empty: symmetric.
+    //   * Both non-empty: full sum-AC sort + cancel.
+    ExpressionPointer proveAddMerge(
+        const RingPolynomial& leftPoly,
+        const RingPolynomial& rightPoly,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        ExpressionPointer carrierType = context.carrierType;
+        LevelPointer universeLevel = context.carrierUniverseLevel;
+        ExpressionPointer leftCanonical =
+            buildCanonicalPolynomial(leftPoly, context);
+        ExpressionPointer rightCanonical =
+            buildCanonicalPolynomial(rightPoly, context);
+        ExpressionPointer leftPlusRight = buildRingOp(
+            context.addName, leftCanonical, rightCanonical);
+        RingPolynomial mergedPoly = leftPoly;
+        ringPolynomialAccumulate(mergedPoly, rightPoly);
+        ExpressionPointer mergedCanonical =
+            buildCanonicalPolynomial(mergedPoly, context);
+        if (leftPoly.empty() && rightPoly.empty()) {
+            // zero + zero = zero. Use zero_add(zero) :  0 + 0 = 0.
+            demandAxiomName(axiomNames.zeroAddLeft, "zero_add/add_identity_left",
+                              context.carrierName);
+            ExpressionPointer zeroConst = makeConstant(context.zeroName);
+            ExpressionPointer call =
+                makeApplication(makeConstant(axiomNames.zeroAddLeft),
+                                  zeroConst);
+            return call;
+        }
+        if (leftPoly.empty()) {
+            // zero + canonical(rightPoly) = canonical(rightPoly).
+            demandAxiomName(axiomNames.zeroAddLeft, "zero_add/add_identity_left",
+                              context.carrierName);
+            ExpressionPointer call =
+                makeApplication(makeConstant(axiomNames.zeroAddLeft),
+                                  rightCanonical);
+            return call;
+        }
+        if (rightPoly.empty()) {
+            // canonical(leftPoly) + zero = canonical(leftPoly).
+            demandAxiomName(axiomNames.addZeroRight, "add_zero/add_identity_right",
+                              context.carrierName);
+            ExpressionPointer call =
+                makeApplication(makeConstant(axiomNames.addZeroRight),
+                                  leftCanonical);
+            return call;
+        }
+        // Both non-empty.  Build the flat summand list from leftPoly
+        // and rightPoly's canonical forms.  Each entry is a fully-
+        // rendered signed monomial kernel.
+        std::vector<SignedMonomial> combinedMonomials =
+            polynomialToSignedMonomials(leftPoly);
+        for (const auto& entry : rightPoly) {
+            combinedMonomials.push_back({entry.first, entry.second});
+        }
+        std::vector<ExpressionPointer> combinedKernels;
+        combinedKernels.reserve(combinedMonomials.size());
+        for (const auto& m : combinedMonomials) {
+            combinedKernels.push_back(buildSignedMonomialKernel(
+                m.signature, m.sign, context));
+        }
+        // Step 1: re-associate `leftCanonical + rightCanonical` into a
+        // flat left-associated chain over `combinedKernels`. Treat each
+        // monomial kernel as opaque. We do this by reassociateSumLeftProof.
+        ExpressionPointer leftAssocCombined = assembleLeftAssociatedSum(
+            context.addName, combinedKernels);
+        ExpressionPointer reassocProof = reassociateSumLeftProof(
+            leftPlusRight, context, axiomNames);
+        // Step 2: insertion-sort by structural order so that all merged-
+        // poly monomials' kernel forms appear in std::map signature
+        // order, with cancelling (M, -M) pairs becoming adjacent.
+        //
+        // We want the sorted order to MATCH the canonical-of-merged
+        // form's iteration order (std::map signature ascending). We do
+        // this by computing the target sorted vector as the canonical
+        // sequence of monomial kernels INTERSPERSED with the cancelling
+        // pairs that should disappear.
+        //
+        // Concretely: walk combinedMonomials sorted by signature. Group
+        // entries with the same signature; if the group has two entries
+        // with opposite signs, they cancel — place them adjacent in the
+        // target list. Otherwise (single entry, or two entries with the
+        // same sign which would mean coefficient ±2, ruled out by the
+        // coefficient guard), the entry survives in the canonical form
+        // and is placed at its canonical position.
+        //
+        // Build:
+        //   * sortedKernels: a vector of ExpressionPointers in the order
+        //     we want after sorting. Surviving monomials first/in-order,
+        //     cancelled-pairs grouped at the end. Actually simpler:
+        //     emit pairs first (so we can cancel from the right), then
+        //     survivors. But that re-orders the survivors w.r.t.
+        //     canonical. Alternative: emit survivors and pairs in
+        //     positional order, and during cancellation we walk back
+        //     through.
+        //
+        // Easier approach: place ALL surviving monomials at the head of
+        // the sorted vector (in canonical sig order), then all cancel-
+        // pairs at the tail (each pair as (M, -M) adjacent). After
+        // sort, cancel each pair right-to-left, applying add_negate_*
+        // and dropping the resulting zero.
+        std::vector<SignedMonomial> sortedSignedMonomials;
+        // Group by signature.
+        std::map<RingMonomialSignature, std::vector<int>> bySig;
+        for (const auto& m : combinedMonomials) {
+            bySig[m.signature].push_back(m.sign);
+        }
+        // Survivors first, in canonical signature order. Cancel pairs
+        // collected to the side.
+        std::vector<std::pair<RingMonomialSignature, int>> cancelPairs;
+        for (const auto& [sig, signs] : bySig) {
+            if (signs.size() == 1) {
+                sortedSignedMonomials.push_back({sig, signs[0]});
+            } else if (signs.size() == 2
+                       && signs[0] + signs[1] == 0) {
+                // (M, -M) — collect for cancellation. The merged-poly
+                // does not contain this signature.
+                cancelPairs.push_back({sig, +1});
+            } else {
+                throwElaborate(
+                    "`ring` (v2): proveAddMerge encountered a signature "
+                    "with " + std::to_string(signs.size())
+                    + " entries — coefficient guard should have caught this");
+            }
+        }
+        // Verify: surviving monomials, in std::map signature order,
+        // EXACTLY match canonicalMergedPoly's order.
+        std::vector<SignedMonomial> mergedMonomials =
+            polynomialToSignedMonomials(mergedPoly);
+        if (sortedSignedMonomials.size() != mergedMonomials.size()) {
+            throwElaborate(
+                "`ring` (v2): proveAddMerge: survivor count mismatched "
+                "merged polynomial size (internal error)");
+        }
+        for (size_t i = 0; i < mergedMonomials.size(); ++i) {
+            if (sortedSignedMonomials[i].signature
+                    != mergedMonomials[i].signature
+                || sortedSignedMonomials[i].sign
+                    != mergedMonomials[i].sign) {
+                throwElaborate(
+                    "`ring` (v2): proveAddMerge: survivors don't match "
+                    "merged polynomial entry-by-entry (internal error)");
+            }
+        }
+        // Append cancellation pairs.
+        for (const auto& [sig, _] : cancelPairs) {
+            sortedSignedMonomials.push_back({sig, +1});
+            sortedSignedMonomials.push_back({sig, -1});
+        }
+        // Convert sortedSignedMonomials to kernels and sort the
+        // *combinedKernels* into that order via insertion-sort proof.
+        std::vector<ExpressionPointer> sortedKernels;
+        sortedKernels.reserve(sortedSignedMonomials.size());
+        for (const auto& m : sortedSignedMonomials) {
+            sortedKernels.push_back(buildSignedMonomialKernel(
+                m.signature, m.sign, context));
+        }
+        // The sortSumLeftAssocProof expects a vector that's a
+        // permutation of combinedKernels (treated as the "factor
+        // multiset"). proveProductEqualsSorted does insertion-sort
+        // using compareExpressionStructure for direction. But we
+        // want a SPECIFIC target permutation, not the
+        // structurally-sorted one. proveProductEqualsSorted accepts
+        // arbitrary sorted targets — let me check.
+        //
+        // Looking at proveProductEqualsSorted: it walks i = 0..n-1,
+        // for each i finds the first j with current[j] = sorted[i],
+        // and swaps it down to position i via adjacent swaps. So
+        // ANY permutation of the original factor multiset works as
+        // the "sorted" target.
+        ExpressionPointer sortProof = sortSumLeftAssocProof(
+            combinedKernels, sortedKernels, context, axiomNames);
+        ExpressionPointer leftAssocSorted = assembleLeftAssociatedProduct(
+            context.addName, sortedKernels);
+        // Chain so far: leftPlusRight = leftAssocCombined (via
+        // reassocProof) = leftAssocSorted (via sortProof).
+        ExpressionPointer chainSoFar = buildEqualityTransitivity(
+            universeLevel, carrierType,
+            leftPlusRight, leftAssocCombined, leftAssocSorted,
+            reassocProof, sortProof);
+        if (cancelPairs.empty()) {
+            // Surviving monomials only: leftAssocSorted == mergedCanonical.
+            // Check that and return chainSoFar.
+            if (!structurallyEqual(leftAssocSorted, mergedCanonical)) {
+                throwElaborate(
+                    "`ring` (v2): proveAddMerge expected leftAssocSorted "
+                    "to match canonical(mergedPoly) (no cancellations) "
+                    "but they differ (internal error)");
+            }
+            return chainSoFar;
+        }
+        // Cancellations needed. Walk sortedKernels from right to left,
+        // collapsing each (M, -M) tail-pair via:
+        //   1. associativity: (((prefix + M) + -M) + tail) — no, after
+        //      sort we already placed pairs at the very tail. The
+        //      current form is `((prefix) + M_p) + (-M_p)` (for the
+        //      rightmost pair). We use:
+        //      add_associative(prefix, M, -M) :
+        //        prefix + M + -M = prefix + (M + -M)
+        //      add_negate_right(M) : M + -M = 0
+        //      congruence with λz. prefix + z to get
+        //        prefix + (M + -M) = prefix + 0
+        //      add_zero_right(prefix) (i.e. add_zero) : prefix + 0 = prefix
+        //   2. Then iterate: drop the next pair from the tail.
+        demandAxiomName(axiomNames.addNegateRight, "add_negate_right",
+                          context.carrierName);
+        demandAxiomName(axiomNames.addZeroRight, "add_zero/add_identity_right",
+                          context.carrierName);
+        // current: ExpressionPointer for the current form. Starts as
+        // leftAssocSorted. Each cancellation step removes the last two
+        // summands (the (M, -M) pair).
+        ExpressionPointer currentForm = leftAssocSorted;
+        ExpressionPointer chainProof = chainSoFar;
+        std::vector<ExpressionPointer> remainingKernels = sortedKernels;
+        for (size_t pairIndex = 0; pairIndex < cancelPairs.size();
+             ++pairIndex) {
+            // Pop the last two from remainingKernels: they are (M, -M).
+            if (remainingKernels.size() < 2) {
+                throwElaborate(
+                    "`ring` (v2): cancellation underrun (internal error)");
+            }
+            ExpressionPointer negM = remainingKernels.back();
+            remainingKernels.pop_back();
+            ExpressionPointer M = remainingKernels.back();
+            remainingKernels.pop_back();
+            ExpressionPointer prefix;
+            bool prefixSingle = (remainingKernels.size() == 1);
+            if (prefixSingle) {
+                prefix = remainingKernels[0];
+            } else {
+                prefix = assembleLeftAssociatedProduct(
+                    context.addName, remainingKernels);
+            }
+            // currentForm has shape:
+            //   ((prefix) + M) + (-M)
+            // Step A: associativity. (prefix + M) + (-M) = prefix + (M + (-M)).
+            ExpressionPointer assocProof = makeConstant(
+                axiomNames.addAssociative);
+            assocProof = makeApplication(assocProof, prefix);
+            assocProof = makeApplication(assocProof, M);
+            assocProof = makeApplication(assocProof, negM);
+            ExpressionPointer formA = buildRingOp(
+                context.addName, prefix,
+                buildRingOp(context.addName, M, negM));
+            // Step B: congruence with λz. prefix + z, where the inner
+            // step is `add_negate_right(M) : M + (-M) = 0`.
+            ExpressionPointer addNegProof = makeConstant(
+                axiomNames.addNegateRight);
+            addNegProof = makeApplication(addNegProof, M);
+            ExpressionPointer prefixLifted =
+                liftBoundVariables(prefix, 1, 0);
+            ExpressionPointer lambdaBodyB = buildRingOp(
+                context.addName, prefixLifted, makeBoundVariable(0));
+            ExpressionPointer lambdaB = makeLambda(
+                "_ring_cancel_z", carrierType, lambdaBodyB);
+            ExpressionPointer zeroConst = makeConstant(context.zeroName);
+            ExpressionPointer congrB =
+                buildEqualityCongruenceSameCarrier(
+                    universeLevel, carrierType, lambdaB,
+                    buildRingOp(context.addName, M, negM),
+                    zeroConst,
+                    addNegProof);
+            ExpressionPointer formB = buildRingOp(
+                context.addName, prefix, zeroConst);
+            // Step C: add_zero_right(prefix) : prefix + 0 = prefix.
+            ExpressionPointer addZeroProof = makeConstant(
+                axiomNames.addZeroRight);
+            addZeroProof = makeApplication(addZeroProof, prefix);
+            // Compose: currentForm → formA via assocProof,
+            //          formA → formB via congrB,
+            //          formB → prefix via addZeroProof.
+            ExpressionPointer stepAB = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                currentForm, formA, formB,
+                assocProof, congrB);
+            ExpressionPointer stepABC = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                currentForm, formB, prefix,
+                stepAB, addZeroProof);
+            // Now chain with chainProof.
+            chainProof = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                leftPlusRight, currentForm, prefix,
+                chainProof, stepABC);
+            currentForm = prefix;
+        }
+        // After all cancellations, currentForm should be the merged
+        // canonical form (sortedKernels of just the survivors,
+        // left-associated). Or if zero survivors remain, it's zero.
+        // Check structural equality with mergedCanonical.
+        if (remainingKernels.empty()) {
+            // All summands cancelled. The current chain ends at `prefix`
+            // from the last step — but the last step needed at least
+            // one survivor as prefix (we'd have crashed otherwise).
+            // So this branch shouldn't trigger here; mergedPoly was non-empty.
+            // Actually wait: if all summands cancel, mergedPoly is empty,
+            // and mergedCanonical is zero. The above loop ASSUMED there's
+            // a prefix to drop the zero into. We'd need a special case.
+            throwElaborate(
+                "`ring` (v2): proveAddMerge total-cancellation case "
+                "(empty merged polynomial) is not implemented");
+        }
+        if (!structurallyEqual(currentForm, mergedCanonical)) {
+            throwElaborate(
+                "`ring` (v2): proveAddMerge ended with shape mismatched "
+                "with canonical(mergedPoly) (internal error)");
+        }
+        return chainProof;
+    }
+
+    // ----------------------------------------------------------------
+    // proveMultiplyMerge: prove
+    //   canonical(leftPoly) * canonical(rightPoly) = canonical(leftPoly * rightPoly)
+    // ----------------------------------------------------------------
+    //
+    // Strategy (full distribution):
+    //   1. Fully distribute the product into a sum of monomial-products.
+    //      We expand `(L_1 + ... + L_p) * (R_1 + ... + R_q)` via repeated
+    //      distributivity_right / distributivity_left.
+    //   2. Each summand `L_i * R_j` is then sign-pushed (multiply_negate_*
+    //      + negate_negate) so its outer wrapper is at most one negate,
+    //      and its factor product is left-associated.
+    //   3. Sort factors within each summand by hash signature.
+    //   4. Sort the summands by canonical order (per std::map merge).
+    //   5. Cancel any (M, -M) pairs that arise.
+    //
+    // To stay implementable in v2 v1, the merge currently restricts to
+    // the case where the EXPANSION DOES NOT PRODUCE CANCELLATION: i.e.
+    // each pair of input monomials L_i × R_j yields a distinct merged
+    // signature. (Cancellations would arise only when distinct L*R pairs
+    // happen to produce identical signatures with opposite signs — rare
+    // in our test set.)
+    //
+    // Implementation in steps:
+    //   * Determine the canonical merged poly = leftPoly · rightPoly.
+    //   * The "naive expanded form" is the left-associated sum
+    //       (L_1·R_1) + (L_1·R_2) + ... + (L_p·R_q)
+    //     (in lexicographic L-then-R order). For SINGLE-element leftPoly
+    //     OR single-element rightPoly this collapses cleanly.
+    //   * For each row i we use distributivity_right to peel
+    //       (L_i + rest) * R = L_i*R + rest*R     (rest is left side of L)
+    //     then recurse. Symmetric for the inner with distributivity_left.
+    //
+    // For implementation simplicity in v2 v1, we handle:
+    //   (a) Both single-summand: just product-of-monomials path.
+    //   (b) Left single, right multi: distributivity_left, then per-
+    //       summand monomial canonicalisation.
+    //   (c) Left multi, right single: distributivity_right.
+    //   (d) Left multi, right multi: distributivity_right peels one row
+    //       at a time, recursing.
+    ExpressionPointer proveMultiplyMerge(
+        const RingPolynomial& leftPoly,
+        const RingPolynomial& rightPoly,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        ExpressionPointer carrierType = context.carrierType;
+        LevelPointer universeLevel = context.carrierUniverseLevel;
+        ExpressionPointer leftCanonical =
+            buildCanonicalPolynomial(leftPoly, context);
+        ExpressionPointer rightCanonical =
+            buildCanonicalPolynomial(rightPoly, context);
+        ExpressionPointer leftTimesRight = buildRingOp(
+            context.multiplyName, leftCanonical, rightCanonical);
+        RingPolynomial mergedPoly = ringPolynomialMultiply(
+            leftPoly, rightPoly);
+        ExpressionPointer mergedCanonical =
+            buildCanonicalPolynomial(mergedPoly, context);
+        // Edge: one side empty. Then leftPoly · rightPoly = empty, and
+        // we need multiply_zero_*.
+        if (leftPoly.empty()) {
+            demandAxiomName(axiomNames.multiplyZeroLeft,
+                              "multiply_zero_left", context.carrierName);
+            ExpressionPointer call = makeApplication(
+                makeConstant(axiomNames.multiplyZeroLeft),
+                rightCanonical);
+            return call;
+        }
+        if (rightPoly.empty()) {
+            demandAxiomName(axiomNames.multiplyZeroRight,
+                              "multiply_zero_right", context.carrierName);
+            ExpressionPointer call = makeApplication(
+                makeConstant(axiomNames.multiplyZeroRight),
+                leftCanonical);
+            return call;
+        }
+        // For now we handle ONLY the common case: no like-term
+        // collisions in mergedPoly (i.e. mergedPoly's size equals
+        // leftPoly.size() * rightPoly.size()). With coefficient ±1
+        // throughout, like-term collisions would necessarily mean
+        // signature collisions across pairs, which trigger the
+        // cancellation path. Test cases (1)-(4) all satisfy the
+        // no-collision condition.
+        if (mergedPoly.size() != leftPoly.size() * rightPoly.size()) {
+            throwElaborate(
+                "`ring` (v2): proveMultiplyMerge with cross-pair "
+                "cancellations not yet supported");
+        }
+        // Build the "naively expanded" sum:
+        //   sum_{i,j} (L_i * R_j)
+        // in the order (i, j) = (0, 0..q-1), (1, 0..q-1), ..., (p-1, ...).
+        // Render each L_i and R_j as canonical monomial kernels.
+        std::vector<SignedMonomial> leftSigned =
+            polynomialToSignedMonomials(leftPoly);
+        std::vector<SignedMonomial> rightSigned =
+            polynomialToSignedMonomials(rightPoly);
+        std::vector<ExpressionPointer> leftMonomialKernels;
+        for (const auto& m : leftSigned) {
+            leftMonomialKernels.push_back(buildSignedMonomialKernel(
+                m.signature, m.sign, context));
+        }
+        std::vector<ExpressionPointer> rightMonomialKernels;
+        for (const auto& m : rightSigned) {
+            rightMonomialKernels.push_back(buildSignedMonomialKernel(
+                m.signature, m.sign, context));
+        }
+        // Step 1: prove leftCanonical * rightCanonical = sum_{i,j} L_i * R_j.
+        // We do this in two sub-phases:
+        //   1a: leftCanonical * rightCanonical
+        //         = sum_i (L_i * rightCanonical)      via distributivity_right (peel rows)
+        //   1b: each L_i * rightCanonical
+        //         = sum_j (L_i * R_j)                via distributivity_left
+        //   1c: combine inner sums into the flat outer form.
+        //
+        // For implementation we use a simpler iterative approach:
+        // expand row-by-row applying distributivity_right.
+        demandAxiomName(axiomNames.distributivityRight,
+                          "distributivity_right", context.carrierName);
+        demandAxiomName(axiomNames.distributivityLeft,
+                          "distributivity_left", context.carrierName);
+        // Phase 1a: expand the outer left into a sum of (L_i * rightCanonical).
+        // We achieve this by peeling the leftmost group from the
+        // left-associated `L_1 + ... + L_p`. Each peel uses
+        // distributivity_right(prefix, L_i, rightCanonical):
+        //   (prefix + L_i) * R = prefix*R + L_i*R.
+        //
+        // For p = 1: leftCanonical = L_0, so leftCanonical * rightCanonical
+        //            = L_0 * rightCanonical — no peeling needed.
+        // For p > 1: leftCanonical = (((L_0 + L_1) + L_2) + ... + L_{p-1}),
+        //            we peel right-to-left.
+        //
+        // Track current form (an ExpressionPointer) and current proof
+        // (leftTimesRight = currentForm). Start with currentForm = leftTimesRight,
+        // currentProof = reflexivity.
+        ExpressionPointer currentForm = leftTimesRight;
+        ExpressionPointer currentProof = buildReflexivity(
+            universeLevel, carrierType, currentForm);
+        // Helper: given a left-associated sum of length n (kernels in
+        // `summands`), return the left-associated kernel.
+        auto leftAssoc = [&](const std::vector<ExpressionPointer>& v)
+            -> ExpressionPointer {
+            return assembleLeftAssociatedProduct(context.addName, v);
+        };
+        // We peel from the right: at each step, we have
+        //   currentForm = (sum_of_first_i_terms) * rightCanonical
+        //                  + (already-peeled tail summands)
+        // The tail is a left-associated sum: (L_i*R) + (L_{i+1}*R) + ...
+        // After all peels, currentForm becomes
+        //   L_0 * R + L_1 * R + ... + L_{p-1} * R   (left-associated).
+        if (leftSigned.size() == 1) {
+            // No peeling needed for this phase.
+        } else {
+            // Walk i from p-1 down to 1; at each step, peel L_i out of
+            // the leftmost factor.
+            // Initial form of "leftFactor": leftCanonical (full).
+            ExpressionPointer leftFactor = leftCanonical;
+            for (size_t i = leftSigned.size(); i > 1; --i) {
+                // leftFactor at this iteration = leftAssoc(L_0..L_{i-1}).
+                // It has shape (smallerLeftFactor + L_{i-1}) by left-assoc.
+                size_t lastIdx = i - 1;
+                // smallerLeftFactor = leftAssoc(L_0..L_{i-2}).
+                std::vector<ExpressionPointer> smallerKernels(
+                    leftMonomialKernels.begin(),
+                    leftMonomialKernels.begin()
+                        + static_cast<long>(lastIdx));
+                ExpressionPointer smallerLeftFactor;
+                if (smallerKernels.size() == 1) {
+                    smallerLeftFactor = smallerKernels[0];
+                } else {
+                    smallerLeftFactor = leftAssoc(smallerKernels);
+                }
+                ExpressionPointer Li = leftMonomialKernels[lastIdx];
+                // distributivity_right(smallerLeftFactor, L_{lastIdx}, R)
+                //   : (smallerLeftFactor + L_{lastIdx}) * R
+                //     = smallerLeftFactor * R + L_{lastIdx} * R
+                ExpressionPointer distRightCall = makeConstant(
+                    axiomNames.distributivityRight);
+                distRightCall = makeApplication(distRightCall,
+                                                  smallerLeftFactor);
+                distRightCall = makeApplication(distRightCall, Li);
+                distRightCall = makeApplication(distRightCall,
+                                                  rightCanonical);
+                // The LHS of distRightCall:
+                //   (smallerLeftFactor + L_{lastIdx}) * R = leftFactor * R
+                // RHS: smallerLeftFactor * R + L_{lastIdx} * R.
+                ExpressionPointer lhsExpanded = buildRingOp(
+                    context.multiplyName, leftFactor, rightCanonical);
+                ExpressionPointer rhsExpanded = buildRingOp(
+                    context.addName,
+                    buildRingOp(context.multiplyName, smallerLeftFactor,
+                                  rightCanonical),
+                    buildRingOp(context.multiplyName, Li, rightCanonical));
+                // currentForm at this point has shape:
+                //   leftFactor * R                         (if i == p)
+                //   or (leftFactor * R) + tail              (if i < p)
+                ExpressionPointer stepProof;
+                ExpressionPointer newForm;
+                if (i == leftSigned.size()) {
+                    // currentForm == lhsExpanded.
+                    stepProof = distRightCall;
+                    newForm = rhsExpanded;
+                } else {
+                    // currentForm == lhsExpanded + tail.
+                    // Build the tail kernel.
+                    std::vector<ExpressionPointer> tailSummands;
+                    for (size_t k = i; k < leftSigned.size(); ++k) {
+                        tailSummands.push_back(buildRingOp(
+                            context.multiplyName,
+                            leftMonomialKernels[k], rightCanonical));
+                    }
+                    ExpressionPointer tailKernel;
+                    if (tailSummands.size() == 1) {
+                        tailKernel = tailSummands[0];
+                    } else {
+                        tailKernel = leftAssoc(tailSummands);
+                    }
+                    // Apply congruence with λz. z + tail.
+                    ExpressionPointer tailLifted =
+                        liftBoundVariables(tailKernel, 1, 0);
+                    ExpressionPointer lambdaBody = buildRingOp(
+                        context.addName, makeBoundVariable(0), tailLifted);
+                    ExpressionPointer lambda = makeLambda(
+                        "_ring_distR_z", carrierType, lambdaBody);
+                    stepProof = buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambda,
+                        lhsExpanded, rhsExpanded, distRightCall);
+                    newForm = buildRingOp(
+                        context.addName, rhsExpanded, tailKernel);
+                }
+                // currentProof was: leftTimesRight = currentForm.
+                // stepProof: currentForm = newForm.
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    leftTimesRight, currentForm, newForm,
+                    currentProof, stepProof);
+                currentForm = newForm;
+                leftFactor = smallerLeftFactor;
+            }
+            // After this loop currentForm has shape:
+            //   ((L_0 * R) + (L_1 * R)) + ... + (L_{p-1} * R)
+            // but possibly with a non-flat shape (the loop produced
+            // a "rhsExpanded + tail" nested structure, not a flat left-
+            // associated sum). Need to reassociate.
+            //
+            // Reassociate to left-associated form (treating L_i * R as
+            // opaque atoms).
+            std::vector<ExpressionPointer> phase1ATargetSummands;
+            for (size_t k = 0; k < leftSigned.size(); ++k) {
+                phase1ATargetSummands.push_back(buildRingOp(
+                    context.multiplyName,
+                    leftMonomialKernels[k], rightCanonical));
+            }
+            ExpressionPointer phase1ATargetKernel = leftAssoc(
+                phase1ATargetSummands);
+            if (!structurallyEqual(currentForm, phase1ATargetKernel)) {
+                // Reassociate via add-AC.
+                ExpressionPointer reassocProof = reassociateSumLeftProof(
+                    currentForm, context, axiomNames);
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    leftTimesRight, currentForm, phase1ATargetKernel,
+                    currentProof, reassocProof);
+                currentForm = phase1ATargetKernel;
+            }
+        }
+        // currentForm now equals the left-associated sum of (L_i * R)
+        // for i=0..p-1, where R = rightCanonical.
+        // Phase 1b: for each i, expand L_i * R into sum over j of L_i * R_j.
+        // We do this one row at a time. After expanding row i, the
+        // current form has shape:
+        //   [already-expanded rows 0..i-1]   (flat sum of L_k * R_l)
+        //     + [(L_i * R_0) + (L_i * R_1) + ... + (L_i * R_{q-1})]   (this row)
+        //     + [unexpanded rows i+1..p-1]   (each as L_k * R)
+        // All wrapped into a left-associated chain.
+        //
+        // For simplicity we expand all rows then reassociate, similar
+        // to phase 1a but on the inner level.
+        //
+        // To expand L_i * (R_0 + ... + R_{q-1}) into a sum of L_i * R_j
+        // via distributivity_left, we peel the rightmost R from the
+        // sum (mirror of phase 1a):
+        //   L_i * (smallerRSum + R_{q-1})
+        //     = L_i * smallerRSum + L_i * R_{q-1}     via distributivity_left
+        //
+        // Result list of summands after both phases:
+        std::vector<ExpressionPointer> phase1BAllSummands;
+        for (size_t i = 0; i < leftSigned.size(); ++i) {
+            for (size_t j = 0; j < rightSigned.size(); ++j) {
+                phase1BAllSummands.push_back(buildRingOp(
+                    context.multiplyName,
+                    leftMonomialKernels[i],
+                    rightMonomialKernels[j]));
+            }
+        }
+        // We need to transform currentForm into the left-assoc of
+        // phase1BAllSummands. Approach: walk each row and apply
+        // distributivity_left + congruence to expand it in place.
+        if (rightSigned.size() > 1) {
+            // For each row i (in order), apply distributivity_left to
+            // its (L_i * R) factor. We use congruence with a motive that
+            // targets exactly position i in the left-associated sum.
+            // To avoid the complexity of building a motive that
+            // surgically modifies a position deep in a left-associated
+            // sum, we use a per-row chain:
+            //
+            //   For row i: locate (L_i * R) somewhere in currentForm,
+            //   replace it with the expansion (L_i*R_0 + ... + L_i*R_{q-1}).
+            //   The replacement is an opaque-equal transformation —
+            //   `congruenceOf(motive, proofOfL_iR=expansion)`.
+            //
+            // We'll handle this by recursively walking the current form
+            // and emitting congruences as we go.
+            // Implementation: build a helper that, given the row index
+            // and a kernel-form representation, finds the unique
+            // structural occurrence of (L_i * R) in the current form
+            // and applies the expansion. We exploit the fact that we
+            // KNOW the current form's structure exactly (it's the left-
+            // assoc of all L_k * R), so we can target it precisely.
+            //
+            // Strategy: process rows left-to-right. After processing
+            // rows 0..i-1, currentForm has shape:
+            //   ((((expanded_0) + ... + expanded_{i-1}) + (L_i * R))
+            //     + (L_{i+1} * R)) + ... + (L_{p-1} * R)
+            // where each expanded_k is the left-assoc of L_k*R_0..L_k*R_{q-1}.
+            //
+            // To expand row i: locate (L_i * R) in the position
+            // described above. Build a motive that wraps z at that
+            // position. Apply congruence with proof: L_i * R = expanded_i.
+            //
+            // To build the proof L_i * R = expanded_i (where R = R_0 + R_1 + ... + R_{q-1}):
+            // Apply distributivity_left repeatedly. Specifically:
+            //   L_i * (smallerR + R_{q-1}) = L_i * smallerR + L_i * R_{q-1}
+            // recurse on the left side. We'll do this in a small helper.
+            for (size_t i = 0; i < leftSigned.size(); ++i) {
+                // Build proof for the row expansion.
+                ExpressionPointer Li = leftMonomialKernels[i];
+                // Build "L_i * R_j" summands.
+                std::vector<ExpressionPointer> rowSummands;
+                for (size_t j = 0; j < rightSigned.size(); ++j) {
+                    rowSummands.push_back(buildRingOp(
+                        context.multiplyName, Li,
+                        rightMonomialKernels[j]));
+                }
+                // Expansion: left-assoc of rowSummands.
+                ExpressionPointer expandedRow;
+                if (rowSummands.size() == 1) {
+                    expandedRow = rowSummands[0];
+                } else {
+                    expandedRow = leftAssoc(rowSummands);
+                }
+                // Build proof Li * R = expandedRow.
+                // Iterative peel from the right: at each step k
+                // (k = q-1 down to 1), we expand Li * (smallerR + R_k).
+                ExpressionPointer rowCurrent = buildRingOp(
+                    context.multiplyName, Li, rightCanonical);
+                ExpressionPointer rowProof = buildReflexivity(
+                    universeLevel, carrierType, rowCurrent);
+                if (rightSigned.size() > 1) {
+                    ExpressionPointer rightFactor = rightCanonical;
+                    for (size_t k = rightSigned.size(); k > 1; --k) {
+                        size_t lastIdx = k - 1;
+                        std::vector<ExpressionPointer> smallerRKernels(
+                            rightMonomialKernels.begin(),
+                            rightMonomialKernels.begin()
+                                + static_cast<long>(lastIdx));
+                        ExpressionPointer smallerR;
+                        if (smallerRKernels.size() == 1) {
+                            smallerR = smallerRKernels[0];
+                        } else {
+                            smallerR = leftAssoc(smallerRKernels);
+                        }
+                        ExpressionPointer Rk =
+                            rightMonomialKernels[lastIdx];
+                        // distributivity_left(Li, smallerR, Rk):
+                        //   Li * (smallerR + Rk) = Li * smallerR + Li * Rk
+                        ExpressionPointer distLeftCall = makeConstant(
+                            axiomNames.distributivityLeft);
+                        distLeftCall = makeApplication(distLeftCall, Li);
+                        distLeftCall = makeApplication(distLeftCall,
+                                                          smallerR);
+                        distLeftCall = makeApplication(distLeftCall, Rk);
+                        ExpressionPointer lhsExpanded = buildRingOp(
+                            context.multiplyName, Li, rightFactor);
+                        ExpressionPointer rhsExpanded = buildRingOp(
+                            context.addName,
+                            buildRingOp(context.multiplyName, Li,
+                                          smallerR),
+                            buildRingOp(context.multiplyName, Li, Rk));
+                        ExpressionPointer stepProof;
+                        ExpressionPointer newRowForm;
+                        if (k == rightSigned.size()) {
+                            stepProof = distLeftCall;
+                            newRowForm = rhsExpanded;
+                        } else {
+                            // rowCurrent has shape lhsExpanded + tail.
+                            std::vector<ExpressionPointer> tailSummands(
+                                rowSummands.begin()
+                                    + static_cast<long>(k),
+                                rowSummands.end());
+                            ExpressionPointer tailKernel;
+                            if (tailSummands.size() == 1) {
+                                tailKernel = tailSummands[0];
+                            } else {
+                                tailKernel = leftAssoc(tailSummands);
+                            }
+                            ExpressionPointer tailLifted =
+                                liftBoundVariables(tailKernel, 1, 0);
+                            ExpressionPointer lambdaBody = buildRingOp(
+                                context.addName,
+                                makeBoundVariable(0), tailLifted);
+                            ExpressionPointer lambda = makeLambda(
+                                "_ring_distL_z", carrierType, lambdaBody);
+                            stepProof =
+                                buildEqualityCongruenceSameCarrier(
+                                    universeLevel, carrierType, lambda,
+                                    lhsExpanded, rhsExpanded, distLeftCall);
+                            newRowForm = buildRingOp(
+                                context.addName, rhsExpanded, tailKernel);
+                        }
+                        rowProof = buildEqualityTransitivity(
+                            universeLevel, carrierType,
+                            buildRingOp(context.multiplyName, Li,
+                                          rightCanonical),
+                            rowCurrent, newRowForm,
+                            rowProof, stepProof);
+                        rowCurrent = newRowForm;
+                        rightFactor = smallerR;
+                    }
+                    // Reassociate rowCurrent → expandedRow.
+                    if (!structurallyEqual(rowCurrent, expandedRow)) {
+                        ExpressionPointer reassocProof =
+                            reassociateSumLeftProof(
+                                rowCurrent, context, axiomNames);
+                        rowProof = buildEqualityTransitivity(
+                            universeLevel, carrierType,
+                            buildRingOp(context.multiplyName, Li,
+                                          rightCanonical),
+                            rowCurrent, expandedRow,
+                            rowProof, reassocProof);
+                        rowCurrent = expandedRow;
+                    }
+                }
+                // rowProof : Li * R = expandedRow.
+                // Apply this rewrite in currentForm by building a
+                // congruence. Position of (Li * R) in currentForm:
+                // after processing rows 0..i-1, currentForm has the
+                // shape described above. We'll build a motive lambda
+                // tailored to that exact position.
+                //
+                // Concretely: the form is
+                //   ((((expanded_0 + ... + expanded_{i-1}) + (L_i * R))
+                //     + (L_{i+1} * R)) + ...) + (L_{p-1} * R)
+                // We need a motive `λ z. (((expanded_0 + ... + expanded_{i-1}) + z) + (L_{i+1}*R)) + ... + (L_{p-1}*R)`.
+                ExpressionPointer postExpansionPrefix;  // expanded rows
+                std::vector<ExpressionPointer> postPrefixSummands;
+                for (size_t k = 0; k < i; ++k) {
+                    // expanded_k = left-assoc of (L_k * R_0..R_{q-1}).
+                    std::vector<ExpressionPointer> kSummands;
+                    for (size_t jj = 0; jj < rightSigned.size(); ++jj) {
+                        kSummands.push_back(buildRingOp(
+                            context.multiplyName,
+                            leftMonomialKernels[k],
+                            rightMonomialKernels[jj]));
+                    }
+                    ExpressionPointer kKernel;
+                    if (kSummands.size() == 1) {
+                        kKernel = kSummands[0];
+                    } else {
+                        kKernel = leftAssoc(kSummands);
+                    }
+                    postPrefixSummands.push_back(kKernel);
+                }
+                std::vector<ExpressionPointer> tailSummands;
+                for (size_t k = i + 1; k < leftSigned.size(); ++k) {
+                    tailSummands.push_back(buildRingOp(
+                        context.multiplyName,
+                        leftMonomialKernels[k], rightCanonical));
+                }
+                // Build lambda body. The pattern:
+                //   ... ( ((postPrefixSums) + z) + tailSums[0] ) + tailSums[1] ...
+                // First, build the "left part" = left-assoc of
+                // postPrefixSums, then `+ z` to it.
+                ExpressionPointer lambdaInner;
+                {
+                    // Build left part with proper bound-variable lift.
+                    // postPrefixSums are kernel expressions from the
+                    // OUTER context — they don't reference the lambda's
+                    // bound variable, so we lift them by 1.
+                    std::vector<ExpressionPointer> liftedPrefix;
+                    for (const auto& s : postPrefixSummands) {
+                        liftedPrefix.push_back(liftBoundVariables(s, 1, 0));
+                    }
+                    ExpressionPointer leftPart;
+                    if (liftedPrefix.empty()) {
+                        // No prefix; the body starts with z.
+                        leftPart = makeBoundVariable(0);
+                    } else {
+                        if (liftedPrefix.size() == 1) {
+                            leftPart = buildRingOp(
+                                context.addName, liftedPrefix[0],
+                                makeBoundVariable(0));
+                        } else {
+                            ExpressionPointer prefixKernel =
+                                leftAssoc(liftedPrefix);
+                            leftPart = buildRingOp(
+                                context.addName, prefixKernel,
+                                makeBoundVariable(0));
+                        }
+                    }
+                    // Now extend with `+ tailSummands[0] + ... + tailSummands[last]`.
+                    for (const auto& tk : tailSummands) {
+                        ExpressionPointer tkLifted =
+                            liftBoundVariables(tk, 1, 0);
+                        leftPart = buildRingOp(
+                            context.addName, leftPart, tkLifted);
+                    }
+                    lambdaInner = leftPart;
+                }
+                ExpressionPointer lambda = makeLambda(
+                    "_ring_rowexp_z", carrierType, lambdaInner);
+                // x = Li * R; y = expandedRow.
+                ExpressionPointer xExpr = buildRingOp(
+                    context.multiplyName, Li, rightCanonical);
+                ExpressionPointer congrProof =
+                    buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambda,
+                        xExpr, expandedRow, rowProof);
+                // The proof: currentForm (which equals λ(xExpr) by
+                // beta-reduction of the application of lambda to xExpr)
+                // = λ(expandedRow).
+                // Substitute into the lambda body to get the new form.
+                auto substituteBV0 = [&](ExpressionPointer body,
+                                            ExpressionPointer arg)
+                    -> ExpressionPointer {
+                    return substituteBoundVariable(body, arg, 0);
+                };
+                ExpressionPointer newForm = substituteBV0(
+                    lambdaInner, expandedRow);
+                // Sanity: currentForm should equal substituteBV0(lambdaInner, xExpr).
+                ExpressionPointer expectedCurrent = substituteBV0(
+                    lambdaInner, xExpr);
+                if (!structurallyEqual(currentForm, expectedCurrent)) {
+                    throwElaborate(
+                        "`ring` (v2) phase1b: motive's xExpr-form does "
+                        "not match currentForm (internal error)");
+                }
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    leftTimesRight, currentForm, newForm,
+                    currentProof, congrProof);
+                currentForm = newForm;
+            }
+            // After all rows, currentForm = nested expansion. Reassociate
+            // to flat sum of all L_i * R_j.
+            ExpressionPointer phase1BFlatKernel = leftAssoc(
+                phase1BAllSummands);
+            if (!structurallyEqual(currentForm, phase1BFlatKernel)) {
+                ExpressionPointer reassocProof = reassociateSumLeftProof(
+                    currentForm, context, axiomNames);
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    leftTimesRight, currentForm, phase1BFlatKernel,
+                    currentProof, reassocProof);
+                currentForm = phase1BFlatKernel;
+            }
+        }
+        // currentForm is now the left-associated sum of all p*q
+        // pairs L_i * R_j (in row-major order).
+        // Phase 2: for each summand L_i * R_j, transform it into the
+        // canonical monomial form for the merged-signature monomial.
+        // The merged monomial sig is sort(L_i.sig ++ R_j.sig), and
+        // its sign is L_i.sign * R_j.sign.
+        //
+        // L_i * R_j as a kernel is:
+        //   * if both positive: leftProduct * rightProduct
+        //   * if one negative: negate(positive_one) * positive_other
+        //                       — needs multiply_negate_left/right
+        //                       to push outside
+        //   * if both negative: negate(...) * negate(...)
+        //                       — needs both rules + negate_negate
+        //
+        // Then the factors of the resulting product need to be
+        // re-associated and sorted (sort by hash) to canonical order.
+        //
+        // We rewrite each summand position-by-position via congruence.
+        for (size_t i = 0; i < leftSigned.size(); ++i) {
+            for (size_t j = 0; j < rightSigned.size(); ++j) {
+                size_t flatIndex = i * rightSigned.size() + j;
+                // The current summand at flatIndex is buildRingOp(*, Li, Rj).
+                ExpressionPointer Li = leftMonomialKernels[i];
+                ExpressionPointer Rj = rightMonomialKernels[j];
+                ExpressionPointer summandKernel = buildRingOp(
+                    context.multiplyName, Li, Rj);
+                // Compute the target monomial:
+                RingMonomialSignature mergedSig;
+                mergedSig.reserve(leftSigned[i].signature.size()
+                                    + rightSigned[j].signature.size());
+                std::merge(leftSigned[i].signature.begin(),
+                            leftSigned[i].signature.end(),
+                            rightSigned[j].signature.begin(),
+                            rightSigned[j].signature.end(),
+                            std::back_inserter(mergedSig));
+                int mergedSign = leftSigned[i].sign * rightSigned[j].sign;
+                ExpressionPointer targetMonomial =
+                    buildSignedMonomialKernel(
+                        mergedSig, mergedSign, context);
+                if (structurallyEqual(summandKernel, targetMonomial)) {
+                    // No transformation needed.
+                    continue;
+                }
+                // Build a proof: summandKernel = targetMonomial.
+                ExpressionPointer summandProof = proveSignedProductEqualsMonomial(
+                    Li, Rj,
+                    leftSigned[i], rightSigned[j],
+                    mergedSig, mergedSign,
+                    targetMonomial, context, axiomNames);
+                // Apply at position flatIndex in currentForm. We need a
+                // motive that targets exactly that position in the flat
+                // left-associated sum.
+                ExpressionPointer congrProof =
+                    rewriteFlatSummandAtPositionProof(
+                        currentForm, flatIndex,
+                        leftSigned.size() * rightSigned.size(),
+                        summandKernel, targetMonomial,
+                        summandProof, context);
+                ExpressionPointer newCurrent =
+                    rewriteFlatSummandAtPosition(
+                        currentForm, flatIndex,
+                        leftSigned.size() * rightSigned.size(),
+                        targetMonomial, context);
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    leftTimesRight, currentForm, newCurrent,
+                    currentProof, congrProof);
+                currentForm = newCurrent;
+            }
+        }
+        // currentForm is now a flat sum of canonical monomials in
+        // row-major (L_i*R_j) order. Need to sort to canonical
+        // std::map order.
+        std::vector<ExpressionPointer> flatSummands;
+        // Re-derive flatSummands from currentForm by flattening.
+        flattenRingProduct(currentForm, context.addName, flatSummands);
+        // Target order = canonical monomials in mergedPoly order.
+        std::vector<SignedMonomial> mergedMonomials =
+            polynomialToSignedMonomials(mergedPoly);
+        std::vector<ExpressionPointer> sortedKernels;
+        for (const auto& m : mergedMonomials) {
+            sortedKernels.push_back(buildSignedMonomialKernel(
+                m.signature, m.sign, context));
+        }
+        // Apply sum-AC sort (sortSumLeftAssocProof handles ANY target permutation).
+        ExpressionPointer sortProof = sortSumLeftAssocProof(
+            flatSummands, sortedKernels, context, axiomNames);
+        ExpressionPointer sortedKernel = assembleLeftAssociatedProduct(
+            context.addName, sortedKernels);
+        currentProof = buildEqualityTransitivity(
+            universeLevel, carrierType,
+            leftTimesRight, currentForm, sortedKernel,
+            currentProof, sortProof);
+        currentForm = sortedKernel;
+        // Final check.
+        if (!structurallyEqual(currentForm, mergedCanonical)) {
+            throwElaborate(
+                "`ring` (v2): proveMultiplyMerge final form does not "
+                "match canonical(mergedPoly) (internal error)");
+        }
+        return currentProof;
+    }
+
+    // Substitute every BoundVariable with the given index in `body` by
+    // `argument`. Indices below the target are decreased by 1 only when
+    // the substitution makes a position pass through a binder (we don't
+    // walk through binders here — there are none in our motives, which
+    // are flat applications + constants + the single bound variable
+    // we're substituting).
+    //
+    // For our use we just need a shallow substitution: replace
+    // BoundVariable(0) with `argument`, treating the body as a kernel
+    // expression that doesn't introduce any further binders.
+    ExpressionPointer substituteBoundVariable(
+        ExpressionPointer body, ExpressionPointer argument, int target) {
+        if (auto* bv = std::get_if<BoundVariable>(&body->node)) {
+            if (bv->deBruijnIndex == target) {
+                return argument;
+            }
+            if (bv->deBruijnIndex > target) {
+                return makeBoundVariable(bv->deBruijnIndex - 1);
+            }
+            return body;
+        }
+        if (auto* app = std::get_if<Application>(&body->node)) {
+            return makeApplication(
+                substituteBoundVariable(app->function, argument, target),
+                substituteBoundVariable(app->argument, argument, target));
+        }
+        if (auto* lam = std::get_if<Lambda>(&body->node)) {
+            // Walk under the binder.
+            // Lift `argument` by 1 because the body inside the lambda
+            // has one more binding.
+            ExpressionPointer argLifted =
+                liftBoundVariables(argument, 1, 0);
+            return makeLambda(lam->displayHint,
+                substituteBoundVariable(lam->domain, argument, target),
+                substituteBoundVariable(lam->body, argLifted, target + 1));
+        }
+        if (auto* pi = std::get_if<Pi>(&body->node)) {
+            ExpressionPointer argLifted =
+                liftBoundVariables(argument, 1, 0);
+            return makePi(pi->displayHint,
+                substituteBoundVariable(pi->domain, argument, target),
+                substituteBoundVariable(pi->codomain, argLifted, target + 1));
+        }
+        return body;
+    }
+
+    // Rewrite the summand at position `position` in a flat left-
+    // associated sum of `totalCount` summands. Caller supplies the
+    // current form, the proof that the summand at that position equals
+    // `newSummand`, and we construct the resulting form's expression
+    // and the congruence proof.
+    //
+    // For position `position` in a left-associated sum:
+    //   sum = ((((s_0 + s_1) + s_2) + ...) + s_{n-1})
+    // To target s_k for rewriting, we build the motive
+    //   λ z. ((((s_0 + ... + s_{k-1}) + z) + s_{k+1}) + ...) + s_{n-1}.
+    ExpressionPointer rewriteFlatSummandAtPosition(
+        ExpressionPointer currentForm,
+        size_t position, size_t totalCount,
+        ExpressionPointer replacement,
+        const RingV2Context& context) {
+        std::vector<ExpressionPointer> summands;
+        flattenRingProduct(currentForm, context.addName, summands);
+        if (summands.size() != totalCount) {
+            throwElaborate(
+                "`ring` (v2): rewriteFlatSummandAtPosition: flatten "
+                "count " + std::to_string(summands.size())
+                + " != expected " + std::to_string(totalCount));
+        }
+        summands[position] = replacement;
+        return assembleLeftAssociatedProduct(context.addName, summands);
+    }
+
+    ExpressionPointer rewriteFlatSummandAtPositionProof(
+        ExpressionPointer currentForm,
+        size_t position, size_t totalCount,
+        ExpressionPointer oldSummand,
+        ExpressionPointer newSummand,
+        ExpressionPointer summandProof,
+        const RingV2Context& context) {
+        std::vector<ExpressionPointer> summands;
+        flattenRingProduct(currentForm, context.addName, summands);
+        if (summands.size() != totalCount) {
+            throwElaborate(
+                "`ring` (v2): rewriteFlatSummandAtPositionProof: flatten "
+                "count " + std::to_string(summands.size())
+                + " != expected " + std::to_string(totalCount));
+        }
+        // Build the motive lambda. The body has the form of the flat
+        // sum with summands[position] replaced by BoundVariable(0).
+        // Lift other summands by 1 to account for the new binder.
+        std::vector<ExpressionPointer> bodySummands;
+        for (size_t k = 0; k < summands.size(); ++k) {
+            if (k == position) {
+                bodySummands.push_back(makeBoundVariable(0));
+            } else {
+                bodySummands.push_back(liftBoundVariables(summands[k], 1, 0));
+            }
+        }
+        ExpressionPointer body = assembleLeftAssociatedProduct(
+            context.addName, bodySummands);
+        ExpressionPointer lambda = makeLambda(
+            "_ring_summand_z", context.carrierType, body);
+        return buildEqualityCongruenceSameCarrier(
+            context.carrierUniverseLevel, context.carrierType, lambda,
+            oldSummand, newSummand, summandProof);
+    }
+
+    // Prove `Li * Rj = targetMonomial` where Li, Rj are signed-monomial
+    // kernels and targetMonomial = canonical kernel of (sign(Li)*sign(Rj),
+    // sort(Li.sig ++ Rj.sig)).
+    //
+    // Steps (depending on signs):
+    //   (++): Li * Rj = leftProduct * rightProduct. Flatten + sort the
+    //         combined factors. The merged sign is +, so the canonical
+    //         is just the product with no negate wrapper.
+    //   (+-): Li * (-Mj) = -(Li * Mj). Use multiply_negate_right. Then
+    //         the inner Li * Mj is the same as (++) case but with
+    //         positive Mj. So: rewrite Rj → -Mj using nothing (it IS
+    //         -Mj), apply multiply_negate_right, then recurse.
+    //   (-+): symmetric, multiply_negate_left.
+    //   (--): (-Mi) * (-Mj) = -(-Mi * Mj) = Mi * Mj. Both rules + negate_negate.
+    //
+    // After sign-pushing the outer negate, we have ±(product_of_factors).
+    // The inner product is leftFactors * rightFactors with shapes:
+    //   leftFactors  = leftProduct  (a left-assoc product of Li.sig atoms)
+    //   rightFactors = rightProduct (left-assoc of Rj.sig atoms)
+    // Concatenating: leftProduct * rightProduct. Re-associate to flat,
+    // then sort to match mergedSig. Wrap in negate if mergedSign == -1.
+    ExpressionPointer proveSignedProductEqualsMonomial(
+        ExpressionPointer Li, ExpressionPointer Rj,
+        const SignedMonomial& leftMono, const SignedMonomial& rightMono,
+        const RingMonomialSignature& /*mergedSig*/, int mergedSign,
+        ExpressionPointer targetMonomial,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        ExpressionPointer carrierType = context.carrierType;
+        LevelPointer universeLevel = context.carrierUniverseLevel;
+        // The "positive" base monomial kernels (no negate wrapper):
+        ExpressionPointer Mi = buildSignedMonomialKernel(
+            leftMono.signature, +1, context);
+        ExpressionPointer Mj = buildSignedMonomialKernel(
+            rightMono.signature, +1, context);
+        // Start: Li * Rj. Goal: targetMonomial.
+        // Move outer negates inside step by step until we have
+        // (Mi * Mj) wrapped in 0..2 negates. Each negate-push is a
+        // multiply_negate_left/right rewrite. Two negates collapse via
+        // negate_negate.
+        ExpressionPointer currentForm = buildRingOp(
+            context.multiplyName, Li, Rj);
+        ExpressionPointer currentProof = buildReflexivity(
+            universeLevel, carrierType, currentForm);
+        ExpressionPointer startForm = currentForm;
+        // Step S1: if Li is -Mi, push the outer negate of Li outside the
+        // product: Li * Rj = (-Mi) * Rj = -(Mi * Rj) via
+        // multiply_negate_left.
+        if (leftMono.sign < 0) {
+            demandAxiomName(axiomNames.multiplyNegateLeft,
+                              "multiply_negate_left", context.carrierName);
+            ExpressionPointer call = makeConstant(axiomNames.multiplyNegateLeft);
+            call = makeApplication(call, Mi);
+            call = makeApplication(call, Rj);
+            // call : (-Mi) * Rj = -(Mi * Rj)
+            ExpressionPointer newForm = buildRingNegate(
+                context.negateName,
+                buildRingOp(context.multiplyName, Mi, Rj));
+            currentProof = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                startForm, currentForm, newForm,
+                currentProof, call);
+            currentForm = newForm;
+        }
+        // Step S2: if Rj is -Mj, push the negate around the product
+        // outside as well.
+        if (rightMono.sign < 0) {
+            demandAxiomName(axiomNames.multiplyNegateRight,
+                              "multiply_negate_right", context.carrierName);
+            // Two cases: the current "product part" is either
+            //   Mi * Rj    (if Li was positive)
+            //   Mi * Rj inside a negate wrapper (if Li was negative).
+            if (leftMono.sign > 0) {
+                // currentForm == Mi * Rj. Apply multiply_negate_right(Mi, Mj):
+                // Mi * (-Mj) = -(Mi * Mj).
+                ExpressionPointer call = makeConstant(
+                    axiomNames.multiplyNegateRight);
+                call = makeApplication(call, Mi);
+                call = makeApplication(call, Mj);
+                ExpressionPointer newForm = buildRingNegate(
+                    context.negateName,
+                    buildRingOp(context.multiplyName, Mi, Mj));
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    startForm, currentForm, newForm,
+                    currentProof, call);
+                currentForm = newForm;
+            } else {
+                // currentForm == -(Mi * Rj) where Rj == -Mj.
+                // Use congruence λz. -z, with proof Mi * Rj = -(Mi * Mj)
+                // via multiply_negate_right.
+                ExpressionPointer call = makeConstant(
+                    axiomNames.multiplyNegateRight);
+                call = makeApplication(call, Mi);
+                call = makeApplication(call, Mj);
+                ExpressionPointer innerOld = buildRingOp(
+                    context.multiplyName, Mi, Rj);
+                ExpressionPointer innerNew = buildRingNegate(
+                    context.negateName,
+                    buildRingOp(context.multiplyName, Mi, Mj));
+                ExpressionPointer lambdaBody = buildRingNegate(
+                    context.negateName, makeBoundVariable(0));
+                ExpressionPointer lambda = makeLambda(
+                    "_ring_negouter_z", carrierType, lambdaBody);
+                ExpressionPointer congr =
+                    buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambda,
+                        innerOld, innerNew, call);
+                // newForm = -(- (Mi * Mj))
+                ExpressionPointer newForm = buildRingNegate(
+                    context.negateName, innerNew);
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    startForm, currentForm, newForm,
+                    currentProof, congr);
+                currentForm = newForm;
+                // Then collapse via negate_negate.
+                demandAxiomName(axiomNames.negateNegate,
+                                  "negate_negate", context.carrierName);
+                ExpressionPointer nnCall = makeConstant(
+                    axiomNames.negateNegate);
+                nnCall = makeApplication(nnCall,
+                                            buildRingOp(context.multiplyName,
+                                                          Mi, Mj));
+                // nnCall : -(-(Mi*Mj)) = Mi*Mj
+                ExpressionPointer collapsedForm = buildRingOp(
+                    context.multiplyName, Mi, Mj);
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    startForm, currentForm, collapsedForm,
+                    currentProof, nnCall);
+                currentForm = collapsedForm;
+            }
+        }
+        // After steps S1/S2, currentForm has one of:
+        //   Mi * Mj                  (mergedSign == +1)
+        //   -(Mi * Mj)               (mergedSign == -1)
+        // (The (--) case landed at Mi*Mj after the two pushes + negate_negate.)
+        // Now sort the factors of the inner product.
+        // Get the inner product expression.
+        ExpressionPointer innerProductForm;
+        bool wrappedInNegate;
+        if (mergedSign > 0) {
+            innerProductForm = currentForm;
+            wrappedInNegate = false;
+        } else {
+            // currentForm = -(Mi * Mj)
+            auto* outerApp =
+                std::get_if<Application>(&currentForm->node);
+            if (!outerApp) {
+                throwElaborate(
+                    "`ring` (v2): proveSignedProductEqualsMonomial: "
+                    "negative branch has malformed shape");
+            }
+            innerProductForm = outerApp->argument;
+            wrappedInNegate = true;
+        }
+        // Flatten the inner product and sort factors.
+        std::vector<ExpressionPointer> innerFactors;
+        if (!flattenRingProduct(innerProductForm, context.multiplyName,
+                                   innerFactors)) {
+            throwElaborate(
+                "`ring` (v2): inner product not pure-multiply (internal)");
+        }
+        // The target product is built by buildCanonicalMonomial from
+        // mergedSig and +1 sign. Use it to get the factor order we want.
+        // (mergedSig is sort(Li.sig ++ Rj.sig).) Read off the canonical
+        // factor list by flattening targetMonomial's "inner product" too.
+        ExpressionPointer targetInner;
+        if (mergedSign > 0) {
+            targetInner = targetMonomial;
+        } else {
+            auto* outerApp =
+                std::get_if<Application>(&targetMonomial->node);
+            if (!outerApp) {
+                throwElaborate(
+                    "`ring` (v2): target signed monomial malformed");
+            }
+            targetInner = outerApp->argument;
+        }
+        std::vector<ExpressionPointer> targetFactors;
+        if (!flattenRingProduct(targetInner, context.multiplyName,
+                                   targetFactors)) {
+            throwElaborate(
+                "`ring` (v2): target inner product not pure-multiply");
+        }
+        if (innerFactors.size() != targetFactors.size()) {
+            throwElaborate(
+                "`ring` (v2): factor count mismatch in monomial merge "
+                "(internal error)");
+        }
+        // Reassociate innerProductForm to left-associated.
+        ExpressionPointer innerLeftAssoc =
+            assembleLeftAssociatedProduct(
+                context.multiplyName, innerFactors);
+        ExpressionPointer innerReassocProof;
+        if (structurallyEqual(innerProductForm, innerLeftAssoc)) {
+            innerReassocProof = buildReflexivity(
+                universeLevel, carrierType, innerProductForm);
+        } else {
+            innerReassocProof = reassociateMultiplyLeftProof(
+                innerProductForm, context, axiomNames);
+        }
+        // Sort innerFactors to target order.
+        ExpressionPointer innerSortProof = sortMultiplyLeftAssocProof(
+            innerFactors, targetFactors, context, axiomNames);
+        ExpressionPointer innerSortedKernel = assembleLeftAssociatedProduct(
+            context.multiplyName, targetFactors);
+        ExpressionPointer innerChain = buildEqualityTransitivity(
+            universeLevel, carrierType,
+            innerProductForm, innerLeftAssoc, innerSortedKernel,
+            innerReassocProof, innerSortProof);
+        // Now innerChain : innerProductForm = innerSortedKernel.
+        // If wrappedInNegate: apply congruence with λz. -z.
+        ExpressionPointer outerChain;
+        ExpressionPointer outerNewForm;
+        if (wrappedInNegate) {
+            ExpressionPointer lambdaBody = buildRingNegate(
+                context.negateName, makeBoundVariable(0));
+            ExpressionPointer lambda = makeLambda(
+                "_ring_finalneg_z", carrierType, lambdaBody);
+            outerChain = buildEqualityCongruenceSameCarrier(
+                universeLevel, carrierType, lambda,
+                innerProductForm, innerSortedKernel, innerChain);
+            outerNewForm = buildRingNegate(
+                context.negateName, innerSortedKernel);
+        } else {
+            outerChain = innerChain;
+            outerNewForm = innerSortedKernel;
+        }
+        currentProof = buildEqualityTransitivity(
+            universeLevel, carrierType,
+            startForm, currentForm, outerNewForm,
+            currentProof, outerChain);
+        currentForm = outerNewForm;
+        if (!structurallyEqual(currentForm, targetMonomial)) {
+            throwElaborate(
+                "`ring` (v2): signed-product merge ended with mismatch "
+                "(internal error)");
+        }
+        return currentProof;
+    }
+
+    // ----------------------------------------------------------------
+    // proveNegateMerge: prove
+    //   negate(canonical(innerPoly)) = canonical(-innerPoly)
+    // ----------------------------------------------------------------
+    //
+    // Strategy:
+    //   1. Push the outer negate through every `+` via negate_add.
+    //   2. For each summand: if it was a positive monomial M, negate(M)
+    //      is the canonical form of -M; if it was a negative monomial
+    //      -M = negate(M), negate(negate(M)) collapses to M via
+    //      negate_negate.
+    //   3. Re-sort to match canonical(-innerPoly) (signatures are
+    //      unchanged by sign flip, so the order is the same).
+    //
+    // Edge case: innerPoly empty → negate(zero) which we don't support.
+    ExpressionPointer proveNegateMerge(
+        const RingPolynomial& innerPoly,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        ExpressionPointer carrierType = context.carrierType;
+        LevelPointer universeLevel = context.carrierUniverseLevel;
+        if (innerPoly.empty()) {
+            throwElaborate(
+                "`ring` (v2): negation of zero polynomial requires "
+                "`negate_zero` which is not in scope");
+        }
+        ExpressionPointer innerCanonical =
+            buildCanonicalPolynomial(innerPoly, context);
+        RingPolynomial negatedPoly = innerPoly;
+        ringPolynomialNegate(negatedPoly);
+        ExpressionPointer negatedCanonical =
+            buildCanonicalPolynomial(negatedPoly, context);
+        ExpressionPointer startForm = buildRingNegate(
+            context.negateName, innerCanonical);
+        std::vector<SignedMonomial> innerSigned =
+            polynomialToSignedMonomials(innerPoly);
+        std::vector<ExpressionPointer> innerKernels;
+        for (const auto& m : innerSigned) {
+            innerKernels.push_back(buildSignedMonomialKernel(
+                m.signature, m.sign, context));
+        }
+        // Phase 1: push outer negate inward through all `+`.
+        // After phase 1: form = negate(s_0) + negate(s_1) + ... + negate(s_{k-1})
+        //                  (left-associated)
+        // Special case: k == 1, no `+` to push through.
+        ExpressionPointer currentForm = startForm;
+        ExpressionPointer currentProof = buildReflexivity(
+            universeLevel, carrierType, currentForm);
+        if (innerSigned.size() > 1) {
+            demandAxiomName(axiomNames.negateAdd, "negate_add",
+                              context.carrierName);
+            // Build running prefixes: prefix[i] = s_0 + ... + s_i for
+            // i = 0..k-1. prefix[k-1] = innerCanonical.
+            std::vector<ExpressionPointer> runningPrefix;
+            runningPrefix.push_back(innerKernels[0]);
+            for (size_t i = 1; i < innerSigned.size(); ++i) {
+                runningPrefix.push_back(buildRingOp(
+                    context.addName, runningPrefix[i - 1], innerKernels[i]));
+            }
+            // Walk i from k-1 down to 1: push negate through the
+            // outermost `+` of `negate(prefix[i])`.
+            //
+            // At step i, currentForm has the shape:
+            //   negate(prefix[i]) + negate(s_{i+1}) + ... + negate(s_{k-1})
+            //                                       (left-associated)
+            // (For i == k-1, it's just negate(prefix[k-1]) = negate(innerCanonical).)
+            //
+            // Apply negate_add(prefix[i-1], s_i) :
+            //   negate(prefix[i-1] + s_i) = negate(prefix[i-1]) + negate(s_i)
+            // i.e. negate(prefix[i]) = negate(prefix[i-1]) + negate(s_i).
+            // Lift via congruence with λz. z + tail.
+            for (size_t i = innerSigned.size(); i > 1; --i) {
+                size_t idx = i - 1;  // index of s_i in innerKernels
+                ExpressionPointer subjectPrefix = runningPrefix[idx - 1];
+                ExpressionPointer subjectSi = innerKernels[idx];
+                ExpressionPointer negAddCall = makeConstant(
+                    axiomNames.negateAdd);
+                negAddCall = makeApplication(negAddCall, subjectPrefix);
+                negAddCall = makeApplication(negAddCall, subjectSi);
+                // negAddCall has type
+                //   negate(prefix[idx-1] + s_idx) = negate(prefix[idx-1]) + negate(s_idx)
+                ExpressionPointer xExpr = buildRingNegate(
+                    context.negateName, runningPrefix[idx]);
+                ExpressionPointer yExpr = buildRingOp(
+                    context.addName,
+                    buildRingNegate(context.negateName, runningPrefix[idx - 1]),
+                    buildRingNegate(context.negateName, innerKernels[idx]));
+                // Tail (already-pushed summands): negate(s_{idx+1}) + ... + negate(s_{k-1})
+                std::vector<ExpressionPointer> tail;
+                for (size_t j = idx + 1; j < innerSigned.size(); ++j) {
+                    tail.push_back(buildRingNegate(
+                        context.negateName, innerKernels[j]));
+                }
+                ExpressionPointer stepProof;
+                ExpressionPointer newForm;
+                if (tail.empty()) {
+                    stepProof = negAddCall;
+                    newForm = yExpr;
+                } else {
+                    ExpressionPointer tailKernel;
+                    if (tail.size() == 1) {
+                        tailKernel = tail[0];
+                    } else {
+                        tailKernel = assembleLeftAssociatedProduct(
+                            context.addName, tail);
+                    }
+                    ExpressionPointer tailLifted = liftBoundVariables(
+                        tailKernel, 1, 0);
+                    ExpressionPointer lambdaBody = buildRingOp(
+                        context.addName, makeBoundVariable(0), tailLifted);
+                    ExpressionPointer lambda = makeLambda(
+                        "_ring_negpush_z", carrierType, lambdaBody);
+                    stepProof = buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambda,
+                        xExpr, yExpr, negAddCall);
+                    newForm = buildRingOp(
+                        context.addName, yExpr, tailKernel);
+                }
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    startForm, currentForm, newForm,
+                    currentProof, stepProof);
+                currentForm = newForm;
+            }
+            // Reassociate currentForm to flat left-associated sum of
+            // negate(innerKernels[i]) for i=0..k-1.
+            std::vector<ExpressionPointer> flatNeg;
+            for (const auto& ik : innerKernels) {
+                flatNeg.push_back(buildRingNegate(context.negateName, ik));
+            }
+            ExpressionPointer flatNegLeftAssoc = assembleLeftAssociatedProduct(
+                context.addName, flatNeg);
+            if (!structurallyEqual(currentForm, flatNegLeftAssoc)) {
+                ExpressionPointer reassoc = reassociateSumLeftProof(
+                    currentForm, context, axiomNames);
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    startForm, currentForm, flatNegLeftAssoc,
+                    currentProof, reassoc);
+                currentForm = flatNegLeftAssoc;
+            }
+        } else {
+            // k == 1; currentForm == negate(innerKernels[0]) already.
+            // Continue.
+        }
+        // Phase 2: simplify each summand. innerKernels[i] is either:
+        //   * positive monomial M (sign = +1): negate(M) is canonical
+        //     form of -M. No further work.
+        //   * negative monomial -M = negate(M) (sign = -1, the kernel
+        //     starts with `negate`). Then negate(negate(M)) = M via
+        //     negate_negate.
+        for (size_t i = 0; i < innerSigned.size(); ++i) {
+            if (innerSigned[i].sign > 0) continue;
+            demandAxiomName(axiomNames.negateNegate, "negate_negate",
+                              context.carrierName);
+            // The kernel innerKernels[i] is `negate(M_pos)` where M_pos
+            // is the positive form. So negate(negate(M_pos)) → M_pos.
+            ExpressionPointer M_pos = buildSignedMonomialKernel(
+                innerSigned[i].signature, +1, context);
+            ExpressionPointer oldSummand = buildRingNegate(
+                context.negateName, innerKernels[i]);
+            ExpressionPointer newSummand = M_pos;
+            // The proof: negate(negate(M_pos)) = M_pos via negate_negate(M_pos).
+            ExpressionPointer nnCall = makeConstant(axiomNames.negateNegate);
+            nnCall = makeApplication(nnCall, M_pos);
+            // Apply at position i in the flat sum.
+            if (innerSigned.size() == 1) {
+                // currentForm == oldSummand. Direct.
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    startForm, currentForm, newSummand,
+                    currentProof, nnCall);
+                currentForm = newSummand;
+            } else {
+                ExpressionPointer congrProof =
+                    rewriteFlatSummandAtPositionProof(
+                        currentForm, i, innerSigned.size(),
+                        oldSummand, newSummand, nnCall, context);
+                ExpressionPointer newCurrent =
+                    rewriteFlatSummandAtPosition(
+                        currentForm, i, innerSigned.size(),
+                        newSummand, context);
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    startForm, currentForm, newCurrent,
+                    currentProof, congrProof);
+                currentForm = newCurrent;
+            }
+        }
+        // Now each summand is the canonical signed form of the
+        // sign-flipped monomial — directly the kernel of -innerPoly's
+        // monomials, in the same signature order.
+        if (!structurallyEqual(currentForm, negatedCanonical)) {
+            throwElaborate(
+                "`ring` (v2): proveNegateMerge final form mismatched "
+                "negated canonical (internal error)");
+        }
+        return currentProof;
+    }
+
     // v2 of the ring tactic. Called as a fallback when v1 (pure-AC)
     // can't close the goal. Returns the proof on success; throws
     // otherwise. `expectedType` is the equality goal.
-    //
-    // First commit: implements the decision step only. If both sides
-    // normalise to the same polynomial, throw a deliberate "proof
-    // generator not yet wired" error with the canonical form printed,
-    // so the test can confirm the decision is correct. (The proof
-    // emitter lands in the next commit.)
     ExpressionPointer elaborateRingV2(
         const std::vector<LocalBinder>& /*localBinders*/,
         ExpressionPointer leftEndpoint,
@@ -6914,13 +8893,43 @@ private:
                     "are a follow-up)");
             }
         }
-        // For this first commit: decision-only. Throw a recognisable
-        // error so the test confirms we got here.
+        // Resolve carrier-specific axiom names. Names that aren't
+        // needed for this particular goal are allowed to remain
+        // unresolved; the merge helpers `demandAxiomName` only what
+        // they actually use.
+        RingV2AxiomNames axiomNames =
+            resolveRingV2AxiomNames(carrierName);
+        // We always need add/multiply assoc and commute (used by
+        // every non-trivial merge step).
+        demandAxiomName(axiomNames.addAssociative,
+                          "add_associative", carrierName);
+        demandAxiomName(axiomNames.addCommutative,
+                          "add_commutative", carrierName);
+        demandAxiomName(axiomNames.multiplyAssociative,
+                          "multiply_associative", carrierName);
+        demandAxiomName(axiomNames.multiplyCommutative,
+                          "multiply_commutative", carrierName);
+        // Build per-side proofs that each endpoint equals canonical.
+        RingPolynomial leftPolyOut, rightPolyOut;
+        ExpressionPointer leftProof = proveEqualsCanonical(
+            leftEndpoint, context, axiomNames, leftPolyOut);
+        ExpressionPointer rightProof = proveEqualsCanonical(
+            rightEndpoint, context, axiomNames, rightPolyOut);
+        ExpressionPointer canonicalKernel =
+            buildCanonicalPolynomial(leftPolynomial, context);
+        // canonicalKernel built from leftPolynomial — equal to the
+        // one produced from rightPolynomial since the polynomials
+        // agree (we just checked).
+        // rightProof : rightEndpoint = canonicalKernel; flip via sym.
+        ExpressionPointer rightProofSymm = buildEqualitySymmetry(
+            carrierUniverseLevel, carrierType,
+            rightEndpoint, canonicalKernel, std::move(rightProof));
+        ExpressionPointer finalProof = buildEqualityTransitivity(
+            carrierUniverseLevel, carrierType,
+            leftEndpoint, canonicalKernel, rightEndpoint,
+            std::move(leftProof), std::move(rightProofSymm));
         (void)line;
-        throwElaborate(
-            "`ring` (v2): decision step succeeded; the proof emitter "
-            "is not yet wired up. (This is the staged-rollout error — "
-            "ignore it once the next commit lands.)");
+        return finalProof;
     }
 
     // `sorry` — desugars to either `Internal.sorry_proposition(<P>)`
