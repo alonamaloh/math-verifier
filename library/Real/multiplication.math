@@ -389,41 +389,31 @@ theorem Rational.sequence.product_is_cauchy_bound
   claim first_total_bound
       : Rational.absolute_value(s(m) * (t(m) - t(n)))
           ≤ Rational.halve(Rational.halve(epsilon))
-    by rewrite(
-           Equality.symmetry(abs_first_eq),
-           Rational.LessOrEqual.transitive(
-               Rational.absolute_value(s(m))
-                   * Rational.absolute_value(t(m) - t(n)),
-               (successor(K_s) : Rational) * delta_t,
-               Rational.halve(Rational.halve(epsilon)),
-               Rational.LessOrEqual.transitive(
-                   Rational.absolute_value(s(m))
-                       * Rational.absolute_value(t(m) - t(n)),
-                   (successor(K_s) : Rational)
-                       * Rational.absolute_value(t(m) - t(n)),
-                   (successor(K_s) : Rational) * delta_t,
-                   first_factor_bound,
-                   first_factor_bound_2),
-               succ_K_s_delta_t_bound));
+    by calc Rational.absolute_value(s(m) * (t(m) - t(n)))
+          = Rational.absolute_value(s(m))
+              * Rational.absolute_value(t(m) - t(n))
+                by abs_first_eq
+          ≤ (successor(K_s) : Rational)
+              * Rational.absolute_value(t(m) - t(n))
+                by first_factor_bound
+          ≤ (successor(K_s) : Rational) * delta_t
+                by first_factor_bound_2
+          ≤ Rational.halve(Rational.halve(epsilon))
+                by succ_K_s_delta_t_bound;
   claim second_total_bound
       : Rational.absolute_value(t(n) * (s(m) - s(n)))
           ≤ Rational.halve(Rational.halve(epsilon))
-    by rewrite(
-           Equality.symmetry(abs_second_eq),
-           Rational.LessOrEqual.transitive(
-               Rational.absolute_value(t(n))
-                   * Rational.absolute_value(s(m) - s(n)),
-               (successor(K_t) : Rational) * delta_s,
-               Rational.halve(Rational.halve(epsilon)),
-               Rational.LessOrEqual.transitive(
-                   Rational.absolute_value(t(n))
-                       * Rational.absolute_value(s(m) - s(n)),
-                   (successor(K_t) : Rational)
-                       * Rational.absolute_value(s(m) - s(n)),
-                   (successor(K_t) : Rational) * delta_s,
-                   second_factor_bound,
-                   second_factor_bound_2),
-               succ_K_t_delta_s_bound));
+    by calc Rational.absolute_value(t(n) * (s(m) - s(n)))
+          = Rational.absolute_value(t(n))
+              * Rational.absolute_value(s(m) - s(n))
+                by abs_second_eq
+          ≤ (successor(K_t) : Rational)
+              * Rational.absolute_value(s(m) - s(n))
+                by second_factor_bound
+          ≤ (successor(K_t) : Rational) * delta_s
+                by second_factor_bound_2
+          ≤ Rational.halve(Rational.halve(epsilon))
+                by succ_K_t_delta_s_bound;
   claim sum_total_bound
       : Rational.absolute_value(s(m) * (t(m) - t(n)))
             + Rational.absolute_value(t(n) * (s(m) - s(n)))
@@ -437,34 +427,19 @@ theorem Rational.sequence.product_is_cauchy_bound
                Rational.halve(Rational.halve(epsilon)),
                first_total_bound,
                second_total_bound));
-  claim triangle_combined_bound
-      : Rational.absolute_value(
-            s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
-          ≤ Rational.halve(epsilon)
-    by Rational.LessOrEqual.transitive(
-           Rational.absolute_value(
-               s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n))),
-           Rational.absolute_value(s(m) * (t(m) - t(n)))
-               + Rational.absolute_value(t(n) * (s(m) - s(n))),
-           Rational.halve(epsilon),
-           sum_abs_bound,
-           sum_total_bound);
-  claim final_weak_bound
-      : Rational.absolute_value(s(m) * t(m) - s(n) * t(n))
-          ≤ Rational.halve(epsilon)
-    by rewrite(
-           Equality.symmetry(
-               congruenceOf(Rational.absolute_value, decomposition_eq)),
-           triangle_combined_bound);
-  claim halve_strict_less
-      : Rational.halve(epsilon) < epsilon
-    by Rational.halve_less_than_self(epsilon, epsilonPositive);
-  Rational.LessThan.transitive_left(
-      Rational.absolute_value(s(m) * t(m) - s(n) * t(n)),
-      Rational.halve(epsilon),
-      epsilon,
-      final_weak_bound,
-      halve_strict_less)
+  -- Triangle on the regrouped form; then ≤ ε/2 by the two halves; then
+  -- < ε by halve_less_than_self. All in one calc chain.
+  calc Rational.absolute_value(s(m) * t(m) - s(n) * t(n))
+     = Rational.absolute_value(
+           s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
+            by congruenceOf(Rational.absolute_value, decomposition_eq)
+     ≤ Rational.absolute_value(s(m) * (t(m) - t(n)))
+           + Rational.absolute_value(t(n) * (s(m) - s(n)))
+            by sum_abs_bound
+     ≤ Rational.halve(epsilon)
+            by sum_total_bound
+     < epsilon
+            by Rational.halve_less_than_self(epsilon, epsilonPositive)
 }
 
 -- ----------------------------------------------------------------------
@@ -634,33 +609,23 @@ theorem Real.multiply_respect_bound_chain
            Rational.LessOrEqual_zero_of_IsNonneg(
                (successor(K) : Rational),
                Integer.from_natural_is_nonneg(successor(K))));
-  claim weak_bound
-      : Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
-          ≤ Rational.halve(epsilon)
-    by rewrite(
-           Equality.symmetry(
-               congruenceOf(Rational.absolute_value, factor_eq)),
-           rewrite(
-               Equality.symmetry(abs_factor_eq),
-               Rational.LessOrEqual.transitive(
-                   Rational.absolute_value(s_x(m))
-                       * Rational.absolute_value(s_y(m) - s_yPrime(m)),
-                   (successor(K) : Rational) * delta,
-                   Rational.halve(epsilon),
-                   Rational.LessOrEqual.transitive(
-                       Rational.absolute_value(s_x(m))
-                           * Rational.absolute_value(s_y(m) - s_yPrime(m)),
-                       (successor(K) : Rational)
-                           * Rational.absolute_value(s_y(m) - s_yPrime(m)),
-                       (successor(K) : Rational) * delta,
-                       step1, step2),
-                   delta_bound)));
-  Rational.LessThan.transitive_left(
-      Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m)),
-      Rational.halve(epsilon),
-      epsilon,
-      weak_bound,
-      Rational.halve_less_than_self(epsilon, epsilonPositive))
+  -- Factor s_x(m) out; |·| splits multiplicatively; bound |s_x| by
+  -- (K+1), then |s_y - s_yPrime| by δ; finally δ·(K+1) ≤ ε/2 < ε.
+  calc Rational.absolute_value(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
+     = Rational.absolute_value(s_x(m) * (s_y(m) - s_yPrime(m)))
+          by congruenceOf(Rational.absolute_value, factor_eq)
+     = Rational.absolute_value(s_x(m))
+           * Rational.absolute_value(s_y(m) - s_yPrime(m))
+          by abs_factor_eq
+     ≤ (successor(K) : Rational)
+           * Rational.absolute_value(s_y(m) - s_yPrime(m))
+          by step1
+     ≤ (successor(K) : Rational) * delta
+          by step2
+     ≤ Rational.halve(epsilon)
+          by delta_bound
+     < epsilon
+          by Rational.halve_less_than_self(epsilon, epsilonPositive)
 }
 
 -- Helper: produce the CauchyEquivalent proof body for the at-rep
