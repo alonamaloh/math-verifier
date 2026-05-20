@@ -237,43 +237,48 @@ theorem Natural.distance_add_triangle (a b c d : Natural)
 -- Respect lemma: if `a + d = b + c`, then `distance(a, b) =
 -- distance(c, d)`. Load-bearing for Integer.absolute_value's lift.
 --
--- Induction on `a` at the outer pattern, then `cases b` in the
--- successor case with an explicit dependent motive so the kernel can
--- refine the hypothesis's type after the inner constructor match.
+-- Induction on `a`. The body's binders `(b c d)` and the hypothesis
+-- are tucked into the goal type so the recursor's motive abstracts
+-- over all of them: that way the inner case-split on `b` automatically
+-- refines the hypothesis's type per branch, and IH at the successor
+-- step takes the predecessor's `(b, c, d, refined-hypothesis)`.
 theorem Natural.distance_respects_integer_equivalent
-        : (a b c d : Natural) → a + d = b + c
-          → Natural.distance(a, b) = Natural.distance(c, d)
-  | zero, b, c, d, hypothesis =>
-      -- hypothesis : 0 + d = b + c, definitionally d = b + c.
-      calc Natural.distance(0, b)
-         = b
-         = Natural.distance(c, b + c)
-                by Equality.symmetry(
-                       Natural.distance_self_add_right(b, c))
-         = Natural.distance(c, d)
-  | successor(k), b, c, d, hypothesis =>
-      (cases b {
-        | zero =>
-            function (refinedHypothesis : (1 + k) + d = 0 + c) =>
-              -- refinedHypothesis : (1+k) + d = c (0 + c reduces to c).
-              -- Walk d off the right of distance((1+k) + d, d), then
-              -- swap (1+k) + d for c via refinedHypothesis.
-              calc Natural.distance(1 + k, 0)
-                 = 1 + k
-                 = Natural.distance((1 + k) + d, d)
-                        by Equality.symmetry(
-                               Natural.distance_add_self_right(1 + k, d))
-                 = Natural.distance(c, d)
-        | successor(bPredecessor) =>
-            function (refinedHypothesis
-                          : (1 + k) + d = (1 + bPredecessor) + c) =>
-              -- refinedHypothesis reduces (add on successor first arg)
-              -- to 1+(k + d) = 1+(bPredecessor + c). successor_injective
-              -- drops the 1+, IH closes.
-              Natural.distance_respects_integer_equivalent(
-                  k, bPredecessor, c, d,
-                  Natural.successor_injective(
-                      k + d, bPredecessor + c, refinedHypothesis))
-       } : (refinedHypothesis : (1 + k) + d = b + c)
-             → Natural.distance(1 + k, b)
-               = Natural.distance(c, d))(hypothesis)
+        (a : Natural)
+        : (b c d : Natural) → a + d = b + c
+          → Natural.distance(a, b) = Natural.distance(c, d) :=
+  by_induction on a with IH {
+    case zero:
+        function (b c d : Natural) (hypothesis : 0 + d = b + c) =>
+          -- hypothesis : d = b + c  (0 + d reduces to d).
+          calc Natural.distance(0, b)
+             = b
+             = Natural.distance(c, b + c)
+                    by Equality.symmetry(
+                           Natural.distance_self_add_right(b, c))
+             = Natural.distance(c, d)
+    case successor(k):
+        function (b c d : Natural) =>
+          by_cases on b {
+            case zero:
+                function (hypothesis : (1 + k) + d = 0 + c) =>
+                  -- hypothesis : (1+k) + d = c  (0 + c reduces to c).
+                  -- Walk d off the right of distance((1+k) + d, d),
+                  -- then swap (1+k) + d for c via the hypothesis.
+                  calc Natural.distance(1 + k, 0)
+                     = 1 + k
+                     = Natural.distance((1 + k) + d, d)
+                            by Equality.symmetry(
+                                   Natural.distance_add_self_right(
+                                       1 + k, d))
+                     = Natural.distance(c, d)
+            case successor(bPredecessor):
+                function (hypothesis : (1 + k) + d
+                                       = (1 + bPredecessor) + c) =>
+                  -- hypothesis reduces (add on successor first arg) to
+                  -- 1+(k + d) = 1+(bPredecessor + c); successor_injective
+                  -- drops the 1+ and IH closes on the smaller a.
+                  IH(bPredecessor, c, d,
+                     Natural.successor_injective(
+                         k + d, bPredecessor + c, hypothesis))
+          }
+  }
