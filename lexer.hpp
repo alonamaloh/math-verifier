@@ -46,6 +46,7 @@ enum class TokenKind {
     KeywordConvention,      // `convention p : T with H` — name-bound implicit binder
     KeywordGiven,           // `given (P)` — look up the in-scope hypothesis of type P
     KeywordAs,              // `in (P) as h:` — name the arm's disjunct hypothesis
+    KeywordRefining,        // `cases X refining h, …` — refine listed binders' types per case
 
     // Punctuation
     LeftParen, RightParen,

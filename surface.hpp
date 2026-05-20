@@ -176,6 +176,14 @@ struct SurfaceCases {
     //   `equalityHypothesisName : X = <constructor pattern>`
     // in scope, generated via the standard convoy desugaring.
     std::string equalityHypothesisName;
+    // `cases X refining h1, h2, … { … }` — when non-empty, each listed
+    // in-scope binder gets its type refined per arm (the scrutinee in
+    // its type is substituted by the constructor pattern). Implemented
+    // by wrapping the goal in a Π over the listed binders, wrapping
+    // each arm body in `function (h1) (h2) … =>`, and applying the
+    // resulting cases to (h1, h2, …) from the outer context. Compatible
+    // with `with equalityHypothesisName` (both can be used together).
+    std::vector<std::string> refiningNames;
 };
 
 // `?` — placeholder for a proof the elaborator should fill in. Phase 3
@@ -537,7 +545,7 @@ inline SurfaceExpressionPointer makeSurfaceCases(
     std::vector<SurfaceCasesClause> clauses,
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
-        SurfaceCases{std::move(scrutinee), std::move(clauses), {}},
+        SurfaceCases{std::move(scrutinee), std::move(clauses), {}, {}},
         line, column});
 }
 
@@ -548,7 +556,20 @@ inline SurfaceExpressionPointer makeSurfaceCasesWithEqualityHypothesis(
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceCases{std::move(scrutinee), std::move(clauses),
-                      std::move(equalityHypothesisName)},
+                      std::move(equalityHypothesisName), {}},
+        line, column});
+}
+
+inline SurfaceExpressionPointer makeSurfaceCasesWithRefining(
+    SurfaceExpressionPointer scrutinee,
+    std::vector<SurfaceCasesClause> clauses,
+    std::string equalityHypothesisName,
+    std::vector<std::string> refiningNames,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceCases{std::move(scrutinee), std::move(clauses),
+                      std::move(equalityHypothesisName),
+                      std::move(refiningNames)},
         line, column});
 }
 

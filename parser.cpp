@@ -248,14 +248,16 @@ SurfaceExpressionPointer substituteSurfaceName(
             newClause.column = clause.column;
             newClauses.push_back(std::move(newClause));
         }
-        if (cases->equalityHypothesisName.empty()) {
+        if (cases->equalityHypothesisName.empty()
+            && cases->refiningNames.empty()) {
             return makeSurfaceCases(std::move(newScrutinee),
                                      std::move(newClauses),
                                      line, column);
         }
-        return makeSurfaceCasesWithEqualityHypothesis(
+        return makeSurfaceCasesWithRefining(
             std::move(newScrutinee), std::move(newClauses),
             cases->equalityHypothesisName,
+            cases->refiningNames,
             line, column);
     }
     if (auto* calc = std::get_if<SurfaceCalc>(&node.node)) {
@@ -1586,20 +1588,52 @@ private:
             Token nameToken = consumeAny();
             equalityHypothesisName = nameToken.lexeme;
         }
+        // Optional `refining <name1>, <name2>, …`: each listed
+        // in-scope binder has its type refined per arm (the scrutinee
+        // appearing in the binder's type is substituted by the arm's
+        // constructor pattern). Hides the convoy-pattern boilerplate.
+        std::vector<std::string> refiningNames =
+            parseOptionalRefiningList();
         expect(TokenKind::LeftBrace, "after cases scrutinee");
         auto clauses = parseCasesClauseBlock(
             /*injectedIhName=*/std::string(),
             /*caseFollowedBy=*/TokenKind::Colon);
         expect(TokenKind::RightBrace, "ending cases expression");
-        if (equalityHypothesisName.empty()) {
+        if (equalityHypothesisName.empty() && refiningNames.empty()) {
             return makeSurfaceCases(std::move(scrutinee),
                                      std::move(clauses),
                                      casesToken.line, casesToken.column);
         }
-        return makeSurfaceCasesWithEqualityHypothesis(
+        return makeSurfaceCasesWithRefining(
             std::move(scrutinee), std::move(clauses),
             std::move(equalityHypothesisName),
+            std::move(refiningNames),
             casesToken.line, casesToken.column);
+    }
+
+    // Parses an optional `refining <name>[, <name>]*` clause used by
+    // `cases`, `by_cases`, and `by_induction` to mark in-scope binders
+    // whose types should be refined per arm. Empty vector if the
+    // keyword isn't present.
+    std::vector<std::string> parseOptionalRefiningList() {
+        std::vector<std::string> names;
+        if (peek().kind != TokenKind::KeywordRefining) {
+            return names;
+        }
+        consumeAny();  // 'refining'
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a binder name after 'refining'");
+        }
+        names.push_back(consumeAny().lexeme);
+        while (peek().kind == TokenKind::Comma) {
+            consumeAny();
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected a binder name after ',' in "
+                          "'refining' list");
+            }
+            names.push_back(consumeAny().lexeme);
+        }
+        return names;
     }
 
     // Parses the inside of a `{ … }` of a cases-style block: either a
@@ -1962,6 +1996,10 @@ private:
             }
             ihName = consumeAny().lexeme;
         }
+        // Optional `refining <name>[, <name>]*`: each listed in-scope
+        // binder has its type refined per arm. See parseOptionalRefiningList.
+        std::vector<std::string> refiningNames =
+            parseOptionalRefiningList();
         expect(TokenKind::LeftBrace,
                isInduction
                    ? "after 'by_induction on <expr> with <ih>'"
@@ -1971,8 +2009,15 @@ private:
         expect(TokenKind::RightBrace,
                isInduction ? "ending by_induction block"
                            : "ending by_cases block");
-        return makeSurfaceCases(
+        if (refiningNames.empty()) {
+            return makeSurfaceCases(
+                std::move(scrutinee), std::move(clauses),
+                byToken.line, byToken.column);
+        }
+        return makeSurfaceCasesWithRefining(
             std::move(scrutinee), std::move(clauses),
+            /*equalityHypothesisName=*/std::string(),
+            std::move(refiningNames),
             byToken.line, byToken.column);
     }
 

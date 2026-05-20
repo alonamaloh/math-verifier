@@ -37,6 +37,17 @@ inline std::string openingNameFor(
     if (original == "_") {
         return "_wildcard_" + std::to_string(index);
     }
+    // Disambiguate against earlier binders with the same name —
+    // FreeVariables are identified by (name, origin), so two binders
+    // sharing a name would collide as a single FV, breaking
+    // substitution and unification. The inner binder (higher index)
+    // shadows the outer in the user's view, so it's the inner that
+    // gets the unique suffix.
+    for (size_t earlier = 0; earlier < index; ++earlier) {
+        if (localBinders[earlier].name == original) {
+            return original + "_shadow_" + std::to_string(index);
+        }
+    }
     return original;
 }
 
@@ -2673,15 +2684,17 @@ private:
                 rewrittenClause.column = clause.column;
                 rewrittenClauses.push_back(std::move(rewrittenClause));
             }
-            if (cases->equalityHypothesisName.empty()) {
+            if (cases->equalityHypothesisName.empty()
+                && cases->refiningNames.empty()) {
                 return makeSurfaceCases(std::move(rewrittenScrutinee),
                                          std::move(rewrittenClauses),
                                          node.line, node.column);
             }
-            return makeSurfaceCasesWithEqualityHypothesis(
+            return makeSurfaceCasesWithRefining(
                 std::move(rewrittenScrutinee),
                 std::move(rewrittenClauses),
                 cases->equalityHypothesisName,
+                cases->refiningNames,
                 node.line, node.column);
         }
         if (auto* calc = std::get_if<SurfaceCalc>(&node.node)) {
@@ -11354,6 +11367,156 @@ private:
         (void)column;
     }
 
+    // `cases X refining h_1, …, h_N { case ctor: body … }` — the
+    // "F1" sugar that automates the convoy pattern for binders whose
+    // types mention the scrutinee.
+    //
+    // Desugars to:
+    //
+    //   (cases X {
+    //      case ctor(args): function (h_1) (h_2) … (h_N) => body
+    //      …
+    //    } : (h_1 : T_h_1) → (h_2 : T_h_2) → … → (h_N : T_h_N) → Goal
+    //   )(h_1, h_2, …, h_N)
+    //
+    // The inner-cases motive is `λ x. (h_1 : T_h_1(x)) → … → Goal(x)`,
+    // so each arm's body has type `(h_1 : T_h_1(ctor(args))) → … →
+    // Goal(ctor(args))` — the lambdas pick up the refined hypothesis
+    // types via motive specialisation, no explicit annotation needed.
+    // Outer application closes the chain by feeding the original
+    // (unrefined-named-but-now-refined-at-this-case) binders back in.
+    ExpressionPointer elaborateCasesWithRefining(
+        const SurfaceCases& cases,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        if (!expectedType) {
+            throwElaborate(
+                "cases ... refining ... { ... } needs an expected "
+                "type from context");
+        }
+        Frame frame(*this,
+            "cases ... refining ... at line " + std::to_string(line));
+
+        // (1) Resolve each refining name to its position in
+        // localBinders (BoundVariable index from innermost) and its
+        // type at depth localBinders.size() (lift from the depth at
+        // which the binder was declared).
+        int refiningCount = static_cast<int>(cases.refiningNames.size());
+        std::vector<int> refiningBoundVariableIndices;
+        std::vector<ExpressionPointer> refiningTypesAtOuterDepth;
+        int totalBinders = static_cast<int>(localBinders.size());
+        for (const auto& name : cases.refiningNames) {
+            int positionInArray = -1;
+            for (int i = totalBinders - 1; i >= 0; --i) {
+                if (localBinders[i].name == name) {
+                    positionInArray = i;
+                    break;
+                }
+            }
+            if (positionInArray < 0) {
+                throwElaborate(
+                    "cases ... refining " + name + ": no binder named '"
+                    + name + "' is in scope");
+            }
+            refiningBoundVariableIndices.push_back(
+                totalBinders - 1 - positionInArray);
+            int liftAmount = totalBinders - positionInArray;
+            refiningTypesAtOuterDepth.push_back(
+                liftBoundVariables(
+                    localBinders[positionInArray].type,
+                    liftAmount, 0));
+        }
+
+        // (2) Build the wrapped expected type at the outer depth:
+        //   Π (h_1 : T_1) Π (h_2 : T_2') … Π (h_N : T_N') Goal'
+        // where each T_i' has references to h_1, …, h_{i-1} replaced
+        // by the corresponding Π binder (and Goal' has all of h_1…h_N
+        // replaced). This is the "generalize" / "revert" telescope
+        // construction: we abstract one refining binder at a time,
+        // starting from the innermost (h_N) and working outward.
+        //
+        // For each step, abstractOverBoundVariable shifts every OTHER
+        // outer BV up by 1 to make room for the new Π's binder at
+        // BV(0). So after `k` iterations, an outer BV originally at
+        // index `j` (and not yet abstracted) lives at `j + k`. The
+        // domain of the Π we're constructing must also be abstracted
+        // against any refining binder we've already moved into the
+        // chain — that's what the inner loop on `j` does for each T_i.
+        ExpressionPointer wrappedExpectedType = expectedType;
+        for (int i = refiningCount - 1; i >= 0; --i) {
+            // abstractOverBoundVariable tracks binder depth itself —
+            // we always pass the binder's *outer* BV index (relative
+            // to depth = totalBinders), and the function lifts other
+            // references for us.
+            int outerIdx = refiningBoundVariableIndices[i];
+            wrappedExpectedType = abstractOverBoundVariable(
+                wrappedExpectedType, outerIdx);
+            // T_i itself may reference any refining binder we already
+            // moved into the chain (those at j > i, which were
+            // processed first because we iterate in reverse). Apply
+            // the same abstractions to T_i.
+            ExpressionPointer domain = refiningTypesAtOuterDepth[i];
+            for (int j = refiningCount - 1; j > i; --j) {
+                domain = abstractOverBoundVariable(
+                    domain, refiningBoundVariableIndices[j]);
+            }
+            wrappedExpectedType = makePi(
+                cases.refiningNames[i],
+                std::move(domain),
+                std::move(wrappedExpectedType));
+        }
+
+        // (3) Wrap each clause body in `function (h_1) (h_2) … (h_N)
+        // => body`. The lambda binders use the same names the user
+        // wrote, shadowing the outer same-named binders inside the
+        // body. No type annotations on the lambdas — the motive-
+        // derived domain tells each lambda what its parameter type is.
+        //
+        // The shadowing requires the elaborator's opening pass to
+        // generate distinct FreeVariable names for the inner lambda
+        // binders so unification (e.g., implicit-arg inference inside
+        // Equality.symmetry) doesn't confuse them with the outer
+        // binders. We rely on openingNameFor's collision-avoidance
+        // for that.
+        std::vector<SurfaceCasesClause> wrappedClauses;
+        for (const auto& clause : cases.clauses) {
+            SurfaceExpressionPointer body = clause.body;
+            for (int i = refiningCount - 1; i >= 0; --i) {
+                SurfaceBinder binder;
+                binder.names = {cases.refiningNames[i]};
+                binder.type = nullptr;
+                binder.isImplicit = false;
+                body = makeSurfaceLambda(
+                    std::move(binder), body,
+                    clause.line, clause.column);
+            }
+            SurfaceCasesClause wrappedClause;
+            wrappedClause.pattern = clause.pattern;
+            wrappedClause.body = std::move(body);
+            wrappedClause.line = clause.line;
+            wrappedClause.column = clause.column;
+            wrappedClauses.push_back(std::move(wrappedClause));
+        }
+        SurfaceExpressionPointer syntheticCases = makeSurfaceCases(
+            cases.scrutinee, std::move(wrappedClauses), line, column);
+
+        // (4) Elaborate the synthetic cases against the wrapped Pi
+        // chain.
+        ExpressionPointer innerCasesKernel = elaborateExpression(
+            *syntheticCases, localBinders, wrappedExpectedType);
+
+        // (5) Apply the result to (h_1, h_2, …, h_N), each as a
+        // BoundVariable reference into the outer context. The kernel
+        // unwinds the Pi chain at the original Goal type.
+        for (int i = 0; i < refiningCount; ++i) {
+            innerCasesKernel = makeApplication(
+                std::move(innerCasesKernel),
+                makeBoundVariable(refiningBoundVariableIndices[i]));
+        }
+        return innerCasesKernel;
+    }
+
     // `cases scrutinee { | pattern => body | ... }`. Phase 1 covers
     // non-indexed inductives only. Re-uses the existing
     // `buildCaseLambda` helper by synthesizing a minimal pattern-match
@@ -11363,6 +11526,20 @@ private:
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column) {
+        // The `cases X refining h1, h2, … { … }` variant lifts the
+        // listed binders into the recursor's motive so each arm sees
+        // the refined types automatically. Routes through a dedicated
+        // desugaring; cannot be combined with `with equalityHypothesisName`
+        // (they're orthogonal but no use site has needed both yet).
+        if (!cases.refiningNames.empty()) {
+            if (!cases.equalityHypothesisName.empty()) {
+                throwElaborate(
+                    "cases ... with <eq> refining ... is not supported; "
+                    "use one or the other");
+            }
+            return elaborateCasesWithRefining(
+                cases, localBinders, expectedType, line, column);
+        }
         // The `cases X with equalityHypothesisName { … }` variant
         // routes through a dedicated convoy desugaring; everything
         // below is the plain `cases X { … }` path.
@@ -12222,18 +12399,12 @@ private:
         if (lambda.binder.names.empty()) {
             throw ElaborateError("lambda binder must have at least one name");
         }
-        std::vector<LocalBinder> extended = localBinders;
-        std::vector<ExpressionPointer> domainsPerName;
-        for (const auto& name : lambda.binder.names) {
-            ExpressionPointer domainHere =
-                elaborateExpression(*lambda.binder.type, extended);
-            domainsPerName.push_back(domainHere);
-            extended.push_back({name, domainHere});
-        }
-        // If we have an expected Pi type, peel off as many Pi binders
-        // as the lambda has names so we can pass the codomain down to
-        // the body's elaboration. This lets constructor parameter
-        // inference inside the body see the expected return type.
+        // Pre-walk the expected Pi if present. Two things drop out:
+        //   - per-name domain types (for untyped binders, used directly;
+        //     for typed binders, double-checked against the annotation)
+        //   - the expected body type after peeling lambda.binder.names
+        //     Pi binders, for downstream constructor-parameter inference.
+        std::vector<ExpressionPointer> expectedDomainsPerName;
         ExpressionPointer expectedBody = nullptr;
         if (expectedType) {
             ExpressionPointer cursor =
@@ -12242,11 +12413,41 @@ private:
             for (size_t k = 0; k < lambda.binder.names.size(); ++k) {
                 auto* pi = std::get_if<Pi>(&cursor->node);
                 if (!pi) { ok = false; break; }
+                expectedDomainsPerName.push_back(pi->domain);
                 cursor = pi->codomain;
             }
             if (ok) {
                 expectedBody = cursor;
+            } else {
+                expectedDomainsPerName.clear();
             }
+        }
+        std::vector<LocalBinder> extended = localBinders;
+        std::vector<ExpressionPointer> domainsPerName;
+        for (size_t k = 0; k < lambda.binder.names.size(); ++k) {
+            const auto& name = lambda.binder.names[k];
+            ExpressionPointer domainHere;
+            if (lambda.binder.type) {
+                domainHere =
+                    elaborateExpression(*lambda.binder.type, extended);
+            } else {
+                // Untyped binder: read the domain from the expected
+                // Pi. The kernel term is already in the right scope
+                // (it came out of the Pi's domain in the surrounding
+                // context); we just need to lift past the binders
+                // we've added so far inside this lambda.
+                if (k >= expectedDomainsPerName.size()) {
+                    throw ElaborateError(
+                        "lambda binder '" + name + "' has no type "
+                        "annotation and no expected type to infer "
+                        "from at this position");
+                }
+                domainHere = liftBoundVariables(
+                    expectedDomainsPerName[k],
+                    static_cast<int>(k), 0);
+            }
+            domainsPerName.push_back(domainHere);
+            extended.push_back({name, domainHere});
         }
         ExpressionPointer body =
             elaborateExpression(*lambda.body, extended, expectedBody);
