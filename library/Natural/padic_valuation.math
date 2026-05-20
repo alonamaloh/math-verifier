@@ -127,13 +127,10 @@ theorem Natural.divide_positive_when_divides
         -- prime * 0 = 0, so target = 0, contradicting targetPositive.
         absurd(
             rewrite(
-                Equality.transitivity(
-                    Equality.symmetry(productEqTarget),
-                    Equality.transitivity(
-                        congruenceOf(
-                            function (z : Natural) => prime * z,
-                            refinedDivideEq),
-                        Natural.multiply_zero(prime))),
+                calc target
+                   = prime * Natural.divide(prime, target)
+                   = prime * zero
+                   = zero,
                 targetPositive))
     | successor(q') =>
         -- divide = successor(q') ≥ 1. Transport from successor(q') back.
@@ -363,16 +360,11 @@ theorem Natural.padic_valuation_strip
     by Natural.multiply_cancel_left(
            prime, Natural.divide(prime, prime * quotient), quotient,
            primePositive,
-           Equality.transitivity(
-               Equality.symmetry(
-                   Natural.add_zero(
-                       prime * Natural.divide(prime, prime * quotient))),
-               Equality.transitivity(
-                   congruenceOf(
-                       function (z : Natural) =>
-                           prime * Natural.divide(prime, prime * quotient) + z,
-                       Equality.symmetry(moduloZero)),
-                   Natural.divide_modulo_decompose(prime, prime * quotient))));
+           calc prime * Natural.divide(prime, prime * quotient)
+              = prime * Natural.divide(prime, prime * quotient) + zero
+              = prime * Natural.divide(prime, prime * quotient)
+                  + Natural.modulo(prime, prime * quotient)
+              = prime * quotient);
   -- Case-split on prime * quotient to expose successor structure for step_succ_when_divides.
   cases prime * quotient with refinedPqEq {
     | zero =>
@@ -392,12 +384,9 @@ theorem Natural.padic_valuation_strip
                          function (m : Natural) =>
                              successor(
                                  Natural.padic_valuation_step(predPQ, prime, m)),
-                         Equality.transitivity(
-                             congruenceOf(
-                                 function (m : Natural) =>
-                                     Natural.divide(prime, m),
-                                 Equality.symmetry(refinedPqEq)),
-                             divideEqQuotient))
+                         calc Natural.divide(prime, successor(predPQ))
+                            = Natural.divide(prime, prime * quotient)
+                            = quotient)
            = successor(Natural.padic_valuation_step(
                  quotient, prime, quotient))
                   by congruenceOf(
@@ -504,16 +493,13 @@ theorem Natural.padic_valuation_multiplicative
                   by Natural.divide_lt_when_divides(
                          prime, a', primeAtLeastTwo, a'Positive, moduloAIsZero);
                 claim aEqPrimeDivide : a' = prime * Natural.divide(prime, a')
-                  by Equality.transitivity(
-                         Equality.symmetry(
-                             Natural.divide_modulo_decompose(prime, a')),
-                         Equality.transitivity(
-                             congruenceOf(
-                                 function (z : Natural) =>
-                                     prime * Natural.divide(prime, a') + z,
-                                 moduloAIsZero),
-                             Natural.add_zero(
-                                 prime * Natural.divide(prime, a'))));
+                  by calc a'
+                        = prime * Natural.divide(prime, a')
+                            + Natural.modulo(prime, a')
+                              by Equality.symmetry(
+                                     Natural.divide_modulo_decompose(prime, a'))
+                        = prime * Natural.divide(prime, a') + zero
+                        = prime * Natural.divide(prime, a');
                 -- IH on (divide(p, a'), b'): need succ(divide + b') ≤ n.
                 claim recursiveSumLeN
                       : successor(Natural.divide(prime, a') + b') ≤ n
@@ -584,16 +570,13 @@ theorem Natural.padic_valuation_multiplicative
                                moduloBIsZero);
                       claim bEqPrimeDivide
                             : b' = prime * Natural.divide(prime, b')
-                        by Equality.transitivity(
-                               Equality.symmetry(
-                                   Natural.divide_modulo_decompose(prime, b')),
-                               Equality.transitivity(
-                                   congruenceOf(
-                                       function (z : Natural) =>
-                                           prime * Natural.divide(prime, b') + z,
-                                       moduloBIsZero),
-                                   Natural.add_zero(
-                                       prime * Natural.divide(prime, b'))));
+                        by calc b'
+                              = prime * Natural.divide(prime, b')
+                                  + Natural.modulo(prime, b')
+                                    by Equality.symmetry(
+                                           Natural.divide_modulo_decompose(prime, b'))
+                              = prime * Natural.divide(prime, b') + zero
+                              = prime * Natural.divide(prime, b');
                       -- IH on (a', divide(p, b')): need succ(a' + divide) ≤ n.
                       -- a' + divide < a' + b' = n; specifically succ(a' + divide) ≤ a' + b'.
                       claim recursiveSumLeN
