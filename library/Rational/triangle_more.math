@@ -139,22 +139,24 @@ theorem Rational.absolute_value_LessThan_bounds
         (absLessThan : Rational.absolute_value(x) < c)
         : And(-c < x, x < c) := {
     claim zeroLessC : Rational.zero < c
-        by Rational.LessThan.transitive_left(
-               Rational.zero, Rational.absolute_value(x), c,
-               Rational.LessOrEqual_zero_of_IsNonneg(
-                   Rational.absolute_value(x),
-                   Rational.absolute_value_IsNonneg(x)),
-               absLessThan);
+        by calc Rational.zero
+              ≤ Rational.absolute_value(x)
+                  by Rational.LessOrEqual_zero_of_IsNonneg(
+                         Rational.absolute_value(x),
+                         Rational.absolute_value_IsNonneg(x))
+              < c
+                  by absLessThan;
     Or.eliminate(
         Rational.IsNonneg(x), Rational.IsNonneg(-x),
         And(-c < x, x < c),
         function (xNonneg : Rational.IsNonneg(x)) =>
           -- |x| = x; so x < c. For -c < x: chain -c < 0 ≤ x.
           And.introduction(-c < x, x < c,
-              Rational.LessThan.transitive_right(
-                  -c, Rational.zero, x,
-                  Rational.negate_LessThan_zero_of_positive(c, zeroLessC),
-                  Rational.LessOrEqual_zero_of_IsNonneg(x, xNonneg)),
+              calc -c
+                 < Rational.zero
+                     by Rational.negate_LessThan_zero_of_positive(c, zeroLessC)
+                 ≤ x
+                     by Rational.LessOrEqual_zero_of_IsNonneg(x, xNonneg),
               rewrite(
                   Rational.absolute_value_when_nonneg(x, xNonneg),
                   absLessThan)),
@@ -171,10 +173,12 @@ theorem Rational.absolute_value_LessThan_bounds
                 rewrite(
                     Rational.negate_negate(x),
                     Rational.LessThan.negate(-x, c, negXLessC)),
-                Rational.LessThan.transitive_left(
-                    x, Rational.zero, c,
-                    Rational.LessOrEqual_zero_of_negate_IsNonneg(x, negXNonneg),
-                    zeroLessC))
+                calc x
+                   ≤ Rational.zero
+                       by Rational.LessOrEqual_zero_of_negate_IsNonneg(
+                              x, negXNonneg)
+                   < c
+                       by zeroLessC)
           } : And(-c < x, x < c)),
         Rational.IsNonneg_or_negate_IsNonneg(x))
 }
