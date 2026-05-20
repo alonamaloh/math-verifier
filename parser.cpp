@@ -703,24 +703,60 @@ private:
                 if (!calcNode || calcNode->steps.empty()) {
                     throwHere("calc statement needs at least one step");
                 }
-                // Recover endpoints. Equality-only chains lift to
-                // `first = last`; if any step uses ≤/<, reject and
-                // require the explicit claim form.
+                // Recover the chain's overall relation and direction.
+                //   - any `<`/`>` → strict; sign from first non-= step
+                //   - else any `≤`/`≥` → non-strict; sign from first non-=
+                //   - else equality
+                // Mixing forward (<, ≤) with backward (>, ≥) is rejected by
+                // the calc elaborator itself, so we don't re-validate here.
+                bool seenStrict = false;
+                bool seenNonStrict = false;
+                bool seenForward = false;
+                bool seenBackward = false;
                 for (const auto& step : calcNode->steps) {
-                    if (step.relation != CalcRelation::Equality) {
-                        throwHere("calc statement (with `as NAME;` or "
-                                  "bare `;`) only supports all-= chains "
-                                  "for now — use `claim NAME : TYPE by "
-                                  "calc …;` for mixed-relation calcs");
+                    switch (step.relation) {
+                        case CalcRelation::LessThan:
+                            seenStrict = true;
+                            seenForward = true;
+                            break;
+                        case CalcRelation::GreaterThan:
+                            seenStrict = true;
+                            seenBackward = true;
+                            break;
+                        case CalcRelation::LessOrEqual:
+                            seenNonStrict = true;
+                            seenForward = true;
+                            break;
+                        case CalcRelation::GreaterOrEqual:
+                            seenNonStrict = true;
+                            seenBackward = true;
+                            break;
+                        case CalcRelation::Equality:
+                            break;
                     }
+                }
+                const char* relationSymbol;
+                if (seenStrict) {
+                    relationSymbol = "<";
+                } else if (seenNonStrict) {
+                    relationSymbol = "≤";
+                } else {
+                    relationSymbol = "=";
                 }
                 SurfaceExpressionPointer firstEndpoint =
                     calcNode->initialExpression;
                 SurfaceExpressionPointer lastEndpoint =
                     calcNode->steps.back().nextExpression;
+                // Backward direction: `first > last` is rendered as
+                // `last < first` (and similarly ≥ → ≤). Equality is
+                // bidirectional, so always render as `first = last`.
+                if (seenBackward && !seenForward) {
+                    std::swap(firstEndpoint, lastEndpoint);
+                }
                 SurfaceExpressionPointer typeExpression =
                     makeSurfaceBinaryOperation(
-                        "=", std::move(firstEndpoint),
+                        relationSymbol,
+                        std::move(firstEndpoint),
                         std::move(lastEndpoint),
                         calcToken.line, calcToken.column);
                 BlockWrapper wrapper;

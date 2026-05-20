@@ -8,6 +8,7 @@ module Test.calc_statement_test
 import Natural.basics
 import Natural.peano
 import Natural.arithmetic
+import Natural.order
 import Equality.basics
 
 -- Named form: `calc … as someEquation;` introduces `someEquation` of
@@ -44,3 +45,18 @@ theorem Test.calc_named_used_explicitly
   -- Reference by name (no auto-prover involved here).
   Equality.transitivity(bridge, thirdStep)
 }
+
+-- Mixed-relation calc statement: chain of `=` and `≤` produces a
+-- non-strict ≤ binding.
+theorem Test.calc_as_named_le
+        (a b c d : Natural)
+        (firstStep : a = b) (secondStep : b ≤ c) (thirdStep : c = d)
+        : a ≤ d := {
+  calc a = b
+       ≤ c                  by secondStep
+       = d                                                  as bound;
+  bound
+}
+
+-- (Strict `<` on Natural would need the operator registered; the ≤
+-- case above covers the non-strict branch of the type-recovery logic.)
