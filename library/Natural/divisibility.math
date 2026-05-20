@@ -87,8 +87,9 @@ theorem Natural.divides_less_or_equal_or_zero_helper (d n : Natural)
           → n = 0 ∨ d ≤ n
   | zero, equalityProof =>
       Or.introduceLeft(
-          Equality.transitivity(equalityProof,
-              Natural.multiply_zero(d)))
+          calc n
+             = d * 0
+             = 0)
   | successor(quotientPredecessor), equalityProof =>
       Or.introduceRight(
           -- d ≤ d + d*quotientPredecessor by le_add_right.
@@ -96,8 +97,9 @@ theorem Natural.divides_less_or_equal_or_zero_helper (d n : Natural)
           -- given equality (reversed).
           rewrite(
               Equality.symmetry(
-                  Equality.transitivity(equalityProof,
-                      Natural.multiply_successor(d, quotientPredecessor))),
+                  calc n
+                     = d * successor(quotientPredecessor)
+                     = d + d * quotientPredecessor),
               Natural.less_or_equal_add_right(
                   d, d * quotientPredecessor)))
 
@@ -171,18 +173,20 @@ theorem Natural.divides_one_of_consecutive_helper
           Natural,
           function (quotient : Natural) => 1 = d * quotient,
           q2,
-          Equality.transitivity(
-              congruenceOf(successor,
-                  Equality.symmetry(Natural.multiply_zero(d))),
-              equalityProof))
+          calc successor(0)
+             = successor(d * 0)
+                   by congruenceOf(successor,
+                          Equality.symmetry(Natural.multiply_zero(d)))
+             = d * q2)
   | successor(q1Predecessor), q2, equalityProof =>
       (cases q2 {
         | zero =>
             function (zeroEquality :
                 successor(d * successor(q1Predecessor)) = d * 0) =>
               absurd(
-                  Equality.transitivity(zeroEquality,
-                      Natural.multiply_zero(d)))
+                  calc successor(d * successor(q1Predecessor))
+                     = d * 0
+                     = 0)
         | successor(q2Predecessor) =>
             function (successorEquality :
                 successor(d * successor(q1Predecessor)) = d * successor(q2Predecessor)) =>
@@ -212,8 +216,7 @@ theorem Natural.divides_consecutive_implies_one
   | Exists.introduce(q2, secondEquality) => {
       let ⟨q1, firstEquality⟩ := firstDivides;
       Natural.divides_one_of_consecutive_helper(d, q1, q2,
-          Equality.transitivity(
-              congruenceOf(successor,
-                  Equality.symmetry(firstEquality)),
-              secondEquality))
+          calc successor(d * q1)
+             = successor(a)
+             = d * q2)
   }

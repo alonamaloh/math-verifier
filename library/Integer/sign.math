@@ -130,7 +130,9 @@ theorem Natural.add_eq_zero_left_zero
 theorem Natural.add_eq_zero_right_zero
         (a b : Natural) (equation : a + b = 0) : b = 0 :=
   Natural.add_eq_zero_left_zero(b, a,
-      Equality.transitivity(Natural.add_commutative(b, a), equation))
+      calc b + a
+         = a + b
+         = 0)
 
 -- a * succ(d) = zero implies a = zero.
 theorem Natural.multiply_successor_eq_zero_left_zero
@@ -151,16 +153,17 @@ theorem Natural.to_integer.injective (n m : Natural)
   -- Quotient.exact yields IntegerEquivalent(make(n, zero), make(m, zero)),
   -- i.e., n + zero = zero + m, which reduces to n = m by add_zero on
   -- the left.
-  Equality.transitivity(
-      Equality.symmetry(Natural.add_zero(n)),
-      Quotient.exact(
-          IntegerRepresentative, IntegerEquivalent,
-          IntegerEquivalent.reflexive,
-          IntegerEquivalent.symmetric,
-          IntegerEquivalent.transitive,
-          IntegerRepresentative.make(n, 0),
-          IntegerRepresentative.make(m, 0),
-          embeddingEquality))
+  calc n
+     = n + 0
+     = m
+           by Quotient.exact(
+                  IntegerRepresentative, IntegerEquivalent,
+                  IntegerEquivalent.reflexive,
+                  IntegerEquivalent.symmetric,
+                  IntegerEquivalent.transitive,
+                  IntegerRepresentative.make(n, 0),
+                  IntegerRepresentative.make(m, 0),
+                  embeddingEquality)
 
 -- ----------------------------------------------------------------------
 -- The key cancellation/sign lemma for Rational.IsNonneg_respect:
@@ -184,15 +187,9 @@ theorem Integer.natural_eq_negate_natural_implies_both_zero
             = -((k : Integer) * (successor(d1) : Integer))
         by Integer.multiply_negate_left((k : Integer),
                                           (successor(d1) : Integer));
-    claim rhsAsNegateNatural
-          : -(k : Integer) * (successor(d1) : Integer)
-            = -(k * successor(d1) : Integer)
-        by Equality.transitivity(
-               rhsMoveNegate,
-               congruenceOf(Integer.negate,
-                   Equality.symmetry(
-                       Natural.to_integer.multiply_preserves(
-                           k, successor(d1)))));
+    calc -(k : Integer) * (successor(d1) : Integer)
+       = -((k : Integer) * (successor(d1) : Integer))
+       = -(k * successor(d1) : Integer)                              as rhsAsNegateNatural;
     -- Step 3: combine — `(a*succ(d2) : Integer) = -(k*succ(d1) : Integer)`.
     calc (a * successor(d2) : Integer)
               = (a : Integer) * (successor(d2) : Integer)
