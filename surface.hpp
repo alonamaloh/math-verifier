@@ -219,10 +219,26 @@ struct SurfaceByInductionUsing {
 };
 
 // Which relation a calc step asserts between the previous expression
-// and `nextExpression`. `=` is the original calc; `≤` extends calc to
-// chained inequalities. A chain mixing the two becomes a `≤` overall
-// (any `=` step is upgraded by congruence with reflexivity).
-enum class CalcRelation { Equality, LessOrEqual };
+// and `nextExpression`. A chain may mix relations subject to the
+// TODO.md "Mixed-relation calc chains" rules:
+//
+//   | Proving | Allowed in the chain   |
+//   | =       | =                      |
+//   | ≤       | ≤, =                   |
+//   | <       | <, ≤, =                |
+//   | ≥       | ≥, =                   |
+//   | >       | >, ≥, =                |
+//
+// Strictness escalates: any < or > step makes the whole chain strict.
+// Mixing a "forward" direction step (<, ≤) with a "backward" direction
+// step (>, ≥) is rejected at elaboration; = goes either way.
+enum class CalcRelation {
+    Equality,
+    LessOrEqual,
+    LessThan,
+    GreaterOrEqual,
+    GreaterThan,
+};
 
 // One step of a `calc` block: the relation that step asserts, a target
 // expression the previous expression stands in that relation to, plus

@@ -4424,12 +4424,15 @@ private:
         LevelPointer carrierLevel =
             typeUniverseOf(localBinders, previousKernel);
 
-        // Resolve the carrier's <T>.LessOrEqual relation (and its
-        // reflexive + transitive lemmas) on first use. Empty until the
-        // calc actually hits a ≤ step. Looked up via the operator
-        // registry (which `operator (≤) on (T, T) := <T>.LessOrEqual;`
-        // populates) plus the small Natural special-case where the
-        // inductive itself is the relation.
+        // Resolve the carrier's <T>.LessOrEqual and <T>.LessThan
+        // relations (and their reflexive / transitive / weaken lemmas)
+        // lazily, on first use. The operator registry — populated by
+        // `operator (≤) on (T, T) := <T>.LessOrEqual;` and the parallel
+        // `<`/`>`/`≥` registrations — drives the name lookup. Natural
+        // has no namespaced wrapper around its inductive `LessOrEqual`,
+        // so we fall back to bare `LessOrEqual` for it (and don't
+        // support `<` on Natural in calc, since there's no Natural-side
+        // LessThan type with transitive_left/right lemmas).
         auto* carrierConstant =
             std::get_if<Constant>(&carrierTypeOpen->node);
         std::string carrierTypeName =
@@ -4438,6 +4441,10 @@ private:
         std::string leqReflexiveName;      // e.g. "Real.LessOrEqual.reflexive"
         std::string leqTransitiveName;     // e.g. "Real.LessOrEqual.transitive"
         bool transitiveTakesProofsSwapped = false;
+        std::string ltRelationName;            // e.g. "Real.LessThan"
+        std::string ltTransitiveLeftName;      // e.g. "Real.LessThan.transitive_left"
+        std::string ltTransitiveRightName;     // e.g. "Real.LessThan.transitive_right"
+        std::string ltWeakenName;              // e.g. "Real.LessThan.weaken"
         auto resolveLeqNames = [&]() {
             if (!leqRelationName.empty()) return;
             std::string registered = environment_.lookupOperator(
@@ -4458,12 +4465,71 @@ private:
                 transitiveTakesProofsSwapped = true;
             } else {
                 throwElaborate(
-                    "calc step uses '≤' but no operator '≤' is "
+                    "calc step uses '≤'/'≥' but no operator '≤' is "
                     "registered on (" + carrierTypeName + ", "
                     + carrierTypeName + ") — register one via "
                     "`operator (≤) on (" + carrierTypeName + ", "
                     + carrierTypeName + ") := <fn>;` first");
             }
+        };
+        auto resolveLtNames = [&]() {
+            if (!ltRelationName.empty()) return;
+            std::string registered = environment_.lookupOperator(
+                "<", carrierTypeName, carrierTypeName);
+            if (registered.empty()) {
+                throwElaborate(
+                    "calc step uses '<'/'>' but no operator '<' is "
+                    "registered on (" + carrierTypeName + ", "
+                    + carrierTypeName + ") — register one via "
+                    "`operator (<) on (" + carrierTypeName + ", "
+                    + carrierTypeName + ") := <fn>;` first");
+            }
+            ltRelationName = registered;
+            ltTransitiveLeftName = registered + ".transitive_left";
+            ltTransitiveRightName = registered + ".transitive_right";
+            ltWeakenName = registered + ".weaken";
+        };
+
+        // Classify a CalcRelation along two axes:
+        //   - direction: Forward (<, ≤), Backward (>, ≥), or Neutral (=).
+        //     A chain may not mix Forward with Backward steps.
+        //   - strictness: Equality, Weak (≤/≥), or Strict (<, >).
+        enum class Direction { Neutral, Forward, Backward };
+        enum class Strictness { Equality, Weak, Strict };
+        auto directionOf = [](CalcRelation r) -> Direction {
+            switch (r) {
+                case CalcRelation::LessOrEqual:
+                case CalcRelation::LessThan:
+                    return Direction::Forward;
+                case CalcRelation::GreaterOrEqual:
+                case CalcRelation::GreaterThan:
+                    return Direction::Backward;
+                default:
+                    return Direction::Neutral;
+            }
+        };
+        auto strictnessOf = [](CalcRelation r) -> Strictness {
+            switch (r) {
+                case CalcRelation::Equality:
+                    return Strictness::Equality;
+                case CalcRelation::LessOrEqual:
+                case CalcRelation::GreaterOrEqual:
+                    return Strictness::Weak;
+                case CalcRelation::LessThan:
+                case CalcRelation::GreaterThan:
+                    return Strictness::Strict;
+            }
+            return Strictness::Equality;
+        };
+        auto relationSymbol = [](CalcRelation r) -> const char* {
+            switch (r) {
+                case CalcRelation::Equality:        return "=";
+                case CalcRelation::LessOrEqual:     return "≤";
+                case CalcRelation::LessThan:        return "<";
+                case CalcRelation::GreaterOrEqual:  return "≥";
+                case CalcRelation::GreaterThan:     return ">";
+            }
+            return "?";
         };
 
         struct StepRecord {
@@ -4480,15 +4546,16 @@ private:
                 "calc step " + std::to_string(k + 1)
                 + " at line " + std::to_string(step.line),
                 localBinders,
-                // Goal for this step is the relation
-                // `previousKernel R next`. We don't yet know `next`,
-                // but `previousKernel` is the left endpoint.
                 previousKernel,
                 step.line, /*column*/ 0);
             ExpressionPointer nextKernel = elaborateExpression(
                 *step.nextExpression, localBinders, carrierType);
             // Build the step's expected proof type from its relation.
+            // For ≥/> the relation's arguments are flipped (a ≥ b is
+            // proved as b ≤ a; a > b is proved as b < a).
             ExpressionPointer stepRelationType;
+            Direction stepDirection = directionOf(step.relation);
+            Strictness stepStrictness = strictnessOf(step.relation);
             if (step.relation == CalcRelation::Equality) {
                 stepRelationType = makeApplication(
                     makeApplication(
@@ -4498,20 +4565,29 @@ private:
                         previousKernel),
                     nextKernel);
             } else {
-                resolveLeqNames();
+                ExpressionPointer lhs =
+                    (stepDirection == Direction::Backward)
+                        ? nextKernel : previousKernel;
+                ExpressionPointer rhs =
+                    (stepDirection == Direction::Backward)
+                        ? previousKernel : nextKernel;
+                std::string relationName;
+                if (stepStrictness == Strictness::Strict) {
+                    resolveLtNames();
+                    relationName = ltRelationName;
+                } else {
+                    resolveLeqNames();
+                    relationName = leqRelationName;
+                }
                 stepRelationType = makeApplication(
                     makeApplication(
-                        makeConstant(leqRelationName),
-                        previousKernel),
-                    nextKernel);
+                        makeConstant(relationName), lhs),
+                    rhs);
             }
             ExpressionPointer stepProofKernel;
             if (step.stepProof) {
                 stepProofKernel = elaborateExpression(
                     *step.stepProof, localBinders, stepRelationType);
-                // `--check-redundant-by`: speculatively run the
-                // auto-prover (= steps only) and warn if it would also
-                // close this step. Pure helper, no side effects.
                 if (reportRedundantBy_
                     && step.relation == CalcRelation::Equality) {
                     ExpressionPointer autoAttempt;
@@ -4534,10 +4610,6 @@ private:
                     }
                 }
             } else if (step.relation == CalcRelation::Equality) {
-                // No `by <proof>` on an = step — run the auto-prover.
-                // v0: reflexivity (definitional equality) only; later
-                // iterations add commutativity/associativity/local-
-                // hypothesis recognition via a single-position diff.
                 stepProofKernel = autoProveCalcStep(
                     localBinders, previousKernel, nextKernel,
                     carrierType, carrierLevel, stepRelationType,
@@ -4550,13 +4622,10 @@ private:
                 }
             } else {
                 throwElaborate(
-                    "calc ≤ step needs `by <proof>` (no auto-prover "
-                    "for inequality steps yet)");
+                    std::string("calc ") + relationSymbol(step.relation)
+                    + " step needs `by <proof>` (no auto-prover for "
+                    "inequality steps yet)");
             }
-            // Verify the proof actually has the relation type the step
-            // claims — bare identifier proofs don't get checked against
-            // expectedType during elaboration, so a wrong proof would
-            // otherwise leak through to a confusing kernel error later.
             ExpressionPointer stepProofType = inferTypeInLocalContext(
                 localBinders, stepProofKernel);
             ExpressionPointer stepRelationTypeOpened = openOverLocalBinders(
@@ -4571,15 +4640,7 @@ private:
             if (!isDefinitionallyEqual(environment_, stepContext,
                                         stepProofType,
                                         stepRelationTypeOpened)) {
-                // Auto-rewrite fallback for = steps. If the user wrote
-                // a bare expression of equality type as the step proof
-                // (most commonly a hypothesis name like `IH`), and it
-                // doesn't match the expected step equality, try
-                // re-elaborating it as `rewrite(<surface>)`. Lets the
-                // user write `by IH` instead of `by rewrite(IH)`.
-                // Only fires for = steps when a surface proof was
-                // supplied — when stepProof is nullptr the auto-prover
-                // above has already run.
+                // Auto-rewrite fallback for = steps only.
                 ExpressionPointer rewriteAttempt;
                 if (step.stepProof
                     && step.relation == CalcRelation::Equality) {
@@ -4619,30 +4680,41 @@ private:
             previousKernel = nextKernel;
         }
 
-        // Determine the overall chain's relation: ≤ if any step is ≤,
-        // else =. (Phase 2 will add < and the strictness propagation.)
-        bool chainIsLessOrEqual = false;
+        // Determine overall chain direction and strictness.
+        Direction chainDirection = Direction::Neutral;
+        Strictness chainStrictness = Strictness::Equality;
         for (const auto& s : steps) {
-            if (s.relation == CalcRelation::LessOrEqual) {
-                chainIsLessOrEqual = true;
-                break;
+            Direction d = directionOf(s.relation);
+            Strictness st = strictnessOf(s.relation);
+            if (d != Direction::Neutral) {
+                if (chainDirection == Direction::Neutral) {
+                    chainDirection = d;
+                } else if (chainDirection != d) {
+                    throwElaborate(
+                        "calc chain mixes forward (<, ≤) and backward "
+                        "(>, ≥) inequalities — only = is allowed in "
+                        "either direction");
+                }
+            }
+            if (st == Strictness::Strict) {
+                chainStrictness = Strictness::Strict;
+            } else if (st == Strictness::Weak
+                       && chainStrictness != Strictness::Strict) {
+                chainStrictness = Strictness::Weak;
             }
         }
 
         // Helper: upgrade an =-proof to a ≤-proof via transport on the
         // relation's right argument. Given p : a = b, returns p' :
         // a ≤ b built as transport_proposition(T, λz. a ≤ z, a, b, p,
-        // reflexive(a)).
-        //
-        // The `aExpr` reference inside the motive lambda body needs its
-        // De Bruijn indices shifted up by one to account for the new
-        // `z` binder we're putting around it.
+        // reflexive(a)). The `aExpr` reference inside the motive lambda
+        // body needs its De Bruijn indices shifted up by one to account
+        // for the new `z` binder we're putting around it.
         auto upgradeEqualityToLessOrEqual =
             [&](ExpressionPointer eqProof,
                 ExpressionPointer aExpr,
                 ExpressionPointer bExpr) -> ExpressionPointer {
             resolveLeqNames();
-            // motive: λ (z : T). leqRelationName(aExpr↑1, z).
             ExpressionPointer aExprShifted = shift(aExpr, 1);
             ExpressionPointer motiveBody = makeApplication(
                 makeApplication(
@@ -4653,7 +4725,6 @@ private:
                 "z", carrierType, std::move(motiveBody));
             ExpressionPointer reflexive = makeApplication(
                 makeConstant(leqReflexiveName), aExpr);
-            // Equality.transport_proposition(T, motive, a, b, eq, refl).
             ExpressionPointer call = makeConstant(
                 "Equality.transport_proposition", {carrierLevel});
             call = makeApplication(std::move(call), carrierType);
@@ -4665,69 +4736,223 @@ private:
             return call;
         };
 
-        // Single-step calc: the step proof already has the right type
-        // unless the chain is ≤ but the only step is =, in which case
-        // we upgrade. (Can't actually happen — single = step keeps
-        // chainIsLessOrEqual=false — but handle defensively.)
-        if (steps.size() == 1) {
-            if (chainIsLessOrEqual
-                && steps[0].relation == CalcRelation::Equality) {
-                return upgradeEqualityToLessOrEqual(
-                    steps[0].proof,
-                    endpointKernels[0], endpointKernels[1]);
+        // Normalize for Backward chains: reverse endpoint and step
+        // order. Each Backward ≥/> step's proof already has type
+        // matching the normalized direction (a ≥ b's proof is b ≤ a,
+        // exactly what the reversed walk wants going from b to a).
+        // But Backward = steps were elaborated with type
+        // `previous = next` (user-direction); the normalized walk
+        // needs `next = previous`, so we flip them via
+        // Equality.symmetry.
+        std::vector<ExpressionPointer> normalizedEndpoints =
+            endpointKernels;
+        std::vector<StepRecord> normalizedSteps = steps;
+        if (chainDirection == Direction::Backward) {
+            std::reverse(normalizedEndpoints.begin(),
+                          normalizedEndpoints.end());
+            std::reverse(normalizedSteps.begin(),
+                          normalizedSteps.end());
+            for (size_t k = 0; k < normalizedSteps.size(); ++k) {
+                if (normalizedSteps[k].relation
+                    != CalcRelation::Equality) {
+                    continue;
+                }
+                // normalizedSteps[k] corresponds to user's step
+                // (N-1-k), whose endpoints are
+                // (endpointKernels[N-1-k], endpointKernels[N-k]) =
+                // (normalizedEndpoints[k+1], normalizedEndpoints[k]).
+                // Build symmetry over the user-direction endpoints.
+                ExpressionPointer call = makeConstant(
+                    "Equality.symmetry", {carrierLevel});
+                call = makeApplication(std::move(call), carrierType);
+                call = makeApplication(std::move(call),
+                    normalizedEndpoints[k + 1]);
+                call = makeApplication(std::move(call),
+                    normalizedEndpoints[k]);
+                call = makeApplication(std::move(call),
+                    normalizedSteps[k].proof);
+                normalizedSteps[k].proof = std::move(call);
             }
-            return steps[0].proof;
         }
 
-        // Composition. If the chain is all =, fold via
-        // Equality.transitivity (unchanged from before). Otherwise fold
-        // via <T>.LessOrEqual.transitive, upgrading each = step on the
-        // fly.
-        if (!chainIsLessOrEqual) {
-            ExpressionPointer running = steps[0].proof;
-            for (size_t k = 1; k < steps.size(); ++k) {
+        // All-= chain: fold via Equality.transitivity (unchanged).
+        if (chainStrictness == Strictness::Equality) {
+            if (normalizedSteps.size() == 1) {
+                return normalizedSteps[0].proof;
+            }
+            ExpressionPointer running = normalizedSteps[0].proof;
+            for (size_t k = 1; k < normalizedSteps.size(); ++k) {
                 ExpressionPointer call = makeConstant(
                     "Equality.transitivity", {carrierLevel});
                 call = makeApplication(std::move(call), carrierType);
-                call = makeApplication(std::move(call), endpointKernels[0]);
-                call = makeApplication(std::move(call), endpointKernels[k]);
-                call = makeApplication(std::move(call), endpointKernels[k + 1]);
+                call = makeApplication(std::move(call), normalizedEndpoints[0]);
+                call = makeApplication(std::move(call), normalizedEndpoints[k]);
+                call = makeApplication(std::move(call), normalizedEndpoints[k + 1]);
                 call = makeApplication(std::move(call), std::move(running));
-                call = makeApplication(std::move(call), steps[k].proof);
+                call = makeApplication(std::move(call), normalizedSteps[k].proof);
                 running = std::move(call);
             }
             return running;
         }
 
-        // Chain has at least one ≤. Build the running proof at type
-        // endpoint[0] ≤ endpoint[k+1] after each step k, upgrading
-        // =-step proofs to ≤ along the way.
+        // Chain has at least one ≤ or <. Process each step's proof into
+        // its working form: = becomes ≤ via transport; ≤ stays ≤; < stays <.
+        // Track the running proof's strictness as we fold.
         auto stepProofAsLeq = [&](size_t k) -> ExpressionPointer {
-            if (steps[k].relation == CalcRelation::LessOrEqual) {
-                return steps[k].proof;
+            const auto& s = normalizedSteps[k];
+            if (strictnessOf(s.relation) == Strictness::Equality) {
+                return upgradeEqualityToLessOrEqual(
+                    s.proof,
+                    normalizedEndpoints[k],
+                    normalizedEndpoints[k + 1]);
             }
-            return upgradeEqualityToLessOrEqual(
-                steps[k].proof,
-                endpointKernels[k], endpointKernels[k + 1]);
+            // ≤ or < step: kept as-is at this point; composition will
+            // pick the right transitive lemma based on strictness.
+            return s.proof;
         };
-        ExpressionPointer running = stepProofAsLeq(0);
-        for (size_t k = 1; k < steps.size(); ++k) {
-            ExpressionPointer nextProof = stepProofAsLeq(k);
-            // <T>.LessOrEqual.transitive(x, y, z, hxy, hyz) : x ≤ z.
-            // For Natural the lemma takes the proofs swapped — flag
-            // recorded by resolveLeqNames.
-            ExpressionPointer call = makeConstant(leqTransitiveName);
-            call = makeApplication(std::move(call), endpointKernels[0]);
-            call = makeApplication(std::move(call), endpointKernels[k]);
-            call = makeApplication(std::move(call), endpointKernels[k + 1]);
-            if (transitiveTakesProofsSwapped) {
-                call = makeApplication(std::move(call), std::move(nextProof));
-                call = makeApplication(std::move(call), std::move(running));
-            } else {
-                call = makeApplication(std::move(call), std::move(running));
-                call = makeApplication(std::move(call), std::move(nextProof));
+
+        // Single-step calc: the (possibly upgraded) step proof IS the
+        // result. If the chain strictness exceeds the step's, we have
+        // to upgrade =-only to ≤ (chain Weak), but a single-step chain
+        // can't be Strict from an = step alone.
+        if (normalizedSteps.size() == 1) {
+            if (strictnessOf(normalizedSteps[0].relation)
+                == Strictness::Equality) {
+                return stepProofAsLeq(0);
             }
-            running = std::move(call);
+            return normalizedSteps[0].proof;
+        }
+
+        // Weak-only chain (no <): compose via <T>.LessOrEqual.transitive.
+        if (chainStrictness == Strictness::Weak) {
+            ExpressionPointer running = stepProofAsLeq(0);
+            for (size_t k = 1; k < normalizedSteps.size(); ++k) {
+                ExpressionPointer nextProof = stepProofAsLeq(k);
+                ExpressionPointer call =
+                    makeConstant(leqTransitiveName);
+                call = makeApplication(std::move(call),
+                    normalizedEndpoints[0]);
+                call = makeApplication(std::move(call),
+                    normalizedEndpoints[k]);
+                call = makeApplication(std::move(call),
+                    normalizedEndpoints[k + 1]);
+                if (transitiveTakesProofsSwapped) {
+                    call = makeApplication(std::move(call),
+                        std::move(nextProof));
+                    call = makeApplication(std::move(call),
+                        std::move(running));
+                } else {
+                    call = makeApplication(std::move(call),
+                        std::move(running));
+                    call = makeApplication(std::move(call),
+                        std::move(nextProof));
+                }
+                running = std::move(call);
+            }
+            return running;
+        }
+
+        // Strict chain (some step is <): the running proof becomes
+        // strict the first time a < step is hit, and stays strict.
+        // Compose using <T>.LessThan.transitive_{left,right} plus
+        // weaken as appropriate.
+        auto weakenStrict =
+            [&](ExpressionPointer xExpr, ExpressionPointer yExpr,
+                ExpressionPointer strictProof) -> ExpressionPointer {
+            ExpressionPointer call = makeConstant(ltWeakenName);
+            call = makeApplication(std::move(call), xExpr);
+            call = makeApplication(std::move(call), yExpr);
+            call = makeApplication(std::move(call),
+                std::move(strictProof));
+            return call;
+        };
+        ExpressionPointer running;
+        Strictness runningStrictness;
+        if (strictnessOf(normalizedSteps[0].relation)
+            == Strictness::Strict) {
+            running = normalizedSteps[0].proof;
+            runningStrictness = Strictness::Strict;
+        } else {
+            running = stepProofAsLeq(0);
+            runningStrictness = Strictness::Weak;
+        }
+        for (size_t k = 1; k < normalizedSteps.size(); ++k) {
+            Strictness stepKind =
+                strictnessOf(normalizedSteps[k].relation);
+            ExpressionPointer stepProof;
+            if (stepKind == Strictness::Strict) {
+                stepProof = normalizedSteps[k].proof;
+            } else {
+                // Equality or Weak: upgrade to ≤ form.
+                stepProof = stepProofAsLeq(k);
+            }
+            ExpressionPointer xExpr = normalizedEndpoints[0];
+            ExpressionPointer yExpr = normalizedEndpoints[k];
+            ExpressionPointer zExpr = normalizedEndpoints[k + 1];
+            if (runningStrictness == Strictness::Weak
+                && stepKind != Strictness::Strict) {
+                // weak ⋈ weak (incl. =-upgraded) → weak.
+                ExpressionPointer call =
+                    makeConstant(leqTransitiveName);
+                call = makeApplication(std::move(call), xExpr);
+                call = makeApplication(std::move(call), yExpr);
+                call = makeApplication(std::move(call), zExpr);
+                if (transitiveTakesProofsSwapped) {
+                    call = makeApplication(std::move(call),
+                        std::move(stepProof));
+                    call = makeApplication(std::move(call),
+                        std::move(running));
+                } else {
+                    call = makeApplication(std::move(call),
+                        std::move(running));
+                    call = makeApplication(std::move(call),
+                        std::move(stepProof));
+                }
+                running = std::move(call);
+            } else if (runningStrictness == Strictness::Weak
+                       && stepKind == Strictness::Strict) {
+                // weak ⋈ strict → strict via transitive_left(le, lt).
+                ExpressionPointer call =
+                    makeConstant(ltTransitiveLeftName);
+                call = makeApplication(std::move(call), xExpr);
+                call = makeApplication(std::move(call), yExpr);
+                call = makeApplication(std::move(call), zExpr);
+                call = makeApplication(std::move(call),
+                    std::move(running));
+                call = makeApplication(std::move(call),
+                    std::move(stepProof));
+                running = std::move(call);
+                runningStrictness = Strictness::Strict;
+            } else if (runningStrictness == Strictness::Strict
+                       && stepKind != Strictness::Strict) {
+                // strict ⋈ weak (incl. =-upgraded) → strict via
+                // transitive_right(lt, le).
+                ExpressionPointer call =
+                    makeConstant(ltTransitiveRightName);
+                call = makeApplication(std::move(call), xExpr);
+                call = makeApplication(std::move(call), yExpr);
+                call = makeApplication(std::move(call), zExpr);
+                call = makeApplication(std::move(call),
+                    std::move(running));
+                call = makeApplication(std::move(call),
+                    std::move(stepProof));
+                running = std::move(call);
+            } else {
+                // strict ⋈ strict → strict via
+                // transitive_left(weaken(running), step).
+                ExpressionPointer weakened =
+                    weakenStrict(xExpr, yExpr, std::move(running));
+                ExpressionPointer call =
+                    makeConstant(ltTransitiveLeftName);
+                call = makeApplication(std::move(call), xExpr);
+                call = makeApplication(std::move(call), yExpr);
+                call = makeApplication(std::move(call), zExpr);
+                call = makeApplication(std::move(call),
+                    std::move(weakened));
+                call = makeApplication(std::move(call),
+                    std::move(stepProof));
+                running = std::move(call);
+            }
         }
         return running;
     }
@@ -12107,6 +12332,19 @@ private:
                                         std::move(rightLocal));
                 return call;
             }
+        }
+        // `≥` and `>` desugar to the flipped `≤`/`<` against the same
+        // carrier. We never register a separate function for them — the
+        // existing `≤`/`<` registry entries are reused with the operand
+        // order reversed. This keeps a single source of truth for the
+        // order relation and lets calc chains mix the two notations.
+        if (operatorSymbol == "≥") {
+            return desugarArithmeticOperator(
+                "≤", rightSurface, leftSurface, localBinders, line);
+        }
+        if (operatorSymbol == ">") {
+            return desugarArithmeticOperator(
+                "<", rightSurface, leftSurface, localBinders, line);
         }
         // Logical operators are dispatched first because their operand
         // type is a Proposition (a `Sort`, not a `Constant`), so the

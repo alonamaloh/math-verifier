@@ -1706,12 +1706,24 @@ private:
         auto initialExpression = parseAdditive();
         std::vector<SurfaceCalcStep> steps;
         while (peek().kind == TokenKind::Equal
-               || peek().kind == TokenKind::LessOrEqual) {
+               || peek().kind == TokenKind::LessOrEqual
+               || peek().kind == TokenKind::Less
+               || peek().kind == TokenKind::GreaterOrEqual
+               || peek().kind == TokenKind::Greater) {
             Token relationToken = consumeAny();
-            CalcRelation relation =
-                (relationToken.kind == TokenKind::LessOrEqual)
-                    ? CalcRelation::LessOrEqual
-                    : CalcRelation::Equality;
+            CalcRelation relation;
+            switch (relationToken.kind) {
+                case TokenKind::LessOrEqual:
+                    relation = CalcRelation::LessOrEqual; break;
+                case TokenKind::Less:
+                    relation = CalcRelation::LessThan; break;
+                case TokenKind::GreaterOrEqual:
+                    relation = CalcRelation::GreaterOrEqual; break;
+                case TokenKind::Greater:
+                    relation = CalcRelation::GreaterThan; break;
+                default:
+                    relation = CalcRelation::Equality; break;
+            }
             auto nextExpression = parseAdditive();
             SurfaceCalcStep step;
             step.relation = relation;
