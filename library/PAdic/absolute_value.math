@@ -1227,76 +1227,40 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_nx_zero
               + Rational.padic_absolute_value(
                     p, primality,
                     Quotient.mk(RationalRepresentative.make(ny, dy))) := {
+  let x : Rational :=
+      (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational);
+  let y : Rational :=
+      (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational);
+  let avX : Rational := Rational.padic_absolute_value(p, primality, x);
+  let avY : Rational := Rational.padic_absolute_value(p, primality, y);
+  -- |nx| = 0 implies nx = 0, so x = 0_Q and |x|_p = 0. Therefore
+  -- |x+y|_p = |y|_p = 0 + |y|_p = |x|_p + |y|_p.
+  claim avXEqZero : avX = Rational.zero
+    by Rational.padic_absolute_value_at_zero(p, nx, dx, eqAbsNxZero);
   claim nxZero : nx = Integer.zero
     by Integer.absolute_value_natural_zero_implies_zero(nx, eqAbsNxZero);
-  -- mk(make(nx, dx)) = mk(make(Integer.zero, dx)) = Rational.zero.
-  calc (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
-     = (Quotient.mk(RationalRepresentative.make(Integer.zero, dx))
-         : Rational)
-     = Rational.zero                                                 as xRationalZero;
-  -- x + y = Rational.zero + y = y.
-  calc (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
-         + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational)
-     = Rational.zero
-         + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational)
-     = (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational)  as sumEqY;
-  -- |x|_p = padic_av_at_rep(make(nx, dx)) = Rational.zero (since |nx|=0).
-  -- The lifted form reduces (Quotient.lift β) to padic_av_at_rep.
-  claim padicAvXEqZero
-        : Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative.make(nx, dx)))
-          = Rational.zero
-    by Rational.padic_absolute_value_at_zero(p, nx, dx, eqAbsNxZero);
-  -- |x+y|_p = |y|_p (by congruenceOf on sumEqY).
-  claim padicAvSumEqY
-        : Rational.padic_absolute_value(
-              p, primality,
-              (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
-              + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational))
-          = Rational.padic_absolute_value(
-                p, primality,
-                Quotient.mk(RationalRepresentative.make(ny, dy)))
-    by congruenceOf(
-           function (m : Rational) =>
-               Rational.padic_absolute_value(p, primality, m),
-           sumEqY);
-  -- RHS = Rational.zero + |y|_p = |y|_p.
-  calc Rational.padic_absolute_value(
-           p, primality,
-           Quotient.mk(RationalRepresentative.make(nx, dx)))
-         + Rational.padic_absolute_value(
-               p, primality,
-               Quotient.mk(RationalRepresentative.make(ny, dy)))
-     = Rational.zero
-         + Rational.padic_absolute_value(
-               p, primality,
-               Quotient.mk(RationalRepresentative.make(ny, dy)))
-     = Rational.padic_absolute_value(
-           p, primality,
-           Quotient.mk(RationalRepresentative.make(ny, dy)))         as rhsEqY;
-  -- LHS = RHS, hence LHS ≤ RHS by reflexivity.
-  rewrite(
-      Equality.symmetry(rhsEqY),
-      Equality.transport_proposition(
-          Rational,
-          function (m : Rational) =>
-              m
-                ≤ Rational.padic_absolute_value(
-                      p, primality,
-                      Quotient.mk(RationalRepresentative.make(ny, dy))),
-          Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative.make(ny, dy))),
-          Rational.padic_absolute_value(
-              p, primality,
-              (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
-              + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational)),
-          Equality.symmetry(padicAvSumEqY),
-          Rational.LessOrEqual.reflexive(
-              Rational.padic_absolute_value(
-                  p, primality,
-                  Quotient.mk(RationalRepresentative.make(ny, dy))))))
+  claim xEqZero : x = Rational.zero
+    by calc x
+          = (Quotient.mk(RationalRepresentative.make(Integer.zero, dx))
+              : Rational)
+          = Rational.zero;
+  calc Rational.padic_absolute_value(p, primality, x + y)
+     = Rational.padic_absolute_value(p, primality, Rational.zero + y)
+         by congruenceOf(
+                function (m : Rational) =>
+                    Rational.padic_absolute_value(p, primality, m + y),
+                xEqZero)
+     = avY
+         by congruenceOf(
+                function (m : Rational) =>
+                    Rational.padic_absolute_value(p, primality, m),
+                Rational.zero_add(y))
+     ≤ avY                       by Rational.LessOrEqual.reflexive(avY)
+     = Rational.zero + avY       by Equality.symmetry(Rational.zero_add(avY))
+     = avX + avY
+         by congruenceOf(
+                function (m : Rational) => m + avY,
+                Equality.symmetry(avXEqZero))
 }
 
 -- Sub-case: when |ny| = 0. Symmetric to the nx-zero case. Here we
@@ -1314,70 +1278,40 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_ny_zero
               + Rational.padic_absolute_value(
                     p, primality,
                     Quotient.mk(RationalRepresentative.make(ny, dy))) := {
+  let x : Rational :=
+      (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational);
+  let y : Rational :=
+      (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational);
+  let avX : Rational := Rational.padic_absolute_value(p, primality, x);
+  let avY : Rational := Rational.padic_absolute_value(p, primality, y);
+  -- Symmetric to the nx_zero case: |ny| = 0 collapses y to 0_Q and
+  -- |y|_p to 0, so |x+y|_p = |x|_p = |x|_p + 0 = |x|_p + |y|_p.
+  claim avYEqZero : avY = Rational.zero
+    by Rational.padic_absolute_value_at_zero(p, ny, dy, eqAbsNyZero);
   claim nyZero : ny = Integer.zero
     by Integer.absolute_value_natural_zero_implies_zero(ny, eqAbsNyZero);
-  calc (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational)
-     = (Quotient.mk(RationalRepresentative.make(Integer.zero, dy))
-         : Rational)
-     = Rational.zero                                                 as yRationalZero;
-  -- x + y = x + Rational.zero = x.
-  calc (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
-         + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational)
-     = (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
-         + Rational.zero
-     = (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)  as sumEqX;
-  claim padicAvYEqZero
-        : Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative.make(ny, dy)))
-          = Rational.zero
-    by Rational.padic_absolute_value_at_zero(p, ny, dy, eqAbsNyZero);
-  claim padicAvSumEqX
-        : Rational.padic_absolute_value(
-              p, primality,
-              (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
-              + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational))
-          = Rational.padic_absolute_value(
-                p, primality,
-                Quotient.mk(RationalRepresentative.make(nx, dx)))
-    by congruenceOf(
-           function (m : Rational) =>
-               Rational.padic_absolute_value(p, primality, m),
-           sumEqX);
-  calc Rational.padic_absolute_value(
-           p, primality,
-           Quotient.mk(RationalRepresentative.make(nx, dx)))
-         + Rational.padic_absolute_value(
-               p, primality,
-               Quotient.mk(RationalRepresentative.make(ny, dy)))
-     = Rational.padic_absolute_value(
-           p, primality,
-           Quotient.mk(RationalRepresentative.make(nx, dx)))
-         + Rational.zero
-     = Rational.padic_absolute_value(
-           p, primality,
-           Quotient.mk(RationalRepresentative.make(nx, dx)))         as rhsEqX;
-  rewrite(
-      Equality.symmetry(rhsEqX),
-      Equality.transport_proposition(
-          Rational,
-          function (m : Rational) =>
-              m
-                ≤ Rational.padic_absolute_value(
-                      p, primality,
-                      Quotient.mk(RationalRepresentative.make(nx, dx))),
-          Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative.make(nx, dx))),
-          Rational.padic_absolute_value(
-              p, primality,
-              (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
-              + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational)),
-          Equality.symmetry(padicAvSumEqX),
-          Rational.LessOrEqual.reflexive(
-              Rational.padic_absolute_value(
-                  p, primality,
-                  Quotient.mk(RationalRepresentative.make(nx, dx))))))
+  claim yEqZero : y = Rational.zero
+    by calc y
+          = (Quotient.mk(RationalRepresentative.make(Integer.zero, dy))
+              : Rational)
+          = Rational.zero;
+  calc Rational.padic_absolute_value(p, primality, x + y)
+     = Rational.padic_absolute_value(p, primality, x + Rational.zero)
+         by congruenceOf(
+                function (m : Rational) =>
+                    Rational.padic_absolute_value(p, primality, x + m),
+                yEqZero)
+     = avX
+         by congruenceOf(
+                function (m : Rational) =>
+                    Rational.padic_absolute_value(p, primality, m),
+                Rational.add_zero(x))
+     ≤ avX                       by Rational.LessOrEqual.reflexive(avX)
+     = avX + Rational.zero       by Equality.symmetry(Rational.add_zero(avX))
+     = avX + avY
+         by congruenceOf(
+                function (m : Rational) => avX + m,
+                Equality.symmetry(avYEqZero))
 }
 
 -- Sub-case: when the sum's numerator has absolute value zero.
@@ -1399,48 +1333,32 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_sum_zero
               + Rational.padic_absolute_value(
                     p, primality,
                     Quotient.mk(RationalRepresentative.make(ny, dy))) := {
+  let x : Rational :=
+      (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational);
+  let y : Rational :=
+      (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational);
+  let avX : Rational := Rational.padic_absolute_value(p, primality, x);
+  let avY : Rational := Rational.padic_absolute_value(p, primality, y);
+  -- |x+y|_p = 0 (sum's numerator has |·| = 0) and avX + avY is nonneg,
+  -- so LHS ≤ RHS via 0 ≤ RHS.
   claim lhsIsZero
-        : Rational.padic_absolute_value(
-              p, primality,
-              (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
-              + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational))
-          = Rational.zero
+        : Rational.padic_absolute_value(p, primality, x + y) = Rational.zero
     by Rational.padic_absolute_value_at_zero(
            p,
-           nx * ((1 + dy) : Integer)
-             + ny * ((1 + dx) : Integer),
+           nx * ((1 + dy) : Integer) + ny * ((1 + dx) : Integer),
            dy + dx * (1 + dy),
            eqAbsSumZero);
+  claim avXNonneg : Rational.IsNonneg(avX)
+    by Rational.IsNonneg_of_LessOrEqual_zero(
+           avX, Rational.padic_absolute_value_nonneg(p, primality, x));
+  claim avYNonneg : Rational.IsNonneg(avY)
+    by Rational.IsNonneg_of_LessOrEqual_zero(
+           avY, Rational.padic_absolute_value_nonneg(p, primality, y));
   rewrite(
       Equality.symmetry(lhsIsZero),
       Rational.LessOrEqual_zero_of_IsNonneg(
-          Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative.make(nx, dx)))
-          + Rational.padic_absolute_value(
-                p, primality,
-                Quotient.mk(RationalRepresentative.make(ny, dy))),
-          Rational.IsNonneg.add(
-              Rational.padic_absolute_value(
-                  p, primality,
-                  Quotient.mk(RationalRepresentative.make(nx, dx))),
-              Rational.padic_absolute_value(
-                  p, primality,
-                  Quotient.mk(RationalRepresentative.make(ny, dy))),
-              Rational.IsNonneg_of_LessOrEqual_zero(
-                  Rational.padic_absolute_value(
-                      p, primality,
-                      Quotient.mk(RationalRepresentative.make(nx, dx))),
-                  Rational.padic_absolute_value_nonneg(
-                      p, primality,
-                      Quotient.mk(RationalRepresentative.make(nx, dx)))),
-              Rational.IsNonneg_of_LessOrEqual_zero(
-                  Rational.padic_absolute_value(
-                      p, primality,
-                      Quotient.mk(RationalRepresentative.make(ny, dy))),
-                  Rational.padic_absolute_value_nonneg(
-                      p, primality,
-                      Quotient.mk(RationalRepresentative.make(ny, dy)))))))
+          avX + avY,
+          Rational.IsNonneg.add(avX, avY, avXNonneg, avYNonneg)))
 }
 
 -- WLOG sub-case for case D: |nx| ≥ 1, |ny| ≥ 1, |sum| ≥ 1, and the
