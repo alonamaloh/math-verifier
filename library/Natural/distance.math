@@ -1,16 +1,18 @@
 -- Natural/distance.math
 --
--- Symmetric difference (≈ "absolute value of a - b") on Naturals.
+-- Symmetric difference (≈ "absolute value of a − b") on Naturals.
 -- Defined recursively, decrementing both arguments simultaneously
--- until one side hits zero. Used to define Integer.absolute_value:
+-- until one side hits 0. Used to define Integer.absolute_value:
 -- the absolute value of the representative `(a, b)` is
 -- `distance(a, b)`.
 --
 -- Implementation note: written as a single pattern on the first
 -- argument with an explicit `cases` on the second — the kernel only
 -- reduces multi-constructor patterns when the inner case is explicit,
--- so a `| s(k), s(m) => ...` clause would not fire reduction at
--- definition use sites.
+-- so a `| 1 + k, 1 + m => …` clause would not fire reduction at
+-- definition use sites. Patterns therefore keep the raw
+-- `successor(…)` constructor form; expressions in proof bodies
+-- prefer the more readable `1 + …` notation (definitionally equal).
 
 module Natural.distance
 
@@ -25,23 +27,23 @@ definition Natural.distance : Natural → Natural → Natural
   | zero,         b => b
   | successor(k), b =>
       cases b {
-        | zero         => successor(k)
+        | zero         => 1 + k
         | successor(m) => Natural.distance(k, m)
       }
 
 -- distance(0, b) = b.
 theorem Natural.distance_zero_left (b : Natural)
-        : Natural.distance(zero, b) = b :=
+        : Natural.distance(0, b) = b :=
   reflexivity(b)
 
 -- distance(a, 0) = a.
-theorem Natural.distance_zero_right : (a : Natural) → Natural.distance(a, zero) = a
-  | zero         => reflexivity(zero)
-  | successor(k) => reflexivity(successor(k))
+theorem Natural.distance_zero_right : (a : Natural) → Natural.distance(a, 0) = a
+  | zero         => reflexivity(0)
+  | successor(k) => reflexivity(1 + k)
 
 -- distance(a, a) = 0.
-theorem Natural.distance_self : (a : Natural) → Natural.distance(a, a) = zero
-  | zero                   => reflexivity(zero)
+theorem Natural.distance_self : (a : Natural) → Natural.distance(a, a) = 0
+  | zero                   => reflexivity(0)
   | successor(predecessor) => Natural.distance_self(predecessor)
 
 -- distance is symmetric. Induction on the first argument, with the
@@ -54,11 +56,10 @@ theorem Natural.distance_symmetric : (a b : Natural)
   | successor(k), b =>
       (cases b {
          | zero =>
-             reflexivity(successor(k))
+             reflexivity(1 + k)
          | successor(m) =>
              Natural.distance_symmetric(k, m)
-       } : Natural.distance(successor(k), b)
-           = Natural.distance(b, successor(k)))
+       } : Natural.distance(1 + k, b) = Natural.distance(b, 1 + k))
 
 -- Helper: distance(a + b, b) = a. Walking off the rightmost `b`
 -- decrements both sides by 1, leaving `(a, 0)` whose distance is `a`.
@@ -66,14 +67,16 @@ theorem Natural.distance_symmetric : (a b : Natural)
 theorem Natural.distance_add_self_right (a : Natural)
         : (b : Natural) → Natural.distance(a + b, b) = a
   | zero =>
-      calc Natural.distance(a + zero, zero)
-         = Natural.distance(a, zero)
+      calc Natural.distance(a + 0, 0)
+         = Natural.distance(a, 0)
          = a
   | successor(predecessor) =>
-      calc Natural.distance(a + successor(predecessor),
-                            successor(predecessor))
-         = Natural.distance(successor(a + predecessor),
-                            successor(predecessor))
+      calc Natural.distance(a + (1 + predecessor), 1 + predecessor)
+         = Natural.distance(1 + (a + predecessor), 1 + predecessor)
+                by congruenceOf(
+                       function (x : Natural) =>
+                           Natural.distance(x, 1 + predecessor),
+                       Natural.add_successor(a, predecessor))
          = Natural.distance(a + predecessor, predecessor)
          = a
 
@@ -86,44 +89,44 @@ theorem Natural.distance_self_add_right (a b : Natural)
      = a
 
 -- distance(a, b) ≤ a + b. The "triangle inequality" at Natural level.
--- WLOG b ≤ a (otherwise swap): distance(a, b) = (a - b). And
--- a + b = (a - b) + 2b, so distance(a, b) + 2b = a + b, hence ≤.
+-- WLOG b ≤ a (otherwise swap): distance(a, b) = (a − b). And
+-- a + b = (a − b) + 2b, so distance(a, b) + 2b = a + b, hence ≤.
 theorem Natural.distance_le_add : (a b : Natural)
         → Natural.distance(a, b) ≤ a + b
   | zero, b =>
-      -- distance(0, b) = b ≤ 0 + b = b. Both sides reduce to `b`.
+      -- Both sides reduce to b.
       LessOrEqual.reflexivity(b)
   | successor(k), b =>
-      -- distance(s(k), b) doesn't auto-reduce — kernel only reduces
+      -- distance(1+k, b) doesn't auto-reduce — kernel only reduces
       -- multi-constructor patterns when the inner case is explicit.
       -- Case-split b explicitly with a dependent motive.
       (cases b {
          | zero =>
-             -- distance(s(k), 0) = s(k) ≤ s(k) = s(k) + 0.
-             calc Natural.distance(successor(k), zero)
-                = successor(k)
-                ≤ successor(k)         by LessOrEqual.reflexivity(successor(k))
-                = successor(k) + zero
+             -- distance(1+k, 0) = 1+k ≤ 1+k = (1+k) + 0.
+             calc Natural.distance(1 + k, 0)
+                = 1 + k
+                ≤ 1 + k         by LessOrEqual.reflexivity(1 + k)
+                = (1 + k) + 0
          | successor(m) =>
-             -- distance(s(k), s(m)) = distance(k, m) (inner-case ι).
-             -- On the RHS, s(k) + s(m) reduces to s(s(k + m)) (both
-             -- successors pop out by add's definition on the first
-             -- arg). So we just need distance(k, m) ≤ s(s(k + m)):
-             -- IH then step twice.
-             calc Natural.distance(successor(k), successor(m))
+             -- distance(1+k, 1+m) = distance(k, m) (inner-case ι);
+             -- (1+k) + (1+m) reduces to 2 + (k + m) (both successors
+             -- pop out by add's definition on the first arg). So we
+             -- just need distance(k, m) ≤ 2 + (k + m): IH then step
+             -- twice up via le_successor.
+             calc Natural.distance(1 + k, 1 + m)
                 = Natural.distance(k, m)
-                ≤ k + m                       by Natural.distance_le_add(k, m)
-                ≤ successor(k + m)             by Natural.le_successor(k + m)
-                ≤ successor(successor(k + m))  by Natural.le_successor(successor(k + m))
-                = successor(k) + successor(m)
+                ≤ k + m                by Natural.distance_le_add(k, m)
+                ≤ 1 + (k + m)          by Natural.le_successor(k + m)
+                ≤ 2 + (k + m)          by Natural.le_successor(1 + (k + m))
+                = (1 + k) + (1 + m)
                        by congruenceOf(
                               successor,
                               Equality.symmetry(Natural.add_successor(k, m)))
-       } : Natural.distance(successor(k), b) ≤ successor(k) + b)
+       } : Natural.distance(1 + k, b) ≤ (1 + k) + b)
 
 -- Cancellation on the left: distance(b + c, b + d) = distance(c, d).
--- Induct on b. With b = s(b'), `s(b') + c` reduces to `s(b' + c)`
--- (add is by recursion on first arg), then distance on s(_), s(_)
+-- Induct on b. With b = 1 + b', `(1 + b') + c` reduces to `1 + (b' + c)`
+-- (add is by recursion on first arg), then distance on 1+_, 1+_
 -- reduces via the inner `cases`.
 theorem Natural.distance_add_left_cancel
         : (b c d : Natural)
@@ -151,25 +154,26 @@ theorem Natural.le_add_distance
       -- 0 ≤ b + distance(0, b) = b + b.
       Natural.zero_least(b + b)
   | successor(k), b =>
-      -- distance(s(k), b) doesn't auto-reduce; case-split b.
+      -- distance(1+k, b) doesn't auto-reduce; case-split b.
       (cases b {
          | zero =>
-             -- s(k) ≤ 0 + distance(s(k), 0) = s(k). Reflexive.
-             LessOrEqual.reflexivity(successor(k))
+             -- 1+k ≤ 0 + distance(1+k, 0) = 1+k. Reflexive.
+             LessOrEqual.reflexivity(1 + k)
          | successor(m) =>
-             -- s(k) ≤ s(m) + distance(s(k), s(m)) = s(m) + distance(k, m).
-             -- Reduce via add on successor: s(m) + distance(k, m)
-             -- = s(m + distance(k, m)). So want s(k) ≤ s(m + distance(k, m)),
-             -- by successor monotonicity from k ≤ m + distance(k, m) (IH).
+             -- 1+k ≤ (1+m) + distance(1+k, 1+m) = (1+m) + distance(k, m).
+             -- Reduce via add on successor: (1+m) + distance(k, m)
+             -- = 1 + (m + distance(k, m)). So want
+             -- 1+k ≤ 1 + (m + distance(k, m)), by successor
+             -- monotonicity from k ≤ m + distance(k, m) (IH).
              Natural.successor_less_or_equal_successor(
                  k, m + Natural.distance(k, m),
                  Natural.le_add_distance(k, m))
-       } : successor(k) ≤ b + Natural.distance(successor(k), b))
+       } : 1 + k ≤ b + Natural.distance(1 + k, b))
 
 -- Metric triangle inequality: distance(a, c) ≤ distance(a, b) +
 -- distance(b, c). Induct on a; inner case-splits on c and b. Base
 -- cases use `le_add_distance` and `distance_le_add`; the recursive
--- case (s(k), s(b'), s(c')) reduces all three distances by 1.
+-- case (1+k, 1+b', 1+c') reduces all three distances by 1.
 theorem Natural.distance_triangle
         : (a b c : Natural)
           → Natural.distance(a, c)
@@ -185,32 +189,31 @@ theorem Natural.distance_triangle
   | successor(k), b, c =>
       (cases c {
          | zero =>
-             -- distance(s(k), 0) = s(k). Want s(k) ≤ distance(s(k), b)
-             -- + distance(b, 0). By le_add_distance(s(k), b): s(k) ≤
-             -- b + distance(s(k), b). Then commute and rewrite
+             -- distance(1+k, 0) = 1+k. Want 1+k ≤ distance(1+k, b)
+             -- + distance(b, 0). By le_add_distance(1+k, b): 1+k ≤
+             -- b + distance(1+k, b). Then commute and rewrite
              -- distance(b, 0) = b.
-             calc Natural.distance(successor(k), zero)
-                = successor(k)
-                ≤ b + Natural.distance(successor(k), b)
-                       by Natural.le_add_distance(successor(k), b)
-                = Natural.distance(successor(k), b) + b
-                = Natural.distance(successor(k), b)
-                      + Natural.distance(b, zero)
+             calc Natural.distance(1 + k, 0)
+                = 1 + k
+                ≤ b + Natural.distance(1 + k, b)
+                       by Natural.le_add_distance(1 + k, b)
+                = Natural.distance(1 + k, b) + b
+                = Natural.distance(1 + k, b) + Natural.distance(b, 0)
          | successor(c') =>
-             -- distance(s(k), s(c')) = distance(k, c'). Case-split b.
+             -- distance(1+k, 1+c') = distance(k, c'). Case-split b.
              (cases b {
                 | zero =>
-                    -- distance(s(k), 0) + distance(0, s(c')) reduces
-                    -- to s(k) + s(c'); the inner ι on the LHS gives
+                    -- distance(1+k, 0) + distance(0, 1+c') reduces
+                    -- to (1+k) + (1+c'); the inner ι on the LHS gives
                     -- distance(k, c'). Climb from IH: distance(k, c')
-                    -- ≤ k + c' ≤ s(k + c') ≤ s(s(k + c')) = s(k) +
-                    -- s(c') (last via add_successor on the right).
-                    calc Natural.distance(successor(k), successor(c'))
+                    -- ≤ k + c' ≤ 1+(k + c') ≤ 2+(k + c') = (1+k) +
+                    -- (1+c') (last via add_successor on the right).
+                    calc Natural.distance(1 + k, 1 + c')
                        = Natural.distance(k, c')
-                       ≤ k + c'                        by Natural.distance_le_add(k, c')
-                       ≤ successor(k + c')              by Natural.le_successor(k + c')
-                       ≤ successor(successor(k + c'))   by Natural.le_successor(successor(k + c'))
-                       = successor(k) + successor(c')
+                       ≤ k + c'              by Natural.distance_le_add(k, c')
+                       ≤ 1 + (k + c')        by Natural.le_successor(k + c')
+                       ≤ 2 + (k + c')        by Natural.le_successor(1 + (k + c'))
+                       = (1 + k) + (1 + c')
                               by congruenceOf(
                                      successor,
                                      Equality.symmetry(
@@ -218,11 +221,11 @@ theorem Natural.distance_triangle
                 | successor(b') =>
                     -- All three distances drop by one. IH on (k, b', c').
                     Natural.distance_triangle(k, b', c')
-              } : Natural.distance(successor(k), successor(c'))
-                  ≤ Natural.distance(successor(k), b)
-                    + Natural.distance(b, successor(c')))
-       } : Natural.distance(successor(k), c)
-           ≤ Natural.distance(successor(k), b)
+              } : Natural.distance(1 + k, 1 + c')
+                  ≤ Natural.distance(1 + k, b)
+                    + Natural.distance(b, 1 + c'))
+       } : Natural.distance(1 + k, c)
+           ≤ Natural.distance(1 + k, b)
              + Natural.distance(b, c))
 
 -- distance(a + c, b + d) ≤ distance(a, b) + distance(c, d). Triangle
@@ -248,7 +251,7 @@ theorem Natural.distance_respects_integer_equivalent
           → Natural.distance(a, b) = Natural.distance(c, d)
   | zero, b, c, d, hypothesis =>
       -- hypothesis : 0 + d = b + c, definitionally d = b + c.
-      calc Natural.distance(zero, b)
+      calc Natural.distance(0, b)
          = b
          = Natural.distance(c, b + c)
                 by Equality.symmetry(
@@ -257,33 +260,26 @@ theorem Natural.distance_respects_integer_equivalent
   | successor(k), b, c, d, hypothesis =>
       (cases b {
         | zero =>
-            function (refinedHypothesis
-                          : successor(k) + d = zero + c) =>
-              -- refinedHypothesis : s(k) + d = c (0 + c reduces to c).
-              -- Walk d off the right of distance(s(k) + d, d), then
-              -- swap s(k) + d for c via refinedHypothesis.
-              calc Natural.distance(successor(k), zero)
-                 = successor(k)
-                 = Natural.distance(successor(k) + d, d)
+            function (refinedHypothesis : (1 + k) + d = 0 + c) =>
+              -- refinedHypothesis : (1+k) + d = c (0 + c reduces to c).
+              -- Walk d off the right of distance((1+k) + d, d), then
+              -- swap (1+k) + d for c via refinedHypothesis.
+              calc Natural.distance(1 + k, 0)
+                 = 1 + k
+                 = Natural.distance((1 + k) + d, d)
                         by Equality.symmetry(
-                               Natural.distance_add_self_right(
-                                   successor(k), d))
+                               Natural.distance_add_self_right(1 + k, d))
                  = Natural.distance(c, d)
-                        by congruenceOf(
-                               function (x : Natural) =>
-                                   Natural.distance(x, d),
-                               refinedHypothesis)
         | successor(bPredecessor) =>
             function (refinedHypothesis
-                          : successor(k) + d
-                            = successor(bPredecessor) + c) =>
+                          : (1 + k) + d = (1 + bPredecessor) + c) =>
               -- refinedHypothesis reduces (add on successor first arg)
-              -- to s(k + d) = s(bPredecessor + c). successor_injective
-              -- drops the s, IH closes.
+              -- to 1+(k + d) = 1+(bPredecessor + c). successor_injective
+              -- drops the 1+, IH closes.
               Natural.distance_respects_integer_equivalent(
                   k, bPredecessor, c, d,
                   Natural.successor_injective(
                       k + d, bPredecessor + c, refinedHypothesis))
-       } : (refinedHypothesis : successor(k) + d = b + c)
-             → Natural.distance(successor(k), b)
+       } : (refinedHypothesis : (1 + k) + d = b + c)
+             → Natural.distance(1 + k, b)
                = Natural.distance(c, d))(hypothesis)
