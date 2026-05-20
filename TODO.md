@@ -322,16 +322,12 @@ desugarings). Reverted to keep `main` clean; resume when there's
 time to debug the index plumbing.
 
 
-## Mixed-relation `calc` chains
+## Mixed-relation `calc` chains — DONE
 
-Mathematicians write things like `calc p ≤ p = m` to chain an
-inequality with an equality. Our current `calc` is monomorphic on
-`=`. Generalising is a real but bounded design problem; deferring
-until a motivating example puts pressure on it (the structured-proof
-work absorbs the small `claim p ≤ p` / `claim p ≤ m` chains for now
-via Step 5's transport bridge).
-
-Composition rules to implement when the time comes:
+Done in two commits: `elaborator: calc supports mixed =/≤ chains`
+(Phase 1) and `elaborator: calc supports <, ≥, > with strictness
+and direction` (Phase 2). Calc now accepts all five relations as
+step separators with the composition rules from the original table:
 
 | Proving | Allowed in the chain                  |
 |---------|---------------------------------------|
@@ -341,10 +337,22 @@ Composition rules to implement when the time comes:
 | `≥`     | `≥` and `=`                           |
 | `>`     | `>`, `≥`, and `=`                     |
 
-(Strict inequality wins over non-strict, like in math.) Each step's
-auto-prover stays the same; the top-level fold picks the right
-composition lemma per relation pair. Likely needs new infrastructure
-for "the strongest relation that bounds this chain so far" tracking.
+Strict inequalities escalate the whole chain. Direction is detected
+from the steps; mixing forward (`<`/`≤`) with backward (`>`/`≥`)
+is rejected with a clear error (`=` is allowed in either direction).
+Backward chains are normalised by reversing the endpoint + step
+arrays and flipping `=` step proofs via `Equality.symmetry`.
+
+Composition lemmas are looked up from the operator registry:
+`<T>.LessOrEqual` (its `.transitive` and `.reflexive`) for `≤`, and
+`<T>.LessThan` (its `.transitive_left`, `.transitive_right`,
+`.weaken`) for `<`. Natural's bare `LessOrEqual` inductive is
+handled as a special case (its `.transitive` takes proofs swapped).
+`=` steps get upgraded to `≤` on the fly via
+`Equality.transport_proposition` with motive `λz. a ≤ z` whenever
+the chain isn't all-`=`. `≥`/`>` are also surfaced as expression-
+level operators (a ≥ b desugars to b ≤ a using the same registry
+entry as ≤), so `(h : a ≥ b)` works in theorem types.
 
 ## Opportunistic — smaller items
 

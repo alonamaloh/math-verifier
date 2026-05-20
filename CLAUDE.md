@@ -232,6 +232,36 @@ it, double-check the direction: `rewrite(eq, term)` looks for the LHS
 of `eq` in `term`'s type. Putting it the wrong way round gives the
 "left endpoint does not appear (structurally) in term's type" error.
 
+## `calc` with mixed relations
+
+`calc` chains support all five relations as step separators: `=`,
+`≤`, `<`, `≥`, `>`. The chain's result picks the strongest relation
+across its steps (any `<`/`>` makes it strict; otherwise `≤`/`≥` if
+present; else `=`). Mixing forward (`<`/`≤`) with backward (`>`/`≥`)
+is rejected — `=` is allowed in either direction.
+
+```math
+calc Rational.absolute_value(s(m) * (t(m) - t(n)))
+   = Rational.absolute_value(s(m))
+       * Rational.absolute_value(t(m) - t(n))   by abs_first_eq
+   ≤ (successor(K_s) : Rational)
+       * Rational.absolute_value(t(m) - t(n))   by first_factor_bound
+   ≤ (successor(K_s) : Rational) * delta_t     by first_factor_bound_2
+   ≤ Rational.halve(Rational.halve(epsilon))   by succ_K_s_delta_t_bound
+```
+
+The carrier-specific transitivity lemmas (`<T>.LessOrEqual.transitive`,
+`<T>.LessThan.transitive_left/right`, `<T>.LessThan.weaken`,
+`<T>.LessOrEqual.reflexive`) are looked up via the same operator
+registry that drives binary `≤`/`<`. `=` steps get upgraded to `≤`
+on the fly whenever the chain isn't all-`=`. `≥`/`>` work as
+expression-level operators too: `a ≥ b` desugars to `b ≤ a` against
+the existing `≤` registration.
+
+Step proofs are parsed at the parseAdditive level — `=`/`≤`/`<`/`≥`/`>`
+are reserved as separators, so step proofs containing those operators
+must be parenthesised.
+
 ## `rewrite(lemma)` / `rewrite(lemma, term)`
 
 Two forms, disambiguated by argument count.
