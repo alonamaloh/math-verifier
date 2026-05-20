@@ -26,6 +26,13 @@ struct ContextEntry {
     std::string name;
     ExpressionPointer type;
     FreeVariableOrigin origin = FreeVariableOrigin::User;
+    // Non-null for let-style binders (surface `let X := V`). When set,
+    // isDefinitionallyEqual ζ-reduces references to the FreeVariable
+    // {name, origin} to this value during equality comparison. The
+    // elaborator's auto-prover separately ζ-unfolds at the closed-term
+    // level so structural matchers (lemma index, hypothesis match)
+    // can see through let-bound names.
+    ExpressionPointer value = nullptr;
 };
 using Context = std::vector<ContextEntry>;
 

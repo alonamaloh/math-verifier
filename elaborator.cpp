@@ -16,9 +16,17 @@ namespace {
 // name and the kernel type. Used both to compute de Bruijn indices for
 // name lookup and to construct a kernel Context for inferType calls
 // during `=` desugaring and `congruenceOf(...)` elaboration.
+//
+// `value` is non-null for let-style binders (surface `let X := V`). It
+// flows through to ContextEntry.value when the elaborator builds an
+// opened Context for kernel calls — so isDefinitionallyEqual can ζ
+// the let-name during equality checks. The auto-prover separately
+// uses it to ζ-unfold at the closed-term level for structural
+// matchers (lemma index, hypothesis match).
 struct LocalBinder {
     std::string name;
     ExpressionPointer type;
+    ExpressionPointer value = nullptr;
 };
 
 // Returns the FreeVariable name used when opening / closing the binder
@@ -3442,7 +3450,12 @@ private:
             ExpressionPointer letValue =
                 elaborateExpression(*let->value, localBinders, letType);
             std::vector<LocalBinder> extended = localBinders;
-            extended.push_back({let->name, letType});
+            // Capture the value on the LocalBinder so downstream
+            // openedContext builders can mark it as let-bound (enabling
+            // ζ-reduction in isDefinitionallyEqual on the FreeVariable),
+            // and so the auto-prover's structural matchers can ζ-unfold
+            // when matching on the closed term.
+            extended.push_back({let->name, letType, letValue});
             // Propagate expectedType to body (shifted for new binder).
             ExpressionPointer bodyExpectedType =
                 expectedType ? shift(expectedType, 1) : nullptr;
@@ -3481,16 +3494,8 @@ private:
                     ExpressionPointer ascribedTypeOpened =
                         openOverLocalBinders(ascribedType, localBinders,
                                               localBinders.size());
-                    Context coercionContext;
-                    for (size_t i = 0; i < localBinders.size(); ++i) {
-                        ExpressionPointer openedBinderType =
-                            openOverLocalBinders(localBinders[i].type,
-                                                  localBinders, i);
-                        coercionContext.push_back(
-                            {openingNameFor(localBinders, i),
-                             openedBinderType,
-                             FreeVariableOrigin::Internal});
-                    }
+                    Context coercionContext =
+                        buildContextFromLocalBinders(localBinders);
                     if (isDefinitionallyEqual(environment_, coercionContext,
                                                 innerTypeOpened,
                                                 ascribedTypeOpened)) {
@@ -3955,14 +3960,7 @@ private:
             environment_, hintType);
 
         // Fast path: hintType already matches the goal definitionally.
-        Context openedContext;
-        for (size_t i = 0; i < localBinders.size(); ++i) {
-            ExpressionPointer openedType = openOverLocalBinders(
-                localBinders[i].type, localBinders, i);
-            openedContext.push_back({openingNameFor(localBinders, i),
-                                      openedType,
-                                      FreeVariableOrigin::Internal});
-        }
+        Context openedContext = buildContextFromLocalBinders(localBinders);
         ExpressionPointer hintTypeOpened = openOverLocalBinders(
             hintType, localBinders, localBinders.size());
         ExpressionPointer goalOpened = openOverLocalBinders(
@@ -4643,13 +4641,7 @@ private:
                 localBinders, stepProofKernel);
             ExpressionPointer stepRelationTypeOpened = openOverLocalBinders(
                 stepRelationType, localBinders, localBinders.size());
-            Context stepContext;
-            for (size_t i = 0; i < localBinders.size(); ++i) {
-                ExpressionPointer openedType = openOverLocalBinders(
-                    localBinders[i].type, localBinders, i);
-                stepContext.push_back({openingNameFor(localBinders, i), openedType,
-                                          FreeVariableOrigin::Internal});
-            }
+            Context stepContext = buildContextFromLocalBinders(localBinders);
             if (!isDefinitionallyEqual(environment_, stepContext,
                                         stepProofType,
                                         stepRelationTypeOpened)) {
@@ -5101,14 +5093,18 @@ private:
         (void)stepEqualityType;
         (void)column;
         (void)line;
+        // ζ-unfold local let-binders so the structural matchers
+        // (tryClassifyDiff path-walk, lemma index) see through surface
+        // abbreviations. The kernel-level Equality at the original
+        // endpoints is ζ-equal to the Equality at the unfolded
+        // endpoints, so a proof for the unfolded form is also a proof
+        // for the original (verified by the post-elaboration
+        // isDefinitionallyEqual check against the original stepRelation
+        // type, which now also sees let-values via ContextEntry.value).
+        previousKernel = zetaUnfoldLetBinders(previousKernel, localBinders);
+        nextKernel = zetaUnfoldLetBinders(nextKernel, localBinders);
         // Strategy 1: reflexivity for definitionally-equal endpoints.
-        Context openedContext;
-        for (size_t i = 0; i < localBinders.size(); ++i) {
-            ExpressionPointer openedType = openOverLocalBinders(
-                localBinders[i].type, localBinders, i);
-            openedContext.push_back({openingNameFor(localBinders, i), openedType,
-                                       FreeVariableOrigin::Internal});
-        }
+        Context openedContext = buildContextFromLocalBinders(localBinders);
         ExpressionPointer previousOpened = openOverLocalBinders(
             previousKernel, localBinders, localBinders.size());
         ExpressionPointer nextOpened = openOverLocalBinders(
@@ -5662,13 +5658,7 @@ private:
             goalType, localBinders, localBinders.size());
         ExpressionPointer goalNormalised =
             weakHeadNormalForm(environment_, goalOpened);
-        Context openedContext;
-        for (size_t i = 0; i < localBinders.size(); ++i) {
-            ExpressionPointer openedType = openOverLocalBinders(
-                localBinders[i].type, localBinders, i);
-            openedContext.push_back({openingNameFor(localBinders, i), openedType,
-                                       FreeVariableOrigin::Internal});
-        }
+        Context openedContext = buildContextFromLocalBinders(localBinders);
         // Hypothesis match.
         for (int i = static_cast<int>(localBinders.size()) - 1;
              i >= 0; --i) {
@@ -5729,13 +5719,7 @@ private:
             goalType, localBinders, localBinders.size());
         ExpressionPointer goalNormalised =
             weakHeadNormalForm(environment_, goalOpened);
-        Context openedContext;
-        for (size_t i = 0; i < localBinders.size(); ++i) {
-            ExpressionPointer openedType = openOverLocalBinders(
-                localBinders[i].type, localBinders, i);
-            openedContext.push_back({openingNameFor(localBinders, i), openedType,
-                                       FreeVariableOrigin::Internal});
-        }
+        Context openedContext = buildContextFromLocalBinders(localBinders);
         for (int i = static_cast<int>(localBinders.size()) - 1;
              i >= 0; --i) {
             ExpressionPointer binderTypeOpened = openOverLocalBinders(
@@ -6123,13 +6107,7 @@ private:
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer goalType) {
         if (!environment_.lookup("False")) return nullptr;
-        Context openedContext;
-        for (size_t i = 0; i < localBinders.size(); ++i) {
-            ExpressionPointer openedType = openOverLocalBinders(
-                localBinders[i].type, localBinders, i);
-            openedContext.push_back({openingNameFor(localBinders, i), openedType,
-                                       FreeVariableOrigin::Internal});
-        }
+        Context openedContext = buildContextFromLocalBinders(localBinders);
         // Walk binders looking for one whose type is `P → False` for
         // some P. For each, scan for another binder whose type is
         // definitionally equal to P.
@@ -10830,14 +10808,7 @@ private:
         bool isProposition = false;
         LevelPointer universeLevel;
         try {
-            Context openedContext;
-            for (size_t i = 0; i < localBinders.size(); ++i) {
-                ExpressionPointer openedType = openOverLocalBinders(
-                    localBinders[i].type, localBinders, i);
-                openedContext.push_back({openingNameFor(localBinders, i),
-                                          openedType,
-                                          FreeVariableOrigin::Internal});
-            }
+            Context openedContext = buildContextFromLocalBinders(localBinders);
             ExpressionPointer expectedTypeOpened = openOverLocalBinders(
                 expectedType, localBinders, localBinders.size());
             ExpressionPointer typeOfType = inferType(
@@ -11768,14 +11739,7 @@ private:
         // reference earlier locals, so open them via openOverLocalBinders.
         LevelPointer motiveLevel;
         {
-            Context openedContext;
-            for (size_t i = 0; i < localBinders.size(); ++i) {
-                ExpressionPointer openedType = openOverLocalBinders(
-                    localBinders[i].type, localBinders, i);
-                openedContext.push_back(
-                    {openingNameFor(localBinders, i), openedType,
-                     FreeVariableOrigin::Internal});
-            }
+            Context openedContext = buildContextFromLocalBinders(localBinders);
             ExpressionPointer motiveType =
                 inferType(environment_, openedContext,
                            openOverLocalBinders(
@@ -13695,14 +13659,7 @@ private:
         auto checkDefinitionallyEqual =
             [&](ExpressionPointer left,
                 ExpressionPointer right) -> bool {
-            Context context;
-            for (size_t i = 0; i < localBinders.size(); ++i) {
-                ExpressionPointer openedType = openOverLocalBinders(
-                    localBinders[i].type, localBinders, i);
-                context.push_back(
-                    {openingNameFor(localBinders, i), openedType,
-                     FreeVariableOrigin::Internal});
-            }
+            Context context = buildContextFromLocalBinders(localBinders);
             ExpressionPointer leftOpened = openOverLocalBinders(
                 left, localBinders, localBinders.size());
             ExpressionPointer rightOpened = openOverLocalBinders(
@@ -13967,14 +13924,7 @@ private:
         // Proposition) and `False.eliminate.{u}` (for goals in
         // Type u = Sort u+1). The goal's universe level is the level
         // of the Sort returned by inferType(expectedType).
-        Context openedContext;
-        for (size_t i = 0; i < localBinders.size(); ++i) {
-            ExpressionPointer openedType = openOverLocalBinders(
-                localBinders[i].type, localBinders, i);
-            openedContext.push_back(
-                {openingNameFor(localBinders, i), openedType,
-                 FreeVariableOrigin::Internal});
-        }
+        Context openedContext = buildContextFromLocalBinders(localBinders);
         ExpressionPointer goalSort = weakHeadNormalForm(
             environment_,
             inferType(environment_, openedContext,
@@ -15005,6 +14955,61 @@ private:
         return term;
     }
 
+    // Build the kernel Context corresponding to `localBinders`: for each
+    // binder, open its type over earlier binders and (when the binder is
+    // a let-binding with a value) its value too. Centralizes the
+    // ~13 ad-hoc loops that previously built this by hand; their value
+    // propagation is what enables isDefinitionallyEqual to ζ-reduce
+    // FreeVariables back to let-bound values.
+    Context buildContextFromLocalBinders(
+        const std::vector<LocalBinder>& localBinders) {
+        Context result;
+        result.reserve(localBinders.size());
+        for (size_t i = 0; i < localBinders.size(); ++i) {
+            ExpressionPointer openedType = openOverLocalBinders(
+                localBinders[i].type, localBinders, i);
+            ExpressionPointer openedValue = nullptr;
+            if (localBinders[i].value) {
+                openedValue = openOverLocalBinders(
+                    localBinders[i].value, localBinders, i);
+            }
+            result.push_back({openingNameFor(localBinders, i), openedType,
+                              FreeVariableOrigin::Internal, openedValue});
+        }
+        return result;
+    }
+
+    // ζ-unfold every reference to a let-bound binder in `term` (a term
+    // in closed-over-localBinders form), replacing it with the let's
+    // value. Returns `term` unchanged when no let-binders are in scope.
+    //
+    // The auto-prover's structural matchers (tryLemmaIndexLookup,
+    // tryClassifyDiff) walk terms by syntactic shape rather than
+    // calling isDefinitionallyEqual on sub-positions, so they don't
+    // benefit from the kernel-level δ-reduction on let-bound
+    // FreeVariables. Calling this helper on cursors before matching
+    // exposes the underlying expressions so library lemmas about V
+    // match goals stated in terms of X (the let-name).
+    ExpressionPointer zetaUnfoldLetBinders(
+        ExpressionPointer term,
+        const std::vector<LocalBinder>& localBinders) {
+        std::map<std::string, ExpressionPointer> assignment;
+        for (size_t i = 0; i < localBinders.size(); ++i) {
+            if (localBinders[i].value) {
+                assignment[openingNameFor(localBinders, i)] =
+                    openOverLocalBinders(
+                        localBinders[i].value, localBinders, i);
+            }
+        }
+        if (assignment.empty()) return term;
+        ExpressionPointer opened = openOverLocalBinders(
+            term, localBinders, localBinders.size());
+        ExpressionPointer substituted =
+            substituteFreeVariables(opened, assignment);
+        return closeOverLocalBinders(
+            substituted, localBinders, localBinders.size());
+    }
+
     // Walks `expression` and replaces every FreeVariable whose name is a
     // key in `assignment` with the corresponding replacement, lifting the
     // replacement by the number of binders we've descended into. Used to
@@ -15372,13 +15377,7 @@ private:
         ExpressionPointer term) {
         ExpressionPointer openedTerm = openOverLocalBinders(
             term, localBinders, localBinders.size());
-        Context context;
-        for (size_t i = 0; i < localBinders.size(); ++i) {
-            ExpressionPointer openedType = openOverLocalBinders(
-                localBinders[i].type, localBinders, i);
-            context.push_back({openingNameFor(localBinders, i), openedType,
-                                FreeVariableOrigin::Internal});
-        }
+        Context context = buildContextFromLocalBinders(localBinders);
         return inferType(environment_, context, openedTerm);
     }
 

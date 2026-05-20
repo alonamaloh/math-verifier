@@ -1,7 +1,10 @@
 #include "kernel.hpp"
 
 #include <algorithm>
+#include <functional>
+#include <map>
 #include <string>
+#include <utility>
 
 bool kernelCheckInvariants = false;
 
@@ -676,6 +679,62 @@ bool structurallyEqual(ExpressionPointer left, ExpressionPointer right) {
     return false;
 }
 
+// δ-reduce FreeVariables whose context entry carries a value (i.e.
+// let-style binders). Walks `expression`, replacing matching FVs with
+// shifted values. Iterates to a fixed point so cascading let-bindings
+// (a later let whose value mentions an earlier let-name) fully unfold.
+// Returns `expression` unchanged when no let-bound FVs are in scope —
+// the common case — so the cost is negligible for non-let proofs.
+ExpressionPointer deltaReduceLetFreeVariables(ExpressionPointer expression,
+                                              const Context& context) {
+    // Build the name → value map once. Skip if empty (no let-binders).
+    std::map<std::pair<std::string, FreeVariableOrigin>, ExpressionPointer>
+        assignment;
+    for (const auto& entry : context) {
+        if (entry.value) {
+            assignment[{entry.name, entry.origin}] = entry.value;
+        }
+    }
+    if (assignment.empty()) return expression;
+    // Recursive walk. depth tracks how many binders we've descended into,
+    // used to shift the replacement when substituting.
+    std::function<ExpressionPointer(ExpressionPointer, int)> walk;
+    walk = [&](ExpressionPointer expr, int depth) -> ExpressionPointer {
+        if (auto* fv = std::get_if<FreeVariable>(&expr->node)) {
+            auto iter = assignment.find({fv->name, fv->origin});
+            if (iter != assignment.end()) {
+                return shift(iter->second, depth);
+            }
+            return expr;
+        }
+        if (std::holds_alternative<BoundVariable>(expr->node)) return expr;
+        if (std::holds_alternative<Sort>(expr->node))          return expr;
+        if (std::holds_alternative<Constant>(expr->node))      return expr;
+        if (auto* pi = std::get_if<Pi>(&expr->node)) {
+            return makePi(pi->displayHint,
+                          walk(pi->domain, depth),
+                          walk(pi->codomain, depth + 1));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expr->node)) {
+            return makeLambda(lambda->displayHint,
+                              walk(lambda->domain, depth),
+                              walk(lambda->body, depth + 1));
+        }
+        if (auto* app = std::get_if<Application>(&expr->node)) {
+            return makeApplication(walk(app->function, depth),
+                                   walk(app->argument, depth));
+        }
+        if (auto* let = std::get_if<Let>(&expr->node)) {
+            return makeLet(let->displayHint,
+                           walk(let->type,  depth),
+                           walk(let->value, depth),
+                           walk(let->body,  depth + 1));
+        }
+        return expr;
+    };
+    return walk(expression, 0);
+}
+
 bool isDefinitionallyEqual(const Environment& environment,
                            const Context& context,
                            ExpressionPointer left,
@@ -702,6 +761,11 @@ bool isDefinitionallyEqual(const Environment& environment,
     if (structurallyEqual(left, right)) {
         return true;
     }
+    // δ-reduce let-bound FreeVariables in both sides so the kernel sees
+    // through surface `let X := V` abbreviations. The walk is a no-op
+    // when the context has no let-binders (every existing call site).
+    left  = deltaReduceLetFreeVariables(std::move(left),  context);
+    right = deltaReduceLetFreeVariables(std::move(right), context);
     auto leftReduced  = weakHeadNormalForm(environment, std::move(left),  fuel);
     auto rightReduced = weakHeadNormalForm(environment, std::move(right), fuel);
     // Same fast-paths after WHNF — reductions often produce the same

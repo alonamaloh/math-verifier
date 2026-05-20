@@ -315,6 +315,41 @@ Step proofs are parsed at the parseAdditive level — `=`/`≤`/`<`/`≥`/`>`
 are reserved as separators, so step proofs containing those operators
 must be parenthesised.
 
+### `let` for local abbreviations — the auto-prover sees through
+
+`let X : T := V;` introduces a local abbreviation. The kernel
+ζ-reduces references to `X` back to `V` whenever the auto-prover or
+`isDefinitionallyEqual` need it, and the auto-prover's structural
+matchers (lemma-index lookup, calc-step path-walk) ζ-unfold `X` to
+`V` on match attempts. Both directions are wired:
+
+- **Equality checks**: `isDefinitionallyEqual` carries the let-value on
+  the kernel `ContextEntry`; FreeVariables for let-binders δ-reduce to
+  their values during comparison. So `claim foo : X = V by …` works
+  even when `foo`'s proof has the unfolded type.
+- **Structural matching**: the auto-prover (in `autoProveCalcStep`)
+  ζ-unfolds let-binders in the calc endpoints before running its
+  pipeline, so library lemmas about `V` apply to goals stated in
+  terms of `X`.
+
+Use this for proofs where one long expression appears many times and
+its structure is irrelevant to the surrounding argument. The
+canonical example is `Rational.padic_absolute_value_at_representative(p, RationalRepresentative.make(nx, dx))` — abbreviating it to `absXAtRep`
+shortens proofs dramatically without losing any kernel guarantees:
+
+```math
+let absXAtRep : Rational :=
+    Rational.padic_absolute_value_at_representative(
+        p, RationalRepresentative.make(nx, dx));
+let absYAtRep : Rational :=
+    Rational.padic_absolute_value_at_representative(
+        p, RationalRepresentative.make(ny, dy));
+-- … use absXAtRep, absYAtRep freely in calc chains …
+```
+
+The library-wide convention is still "spell out the long name once,
+abbreviate when it appears 3+ times in the surrounding proof."
+
 ### Prefer `calc` to `Equality.transitivity`
 
 Nested `Equality.transitivity(A, transitivity(B, C))` — common in older

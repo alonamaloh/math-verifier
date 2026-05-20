@@ -1,0 +1,49 @@
+-- Tests for the let-abbreviation feature: surface `let X := V;`
+-- carries the value into the elaborator's Context, so
+-- isDefinitionallyEqual ζ-reduces references to X back to V.
+-- The user gets to write proofs using the short name X; the kernel
+-- sees through it for equality checks.
+
+module Test.let_abbreviation_test
+
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Equality.basics
+
+-- Baseline: without abbreviation, the calc-step matcher finds the
+-- ζ-reduction `n * 0 = 0` directly via kernel reflexivity.
+theorem Test.calc_finds_multiply_zero_directly (n : Natural)
+        : n * 0 = 0 := {
+  calc n * 0 = 0
+}
+
+-- With abbreviation: the same proof, but the user names the LHS
+-- `nTimesZero`. After the let, the matcher's reflexivity check
+-- sees through nTimesZero to its value (n * 0) via ζ in
+-- isDefinitionallyEqual, so the step closes.
+theorem Test.calc_finds_multiply_zero_through_let (n : Natural)
+        : n * 0 = 0 := {
+  let nTimesZero : Natural := n * 0;
+  calc nTimesZero = 0
+}
+
+-- Two-step calc where the abbreviation appears on the LHS of the
+-- first step.
+theorem Test.calc_through_let_two_step (n : Natural)
+        : n * 0 + n = n := {
+  let nTimesZero : Natural := n * 0;
+  calc nTimesZero + n
+     = 0 + n
+     = n
+}
+
+-- The abbreviation also works on the RHS. Lemma-index lookup tries
+-- both directions, so `multiply_zero(n)` closes this even with the
+-- equation flipped.
+theorem Test.calc_finds_through_let_on_rhs (n : Natural)
+        : 0 = n * 0 := {
+  let nTimesZero : Natural := n * 0;
+  calc (0 : Natural) = nTimesZero
+                       by Equality.symmetry(Natural.multiply_zero(n))
+}
