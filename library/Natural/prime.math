@@ -17,3 +17,24 @@ definition Natural.is_prime(candidate : Natural) : Proposition :=
   ∧ (∀ (divisor : Natural).
         divisor ∣ candidate
         → divisor = 1 ∨ divisor = candidate)
+
+-- A prime is at least 2. The first half of the is_prime conjunction —
+-- exposes the bound without forcing callers to unfold via And.eliminate.
+theorem Natural.is_prime.at_least_two
+        (candidate : Natural) (primality : Natural.is_prime(candidate))
+        : 2 ≤ candidate :=
+  And.left(
+      2 ≤ candidate,
+      (divisor : Natural) → divisor ∣ candidate
+                              → divisor = 1 ∨ divisor = candidate,
+      primality)
+
+-- A prime is at least 1. Composes at_least_two with the predecessor
+-- inequality. Used wherever the proof only needs positivity, not the
+-- ≥2 fact.
+theorem Natural.is_prime.positive
+        (candidate : Natural) (primality : Natural.is_prime(candidate))
+        : 1 ≤ candidate :=
+  Natural.less_or_equal_predecessor_less_or_equal(
+      1, candidate,
+      Natural.is_prime.at_least_two(candidate, primality))
