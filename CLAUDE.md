@@ -181,6 +181,37 @@ require the bare constructor — the parser doesn't accept `1 + k` there.
 Companion memory: [[prefer_numeric_literals]] covers the related
 `0`/`1`/`2` over `zero`/`successor(zero)`/`two` rule.
 
+**When `successor(n)` wins anyway.** Two situations where the
+substitution makes the proof *harder* to read, learned the hard way:
+
+- **Structural reduction sites.** `Natural.add` and `Natural.multiply`
+  are defined by recursion on the `successor` constructor of the first
+  argument, so `successor(k) + b ≡ successor(k + b)` and
+  `d * successor(q) ≡ d + d * q` are definitional reductions the
+  kernel will perform. Rewrite-matchers and calc-step matchers see the
+  `successor(...)` form structurally, but they don't always see the
+  reduced form behind `1 + k`. Concretely: in
+  `library/Natural/arithmetic.math:60` (`add_commutative`'s successor
+  case), the calc starts at the REDUCED form `successor(predecessor + b)`
+  precisely so a downstream rewrite can find `predecessor + b` as a
+  subterm. Writing `(1 + predecessor) + b` instead breaks that.
+  Foundational Natural arithmetic files (`basics`, `peano`,
+  `arithmetic`, plus `divide`, `divides_subtract`, `divisibility`,
+  `power`) keep `successor(...)` for this reason.
+
+- **Structural-atom slots.** When `successor(n)` appears uniformly as a
+  "positive successor" atom (e.g. positive denominator in Rational
+  cross-multiplication), `(succ(d) : Integer)` reads as one concept —
+  "the *d*th positive denominator." `((1 + d) : Integer)` adds an
+  extra paren pair (the inner one is forced by `+`'s precedence under
+  type ascription) and makes the reader parse a sum before recognising
+  the slot. Saw this on `Rational/basics.math:transitive_natural`
+  where the substitution made the proof noticeably noisier.
+
+Rule of thumb: prefer `1 + n` when the `+1` is doing arithmetic work
+the reader cares about (`1 ≤ 1 + k`, `1 + k = succ(k)` reductions).
+Keep `successor(n)` when it's a structural placeholder.
+
 ## Multi-pattern bindings
 
 Constructor patterns at non-scrutinee positions of a pattern-match
