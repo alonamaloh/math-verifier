@@ -1,0 +1,57 @@
+-- Tests for diff-inference calc-step fallback: when the user's
+-- `by <proof>` has type Equality(T, a, b) but the calc step is
+-- Equality(_, ctx[a], ctx[b]) for a unique single-slot context, the
+-- elaborator auto-wraps the proof with Equality.congruence. The user
+-- supplies just the equation; the elaborator finds the slot.
+
+module Test.diff_inference_test
+
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Equality.basics
+
+-- Baseline: a direct equation.
+theorem Test.diff_baseline_direct (a b : Natural) (eq : a = b) : a = b := {
+  calc a = b by eq
+}
+
+-- 1-deep wrap: `by eq` where step is `f(a) = f(b)`. The elaborator
+-- should auto-build congruenceOf(λm. successor(m), eq).
+theorem Test.diff_one_deep_wrap
+        (a b : Natural) (eq : a = b)
+        : successor(a) = successor(b) := {
+  calc successor(a) = successor(b) by eq
+}
+
+-- 2-deep wrap: `by eq` where step is `f(g(a)) = f(g(b))`. Should walk
+-- down two App levels and wrap with two congruenceOf calls.
+theorem Test.diff_two_deep_wrap
+        (a b : Natural) (eq : a = b)
+        : successor(successor(a)) = successor(successor(b)) := {
+  calc successor(successor(a)) = successor(successor(b)) by eq
+}
+
+-- Wrap on the argument slot of a binary function: `by eq` where step
+-- is `c + a = c + b`. Should walk down the App to the second arg of `+`.
+theorem Test.diff_right_arg_wrap
+        (a b c : Natural) (eq : a = b)
+        : c + a = c + b := {
+  calc c + a = c + b by eq
+}
+
+-- Wrap on the left arg of a binary function. The left arg has the
+-- function head as one descent step (App is structurally left-leaning).
+theorem Test.diff_left_arg_wrap
+        (a b c : Natural) (eq : a = b)
+        : a + c = b + c := {
+  calc a + c = b + c by eq
+}
+
+-- Symmetric direction: `by eq : b = a` where step is `f(a) = f(b)`.
+-- Should wrap with congruenceOf composed with Equality.symmetry.
+theorem Test.diff_symmetric_wrap
+        (a b : Natural) (eq : b = a)
+        : successor(a) = successor(b) := {
+  calc successor(a) = successor(b) by eq
+}

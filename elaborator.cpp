@@ -4664,6 +4664,40 @@ private:
                     }
                 }
             }
+            // Diff-inference fallback: if the user's `by <proof>` has
+            // type Equality(T, a, b) and the calc step's
+            // (previousKernel, nextKernel) differ in a single slot at
+            // (a, b), wrap with Equality.congruence. Lets the user
+            // write `by lemma` instead of
+            // `by congruenceOf(λm. <giant context>, lemma)`.
+            if (step.stepProof
+                && step.relation == CalcRelation::Equality
+                && !isDefinitionallyEqual(environment_, stepContext,
+                                            stepProofType,
+                                            stepRelationTypeOpened)) {
+                ExpressionPointer diffAttempt;
+                try {
+                    diffAttempt = tryDiffApplyUserProof(
+                        localBinders, previousKernel, nextKernel,
+                        stepProofKernel, stepProofType,
+                        step.line, step.column);
+                } catch (const ElaborateError&) {
+                    diffAttempt = nullptr;
+                } catch (const TypeError&) {
+                    diffAttempt = nullptr;
+                }
+                if (diffAttempt) {
+                    ExpressionPointer diffAttemptType =
+                        inferTypeInLocalContext(localBinders,
+                            diffAttempt);
+                    if (isDefinitionallyEqual(environment_, stepContext,
+                                                diffAttemptType,
+                                                stepRelationTypeOpened)) {
+                        stepProofKernel = diffAttempt;
+                        stepProofType = diffAttemptType;
+                    }
+                }
+            }
             if (!isDefinitionallyEqual(environment_, stepContext,
                                         stepProofType,
                                         stepRelationTypeOpened)) {
@@ -5255,6 +5289,189 @@ private:
         }
         (void)carrierType;
         (void)carrierLevel;
+        return currentProof;
+    }
+
+    // Given a user-supplied `by <equationProof>` for a calc `=` step,
+    // see whether the proof's equation (a = b) sits at a unique
+    // single-position diff between `previousKernel` and `nextKernel`.
+    // If so, wrap with the chain of `Equality.congruence` calls to
+    // produce a proof of `previousKernel = nextKernel`. Returns
+    // nullptr on miss. Caller already verified the user proof's type
+    // didn't directly match the step's expected type, so this is the
+    // diff-inference fallback ("user wrote the equation, elaborator
+    // finds the slot").
+    ExpressionPointer tryDiffApplyUserProof(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer userProof,
+        ExpressionPointer userProofType,
+        int line, int column) {
+        (void)column;
+        (void)line;
+        // Extract (carrierLevel, T, a, b) from userProofType.
+        ExpressionPointer userTypeWhnf = weakHeadNormalForm(
+            environment_, userProofType);
+        EqualityComponents components;
+        try {
+            components = extractEqualityComponents(
+                userTypeWhnf, "calc step diff", line);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+        ExpressionPointer userLeft = components.leftEndpoint;
+        ExpressionPointer userRight = components.rightEndpoint;
+        ExpressionPointer userCarrier = components.carrierType;
+        LevelPointer userCarrierLevel = components.carrierUniverseLevel;
+        // ζ-unfold local let-binders (consistent with autoProveCalcStep).
+        previousKernel = zetaUnfoldLetBinders(previousKernel, localBinders);
+        nextKernel = zetaUnfoldLetBinders(nextKernel, localBinders);
+        Context openedContext = buildContextFromLocalBinders(localBinders);
+        // Lockstep walk: descend via App nodes, at each level check
+        // if the user proof matches (forward or symmetric).
+        struct CalcPathStep {
+            enum class Kind { Arg, Fn };
+            Kind kind;
+            ExpressionPointer savedSide;
+        };
+        std::vector<CalcPathStep> pathStepsOutsideIn;
+        ExpressionPointer leftCursor = previousKernel;
+        ExpressionPointer rightCursor = nextKernel;
+        ExpressionPointer innerProof = nullptr;
+        ExpressionPointer userLeftOpened = openOverLocalBinders(
+            userLeft, localBinders, localBinders.size());
+        ExpressionPointer userRightOpened = openOverLocalBinders(
+            userRight, localBinders, localBinders.size());
+        ExpressionPointer userCarrierClosed = closeOverLocalBinders(
+            userCarrier, localBinders, localBinders.size());
+        while (true) {
+            ExpressionPointer leftOpened = openOverLocalBinders(
+                leftCursor, localBinders, localBinders.size());
+            ExpressionPointer rightOpened = openOverLocalBinders(
+                rightCursor, localBinders, localBinders.size());
+            bool forwardMatch =
+                isDefinitionallyEqual(environment_, openedContext,
+                                       leftOpened, userLeftOpened)
+                && isDefinitionallyEqual(environment_, openedContext,
+                                          rightOpened, userRightOpened);
+            if (forwardMatch) {
+                innerProof = userProof;
+                break;
+            }
+            bool symmetricMatch =
+                isDefinitionallyEqual(environment_, openedContext,
+                                       leftOpened, userRightOpened)
+                && isDefinitionallyEqual(environment_, openedContext,
+                                          rightOpened, userLeftOpened);
+            if (symmetricMatch) {
+                // Wrap with Equality.symmetry.
+                ExpressionPointer symmetryCall = makeConstant(
+                    "Equality.symmetry", {userCarrierLevel});
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall), userCarrierClosed);
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall),
+                    closeOverLocalBinders(userRight, localBinders,
+                                            localBinders.size()));
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall),
+                    closeOverLocalBinders(userLeft, localBinders,
+                                            localBinders.size()));
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall), userProof);
+                innerProof = std::move(symmetryCall);
+                break;
+            }
+            // Descend through Application nodes.
+            auto* leftApp = std::get_if<Application>(&leftCursor->node);
+            auto* rightApp = std::get_if<Application>(&rightCursor->node);
+            if (!leftApp || !rightApp) break;
+            bool functionEqual = structurallyEqual(
+                leftApp->function, rightApp->function);
+            bool argumentEqual = structurallyEqual(
+                leftApp->argument, rightApp->argument);
+            if (functionEqual && argumentEqual) break;
+            if (functionEqual) {
+                pathStepsOutsideIn.push_back(
+                    {CalcPathStep::Kind::Arg, leftApp->function});
+                leftCursor = leftApp->argument;
+                rightCursor = rightApp->argument;
+                continue;
+            }
+            if (argumentEqual) {
+                pathStepsOutsideIn.push_back(
+                    {CalcPathStep::Kind::Fn, leftApp->argument});
+                leftCursor = leftApp->function;
+                rightCursor = rightApp->function;
+                continue;
+            }
+            break;
+        }
+        if (!innerProof) return nullptr;
+        // Wrap from innermost out with Equality.congruence (mirrors
+        // autoProveCalcStep's wrapping loop).
+        ExpressionPointer currentLeft = leftCursor;
+        ExpressionPointer currentRight = rightCursor;
+        ExpressionPointer currentProof = innerProof;
+        try {
+            for (auto iterator = pathStepsOutsideIn.rbegin();
+                 iterator != pathStepsOutsideIn.rend(); ++iterator) {
+                const CalcPathStep& step = *iterator;
+                LevelPointer varLevel = typeUniverseOf(
+                    localBinders, currentLeft);
+                ExpressionPointer varType = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, currentLeft),
+                    localBinders, localBinders.size());
+                ExpressionPointer lambdaBody;
+                ExpressionPointer outerLeft, outerRight;
+                if (step.kind == CalcPathStep::Kind::Arg) {
+                    ExpressionPointer liftedFunction =
+                        liftBoundVariables(step.savedSide, 1, 0);
+                    lambdaBody = makeApplication(
+                        std::move(liftedFunction),
+                        makeBoundVariable(0));
+                    outerLeft = makeApplication(step.savedSide,
+                                                 currentLeft);
+                    outerRight = makeApplication(step.savedSide,
+                                                  currentRight);
+                } else {
+                    ExpressionPointer liftedArgument =
+                        liftBoundVariables(step.savedSide, 1, 0);
+                    lambdaBody = makeApplication(
+                        makeBoundVariable(0),
+                        std::move(liftedArgument));
+                    outerLeft = makeApplication(currentLeft,
+                                                 step.savedSide);
+                    outerRight = makeApplication(currentRight,
+                                                  step.savedSide);
+                }
+                ExpressionPointer lambda = makeLambda(
+                    "_calc_z", varType, std::move(lambdaBody));
+                LevelPointer outerLevel = typeUniverseOf(
+                    localBinders, outerLeft);
+                ExpressionPointer outerType = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, outerLeft),
+                    localBinders, localBinders.size());
+                ExpressionPointer call = makeConstant(
+                    "Equality.congruence", {varLevel, outerLevel});
+                call = makeApplication(std::move(call), varType);
+                call = makeApplication(std::move(call), outerType);
+                call = makeApplication(std::move(call),
+                                        std::move(lambda));
+                call = makeApplication(std::move(call), currentLeft);
+                call = makeApplication(std::move(call), currentRight);
+                call = makeApplication(std::move(call),
+                                        std::move(currentProof));
+                currentProof = std::move(call);
+                currentLeft = std::move(outerLeft);
+                currentRight = std::move(outerRight);
+            }
+        } catch (const TypeError&) {
+            return nullptr;
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
         return currentProof;
     }
 

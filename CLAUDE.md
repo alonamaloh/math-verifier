@@ -445,6 +445,53 @@ head-WHNF, deep-β). If you get "left endpoint does not appear
 true, check the equation direction first; then check whether the LHS
 appears modulo a definitional unfold not covered by WHNF.
 
+## `by lemma` in calc context — diff-inferred congruence
+
+In a calc `=` step, if the `by` proof has type `Equality(T, a, b)` and
+the step's two endpoints differ in a unique single-position slot at
+exactly `(a, b)`, the elaborator auto-wraps with `Equality.congruence`.
+The user just supplies the equation; the elaborator finds the slot.
+
+```math
+-- Used to require an explicit motive lambda:
+calc Natural.power(Natural.padic_valuation(p, (1 + dy + dx*(1+dy))), p)
+   = Natural.power(Natural.padic_valuation(p, (1+dx))
+                       + Natural.padic_valuation(p, (1+dy)), p)
+       by congruenceOf(
+              function (m : Natural) => Natural.power(m, p),
+              Natural.padic_valuation_multiplicative(
+                  p, (1+dx), (1+dy), primality, succDxPos, succDyPos))
+
+-- Now: the elaborator infers `λm. Natural.power(m, p)` from the diff.
+calc Natural.power(Natural.padic_valuation(p, (1 + dy + dx*(1+dy))), p)
+   = Natural.power(Natural.padic_valuation(p, (1+dx))
+                       + Natural.padic_valuation(p, (1+dy)), p)
+       by Natural.padic_valuation_multiplicative(
+              p, (1+dx), (1+dy), primality, succDxPos, succDyPos)
+```
+
+How it works: the elaborator's `tryDiffApplyUserProof` walks the step's
+`(previous, next)` in lockstep through `Application` nodes. At each
+level, it tests whether the current `(subLeft, subRight)` matches the
+proof's `(a, b)` modulo `isDefinitionallyEqual` (forward) or `(b, a)`
+(symmetric — wraps in `Equality.symmetry`). On match, it wraps from
+the innermost level outward with `Equality.congruence` calls,
+reconstructing the path with the saved sibling subexpressions.
+
+Limits:
+- Single-position diff only. Multi-position diffs (the diff appears in
+  two independent slots) fall through. Use explicit
+  `congruenceOf(λm. …, eq)` or split into multiple calc steps.
+- The user's proof has to elaborate without the step's expected type
+  as a guide. Lemma calls with all arguments supplied are fine;
+  underspecified lemma calls that needed the expected type to
+  disambiguate won't reach the fallback.
+- The match uses kernel `isDefinitionallyEqual`, so it sees through
+  β/ζ/ι reductions. Plain `rewrite(eq)` does a stricter structural
+  match — diff inference catches cases like `v_p((1+dx)*(1+dy))` (the
+  lemma's LHS) vs `v_p(1+dy+dx*(1+dy))` (the step's slot) where
+  multiplication reduces structurally.
+
 ## Proof style — write proofs that read like math
 
 The overriding goal is that a proof reads like what a mathematician
