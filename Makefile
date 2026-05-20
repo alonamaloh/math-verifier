@@ -68,13 +68,15 @@ library: $(LIBRARY_MATHV_FILES)
 
 tests: library $(TEST_MATHV_FILES)
 
-# Optional verification flags. Set `CHECK_REDUNDANT_BY=1` on the make
-# command line to ask the verifier to warn about `by` annotations that
-# the auto-prover could close on its own. Doesn't affect cache contents;
-# warnings just go to stderr.
+# Verification flags. The redundant-`by` check runs by default: it warns
+# about `by <proof>` calls that the auto-prover would close on its own,
+# which keeps the library tidy as it grows. The overhead is in the noise
+# (~1s on a full -B rebuild). Doesn't affect cache contents; warnings
+# just go to stderr. Set `CHECK_REDUNDANT_BY=0` on the make command line
+# to silence.
+VERIFY_FLAGS := --check-redundant-by
+ifeq ($(CHECK_REDUNDANT_BY),0)
 VERIFY_FLAGS :=
-ifeq ($(CHECK_REDUNDANT_BY),1)
-VERIFY_FLAGS += --check-redundant-by
 endif
 
 # Recipe for a .mathv. The pattern rule provides the .math prerequisite;
