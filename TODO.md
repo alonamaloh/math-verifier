@@ -118,6 +118,79 @@ Plan: change signatures in `library/Equality/basics.math`,
 bulk-refactor call sites (agent template from the Quotient.* sweep
 applies). Estimated ~2 hours.
 
+## Rational `/` operator via implicit-prop-arg discharge
+
+Goal: an honest `/` operator on `(Integer, Natural) → Rational` with
+the *actual* denominator (not the denominator-minus-one of the rep
+encoding), so call sites read as math:
+
+    Rational.halve := (1 : Integer) / 2
+    Rational.zero  := (0 : Integer) / 1
+    -- with d : Natural, h : d ≠ 0 in scope:
+    n / d
+
+Underlying function and operator registration:
+
+    definition Rational.divide
+            : (n : Integer) → (d : Natural) → d ≠ 0 → Rational
+      | n, zero,         h => False.eliminate(Rational,
+                                  h(reflexivity(Natural, zero)))
+      | n, successor(k), _ => Quotient.mk(
+                                  RationalRepresentative.make(n, k))
+
+    definition Rational./ (n : Integer) (d : Natural) {h : d ≠ 0}
+            : Rational := Rational.divide(n, d, h)
+    operator (/) on (Integer, Natural) := Rational./
+
+Missing language piece. The existing implicit-args machinery fills
+implicits that are *uniquely determined by another argument's type*
+(e.g. `{T : Type}` from `(x : T)`, or `{primality}` from `x :
+PAdic(p, primality)` once the PAdic migration lands). The `{h : d ≠
+0}` here isn't in any other argument's type — it has to be *proved*.
+New infrastructure: when the elaborator hits an unfilled implicit
+propositional argument of type P, run a discharge protocol —
+
+  1. If P is `n ≠ 0` (or `Not(n = 0)`) and `n` head-WHNFs to
+     `successor(_)`, fill with `Natural.successor_not_zero(_)`.
+     Handles every literal denominator.
+  2. Otherwise scan local hypotheses for a term of type P. Handles
+     `d ≠ 0` already in scope.
+  3. Otherwise route to the existing `by` auto-prover
+     (`CHECK_REDUNDANT_BY=1` lemma-index path) for a library-lemma
+     sweep.
+  4. Otherwise fail with a clear "pass `Rational.divide(n, d, proof)`
+     explicitly" message.
+
+Steps 2 and 3 reuse machinery the `by` desugaring already has. Step 1
+is a few lines of recognition plus a one-liner proof construction. The
+larger change is the routing — detecting an unfilled implicit prop
+arg in the elaborator and threading it into the discharger.
+
+Risks:
+  - Nondeterminism if multiple local hypotheses match. First-match-
+    wins; explicit pass overrides.
+  - Cost on every implicit-prop hole. Need a fast negative path when
+    nothing matches.
+
+Shared payoff: any future operator/function with a side-condition
+implicit that isn't embedded in another arg's type gets covered by
+the same machinery — generalizes beyond `/`.
+
+Migration scope after landing: the literal-rational construction
+sites (`Rational.zero`, `Rational.one`, `Rational.halve`, and ~20
+others surfaced by `grep "Quotient.mk(RationalRepresentative" library/
+Rational/`) collapse to one-line definitions reading as math.
+Abstract-rep sites inside `Quotient.induct` motives in
+`reciprocal_function.math` etc. do *not* migrate — there the rep's
+`+1` offset is structurally what the proof manipulates, and `/` would
+be misleading. Operator and raw constructor will coexist.
+
+Order of operations:
+  1. Discharge protocol in the elaborator (the substantive piece).
+  2. `Rational.divide` + operator registration (~30 lines of library
+     code).
+  3. Sweep the literal-rational construction sites.
+
 ## Ergonomics — top friction points
 
 From a full-library audit (2026-05-17). Each item is annotated with
