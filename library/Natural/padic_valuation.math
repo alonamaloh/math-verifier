@@ -281,12 +281,14 @@ theorem Natural.padic_valuation_step_fuel_stable
                                                        f2', prime, n,
                                                        refinedModuloEq))
                               | successor(predM) =>
-                                  Equality.transitivity(
-                                      Natural.padic_valuation_step_zero_when_not_divides(
-                                          f1', prime, n, predM, refinedModuloEq),
-                                      Equality.symmetry(
-                                          Natural.padic_valuation_step_zero_when_not_divides(
-                                              f2', prime, n, predM, refinedModuloEq)))
+                                  calc Natural.padic_valuation_step(successor(f1'), prime, n)
+                                     = 0
+                                           by Natural.padic_valuation_step_zero_when_not_divides(
+                                                  f1', prime, n, predM, refinedModuloEq)
+                                     = Natural.padic_valuation_step(successor(f2'), prime, n)
+                                           by Equality.symmetry(
+                                                  Natural.padic_valuation_step_zero_when_not_divides(
+                                                      f2', prime, n, predM, refinedModuloEq))
                             }
                     } : (refinedNLeF2 : n ≤ f2)
                         → Natural.padic_valuation_step(successor(f1'), prime, n)
@@ -742,9 +744,9 @@ theorem Natural.padic_valuation_power_divides
                                    mValue),
                            0, m,
                            Equality.symmetry(
-                               Equality.transitivity(
-                                   refinedMEq,
-                                   Natural.multiply_zero(prime))),
+                               calc m
+                                  = prime * 0
+                                  = 0),
                            Natural.one_divides(0))
                  | successor(predQ) =>
                      function (refinedMEq : m = prime * successor(predQ)) => {
@@ -905,9 +907,9 @@ theorem Natural.power_divides_implies_padic_valuation_ge
              function (refinedNEq : n = prime * 0) =>
                absurd(
                    rewrite(
-                       Equality.transitivity(
-                           refinedNEq,
-                           Natural.multiply_zero(prime)),
+                       calc n
+                          = prime * 0
+                          = 0,
                        nPositive))
          | successor(predQ) =>
              function (refinedNEq : n = prime * successor(predQ)) => {
@@ -953,15 +955,13 @@ theorem Natural.power_divides_implies_padic_valuation_ge
                -- v_p(n) = v_p(p * succ(predQ)) = succ(v_p(succ(predQ))) by strip.
                -- So we want succ(predK) ≤ succ(v_p(succ(predQ))).
                rewrite(
-                   Equality.transitivity(
-                       Equality.symmetry(
-                           Natural.padic_valuation_strip(
-                               prime, successor(predQ),
-                               primeAtLeastTwo, succQPositive)),
-                       congruenceOf(
-                           function (m : Natural) =>
-                               Natural.padic_valuation(prime, m),
-                           Equality.symmetry(refinedNEq))),
+                   calc successor(Natural.padic_valuation(prime, successor(predQ)))
+                      = Natural.padic_valuation(prime, prime * successor(predQ))
+                            by Equality.symmetry(
+                                   Natural.padic_valuation_strip(
+                                       prime, successor(predQ),
+                                       primeAtLeastTwo, succQPositive))
+                      = Natural.padic_valuation(prime, n),
                    Natural.successor_less_or_equal_successor(
                        predK,
                        Natural.padic_valuation(prime, successor(predQ)),
@@ -1117,9 +1117,9 @@ theorem Natural.distance_monus_when_le
         : (b a : Natural) → b ≤ a → Natural.distance(a, b) = Natural.monus(a, b)
   | zero, a, _ =>
       -- distance(a, 0) = a, monus(a, 0) = a.
-      Equality.transitivity(
-          Natural.distance_zero_right(a),
-          Equality.symmetry(Natural.monus_zero(a)))
+      calc Natural.distance(a, 0)
+         = a
+         = Natural.monus(a, 0)
   | successor(predB), a, succPredBLeA =>
       (cases a {
          | zero =>
@@ -1142,9 +1142,10 @@ theorem Natural.distance_monus_when_le
 theorem Natural.distance_monus_when_ge
         (a b : Natural) (aLeB : a ≤ b)
         : Natural.distance(a, b) = Natural.monus(b, a) :=
-  Equality.transitivity(
-      Natural.distance_symmetric(a, b),
-      Natural.distance_monus_when_le(a, b, aLeB))
+  calc Natural.distance(a, b)
+     = Natural.distance(b, a)
+     = Natural.monus(b, a)
+           by Natural.distance_monus_when_le(a, b, aLeB)
 
 -- Helper: a ≤ c implies a + b ≤ c + b. By induction on the proof of a ≤ c.
 theorem Natural.le_add_preserves_left
@@ -1205,13 +1206,11 @@ theorem Natural.monus_add_distributes
        = (a + Natural.monus(c, a)) + d
        = (a + Natural.monus(c, a)) + (b + Natural.monus(d, b))
        = (a + b) + (Natural.monus(c, a) + Natural.monus(d, b));
-  Equality.transitivity(
-      congruenceOf(
-          function (m : Natural) => Natural.monus(m, a + b),
-          sumDecompose),
-      Natural.monus_add_cancel(
-          a + b,
-          Natural.monus(c, a) + Natural.monus(d, b)))
+  calc Natural.monus(c + d, a + b)
+     = Natural.monus(
+           (a + b) + (Natural.monus(c, a) + Natural.monus(d, b)),
+           a + b)
+     = Natural.monus(c, a) + Natural.monus(d, b)
 }
 
 -- Helper: d divides distance(a, b) when d divides both a and b.
@@ -1254,25 +1253,18 @@ theorem Natural.distance_sum_cross_le_le
      = Natural.distance(a1 + (b2 + Natural.monus(b1, b2)),
                          (a1 + Natural.monus(a2, a1)) + b2)
      = Natural.distance((a1 + b2) + Natural.monus(b1, b2),
+                         (a1 + Natural.monus(a2, a1)) + b2)
+     = Natural.distance((a1 + b2) + Natural.monus(b1, b2),
                          (a1 + b2) + Natural.monus(a2, a1))
-            by Equality.transitivity(
-                   congruenceOf(
-                       function (m : Natural) =>
-                           Natural.distance(
-                               m,
-                               (a1 + Natural.monus(a2, a1)) + b2),
-                       Equality.symmetry(
-                           Natural.add_associative(
-                               a1, b2, Natural.monus(b1, b2)))),
-                   congruenceOf(
-                       function (m : Natural) =>
-                           Natural.distance(
-                               (a1 + b2) + Natural.monus(b1, b2),
-                               m),
-                       calc (a1 + Natural.monus(a2, a1)) + b2
-                          = a1 + (Natural.monus(a2, a1) + b2)
-                          = a1 + (b2 + Natural.monus(a2, a1))
-                          = (a1 + b2) + Natural.monus(a2, a1)))
+            by congruenceOf(
+                   function (m : Natural) =>
+                       Natural.distance(
+                           (a1 + b2) + Natural.monus(b1, b2),
+                           m),
+                   calc (a1 + Natural.monus(a2, a1)) + b2
+                      = a1 + (Natural.monus(a2, a1) + b2)
+                      = a1 + (b2 + Natural.monus(a2, a1))
+                      = (a1 + b2) + Natural.monus(a2, a1))
      = Natural.distance(Natural.monus(b1, b2), Natural.monus(a2, a1))
 }
 
