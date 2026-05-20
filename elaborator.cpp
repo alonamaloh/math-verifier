@@ -5203,8 +5203,16 @@ private:
                 const CalcPathStep& step = *iterator;
                 LevelPointer varLevel = typeUniverseOf(
                     localBinders, currentLeft);
-                ExpressionPointer varType = inferTypeInLocalContext(
-                    localBinders, currentLeft);
+                // inferTypeInLocalContext returns the type in OPENED form
+                // (with FVar references for local binders). We splice it
+                // into a kernel term that's built in CLOSED form, so we
+                // must close it back — otherwise an FVar reference to a
+                // local binder (e.g. `carrier : Type(0)` parameter) leaks
+                // into the emitted term and the kernel rejects it as an
+                // unbound internal variable.
+                ExpressionPointer varType = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, currentLeft),
+                    localBinders, localBinders.size());
                 ExpressionPointer lambdaBody;
                 ExpressionPointer outerLeft, outerRight;
                 if (step.kind == CalcPathStep::Kind::Arg) {
@@ -5232,8 +5240,9 @@ private:
                     "_calc_z", varType, std::move(lambdaBody));
                 LevelPointer outerLevel = typeUniverseOf(
                     localBinders, outerLeft);
-                ExpressionPointer outerType =
-                    inferTypeInLocalContext(localBinders, outerLeft);
+                ExpressionPointer outerType = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, outerLeft),
+                    localBinders, localBinders.size());
                 ExpressionPointer call = makeConstant(
                     "Equality.congruence",
                     {varLevel, outerLevel});
