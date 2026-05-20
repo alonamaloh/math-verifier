@@ -264,6 +264,7 @@ SurfaceExpressionPointer substituteSurfaceName(
         std::vector<SurfaceCalcStep> newSteps;
         for (const auto& step : calc->steps) {
             SurfaceCalcStep newStep;
+            newStep.relation = step.relation;
             newStep.nextExpression = substituteSurfaceName(
                 step.nextExpression, targetName, replacement);
             newStep.stepProof = substituteSurfaceName(
@@ -1677,36 +1678,53 @@ private:
     }
 
     // Calc-step proof bodies are parsed at a precedence below `=` so the
-    // next `=` (if any) starts the next calc step rather than being
-    // consumed as a top-level equality. `function`/`let` are still
-    // allowed at the top of a step proof; users who need a top-level
-    // `→`, `∧`, `∨`, or `=` inside a step proof must parenthesise.
+    // next calc-separator token (`=`, `≤`, `<`, `≥`, `>`) starts the
+    // next calc step rather than being consumed as part of this step's
+    // proof. `function`/`let` are still allowed at the top of a step
+    // proof; users who need a top-level `→`, `∧`, `∨`, `=`, or any
+    // inequality inside a step proof must parenthesise.
     SurfaceExpressionPointer parseCalcStepProof() {
         if (peek().kind == TokenKind::KeywordFunction) return parseLambda();
         if (peek().kind == TokenKind::KeywordLet)      return parseLet();
-        return parseRelational();
+        return parseAdditive();
     }
 
-    // `calc <initial> = <next1> by <proof1> = <next2> by <proof2> …`.
-    // Each `proofₖ` proves `<previous-expression> = <nextₖ>`. The
-    // elaborator turns the chain into nested Equality.transitivity calls.
+    // `calc <initial> R1 <next1> by <proof1> R2 <next2> by <proof2> …`.
+    // Each `Rₖ` is `=` or `≤`, each `proofₖ` proves
+    // `<previous-expression> Rₖ <nextₖ>`. The elaborator composes the
+    // chain via Equality.transitivity / <T>.LessOrEqual.transitive,
+    // upgrading `=` to `≤` by rewrite-of-reflexivity wherever the chain
+    // mixes relations.
+    //
+    // Note: initial and step expressions are parsed at the parseAdditive
+    // level, not parseRelational — `≤` (and friends, as we add them) is
+    // the calc separator, not an in-expression operator. Step
+    // expressions containing `≤`/`<` etc. must be parenthesised, just
+    // as they must already be for `=`.
     SurfaceExpressionPointer parseCalc() {
         Token calcToken = consumeAny();  // 'calc'
-        auto initialExpression = parseRelational();
+        auto initialExpression = parseAdditive();
         std::vector<SurfaceCalcStep> steps;
-        while (peek().kind == TokenKind::Equal) {
-            Token equalToken = consumeAny();  // '='
-            auto nextExpression = parseRelational();
+        while (peek().kind == TokenKind::Equal
+               || peek().kind == TokenKind::LessOrEqual) {
+            Token relationToken = consumeAny();
+            CalcRelation relation =
+                (relationToken.kind == TokenKind::LessOrEqual)
+                    ? CalcRelation::LessOrEqual
+                    : CalcRelation::Equality;
+            auto nextExpression = parseAdditive();
             SurfaceCalcStep step;
+            step.relation = relation;
             step.nextExpression = std::move(nextExpression);
-            step.line = equalToken.line;
-            step.column = equalToken.column;
+            step.line = relationToken.line;
+            step.column = relationToken.column;
             // `by <proof>` is optional. When omitted, the elaborator
             // runs an auto-prover that tries reflexivity (def-eq) and
             // single-position diffs categorized as commutativity /
             // associativity / local hypothesis. If the auto-prover
             // can't close the step, the user gets an error and supplies
-            // `by <reason>`.
+            // `by <reason>`. (Auto-prover currently runs for `=` steps
+            // only; `≤` steps must supply `by`.)
             if (peek().kind == TokenKind::KeywordBy) {
                 consumeAny();  // 'by'
                 step.stepProof = parseCalcStepProof();
@@ -1717,7 +1735,8 @@ private:
         }
         if (steps.empty()) {
             throwHere("calc block needs at least one "
-                      "'= <expression> [by <proof>]' step");
+                      "'= <expression> [by <proof>]' or "
+                      "'≤ <expression> by <proof>' step");
         }
         return makeSurfaceCalc(std::move(initialExpression),
                                 std::move(steps),

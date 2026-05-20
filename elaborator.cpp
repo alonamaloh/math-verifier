@@ -2691,6 +2691,7 @@ private:
             std::vector<SurfaceCalcStep> rewrittenSteps;
             for (const auto& step : calc->steps) {
                 SurfaceCalcStep rewrittenStep;
+                rewrittenStep.relation = step.relation;
                 rewrittenStep.nextExpression = rewriteRecursiveCalls(
                     step.nextExpression, thisDeclName,
                     recursiveArgToHypothesis, outerBinderCount);
@@ -4422,44 +4423,103 @@ private:
             carrierTypeOpen, localBinders, localBinders.size());
         LevelPointer carrierLevel =
             typeUniverseOf(localBinders, previousKernel);
-        std::vector<ExpressionPointer> stepProofKernels;
+
+        // Resolve the carrier's <T>.LessOrEqual relation (and its
+        // reflexive + transitive lemmas) on first use. Empty until the
+        // calc actually hits a ≤ step. Looked up via the operator
+        // registry (which `operator (≤) on (T, T) := <T>.LessOrEqual;`
+        // populates) plus the small Natural special-case where the
+        // inductive itself is the relation.
+        auto* carrierConstant =
+            std::get_if<Constant>(&carrierTypeOpen->node);
+        std::string carrierTypeName =
+            carrierConstant ? carrierConstant->name : std::string{};
+        std::string leqRelationName;       // e.g. "Real.LessOrEqual"
+        std::string leqReflexiveName;      // e.g. "Real.LessOrEqual.reflexive"
+        std::string leqTransitiveName;     // e.g. "Real.LessOrEqual.transitive"
+        bool transitiveTakesProofsSwapped = false;
+        auto resolveLeqNames = [&]() {
+            if (!leqRelationName.empty()) return;
+            std::string registered = environment_.lookupOperator(
+                "≤", carrierTypeName, carrierTypeName);
+            if (!registered.empty()) {
+                leqRelationName = registered;
+                leqReflexiveName = registered + ".reflexive";
+                leqTransitiveName = registered + ".transitive";
+            } else if (carrierTypeName == "Natural") {
+                // Natural's ≤ falls back to the bare inductive
+                // `LessOrEqual`. Its transitive lemma takes the proofs
+                // in (b≤c, a≤b) order — historical accident from the
+                // pattern-match-on-second-proof construction — so flag
+                // the swap for the composition step below.
+                leqRelationName = "LessOrEqual";
+                leqReflexiveName = "LessOrEqual.reflexivity";
+                leqTransitiveName = "LessOrEqual.transitive";
+                transitiveTakesProofsSwapped = true;
+            } else {
+                throwElaborate(
+                    "calc step uses '≤' but no operator '≤' is "
+                    "registered on (" + carrierTypeName + ", "
+                    + carrierTypeName + ") — register one via "
+                    "`operator (≤) on (" + carrierTypeName + ", "
+                    + carrierTypeName + ") := <fn>;` first");
+            }
+        };
+
+        struct StepRecord {
+            CalcRelation relation;
+            ExpressionPointer proof;
+        };
+        std::vector<StepRecord> steps;
         std::vector<ExpressionPointer> endpointKernels;
         endpointKernels.push_back(previousKernel);
+
         for (size_t k = 0; k < calc.steps.size(); ++k) {
             const auto& step = calc.steps[k];
             Frame stepFrame(*this,
                 "calc step " + std::to_string(k + 1)
                 + " at line " + std::to_string(step.line),
                 localBinders,
-                // Goal for this step is the equality
-                // `previousKernel = next`. We don't yet know `next`,
-                // but `previousKernel` is the left endpoint and the
-                // user usually wants to see what they're stepping from.
+                // Goal for this step is the relation
+                // `previousKernel R next`. We don't yet know `next`,
+                // but `previousKernel` is the left endpoint.
                 previousKernel,
                 step.line, /*column*/ 0);
             ExpressionPointer nextKernel = elaborateExpression(
                 *step.nextExpression, localBinders, carrierType);
-            ExpressionPointer stepEqualityType = makeApplication(
-                makeApplication(
+            // Build the step's expected proof type from its relation.
+            ExpressionPointer stepRelationType;
+            if (step.relation == CalcRelation::Equality) {
+                stepRelationType = makeApplication(
                     makeApplication(
-                        makeConstant("Equality", {carrierLevel}),
-                        carrierType),
-                    previousKernel),
-                nextKernel);
+                        makeApplication(
+                            makeConstant("Equality", {carrierLevel}),
+                            carrierType),
+                        previousKernel),
+                    nextKernel);
+            } else {
+                resolveLeqNames();
+                stepRelationType = makeApplication(
+                    makeApplication(
+                        makeConstant(leqRelationName),
+                        previousKernel),
+                    nextKernel);
+            }
             ExpressionPointer stepProofKernel;
             if (step.stepProof) {
                 stepProofKernel = elaborateExpression(
-                    *step.stepProof, localBinders, stepEqualityType);
+                    *step.stepProof, localBinders, stepRelationType);
                 // `--check-redundant-by`: speculatively run the
-                // auto-prover and report a warning if it would also
+                // auto-prover (= steps only) and warn if it would also
                 // close this step. Pure helper, no side effects.
-                if (reportRedundantBy_) {
+                if (reportRedundantBy_
+                    && step.relation == CalcRelation::Equality) {
                     ExpressionPointer autoAttempt;
                     try {
                         autoAttempt = autoProveCalcStep(
                             localBinders, previousKernel, nextKernel,
                             carrierType, carrierLevel,
-                            stepEqualityType,
+                            stepRelationType,
                             step.line, step.column);
                     } catch (const ElaborateError&) {
                         autoAttempt = nullptr;
@@ -4473,14 +4533,14 @@ private:
                             "auto-prover closes it without help\n";
                     }
                 }
-            } else {
-                // No `by <proof>` — run the auto-prover. v0: try
-                // reflexivity (definitional equality) only. Future
+            } else if (step.relation == CalcRelation::Equality) {
+                // No `by <proof>` on an = step — run the auto-prover.
+                // v0: reflexivity (definitional equality) only; later
                 // iterations add commutativity/associativity/local-
                 // hypothesis recognition via a single-position diff.
                 stepProofKernel = autoProveCalcStep(
                     localBinders, previousKernel, nextKernel,
-                    carrierType, carrierLevel, stepEqualityType,
+                    carrierType, carrierLevel, stepRelationType,
                     step.line, step.column);
                 if (!stepProofKernel) {
                     throwElaborate(
@@ -4488,15 +4548,19 @@ private:
                         "auto-prover couldn't close it. Add `by "
                         "<reason>` to disambiguate.");
                 }
+            } else {
+                throwElaborate(
+                    "calc ≤ step needs `by <proof>` (no auto-prover "
+                    "for inequality steps yet)");
             }
-            // Verify the proof actually has the equality type the step
+            // Verify the proof actually has the relation type the step
             // claims — bare identifier proofs don't get checked against
             // expectedType during elaboration, so a wrong proof would
             // otherwise leak through to a confusing kernel error later.
             ExpressionPointer stepProofType = inferTypeInLocalContext(
                 localBinders, stepProofKernel);
-            ExpressionPointer stepEqualityTypeOpened = openOverLocalBinders(
-                stepEqualityType, localBinders, localBinders.size());
+            ExpressionPointer stepRelationTypeOpened = openOverLocalBinders(
+                stepRelationType, localBinders, localBinders.size());
             Context stepContext;
             for (size_t i = 0; i < localBinders.size(); ++i) {
                 ExpressionPointer openedType = openOverLocalBinders(
@@ -4506,25 +4570,23 @@ private:
             }
             if (!isDefinitionallyEqual(environment_, stepContext,
                                         stepProofType,
-                                        stepEqualityTypeOpened)) {
-                // Auto-rewrite fallback. If the user wrote a bare
-                // expression of equality type as the step proof
-                // (most commonly a hypothesis name like `IH`), and
-                // it doesn't match the expected step equality, try
-                // re-elaborating it as `rewrite(<surface>)`. The
-                // existing rewrite desugaring finds the unique
-                // occurrence of the proof's LHS in the goal's LHS
-                // and wraps the proof in `Equality.congruence`.
-                // Lets the user write `by IH` instead of
-                // `by rewrite(IH)`. Only fires when a surface proof
-                // was supplied — when stepProof is nullptr the
-                // auto-prover above has already run.
+                                        stepRelationTypeOpened)) {
+                // Auto-rewrite fallback for = steps. If the user wrote
+                // a bare expression of equality type as the step proof
+                // (most commonly a hypothesis name like `IH`), and it
+                // doesn't match the expected step equality, try
+                // re-elaborating it as `rewrite(<surface>)`. Lets the
+                // user write `by IH` instead of `by rewrite(IH)`.
+                // Only fires for = steps when a surface proof was
+                // supplied — when stepProof is nullptr the auto-prover
+                // above has already run.
                 ExpressionPointer rewriteAttempt;
-                if (step.stepProof) {
+                if (step.stepProof
+                    && step.relation == CalcRelation::Equality) {
                     try {
                         rewriteAttempt = desugarRewrite(
                             step.stepProof, localBinders,
-                            stepEqualityType,
+                            stepRelationType,
                             step.line, step.column);
                     } catch (const ElaborateError&) {
                         rewriteAttempt = nullptr;
@@ -4536,7 +4598,7 @@ private:
                             rewriteAttempt);
                     if (isDefinitionallyEqual(environment_, stepContext,
                                                 rewriteType,
-                                                stepEqualityTypeOpened)) {
+                                                stepRelationTypeOpened)) {
                         stepProofKernel = rewriteAttempt;
                         stepProofType = rewriteType;
                     }
@@ -4544,35 +4606,127 @@ private:
             }
             if (!isDefinitionallyEqual(environment_, stepContext,
                                         stepProofType,
-                                        stepEqualityTypeOpened)) {
+                                        stepRelationTypeOpened)) {
                 TypeError error(
-                    "calc step proof's type does not match the equality "
-                    "claimed by this step");
-                error.expectedType = stepEqualityTypeOpened;
+                    "calc step proof's type does not match the "
+                    "relation claimed by this step");
+                error.expectedType = stepRelationTypeOpened;
                 error.actualType = stepProofType;
                 rethrowKernelError(error);
             }
-            stepProofKernels.push_back(stepProofKernel);
+            steps.push_back({step.relation, stepProofKernel});
             endpointKernels.push_back(nextKernel);
             previousKernel = nextKernel;
         }
-        // One-step calc: the proof already has the desired type.
-        if (stepProofKernels.size() == 1) {
-            return stepProofKernels[0];
+
+        // Determine the overall chain's relation: ≤ if any step is ≤,
+        // else =. (Phase 2 will add < and the strictness propagation.)
+        bool chainIsLessOrEqual = false;
+        for (const auto& s : steps) {
+            if (s.relation == CalcRelation::LessOrEqual) {
+                chainIsLessOrEqual = true;
+                break;
+            }
         }
-        // Left-fold transitivity. After step k (0-indexed, k ≥ 1) the
-        // running proof spans endpoints[0] → endpoints[k+1] via the
-        // running middle endpoints[k].
-        ExpressionPointer running = stepProofKernels[0];
-        for (size_t k = 1; k < stepProofKernels.size(); ++k) {
+
+        // Helper: upgrade an =-proof to a ≤-proof via transport on the
+        // relation's right argument. Given p : a = b, returns p' :
+        // a ≤ b built as transport_proposition(T, λz. a ≤ z, a, b, p,
+        // reflexive(a)).
+        //
+        // The `aExpr` reference inside the motive lambda body needs its
+        // De Bruijn indices shifted up by one to account for the new
+        // `z` binder we're putting around it.
+        auto upgradeEqualityToLessOrEqual =
+            [&](ExpressionPointer eqProof,
+                ExpressionPointer aExpr,
+                ExpressionPointer bExpr) -> ExpressionPointer {
+            resolveLeqNames();
+            // motive: λ (z : T). leqRelationName(aExpr↑1, z).
+            ExpressionPointer aExprShifted = shift(aExpr, 1);
+            ExpressionPointer motiveBody = makeApplication(
+                makeApplication(
+                    makeConstant(leqRelationName),
+                    std::move(aExprShifted)),
+                makeBoundVariable(0));
+            ExpressionPointer motive = makeLambda(
+                "z", carrierType, std::move(motiveBody));
+            ExpressionPointer reflexive = makeApplication(
+                makeConstant(leqReflexiveName), aExpr);
+            // Equality.transport_proposition(T, motive, a, b, eq, refl).
             ExpressionPointer call = makeConstant(
-                "Equality.transitivity", {carrierLevel});
+                "Equality.transport_proposition", {carrierLevel});
             call = makeApplication(std::move(call), carrierType);
+            call = makeApplication(std::move(call), std::move(motive));
+            call = makeApplication(std::move(call), aExpr);
+            call = makeApplication(std::move(call), bExpr);
+            call = makeApplication(std::move(call), std::move(eqProof));
+            call = makeApplication(std::move(call), std::move(reflexive));
+            return call;
+        };
+
+        // Single-step calc: the step proof already has the right type
+        // unless the chain is ≤ but the only step is =, in which case
+        // we upgrade. (Can't actually happen — single = step keeps
+        // chainIsLessOrEqual=false — but handle defensively.)
+        if (steps.size() == 1) {
+            if (chainIsLessOrEqual
+                && steps[0].relation == CalcRelation::Equality) {
+                return upgradeEqualityToLessOrEqual(
+                    steps[0].proof,
+                    endpointKernels[0], endpointKernels[1]);
+            }
+            return steps[0].proof;
+        }
+
+        // Composition. If the chain is all =, fold via
+        // Equality.transitivity (unchanged from before). Otherwise fold
+        // via <T>.LessOrEqual.transitive, upgrading each = step on the
+        // fly.
+        if (!chainIsLessOrEqual) {
+            ExpressionPointer running = steps[0].proof;
+            for (size_t k = 1; k < steps.size(); ++k) {
+                ExpressionPointer call = makeConstant(
+                    "Equality.transitivity", {carrierLevel});
+                call = makeApplication(std::move(call), carrierType);
+                call = makeApplication(std::move(call), endpointKernels[0]);
+                call = makeApplication(std::move(call), endpointKernels[k]);
+                call = makeApplication(std::move(call), endpointKernels[k + 1]);
+                call = makeApplication(std::move(call), std::move(running));
+                call = makeApplication(std::move(call), steps[k].proof);
+                running = std::move(call);
+            }
+            return running;
+        }
+
+        // Chain has at least one ≤. Build the running proof at type
+        // endpoint[0] ≤ endpoint[k+1] after each step k, upgrading
+        // =-step proofs to ≤ along the way.
+        auto stepProofAsLeq = [&](size_t k) -> ExpressionPointer {
+            if (steps[k].relation == CalcRelation::LessOrEqual) {
+                return steps[k].proof;
+            }
+            return upgradeEqualityToLessOrEqual(
+                steps[k].proof,
+                endpointKernels[k], endpointKernels[k + 1]);
+        };
+        ExpressionPointer running = stepProofAsLeq(0);
+        for (size_t k = 1; k < steps.size(); ++k) {
+            ExpressionPointer nextProof = stepProofAsLeq(k);
+            // <T>.LessOrEqual.transitive(x, y, z, hxy, hyz) : x ≤ z.
+            // For Natural the lemma takes the proofs swapped — flag
+            // recorded by resolveLeqNames.
+            ExpressionPointer call = makeConstant(leqTransitiveName);
             call = makeApplication(std::move(call), endpointKernels[0]);
             call = makeApplication(std::move(call), endpointKernels[k]);
             call = makeApplication(std::move(call), endpointKernels[k + 1]);
-            call = makeApplication(std::move(call), std::move(running));
-            call = makeApplication(std::move(call), stepProofKernels[k]);
+            if (transitiveTakesProofsSwapped) {
+                call = makeApplication(std::move(call), std::move(nextProof));
+                call = makeApplication(std::move(call), std::move(running));
+            } else {
+                call = makeApplication(std::move(call), std::move(running));
+                call = makeApplication(std::move(call), std::move(nextProof));
+            }
             running = std::move(call);
         }
         return running;

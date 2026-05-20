@@ -218,19 +218,28 @@ struct SurfaceByInductionUsing {
     SurfaceExpressionPointer body;
 };
 
-// One step of a `calc` block: a target expression that the previous
-// expression should equal, plus the proof of that single step.
+// Which relation a calc step asserts between the previous expression
+// and `nextExpression`. `=` is the original calc; `≤` extends calc to
+// chained inequalities. A chain mixing the two becomes a `≤` overall
+// (any `=` step is upgraded by congruence with reflexivity).
+enum class CalcRelation { Equality, LessOrEqual };
+
+// One step of a `calc` block: the relation that step asserts, a target
+// expression the previous expression stands in that relation to, plus
+// the proof of that single step.
 struct SurfaceCalcStep {
+    CalcRelation relation = CalcRelation::Equality;
     SurfaceExpressionPointer nextExpression;
     SurfaceExpressionPointer stepProof;
     int line = 0;
     int column = 0;
 };
 
-// `calc <initial> = <next1> by <p1> = <next2> by <p2> ...`. Each step's
-// proof `pₖ` proves `<previous-expression> = <nextₖ>`. Elaborates to a
-// left-fold of Equality.transitivity over the step proofs (or just the
-// single proof when there's exactly one step).
+// `calc <initial> R1 <next1> by <p1> R2 <next2> by <p2> ...`. Each step
+// asserts `<previous> Rₖ <nextₖ>` with proof `pₖ`. Currently Rₖ ∈ {=, ≤};
+// see CalcRelation. The elaborator composes the chain via
+// Equality.transitivity / <T>.LessOrEqual.transitive, upgrading `=` to
+// `≤` by rewrite-of-reflexivity wherever the chain mixes relations.
 struct SurfaceCalc {
     SurfaceExpressionPointer initialExpression;
     std::vector<SurfaceCalcStep> steps;
