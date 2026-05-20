@@ -195,18 +195,11 @@ theorem Natural.prime_divides_product_when_coprime
           : (p : Integer) * x * (b : Integer)
                 + (a : Integer) * y * (b : Integer)
             = (b : Integer)
-        by Equality.transitivity(
-               Equality.symmetry(
-                   Integer.distributivity_right(
-                       (p : Integer) * x,
-                       (a : Integer) * y,
-                       (b : Integer))),
-               Equality.transitivity(
-                   congruenceOf(
-                       function (sumPart : Integer) =>
-                           sumPart * (b : Integer),
-                       bezoutEquation),
-                   Integer.multiply_identity_left((b : Integer))));
+        by calc (p : Integer) * x * (b : Integer)
+                  + (a : Integer) * y * (b : Integer)
+              = ((p : Integer) * x + (a : Integer) * y) * (b : Integer)
+              = Integer.one * (b : Integer)
+              = (b : Integer);
 
     -- Step 2: rewrite (a*y)*b into p*((k:Integer)*y) using
     -- a*b = p * productQuotient at Integer level.
@@ -254,15 +247,12 @@ theorem Natural.prime_divides_product_when_coprime
         -- Inject to Natural: b = p * coefficient.
         claim bAsCastedProduct
               : (b : Integer) = (p * coefficient : Integer)
-          by Equality.transitivity(
-                 bAsProduct,
-                 Equality.transitivity(
-                     congruenceOf(
-                         function (z : Integer) => (p : Integer) * z,
-                         zEqCoefficient),
-                     Equality.symmetry(
-                         Natural.to_integer.multiply_preserves(
-                             p, coefficient))));
+          by calc (b : Integer)
+                = (p : Integer)
+                    * (x * (b : Integer)
+                       + (productQuotient : Integer) * y)
+                = (p : Integer) * (coefficient : Integer)
+                = (p * coefficient : Integer);
         ⟨coefficient,
          Natural.to_integer.injective(b, p * coefficient, bAsCastedProduct)⟩
       }
@@ -274,20 +264,13 @@ theorem Natural.prime_divides_product_when_coprime
         -- (b : Int) = (p : Int) * -(negativePart : Int) = -((p * negativePart) : Int).
         claim bEqNegateProduct
               : (b : Integer) = -((p * negativePart) : Integer)
-          by Equality.transitivity(
-                 bAsProduct,
-                 Equality.transitivity(
-                     congruenceOf(
-                         function (z : Integer) => (p : Integer) * z,
-                         zEqNegated),
-                     Equality.transitivity(
-                         Integer.multiply_negate_right(
-                             (p : Integer), (negativePart : Integer)),
-                         congruenceOf(
-                             Integer.negate,
-                             Equality.symmetry(
-                                 Natural.to_integer.multiply_preserves(
-                                     p, negativePart))))));
+          by calc (b : Integer)
+                = (p : Integer)
+                    * (x * (b : Integer)
+                       + (productQuotient : Integer) * y)
+                = (p : Integer) * -(negativePart : Integer)
+                = -((p : Integer) * (negativePart : Integer))
+                = -((p * negativePart) : Integer);
         claim bIsZero : b = zero
           by Natural.natural_eq_negate_natural_implies_first_zero(
                  b, p * negativePart, bEqNegateProduct);

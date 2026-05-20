@@ -74,11 +74,10 @@ theorem Natural.has_bezout_zero_right (a : Natural)
     claim combined
           : (a : Integer) * Integer.one + (zero : Integer) * Integer.zero
             = (a : Integer)
-        by Equality.transitivity(
-               rewrite(multiplyByOne),
-               Equality.transitivity(
-                   rewrite(zeroTimesZero),
-                   Integer.add_identity_right((a : Integer))));
+        by calc (a : Integer) * Integer.one + (zero : Integer) * Integer.zero
+              = (a : Integer) + (zero : Integer) * Integer.zero
+              = (a : Integer) + Integer.zero
+              = (a : Integer);
     ⟨a, Integer.one, Integer.zero, combined, Natural.is_gcd_zero_right(a)⟩
 }
 
@@ -182,23 +181,20 @@ theorem Integer.bezout_substitute
         by Equality.transitivity(
                factorYPrime,
                rewrite(subtractToRemainder));
-    -- Combine all reshufflings.
+    -- Combine all reshufflings. Every step matches a local-hypothesis
+    -- equation; the auto-prover closes them by name (no `by` needed).
     claim assembledLeft
           : aInt * yPrime + bInt * (xPrime - qInt * yPrime)
             = bInt * xPrime + rInt * yPrime
-        by Equality.transitivity(
-               outerRewritten,
-               Equality.transitivity(
-                   reassociateOuter,
-                   Equality.transitivity(
-                       swapOuter,
-                       Equality.transitivity(
-                           reassociateForward,
-                           congruenceOf(
-                               function (subtractedPair : Integer) =>
-                                   bInt * xPrime + subtractedPair,
-                               factoredEqualsRYPrime)))));
-    Equality.transitivity(assembledLeft, recursedEquation)
+        by calc aInt * yPrime + bInt * (xPrime - qInt * yPrime)
+              = aInt * yPrime + (bInt * xPrime - qInt * bInt * yPrime)
+              = aInt * yPrime + bInt * xPrime + -(qInt * bInt * yPrime)
+              = bInt * xPrime + aInt * yPrime + -(qInt * bInt * yPrime)
+              = bInt * xPrime + (aInt * yPrime + -(qInt * bInt * yPrime))
+              = bInt * xPrime + rInt * yPrime;
+    calc aInt * yPrime + bInt * (xPrime - qInt * yPrime)
+       = bInt * xPrime + rInt * yPrime
+       = gcdInt
 }
 
 -- ----------------------------------------------------------------------
