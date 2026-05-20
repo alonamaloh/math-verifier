@@ -839,15 +839,21 @@ theorem Rational.padic_absolute_value_multiplicative
            | RationalRepresentative.make(nx, dx) =>
                (cases rep_y {
                   | RationalRepresentative.make(ny, dy) => {
+                      -- Abbreviations for the three padic-av representative
+                      -- atoms that show up dozens of times below.
+                      let absXAtRep : Rational :=
+                          Rational.padic_absolute_value_at_representative(
+                              p, RationalRepresentative.make(nx, dx));
+                      let absYAtRep : Rational :=
+                          Rational.padic_absolute_value_at_representative(
+                              p, RationalRepresentative.make(ny, dy));
+                      let absXYAtRep : Rational :=
+                          Rational.padic_absolute_value_at_representative(
+                              p, RationalRepresentative.make(
+                                     nx * ny, dy + dx * (1 + dy)));
                       -- With-pattern on |nx| and |ny|.
                       cases Integer.absolute_value_natural(nx) with eqAbsNx {
                          | zero => {
-                             let absXAtRep : Rational :=
-                                 Rational.padic_absolute_value_at_representative(
-                                     p, RationalRepresentative.make(nx, dx));
-                             let absYAtRep : Rational :=
-                                 Rational.padic_absolute_value_at_representative(
-                                     p, RationalRepresentative.make(ny, dy));
                              -- |nx*ny| = |nx| * |ny| = 0 * |ny| = 0.
                              calc Integer.absolute_value_natural(nx * ny)
                                 = Integer.absolute_value_natural(nx)
@@ -855,11 +861,7 @@ theorem Rational.padic_absolute_value_multiplicative
                                 = 0
                                       * Integer.absolute_value_natural(ny)
                                 = 0                                                as productAbsZero;
-                             calc Rational.padic_absolute_value_at_representative(
-                                      p,
-                                      RationalRepresentative.make(
-                                          nx * ny,
-                                          dy + dx * (1 + dy)))
+                             calc absXYAtRep
                                 = Rational.zero
                                        by Rational.padic_absolute_value_at_zero(
                                               p, nx * ny,
@@ -885,39 +887,54 @@ theorem Rational.padic_absolute_value_multiplicative
                                        = Integer.absolute_value_natural(nx)
                                              * 0
                                        = 0                                         as productAbsZero;
-                                    calc Rational.padic_absolute_value_at_representative(
-                                             p,
-                                             RationalRepresentative.make(
-                                                 nx * ny,
-                                                 dy + dx * (1 + dy)))
+                                    calc absXYAtRep
                                        = Rational.zero
                                               by Rational.padic_absolute_value_at_zero(
                                                      p, nx * ny,
                                                      dy + dx * (1 + dy),
                                                      productAbsZero)
-                                       = Rational.padic_absolute_value_at_representative(
-                                             p,
-                                             RationalRepresentative.make(nx, dx))
-                                         * Rational.zero
-                                       = Rational.padic_absolute_value_at_representative(
-                                             p,
-                                             RationalRepresentative.make(nx, dx))
-                                         * Rational.padic_absolute_value_at_representative(
-                                               p,
-                                               RationalRepresentative.make(
-                                                   ny, dy))
+                                       = absXAtRep * Rational.zero
+                                       = absXAtRep * absYAtRep
                                               by congruenceOf(
                                                      function (m : Rational) =>
-                                                         Rational.padic_absolute_value_at_representative(
-                                                             p,
-                                                             RationalRepresentative.make(
-                                                                 nx, dx))
-                                                         * m,
+                                                         absXAtRep * m,
                                                      Equality.symmetry(
                                                          Rational.padic_absolute_value_at_zero(
                                                              p, ny, dy, eqAbsNy)))
                                   }
                                 | successor(ky) => {
+                                    -- Further abbreviations for the three
+                                    -- padic-av "successor-form" Quotient.mk
+                                    -- atoms that recur through the calc chain.
+                                    let padicAvMkX : Rational :=
+                                        (Quotient.mk(RationalRepresentative.make(
+                                                 (Natural.power(
+                                                      Natural.padic_valuation(p, (1 + dx)), p)
+                                                      : Integer),
+                                                 Natural.monus(
+                                                     Natural.power(
+                                                         Natural.padic_valuation(p, (1 + kx)), p),
+                                                     1))) : Rational);
+                                    let padicAvMkY : Rational :=
+                                        (Quotient.mk(RationalRepresentative.make(
+                                                 (Natural.power(
+                                                      Natural.padic_valuation(p, (1 + dy)), p)
+                                                      : Integer),
+                                                 Natural.monus(
+                                                     Natural.power(
+                                                         Natural.padic_valuation(p, (1 + ky)), p),
+                                                     1))) : Rational);
+                                    let padicAvMkXY : Rational :=
+                                        (Quotient.mk(RationalRepresentative.make(
+                                                 (Natural.power(
+                                                      Natural.padic_valuation(
+                                                          p, (1 + dy + dx * (1 + dy))), p)
+                                                      : Integer),
+                                                 Natural.monus(
+                                                     Natural.power(
+                                                         Natural.padic_valuation(
+                                                             p, (1 + ky + kx * (1 + ky))), p),
+                                                     1))) : Rational);
                                     -- |nx*ny| = |nx|*|ny| = succ(kx)*succ(ky)
                                     -- = succ(ky + kx*succ(ky)) (by kernel reduction).
                                     calc Integer.absolute_value_natural(
@@ -928,138 +945,77 @@ theorem Rational.padic_absolute_value_multiplicative
                                              * Integer.absolute_value_natural(ny)
                                        = (1 + kx) * (1 + ky)
                                        = (1 + ky + kx * (1 + ky))                  as productAbsSucc;
-                                              calc Rational.padic_absolute_value_at_representative(
-                                                       p,
-                                                       RationalRepresentative.make(
-                                                           nx * ny,
-                                                           dy + dx * (1 + dy)))
-                                                 = Quotient.mk(RationalRepresentative.make(
-                                                           (Natural.power(
+                                    calc absXYAtRep
+                                       = padicAvMkXY
+                                             by Rational.padic_absolute_value_at_succ(
+                                                    p, nx * ny,
+                                                    dy + dx * (1 + dy),
+                                                    ky + kx * (1 + ky),
+                                                    productAbsSucc)
+                                       -- padic_multiplicative_cross_equation bridges the
+                                       -- single-mk form to the multiplied-reps form.
+                                       = Quotient.mk(Rational.multiply_representatives(
+                                             RationalRepresentative.make(
+                                                 (Natural.power(
+                                                      Natural.padic_valuation(p, (1 + dx)), p)
+                                                      : Integer),
+                                                 Natural.monus(
+                                                     Natural.power(
+                                                         Natural.padic_valuation(p, (1 + kx)), p),
+                                                     1)),
+                                             RationalRepresentative.make(
+                                                 (Natural.power(
+                                                      Natural.padic_valuation(p, (1 + dy)), p)
+                                                      : Integer),
+                                                 Natural.monus(
+                                                     Natural.power(
+                                                         Natural.padic_valuation(p, (1 + ky)), p),
+                                                     1))))
+                                             by Quotient.sound(
+                                                    RationalRepresentative.make(
+                                                        (Natural.power(
+                                                             Natural.padic_valuation(
+                                                                 p, (1 + dy + dx * (1 + dy))), p)
+                                                             : Integer),
+                                                        Natural.monus(
+                                                            Natural.power(
                                                                 Natural.padic_valuation(
-                                                                    p,
-                                                                    (1 + 
-                                                                        dy + dx * (1 + dy))), p)
-                                                                : Integer),
-                                                           Natural.monus(
-                                                               Natural.power(
-                                                                   Natural.padic_valuation(
-                                                                       p,
-                                                                       (1 + 
-                                                                           ky + kx * (1 + ky))), p),
-                                                               1)))
-                                                        by Rational.padic_absolute_value_at_succ(
-                                                               p, nx * ny,
-                                                               dy + dx * (1 + dy),
-                                                               ky + kx * (1 + ky),
-                                                               productAbsSucc)
-                                                 = Quotient.mk(Rational.multiply_representatives(
-                                                           RationalRepresentative.make(
-                                                               (Natural.power(
-                                                                    Natural.padic_valuation(
-                                                                        p, (1 + dx)), p)
-                                                                    : Integer),
-                                                               Natural.monus(
-                                                                   Natural.power(
-                                                                       Natural.padic_valuation(
-                                                                           p, (1 + kx)), p),
-                                                                   1)),
-                                                           RationalRepresentative.make(
-                                                               (Natural.power(
-                                                                    Natural.padic_valuation(
-                                                                        p, (1 + dy)), p)
-                                                                    : Integer),
-                                                               Natural.monus(
-                                                                   Natural.power(
-                                                                       Natural.padic_valuation(
-                                                                           p, (1 + ky)), p),
-                                                                   1))))
-                                                        by Quotient.sound(
-                                                               RationalRepresentative.make(
-                                                                   (Natural.power(
-                                                                        Natural.padic_valuation(
-                                                                            p,
-                                                                            (1 + 
-                                                                                dy + dx * (1 + dy))), p)
-                                                                        : Integer),
-                                                                   Natural.monus(
-                                                                       Natural.power(
-                                                                           Natural.padic_valuation(
-                                                                               p,
-                                                                               (1 + 
-                                                                                   ky + kx * (1 + ky))), p),
-                                                                       1)),
-                                                               Rational.multiply_representatives(
-                                                                   RationalRepresentative.make(
-                                                                       (Natural.power(
-                                                                            Natural.padic_valuation(
-                                                                                p, (1 + dx)), p)
-                                                                            : Integer),
-                                                                       Natural.monus(
-                                                                           Natural.power(
-                                                                               Natural.padic_valuation(
-                                                                                   p, (1 + kx)), p),
-                                                                           1)),
-                                                                   RationalRepresentative.make(
-                                                                       (Natural.power(
-                                                                            Natural.padic_valuation(
-                                                                                p, (1 + dy)), p)
-                                                                            : Integer),
-                                                                       Natural.monus(
-                                                                           Natural.power(
-                                                                               Natural.padic_valuation(
-                                                                                   p, (1 + ky)), p),
-                                                                           1))),
-                                                               Rational.padic_multiplicative_cross_equation(
-                                                                   p, primality,
-                                                                   dx, dy, kx, ky))
-                                                 = Rational.padic_absolute_value_at_representative(
-                                                       p,
-                                                       RationalRepresentative.make(nx, dx))
-                                                   * (Quotient.mk(RationalRepresentative.make(
-                                                          (Natural.power(
-                                                               Natural.padic_valuation(
-                                                                   p, (1 + dy)), p)
-                                                               : Integer),
-                                                          Natural.monus(
-                                                              Natural.power(
-                                                                  Natural.padic_valuation(
-                                                                      p, (1 + ky)), p),
-                                                              1))) : Rational)
-                                                        by congruenceOf(
-                                                               function (m : Rational) =>
-                                                                   m
-                                                                   * (Quotient.mk(RationalRepresentative.make(
-                                                                          (Natural.power(
-                                                                               Natural.padic_valuation(
-                                                                                   p, (1 + dy)), p)
-                                                                               : Integer),
-                                                                          Natural.monus(
-                                                                              Natural.power(
-                                                                                  Natural.padic_valuation(
-                                                                                      p, (1 + ky)), p),
-                                                                              1))) : Rational),
-                                                               Equality.symmetry(
-                                                                   Rational.padic_absolute_value_at_succ(
-                                                                       p, nx, dx, kx,
-                                                                       eqAbsNx)))
-                                                 = Rational.padic_absolute_value_at_representative(
-                                                       p,
-                                                       RationalRepresentative.make(nx, dx))
-                                                   * Rational.padic_absolute_value_at_representative(
-                                                         p,
-                                                         RationalRepresentative.make(
-                                                             ny, dy))
-                                                        by congruenceOf(
-                                                               function (m : Rational) =>
-                                                                   Rational.padic_absolute_value_at_representative(
-                                                                       p,
-                                                                       RationalRepresentative.make(
-                                                                           nx, dx))
-                                                                   * m,
-                                                               Equality.symmetry(
-                                                                   Rational.padic_absolute_value_at_succ(
-                                                                       p, ny, dy, ky,
-                                                                       eqAbsNy)))
+                                                                    p, (1 + ky + kx * (1 + ky))), p),
+                                                            1)),
+                                                    Rational.multiply_representatives(
+                                                        RationalRepresentative.make(
+                                                            (Natural.power(
+                                                                 Natural.padic_valuation(p, (1 + dx)), p)
+                                                                 : Integer),
+                                                            Natural.monus(
+                                                                Natural.power(
+                                                                    Natural.padic_valuation(p, (1 + kx)), p),
+                                                                1)),
+                                                        RationalRepresentative.make(
+                                                            (Natural.power(
+                                                                 Natural.padic_valuation(p, (1 + dy)), p)
+                                                                 : Integer),
+                                                            Natural.monus(
+                                                                Natural.power(
+                                                                    Natural.padic_valuation(p, (1 + ky)), p),
+                                                                1))),
+                                                    Rational.padic_multiplicative_cross_equation(
+                                                        p, primality,
+                                                        dx, dy, kx, ky))
+                                       = absXAtRep * padicAvMkY
+                                             by congruenceOf(
+                                                    function (m : Rational) =>
+                                                        m * padicAvMkY,
+                                                    Equality.symmetry(
+                                                        Rational.padic_absolute_value_at_succ(
+                                                            p, nx, dx, kx, eqAbsNx)))
+                                       = absXAtRep * absYAtRep
+                                             by congruenceOf(
+                                                    function (m : Rational) =>
+                                                        absXAtRep * m,
+                                                    Equality.symmetry(
+                                                        Rational.padic_absolute_value_at_succ(
+                                                            p, ny, dy, ky, eqAbsNy)))
                                   }
                               }
                        }

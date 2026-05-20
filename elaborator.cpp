@@ -2064,13 +2064,7 @@ private:
                 bodyStack, bodyKernel);
             ExpressionPointer expectedOpened = openOverLocalBinders(
                 expectedBodyType, bodyStack, bodyStack.size());
-            Context bodyContext;
-            for (size_t i = 0; i < bodyStack.size(); ++i) {
-                ExpressionPointer openedType = openOverLocalBinders(
-                    bodyStack[i].type, bodyStack, i);
-                bodyContext.push_back({openingNameFor(bodyStack, i), openedType,
-                                          FreeVariableOrigin::Internal});
-            }
+            Context bodyContext = buildContextFromLocalBinders(bodyStack);
             if (!isDefinitionallyEqual(environment_, bodyContext,
                                         bodyTypeOpened, expectedOpened)) {
                 // Pass the OPENED types so the display path doesn't
