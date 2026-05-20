@@ -159,6 +159,28 @@ historical reasons; migration is a planned cleanup.
 - `IsX` (predicate) and `X_is_Y` (witness) conventions match the
   algebraic-instance pattern in `library/Rational/instances.math`.
 
+## Prefer `1 + n` over `successor(n)` in expressions
+
+`successor(n)` is the Peano constructor; `1 + n` is the same value in
+the carrier's `+`. They are definitionally equal (kernel reduces
+`1 + n = successor(0) + n = successor(0 + n) = successor(n)`), so they
+typecheck interchangeably wherever an EXPRESSION is expected. The `1 + n`
+form reads as math; `successor(...)` reads as bureaucracy.
+
+Same applies to deeper successors: prefer `2 + n` over
+`successor(successor(n))`, and `n + 1` is fine when it parses more
+naturally (commutativity is also definitional via `add_commutative` but
+even better, the kernel reduces either form to the constructor chain).
+
+A goal stated as `1 ≤ successor(k)` reads better as `1 ≤ 1 + k` or just
+`1 ≤ k + 1`. The corresponding helper `Natural.successor_positive`
+proves it either way.
+
+**Exception: patterns.** Pattern positions (`| successor(k) => ...`)
+require the bare constructor — the parser doesn't accept `1 + k` there.
+Companion memory: [[prefer_numeric_literals]] covers the related
+`0`/`1`/`2` over `zero`/`successor(zero)`/`two` rule.
+
 ## Multi-pattern bindings
 
 Constructor patterns at non-scrutinee positions of a pattern-match
@@ -261,6 +283,39 @@ the existing `≤` registration.
 Step proofs are parsed at the parseAdditive level — `=`/`≤`/`<`/`≥`/`>`
 are reserved as separators, so step proofs containing those operators
 must be parenthesised.
+
+### Prefer `calc` to `Equality.transitivity`
+
+Nested `Equality.transitivity(A, transitivity(B, C))` — common in older
+code — encodes a chain in a right-associated binary tree. A reader has
+to mentally flatten the tree to see the actual chain. Rewriting as a
+calc surfaces the intermediate forms as the math:
+
+```math
+-- Hard to read (5 lines of nesting):
+by Equality.transitivity(
+       Equality.symmetry(lemmaA),
+       Equality.transitivity(
+           congruenceOf(f, hyp),
+           lemmaB))
+
+-- Reads as the math (4-link calc):
+by calc lhs
+      = midpoint1   by Equality.symmetry(lemmaA)
+      = midpoint2   by congruenceOf(f, hyp)
+      = rhs         by lemmaB
+```
+
+Bonus: under `CHECK_REDUNDANT_BY=1` (default), the auto-prover will
+often close several of the `by` annotations on its own — local
+hypotheses match via the in-scope hypothesis lookup, and library lemmas
+match via the lemma index. The naturalProduct claim in
+`PAdic/absolute_value.math` went from 5-deep transitivity to a 4-link
+calc with ZERO `by` clauses this way.
+
+Two-step transitivity (`Equality.transitivity(stepA, stepB)`) is
+borderline — a 3-link calc is the same length. Use whichever reads
+more clearly; calc usually wins because the intermediate form is named.
 
 ## `rewrite(lemma)` / `rewrite(lemma, term)`
 
