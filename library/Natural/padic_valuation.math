@@ -49,7 +49,7 @@ definition Natural.padic_valuation_step
                     fuel, prime, Natural.divide(prime, target)))
         | successor(_) =>
             -- prime ∤ target: done.
-            zero
+            0
       }
 
 -- Top-level p-adic valuation. Fuel = target is more than enough.
@@ -66,7 +66,7 @@ theorem Natural.padic_valuation_step_zero_when_not_divides
         (fuel prime target predM : Natural)
         (moduloIsSucc : Natural.modulo(prime, target) = successor(predM))
         : Natural.padic_valuation_step(successor(fuel), prime, target)
-          = zero :=
+          = 0 :=
   Equality.transport_proposition(
       Natural,
       function (m : Natural) =>
@@ -75,15 +75,15 @@ theorem Natural.padic_valuation_step_zero_when_not_divides
                  successor(Natural.padic_valuation_step(
                                fuel, prime, Natural.divide(prime, target)))
              | successor(_) => zero
-           } : Natural) = zero,
+           } : Natural) = 0,
       successor(predM), Natural.modulo(prime, target),
       Equality.symmetry(moduloIsSucc),
-      reflexivity(Natural, zero))
+      reflexivity(Natural, 0))
 
 -- When modulo(p, n) = 0, the step recurses.
 theorem Natural.padic_valuation_step_succ_when_divides
         (fuel prime target : Natural)
-        (moduloZero : Natural.modulo(prime, target) = zero)
+        (moduloZero : Natural.modulo(prime, target) = 0)
         : Natural.padic_valuation_step(successor(fuel), prime, target)
           = successor(Natural.padic_valuation_step(
                           fuel, prime, Natural.divide(prime, target))) :=
@@ -98,7 +98,7 @@ theorem Natural.padic_valuation_step_succ_when_divides
            } : Natural)
           = successor(Natural.padic_valuation_step(
                           fuel, prime, Natural.divide(prime, target))),
-      zero, Natural.modulo(prime, target),
+      0, Natural.modulo(prime, target),
       Equality.symmetry(moduloZero),
       reflexivity(Natural,
           successor(Natural.padic_valuation_step(
@@ -113,12 +113,12 @@ theorem Natural.padic_valuation_step_succ_when_divides
 -- value of divide, using the with-pattern.
 theorem Natural.divide_positive_when_divides
         (prime target : Natural)
-        (targetPositive : successor(zero) ≤ target)
-        (moduloZero : Natural.modulo(prime, target) = zero)
-        : successor(zero) ≤ Natural.divide(prime, target) := {
+        (targetPositive : successor(0) ≤ target)
+        (moduloZero : Natural.modulo(prime, target) = 0)
+        : successor(0) ≤ Natural.divide(prime, target) := {
   claim productEqTarget : prime * Natural.divide(prime, target) = target
     by calc prime * Natural.divide(prime, target)
-          = prime * Natural.divide(prime, target) + zero
+          = prime * Natural.divide(prime, target) + 0
           = prime * Natural.divide(prime, target)
               + Natural.modulo(prime, target)
           = target;
@@ -129,15 +129,15 @@ theorem Natural.divide_positive_when_divides
             rewrite(
                 calc target
                    = prime * Natural.divide(prime, target)
-                   = prime * zero
-                   = zero,
+                   = prime * 0
+                   = 0,
                 targetPositive))
     | successor(q') =>
         -- divide = successor(q') ≥ 1. Transport from successor(q') back.
         rewrite(
             Equality.symmetry(refinedDivideEq),
             Natural.successor_less_or_equal_successor(
-                zero, q', Natural.zero_least(q')))
+                0, q', Natural.zero_least(q')))
   }
 }
 
@@ -146,17 +146,17 @@ theorem Natural.divide_positive_when_divides
 -- with divide ≥ 1 and prime ≥ 2, successor(divide) ≤ prime * divide.
 theorem Natural.divide_lt_when_divides
         (prime target : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
-        (targetPositive : successor(zero) ≤ target)
-        (moduloZero : Natural.modulo(prime, target) = zero)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
+        (targetPositive : successor(0) ≤ target)
+        (moduloZero : Natural.modulo(prime, target) = 0)
         : successor(Natural.divide(prime, target)) ≤ target := {
   claim productEqTarget : prime * Natural.divide(prime, target) = target
     by calc prime * Natural.divide(prime, target)
-          = prime * Natural.divide(prime, target) + zero
+          = prime * Natural.divide(prime, target) + 0
           = prime * Natural.divide(prime, target)
               + Natural.modulo(prime, target)
           = target;
-  claim dividePositive : successor(zero) ≤ Natural.divide(prime, target)
+  claim dividePositive : successor(0) ≤ Natural.divide(prime, target)
     by Natural.divide_positive_when_divides(
            prime, target, targetPositive, moduloZero);
   -- successor(divide) ≤ prime * divide  (since 2 ≤ prime, 1 ≤ divide).
@@ -182,8 +182,8 @@ theorem Natural.divide_lt_when_divides
 
 theorem Natural.padic_valuation_step_fuel_stable
         (prime target fuel1 fuel2 : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
-        (targetPositive : successor(zero) ≤ target)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
+        (targetPositive : successor(0) ≤ target)
         (fuel1Sufficient : target ≤ fuel1)
         (fuel2Sufficient : target ≤ fuel2)
         : Natural.padic_valuation_step(fuel1, prime, target)
@@ -191,37 +191,37 @@ theorem Natural.padic_valuation_step_fuel_stable
   Natural.strong_induction(
       function (t : Natural) =>
           (f1 f2 : Natural)
-            → successor(zero) ≤ t → t ≤ f1 → t ≤ f2
+            → successor(0) ≤ t → t ≤ f1 → t ≤ f2
             → Natural.padic_valuation_step(f1, prime, t)
               = Natural.padic_valuation_step(f2, prime, t),
       function (n : Natural)
                (inductionHypothesis :
                    (k : Natural) → successor(k) ≤ n
                      → (f1 f2 : Natural)
-                         → successor(zero) ≤ k → k ≤ f1 → k ≤ f2
+                         → successor(0) ≤ k → k ≤ f1 → k ≤ f2
                          → Natural.padic_valuation_step(f1, prime, k)
                            = Natural.padic_valuation_step(f2, prime, k)) =>
         function (f1 f2 : Natural)
-                 (nPositive : successor(zero) ≤ n)
+                 (nPositive : successor(0) ≤ n)
                  (nLeF1 : n ≤ f1)
                  (nLeF2 : n ≤ f2) =>
           -- Case on f1; f1 must be a successor since n ≥ 1.
           (cases f1 {
              | zero =>
-                 function (refinedNLeF1 : n ≤ zero) =>
+                 function (refinedNLeF1 : n ≤ 0) =>
                    absurd(
                        LessOrEqual.transitive(
-                           successor(zero), n, zero,
+                           successor(0), n, 0,
                            refinedNLeF1, nPositive))
              | successor(f1') =>
                  function (refinedNLeF1 : n ≤ successor(f1')) =>
                    -- Case on f2 next.
                    (cases f2 {
                       | zero =>
-                          function (refinedNLeF2 : n ≤ zero) =>
+                          function (refinedNLeF2 : n ≤ 0) =>
                             absurd(
                                 LessOrEqual.transitive(
-                                    successor(zero), n, zero,
+                                    successor(0), n, 0,
                                     refinedNLeF2, nPositive))
                       | successor(f2') =>
                           function (refinedNLeF2 : n ≤ successor(f2')) =>
@@ -310,10 +310,10 @@ theorem Natural.padic_valuation_step_fuel_stable
 theorem Natural.padic_valuation_when_not_divides
         (prime target : Natural)
         (notDivides : ¬ Natural.divides(prime, target))
-        : Natural.padic_valuation(prime, target) = zero :=
+        : Natural.padic_valuation(prime, target) = 0 :=
   (cases target {
      | zero =>
-         function (refinedNotDivides : ¬ Natural.divides(prime, zero)) =>
+         function (refinedNotDivides : ¬ Natural.divides(prime, 0)) =>
            absurd(refinedNotDivides(Natural.divides_zero(prime)))
      | successor(predT) =>
          function (refinedNotDivides
@@ -329,7 +329,7 @@ theorem Natural.padic_valuation_when_not_divides
                      predT, prime, successor(predT), predM, refinedModuloEq)
            }
    } : ¬ Natural.divides(prime, target)
-       → Natural.padic_valuation(prime, target) = zero)(notDivides)
+       → Natural.padic_valuation(prime, target) = 0)(notDivides)
 
 -- Stripping one factor of the prime increases the valuation by one.
 -- For prime ≥ 2 and quotient ≥ 1, modulo(prime, prime * quotient) = 0
@@ -340,17 +340,17 @@ theorem Natural.padic_valuation_when_not_divides
 -- and padic_valuation(prime, quotient) (with fuel = quotient).
 theorem Natural.padic_valuation_strip
         (prime quotient : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
-        (quotientPositive : successor(zero) ≤ quotient)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
+        (quotientPositive : successor(0) ≤ quotient)
         : Natural.padic_valuation(prime, prime * quotient)
           = successor(Natural.padic_valuation(prime, quotient)) := {
-  claim primePositive : successor(zero) ≤ prime
+  claim primePositive : successor(0) ≤ prime
     by Natural.less_or_equal_predecessor_less_or_equal(
-           successor(zero), prime, primeAtLeastTwo);
-  claim productPositive : successor(zero) ≤ prime * quotient
+           successor(0), prime, primeAtLeastTwo);
+  claim productPositive : successor(0) ≤ prime * quotient
     by Natural.multiply_at_least_one(
            prime, quotient, primePositive, quotientPositive);
-  claim moduloZero : Natural.modulo(prime, prime * quotient) = zero
+  claim moduloZero : Natural.modulo(prime, prime * quotient) = 0
     by Natural.divides_implies_modulo_zero(
            prime, prime * quotient, primePositive,
            Natural.divides_self_multiple(prime, quotient));
@@ -361,7 +361,7 @@ theorem Natural.padic_valuation_strip
            prime, Natural.divide(prime, prime * quotient), quotient,
            primePositive,
            calc prime * Natural.divide(prime, prime * quotient)
-              = prime * Natural.divide(prime, prime * quotient) + zero
+              = prime * Natural.divide(prime, prime * quotient) + 0
               = prime * Natural.divide(prime, prime * quotient)
                   + Natural.modulo(prime, prime * quotient)
               = prime * quotient);
@@ -450,8 +450,8 @@ theorem Natural.successor_add_preserves_le
 theorem Natural.padic_valuation_multiplicative
         (prime a b : Natural)
         (primality : Natural.is_prime(prime))
-        (aPositive : successor(zero) ≤ a)
-        (bPositive : successor(zero) ≤ b)
+        (aPositive : successor(0) ≤ a)
+        (bPositive : successor(0) ≤ b)
         : Natural.padic_valuation(prime, a * b)
           = Natural.padic_valuation(prime, a)
                 + Natural.padic_valuation(prime, b) := {
@@ -460,7 +460,7 @@ theorem Natural.padic_valuation_multiplicative
   Natural.strong_induction(
       function (s : Natural) =>
           (a' b' : Natural)
-            → successor(zero) ≤ a' → successor(zero) ≤ b'
+            → successor(0) ≤ a' → successor(0) ≤ b'
             → a' + b' = s
             → Natural.padic_valuation(prime, a' * b')
               = Natural.padic_valuation(prime, a')
@@ -469,23 +469,23 @@ theorem Natural.padic_valuation_multiplicative
                (inductionHypothesis :
                    (k : Natural) → successor(k) ≤ n
                      → (a' b' : Natural)
-                         → successor(zero) ≤ a' → successor(zero) ≤ b'
+                         → successor(0) ≤ a' → successor(0) ≤ b'
                          → a' + b' = k
                          → Natural.padic_valuation(prime, a' * b')
                            = Natural.padic_valuation(prime, a')
                                  + Natural.padic_valuation(prime, b')) =>
         function (a' b' : Natural)
-                 (a'Positive : successor(zero) ≤ a')
-                 (b'Positive : successor(zero) ≤ b')
+                 (a'Positive : successor(0) ≤ a')
+                 (b'Positive : successor(0) ≤ b')
                  (sumEq : a' + b' = n) =>
           claim (prime ∣ a') ∨ (prime ∤ a')
           claim by cases {
             in (prime ∣ a') as pDividesA: {
-                claim moduloAIsZero : Natural.modulo(prime, a') = zero
+                claim moduloAIsZero : Natural.modulo(prime, a') = 0
                   by Natural.divides_implies_modulo_zero(
                          prime, a', primePositive, pDividesA);
                 claim divideAPositive
-                      : successor(zero) ≤ Natural.divide(prime, a')
+                      : successor(0) ≤ Natural.divide(prime, a')
                   by Natural.divide_positive_when_divides(
                          prime, a', a'Positive, moduloAIsZero);
                 claim succDivideALeA
@@ -498,7 +498,7 @@ theorem Natural.padic_valuation_multiplicative
                             + Natural.modulo(prime, a')
                               by Equality.symmetry(
                                      Natural.divide_modulo_decompose(prime, a'))
-                        = prime * Natural.divide(prime, a') + zero
+                        = prime * Natural.divide(prime, a') + 0
                         = prime * Natural.divide(prime, a');
                 -- IH on (divide(p, a'), b'): need succ(divide + b') ≤ n.
                 claim recursiveSumLeN
@@ -556,11 +556,11 @@ theorem Natural.padic_valuation_multiplicative
                 claim (prime ∣ b') ∨ (prime ∤ b')
                 claim by cases {
                   in (prime ∣ b') as pDividesB: {
-                      claim moduloBIsZero : Natural.modulo(prime, b') = zero
+                      claim moduloBIsZero : Natural.modulo(prime, b') = 0
                         by Natural.divides_implies_modulo_zero(
                                prime, b', primePositive, pDividesB);
                       claim divideBPositive
-                            : successor(zero) ≤ Natural.divide(prime, b')
+                            : successor(0) ≤ Natural.divide(prime, b')
                         by Natural.divide_positive_when_divides(
                                prime, b', b'Positive, moduloBIsZero);
                       claim succDivideBLeB
@@ -575,7 +575,7 @@ theorem Natural.padic_valuation_multiplicative
                                   + Natural.modulo(prime, b')
                                     by Equality.symmetry(
                                            Natural.divide_modulo_decompose(prime, b'))
-                              = prime * Natural.divide(prime, b') + zero
+                              = prime * Natural.divide(prime, b') + 0
                               = prime * Natural.divide(prime, b');
                       -- IH on (a', divide(p, b')): need succ(a' + divide) ≤ n.
                       -- a' + divide < a' + b' = n; specifically succ(a' + divide) ≤ a' + b'.
@@ -664,13 +664,13 @@ theorem Natural.padic_valuation_multiplicative
                                };
                       -- All three valuations are zero.
                       calc Natural.padic_valuation(prime, a' * b')
-                         = zero
+                         = 0
                                 by Natural.padic_valuation_when_not_divides(
                                        prime, a' * b', notDivProduct)
-                         = zero + zero
-                         = Natural.padic_valuation(prime, a') + zero
+                         = 0 + 0
+                         = Natural.padic_valuation(prime, a') + 0
                                 by congruenceOf(
-                                       function (m : Natural) => m + zero,
+                                       function (m : Natural) => m + 0,
                                        Equality.symmetry(
                                            Natural.padic_valuation_when_not_divides(
                                                prime, a', notDivA)))
@@ -708,7 +708,7 @@ theorem Natural.divides_multiply_left
 -- dispatch.
 theorem Natural.padic_valuation_power_divides
         (prime : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
         : (n : Natural)
           → Natural.divides(
                 Natural.power(Natural.padic_valuation(prime, n), prime), n) :=
@@ -730,7 +730,7 @@ theorem Natural.padic_valuation_power_divides
               let ⟨q, mEqPrimeQ⟩ := pDividesM;
               (cases q {
                  | zero =>
-                     function (refinedMEq : m = prime * zero) =>
+                     function (refinedMEq : m = prime * 0) =>
                        -- m = prime * 0 = 0. v_p(0) = 0. p^0 = 1. 1 | m = 0.
                        Equality.transport_proposition(
                            Natural,
@@ -740,17 +740,17 @@ theorem Natural.padic_valuation_power_divides
                                        Natural.padic_valuation(prime, mValue),
                                        prime),
                                    mValue),
-                           zero, m,
+                           0, m,
                            Equality.symmetry(
                                Equality.transitivity(
                                    refinedMEq,
                                    Natural.multiply_zero(prime))),
-                           Natural.one_divides(zero))
+                           Natural.one_divides(0))
                  | successor(predQ) =>
                      function (refinedMEq : m = prime * successor(predQ)) => {
-                       claim primePositive : successor(zero) ≤ prime
+                       claim primePositive : successor(0) ≤ prime
                          by Natural.less_or_equal_predecessor_less_or_equal(
-                                successor(zero), prime, primeAtLeastTwo);
+                                successor(0), prime, primeAtLeastTwo);
                        claim succQPositive : 1 ≤ successor(predQ)
                          by Natural.successor_positive(predQ);
                        -- succ(q) < m. From m = p * q with p ≥ 2, q ≥ 1:
@@ -836,7 +836,7 @@ theorem Natural.padic_valuation_power_divides
                   Natural,
                   function (v : Natural) =>
                       Natural.divides(Natural.power(v, prime), m),
-                  zero, Natural.padic_valuation(prime, m),
+                  0, Natural.padic_valuation(prime, m),
                   Equality.symmetry(
                       Natural.padic_valuation_when_not_divides(
                           prime, m, notDivM)),
@@ -858,7 +858,7 @@ theorem Natural.power_divides_power
 -- Combining the above two: if k ≤ v_p(n), then p^k | n.
 theorem Natural.padic_valuation_ge_implies_power_divides
         (prime : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
         (k n : Natural)
         (kLeValuation : k ≤ Natural.padic_valuation(prime, n))
         : Natural.divides(Natural.power(k, prime), n) :=
@@ -875,17 +875,17 @@ theorem Natural.padic_valuation_ge_implies_power_divides
 -- (since p | p^succ(k') | n). Apply IH on q = divide(p, n) using strip.
 theorem Natural.power_divides_implies_padic_valuation_ge
         (prime : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
         : (k n : Natural)
-          → successor(zero) ≤ n
+          → successor(0) ≤ n
           → Natural.divides(Natural.power(k, prime), n)
           → k ≤ Natural.padic_valuation(prime, n)
   | zero, n, _, _ =>
       Natural.zero_least(Natural.padic_valuation(prime, n))
   | successor(predK), n, nPositive, succPDivides => {
-      claim primePositive : successor(zero) ≤ prime
+      claim primePositive : successor(0) ≤ prime
         by Natural.less_or_equal_predecessor_less_or_equal(
-               successor(zero), prime, primeAtLeastTwo);
+               successor(0), prime, primeAtLeastTwo);
       -- p^succ(predK) = p * p^predK | n. So p | n.
       claim pDividesN : prime ∣ n
         by Natural.divides_transitive(
@@ -902,7 +902,7 @@ theorem Natural.power_divides_implies_padic_valuation_ge
       -- For q = succ(predQ): apply strip + IH.
       (cases q {
          | zero =>
-             function (refinedNEq : n = prime * zero) =>
+             function (refinedNEq : n = prime * 0) =>
                absurd(
                    rewrite(
                        Equality.transitivity(
@@ -978,9 +978,9 @@ theorem Natural.power_divides_implies_padic_valuation_ge
 -- then the converse bridge gives v_p(a) ≤ v_p(a+b).
 theorem Natural.padic_valuation_ultrametric_when_le
         (prime : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
         (a b : Natural)
-        (sumPositive : successor(zero) ≤ a + b)
+        (sumPositive : successor(0) ≤ a + b)
         (valuationLe :
             Natural.padic_valuation(prime, a)
               ≤ Natural.padic_valuation(prime, b))
@@ -1016,9 +1016,9 @@ theorem Natural.padic_valuation_ultrametric_when_le
 -- Derived from the previous via add_commutative.
 theorem Natural.padic_valuation_ultrametric_when_ge
         (prime : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
         (a b : Natural)
-        (sumPositive : successor(zero) ≤ a + b)
+        (sumPositive : successor(0) ≤ a + b)
         (valuationLe :
             Natural.padic_valuation(prime, b)
               ≤ Natural.padic_valuation(prime, a))
@@ -1057,10 +1057,10 @@ theorem Natural.divides_monus
 -- monus(a, b) ≥ 1.
 theorem Natural.padic_valuation_monus_ultrametric_when_le
         (prime : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
         (a b : Natural)
         (bLeA : b ≤ a)
-        (monusPositive : successor(zero) ≤ Natural.monus(a, b))
+        (monusPositive : successor(0) ≤ Natural.monus(a, b))
         (valuationLe :
             Natural.padic_valuation(prime, b)
               ≤ Natural.padic_valuation(prime, a))
@@ -1097,10 +1097,10 @@ theorem Natural.padic_valuation_monus_ultrametric_when_le
 -- _when_le above by swapping a, b.
 theorem Natural.padic_valuation_monus_ultrametric_when_ge
         (prime : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
         (a b : Natural)
         (aLeB : a ≤ b)
-        (monusPositive : successor(zero) ≤ Natural.monus(b, a))
+        (monusPositive : successor(0) ≤ Natural.monus(b, a))
         (valuationLe :
             Natural.padic_valuation(prime, a)
               ≤ Natural.padic_valuation(prime, b))
@@ -1123,7 +1123,7 @@ theorem Natural.distance_monus_when_le
   | successor(predB), a, succPredBLeA =>
       (cases a {
          | zero =>
-             function (refinedLe : successor(predB) ≤ zero) =>
+             function (refinedLe : successor(predB) ≤ 0) =>
                absurd(refinedLe)
          | successor(predA) =>
              function (refinedLe : successor(predB) ≤ successor(predA)) =>
@@ -1458,33 +1458,33 @@ theorem Integer.divides_absolute_value_natural_sum
 -- x ≤ p * x for p ≥ 1. From p = 1 + monus(p, 1): p * x = x + monus(p, 1)*x,
 -- then less_or_equal_add_right.
 theorem Natural.le_multiply_when_factor_at_least_one
-        (x p : Natural) (pPositive : successor(zero) ≤ p)
+        (x p : Natural) (pPositive : successor(0) ≤ p)
         : x ≤ p * x := {
-  claim pDecompose : p = successor(zero) + Natural.monus(p, successor(zero))
+  claim pDecompose : p = successor(0) + Natural.monus(p, successor(0))
     by Natural.monus_zero_implies_decompose(
-           successor(zero), p,
-           Natural.le_implies_monus_zero(p, successor(zero), pPositive));
+           successor(0), p,
+           Natural.le_implies_monus_zero(p, successor(0), pPositive));
   rewrite(
       Equality.symmetry(pDecompose),
       -- (1 + monus(p, 1)) * x = x + monus(p, 1) * x. Then x ≤ that.
       rewrite(
-          calc x + Natural.monus(p, successor(zero)) * x
-             = successor(zero) * x + Natural.monus(p, successor(zero)) * x
-             = (successor(zero) + Natural.monus(p, successor(zero))) * x,
+          calc x + Natural.monus(p, successor(0)) * x
+             = successor(0) * x + Natural.monus(p, successor(0)) * x
+             = (successor(0) + Natural.monus(p, successor(0))) * x,
           Natural.less_or_equal_add_right(
-              x, Natural.monus(p, successor(zero)) * x)))
+              x, Natural.monus(p, successor(0)) * x)))
 }
 
 -- Power is monotone in the exponent (when base p ≥ 1).
 -- Direct induction on r where b = a + r.
 theorem Natural.power_monotone_via_r
-        (a p : Natural) (pPositive : successor(zero) ≤ p)
+        (a p : Natural) (pPositive : successor(0) ≤ p)
         : (r : Natural) → Natural.power(a, p) ≤ Natural.power(a + r, p)
   | zero =>
       Equality.transport_proposition(
           Natural,
           function (m : Natural) => Natural.power(a, p) ≤ Natural.power(m, p),
-          a, a + zero,
+          a, a + 0,
           Equality.symmetry(Natural.add_zero(a)),
           LessOrEqual.reflexivity(Natural.power(a, p)))
   | successor(r') =>
@@ -1509,7 +1509,7 @@ theorem Natural.power_monotone_via_r
 -- Power monotonicity: a ≤ b implies power(a, p) ≤ power(b, p).
 theorem Natural.power_monotone
         (a b p : Natural) (aLeB : a ≤ b)
-        (pPositive : successor(zero) ≤ p)
+        (pPositive : successor(0) ≤ p)
         : Natural.power(a, p) ≤ Natural.power(b, p) := {
     obtain ⟨r, bEqAplusR⟩ from Natural.subtraction_witness(a, b, aLeB);
     rewrite(
@@ -1520,49 +1520,49 @@ theorem Natural.power_monotone
 -- distance(a, b) = 0 implies a = b. Useful for the |·|_Nat = 0 →
 -- Integer.zero bridge.
 theorem Natural.distance_zero_implies_equal
-        : (a b : Natural) → Natural.distance(a, b) = zero → a = b
+        : (a b : Natural) → Natural.distance(a, b) = 0 → a = b
   | zero, b, eq =>
       Equality.symmetry(eq)
   | successor(k), b, eq =>
       (cases b {
          | zero =>
              function (refinedEq
-                         : Natural.distance(successor(k), zero) = zero) =>
+                         : Natural.distance(successor(k), 0) = 0) =>
                absurd(refinedEq)
          | successor(m) =>
              function (refinedEq
-                         : Natural.distance(successor(k), successor(m)) = zero) =>
+                         : Natural.distance(successor(k), successor(m)) = 0) =>
                congruenceOf(
                    successor,
                    Natural.distance_zero_implies_equal(k, m, refinedEq))
-       } : Natural.distance(successor(k), b) = zero → successor(k) = b)(eq)
+       } : Natural.distance(successor(k), b) = 0 → successor(k) = b)(eq)
 
 -- |x|_Nat = 0 implies x = Integer.zero. Quotient.induct on x; at rep
 -- distance(a, b) = 0 gives a = b, and Quotient.sound between
 -- make(a, a) and make(zero, zero) (using the trivial a + 0 = a + 0).
 theorem Integer.absolute_value_natural_zero_implies_zero
         (x : Integer)
-        (eq : Integer.absolute_value_natural(x) = zero)
+        (eq : Integer.absolute_value_natural(x) = 0)
         : x = Integer.zero :=
   Quotient.induct(
       function (x' : Integer) =>
-          Integer.absolute_value_natural(x') = zero → x' = Integer.zero,
+          Integer.absolute_value_natural(x') = 0 → x' = Integer.zero,
       function (rep : IntegerRepresentative) =>
         (cases rep {
            | IntegerRepresentative.make(a, b) =>
-               function (distanceEq : Natural.distance(a, b) = zero) =>
+               function (distanceEq : Natural.distance(a, b) = 0) =>
                  Quotient.sound(
                      IntegerRepresentative.make(a, b),
-                     IntegerRepresentative.make(zero, zero),
-                     Equality.transitivity(
-                         Natural.add_zero(a),
-                         Equality.transitivity(
-                             Natural.distance_zero_implies_equal(
-                                 a, b, distanceEq),
-                             Equality.symmetry(Natural.add_zero(b)))))
+                     IntegerRepresentative.make(0, 0),
+                     calc a + 0
+                        = a
+                        = b
+                              by Natural.distance_zero_implies_equal(
+                                     a, b, distanceEq)
+                        = b + 0)
          } : Integer.absolute_value_natural(
                  Quotient.mk(IntegerRepresentative,
-                              IntegerEquivalent, rep)) = zero
+                              IntegerEquivalent, rep)) = 0
              → Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep)
                = Integer.zero),
       x)(eq)
@@ -1573,10 +1573,10 @@ theorem Integer.absolute_value_natural_zero_implies_zero
 -- v_p ↔ p^k divides bridge.
 theorem Integer.padic_valuation_absolute_value_natural_ultrametric_when_le
         (prime : Natural)
-        (primeAtLeastTwo : successor(successor(zero)) ≤ prime)
+        (primeAtLeastTwo : successor(successor(0)) ≤ prime)
         (A B : Integer)
         (sumAbsPositive
-            : successor(zero) ≤ Integer.absolute_value_natural(A + B))
+            : successor(0) ≤ Integer.absolute_value_natural(A + B))
         (valuationLe :
             Natural.padic_valuation(
                 prime, Integer.absolute_value_natural(A))

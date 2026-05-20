@@ -26,43 +26,43 @@ definition Natural.monus : Natural → Natural → Natural
       }
 
 -- monus(zero, b) = zero (definitional).
-theorem Natural.monus_zero_left (b : Natural) : Natural.monus(zero, b) = zero :=
-  reflexivity(Natural, zero)
+theorem Natural.monus_zero_left (b : Natural) : Natural.monus(0, b) = 0 :=
+  reflexivity(Natural, 0)
 
 -- monus(successor(k), zero) = successor(k). The kernel sees the outer
 -- successor and the inner zero case, reducing the inner `cases` to
 -- the constructor branch.
 theorem Natural.monus_succ_zero (k : Natural)
-        : Natural.monus(successor(k), zero) = successor(k) :=
+        : Natural.monus(successor(k), 0) = successor(k) :=
   reflexivity(Natural, successor(k))
 
 -- monus(a, zero) = a. Case-split a (the kernel doesn't auto-reduce when
 -- the second arg isn't a constructor).
-theorem Natural.monus_zero : (a : Natural) → Natural.monus(a, zero) = a
+theorem Natural.monus_zero : (a : Natural) → Natural.monus(a, 0) = a
   | zero         => reflexivity(zero)
   | successor(k) => reflexivity(successor(k))
 
 -- monus(a, a) = zero. Induct on a.
-theorem Natural.monus_self : (a : Natural) → Natural.monus(a, a) = zero
+theorem Natural.monus_self : (a : Natural) → Natural.monus(a, a) = 0
   | zero         => reflexivity(zero)
   | successor(k) => Natural.monus_self(k)
 
 -- If a ≤ b, then monus(a, b) = zero. Induct on b, inner case on a.
 theorem Natural.le_implies_monus_zero
-        : (b a : Natural) → a ≤ b → Natural.monus(a, b) = zero
+        : (b a : Natural) → a ≤ b → Natural.monus(a, b) = 0
   | zero, a, aLeqZero =>
       -- a ≤ 0 forces a = 0. monus(0, 0) = 0.
       Equality.transport_proposition(
           Natural,
-          function (x : Natural) => Natural.monus(x, zero) = zero,
-          zero, a,
+          function (x : Natural) => Natural.monus(x, 0) = 0,
+          0, a,
           Equality.symmetry(
               Natural.less_or_equal_zero_implies_equals_zero(a, aLeqZero)),
-          reflexivity(Natural, zero))
+          reflexivity(Natural, 0))
   | successor(predecessorB), a, aLeqSuccB =>
       (cases a {
          | zero =>
-             function (refinedProof : zero ≤ successor(predecessorB)) =>
+             function (refinedProof : 0 ≤ successor(predecessorB)) =>
                Natural.monus_zero_left(successor(predecessorB))
          | successor(k) =>
              function (refinedProof : successor(k) ≤ successor(predecessorB)) =>
@@ -73,4 +73,4 @@ theorem Natural.le_implies_monus_zero
                    Natural.less_or_equal_successor_successor_descend(
                        k, predecessorB, refinedProof))
        } : (refinedProof : a ≤ successor(predecessorB))
-           → Natural.monus(a, successor(predecessorB)) = zero)(aLeqSuccB)
+           → Natural.monus(a, successor(predecessorB)) = 0)(aLeqSuccB)
