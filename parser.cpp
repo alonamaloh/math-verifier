@@ -654,11 +654,85 @@ private:
             int column = 0;
         };
         std::vector<BlockWrapper> wrappers;
+        // `calc … as NAME;` or bare `calc …;` at statement position
+        // gets parsed below and may turn out to NOT be a statement
+        // (it's the final expression). In that case we stash the parsed
+        // calc here and skip the trailing parseExpression() call.
+        SurfaceExpressionPointer parsedFinalCalc;
         while (peek().kind == TokenKind::KeywordLet
                || peek().kind == TokenKind::KeywordClaim
                || peek().kind == TokenKind::KeywordObtain
                || peek().kind == TokenKind::KeywordAssume
-               || peek().kind == TokenKind::KeywordSet) {
+               || peek().kind == TokenKind::KeywordSet
+               || peek().kind == TokenKind::KeywordCalc) {
+            // `calc` at statement position has two shapes:
+            //   - `calc … as NAME;`  (named binding for downstream use)
+            //   - `calc …;`          (anonymous binding; the auto-prover
+            //                         still finds it via type-match)
+            // Both desugar to a TypedLet wrapper with type recovered
+            // from the calc's endpoints (LHS = final RHS, all-= chain
+            // only — mixed `=`/`≤` calcs must use the explicit
+            // `claim NAME : TYPE by calc …` form). If the calc is
+            // followed by neither `as` nor `;`, treat it as the block's
+            // final expression instead.
+            if (peek().kind == TokenKind::KeywordCalc) {
+                Token calcToken = peek();
+                SurfaceExpressionPointer calcExpression = parseCalc();
+                if (peek().kind != TokenKind::KeywordAs
+                    && peek().kind != TokenKind::Semicolon) {
+                    parsedFinalCalc = std::move(calcExpression);
+                    break;
+                }
+                std::string statementName;
+                if (peek().kind == TokenKind::KeywordAs) {
+                    consumeAny();  // 'as'
+                    if (!isIdentifierLike(peek().kind)) {
+                        throwHere("expected identifier after 'as'");
+                    }
+                    statementName = consumeAny().lexeme;
+                } else {
+                    // Anonymous: synthesise a name that won't collide.
+                    statementName = "_calc_"
+                        + std::to_string(calcToken.line) + "_"
+                        + std::to_string(calcToken.column);
+                }
+                expect(TokenKind::Semicolon,
+                       "ending calc statement");
+                auto* calcNode = std::get_if<SurfaceCalc>(
+                    &calcExpression->node);
+                if (!calcNode || calcNode->steps.empty()) {
+                    throwHere("calc statement needs at least one step");
+                }
+                // Recover endpoints. Equality-only chains lift to
+                // `first = last`; if any step uses ≤/<, reject and
+                // require the explicit claim form.
+                for (const auto& step : calcNode->steps) {
+                    if (step.relation != CalcRelation::Equality) {
+                        throwHere("calc statement (with `as NAME;` or "
+                                  "bare `;`) only supports all-= chains "
+                                  "for now — use `claim NAME : TYPE by "
+                                  "calc …;` for mixed-relation calcs");
+                    }
+                }
+                SurfaceExpressionPointer firstEndpoint =
+                    calcNode->initialExpression;
+                SurfaceExpressionPointer lastEndpoint =
+                    calcNode->steps.back().nextExpression;
+                SurfaceExpressionPointer typeExpression =
+                    makeSurfaceBinaryOperation(
+                        "=", std::move(firstEndpoint),
+                        std::move(lastEndpoint),
+                        calcToken.line, calcToken.column);
+                BlockWrapper wrapper;
+                wrapper.kind = BlockWrapper::TypedLet;
+                wrapper.name = std::move(statementName);
+                wrapper.type = std::move(typeExpression);
+                wrapper.value = std::move(calcExpression);
+                wrapper.line = calcToken.line;
+                wrapper.column = calcToken.column;
+                wrappers.push_back(std::move(wrapper));
+                continue;
+            }
             // `claim` has two block-statement shapes:
             //   - Legacy:    `claim NAME : TYPE [by V];` (typed let-synonym)
             //   - Structured: `claim …` (any of the new structured-proof
@@ -808,6 +882,14 @@ private:
             if (peek().kind == TokenKind::Semicolon) consumeAny();
             finalExpression = makeSurfaceHammer(
                 contradictionToken.line, contradictionToken.column);
+        } else if (parsedFinalCalc) {
+            // The wrapper loop already parsed a `calc` and discovered it
+            // wasn't followed by `as` or `;`, so it's the block's final
+            // expression. Use the pre-parsed value directly.
+            finalExpression = std::move(parsedFinalCalc);
+            if (peek().kind == TokenKind::Semicolon) {
+                consumeAny();
+            }
         } else {
             finalExpression = parseExpression();
             // Optional trailing semicolon for the final expression.

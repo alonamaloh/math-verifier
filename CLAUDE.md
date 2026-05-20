@@ -348,6 +348,43 @@ Two-step transitivity (`Equality.transitivity(stepA, stepB)`) is
 borderline — a 3-link calc is the same length. Use whichever reads
 more clearly; calc usually wins because the intermediate form is named.
 
+### `calc … as NAME;` and bare `calc …;` at statement position
+
+A calc at statement position (inside a `{ … }` block, terminated by
+`;`) binds its result into local scope, no `claim` ceremony required:
+
+```math
+-- Named binding — for downstream references:
+calc (aInt * yPrime - qInt * bInt * yPrime)
+   = (aInt - qInt * bInt) * yPrime
+   = rInt * yPrime                                  as factoredEqualsRYPrime;
+
+-- Anonymous binding — auto-prover still finds it by type-match:
+calc a = b
+     = c;
+-- Later:
+calc a = c        -- this step auto-closes via the binding above
+     = d
+```
+
+Both forms desugar to `claim NAME : (first = last) by calc …` where
+`first` and `last` come from the calc's endpoints. The anonymous form
+synthesises a name like `_calc_<line>_<col>`. Either way the binding
+is in scope for the rest of the block, so the auto-prover's local-
+hypothesis matcher picks it up.
+
+Restrictions:
+- All-`=` chains only. For mixed `=`/`≤`/`<` calcs at statement
+  position, use the explicit `claim NAME : TYPE by calc …;` form so
+  the resulting relation type is unambiguous.
+- The `as NAME` postfix lives at the END of the calc, after the last
+  step's optional `by`. Parses cleanly: `calc … = rhs by lemma as foo;`.
+
+Math-reading rationale: a textbook proof reads "by calculation: A = B
+= C; call this (∗); now…". The `as` form matches that phrasing
+exactly. The anonymous form matches "by a calculation: A = B = C; now
+…" where the auxiliary fact is used implicitly.
+
 ## `rewrite(lemma)` / `rewrite(lemma, term)`
 
 Two forms, disambiguated by argument count.

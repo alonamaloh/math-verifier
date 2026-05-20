@@ -1,0 +1,46 @@
+-- Tests for the `calc … as NAME;` and `calc …;` (anonymous) statement
+-- forms. Both desugar to a TypedLet binding the calc-recovered
+-- equation `first = last` into local scope, so the auto-prover can
+-- find them when later calc steps need them.
+
+module Test.calc_statement_test
+
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Equality.basics
+
+-- Named form: `calc … as someEquation;` introduces `someEquation` of
+-- type matching the calc's endpoints.
+theorem Test.calc_as_named (a b c : Natural)
+        (firstStep : a = b) (secondStep : b = c)
+        : a = c := {
+  calc a = b
+       = c                                                  as bridge;
+  bridge
+}
+
+-- Anonymous form: `calc …;` introduces an anonymous binding; later
+-- calc steps still pick it up via the local-hypothesis matcher.
+theorem Test.calc_anonymous_via_lookup
+        (a b c d : Natural)
+        (firstStep : a = b) (secondStep : b = c) (thirdStep : c = d)
+        : a = d := {
+  -- Anonymous calc registers an equation `a = c` in scope.
+  calc a = b
+       = c;
+  -- The next calc step `a → c` finds it without an explicit `by`.
+  calc a = c
+       = d
+}
+
+-- Mix: named bridge used explicitly by name later.
+theorem Test.calc_named_used_explicitly
+        (a b c d : Natural)
+        (firstStep : a = b) (secondStep : b = c) (thirdStep : c = d)
+        : a = d := {
+  calc a = b
+       = c                                                  as bridge;
+  -- Reference by name (no auto-prover involved here).
+  Equality.transitivity(bridge, thirdStep)
+}
