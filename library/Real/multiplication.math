@@ -191,93 +191,38 @@ theorem Rational.sequence.product_is_cauchy_bound
                                  Rational.halve(Rational.halve(epsilon)))))
         (epsilonPositive : Rational.zero < epsilon)
         : Rational.absolute_value(s(m) * t(m) - s(n) * t(n)) < epsilon := {
-  -- m, n ≥ N_s_bound, N_t_bound, N_s, N_t via the nested max + transitivity.
+  -- m, n ≥ N_s_bound, N_t_bound, N_s, N_t. Each is one left-then-{left,right}
+  -- projection through the nested max, via le_through_max_{left,right}.
   claim m_ge_N_s_bound : N_s_bound ≤ m
-    by LessOrEqual.transitive(
-           N_s_bound,
-           Natural.maximum(N_s_bound, N_t_bound), m,
-           LessOrEqual.transitive(
+    by Natural.le_through_max_left(N_s_bound, N_t_bound, m,
+           Natural.le_through_max_left(
                Natural.maximum(N_s_bound, N_t_bound),
-               Natural.maximum(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t)),
-               m,
-               m_ge,
-               Natural.left_le_max(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t))),
-           Natural.left_le_max(N_s_bound, N_t_bound));
+               Natural.maximum(N_s, N_t), m, m_ge));
   claim n_ge_N_t_bound : N_t_bound ≤ n
-    by LessOrEqual.transitive(
-           N_t_bound,
-           Natural.maximum(N_s_bound, N_t_bound), n,
-           LessOrEqual.transitive(
+    by Natural.le_through_max_right(N_s_bound, N_t_bound, n,
+           Natural.le_through_max_left(
                Natural.maximum(N_s_bound, N_t_bound),
-               Natural.maximum(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t)),
-               n,
-               n_ge,
-               Natural.left_le_max(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t))),
-           Natural.right_le_max(N_s_bound, N_t_bound));
+               Natural.maximum(N_s, N_t), n, n_ge));
   claim m_ge_N_s : N_s ≤ m
-    by LessOrEqual.transitive(
-           N_s, Natural.maximum(N_s, N_t), m,
-           LessOrEqual.transitive(
-               Natural.maximum(N_s, N_t),
-               Natural.maximum(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t)),
-               m,
-               m_ge,
-               Natural.right_le_max(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t))),
-           Natural.left_le_max(N_s, N_t));
+    by Natural.le_through_max_left(N_s, N_t, m,
+           Natural.le_through_max_right(
+               Natural.maximum(N_s_bound, N_t_bound),
+               Natural.maximum(N_s, N_t), m, m_ge));
   claim n_ge_N_s : N_s ≤ n
-    by LessOrEqual.transitive(
-           N_s, Natural.maximum(N_s, N_t), n,
-           LessOrEqual.transitive(
-               Natural.maximum(N_s, N_t),
-               Natural.maximum(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t)),
-               n,
-               n_ge,
-               Natural.right_le_max(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t))),
-           Natural.left_le_max(N_s, N_t));
+    by Natural.le_through_max_left(N_s, N_t, n,
+           Natural.le_through_max_right(
+               Natural.maximum(N_s_bound, N_t_bound),
+               Natural.maximum(N_s, N_t), n, n_ge));
   claim m_ge_N_t : N_t ≤ m
-    by LessOrEqual.transitive(
-           N_t, Natural.maximum(N_s, N_t), m,
-           LessOrEqual.transitive(
-               Natural.maximum(N_s, N_t),
-               Natural.maximum(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t)),
-               m,
-               m_ge,
-               Natural.right_le_max(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t))),
-           Natural.right_le_max(N_s, N_t));
+    by Natural.le_through_max_right(N_s, N_t, m,
+           Natural.le_through_max_right(
+               Natural.maximum(N_s_bound, N_t_bound),
+               Natural.maximum(N_s, N_t), m, m_ge));
   claim n_ge_N_t : N_t ≤ n
-    by LessOrEqual.transitive(
-           N_t, Natural.maximum(N_s, N_t), n,
-           LessOrEqual.transitive(
-               Natural.maximum(N_s, N_t),
-               Natural.maximum(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t)),
-               n,
-               n_ge,
-               Natural.right_le_max(
-                   Natural.maximum(N_s_bound, N_t_bound),
-                   Natural.maximum(N_s, N_t))),
-           Natural.right_le_max(N_s, N_t));
+    by Natural.le_through_max_right(N_s, N_t, n,
+           Natural.le_through_max_right(
+               Natural.maximum(N_s_bound, N_t_bound),
+               Natural.maximum(N_s, N_t), n, n_ge));
   -- Specific bounds at m, n.
   claim s_at_m_bound : Rational.absolute_value(s(m)) ≤ (successor(K_s) : Rational)
     by sBound(m, m_ge_N_s_bound);
@@ -647,19 +592,9 @@ theorem Real.multiply_after_first_respects_at_rep_inner
               s_x, s_y, s_yPrime,
               epsilon, K, delta, m,
               xBound(m,
-                  LessOrEqual.transitive(
-                      N_x_bound,
-                      Natural.maximum(N_x_bound, N_y),
-                      m,
-                      m_ge_max,
-                      Natural.left_le_max(N_x_bound, N_y))),
+                  Natural.le_through_max_left(N_x_bound, N_y, m, m_ge_max)),
               yEquivAt(m,
-                  LessOrEqual.transitive(
-                      N_y,
-                      Natural.maximum(N_x_bound, N_y),
-                      m,
-                      m_ge_max,
-                      Natural.right_le_max(N_x_bound, N_y))),
+                  Natural.le_through_max_right(N_x_bound, N_y, m, m_ge_max)),
               delta_bound,
               epsilonPositive)
 }
