@@ -3296,11 +3296,11 @@ private:
                                 totalPiCount
                                 - static_cast<int>(argumentCount);
                         }
-                        bool universesOk =
+                        bool universesProvided =
                             declarationUniverseParams->empty()
                             || (headIdentifier->universeArgs.size()
                                 == declarationUniverseParams->size());
-                        if (numLeadingToInfer > 0 && universesOk) {
+                        if (numLeadingToInfer > 0) {
                             // When the declaration uses explicit
                             // `{x : T}` binders, the user has
                             // committed to inference — any failure is
@@ -3320,6 +3320,35 @@ private:
                                         universeArguments.push_back(
                                             elaborateLevel(*level));
                                     }
+                                } else if (!declarationUniverseParams
+                                               ->empty()) {
+                                    // No user-supplied `.{...}`, but the
+                                    // declaration is universe-polymorphic.
+                                    // Infer universes from the trailing
+                                    // value args' types (skipping the
+                                    // leading implicit binders the user
+                                    // also didn't pass).
+                                    std::vector<ExpressionPointer>
+                                        valueArgsForUniverseInference;
+                                    for (const auto& argumentSurface :
+                                         positionalArguments) {
+                                        try {
+                                            valueArgsForUniverseInference
+                                                .push_back(
+                                                    elaborateExpression(
+                                                        *argumentSurface,
+                                                        localBinders));
+                                        } catch (const ElaborateError&) {
+                                            valueArgsForUniverseInference
+                                                .push_back(nullptr);
+                                        }
+                                    }
+                                    universeArguments =
+                                        inferUniverseArguments(
+                                            *environmentDeclaration,
+                                            valueArgsForUniverseInference,
+                                            localBinders,
+                                            numLeadingToInfer);
                                 }
                                 ExpressionPointer instantiated =
                                     substituteUniverseLevels(
@@ -3350,15 +3379,15 @@ private:
                                 }
                                 return head;
                             };
-                            if (explicitImplicitMode) {
+                            if (explicitImplicitMode
+                                && universesProvided) {
                                 return runInference();
                             }
                             try {
                                 return runInference();
                             } catch (const ElaborateError&) {
-                                // Inference failed in arity-based
-                                // mode — fall through to partial
-                                // application.
+                                // Inference failed — fall through to
+                                // Stage 2 / partial application.
                             }
                         }
                     }
@@ -16018,10 +16047,16 @@ private:
     // value-argument types to derive the universe instantiation. Returns
     // the inferred universe arguments in declaration order. Universe
     // parameters that cannot be derived are defaulted to LevelConst(0).
+    //
+    // `skipLeadingPis` skips that many Pi binders before aligning the
+    // value arguments with the remaining Pis. This lets the same routine
+    // serve declarations with an implicit-arg prefix the user did NOT
+    // pass — the caller infers those implicits separately.
     std::vector<LevelPointer> inferUniverseArguments(
         const Declaration& declaration,
         const std::vector<ExpressionPointer>& valueArguments,
-        const std::vector<LocalBinder>& localBinders) {
+        const std::vector<LocalBinder>& localBinders,
+        int skipLeadingPis = 0) {
 
         const std::vector<std::string>& universeParameters =
             declarationUniverseParameters(declaration);
@@ -16029,11 +16064,26 @@ private:
 
         std::map<std::string, LevelPointer> assignment;
         ExpressionPointer cursor = declarationType(declaration);
+        for (int s = 0; s < skipLeadingPis && cursor != nullptr; ++s) {
+            cursor = weakHeadNormalForm(environment_, cursor);
+            auto* pi = std::get_if<Pi>(&cursor->node);
+            if (!pi) { cursor = nullptr; break; }
+            // Open the binder with a fresh Internal FreeVariable so the
+            // codomain refers to a free name rather than a loose BVar.
+            std::string skipName =
+                "_inferUniverseSkip_" + std::to_string(s);
+            cursor = openBinder(pi->codomain, skipName,
+                                  FreeVariableOrigin::Internal);
+        }
         for (size_t i = 0;
              i < valueArguments.size() && cursor != nullptr; ++i) {
             cursor = weakHeadNormalForm(environment_, cursor);
             auto* pi = std::get_if<Pi>(&cursor->node);
             if (!pi) break;
+            if (!valueArguments[i]) {
+                cursor = pi->codomain;
+                continue;
+            }
             ExpressionPointer expectedDomain =
                 weakHeadNormalForm(environment_, pi->domain);
             ExpressionPointer actualType;
