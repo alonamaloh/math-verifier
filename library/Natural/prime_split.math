@@ -214,64 +214,42 @@ theorem Natural.classify_divisor_when_no_proper
                = 0))
     }
     in (divisor ≠ 0) as divisorNotZero:
-        Or.eliminate(
-              divisor = 1,
-              divisor ≠ 1,
-              Or(divisor = 1, divisor = successor(predecessorOfN)),
-              function (divisorIsOne : divisor = 1) =>
-                  Or.introduceLeft(divisorIsOne),
-              function (divisorNotOne : divisor ≠ 1) =>
-                  -- divisor ≥ 2 (it's neither 0 nor 1). Now classify
-                  -- against successor(predecessorOfN): either successor(divisor) ≤ successor(predecessorOfN)
-                  -- (i.e. divisor ≤ predecessorOfN) leading to a contradiction
-                  -- via noProperDivisor, or NOT(successor(divisor) ≤ successor(predecessorOfN))
-                  -- combined with divisor ≤ successor(predecessorOfN) (from
-                  -- divides_le_or_zero) forces divisor = successor(predecessorOfN).
-                  Or.eliminate(
-                      successor(divisor) ≤ successor(predecessorOfN),
-                      successor(divisor) ≰ successor(predecessorOfN),
-                      Or(divisor = 1, divisor = successor(predecessorOfN)),
-                      function (successorDivisorLessOrEqualSuccessorPredecessorOfN :
-                              successor(divisor) ≤ successor(predecessorOfN)) =>
-                          -- successor(divisor) ≤ successor(predecessorOfN) iff divisor ≤ predecessorOfN.
-                          -- Then noProperDivisor applies if divisor ≥ 2.
-                          absurd(noProperDivisor(
-                              divisor,
-                              -- Need 2 ≤ divisor.
-                              -- divisor is neither 0 nor 1.
-                              -- Pattern-match-style: this is exactly
-                              -- the role of `decides_equality` results,
-                              -- but we need to get the inequality.
-                              Natural.geq_two_when_not_zero_or_one(
-                                  divisor, divisorNotZero, divisorNotOne),
-                              Natural.less_or_equal_successor_successor_descend(
-                                  divisor, predecessorOfN,
-                                  successorDivisorLessOrEqualSuccessorPredecessorOfN),
-                              divDivides)),
-                      function (notSuccessorDivisorLessOrEqualSuccessorPredecessorOfN :
-                              successor(divisor) ≰ successor(predecessorOfN)) =>
-                          -- divisor ≤ successor(predecessorOfN) from divides_le_or_zero.
-                          -- Combined with NOT(successor(divisor) ≤ successor(predecessorOfN)),
-                          -- forces divisor = successor(predecessorOfN).
-                          Or.introduceRight(
-                              Natural.equals_when_less_or_equal_and_not_less_than(
-                                  divisor, successor(predecessorOfN),
-                                  Or.eliminate(
-                                      successor(predecessorOfN) = 0,
-                                      divisor ≤ successor(predecessorOfN),
-                                      divisor ≤ successor(predecessorOfN),
-                                      function (successorPredecessorEqualsZero :
-                                              successor(predecessorOfN) = 0) =>
-                                          absurd(successorPredecessorEqualsZero),
-                                      function (divisorLessOrEqual : divisor ≤ successor(predecessorOfN)) =>
-                                          divisorLessOrEqual,
-                                      Natural.divides_less_or_equal_or_zero(
-                                          divisor, successor(predecessorOfN),
-                                          divDivides)),
-                                  notSuccessorDivisorLessOrEqualSuccessorPredecessorOfN)),
-                      Natural.decides_less_or_equal(
-                          successor(divisor), successor(predecessorOfN))),
-              Natural.decides_equality(divisor, 1))
+        cases Natural.decides_equality(divisor, 1) {
+          | Or.introduceLeft(divisorIsOne) =>
+              Or.introduceLeft(divisorIsOne)
+          | Or.introduceRight(divisorNotOne) =>
+              -- divisor ≥ 2 (it's neither 0 nor 1). Classify against
+              -- successor(predecessorOfN): either successor(divisor) ≤
+              -- successor(predecessorOfN) leading to a contradiction via
+              -- noProperDivisor, or NOT — combined with divisor ≤
+              -- successor(predecessorOfN) (from divides_le_or_zero)
+              -- forces divisor = successor(predecessorOfN).
+              cases Natural.decides_less_or_equal(
+                        successor(divisor), successor(predecessorOfN)) {
+                | Or.introduceLeft(successorDivisorLessOrEqualSuccessorPredecessorOfN) =>
+                    absurd(noProperDivisor(
+                        divisor,
+                        Natural.geq_two_when_not_zero_or_one(
+                            divisor, divisorNotZero, divisorNotOne),
+                        Natural.less_or_equal_successor_successor_descend(
+                            divisor, predecessorOfN,
+                            successorDivisorLessOrEqualSuccessorPredecessorOfN),
+                        divDivides))
+                | Or.introduceRight(notSuccessorDivisorLessOrEqualSuccessorPredecessorOfN) =>
+                    Or.introduceRight(
+                        Natural.equals_when_less_or_equal_and_not_less_than(
+                            divisor, successor(predecessorOfN),
+                            cases Natural.divides_less_or_equal_or_zero(
+                                      divisor, successor(predecessorOfN),
+                                      divDivides) {
+                              | Or.introduceLeft(successorPredecessorEqualsZero) =>
+                                  absurd(successorPredecessorEqualsZero)
+                              | Or.introduceRight(divisorLessOrEqual) =>
+                                  divisorLessOrEqual
+                            },
+                            notSuccessorDivisorLessOrEqualSuccessorPredecessorOfN))
+              }
+        }
   }
 
 -- The main split: for n ≥ 2, n is prime or has a proper divisor.

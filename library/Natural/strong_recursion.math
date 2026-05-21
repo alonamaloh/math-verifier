@@ -104,27 +104,22 @@ theorem Natural.for_all_below
   | successor(predecessor) =>
       function (k : Natural)
           (successorKLessOrEqualSuccessorM : successor(k) ≤ successor(predecessor)) =>
-        Or.eliminate(
-            k = predecessor,
-            successor(k) ≤ predecessor,
-            P(k),
-            function (kEqualsPredecessor : k = predecessor) =>
-                -- We need P(k). Use step(predecessor,
-                -- for_all_below(predecessor)) to get P(predecessor),
-                -- then transport along k = predecessor reversed.
-                rewrite(
-                    Equality.symmetry(kEqualsPredecessor),
-                    step(predecessor,
-                          Natural.for_all_below(
-                              P, step, predecessor))),
-            function (successorKLessOrEqualPredecessor : successor(k) ≤ predecessor) =>
-                -- Recurse on the predecessor level: for_all_below for
-                -- `predecessor` directly handles k with successor(k) ≤
-                -- predecessor.
-                Natural.for_all_below(
-                    P, step, predecessor, k, successorKLessOrEqualPredecessor),
-            Natural.less_or_equal_successor_successor_inversion(
-                k, predecessor, successorKLessOrEqualSuccessorM))
+        cases Natural.less_or_equal_successor_successor_inversion(
+                  k, predecessor, successorKLessOrEqualSuccessorM) {
+          | Or.introduceLeft(kEqualsPredecessor) =>
+              -- We need P(k). Use step(predecessor,
+              -- for_all_below(predecessor)) to get P(predecessor),
+              -- then transport along k = predecessor reversed.
+              rewrite(
+                  Equality.symmetry(kEqualsPredecessor),
+                  step(predecessor,
+                        Natural.for_all_below(
+                            P, step, predecessor)))
+          | Or.introduceRight(successorKLessOrEqualPredecessor) =>
+              -- Recurse on the predecessor level.
+              Natural.for_all_below(
+                  P, step, predecessor, k, successorKLessOrEqualPredecessor)
+        }
 
 -- q ≤ 0 forces q = 0. Apply LessOrEqual.invert and discharge the
 -- step disjunct via zero_not_successor.

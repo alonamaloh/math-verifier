@@ -83,17 +83,15 @@ theorem Rational.LessThan.multiply_cancel_right
         (cPositive : Rational.zero < c)
         (xCLessThanYC : x * c < y * c)
         : x < y :=
-  Or.eliminate(
-      Rational.LessOrEqual(x, y), Rational.LessOrEqual(y, x),
-      x < y,
-      function (xLeqY : x ≤ y) =>
+  cases Rational.LessOrEqual.linear(x, y) {
+    | Or.introduceLeft(xLeqY) =>
         And.introduction(
             Rational.LessOrEqual(x, y), Not(x = y),
             xLeqY,
             function (xEqY : x = y) =>
               Rational.LessThan.distinct(x * c, y * c, xCLessThanYC)(
-                  xEqY)),
-      function (yLeqX : y ≤ x) =>
+                  xEqY))
+    | Or.introduceRight(yLeqX) =>
         False.eliminate_proposition(
             x < y,
             Rational.LessThan.distinct(x * c, y * c, xCLessThanYC)(
@@ -103,8 +101,8 @@ theorem Rational.LessThan.multiply_cancel_right
                     Rational.LessOrEqual.multiply_by_nonneg_right(
                         y, x, c, yLeqX,
                         Rational.LessThan.weaken(
-                            Rational.zero, c, cPositive))))),
-      Rational.LessOrEqual.linear(x, y))
+                            Rational.zero, c, cPositive)))))
+  }
 
 -- ----------------------------------------------------------------------
 -- The Cauchy proof. For `m, n ≥ max(apartnessIndex, cauchyIndex(ε · K²))`,

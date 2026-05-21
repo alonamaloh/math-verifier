@@ -20,12 +20,12 @@ theorem Logic.double_negation_eliminate
         (proposition : Proposition)
         (notNotProposition : Not(Not(proposition)))
         : proposition :=
-  Or.eliminate(
-      function (proof : proposition) => proof,
-      function (notProposition : Not(proposition)) =>
-          False.eliminate_proposition(
-              proposition, notNotProposition(notProposition)),
-      Logic.excluded_middle(proposition))
+  cases Logic.excluded_middle(proposition) {
+    | Or.introduceLeft(proof) => proof
+    | Or.introduceRight(notProposition) =>
+        False.eliminate_proposition(
+            proposition, notNotProposition(notProposition))
+  }
 
 -- ----------------------------------------------------------------------
 -- Negation distributes across implication: `¬(antecedent → consequent)
@@ -40,23 +40,23 @@ theorem Logic.not_implies_implies_and_not
         (antecedent consequent : Proposition)
         (notImplication : Not(antecedent → consequent))
         : And(antecedent, Not(consequent)) :=
-  Or.eliminate(
-      function (antecedentHolds : antecedent) =>
-          And.introduction(
-              antecedent, Not(consequent),
-              antecedentHolds,
-              function (consequentHolds : consequent) =>
-                  notImplication(
-                      function (_ : antecedent) => consequentHolds)),
-      function (notAntecedent : Not(antecedent)) =>
-          False.eliminate_proposition(
-              And(antecedent, Not(consequent)),
-              notImplication(
-                  function (antecedentHolds : antecedent) =>
-                      False.eliminate_proposition(
-                          consequent,
-                          notAntecedent(antecedentHolds)))),
-      Logic.excluded_middle(antecedent))
+  cases Logic.excluded_middle(antecedent) {
+    | Or.introduceLeft(antecedentHolds) =>
+        And.introduction(
+            antecedent, Not(consequent),
+            antecedentHolds,
+            function (consequentHolds : consequent) =>
+                notImplication(
+                    function (_ : antecedent) => consequentHolds))
+    | Or.introduceRight(notAntecedent) =>
+        False.eliminate_proposition(
+            And(antecedent, Not(consequent)),
+            notImplication(
+                function (antecedentHolds : antecedent) =>
+                    False.eliminate_proposition(
+                        consequent,
+                        notAntecedent(antecedentHolds))))
+  }
 
 -- ----------------------------------------------------------------------
 -- `¬(∀ x. predicate(x)) → ∃ x. ¬predicate(x)`. Standard classical

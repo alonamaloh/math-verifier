@@ -70,28 +70,17 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
                           nEqualsDTimesQuotient)))
       }
   | successor(prevBound) =>
-      Or.eliminate(
-          ∃ (q : Natural). q ≤ prevBound ∧ n = d * q,
-          (q : Natural)
-              → q ≤ prevBound
-              → n ≠ d * q,
-          Or(∃ (q : Natural). q ≤ successor(prevBound) ∧ n = d * q,
-              (q : Natural)
-                → q ≤ successor(prevBound)
-                → n ≠ d * q),
-          -- Found earlier: propagate, boosting the bound proof.
-          function (foundEarlier : ∃ (q : Natural). q ≤ prevBound ∧ n = d * q) => {
+      cases Natural.search_quotient_witness_up_to(d, n, prevBound) {
+        | Or.introduceLeft(foundEarlier) => {
+            -- Found earlier: propagate, boosting the bound proof.
             obtain ⟨q, qLePrevBound, nEqualsDTimesQuotient⟩ from foundEarlier;
             Or.introduceLeft(
                 witness q with
                     ⟨LessOrEqual.step(q, prevBound, qLePrevBound),
                      nEqualsDTimesQuotient⟩)
-          },
-          -- Not found in [0, prevBound]: check q = successor(prevBound).
-          function (noneEarlier :
-                  (q : Natural)
-                  → q ≤ prevBound
-                  → n ≠ d * q) => {
+          }
+        | Or.introduceRight(noneEarlier) => {
+            -- Not found in [0, prevBound]: check q = successor(prevBound).
             claim (n = d * successor(prevBound)) ∨ (n ≠ d * successor(prevBound))
             claim by cases {
               in (n = d * successor(prevBound)) as nEqualsDTimesSuccessorPrevious:
@@ -142,8 +131,8 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
                             }
                           })
             }
-          },
-          Natural.search_quotient_witness_up_to(d, n, prevBound))
+          }
+      }
 
 -- Decidable divisibility on Natural. For d = 0, dispatches via
 -- decides_equality(n, 0). For d = successor(dPredecessor), runs the bounded search

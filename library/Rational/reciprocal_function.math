@@ -158,13 +158,8 @@ theorem Rational.reciprocal_at_natural_pair_respect
           = Rational.reciprocal_at_natural_pair(
                 secondA, secondB, denominatorPredecessor) :=
   -- Trichotomy on (firstA, firstB) via Natural.totality_of_less_or_equal.
-  Or.eliminate(
-      firstA ≤ firstB, firstB ≤ firstA,
-      Rational.reciprocal_at_natural_pair(
-          firstA, firstB, denominatorPredecessor)
-        = Rational.reciprocal_at_natural_pair(
-              secondA, secondB, denominatorPredecessor),
-      function (firstALeqFirstB : firstA ≤ firstB) => {
+  cases Natural.totality_of_less_or_equal(firstA, firstB) {
+    | Or.introduceLeft(firstALeqFirstB) => {
         obtain ⟨gap, firstBEqualsFirstAPlusGap⟩
             from Natural.subtraction_witness(
                      firstA, firstB, firstALeqFirstB);
@@ -236,8 +231,8 @@ theorem Rational.reciprocal_at_natural_pair_respect
                         secondA, secondB, denominatorPredecessor)
              }
         }
-      },
-      function (firstBLeqFirstA : firstB ≤ firstA) => {
+      }
+    | Or.introduceRight(firstBLeqFirstA) => {
         obtain ⟨gap, firstAEqualsFirstBPlusGap⟩
             from Natural.subtraction_witness(
                      firstB, firstA, firstBLeqFirstA);
@@ -308,8 +303,8 @@ theorem Rational.reciprocal_at_natural_pair_respect
                         secondA, secondB, denominatorPredecessor)
              }
         }
-      },
-      Natural.totality_of_less_or_equal(firstA, firstB))
+      }
+  }
 
 -- ----------------------------------------------------------------------
 -- Integer-rep level reciprocal: case-analyzes the integer rep to
@@ -615,18 +610,11 @@ theorem Rational.reciprocal_function_at_rational_rep_respect
   | RationalRepresentative.make(n1, d1),
     RationalRepresentative.make(n2, d2),
     equivalenceHypothesis =>
-      Or.eliminate(
-          (Quotient.mk(RationalRepresentative.make(n1, d1)) : Rational)
-              = Rational.zero,
-          ¬((Quotient.mk(RationalRepresentative.make(n1, d1)) : Rational)
-                = Rational.zero),
-          Rational.reciprocal_at_integer(n1, d1)
-              = Rational.reciprocal_at_integer(n2, d2),
-          -- Zero branch: both reciprocals reduce to Rational.zero.
-          function (mkFirstIsZero
-                        : (Quotient.mk(RationalRepresentative.make(n1, d1))
-                               : Rational)
-                            = Rational.zero) => {
+      cases Logic.excluded_middle(
+                (Quotient.mk(RationalRepresentative.make(n1, d1)) : Rational)
+                    = Rational.zero) {
+        | Or.introduceLeft(mkFirstIsZero) => {
+            -- Zero branch: both reciprocals reduce to Rational.zero.
             claim n1IsZero : n1 = Integer.zero
               by Rational.mk_zero_implies_integer_zero(
                      n1, d1, mkFirstIsZero);
@@ -646,13 +634,9 @@ theorem Rational.reciprocal_function_at_rational_rep_respect
                = Rational.zero
                = Rational.reciprocal_at_integer(Integer.zero, d2)
                = Rational.reciprocal_at_integer(n2, d2)
-          },
-          -- Non-zero branch: uniqueness of inverse via multiplication.
-          function (mkFirstIsNonzero
-                        : ¬((Quotient.mk(
-                                 RationalRepresentative.make(n1, d1))
-                                 : Rational)
-                                = Rational.zero)) => {
+          }
+        | Or.introduceRight(mkFirstIsNonzero) => {
+            -- Non-zero branch: uniqueness of inverse via multiplication.
             -- Build mkSecondIsNonzero from equivalence.
             claim mkSecondIsNonzero
                   : ¬((Quotient.mk(
@@ -711,10 +695,8 @@ theorem Rational.reciprocal_function_at_rational_rep_respect
                        * Rational.reciprocal_at_integer(n1, d1))
                = Rational.reciprocal_at_integer(n2, d2) * Rational.one
                = Rational.reciprocal_at_integer(n2, d2)
-          },
-          Logic.excluded_middle(
-              (Quotient.mk(RationalRepresentative.make(n1, d1)) : Rational)
-                  = Rational.zero))
+          }
+      }
 
 -- ----------------------------------------------------------------------
 -- The headline definition: a total Rational → Rational function.
