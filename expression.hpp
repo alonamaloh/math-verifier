@@ -44,6 +44,14 @@ struct Expression {
     // this should never appear in well-formed terms. Used as a
     // constant-time fast-reject in structurallyEqual.
     uint64_t hash = 0;
+    // Highest free-BoundVariable index in this subtree, accounting for
+    // binders along the way (binders decrement the visible BV indices
+    // of references inside their body). -1 means closed (no free BV
+    // refs). Populated by the make* helpers. Lets shift/substitute
+    // short-circuit on closed subtrees: most of any given proof is
+    // closed library terms, so a single int compare at the top of each
+    // recursion replaces an O(size) walk.
+    int maxFreeBoundVariable = -1;
 
     Expression() = default;
 
@@ -60,6 +68,7 @@ inline ExpressionPointer makeBoundVariable(int index) {
         subtree_hash::mix(subtree_hash::kSeed,
                            subtree_hash::kTagBoundVariable),
         static_cast<uint64_t>(index));
+    expression->maxFreeBoundVariable = index;
     return expression;
 }
 inline ExpressionPointer makeFreeVariable(std::string name) {
@@ -111,6 +120,12 @@ inline ExpressionPointer makePi(std::string displayHint,
     // (structurallyEqual ignores it for the same reason).
     uint64_t domainHash = domain->hash;
     uint64_t codomainHash = codomain->hash;
+    // Binder shifts BVs in codomain by 1 (BV(0) refers to this Pi's
+    // binder, BV(1) refers to enclosing scope's BV(0), etc).
+    int domainMax = domain->maxFreeBoundVariable;
+    int codomainAdj = codomain->maxFreeBoundVariable - 1;
+    int maxFree = domainMax > codomainAdj ? domainMax : codomainAdj;
+    if (maxFree < -1) maxFree = -1;
     auto expression = std::make_shared<Expression>(
         Pi{std::move(displayHint), std::move(domain),
            std::move(codomain)});
@@ -120,6 +135,7 @@ inline ExpressionPointer makePi(std::string displayHint,
                                subtree_hash::kTagPi),
             domainHash),
         codomainHash);
+    expression->maxFreeBoundVariable = maxFree;
     return expression;
 }
 inline ExpressionPointer makeLambda(std::string displayHint,
@@ -127,6 +143,10 @@ inline ExpressionPointer makeLambda(std::string displayHint,
                                 ExpressionPointer body) {
     uint64_t domainHash = domain->hash;
     uint64_t bodyHash = body->hash;
+    int domainMax = domain->maxFreeBoundVariable;
+    int bodyAdj = body->maxFreeBoundVariable - 1;
+    int maxFree = domainMax > bodyAdj ? domainMax : bodyAdj;
+    if (maxFree < -1) maxFree = -1;
     auto expression = std::make_shared<Expression>(
         Lambda{std::move(displayHint), std::move(domain),
                std::move(body)});
@@ -136,12 +156,16 @@ inline ExpressionPointer makeLambda(std::string displayHint,
                                subtree_hash::kTagLambda),
             domainHash),
         bodyHash);
+    expression->maxFreeBoundVariable = maxFree;
     return expression;
 }
 inline ExpressionPointer makeApplication(ExpressionPointer function,
                                      ExpressionPointer argument) {
     uint64_t functionHash = function->hash;
     uint64_t argumentHash = argument->hash;
+    int fnMax = function->maxFreeBoundVariable;
+    int argMax = argument->maxFreeBoundVariable;
+    int maxFree = fnMax > argMax ? fnMax : argMax;
     auto expression = std::make_shared<Expression>(
         Application{std::move(function), std::move(argument)});
     expression->hash = subtree_hash::mix(
@@ -150,6 +174,7 @@ inline ExpressionPointer makeApplication(ExpressionPointer function,
                                subtree_hash::kTagApplication),
             functionHash),
         argumentHash);
+    expression->maxFreeBoundVariable = maxFree;
     return expression;
 }
 inline ExpressionPointer makeConstant(std::string name,
@@ -180,6 +205,13 @@ inline ExpressionPointer makeLet(std::string displayHint,
     uint64_t typeHash = type->hash;
     uint64_t valueHash = value->hash;
     uint64_t bodyHash = body->hash;
+    int typeMax = type->maxFreeBoundVariable;
+    int valueMax = value->maxFreeBoundVariable;
+    int bodyAdj = body->maxFreeBoundVariable - 1;
+    int maxFree = typeMax;
+    if (valueMax > maxFree) maxFree = valueMax;
+    if (bodyAdj > maxFree) maxFree = bodyAdj;
+    if (maxFree < -1) maxFree = -1;
     auto expression = std::make_shared<Expression>(
         Let{std::move(displayHint), std::move(type),
             std::move(value), std::move(body)});
@@ -191,5 +223,6 @@ inline ExpressionPointer makeLet(std::string displayHint,
                 typeHash),
             valueHash),
         bodyHash);
+    expression->maxFreeBoundVariable = maxFree;
     return expression;
 }

@@ -155,6 +155,10 @@ ExpressionPointer declarationType(const Declaration& declaration) {
 } // namespace
 
 ExpressionPointer shift(ExpressionPointer expression, int amount, int cutoff) {
+    // Short-circuit: if the subtree's highest free BV is below cutoff,
+    // shift is a no-op. Most subtrees are closed library terms, so
+    // this skips the entire recursion in the common case.
+    if (expression->maxFreeBoundVariable < cutoff) return expression;
     if (auto* boundVariable = std::get_if<BoundVariable>(&expression->node)) {
         if (boundVariable->deBruijnIndex >= cutoff) {
             return makeBoundVariable(boundVariable->deBruijnIndex + amount);
@@ -164,25 +168,49 @@ ExpressionPointer shift(ExpressionPointer expression, int amount, int cutoff) {
     if (std::holds_alternative<FreeVariable>(expression->node)) return expression;
     if (std::holds_alternative<Sort>(expression->node))         return expression;
     if (std::holds_alternative<Constant>(expression->node))     return expression;
+    // Structural-sharing fast path: if recursive shifts return the
+    // same children (no BV at or above cutoff appeared in the subtree),
+    // hand the original expression back unchanged. Most shifts touch
+    // very few subterms; rebuilding the entire tree per shift was the
+    // dominant cost in profiling.
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        auto newDomain   = shift(pi->domain,   amount, cutoff);
+        auto newCodomain = shift(pi->codomain, amount, cutoff + 1);
+        if (newDomain == pi->domain && newCodomain == pi->codomain) {
+            return expression;
+        }
         return makePi(pi->displayHint,
-                      shift(pi->domain,   amount, cutoff),
-                      shift(pi->codomain, amount, cutoff + 1));
+                      std::move(newDomain), std::move(newCodomain));
     }
     if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        auto newDomain = shift(lambda->domain, amount, cutoff);
+        auto newBody   = shift(lambda->body,   amount, cutoff + 1);
+        if (newDomain == lambda->domain && newBody == lambda->body) {
+            return expression;
+        }
         return makeLambda(lambda->displayHint,
-                          shift(lambda->domain, amount, cutoff),
-                          shift(lambda->body,   amount, cutoff + 1));
+                          std::move(newDomain), std::move(newBody));
     }
     if (auto* application = std::get_if<Application>(&expression->node)) {
-        return makeApplication(shift(application->function, amount, cutoff),
-                               shift(application->argument, amount, cutoff));
+        auto newFn  = shift(application->function, amount, cutoff);
+        auto newArg = shift(application->argument, amount, cutoff);
+        if (newFn == application->function
+            && newArg == application->argument) {
+            return expression;
+        }
+        return makeApplication(std::move(newFn), std::move(newArg));
     }
     if (auto* let = std::get_if<Let>(&expression->node)) {
+        auto newType  = shift(let->type,  amount, cutoff);
+        auto newValue = shift(let->value, amount, cutoff);
+        auto newBody  = shift(let->body,  amount, cutoff + 1);
+        if (newType == let->type && newValue == let->value
+            && newBody == let->body) {
+            return expression;
+        }
         return makeLet(let->displayHint,
-                       shift(let->type,  amount, cutoff),
-                       shift(let->value, amount, cutoff),
-                       shift(let->body,  amount, cutoff + 1));
+                       std::move(newType), std::move(newValue),
+                       std::move(newBody));
     }
     throw TypeError("internal: unhandled Expression variant in shift");
 }
@@ -190,6 +218,10 @@ ExpressionPointer shift(ExpressionPointer expression, int amount, int cutoff) {
 ExpressionPointer substitute(ExpressionPointer expression,
                          int targetIndex,
                          ExpressionPointer replacement) {
+    // Short-circuit: if the subtree has no free BV at or above
+    // targetIndex, substitute is identity. Skips the entire recursion
+    // on closed subtrees (the common case).
+    if (expression->maxFreeBoundVariable < targetIndex) return expression;
     if (auto* boundVariable = std::get_if<BoundVariable>(&expression->node)) {
         if (boundVariable->deBruijnIndex == targetIndex) return replacement;
         if (boundVariable->deBruijnIndex >  targetIndex) {
@@ -200,26 +232,58 @@ ExpressionPointer substitute(ExpressionPointer expression,
     if (std::holds_alternative<FreeVariable>(expression->node)) return expression;
     if (std::holds_alternative<Sort>(expression->node))         return expression;
     if (std::holds_alternative<Constant>(expression->node))     return expression;
+    // Structural-sharing fast path: if recursive substitutes return the
+    // same children, hand back the original. Most substitutes leave
+    // most subterms untouched (the target BV appears in only one
+    // branch). Rebuilding the entire tree per substitute was the
+    // dominant cost in profiling.
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        auto newDomain   = substitute(pi->domain,   targetIndex,
+                                       replacement);
+        auto newCodomain = substitute(pi->codomain, targetIndex + 1,
+                                       shift(replacement, 1));
+        if (newDomain == pi->domain && newCodomain == pi->codomain) {
+            return expression;
+        }
         return makePi(pi->displayHint,
-                      substitute(pi->domain,   targetIndex,     replacement),
-                      substitute(pi->codomain, targetIndex + 1, shift(replacement, 1)));
+                      std::move(newDomain), std::move(newCodomain));
     }
     if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        auto newDomain = substitute(lambda->domain, targetIndex,
+                                     replacement);
+        auto newBody   = substitute(lambda->body,   targetIndex + 1,
+                                     shift(replacement, 1));
+        if (newDomain == lambda->domain && newBody == lambda->body) {
+            return expression;
+        }
         return makeLambda(lambda->displayHint,
-                          substitute(lambda->domain, targetIndex,     replacement),
-                          substitute(lambda->body,   targetIndex + 1, shift(replacement, 1)));
+                          std::move(newDomain), std::move(newBody));
     }
     if (auto* application = std::get_if<Application>(&expression->node)) {
-        return makeApplication(
-            substitute(application->function, targetIndex, replacement),
-            substitute(application->argument, targetIndex, replacement));
+        auto newFn  = substitute(application->function, targetIndex,
+                                  replacement);
+        auto newArg = substitute(application->argument, targetIndex,
+                                  replacement);
+        if (newFn == application->function
+            && newArg == application->argument) {
+            return expression;
+        }
+        return makeApplication(std::move(newFn), std::move(newArg));
     }
     if (auto* let = std::get_if<Let>(&expression->node)) {
+        auto newType  = substitute(let->type,  targetIndex,
+                                    replacement);
+        auto newValue = substitute(let->value, targetIndex,
+                                    replacement);
+        auto newBody  = substitute(let->body,  targetIndex + 1,
+                                    shift(replacement, 1));
+        if (newType == let->type && newValue == let->value
+            && newBody == let->body) {
+            return expression;
+        }
         return makeLet(let->displayHint,
-                       substitute(let->type,  targetIndex,     replacement),
-                       substitute(let->value, targetIndex,     replacement),
-                       substitute(let->body,  targetIndex + 1, shift(replacement, 1)));
+                       std::move(newType), std::move(newValue),
+                       std::move(newBody));
     }
     throw TypeError("internal: unhandled Expression variant in substitute");
 }
