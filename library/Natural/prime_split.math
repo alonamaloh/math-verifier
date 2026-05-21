@@ -54,143 +54,91 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                         divisor, divisorLessOrEqualZero),
                     twoLessOrEqualDivisor)))
   | successor(predecessorOfBound) =>
-      Or.eliminate(
-          Exists(Natural, function (divisor : Natural) =>
-              2 ≤ divisor ∧ divisor ≤ predecessorOfBound ∧ divisor ∣ n),
-          (divisor : Natural)
-              → 2 ≤ divisor
-              → divisor ≤ predecessorOfBound
-              → divisor ∤ n,
-          Or(Exists(Natural, function (divisor : Natural) =>
-                  2 ≤ divisor ∧ divisor ≤ successor(predecessorOfBound) ∧ divisor ∣ n),
-              (divisor : Natural)
-                → 2 ≤ divisor
-                → divisor ≤ successor(predecessorOfBound)
-                → divisor ∤ n),
-          function (foundEarlier : Exists(Natural,
-                  function (divisor : Natural) =>
-                      2 ≤ divisor ∧ divisor ≤ predecessorOfBound ∧ divisor ∣ n)) => {
-              obtain ⟨divisor, twoLessOrEqualDivisor,
-                      divLePredBound, divDivides⟩
-                  from foundEarlier;
-              Or.introduceLeft(
-                  witness divisor with
-                      ⟨twoLessOrEqualDivisor,
-                       LessOrEqual.step(
-                           divisor, predecessorOfBound,
-                           divLePredBound),
-                       divDivides⟩)
-          },
-          function (noEarlierDivisor :
-                  (divisor : Natural)
-                  → 2 ≤ divisor
-                  → divisor ≤ predecessorOfBound
-                  → divisor ∤ n) =>
+      cases Natural.search_proper_divisor_up_to(n, predecessorOfBound) {
+        | Or.introduceLeft(foundEarlier) => {
+            obtain ⟨divisor, twoLessOrEqualDivisor,
+                    divLePredBound, divDivides⟩
+                from foundEarlier;
+            Or.introduceLeft(
+                witness divisor with
+                    ⟨twoLessOrEqualDivisor,
+                     LessOrEqual.step(
+                         divisor, predecessorOfBound,
+                         divLePredBound),
+                     divDivides⟩)
+          }
+        | Or.introduceRight(noEarlierDivisor) =>
               -- induction hypothesis says no divisor in [2, predecessorOfBound]. Check the boundary
               -- candidate successor(predecessorOfBound): either ≥ 2 and divides n
               -- (in which case we have a witness), or doesn't divide
               -- (in which case combined with induction hypothesis no candidate ≤ successor(predecessorOfBound)
               -- works), or < 2 (so the range [2, successor(predecessorOfBound)] still
               -- only includes [2, predecessorOfBound]).
-              Or.eliminate(
-                  2 ≤ successor(predecessorOfBound),
-                  2 ≰ successor(predecessorOfBound),
-                  Or(Exists(Natural, function (d : Natural) =>
-                          2 ≤ d ∧ d ≤ successor(predecessorOfBound) ∧ d ∣ n),
-                      (d : Natural)
-                        → 2 ≤ d
-                        → d ≤ successor(predecessorOfBound)
-                        → d ∤ n),
-                  function (twoLeSuccPredBound :
-                          2 ≤ successor(predecessorOfBound)) =>
-                      Or.eliminate(
-                          successor(predecessorOfBound) ∣ n,
-                          successor(predecessorOfBound) ∤ n,
-                          Or(Exists(Natural, function (d : Natural) =>
-                                  2 ≤ d ∧ d ≤ successor(predecessorOfBound) ∧ d ∣ n),
-                              (d : Natural)
-                                → 2 ≤ d
-                                → d ≤ successor(predecessorOfBound)
-                                → d ∤ n),
-                          function (successorPredecessorBoundDivides :
-                                  successor(predecessorOfBound) ∣ n) =>
-                              Or.introduceLeft(
-                                  witness successor(predecessorOfBound) with
-                                      ⟨twoLeSuccPredBound,
-                                       LessOrEqual.reflexivity(
-                                           successor(predecessorOfBound)),
-                                       successorPredecessorBoundDivides⟩),
-                          function (successorPredecessorBoundDoesNotDivide :
-                                  successor(predecessorOfBound) ∤ n) =>
-                              Or.introduceRight(
-                                  function (divisor : Natural)
-                                      (twoLessOrEqualDivisor : 2 ≤ divisor)
-                                      (divisorLessOrEqualSuccessorPredecessorBound :
-                                          divisor ≤ successor(predecessorOfBound))
-                                      (divDividesN : divisor ∣ n) =>
-                                    -- divisor ≤ successor(predecessorOfBound). Either
-                                    -- divisor ≤ predecessorOfBound (use induction hypothesis) or
-                                    -- divisor = successor(predecessorOfBound) (use this
-                                    -- case's negation).
-                                    Or.eliminate(
-                                        divisor = successor(predecessorOfBound),
-                                        Exists(Natural,
-                                            function (bPredecessor : Natural) =>
-                                                successor(predecessorOfBound) =
-                                                        successor(bPredecessor) ∧ divisor ≤ bPredecessor),
-                                        False,
-                                        function (divisorEqualsSuccessorPredecessorBound :
-                                                divisor = successor(predecessorOfBound)) =>
-                                            successorPredecessorBoundDoesNotDivide(
-                                                rewrite(
-                                                    divisorEqualsSuccessorPredecessorBound,
-                                                    divDividesN)),
-                                        function (existsProof :
-                                                Exists(Natural,
-                                                    function (bPredecessor : Natural) =>
-                                                        successor(predecessorOfBound) =
-                                                                successor(bPredecessor) ∧ divisor ≤ bPredecessor)) => {
-                                            obtain ⟨bPredecessor, successorEquals,
-                                                    divisorLessOrEqualBPredecessor⟩
-                                                from existsProof;
-                                            noEarlierDivisor(
-                                                divisor,
-                                                twoLessOrEqualDivisor,
-                                                rewrite(
-                                                    Equality.symmetry(
-                                                        Natural.successor_injective(
-                                                            predecessorOfBound,
-                                                            bPredecessor,
-                                                            successorEquals)),
-                                                    divisorLessOrEqualBPredecessor),
-                                                divDividesN)
-                                        },
-                                        LessOrEqual.invert(
-                                            divisor,
-                                            successor(predecessorOfBound),
-                                            divisorLessOrEqualSuccessorPredecessorBound))),
-                          Natural.decides_divides(
-                              successor(predecessorOfBound), n)),
-                  function (notTwoLeSuccPredBound :
-                          2 ≰ successor(predecessorOfBound)) =>
-                      -- successor(predecessorOfBound) < 2, so the range [2, successor(predecessorOfBound)]
-                      -- only contains things ≤ predecessorOfBound. Same conclusion
-                      -- as noEarlierDivisor but extended to the wider
-                      -- range — we just have to derive d ≤ predecessorOfBound from
-                      -- d ≤ successor(predecessorOfBound).
-                      Or.introduceRight(
-                          function (divisor : Natural)
-                              (twoLessOrEqualDivisor : 2 ≤ divisor)
-                              (divisorLessOrEqualSuccessorPredecessorBound :
-                                  divisor ≤ successor(predecessorOfBound))
-                              (divDividesN : divisor ∣ n) =>
-                            notTwoLeSuccPredBound(
-                                LessOrEqual.transitive(
-                                    2, divisor, successor(predecessorOfBound),
-                                    divisorLessOrEqualSuccessorPredecessorBound,
-                                    twoLessOrEqualDivisor))),
-                  Natural.decides_less_or_equal(2, successor(predecessorOfBound))),
-          Natural.search_proper_divisor_up_to(n, predecessorOfBound))
+              cases Natural.decides_less_or_equal(2, successor(predecessorOfBound)) {
+                | Or.introduceLeft(twoLeSuccPredBound) =>
+                    cases Natural.decides_divides(successor(predecessorOfBound), n) {
+                      | Or.introduceLeft(successorPredecessorBoundDivides) =>
+                          Or.introduceLeft(
+                              witness successor(predecessorOfBound) with
+                                  ⟨twoLeSuccPredBound,
+                                   LessOrEqual.reflexivity(
+                                       successor(predecessorOfBound)),
+                                   successorPredecessorBoundDivides⟩)
+                      | Or.introduceRight(successorPredecessorBoundDoesNotDivide) =>
+                          Or.introduceRight(
+                              function (divisor : Natural)
+                                  (twoLessOrEqualDivisor : 2 ≤ divisor)
+                                  (divisorLessOrEqualSuccessorPredecessorBound :
+                                      divisor ≤ successor(predecessorOfBound))
+                                  (divDividesN : divisor ∣ n) =>
+                                -- divisor ≤ successor(predecessorOfBound). Either
+                                -- divisor ≤ predecessorOfBound (use induction hypothesis) or
+                                -- divisor = successor(predecessorOfBound) (use this
+                                -- case's negation).
+                                cases LessOrEqual.invert(
+                                          divisor,
+                                          successor(predecessorOfBound),
+                                          divisorLessOrEqualSuccessorPredecessorBound) {
+                                  | Or.introduceLeft(divisorEqualsSuccessorPredecessorBound) =>
+                                      successorPredecessorBoundDoesNotDivide(
+                                          rewrite(
+                                              divisorEqualsSuccessorPredecessorBound,
+                                              divDividesN))
+                                  | Or.introduceRight(existsProof) => {
+                                      obtain ⟨bPredecessor, successorEquals,
+                                              divisorLessOrEqualBPredecessor⟩
+                                          from existsProof;
+                                      noEarlierDivisor(
+                                          divisor,
+                                          twoLessOrEqualDivisor,
+                                          rewrite(
+                                              Equality.symmetry(
+                                                  Natural.successor_injective(
+                                                      predecessorOfBound,
+                                                      bPredecessor,
+                                                      successorEquals)),
+                                              divisorLessOrEqualBPredecessor),
+                                          divDividesN)
+                                    }
+                                }
+                          )
+                    }
+                | Or.introduceRight(notTwoLeSuccPredBound) =>
+                    -- successor(predecessorOfBound) < 2, so the range [2, successor(predecessorOfBound)]
+                    -- only contains things ≤ predecessorOfBound.
+                    Or.introduceRight(
+                        function (divisor : Natural)
+                            (twoLessOrEqualDivisor : 2 ≤ divisor)
+                            (divisorLessOrEqualSuccessorPredecessorBound :
+                                divisor ≤ successor(predecessorOfBound))
+                            (divDividesN : divisor ∣ n) =>
+                          notTwoLeSuccPredBound(
+                              LessOrEqual.transitive(
+                                  2, divisor, successor(predecessorOfBound),
+                                  divisorLessOrEqualSuccessorPredecessorBound,
+                                  twoLessOrEqualDivisor)))
+              }
+      }
 
 -- d ≠ 0 implies 1 ≤ d.
 theorem Natural.geq_one_when_not_zero

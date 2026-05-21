@@ -1,0 +1,37 @@
+-- Test whether `cases X { | Or.introduceLeft(p) => ... }` works on Or,
+-- including nested destructuring with existentials.
+
+module Test.cases_or_check
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+
+theorem cases_or_symmetric (A B : Proposition) (h : Or(A, B)) : Or(B, A) :=
+  cases h {
+    | Or.introduceLeft(left) => Or.introduceRight(B, A, left)
+    | Or.introduceRight(right) => Or.introduceLeft(B, A, right)
+  }
+
+-- Or with existential payload — does `cases` peel both at once?
+theorem cases_or_with_exists
+        (P Q : Natural → Proposition)
+        (h : Or(Exists(Natural, P), Exists(Natural, Q)))
+        : Exists(Natural, function (n : Natural) => Or(P(n), Q(n))) :=
+  cases h {
+    | Or.introduceLeft(existsP) => {
+        obtain ⟨witnessValue, witnessValueP⟩ from existsP;
+        Exists.introduce(Natural,
+            function (n : Natural) => Or(P(n), Q(n)),
+            witnessValue,
+            Or.introduceLeft(P(witnessValue), Q(witnessValue), witnessValueP))
+      }
+    | Or.introduceRight(existsQ) => {
+        obtain ⟨witnessValue, witnessValueQ⟩ from existsQ;
+        Exists.introduce(Natural,
+            function (n : Natural) => Or(P(n), Q(n)),
+            witnessValue,
+            Or.introduceRight(P(witnessValue), Q(witnessValue), witnessValueQ))
+      }
+  }
