@@ -170,150 +170,144 @@ theorem Rational.reciprocal_at_natural_pair_respect
                      firstA, firstB, firstALeqFirstB);
         -- Case on gap, with the equation firstB = firstA + gap
         -- refined per branch via the convoy pattern.
-        (cases gap {
-           | zero =>
-               function (refinedFirstBEquation : firstB = firstA + 0) => {
-                 calc firstA
-                    = firstA + 0
-                    = firstB                                         as firstAEqualsFirstB;
-                 claim secondBEqualsSecondA
-                       : secondB = secondA
-                   by {
-                     calc firstB + secondB
-                        = firstA + secondB
-                        = firstB + secondA                           as sumEquation;
-                     Natural.add_cancel_left(
-                         firstB, secondB, secondA, sumEquation)
-                   };
-                 calc Rational.reciprocal_at_natural_pair(
-                          firstA, firstB, denominatorPredecessor)
-                    = Rational.reciprocal_at_natural_pair(
-                          firstB, firstB, denominatorPredecessor)
-                    = Rational.zero
-                    = Rational.reciprocal_at_natural_pair(
-                          secondA, secondA, denominatorPredecessor)
-                         by Equality.symmetry(
-                                Rational.reciprocal_at_natural_pair_self(
-                                    secondA, denominatorPredecessor))
-                    = Rational.reciprocal_at_natural_pair(
-                          secondA, secondB, denominatorPredecessor)
-               }
-           | successor(gapPredecessor) =>
-               function (refinedFirstBEquation
-                             : firstB = firstA + successor(gapPredecessor)) => {
-                 claim secondBExpansion
-                       : secondB = secondA + successor(gapPredecessor)
-                   by {
-                     calc firstA + secondB
-                             = firstB + secondA
-                             = (firstA + successor(gapPredecessor)) + secondA
-                             = firstA + (successor(gapPredecessor) + secondA)
-                             = firstA + (secondA + successor(gapPredecessor))    as sumEquation;                     Natural.add_cancel_left(
-                         firstA, secondB,
-                         secondA + successor(gapPredecessor),
-                         sumEquation)
-                   };
-                 calc Rational.reciprocal_at_natural_pair(
-                          firstA, firstB, denominatorPredecessor)
-                    = Rational.reciprocal_at_natural_pair(
-                          firstA, firstA + successor(gapPredecessor),
-                          denominatorPredecessor)
-                    = (Quotient.mk(
-                           RationalRepresentative.make(
-                               -(successor(denominatorPredecessor) : Integer),
-                               gapPredecessor))
-                       : Rational)
-                    = Rational.reciprocal_at_natural_pair(
-                          secondA, secondA + successor(gapPredecessor),
-                          denominatorPredecessor)
-                         by Equality.symmetry(
-                                Rational.reciprocal_at_natural_pair_negative_shift(
-                                    secondA, gapPredecessor,
-                                    denominatorPredecessor))
-                    = Rational.reciprocal_at_natural_pair(
-                          secondA, secondB, denominatorPredecessor)
-               }
-         } : (refinedFirstBEquation : firstB = firstA + gap)
-             → Rational.reciprocal_at_natural_pair(
-                   firstA, firstB, denominatorPredecessor)
-               = Rational.reciprocal_at_natural_pair(
-                     secondA, secondB, denominatorPredecessor))(
-            firstBEqualsFirstAPlusGap)
+        cases gap with gapEq {
+           | zero => {
+               let refinedFirstBEquation : firstB = firstA + 0 :=
+                   rewrite(gapEq, firstBEqualsFirstAPlusGap);
+               calc firstA
+                  = firstA + 0
+                  = firstB                                         as firstAEqualsFirstB;
+               claim secondBEqualsSecondA
+                     : secondB = secondA
+                 by {
+                   calc firstB + secondB
+                      = firstA + secondB
+                      = firstB + secondA                           as sumEquation;
+                   Natural.add_cancel_left(
+                       firstB, secondB, secondA, sumEquation)
+                 };
+               calc Rational.reciprocal_at_natural_pair(
+                        firstA, firstB, denominatorPredecessor)
+                  = Rational.reciprocal_at_natural_pair(
+                        firstB, firstB, denominatorPredecessor)
+                  = Rational.zero
+                  = Rational.reciprocal_at_natural_pair(
+                        secondA, secondA, denominatorPredecessor)
+                       by Equality.symmetry(
+                              Rational.reciprocal_at_natural_pair_self(
+                                  secondA, denominatorPredecessor))
+                  = Rational.reciprocal_at_natural_pair(
+                        secondA, secondB, denominatorPredecessor)
+             }
+           | successor(gapPredecessor) => {
+               let refinedFirstBEquation
+                       : firstB = firstA + successor(gapPredecessor) :=
+                   rewrite(gapEq, firstBEqualsFirstAPlusGap);
+               claim secondBExpansion
+                     : secondB = secondA + successor(gapPredecessor)
+                 by {
+                   calc firstA + secondB
+                           = firstB + secondA
+                           = (firstA + successor(gapPredecessor)) + secondA
+                           = firstA + (successor(gapPredecessor) + secondA)
+                           = firstA + (secondA + successor(gapPredecessor))    as sumEquation;                     Natural.add_cancel_left(
+                       firstA, secondB,
+                       secondA + successor(gapPredecessor),
+                       sumEquation)
+                 };
+               calc Rational.reciprocal_at_natural_pair(
+                        firstA, firstB, denominatorPredecessor)
+                  = Rational.reciprocal_at_natural_pair(
+                        firstA, firstA + successor(gapPredecessor),
+                        denominatorPredecessor)
+                  = (Quotient.mk(
+                         RationalRepresentative.make(
+                             -(successor(denominatorPredecessor) : Integer),
+                             gapPredecessor))
+                     : Rational)
+                  = Rational.reciprocal_at_natural_pair(
+                        secondA, secondA + successor(gapPredecessor),
+                        denominatorPredecessor)
+                       by Equality.symmetry(
+                              Rational.reciprocal_at_natural_pair_negative_shift(
+                                  secondA, gapPredecessor,
+                                  denominatorPredecessor))
+                  = Rational.reciprocal_at_natural_pair(
+                        secondA, secondB, denominatorPredecessor)
+             }
+        }
       },
       function (firstBLeqFirstA : firstB ≤ firstA) => {
         obtain ⟨gap, firstAEqualsFirstBPlusGap⟩
             from Natural.subtraction_witness(
                      firstB, firstA, firstBLeqFirstA);
-        (cases gap {
-           | zero =>
-               function (refinedFirstAEquation : firstA = firstB + 0) => {
-                 calc firstB
-                    = firstB + 0
-                    = firstA                                         as firstBEqualsFirstA;
-                 claim secondAEqualsSecondB
-                       : secondA = secondB
-                   by {
-                     calc firstA + secondB
-                        = firstB + secondA
-                        = firstA + secondA                           as sumEquation;
-                     Equality.symmetry(
-                         Natural.add_cancel_left(
-                             firstA, secondB, secondA, sumEquation))
-                   };
-                 calc Rational.reciprocal_at_natural_pair(
-                          firstA, firstB, denominatorPredecessor)
-                    = Rational.reciprocal_at_natural_pair(
-                          firstA, firstA, denominatorPredecessor)
-                    = Rational.zero
-                    = Rational.reciprocal_at_natural_pair(
-                          secondB, secondB, denominatorPredecessor)
-                         by Equality.symmetry(
-                                Rational.reciprocal_at_natural_pair_self(
-                                    secondB, denominatorPredecessor))
-                    = Rational.reciprocal_at_natural_pair(
-                          secondA, secondB, denominatorPredecessor)
-               }
-           | successor(gapPredecessor) =>
-               function (refinedFirstAEquation
-                             : firstA = firstB + successor(gapPredecessor)) => {
-                 claim secondAExpansion
-                       : secondA = secondB + successor(gapPredecessor)
-                   by {
-                     calc firstB + secondA
-                             = firstA + secondB
-                             = (firstB + successor(gapPredecessor)) + secondB
-                             = firstB + (successor(gapPredecessor) + secondB)
-                             = firstB + (secondB + successor(gapPredecessor))    as sumEquation;                     Natural.add_cancel_left(
-                         firstB, secondA,
-                         secondB + successor(gapPredecessor),
-                         sumEquation)
-                   };
-                 calc Rational.reciprocal_at_natural_pair(
-                          firstA, firstB, denominatorPredecessor)
-                    = Rational.reciprocal_at_natural_pair(
-                          firstB + successor(gapPredecessor), firstB,
-                          denominatorPredecessor)
-                    = (Quotient.mk(
-                           RationalRepresentative.make(
-                               (successor(denominatorPredecessor) : Integer),
-                               gapPredecessor))
-                       : Rational)
-                    = Rational.reciprocal_at_natural_pair(
-                          secondB + successor(gapPredecessor), secondB,
-                          denominatorPredecessor)
-                         by Equality.symmetry(
-                                Rational.reciprocal_at_natural_pair_positive_shift(
-                                    secondB, gapPredecessor,
-                                    denominatorPredecessor))
-                    = Rational.reciprocal_at_natural_pair(
-                          secondA, secondB, denominatorPredecessor)
-               }
-         } : (refinedFirstAEquation : firstA = firstB + gap)
-             → Rational.reciprocal_at_natural_pair(
-                   firstA, firstB, denominatorPredecessor)
-               = Rational.reciprocal_at_natural_pair(
-                     secondA, secondB, denominatorPredecessor))(
-            firstAEqualsFirstBPlusGap)
+        cases gap with gapEq {
+           | zero => {
+               let refinedFirstAEquation : firstA = firstB + 0 :=
+                   rewrite(gapEq, firstAEqualsFirstBPlusGap);
+               calc firstB
+                  = firstB + 0
+                  = firstA                                         as firstBEqualsFirstA;
+               claim secondAEqualsSecondB
+                     : secondA = secondB
+                 by {
+                   calc firstA + secondB
+                      = firstB + secondA
+                      = firstA + secondA                           as sumEquation;
+                   Equality.symmetry(
+                       Natural.add_cancel_left(
+                           firstA, secondB, secondA, sumEquation))
+                 };
+               calc Rational.reciprocal_at_natural_pair(
+                        firstA, firstB, denominatorPredecessor)
+                  = Rational.reciprocal_at_natural_pair(
+                        firstA, firstA, denominatorPredecessor)
+                  = Rational.zero
+                  = Rational.reciprocal_at_natural_pair(
+                        secondB, secondB, denominatorPredecessor)
+                       by Equality.symmetry(
+                              Rational.reciprocal_at_natural_pair_self(
+                                  secondB, denominatorPredecessor))
+                  = Rational.reciprocal_at_natural_pair(
+                        secondA, secondB, denominatorPredecessor)
+             }
+           | successor(gapPredecessor) => {
+               let refinedFirstAEquation
+                       : firstA = firstB + successor(gapPredecessor) :=
+                   rewrite(gapEq, firstAEqualsFirstBPlusGap);
+               claim secondAExpansion
+                     : secondA = secondB + successor(gapPredecessor)
+                 by {
+                   calc firstB + secondA
+                           = firstA + secondB
+                           = (firstB + successor(gapPredecessor)) + secondB
+                           = firstB + (successor(gapPredecessor) + secondB)
+                           = firstB + (secondB + successor(gapPredecessor))    as sumEquation;                     Natural.add_cancel_left(
+                       firstB, secondA,
+                       secondB + successor(gapPredecessor),
+                       sumEquation)
+                 };
+               calc Rational.reciprocal_at_natural_pair(
+                        firstA, firstB, denominatorPredecessor)
+                  = Rational.reciprocal_at_natural_pair(
+                        firstB + successor(gapPredecessor), firstB,
+                        denominatorPredecessor)
+                  = (Quotient.mk(
+                         RationalRepresentative.make(
+                             (successor(denominatorPredecessor) : Integer),
+                             gapPredecessor))
+                     : Rational)
+                  = Rational.reciprocal_at_natural_pair(
+                        secondB + successor(gapPredecessor), secondB,
+                        denominatorPredecessor)
+                       by Equality.symmetry(
+                              Rational.reciprocal_at_natural_pair_positive_shift(
+                                  secondB, gapPredecessor,
+                                  denominatorPredecessor))
+                  = Rational.reciprocal_at_natural_pair(
+                        secondA, secondB, denominatorPredecessor)
+             }
+        }
       },
       Natural.totality_of_less_or_equal(firstA, firstB))
 
@@ -387,176 +381,170 @@ theorem Rational.reciprocal_at_integer_multiplies
     claim by cases {
       in (Integer.IsNonneg(n)) as nIsNonneg: {
           obtain ⟨a, nIsImage⟩ from nIsNonneg;
-          (cases a {
-             | zero =>
-                 function (refinedHypothesis : n = (0 : Integer)) =>
-                   -- n = (zero : I) = Integer.zero, so mk(make(n, d)) = Rational.zero,
-                   -- contradicting mkNonzero.
-                   absurd(mkNonzero(
-                              calc (Quotient.mk(
-                                       RationalRepresentative.make(
-                                           n, denominatorPredecessor))
-                                       : Rational)
-                                 = Quotient.mk(
-                                       RationalRepresentative.make(
-                                           (0 : Integer),
-                                           denominatorPredecessor))
-                                 = Quotient.mk(
-                                       RationalRepresentative.make(
-                                           Integer.zero,
-                                           denominatorPredecessor))
-                                 = Rational.zero))
-             | successor(predecessor) =>
-                 function (refinedHypothesis
-                              : n = (successor(predecessor) : Integer)) =>
-                   -- n = succ(predecessor) : I. Chain through congruence
-                   -- on both factors, then StrictPositive multiplication.
-                   calc (Quotient.mk(
-                             RationalRepresentative.make(
-                                 n, denominatorPredecessor))
-                             : Rational)
-                            * Rational.reciprocal_at_integer(
-                                  n, denominatorPredecessor)
-                      = (Quotient.mk(
-                             RationalRepresentative.make(
-                                 (successor(predecessor) : Integer),
-                                 denominatorPredecessor))
-                             : Rational)
-                            * Rational.reciprocal_at_integer(
-                                  (successor(predecessor) : Integer),
-                                  denominatorPredecessor)
-                             by congruenceOf(
-                                    function (m : Integer) =>
-                                        (Quotient.mk(
-                                             RationalRepresentative.make(
-                                                 m,
-                                                 denominatorPredecessor))
-                                             : Rational)
-                                        * Rational.reciprocal_at_integer(
-                                              m,
-                                              denominatorPredecessor),
-                                    refinedHypothesis)
-                      = Rational.one
-                             by StrictPositiveRational.reciprocal_multiplied(
-                                    StrictPositiveRational.make(
-                                        predecessor,
-                                        denominatorPredecessor))
-           } : (refinedHypothesis : n = (a : Integer))
-               → (Quotient.mk(
-                      RationalRepresentative.make(
-                          n, denominatorPredecessor))
-                      : Rational)
-                   * Rational.reciprocal_at_integer(
-                         n, denominatorPredecessor)
-                 = Rational.one)(nIsImage)
+          cases a with aEq {
+             | zero => {
+                 -- n = (zero : I) = Integer.zero, so mk(make(n, d)) = Rational.zero,
+                 -- contradicting mkNonzero.
+                 let refinedHypothesis : n = (0 : Integer) :=
+                     rewrite(aEq, nIsImage);
+                 absurd(mkNonzero(
+                            calc (Quotient.mk(
+                                     RationalRepresentative.make(
+                                         n, denominatorPredecessor))
+                                     : Rational)
+                               = Quotient.mk(
+                                     RationalRepresentative.make(
+                                         (0 : Integer),
+                                         denominatorPredecessor))
+                               = Quotient.mk(
+                                     RationalRepresentative.make(
+                                         Integer.zero,
+                                         denominatorPredecessor))
+                               = Rational.zero))
+               }
+             | successor(predecessor) => {
+                 -- n = succ(predecessor) : I. Chain through congruence
+                 -- on both factors, then StrictPositive multiplication.
+                 let refinedHypothesis
+                       : n = (successor(predecessor) : Integer) :=
+                     rewrite(aEq, nIsImage);
+                 calc (Quotient.mk(
+                           RationalRepresentative.make(
+                               n, denominatorPredecessor))
+                           : Rational)
+                          * Rational.reciprocal_at_integer(
+                                n, denominatorPredecessor)
+                    = (Quotient.mk(
+                           RationalRepresentative.make(
+                               (successor(predecessor) : Integer),
+                               denominatorPredecessor))
+                           : Rational)
+                          * Rational.reciprocal_at_integer(
+                                (successor(predecessor) : Integer),
+                                denominatorPredecessor)
+                           by congruenceOf(
+                                  function (m : Integer) =>
+                                      (Quotient.mk(
+                                           RationalRepresentative.make(
+                                               m,
+                                               denominatorPredecessor))
+                                           : Rational)
+                                      * Rational.reciprocal_at_integer(
+                                            m,
+                                            denominatorPredecessor),
+                                  refinedHypothesis)
+                    = Rational.one
+                           by StrictPositiveRational.reciprocal_multiplied(
+                                  StrictPositiveRational.make(
+                                      predecessor,
+                                      denominatorPredecessor))
+               }
+          }
       }
       in (∃ (k : Natural). n = -(k : Integer)) as nIsNegated: {
           obtain ⟨a, nIsNegatedImage⟩ from nIsNegated;
-          (cases a {
-             | zero =>
-                 function (refinedHypothesis : n = -(0 : Integer)) =>
-                   -- n = -(zero : I) = -Integer.zero. mk(make(n, d))
-                   -- is Rational.zero — contradiction.
-                   absurd(mkNonzero(
-                              calc (Quotient.mk(
-                                       RationalRepresentative.make(
-                                           n, denominatorPredecessor))
-                                       : Rational)
-                                 = Quotient.mk(
-                                       RationalRepresentative.make(
-                                           -(0 : Integer),
-                                           denominatorPredecessor))
-                                 = Quotient.mk(
-                                       RationalRepresentative.make(
-                                           Integer.zero,
-                                           denominatorPredecessor))
-                                 = Rational.zero))
-             | successor(predecessor) =>
-                 function (refinedHypothesis
-                              : n = -(successor(predecessor) : Integer)) =>
-                   -- n = -(succ(predecessor) : I). Chain congruence on n,
-                   -- then the negate-cancellation Quotient.sound calc.
-                   calc (Quotient.mk(
-                             RationalRepresentative.make(
-                                 n, denominatorPredecessor))
-                             : Rational)
-                            * Rational.reciprocal_at_integer(
-                                  n, denominatorPredecessor)
-                      = (Quotient.mk(
-                             RationalRepresentative.make(
-                                 -(successor(predecessor) : Integer),
-                                 denominatorPredecessor))
-                             : Rational)
-                            * Rational.reciprocal_at_integer(
-                                  -(successor(predecessor) : Integer),
-                                  denominatorPredecessor)
-                             by congruenceOf(
-                                    function (m : Integer) =>
-                                        (Quotient.mk(
-                                             RationalRepresentative.make(
-                                                 m,
-                                                 denominatorPredecessor))
-                                             : Rational)
-                                        * Rational.reciprocal_at_integer(
-                                              m,
-                                              denominatorPredecessor),
-                                    refinedHypothesis)
-                      = Rational.one
-                             by Quotient.sound(
-                           RationalRepresentative, RationalEquivalent,
+          cases a with aEq {
+             | zero => {
+                 -- n = -(zero : I) = -Integer.zero. mk(make(n, d))
+                 -- is Rational.zero — contradiction.
+                 let refinedHypothesis : n = -(0 : Integer) :=
+                     rewrite(aEq, nIsNegatedImage);
+                 absurd(mkNonzero(
+                            calc (Quotient.mk(
+                                     RationalRepresentative.make(
+                                         n, denominatorPredecessor))
+                                     : Rational)
+                               = Quotient.mk(
+                                     RationalRepresentative.make(
+                                         -(0 : Integer),
+                                         denominatorPredecessor))
+                               = Quotient.mk(
+                                     RationalRepresentative.make(
+                                         Integer.zero,
+                                         denominatorPredecessor))
+                               = Rational.zero))
+               }
+             | successor(predecessor) => {
+                 -- n = -(succ(predecessor) : I). Chain congruence on n,
+                 -- then the negate-cancellation Quotient.sound calc.
+                 let refinedHypothesis
+                       : n = -(successor(predecessor) : Integer) :=
+                     rewrite(aEq, nIsNegatedImage);
+                 calc (Quotient.mk(
                            RationalRepresentative.make(
-                               -(successor(predecessor) : Integer)
-                                   * -(successor(denominatorPredecessor) : Integer),
-                               predecessor
-                                   + denominatorPredecessor
-                                     * successor(predecessor)),
-                           RationalRepresentative.make(Integer.one, 0),
-                           calc -(successor(predecessor) : Integer)
-                                    * -(successor(denominatorPredecessor) : Integer)
-                                    * (successor(0) : Integer)
-                              = -(successor(predecessor) : Integer)
-                                    * -(successor(denominatorPredecessor) : Integer)
-                                   by Integer.multiply_identity_right(
-                                          -(successor(predecessor) : Integer)
-                                              * -(successor(denominatorPredecessor) : Integer))
-                              = -((successor(predecessor) : Integer)
-                                      * -(successor(denominatorPredecessor) : Integer))
-                              = -(-((successor(predecessor) : Integer)
-                                         * (successor(denominatorPredecessor) : Integer)))
-                              = (successor(predecessor) : Integer)
-                                    * (successor(denominatorPredecessor) : Integer)
-                              = (successor(predecessor)
-                                     * successor(denominatorPredecessor)
-                                     : Integer)
-                              = (successor(predecessor
-                                                + denominatorPredecessor
-                                                  * successor(predecessor))
-                                     : Integer)
-                                   by (calc successor(predecessor)
-                                                * successor(denominatorPredecessor)
-                                          = successor(predecessor)
-                                              + successor(predecessor)
-                                                * denominatorPredecessor
-                                          = successor(predecessor)
+                               n, denominatorPredecessor))
+                           : Rational)
+                          * Rational.reciprocal_at_integer(
+                                n, denominatorPredecessor)
+                    = (Quotient.mk(
+                           RationalRepresentative.make(
+                               -(successor(predecessor) : Integer),
+                               denominatorPredecessor))
+                           : Rational)
+                          * Rational.reciprocal_at_integer(
+                                -(successor(predecessor) : Integer),
+                                denominatorPredecessor)
+                           by congruenceOf(
+                                  function (m : Integer) =>
+                                      (Quotient.mk(
+                                           RationalRepresentative.make(
+                                               m,
+                                               denominatorPredecessor))
+                                           : Rational)
+                                      * Rational.reciprocal_at_integer(
+                                            m,
+                                            denominatorPredecessor),
+                                  refinedHypothesis)
+                    = Rational.one
+                           by Quotient.sound(
+                         RationalRepresentative, RationalEquivalent,
+                         RationalRepresentative.make(
+                             -(successor(predecessor) : Integer)
+                                 * -(successor(denominatorPredecessor) : Integer),
+                             predecessor
+                                 + denominatorPredecessor
+                                   * successor(predecessor)),
+                         RationalRepresentative.make(Integer.one, 0),
+                         calc -(successor(predecessor) : Integer)
+                                  * -(successor(denominatorPredecessor) : Integer)
+                                  * (successor(0) : Integer)
+                            = -(successor(predecessor) : Integer)
+                                  * -(successor(denominatorPredecessor) : Integer)
+                                 by Integer.multiply_identity_right(
+                                        -(successor(predecessor) : Integer)
+                                            * -(successor(denominatorPredecessor) : Integer))
+                            = -((successor(predecessor) : Integer)
+                                    * -(successor(denominatorPredecessor) : Integer))
+                            = -(-((successor(predecessor) : Integer)
+                                       * (successor(denominatorPredecessor) : Integer)))
+                            = (successor(predecessor) : Integer)
+                                  * (successor(denominatorPredecessor) : Integer)
+                            = (successor(predecessor)
+                                   * successor(denominatorPredecessor)
+                                   : Integer)
+                            = (successor(predecessor
                                               + denominatorPredecessor
-                                                * successor(predecessor)
-                                          = successor(
-                                                predecessor
-                                                + denominatorPredecessor
-                                                  * successor(predecessor)))
-                              = Integer.one
-                                    * (successor(predecessor
-                                                     + denominatorPredecessor
-                                                       * successor(predecessor))
-                                        : Integer))
-           } : (refinedHypothesis : n = -(a : Integer))
-               → (Quotient.mk(
-                      RationalRepresentative.make(
-                          n, denominatorPredecessor))
-                      : Rational)
-                   * Rational.reciprocal_at_integer(
-                         n, denominatorPredecessor)
-                 = Rational.one)(nIsNegatedImage)
+                                                * successor(predecessor))
+                                   : Integer)
+                                 by (calc successor(predecessor)
+                                              * successor(denominatorPredecessor)
+                                        = successor(predecessor)
+                                            + successor(predecessor)
+                                              * denominatorPredecessor
+                                        = successor(predecessor)
+                                            + denominatorPredecessor
+                                              * successor(predecessor)
+                                        = successor(
+                                              predecessor
+                                              + denominatorPredecessor
+                                                * successor(predecessor)))
+                            = Integer.one
+                                  * (successor(predecessor
+                                                   + denominatorPredecessor
+                                                     * successor(predecessor))
+                                      : Integer))
+               }
+          }
       }
     }
 }

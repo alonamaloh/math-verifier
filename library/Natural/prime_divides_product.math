@@ -50,61 +50,68 @@ theorem Natural.divides_one_implies_equals_one
         : d = 1 := {
   let ⟨q, oneEqDTimesQ⟩ := dividesOne;
   -- oneEqDTimesQ : 1 = d * q.
-  (cases d {
-     | zero =>
-         function (refinedEq : successor(0) = 0 * q) =>
-           -- zero * q = zero, so 1 = 0, contradiction.
-           absurd(
-               calc successor(0)
-                  = 0 * q
-                  = 0)
-     | successor(predD) =>
-         function (refinedEq : successor(0) = successor(predD) * q) =>
-           -- successor(predD) * q reduces to q + predD * q.
-           -- 1 = q + predD * q. Case-split q.
-           (cases q {
-              | zero =>
-                  function (refinedQEq
-                              : successor(0)
-                                = successor(predD) * 0) =>
-                    -- successor(predD) * zero = zero. 1 = 0, contradiction.
-                    absurd(
-                        calc successor(0)
-                           = successor(predD) * 0
-                           = 0)
-              | successor(predQ) =>
-                  function (refinedQEq
-                              : successor(0)
-                                = successor(predD) * successor(predQ)) =>
-                    -- successor(predD) * successor(predQ) reduces to
-                    --   successor(predQ) + predD * successor(predQ).
-                    -- That successor expands to
-                    --   successor(predQ + predD * successor(predQ)).
-                    -- 1 = successor(0), so predQ + predD * successor(predQ) = 0.
-                    -- Hence predD * successor(predQ) = 0 (right zero),
-                    -- and since successor(predQ) ≥ 1, predD = 0.
-                    -- So d = successor(0) = 1.
-                    {
-                      claim sumEqZero
-                            : predQ + predD * successor(predQ) = 0
-                        by Natural.successor_injective(
-                               predQ + predD * successor(predQ), 0,
-                               Equality.symmetry(refinedQEq));
-                      claim productEqZero
-                            : predD * successor(predQ) = 0
-                        by Natural.add_eq_zero_right_zero(
-                               predQ, predD * successor(predQ), sumEqZero);
-                      claim predDEqZero : predD = 0
-                        by Natural.multiply_equals_zero_with_positive_right(
-                               predD, successor(predQ),
-                               Natural.successor_less_or_equal_successor(
-                                   0, predQ, Natural.zero_least(predQ)),
-                               productEqZero);
-                      congruenceOf(successor, predDEqZero)
-                    }
-            } : successor(0) = successor(predD) * q
-                → successor(predD) = 1)(refinedEq)
-   } : successor(0) = d * q → d = 1)(oneEqDTimesQ)
+  cases d with dEq {
+     | zero => {
+         let refinedEq : successor(0) = 0 * q :=
+             rewrite(dEq, oneEqDTimesQ);
+         -- zero * q = zero, so 1 = 0, contradiction.
+         absurd(
+             calc successor(0)
+                = 0 * q
+                = 0)
+       }
+     | successor(predD) => {
+         let refinedEq : successor(0) = successor(predD) * q :=
+             rewrite(dEq, oneEqDTimesQ);
+         -- successor(predD) * q reduces to q + predD * q.
+         -- 1 = q + predD * q. Case-split q to derive `successor predD = 1`,
+         -- then transport back to `d = 1` via `Equality.symmetry(dEq)`.
+         let successorPredDEqualsOne : successor(predD) = 1 :=
+           cases q with qEq {
+              | zero => {
+                  let refinedQEq
+                        : successor(0) = successor(predD) * 0 :=
+                      rewrite(qEq, refinedEq);
+                  -- successor(predD) * zero = zero. 1 = 0, contradiction.
+                  absurd(
+                      calc successor(0)
+                         = successor(predD) * 0
+                         = 0)
+                }
+              | successor(predQ) => {
+                  let refinedQEq
+                        : successor(0)
+                          = successor(predD) * successor(predQ) :=
+                      rewrite(qEq, refinedEq);
+                  -- successor(predD) * successor(predQ) reduces to
+                  --   successor(predQ) + predD * successor(predQ).
+                  -- That successor expands to
+                  --   successor(predQ + predD * successor(predQ)).
+                  -- 1 = successor(0), so predQ + predD * successor(predQ) = 0.
+                  -- Hence predD * successor(predQ) = 0 (right zero),
+                  -- and since successor(predQ) ≥ 1, predD = 0.
+                  -- So d = successor(0) = 1.
+                  claim sumEqZero
+                        : predQ + predD * successor(predQ) = 0
+                    by Natural.successor_injective(
+                           predQ + predD * successor(predQ), 0,
+                           Equality.symmetry(refinedQEq));
+                  claim productEqZero
+                        : predD * successor(predQ) = 0
+                    by Natural.add_eq_zero_right_zero(
+                           predQ, predD * successor(predQ), sumEqZero);
+                  claim predDEqZero : predD = 0
+                    by Natural.multiply_equals_zero_with_positive_right(
+                           predD, successor(predQ),
+                           Natural.successor_less_or_equal_successor(
+                               0, predQ, Natural.zero_least(predQ)),
+                           productEqZero);
+                  congruenceOf(successor, predDEqZero)
+                }
+           };
+         rewrite(Equality.symmetry(dEq), successorPredDEqualsOne)
+       }
+   }
 }
 
 -- ----------------------------------------------------------------------

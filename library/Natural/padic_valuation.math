@@ -681,27 +681,30 @@ theorem Natural.padic_valuation_power_divides
               -- m = prime * q. Case on q to handle m = 0 (q = 0) vs the
               -- recursive case (q ≥ 1).
               let ⟨q, mEqPrimeQ⟩ := pDividesM;
-              (cases q {
-                 | zero =>
-                     function (refinedMEq : m = prime * 0) =>
-                       -- m = prime * 0 = 0. v_p(0) = 0. p^0 = 1. 1 | m = 0.
-                       Equality.transport_proposition(
-                           function (mValue : Natural) =>
-                               Natural.divides(
-                                   Natural.power(
-                                       Natural.padic_valuation(prime, mValue),
-                                       prime),
-                                   mValue),
-                           0, m,
-                           Equality.symmetry(
-                               calc m
-                                  = prime * 0
-                                  = 0),
-                           Natural.one_divides(0))
-                 | successor(predQ) =>
-                     function (refinedMEq : m = prime * successor(predQ)) => {
-                       claim succQPositive : 1 ≤ successor(predQ)
-                         by Natural.successor_positive(predQ);
+              cases q with qEq {
+                 | zero => {
+                     let refinedMEq : m = prime * 0 :=
+                         rewrite(qEq, mEqPrimeQ);
+                     -- m = prime * 0 = 0. v_p(0) = 0. p^0 = 1. 1 | m = 0.
+                     Equality.transport_proposition(
+                         function (mValue : Natural) =>
+                             Natural.divides(
+                                 Natural.power(
+                                     Natural.padic_valuation(prime, mValue),
+                                     prime),
+                                 mValue),
+                         0, m,
+                         Equality.symmetry(
+                             calc m
+                                = prime * 0
+                                = 0),
+                         Natural.one_divides(0))
+                   }
+                 | successor(predQ) => {
+                     let refinedMEq : m = prime * successor(predQ) :=
+                         rewrite(qEq, mEqPrimeQ);
+                     claim succQPositive : 1 ≤ successor(predQ)
+                       by Natural.successor_positive(predQ);
                        -- succ(q) < m. From m = p * q with p ≥ 2, q ≥ 1:
                        -- succ(q) ≤ p * q = m.
                        claim succQLeM
@@ -771,11 +774,8 @@ theorem Natural.padic_valuation_power_divides
                                -- power(succ(v_p(q)), p) reduces to
                                -- p * power(v_p(q), p) by definition.
                                shiftedDivides))
-                     }
-               } : m = prime * q
-                   → Natural.divides(
-                         Natural.power(Natural.padic_valuation(prime, m), prime),
-                         m))(mEqPrimeQ)
+                   }
+              }
           }
           in (prime ∤ m) as notDivM:
               -- v_p(m) = 0. p^0 = 1. 1 | m.
@@ -846,69 +846,71 @@ theorem Natural.power_divides_implies_padic_valuation_ge
       let ⟨q, nEqPrimeQ⟩ := pDividesN;
       -- For q = 0 case: n = 0, contradicts n ≥ 1.
       -- For q = succ(predQ): apply strip + IH.
-      (cases q {
-         | zero =>
-             function (refinedNEq : n = prime * 0) =>
-               absurd(
-                   rewrite(
-                       calc n
-                          = prime * 0
-                          = 0,
-                       nPositive))
-         | successor(predQ) =>
-             function (refinedNEq : n = prime * successor(predQ)) => {
-               claim succQPositive : 1 ≤ successor(predQ)
-                 by Natural.successor_positive(predQ);
-               -- p^succ(predK) | n = p * succ(predQ). Hence
-               -- p * p^predK | p * succ(predQ). Cancel p (multiply_cancel_left).
-               -- Get p^predK | succ(predQ).
-               -- More directly: p^succ(predK) | p*succ(predQ), and
-               -- p^succ(predK) = p * p^predK. So p * p^predK | p * succ(predQ).
-               -- From this we extract p^predK | succ(predQ).
-               let ⟨w, nEqProductW⟩ := succPDivides;
-               -- nEqProductW : n = p^succ(predK) * w = (p * p^predK) * w
-               --             = p * (p^predK * w).
-               -- And n = p * succ(predQ) by refinedNEq.
-               -- So p * succ(predQ) = p * (p^predK * w).
-               -- By multiply_cancel_left: succ(predQ) = p^predK * w. So p^predK | succ(predQ).
-               claim qDividesEq
-                     : successor(predQ)
-                       = Natural.power(predK, prime) * w
-                 by Natural.multiply_cancel_left(
-                        prime, successor(predQ),
-                        Natural.power(predK, prime) * w,
-                        primePositive,
-                        calc prime * successor(predQ)
-                           = n
-                           = Natural.power(successor(predK), prime) * w
-                           = (prime * Natural.power(predK, prime)) * w
-                           = prime * (Natural.power(predK, prime) * w));
-               claim pPredKDividesQ
-                     : Natural.divides(
-                           Natural.power(predK, prime),
-                           successor(predQ))
-                 by witness w with qDividesEq;
-               -- By IH on (predK, succ(predQ)): predK ≤ v_p(succ(predQ)).
-               claim ihResult
-                     : predK ≤ Natural.padic_valuation(
-                                   prime, successor(predQ))
-                 by Natural.power_divides_implies_padic_valuation_ge(
-                        prime, primeAtLeastTwo,
-                        predK, successor(predQ),
-                        succQPositive, pPredKDividesQ);
-               -- v_p(n) = v_p(p * succ(predQ)) = succ(v_p(succ(predQ))) by strip.
-               -- So we want succ(predK) ≤ succ(v_p(succ(predQ))).
-               rewrite(
-                   calc successor(Natural.padic_valuation(prime, successor(predQ)))
-                      = Natural.padic_valuation(prime, prime * successor(predQ))
-                      = Natural.padic_valuation(prime, n),
-                   Natural.successor_less_or_equal_successor(
-                       predK,
-                       Natural.padic_valuation(prime, successor(predQ)),
-                       ihResult))
-             }
-       } : n = prime * q
-           → successor(predK) ≤ Natural.padic_valuation(prime, n))(nEqPrimeQ)
+      cases q with qEq {
+         | zero => {
+             let refinedNEq : n = prime * 0 :=
+                 rewrite(qEq, nEqPrimeQ);
+             absurd(
+                 rewrite(
+                     calc n
+                        = prime * 0
+                        = 0,
+                     nPositive))
+           }
+         | successor(predQ) => {
+             let refinedNEq : n = prime * successor(predQ) :=
+                 rewrite(qEq, nEqPrimeQ);
+             claim succQPositive : 1 ≤ successor(predQ)
+               by Natural.successor_positive(predQ);
+             -- p^succ(predK) | n = p * succ(predQ). Hence
+             -- p * p^predK | p * succ(predQ). Cancel p (multiply_cancel_left).
+             -- Get p^predK | succ(predQ).
+             -- More directly: p^succ(predK) | p*succ(predQ), and
+             -- p^succ(predK) = p * p^predK. So p * p^predK | p * succ(predQ).
+             -- From this we extract p^predK | succ(predQ).
+             let ⟨w, nEqProductW⟩ := succPDivides;
+             -- nEqProductW : n = p^succ(predK) * w = (p * p^predK) * w
+             --             = p * (p^predK * w).
+             -- And n = p * succ(predQ) by refinedNEq.
+             -- So p * succ(predQ) = p * (p^predK * w).
+             -- By multiply_cancel_left: succ(predQ) = p^predK * w. So p^predK | succ(predQ).
+             claim qDividesEq
+                   : successor(predQ)
+                     = Natural.power(predK, prime) * w
+               by Natural.multiply_cancel_left(
+                      prime, successor(predQ),
+                      Natural.power(predK, prime) * w,
+                      primePositive,
+                      calc prime * successor(predQ)
+                         = n
+                         = Natural.power(successor(predK), prime) * w
+                         = (prime * Natural.power(predK, prime)) * w
+                         = prime * (Natural.power(predK, prime) * w));
+             claim pPredKDividesQ
+                   : Natural.divides(
+                         Natural.power(predK, prime),
+                         successor(predQ))
+               by witness w with qDividesEq;
+             -- By IH on (predK, succ(predQ)): predK ≤ v_p(succ(predQ)).
+             claim ihResult
+                   : predK ≤ Natural.padic_valuation(
+                                 prime, successor(predQ))
+               by Natural.power_divides_implies_padic_valuation_ge(
+                      prime, primeAtLeastTwo,
+                      predK, successor(predQ),
+                      succQPositive, pPredKDividesQ);
+             -- v_p(n) = v_p(p * succ(predQ)) = succ(v_p(succ(predQ))) by strip.
+             -- So we want succ(predK) ≤ succ(v_p(succ(predQ))).
+             rewrite(
+                 calc successor(Natural.padic_valuation(prime, successor(predQ)))
+                    = Natural.padic_valuation(prime, prime * successor(predQ))
+                    = Natural.padic_valuation(prime, n),
+                 Natural.successor_less_or_equal_successor(
+                     predK,
+                     Natural.padic_valuation(prime, successor(predQ)),
+                     ihResult))
+           }
+      }
     }
 
 -- Natural ultrametric, asymmetric form: when v_p(a) ≤ v_p(b),
