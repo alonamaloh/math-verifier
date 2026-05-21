@@ -3300,7 +3300,17 @@ private:
                             declarationUniverseParams->empty()
                             || (headIdentifier->universeArgs.size()
                                 == declarationUniverseParams->size());
-                        if (numLeadingToInfer > 0) {
+                        bool explicitImplicitMode =
+                            declaredImplicitCount > 0;
+                        // Gate: in explicit-implicit mode we can infer
+                        // universe args from value args (with skip), so
+                        // we proceed even without `universesProvided`.
+                        // In arity-based mode we keep the original gate
+                        // to avoid changing behavior for under-applied
+                        // polymorphic calls — Stage 2 handles those.
+                        bool gateOk = explicitImplicitMode
+                                      || universesProvided;
+                        if (numLeadingToInfer > 0 && gateOk) {
                             // When the declaration uses explicit
                             // `{x : T}` binders, the user has
                             // committed to inference — any failure is
@@ -3310,8 +3320,6 @@ private:
                             // we fall back to partial application so
                             // intentional under-application still
                             // works.
-                            bool explicitImplicitMode =
-                                declaredImplicitCount > 0;
                             auto runInference = [&]() {
                                 std::vector<LevelPointer> universeArguments;
                                 if (!headIdentifier->universeArgs.empty()) {
@@ -3379,15 +3387,15 @@ private:
                                 }
                                 return head;
                             };
-                            if (explicitImplicitMode
-                                && universesProvided) {
+                            if (explicitImplicitMode) {
                                 return runInference();
                             }
                             try {
                                 return runInference();
                             } catch (const ElaborateError&) {
-                                // Inference failed — fall through to
-                                // Stage 2 / partial application.
+                                // Inference failed in arity-based
+                                // mode — fall through to partial
+                                // application.
                             }
                         }
                     }
