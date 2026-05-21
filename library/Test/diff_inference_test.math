@@ -10,6 +10,7 @@ import Natural.basics
 import Natural.peano
 import Natural.arithmetic
 import Equality.basics
+import Logic.basics
 
 -- Baseline: a direct equation.
 theorem Test.diff_baseline_direct (a b : Natural) (eq : a = b) : a = b := {
@@ -55,3 +56,32 @@ theorem Test.diff_symmetric_wrap
         : successor(a) = successor(b) := {
   calc successor(a) = successor(b) by eq
 }
+
+-- WHNF-aware walker: the calc endpoints `2 + n` and `1 + (1 + m)` differ
+-- in BOTH the function head (`add 2` vs `add 1`) and the argument
+-- (`n` vs `1 + m`), so the pre-WHNF structural walker can't pick a
+-- descent direction. After WHNF both sides reduce to
+-- `successor(successor(_))`, exposing the single-position diff at `n`/`m`.
+theorem Test.diff_whnf_two_args
+        (n m : Natural) (eq : n = m)
+        : 2 + n = 1 + (1 + m) := {
+  calc 2 + n = 1 + (1 + m) by eq
+}
+
+-- Non-calc `claim ... by lemma`: the goal is `successor(a) = successor(b)`
+-- and the hint is `eq : a = b`. Today this requires
+-- `claim ... by congruenceOf(successor, eq)`; with the extension, the
+-- bare `by eq` should suffice.
+theorem Test.diff_claim_context
+        (a b : Natural) (eq : a = b)
+        : True := {
+  claim wrappedSuccessorEquality
+        : successor(a) = successor(b)  by eq;
+  True.trivial
+}
+
+-- Non-calc theorem body: `:=` form with the body being the inner lemma.
+-- Same idea as the claim test, applied at the top level.
+theorem Test.diff_theorem_body
+        (a b : Natural) (eq : a = b)
+        : successor(a) = successor(b) := eq

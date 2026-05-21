@@ -1133,6 +1133,15 @@ private:
             rethrowKernelError(kernelError);
         }
 
+        // Diff-inference for non-calc equality coercion at theorem body
+        // position: covers `theorem foo : succ(a) = succ(b) := eq` (no
+        // explicit congruenceOf wrapper) when `eq : a = b`.
+        bodyExpression = coerceToExpectedTypeViaDiff(
+            localBinders, bodyExpression, returnType);
+        checkRedundantCongruenceOfWrapper(
+            declaration.body, localBinders, returnType,
+            "theorem body");
+
         // Build the full declared type and body by wrapping in reverse.
         ExpressionPointer fullType = returnType;
         ExpressionPointer fullBody = bodyExpression;
@@ -2146,8 +2155,14 @@ private:
             SurfaceExpressionPointer rewrittenBody = rewriteRecursiveCalls(
                 matchedCase.body, declarationName,
                 recursiveArgToHypothesis, outerBinderCount);
-            return elaborateExpression(*rewrittenBody, bodyStack,
-                                       expectedType);
+            ExpressionPointer caseBody = elaborateExpression(
+                *rewrittenBody, bodyStack, expectedType);
+            caseBody = coerceToExpectedTypeViaDiff(
+                bodyStack, caseBody, expectedType);
+            checkRedundantCongruenceOfWrapper(
+                rewrittenBody, bodyStack, expectedType,
+                "pattern-match case body");
+            return caseBody;
         }
 
         const auto& ctorPattern =
@@ -3451,6 +3466,20 @@ private:
                 ExpressionPointer argumentTerm =
                     elaborateExpression(*argument, localBinders,
                                          argumentExpectedType);
+                // Diff-wrap and redundancy check on the argument too —
+                // catches `f(congruenceOf(λ, P))` where bare `f(P)`
+                // would work (e.g. `rewrite(congruenceOf(...), term)`
+                // when the inner lemma alone has the equality shape
+                // that diff inference can fit to `rewrite`'s expected
+                // first-arg type).
+                if (argumentExpectedType) {
+                    argumentTerm = coerceToExpectedTypeViaDiff(
+                        localBinders, argumentTerm,
+                        argumentExpectedType);
+                    checkRedundantCongruenceOfWrapper(
+                        argument, localBinders, argumentExpectedType,
+                        "function-call argument");
+                }
                 if (headType) {
                     if (auto* pi =
                             std::get_if<Pi>(&headType->node)) {
@@ -3480,6 +3509,14 @@ private:
             // can't trigger the hammer's reflexivity-match etc.
             ExpressionPointer letValue =
                 elaborateExpression(*let->value, localBinders, letType);
+            // Diff-inference for non-calc equality coercion: covers
+            // `claim X : succ(a) = succ(b) by eq` (desugars to a
+            // SurfaceLet) without an explicit congruenceOf wrapper.
+            letValue = coerceToExpectedTypeViaDiff(
+                localBinders, letValue, letType);
+            checkRedundantCongruenceOfWrapper(
+                let->value, localBinders, letType,
+                "let value");
             std::vector<LocalBinder> extended = localBinders;
             // Capture the value on the LocalBinder so downstream
             // openedContext builders can mark it as let-bound (enabling
@@ -5436,6 +5473,132 @@ private:
         return currentProof;
     }
 
+    // Non-calc wrapper around tryDiffApplyUserProof. Extracts the
+    // equality endpoints from `goalClosed` and dispatches to the same
+    // single-position diff walker used inside calc steps. Returns the
+    // wrapped proof (with type definitionally equal to `goalClosed`)
+    // on success, nullptr if either the goal isn't an Equality, the
+    // hint isn't an Equality, or the walker can't bridge them.
+    // Speculative check: if the user wrote `congruenceOf(λ, P)` at a
+    // non-calc position where bare `P` would also close the goal via
+    // diff inference, warn that the wrapper is redundant. Mirrors the
+    // calc-step detector at the `by` site. No-op unless
+    // --check-redundant-by is on. `surfaceExpression` is the source
+    // expression at the position whose expected type is
+    // `expectedTypeClosed` (already-elaborated form).
+    void checkRedundantCongruenceOfWrapper(
+        const SurfaceExpressionPointer& surfaceExpression,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedTypeClosed,
+        const std::string& positionLabel) {
+        if (!reportRedundantBy_ || !surfaceExpression
+            || !expectedTypeClosed) return;
+        auto* surfApp = std::get_if<SurfaceApplication>(
+            &surfaceExpression->node);
+        if (!surfApp || surfApp->arguments.size() != 2) return;
+        auto* head = std::get_if<SurfaceIdentifier>(
+            &surfApp->function->node);
+        if (!head || head->qualifiedName != "congruenceOf"
+            || !head->universeArgs.empty()) return;
+        ExpressionPointer innerKernel;
+        try {
+            innerKernel = elaborateExpression(
+                *surfApp->arguments[1].value, localBinders);
+        } catch (const ElaborateError&) { return; }
+          catch (const TypeError&) { return; }
+        if (!innerKernel) return;
+        ExpressionPointer coerced = coerceToExpectedTypeViaDiff(
+            localBinders, innerKernel, expectedTypeClosed);
+        if (coerced == innerKernel) return;
+        ExpressionPointer coercedType;
+        try {
+            coercedType = inferTypeInLocalContext(
+                localBinders, coerced);
+        } catch (const TypeError&) { return; }
+          catch (const ElaborateError&) { return; }
+        ExpressionPointer expectedOpened = openOverLocalBinders(
+            expectedTypeClosed, localBinders, localBinders.size());
+        Context openedContext =
+            buildContextFromLocalBinders(localBinders);
+        if (isSubtype(environment_, openedContext,
+                       coercedType, expectedOpened)) {
+            std::cerr << "warning: " << moduleName_ << ":"
+                << surfaceExpression->line << ":"
+                << surfaceExpression->column
+                << ": redundant congruenceOf wrapper at "
+                << positionLabel
+                << " — the inner lemma alone would close the goal "
+                "(diff inference fills the lambda)\n";
+        }
+    }
+
+    // After elaborating a term with an expected type, retry with
+    // diff-wrap if the inferred type doesn't subtype-match the
+    // expected type and both are Equality types with a unique
+    // single-position diff. Returns the (possibly wrapped) term, or
+    // the original term unchanged on either match or failure. Cheap
+    // when types already match (one infer + one isSubtype check).
+    ExpressionPointer coerceToExpectedTypeViaDiff(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term,
+        ExpressionPointer expectedTypeClosed) {
+        ExpressionPointer termTypeOpened;
+        try {
+            termTypeOpened = inferTypeInLocalContext(
+                localBinders, term);
+        } catch (const TypeError&) {
+            return term;
+        } catch (const ElaborateError&) {
+            return term;
+        }
+        ExpressionPointer expectedOpened = openOverLocalBinders(
+            expectedTypeClosed, localBinders, localBinders.size());
+        Context openedContext =
+            buildContextFromLocalBinders(localBinders);
+        if (isSubtype(environment_, openedContext,
+                       termTypeOpened, expectedOpened)) {
+            return term;
+        }
+        ExpressionPointer termTypeClosed = closeOverLocalBinders(
+            termTypeOpened, localBinders, localBinders.size());
+        ExpressionPointer wrapped = tryDiffWrapForEqualityGoal(
+            localBinders, term, termTypeClosed, expectedTypeClosed);
+        return wrapped ? wrapped : term;
+    }
+
+    ExpressionPointer tryDiffWrapForEqualityGoal(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer hintTerm,
+        ExpressionPointer hintType,
+        ExpressionPointer goalClosed) {
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, localBinders.size());
+        ExpressionPointer goalWhnf = weakHeadNormalForm(
+            environment_, goalOpened);
+        EqualityComponents goalComps;
+        try {
+            goalComps = extractEqualityComponents(
+                goalWhnf, "diff-wrap goal", 0);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+        ExpressionPointer previousKernel = closeOverLocalBinders(
+            goalComps.leftEndpoint, localBinders,
+            localBinders.size());
+        ExpressionPointer nextKernel = closeOverLocalBinders(
+            goalComps.rightEndpoint, localBinders,
+            localBinders.size());
+        try {
+            return tryDiffApplyUserProof(
+                localBinders, previousKernel, nextKernel,
+                hintTerm, hintType, 0, 0);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        } catch (const TypeError&) {
+            return nullptr;
+        }
+    }
+
     // Given a user-supplied `by <equationProof>` for a calc `=` step,
     // see whether the proof's equation (a = b) sits at a unique
     // single-position diff between `previousKernel` and `nextKernel`.
@@ -5527,30 +5690,57 @@ private:
                 innerProof = std::move(symmetryCall);
                 break;
             }
-            // Descend through Application nodes.
-            auto* leftApp = std::get_if<Application>(&leftCursor->node);
-            auto* rightApp = std::get_if<Application>(&rightCursor->node);
-            if (!leftApp || !rightApp) break;
-            bool functionEqual = structurallyEqual(
-                leftApp->function, rightApp->function);
-            bool argumentEqual = structurallyEqual(
-                leftApp->argument, rightApp->argument);
-            if (functionEqual && argumentEqual) break;
-            if (functionEqual) {
-                pathStepsOutsideIn.push_back(
-                    {CalcPathStep::Kind::Arg, leftApp->function});
-                leftCursor = leftApp->argument;
-                rightCursor = rightApp->argument;
-                continue;
-            }
-            if (argumentEqual) {
-                pathStepsOutsideIn.push_back(
-                    {CalcPathStep::Kind::Fn, leftApp->argument});
-                leftCursor = leftApp->function;
-                rightCursor = rightApp->function;
-                continue;
-            }
-            break;
+            // Descend through Application nodes. If structural compare
+            // bails (neither function nor argument structurally equal),
+            // retry once after WHNF — unfolds Definition heads (e.g.
+            // `Rational.subtract` → `+`/`negate`) and exposes reduced
+            // App spines (`Natural.add(successor(_), _)` → `successor(
+            // Natural.add(_, _))`). The reconstruction below uses the
+            // post-WHNF saved sides; the resulting proof type is
+            // definitionally equal to the original calc-step type, so
+            // the caller's coercion accepts it.
+            auto descendOrWhnf = [&]() -> bool {
+                auto* leftApp =
+                    std::get_if<Application>(&leftCursor->node);
+                auto* rightApp =
+                    std::get_if<Application>(&rightCursor->node);
+                if (leftApp && rightApp) {
+                    bool functionEqual = structurallyEqual(
+                        leftApp->function, rightApp->function);
+                    bool argumentEqual = structurallyEqual(
+                        leftApp->argument, rightApp->argument);
+                    if (functionEqual && argumentEqual) return false;
+                    if (functionEqual) {
+                        pathStepsOutsideIn.push_back(
+                            {CalcPathStep::Kind::Arg,
+                             leftApp->function});
+                        leftCursor = leftApp->argument;
+                        rightCursor = rightApp->argument;
+                        return true;
+                    }
+                    if (argumentEqual) {
+                        pathStepsOutsideIn.push_back(
+                            {CalcPathStep::Kind::Fn,
+                             leftApp->argument});
+                        leftCursor = leftApp->function;
+                        rightCursor = rightApp->function;
+                        return true;
+                    }
+                }
+                ExpressionPointer leftWhnf = weakHeadNormalForm(
+                    environment_, leftCursor);
+                ExpressionPointer rightWhnf = weakHeadNormalForm(
+                    environment_, rightCursor);
+                bool leftChanged =
+                    !structurallyEqual(leftWhnf, leftCursor);
+                bool rightChanged =
+                    !structurallyEqual(rightWhnf, rightCursor);
+                if (!leftChanged && !rightChanged) return false;
+                leftCursor = leftWhnf;
+                rightCursor = rightWhnf;
+                return true;
+            };
+            if (!descendOrWhnf()) break;
         }
         if (!innerProof) return nullptr;
         // Wrap from innermost out with Equality.congruence (mirrors
@@ -12939,6 +13129,17 @@ private:
         }
         ExpressionPointer body =
             elaborateExpression(*lambda.body, extended, expectedBody);
+        // Diff-wrap the body if the expected codomain is an equality
+        // and the body's type doesn't directly match. Catches
+        // `function (rep) => congruenceOf(λ, P)` simplifications
+        // where bare `P` would suffice given diff inference.
+        if (expectedBody) {
+            body = coerceToExpectedTypeViaDiff(
+                extended, body, expectedBody);
+            checkRedundantCongruenceOfWrapper(
+                lambda.body, extended, expectedBody,
+                "lambda body");
+        }
         ExpressionPointer result = body;
         for (int i = static_cast<int>(lambda.binder.names.size()) - 1;
              i >= 0; --i) {
