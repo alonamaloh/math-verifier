@@ -3698,7 +3698,7 @@ private:
             }
             return desugarArithmeticOperator(
                 binary->opSymbol, *binary->left, *binary->right,
-                localBinders, expression.line);
+                localBinders, expectedType, expression.line);
         }
         if (auto* unary =
                 std::get_if<SurfaceUnaryOperation>(&expression.node)) {
@@ -3722,8 +3722,20 @@ private:
                 // names from the binary `-` registry whose definition
                 // δ-reduces to the operand's actual type — same fallback
                 // as the binary operator dispatch.
+                //
+                // Propagate the outer expected type to the operand
+                // when it has a Constant head — `-` is type-preserving
+                // for numeric carriers, so short-form `Quotient.mk(rep)`
+                // can fire under it.
+                ExpressionPointer operandExpectedType = nullptr;
+                if (expectedType
+                    && std::holds_alternative<Constant>(
+                            expectedType->node)) {
+                    operandExpectedType = expectedType;
+                }
                 ExpressionPointer operandKernel =
-                    elaborateExpression(*unary->operand, localBinders);
+                    elaborateExpression(*unary->operand, localBinders,
+                                         operandExpectedType);
                 ExpressionPointer operandType =
                     inferTypeInLocalContext(localBinders, operandKernel);
                 std::string operandTypeName =
@@ -13199,6 +13211,7 @@ private:
         const SurfaceExpression& leftSurface,
         const SurfaceExpression& rightSurface,
         const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
         int line) {
         // First: if a local binder has the operator symbol as its
         // name (introduced via `((·) : G → G → G)`-style binders),
@@ -13230,11 +13243,13 @@ private:
         // order relation and lets calc chains mix the two notations.
         if (operatorSymbol == "≥") {
             return desugarArithmeticOperator(
-                "≤", rightSurface, leftSurface, localBinders, line);
+                "≤", rightSurface, leftSurface, localBinders,
+                expectedType, line);
         }
         if (operatorSymbol == ">") {
             return desugarArithmeticOperator(
-                "<", rightSurface, leftSurface, localBinders, line);
+                "<", rightSurface, leftSurface, localBinders,
+                expectedType, line);
         }
         // Logical operators are dispatched first because their operand
         // type is a Proposition (a `Sort`, not a `Constant`), so the
@@ -13260,10 +13275,23 @@ private:
             call = makeApplication(std::move(call), std::move(rightLogical));
             return call;
         }
+        // Use the outer expected type as a hint for the LEFT operand
+        // only when it's a Constant head — e.g. `Rational`, `Integer`,
+        // `Real`, `PAdic`. For arithmetic operators like `+`, `*`,
+        // `-`, the result type equals the operand type, so the hint
+        // is exactly the operand type. For `≤`, `<`, etc. the result
+        // type is `Proposition` (a Sort, not a Constant), so the
+        // guard skips them. Lets short-form `Quotient.mk(rep)` fire
+        // on the LEFT of a homogeneous operator when the outer
+        // context provides the carrier head.
+        ExpressionPointer leftExpectedType = nullptr;
+        if (expectedType
+            && std::holds_alternative<Constant>(expectedType->node)) {
+            leftExpectedType = expectedType;
+        }
         ExpressionPointer leftKernel =
-            elaborateExpression(leftSurface, localBinders);
-        ExpressionPointer rightKernel =
-            elaborateExpression(rightSurface, localBinders);
+            elaborateExpression(leftSurface, localBinders,
+                                 leftExpectedType);
         // Determine the operand type by inferring the type of the left
         // operand. Check the raw inferred type first: if a binder was
         // declared with a named type like `Integer` (which δ-reduces
@@ -13274,6 +13302,16 @@ private:
         // whose type-annotation is a reducible expression).
         ExpressionPointer leftTypeRaw =
             inferTypeInLocalContext(localBinders, leftKernel);
+        // Propagate the left operand's type as expected type for the
+        // right operand. This lets short-form `Quotient.mk(rep)` (with
+        // R inferred from expected type) fire in operand position of
+        // homogeneous operators like `+`, `*`, `≤`, `<` on Rational,
+        // Real, etc. — mirrors the `=` desugaring's identical trick.
+        ExpressionPointer leftTypeClosed = closeOverLocalBinders(
+            leftTypeRaw, localBinders, localBinders.size());
+        ExpressionPointer rightKernel =
+            elaborateExpression(rightSurface, localBinders,
+                                 leftTypeClosed);
         auto* leftTypeConstantRaw =
             std::get_if<Constant>(&leftTypeRaw->node);
         std::string operandTypeName;
