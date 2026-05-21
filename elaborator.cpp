@@ -3456,6 +3456,21 @@ private:
             ExpressionPointer letBody =
                 elaborateExpression(*let->body, extended,
                                      bodyExpectedType);
+            // Unused-name warning. The binding's name is user-visible
+            // when it doesn't start with '_' (anonymous calc statements
+            // synthesise `_calc_<line>_<col>` names that aren't
+            // typed by the user). If the body never references the
+            // binding via a BoundVariable, the name is dead — usually
+            // a stale leftover from a refactor.
+            if (reportRedundantBy_ && !let->name.empty()
+                && let->name[0] != '_'
+                && !referencesBoundVariable(letBody, 0)) {
+                std::cerr << "warning: " << moduleName_
+                    << ":" << expression.line
+                    << ":" << expression.column
+                    << ": unused name `" << let->name
+                    << "` — let/claim/as binding never referenced\n";
+            }
             return makeLet(let->name, std::move(letType),
                            std::move(letValue), std::move(letBody));
         }
@@ -5615,6 +5630,43 @@ private:
     // tree (including bindings[0]) and decrements BV(>=1) — clobbering
     // bindings[0]'s outer-binder references. A single combined walk
     // sidesteps that by treating each binding as opaque once placed.
+    // Whether `expression` references a BoundVariable at the relative
+    // de Bruijn index `targetIndex` (counting outward from the
+    // expression's enclosing scope). Used by the unused-name warning
+    // for SurfaceLet bindings: after elaborating the let body, we
+    // check whether the body has any BV(0) reference (i.e. uses the
+    // just-introduced let binder).
+    bool referencesBoundVariable(
+        ExpressionPointer expression, int targetIndex) {
+        if (auto* bv =
+                std::get_if<BoundVariable>(&expression->node)) {
+            return bv->deBruijnIndex == targetIndex;
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return referencesBoundVariable(
+                       application->function, targetIndex)
+                || referencesBoundVariable(
+                       application->argument, targetIndex);
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return referencesBoundVariable(pi->domain, targetIndex)
+                || referencesBoundVariable(
+                       pi->codomain, targetIndex + 1);
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return referencesBoundVariable(lambda->domain, targetIndex)
+                || referencesBoundVariable(
+                       lambda->body, targetIndex + 1);
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            return referencesBoundVariable(let->type, targetIndex)
+                || referencesBoundVariable(let->value, targetIndex)
+                || referencesBoundVariable(let->body, targetIndex + 1);
+        }
+        return false;
+    }
+
     // Whether every BoundVariable reference in `expression` that maps
     // to a lemma binder (relative index < bindings.size()) has a
     // non-null entry in `bindings`. Used by the precondition-discharge
