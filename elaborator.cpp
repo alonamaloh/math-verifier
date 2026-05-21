@@ -4627,6 +4627,78 @@ private:
                             << ":" << step.line << ":" << step.column
                             << ": redundant `by` on calc step — "
                             "auto-prover closes it without help\n";
+                    } else {
+                        // Auto-prover couldn't close on its own, but
+                        // maybe the user wrote `by congruenceOf(λ, L)`
+                        // and `by L` alone would close via the diff-
+                        // inference fallback. That catches verbose
+                        // congruenceOf wrappers the redundant-by check
+                        // misses (because the lemma's preconditions
+                        // aren't synthesizable without the user's call).
+                        auto* surfApp =
+                            std::get_if<SurfaceApplication>(
+                                &step.stepProof->node);
+                        if (surfApp && surfApp->arguments.size() == 2) {
+                            auto* head =
+                                std::get_if<SurfaceIdentifier>(
+                                    &surfApp->function->node);
+                            if (head
+                                && head->qualifiedName == "congruenceOf"
+                                && head->universeArgs.empty()) {
+                                ExpressionPointer lemmaKernel;
+                                try {
+                                    lemmaKernel = elaborateExpression(
+                                        *surfApp->arguments[1].value,
+                                        localBinders);
+                                } catch (const ElaborateError&) {
+                                    lemmaKernel = nullptr;
+                                } catch (const TypeError&) {
+                                    lemmaKernel = nullptr;
+                                }
+                                if (lemmaKernel) {
+                                    ExpressionPointer lemmaType;
+                                    try {
+                                        lemmaType =
+                                            inferTypeInLocalContext(
+                                                localBinders,
+                                                lemmaKernel);
+                                    } catch (const TypeError&) {
+                                        lemmaType = nullptr;
+                                    } catch (const ElaborateError&) {
+                                        lemmaType = nullptr;
+                                    }
+                                    ExpressionPointer diffAttempt;
+                                    if (lemmaType) {
+                                        try {
+                                            diffAttempt =
+                                                tryDiffApplyUserProof(
+                                                    localBinders,
+                                                    previousKernel,
+                                                    nextKernel,
+                                                    lemmaKernel,
+                                                    lemmaType,
+                                                    step.line,
+                                                    step.column);
+                                        } catch (const ElaborateError&) {
+                                            diffAttempt = nullptr;
+                                        } catch (const TypeError&) {
+                                            diffAttempt = nullptr;
+                                        }
+                                    }
+                                    if (diffAttempt) {
+                                        std::cerr << "warning: "
+                                            << moduleName_ << ":"
+                                            << step.line << ":"
+                                            << step.column
+                                            << ": redundant congruenceOf "
+                                            "wrapper — `by <inner lemma>`"
+                                            " alone would close this "
+                                            "step (diff inference fills "
+                                            "the lambda)\n";
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             } else if (step.relation == CalcRelation::Equality) {
