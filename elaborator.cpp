@@ -5046,13 +5046,15 @@ private:
             std::get_if<Definition>(declaration);
         if (!asDefinition) return;
         if (!asDefinition->universeParameters.empty()) return;
-        // Peel leading Pi binders.
-        int binderCount = 0;
+        // Peel leading Pi binders, collecting each domain in
+        // outer-to-inner order.
+        std::vector<ExpressionPointer> rawDomains;
         ExpressionPointer cursor = typeExpr;
         while (auto* pi = std::get_if<Pi>(&cursor->node)) {
-            ++binderCount;
+            rawDomains.push_back(pi->domain);
             cursor = pi->codomain;
         }
+        int binderCount = static_cast<int>(rawDomains.size());
         if (binderCount == 0) return;
         // Body must be App(App(App(Equality, carrier), lhs), rhs).
         auto* eqApp3 = std::get_if<Application>(&cursor->node);
@@ -5072,6 +5074,22 @@ private:
             && std::holds_alternative<BoundVariable>(rhs->node)) {
             return;
         }
+        // Lift each binder's domain into the conclusion's frame so
+        // `instantiateLemmaBinders` can substitute via the binding
+        // vector. Pi at peel index k (0 = outermost) has its domain in
+        // a frame with k outer binders; the corresponding conclusion-
+        // frame index is `binderCount - 1 - k`. The lift amount is
+        // `binderCount - k` so that the OUTERMOST binder (peel index 0,
+        // conclusion-frame index n-1, no inner BVs in its domain) shifts
+        // by n — a no-op on closed domains — and the innermost (peel
+        // index n-1, conclusion-frame index 0) shifts by 1 — moving its
+        // BV(0..n-2) refs (to outer binders) up to BV(1..n-1).
+        std::vector<ExpressionPointer> binderTypes(binderCount);
+        for (int peelIdx = 0; peelIdx < binderCount; ++peelIdx) {
+            int conclusionIdx = binderCount - 1 - peelIdx;
+            binderTypes[conclusionIdx] = liftBoundVariables(
+                rawDomains[peelIdx], binderCount - peelIdx, 0);
+        }
         // Register both directions. When a side is a bare BoundVariable
         // its spineHash is the wildcard tag, which lands the entry in
         // the wildcard bucket. That bucket is consulted only when the
@@ -5082,6 +5100,7 @@ private:
         forwardEntry.binderCount = binderCount;
         forwardEntry.lhs = lhs;
         forwardEntry.rhs = rhs;
+        forwardEntry.binderTypes = binderTypes;
         forwardEntry.reverseDirection = false;
         lemmaIndex_.emplace(spineHash(lhs),
                               std::move(forwardEntry));
@@ -5090,6 +5109,7 @@ private:
         reverseEntry.binderCount = binderCount;
         reverseEntry.lhs = lhs;
         reverseEntry.rhs = rhs;
+        reverseEntry.binderTypes = std::move(binderTypes);
         reverseEntry.reverseDirection = true;
         lemmaIndex_.emplace(spineHash(rhs),
                               std::move(reverseEntry));
@@ -5595,6 +5615,54 @@ private:
     // tree (including bindings[0]) and decrements BV(>=1) — clobbering
     // bindings[0]'s outer-binder references. A single combined walk
     // sidesteps that by treating each binding as opaque once placed.
+    // Whether every BoundVariable reference in `expression` that maps
+    // to a lemma binder (relative index < bindings.size()) has a
+    // non-null entry in `bindings`. Used by the precondition-discharge
+    // pass in `tryLemmaIndexLookup` to know whether a binder type can
+    // be safely instantiated yet, given only partial bindings.
+    bool binderReferencesAllBound(
+        ExpressionPointer expression,
+        const std::vector<ExpressionPointer>& bindings,
+        int nestedBinderDepth = 0) {
+        if (auto* bv =
+                std::get_if<BoundVariable>(&expression->node)) {
+            if (bv->deBruijnIndex < nestedBinderDepth) return true;
+            int relative = bv->deBruijnIndex - nestedBinderDepth;
+            if (relative >= static_cast<int>(bindings.size())) {
+                return true;
+            }
+            return bindings[relative] != nullptr;
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return binderReferencesAllBound(
+                       application->function, bindings, nestedBinderDepth)
+                && binderReferencesAllBound(
+                       application->argument, bindings, nestedBinderDepth);
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return binderReferencesAllBound(
+                       pi->domain, bindings, nestedBinderDepth)
+                && binderReferencesAllBound(
+                       pi->codomain, bindings, nestedBinderDepth + 1);
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return binderReferencesAllBound(
+                       lambda->domain, bindings, nestedBinderDepth)
+                && binderReferencesAllBound(
+                       lambda->body, bindings, nestedBinderDepth + 1);
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            return binderReferencesAllBound(
+                       let->type, bindings, nestedBinderDepth)
+                && binderReferencesAllBound(
+                       let->value, bindings, nestedBinderDepth)
+                && binderReferencesAllBound(
+                       let->body, bindings, nestedBinderDepth + 1);
+        }
+        return true;
+    }
+
     ExpressionPointer instantiateLemmaBinders(
         ExpressionPointer expression,
         const std::vector<ExpressionPointer>& bindings,
@@ -5689,6 +5757,81 @@ private:
                                        lemma.binderCount, bindings)) {
                 continue;
             }
+            // Discharge unbound preconditions outer-to-inner: a binder
+            // type at conclusion-frame index i may reference outer
+            // binders (index > i), so we need those filled first.
+            // Pattern matching populates LHS/RHS slots; this pass
+            // populates propositional preconditions by searching local
+            // hypotheses for proofs of the instantiated type. Lemmas
+            // like `padic_valuation_multiplicative(prime, a, b)
+            // (primality)(aPos)(bPos)` have primality/aPos/bPos in
+            // scope via the user's `claim`s — the discharge finds them
+            // and the lemma fires without an explicit `by`.
+            bool dischargedAll = true;
+            if (static_cast<int>(lemma.binderTypes.size())
+                == lemma.binderCount) {
+                Context openedContext =
+                    buildContextFromLocalBinders(localBinders);
+                for (int i = lemma.binderCount - 1; i >= 0; --i) {
+                    if (bindings[i]) continue;
+                    if (!binderReferencesAllBound(
+                            lemma.binderTypes[i], bindings)) {
+                        dischargedAll = false;
+                        break;
+                    }
+                    ExpressionPointer slotType = instantiateLemmaBinders(
+                        lemma.binderTypes[i], bindings);
+                    ExpressionPointer slotTypeOpened =
+                        openOverLocalBinders(slotType, localBinders,
+                                              localBinders.size());
+                    ExpressionPointer slotTypeNormalised;
+                    try {
+                        slotTypeNormalised = weakHeadNormalForm(
+                            environment_, slotTypeOpened);
+                    } catch (const TypeError&) {
+                        dischargedAll = false;
+                        break;
+                    }
+                    bool found = false;
+                    for (int j =
+                             static_cast<int>(localBinders.size()) - 1;
+                         j >= 0; --j) {
+                        ExpressionPointer candidateType =
+                            openOverLocalBinders(
+                                localBinders[j].type, localBinders, j);
+                        bool eq;
+                        try {
+                            eq = isDefinitionallyEqual(environment_,
+                                openedContext, candidateType,
+                                slotTypeNormalised);
+                        } catch (const TypeError&) {
+                            eq = false;
+                        }
+                        if (eq) {
+                            int deBruijnIndex =
+                                static_cast<int>(localBinders.size())
+                                - 1 - j;
+                            bindings[i] =
+                                makeBoundVariable(deBruijnIndex);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        dischargedAll = false;
+                        break;
+                    }
+                }
+            } else {
+                // Older registration without binderTypes; fall back to
+                // the original all-or-nothing check.
+                dischargedAll = false;
+                for (const auto& binding : bindings) {
+                    if (!binding) { dischargedAll = false; break; }
+                    dischargedAll = true;
+                }
+            }
+            if (!dischargedAll) continue;
             bool allBound = true;
             for (const auto& binding : bindings) {
                 if (!binding) { allBound = false; break; }
@@ -15875,6 +16018,15 @@ private:
         // refer to the lemma's binders, BV(0) being the *innermost*.
         ExpressionPointer lhs;
         ExpressionPointer rhs;
+        // Each binder's type, lifted into the conclusion's frame so
+        // `instantiateLemmaBinders` can substitute the metavariable
+        // bindings directly. `binderTypes[i]` is the type of the
+        // binder with conclusion-frame de Bruijn index i (0 =
+        // innermost, n-1 = outermost). Used to discharge propositional
+        // preconditions when pattern matching the LHS/RHS leaves some
+        // binders unbound (e.g. `primality` / positivity proofs on
+        // `padic_valuation_multiplicative`).
+        std::vector<ExpressionPointer> binderTypes;
         // Set when this entry indexes the lemma's RHS (so a hash hit
         // means we matched the wrong side and must emit
         // `Equality.symmetry`).
