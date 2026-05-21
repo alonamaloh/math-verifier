@@ -202,29 +202,25 @@ the directories that motivate it.
    etc.). Still missing: a reverse-direction form (`← L`) and a
    "rewrite a hypothesis in place" form for `let` / `claim` bindings.
 
-3. **Short `Quotient.mk` blocked under `+`, `*`, `=`, `≤`.**
-   Documented in CLAUDE.md; in practice bloats `Integer/ring.math` by
-   ~30% and shows up at `Rational/triangle.math:282-294`,
-   `Rational/positive.math:142-157`,
-   `Rational/order_arithmetic.math:191-206`. Remedy: when an operand
-   of a registered operator has head `Integer` / `Rational` / `Real`
-   / `PAdic`, propagate that head as the expected type for an
-   unresolved `Quotient.mk` on the other side.
+3. **Short `Quotient.mk` blocked under `+`, `*`, `=`, `≤`.** ~~Bloats
+   `Integer/ring.math` by ~30% and shows up across `Rational/`
+   files.~~ **Fixed:** binary `+`/`*`/`-`/`=`/`≤`/`<` and unary `-`
+   propagate the outer expected type (when it's a Constant head) to
+   the LEFT operand, and propagate left's inferred type to the RIGHT
+   operand. Removes the 70+ verbose `Quotient.mk(RationalRepresentative,
+   RationalEquivalent, X)` sites — sweep landed in 3846040.
 
 4. **`Or.eliminate` / `Exists.eliminate` / `And.eliminate` re-type
-   the motive that the elaborator already knows from context.**
-   Pyramids of these forms dominate `Natural/prime_split.math` (200-
-   line `Or → Exists → And` staircase),
-   `Integer/absolute_value_multiplicative.math:151-237` (87 lines of
-   four-way sign dispatch), and the Cauchy-equivalence transitivity
-   in `Real/basics.math:160-298` (139 lines, mostly ∃-unpacking).
-   Partial fix landed: `Or.eliminate(hL, hR, disj)`,
-   `And.eliminate(h, conj)`, `Exists.eliminate(h, ex)` short forms
-   recover A, B, P, and the goal-Proposition from the scrutinee's
-   type and the call-site expected type. Remaining ergonomic win:
-   `dispatch on X { case Or.introduceLeft(p): … }` /
-   `case ⟨w, hw⟩: …` syntax that scrutinizes the eliminator targets
-   inline, eliding the outer `… .eliminate` head.
+   the motive.** ~~Pyramids dominate `Natural/prime_split.math`,
+   `Integer/absolute_value_multiplicative.math`, Cauchy-equivalence
+   transitivity in `Real/basics.math`.~~ **Fixed:** the existing
+   `cases X { | Or.introduceLeft(p) => … | Or.introduceRight(q) =>
+   … }` handles `Or` (and other inductives) directly — no new
+   syntax needed. Library sweep landed in aa1607a + 85352d4
+   retiring all 17 non-`cases` `Or.eliminate` sites. Remaining
+   targets if more 4-way / ∃-unpack chains appear: extend the same
+   pattern. The `Integer/absolute_value_multiplicative.math` and
+   `Real/basics.math` chains noted in the audit are next.
 
 5. **`obtain ⟨a, b, c⟩ from …` cannot flat-destructure nested
    existentials and conjunctions.** `Natural/division.math:119-179`
@@ -247,6 +243,16 @@ the directories that motivate it.
    pattern-match definition's β-reduction as a one-step calc rewrite
    when the matched argument is structurally a constructor.
 
+   **Investigated, not landed.** Two routes failed: (a) library-side
+   at_make refactor — the kernel does ι-reduce, but `rewrite`'s
+   `abstractStructuralOccurrence` matcher does only structural compare
+   without reduction so the rewrite target can't be found inside the
+   reduced term. (b) Adding WHNF to the matcher — WHNF stops at the
+   outer `Rational.subtract` head and doesn't reach inner
+   `sequenceFunction(make(...))` calls. Real fix needs either
+   deep-β/ι matching (expensive) or `isDefinitionallyEqual`-based
+   matching with unique-occurrence detection (open design question).
+
 8. **Strict `<` doesn't transport cleanly.** `LessThan` is `And(≤,
    Not(_=_))`, so every transport along `<` manually destructures
    and rebuilds. See `Rational/order_arithmetic.math:336-356,
@@ -255,8 +261,10 @@ the directories that motivate it.
    `by strict_mono(weak_lemma, neq_lemma)` tactic that auto-
    assembles `And.introduction`.
 
-Proposed first sprint of three orthogonal items: **1, 2, 5**. They
-retire roughly half the plumbing the audit flagged.
+Diff-inference walker + non-calc hook (8dbde1c) was the elaborator
+change that unlocked items 1 (sweep) and 2 (the `claim X : T by P`
+form). Items 3, 4 are now FIXED. Items 1 and 2 sweeps are mechanical
+follow-up.
 
 ## `Algebra/CauchyCompletion`
 
