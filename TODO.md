@@ -104,20 +104,6 @@ lemma-index lookup by spineHash), the residual items are:
   profile a cold-rebuild — pack the bits only if `substitute` /
   `openBinder` show up in the top 5.
 
-## Equality combinator carrier implicit
-
-`Equality.transport_proposition`, `Equality.transitivity`,
-`Equality.symmetry`, `Equality.congruence` all take an explicit
-`(A : Type)` carrier as their first argument, then `(x : A)` etc.
-The carrier is derivable from `x`'s type at every call site.
-Library-wide there are ~720 uses (192 + 527); the carrier often
-takes its own line. Making it `{A : Type}` implicit would save
-~500 lines.
-
-Plan: change signatures in `library/Equality/basics.math`,
-bulk-refactor call sites (agent template from the Quotient.* sweep
-applies). Estimated ~2 hours.
-
 ## Rational `/` operator via implicit-prop-arg discharge
 
 Goal: an honest `/` operator on `(Integer, Natural) → Rational` with
@@ -443,10 +429,32 @@ entry as ≤), so `(h : a ≥ b)` works in theorem types.
   be single-constructor, non-indexed, non-recursive (parameterised
   OK). Multi-constructor inner positions would need cross-row coverage
   analysis.
-- **PAdic `(p, primality)` → implicit args.** Mechanical migration;
-  blocks `operator (+) on (PAdic, PAdic)` and the
-  CauchyCompletion abstraction. The implicit-args machinery already
-  exists.
+- **PAdic `(p, primality)` → implicit args.** NOT mechanical after
+  all. Two blockers found during a sweep attempt:
+    (1) **`Rational.padic_*` and `Rational.sequence.*` callees take
+        Rational/sequence args that don't constrain p**, so dropping
+        the explicit `(p, primality, …)` prefix at those call sites
+        leaves the implicit-args inference with nothing to drive p
+        from. `Rational.padic_absolute_value(q : Rational) : Rational`
+        is the canonical example — q's type has no p. Need either:
+        keep explicit p at those sites, or extend inference to use
+        the surrounding type-position context (works less often than
+        you'd hope: many sites are in calc steps / let-bindings where
+        the expected type is also a plain `Rational`).
+    (2) **The `=` desugar elaborates the LHS without an expected
+        type**, so even `PAdic.add(x, y) = …` (where x : PAdic(p, _))
+        currently fails: inference for `PAdic.add` on the LHS can't
+        see the implicit prefix back-propagated from the RHS. A fix
+        would either pre-elaborate the RHS first to recover a carrier
+        hint, or wire forward inference to use the surrounding
+        equality context. The bug pre-dates the recent elaborator
+        work; it just didn't matter before because PAdic call sites
+        passed `(p, primality)` explicitly.
+  Recommended sequence: fix (2) in the elaborator first (general
+  win), then migrate the inference-friendly subset (PAdic.{add,
+  multiply, negate, subtract} and call sites where p is reachable
+  through args), then revisit Rational.padic_* once an expected-type
+  back-propagation path exists.
 - **`operator (+) on (PAdic, PAdic)`** etc. — unblocked by the
   above.
 - **Per-block `open NAMESPACE`** for terser long names like
