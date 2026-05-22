@@ -1015,6 +1015,124 @@ theorem Real.LessOrEqual_of_pointwise
                      ≤ (Quotient.mk(b_rep) : Real)),
       B)(pointwiseLeq)
 
+-- Dual: at-make form, lower bound by the limit. If every term of a
+-- Cauchy rational sequence is (as Real) ≥ some lower bound mk(make(b, _)),
+-- then mk(make(b, _)) ≤ mk(make(s, _)). Same proof structure as the
+-- upper-bound version with s and b swapped: pick N_s from s's Cauchy
+-- modulus at ε/2 (giving `s(N_s) - s(j) < ε/2`), apply the pointwise
+-- bound at N_s to extract `s(N_s) - b(j) > -ε/2`, sum to
+-- `s(j) - b(j) > -ε`.
+theorem Real.LessOrEqual_of_pointwise_lower_at_make
+        (s : Natural → Rational)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        (b : Natural → Rational)
+        (bIsCauchy : Rational.sequence.IsCauchy(b))
+        (pointwiseGeq
+            : (n : Natural)
+              → (Quotient.mk(CauchyRationalSequence.make(b, bIsCauchy)) : Real)
+                  ≤ (s(n) : Real))
+        : (Quotient.mk(CauchyRationalSequence.make(b, bIsCauchy)) : Real)
+            ≤ (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real) :=
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) => {
+    claim halvedPositive : Rational.zero < Rational.halve(epsilon)
+      by Rational.halve_positive(epsilon, epsilonPositive);
+    obtain ⟨N_s, sCauchyAt⟩
+        from sIsCauchy(Rational.halve(epsilon), halvedPositive);
+    -- pointwiseGeq(N_s) : mk(make(b, _)) ≤ (s(N_s) : Real)
+    --   = Real.IsNonneg((s(N_s) : Real) - mk(make(b, _)))
+    --   = IsEventuallyNonneg(λj. s(N_s) - b(j))
+    obtain ⟨N_b, sNsMinusBAt⟩
+        from pointwiseGeq(N_s)(Rational.halve(epsilon), halvedPositive);
+    witness Natural.maximum(N_s, N_b) with
+        function (m : Natural)
+                 (mGeMax : Natural.maximum(N_s, N_b) ≤ m) => {
+          claim m_geq_N_s : N_s ≤ m
+            by Natural.le_through_max_left(N_s, N_b, m, mGeMax);
+          claim m_geq_N_b : N_b ≤ m
+            by Natural.le_through_max_right(N_s, N_b, m, mGeMax);
+          -- |s(m) - s(N_s)| < halve(ε)
+          claim sCauchyAtM
+                : Rational.absolute_value(s(m) - s(N_s))
+                  < Rational.halve(epsilon)
+            by sCauchyAt(m, m_geq_N_s, N_s, LessOrEqual.reflexivity(N_s));
+          -- Lower bound: -halve(ε) < s(m) - s(N_s)
+          claim sLowerBound
+                : -Rational.halve(epsilon) < s(m) - s(N_s)
+            by And.left(
+                   -Rational.halve(epsilon) < s(m) - s(N_s),
+                   s(m) - s(N_s) < Rational.halve(epsilon),
+                   Rational.absolute_value_LessThan_bounds(
+                       s(m) - s(N_s), Rational.halve(epsilon), sCauchyAtM));
+          -- pointwiseGeq at m: -halve(ε) < s(N_s) - b(m)
+          claim sBBound
+                : -Rational.halve(epsilon) < s(N_s) - b(m)
+            by sNsMinusBAt(m, m_geq_N_b);
+          -- Sum: -halve(ε) + -halve(ε) < (s(m) - s(N_s)) + (s(N_s) - b(m))
+          claim summedBound
+                : -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  < (s(m) - s(N_s)) + (s(N_s) - b(m))
+            by Rational.LessThan.transitive_right(
+                   -Rational.halve(epsilon) + -Rational.halve(epsilon),
+                   (s(m) - s(N_s)) + -Rational.halve(epsilon),
+                   (s(m) - s(N_s)) + (s(N_s) - b(m)),
+                   Rational.add_preserves_LessThan(
+                       -Rational.halve(epsilon),
+                       s(m) - s(N_s),
+                       -Rational.halve(epsilon),
+                       sLowerBound),
+                   Rational.add_general_LessOrEqual_left(
+                       s(m) - s(N_s),
+                       -Rational.halve(epsilon),
+                       s(N_s) - b(m),
+                       Rational.LessThan.weaken(
+                           -Rational.halve(epsilon),
+                           s(N_s) - b(m),
+                           sBBound)));
+          -- LHS = -ε, RHS = s(m) - b(m).
+          claim lhsEq
+                : -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  = -epsilon
+            by calc -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  = -(Rational.halve(epsilon) + Rational.halve(epsilon))
+                  = -epsilon;
+          claim rhsEq
+                : (s(m) - s(N_s)) + (s(N_s) - b(m))
+                  = s(m) - b(m)
+            by ring;
+          rewrite(rhsEq, rewrite(lhsEq, summedBound))
+        }
+  }
+
+-- Lift the dual via Quotient.induct on B.
+theorem Real.LessOrEqual_of_pointwise_lower
+        (s : Natural → Rational)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        (B : Real)
+        (pointwiseGeq : (n : Natural) → B ≤ (s(n) : Real))
+        : B ≤ (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real) :=
+  Quotient.induct(
+      function (BArg : Real) =>
+          ((n : Natural) → BArg ≤ (s(n) : Real))
+          → BArg
+              ≤ (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real),
+      function (b_rep : CauchyRationalSequence) =>
+          (cases b_rep {
+             | CauchyRationalSequence.make(b, bIsCauchy) =>
+                 function (ptGeq
+                              : (n : Natural)
+                                → (Quotient.mk(
+                                       CauchyRationalSequence.make(b, bIsCauchy))
+                                    : Real)
+                                    ≤ (s(n) : Real)) =>
+                     Real.LessOrEqual_of_pointwise_lower_at_make(
+                         s, sIsCauchy, b, bIsCauchy, ptGeq)
+           } : ((n : Natural)
+                  → (Quotient.mk(b_rep) : Real) ≤ (s(n) : Real))
+                 → (Quotient.mk(b_rep) : Real)
+                     ≤ (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real)),
+      B)(pointwiseGeq)
+
 -- I4: the lower-bound sequence is Cauchy at the rational level.
 -- The bound is `|aₘ - aₙ| < ε` once both indices exceed a suitable
 -- N depending on `(b0 - a0)` and ε (geometric series majorant).
