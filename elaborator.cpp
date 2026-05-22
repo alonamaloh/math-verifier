@@ -5333,6 +5333,14 @@ private:
         (void)stepEqualityType;
         (void)column;
         (void)line;
+        // Strategy 2 below wraps with Equality.congruence. If that name
+        // isn't declared (small test modules sometimes omit it), we'd
+        // build a term referencing an undefined constant. Only the
+        // pure-reflexivity strategy 1 below is safe in that case — and
+        // it's cheap to keep, so we keep going past this point but skip
+        // strategy 2 below.
+        const bool congruenceAvailable =
+            environment_.lookup("Equality.congruence") != nullptr;
         // ζ-unfold local let-binders so the structural matchers
         // (tryClassifyDiff path-walk, lemma index) see through surface
         // abbreviations. The kernel-level Equality at the original
@@ -5364,6 +5372,13 @@ private:
         // function), or both differ (bail). We collect a list of
         // path steps and reconstruct the proof inside-out with
         // Equality.congruence wrappers.
+        // Skip strategy 2 entirely if Equality.congruence isn't in
+        // scope — the wrappers below would reference an undefined
+        // constant, and the eventual kernel error wouldn't carry
+        // calc-step attribution.
+        if (!congruenceAvailable) {
+            return nullptr;
+        }
         struct CalcPathStep {
             enum class Kind { Arg, Fn };
             Kind kind;
@@ -5648,6 +5663,17 @@ private:
         int line, int column) {
         (void)column;
         (void)line;
+        // The diff-inference fallback wraps with Equality.congruence;
+        // refuse the attempt if that name isn't declared, otherwise we'd
+        // hand the kernel a term referencing an undefined constant and
+        // the eventual addDefinition would report it without any calc-
+        // step attribution context (the calc-step frame is long gone by
+        // then). Returning nullptr here lets the caller fall through to
+        // its normal "type mismatch" error path, which fires inside the
+        // calc-step Frame and reports the line of the offending step.
+        if (!environment_.lookup("Equality.congruence")) {
+            return nullptr;
+        }
         // Extract (carrierLevel, T, a, b) from userProofType.
         ExpressionPointer userTypeWhnf = weakHeadNormalForm(
             environment_, userProofType);
@@ -14013,6 +14039,17 @@ private:
                 "rewrite needs an expected type from context — use it "
                 "in a calc step, where the step's `previous = next` "
                 "equality provides the target");
+        }
+        // The 1-arg rewrite wraps via Equality.congruence. If that name
+        // isn't declared (small test modules sometimes omit it), bail
+        // out so the caller can fall through to its own diagnostic,
+        // rather than handing the kernel a term that mentions an
+        // undefined constant.
+        if (!environment_.lookup("Equality.congruence")) {
+            throwElaborate(
+                "rewrite: Equality.congruence is not declared in "
+                "scope; cannot synthesise the calc-step congruence "
+                "wrap");
         }
         EqualityComponents goalComponents =
             extractEqualityComponents(expectedType, "rewrite (goal)", line);
