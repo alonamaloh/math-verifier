@@ -1582,16 +1582,211 @@ theorem Real.bisectionLeft_le_bisectionRight_predecessor
       Real.bisectionRight_le_predecessor(
           subset, initial, initialLeftLeqRight, k, n))
 
+-- ----------------------------------------------------------------------
+-- Cauchy modulus for the bisection width.
+
+-- (n : Rational) is nonneg for natural n. The cast goes
+-- Natural → Integer → Rational; the numerator at the Rational
+-- representative is Integer.from_natural(n), which is Integer.IsNonneg.
+theorem Rational.from_natural_IsNonneg (n : Natural)
+        : Rational.IsNonneg((n : Rational)) :=
+  Integer.from_natural_is_nonneg(n)
+
+-- (successor(n) : Rational) = Rational.one + (n : Rational). The cast
+-- of (succ(n) : Integer) reduces definitionally to Integer.one + (n :
+-- Integer); applying Integer.to_rational.add_preserves bridges to the
+-- Rational sum.
+theorem Rational.successor_cast (n : Natural)
+        : (successor(n) : Rational) = Rational.one + (n : Rational) :=
+  Integer.to_rational.add_preserves(Integer.one, (n : Integer))
+
+-- (successor(successor(n)) : Rational) = Rational.one + Rational.one
+-- + (n : Rational). Two applications of add_preserves, bridging
+-- (Integer.one + Integer.one + (n : Integer)) up to Rational.
+theorem Rational.successor_successor_cast (n : Natural)
+        : (successor(successor(n)) : Rational)
+          = Rational.one + Rational.one + (n : Rational) :=
+  calc (successor(successor(n)) : Rational)
+     = ((Integer.one + Integer.one : Integer) : Rational) + (n : Rational)
+            by Integer.to_rational.add_preserves(
+                   Integer.one + Integer.one, (n : Integer))
+     = (Integer.one : Rational) + (Integer.one : Rational)
+       + (n : Rational)
+     = Rational.one + Rational.one + (n : Rational)
+
+-- halve(x) * y = x * halve(y). One-half is symmetric across the
+-- multiplication: ring after unfolding halve to `* one_half`.
+theorem Rational.halve_multiply_swap (x y : Rational)
+        : Rational.halve(x) * y = x * Rational.halve(y) :=
+  calc Rational.halve(x) * y
+     = (x * Rational.one_half) * y
+     = x * (Rational.one_half * y)
+     = x * (y * Rational.one_half)
+     = x * Rational.halve(y)
+
+-- halve((1 + 1) + (n : Rational)) ≤ (1 + (n : Rational)). Used to
+-- step the multiplicative bound.
+theorem Rational.halve_two_plus_le_one_plus (n : Natural)
+        : Rational.halve(Rational.one + Rational.one + (n : Rational))
+          ≤ Rational.one + (n : Rational) := {
+  -- Inner bound: 1 + 1 + n ≤ (1 + n) + (1 + n). Via LessOrEqual.sum
+  -- with 1 ≤ 1 + n (using n ≥ 0) and reflexivity on (1 + n).
+  claim oneLeqOnePlusN
+        : Rational.one ≤ Rational.one + (n : Rational)
+    by rewrite(
+           (ring : Rational.one + Rational.zero = Rational.one),
+           Rational.add_general_LessOrEqual_left(
+               Rational.one, Rational.zero, (n : Rational),
+               Rational.LessOrEqual_zero_of_IsNonneg(
+                   (n : Rational),
+                   Rational.from_natural_IsNonneg(n))));
+  claim innerBound
+        : Rational.one + Rational.one + (n : Rational)
+          ≤ (Rational.one + (n : Rational))
+            + (Rational.one + (n : Rational))
+    by rewrite(
+           (ring : Rational.one + (Rational.one + (n : Rational))
+                   = Rational.one + Rational.one + (n : Rational)),
+           Rational.LessOrEqual.sum(
+               Rational.one,
+               Rational.one + (n : Rational),
+               Rational.one + (n : Rational),
+               Rational.one + (n : Rational),
+               oneLeqOnePlusN,
+               Rational.LessOrEqual.reflexive(
+                   Rational.one + (n : Rational))));
+  -- halve preserves the inner bound; halve_of_doubled folds the RHS.
+  rewrite(
+      Rational.halve_of_doubled(Rational.one + (n : Rational)),
+      Rational.halve_preserves_LessOrEqual(
+          Rational.one + Rational.one + (n : Rational),
+          (Rational.one + (n : Rational))
+              + (Rational.one + (n : Rational)),
+          innerBound))
+}
+
+-- width(n) ≥ 0 inductively from initial width ≥ 0 + halve preserves nonneg.
+theorem Real.bisectionWidth_nonneg
+        (initial : Real.BisectionInterval)
+        (initialWidthNonneg
+            : Rational.IsNonneg(
+                  Real.BisectionInterval.right(initial)
+                  - Real.BisectionInterval.left(initial)))
+        : (n : Natural)
+          → Rational.IsNonneg(Real.bisectionWidth(initial, n))
+  | zero => initialWidthNonneg
+  | successor(predecessor) =>
+      Rational.halve_IsNonneg(
+          Real.bisectionWidth(initial, predecessor),
+          Real.bisectionWidth_nonneg(
+              initial, initialWidthNonneg, predecessor))
+
+-- For c ≥ 0, halve^n(c) * (successor(n) : Rational) ≤ c. Multiplicative
+-- bound that turns into the Cauchy modulus via Archimedean.
+theorem Real.bisectionWidth_times_succ_le_initial
+        (initial : Real.BisectionInterval)
+        (initialWidthNonneg
+            : Rational.IsNonneg(
+                  Real.BisectionInterval.right(initial)
+                  - Real.BisectionInterval.left(initial)))
+        : (n : Natural)
+          → Real.bisectionWidth(initial, n)
+              * (successor(n) : Rational)
+            ≤ Real.BisectionInterval.right(initial)
+              - Real.BisectionInterval.left(initial)
+  | zero =>
+      -- width(0) * (1 : R) = (right - left) * 1 = right - left ≤ right - left.
+      -- Transport reflexivity through `initial_width = initial_width * 1`.
+      Equality.transport_proposition(
+          function (w : Rational) =>
+              w ≤ Real.BisectionInterval.right(initial)
+                  - Real.BisectionInterval.left(initial),
+          Real.BisectionInterval.right(initial)
+              - Real.BisectionInterval.left(initial),
+          (Real.BisectionInterval.right(initial)
+              - Real.BisectionInterval.left(initial))
+              * Rational.one,
+          Equality.symmetry(
+              Rational.multiply_one(
+                  Real.BisectionInterval.right(initial)
+                  - Real.BisectionInterval.left(initial))),
+          Rational.LessOrEqual.reflexive(
+              Real.BisectionInterval.right(initial)
+              - Real.BisectionInterval.left(initial)))
+  | successor(predecessor) => {
+      claim IH
+            : Real.bisectionWidth(initial, predecessor)
+                * (successor(predecessor) : Rational)
+              ≤ Real.BisectionInterval.right(initial)
+                - Real.BisectionInterval.left(initial)
+        by Real.bisectionWidth_times_succ_le_initial(
+               initial, initialWidthNonneg, predecessor);
+      -- width(succ(predecessor)) = halve(width(predecessor)).
+      -- (succ(succ(predecessor)) : R) = 1 + 1 + (predecessor : R) (kernel reduces).
+      -- halve(width(predecessor)) * (1+1+pred) = width(predecessor) * halve(1+1+pred)
+      --       [halve_multiply_swap]
+      -- halve(1+1+pred) ≤ 1+pred                  [halve_two_plus_le_one_plus]
+      -- width(predecessor) ≥ 0 (need this)
+      -- So width(predecessor) * halve(1+1+pred) ≤ width(predecessor) * (1+pred) ≤ initial
+      claim widthNonneg
+            : Rational.IsNonneg(Real.bisectionWidth(initial, predecessor))
+        by Real.bisectionWidth_nonneg(initial, initialWidthNonneg, predecessor);
+      claim halveSwap
+            : Rational.halve(Real.bisectionWidth(initial, predecessor))
+                * (successor(successor(predecessor)) : Rational)
+              = Real.bisectionWidth(initial, predecessor)
+                * Rational.halve(
+                      (successor(successor(predecessor)) : Rational))
+        by Rational.halve_multiply_swap(
+               Real.bisectionWidth(initial, predecessor),
+               (successor(successor(predecessor)) : Rational));
+      -- Bridge through the cast: halve((succ(succ(n)) : R)) ≤ (succ(n) : R)
+      -- using halve_two_plus_le_one_plus on the expanded Rational form.
+      claim halveOfTwoPlus
+            : Rational.halve(
+                  (successor(successor(predecessor)) : Rational))
+              ≤ (successor(predecessor) : Rational)
+        by rewrite(
+               Equality.symmetry(Rational.successor_cast(predecessor)),
+               rewrite(
+                   Equality.symmetry(
+                       Rational.successor_successor_cast(predecessor)),
+                   Rational.halve_two_plus_le_one_plus(predecessor)));
+      claim widthMultLeq
+            : Real.bisectionWidth(initial, predecessor)
+                * Rational.halve(
+                      (successor(successor(predecessor)) : Rational))
+              ≤ Real.bisectionWidth(initial, predecessor)
+                * (successor(predecessor) : Rational)
+        by Rational.LessOrEqual.multiply_by_nonneg_left(
+               Rational.halve(
+                   (successor(successor(predecessor)) : Rational)),
+               (successor(predecessor) : Rational),
+               Real.bisectionWidth(initial, predecessor),
+               halveOfTwoPlus,
+               Rational.LessOrEqual_zero_of_IsNonneg(
+                   Real.bisectionWidth(initial, predecessor),
+                   widthNonneg));
+      Rational.LessOrEqual.transitive(
+          Rational.halve(Real.bisectionWidth(initial, predecessor))
+              * (successor(successor(predecessor)) : Rational),
+          Real.bisectionWidth(initial, predecessor)
+              * (successor(predecessor) : Rational),
+          Real.BisectionInterval.right(initial)
+              - Real.BisectionInterval.left(initial),
+          rewrite(Equality.symmetry(halveSwap), widthMultLeq),
+          IH)
+  }
+
 -- I4: the lower-bound sequence is Cauchy at the rational level.
 -- Plan: |a_m - a_n| ≤ width(min(m, n)) (from monotone containment +
 -- the within-interval invariant), and width(N) → 0 by Archimedean.
--- Combined: pick N with width(N) < ε, then for m, n ≥ N the bound
--- holds. Still missing: the Cauchy modulus
+-- Still missing: the Cauchy modulus
 --   ∀ ε > 0. ∃ N. bisectionWidth(initial, N) < ε
--- which needs `Natural.power(n, 2) ≥ successor(n)` (induction) +
--- `halve_iterate(c, n) * (Natural.power(n, 2) : Rational) = c`
--- (induction with halve_doubled) + Archimedean on c via
--- Rational.absolute_value_le_succ_natural.
+-- which combines bisectionWidth_times_succ_le_initial with Archimedean
+-- (absolute_value_le_succ_natural applied to (right - left) * reciprocal(ε))
+-- plus a multiplicative cancellation lemma. The multiplicative bound
+-- is in place; the modulus is the next chunk.
 theorem Real.bisectionLeft_is_cauchy
         (subset : Set(Real)) (initial : Real.BisectionInterval)
         : Rational.sequence.IsCauchy(
