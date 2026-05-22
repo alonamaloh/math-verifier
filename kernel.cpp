@@ -6,6 +6,8 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -18,6 +20,7 @@ uint64_t kernelStepLimit = 0;
 uint64_t kernelTraceInterval = 0;
 bool kernelProfileEnabled = false;
 std::size_t kernelDumpWidth = 240;
+bool kernelCacheEnabled = false;
 
 namespace {
 
@@ -47,6 +50,108 @@ thread_local ExpressionPointer kernelLastRight;
 // kernelProfileEnabled is true. Emitted from the top-level entry-point
 // wrapper when the call completes.
 thread_local std::map<std::string, uint64_t> kernelProfileCounts;
+
+// ---- WHNF memoization ----------------------------------------------------
+//
+// Keyed by **structural identity** (not pointer identity): the hash that
+// every Expression carries is the bucket selector, and structurallyEqual
+// is the bucket-equality test. This means two freshly-allocated but
+// structurally-identical inputs hit the same cache entry — which is the
+// whole point, since the elaborator hands the kernel many such pairs.
+//
+// Reset by KernelInstrumentationScope at each public-entry boundary, so
+// the environment is constant for any single lookup and WHNF's answer
+// depends only on the input expression.
+//
+// We intentionally do NOT cache isDefinitionallyEqual: its answer depends
+// on the local Context (let-bindings, opened binders) which we'd have to
+// fold into the key. WHNF, by contrast, only takes an Environment +
+// expression — the cache is well-defined.
+struct ExpressionStructuralHash {
+    std::size_t operator()(const ExpressionPointer& expression) const noexcept {
+        return expression ? static_cast<std::size_t>(expression->hash) : 0;
+    }
+};
+struct ExpressionStructuralEqual {
+    bool operator()(const ExpressionPointer& left,
+                    const ExpressionPointer& right) const noexcept {
+        if (left.get() == right.get()) return true;
+        if (!left || !right) return false;
+        return structurallyEqual(left, right);
+    }
+};
+thread_local std::unordered_map<ExpressionPointer, ExpressionPointer,
+                                ExpressionStructuralHash,
+                                ExpressionStructuralEqual> whnfCache;
+
+// Positive-result cache for isDefinitionallyEqual. Key: structural pair
+// (left, right). We only cache TRUE results — a `false` may have been
+// conservatively returned due to fuel exhaustion in a particular call,
+// and reusing it elsewhere would be unsound. A true result, however, is
+// a positive proof that the expressions are definitionally equal, and
+// equality is symmetric and context-monotone (adding binders to context
+// can only refine, not refute, equality of closed-under-FVs terms).
+//
+// Reset, like whnfCache, at every public-entry boundary because the
+// environment is mutated there.
+struct ExpressionPairStructuralHash {
+    std::size_t operator()(
+            const std::pair<ExpressionPointer, ExpressionPointer>& pair)
+            const noexcept {
+        uint64_t a = pair.first  ? pair.first->hash  : 0;
+        uint64_t b = pair.second ? pair.second->hash : 0;
+        // Combine the two hashes asymmetrically so (a,b) and (b,a) get
+        // distinct bucket slots — the cache could be made symmetric, but
+        // we want it to track the exact comparisons the caller performed.
+        return static_cast<std::size_t>(a ^ (b * 0x9e3779b97f4a7c15ULL));
+    }
+};
+struct ExpressionPairStructuralEqual {
+    bool operator()(
+            const std::pair<ExpressionPointer, ExpressionPointer>& left,
+            const std::pair<ExpressionPointer, ExpressionPointer>& right)
+            const noexcept {
+        ExpressionStructuralEqual e;
+        return e(left.first, right.first) && e(left.second, right.second);
+    }
+};
+thread_local std::unordered_set<
+    std::pair<ExpressionPointer, ExpressionPointer>,
+    ExpressionPairStructuralHash,
+    ExpressionPairStructuralEqual> isDefEqTrueCache;
+thread_local uint64_t isDefEqCacheHits = 0;
+thread_local uint64_t isDefEqCacheMisses = 0;
+
+// ---- In-flight tracking (loop detection) ---------------------------------
+//
+// Track pointer-pairs currently being computed by isDefEq. If a recursive
+// call re-enters a comparison that's already on the stack (without the
+// cache having absorbed it — meaning the outer call hasn't returned yet),
+// we're in a reduction loop: descending into subexpressions has brought us
+// back to the same question. Bail out conservatively with `false`. The
+// outer call's "no I'm not equal" answer is the right one for that level —
+// either the expressions genuinely differ, or we'll know it because some
+// caller fed us a non-terminating type.
+//
+// We track WHNF too: re-entering the same input mid-reduction is a
+// definitional-equality loop (a definition that unfolds to mention
+// itself). WHNF currently relies on fuel for that — loop detection is a
+// cheaper, more informative termination signal.
+thread_local std::unordered_set<ExpressionPointer,
+                                ExpressionStructuralHash,
+                                ExpressionStructuralEqual> whnfInFlight;
+thread_local std::unordered_set<
+    std::pair<ExpressionPointer, ExpressionPointer>,
+    ExpressionPairStructuralHash,
+    ExpressionPairStructuralEqual> isDefEqInFlight;
+thread_local uint64_t isDefEqLoopsDetected = 0;
+thread_local uint64_t whnfLoopsDetected = 0;
+
+// Diagnostic counters for the cache, reported under KERNEL_PROFILE.
+thread_local uint64_t whnfCacheHits = 0;
+thread_local uint64_t whnfCacheMisses = 0;
+thread_local uint64_t isDefEqCallCount = 0;
+thread_local uint64_t whnfCallCount = 0;
 
 // Render an expression for a diagnostic message. The full pretty-print
 // can be huge; we truncate to keep error messages and trace breadcrumbs
@@ -96,10 +201,26 @@ inline void kernelStep(const char* operation,
         // practice the elaborator's outer error handling can swallow the
         // stderr ordering, so we emit it eagerly here as well.
         if (kernelProfileEnabled) {
+            uint64_t whnfLookups = whnfCacheHits + whnfCacheMisses;
+            uint64_t isDefEqLookups = isDefEqCacheHits + isDefEqCacheMisses;
             std::fprintf(
                 stderr,
-                "[kernel profile, on step-limit] %llu total step(s)\n",
-                (unsigned long long)kernelStepCounter);
+                "[kernel profile, on step-limit] %llu step(s), "
+                "isDefEq %llu (cache %llu/%llu, %.1f%%, loops %llu), "
+                "WHNF %llu (cache %llu/%llu, %.1f%%, loops %llu)\n",
+                (unsigned long long)kernelStepCounter,
+                (unsigned long long)isDefEqCallCount,
+                (unsigned long long)isDefEqCacheHits,
+                (unsigned long long)isDefEqCacheMisses,
+                isDefEqLookups > 0
+                    ? 100.0 * isDefEqCacheHits / isDefEqLookups : 0.0,
+                (unsigned long long)isDefEqLoopsDetected,
+                (unsigned long long)whnfCallCount,
+                (unsigned long long)whnfCacheHits,
+                (unsigned long long)whnfCacheMisses,
+                whnfLookups > 0
+                    ? 100.0 * whnfCacheHits / whnfLookups : 0.0,
+                (unsigned long long)whnfLoopsDetected);
             std::vector<std::pair<uint64_t, std::string>> sorted;
             for (const auto& [name, count] : kernelProfileCounts) {
                 sorted.emplace_back(count, name);
@@ -151,14 +272,50 @@ struct KernelInstrumentationScope {
         kernelLastLeft.reset();
         kernelLastRight.reset();
         kernelProfileCounts.clear();
+        whnfCacheHits = 0;
+        whnfCacheMisses = 0;
+        isDefEqCacheHits = 0;
+        isDefEqCacheMisses = 0;
+        isDefEqCallCount = 0;
+        whnfCallCount = 0;
+        // The environment is about to be mutated (a new axiom / definition
+        // / inductive added). Cached WHNF and isDefEq results computed
+        // against the pre-mutation environment may no longer be correct
+        // (e.g. a name that was previously stuck as a bare Constant now
+        // δ-reduces), so wipe both caches before doing any more reduction
+        // work.
+        if (kernelCacheEnabled) {
+            whnfCache.clear();
+            isDefEqTrueCache.clear();
+            whnfInFlight.clear();
+            isDefEqInFlight.clear();
+        }
+        isDefEqLoopsDetected = 0;
+        whnfLoopsDetected = 0;
     }
     ~KernelInstrumentationScope() {
         if (kernelProfileEnabled) {
+            uint64_t whnfLookups = whnfCacheHits + whnfCacheMisses;
+            uint64_t isDefEqLookups = isDefEqCacheHits + isDefEqCacheMisses;
             std::fprintf(
                 stderr,
-                "[kernel profile] %s: %llu total step(s)\n",
+                "[kernel profile] %s: %llu step(s), "
+                "isDefEq %llu (cache %llu/%llu, %.1f%%, loops %llu), "
+                "WHNF %llu (cache %llu/%llu, %.1f%%, loops %llu)\n",
                 declarationName.c_str(),
-                (unsigned long long)kernelStepCounter);
+                (unsigned long long)kernelStepCounter,
+                (unsigned long long)isDefEqCallCount,
+                (unsigned long long)isDefEqCacheHits,
+                (unsigned long long)isDefEqCacheMisses,
+                isDefEqLookups > 0
+                    ? 100.0 * isDefEqCacheHits / isDefEqLookups : 0.0,
+                (unsigned long long)isDefEqLoopsDetected,
+                (unsigned long long)whnfCallCount,
+                (unsigned long long)whnfCacheHits,
+                (unsigned long long)whnfCacheMisses,
+                whnfLookups > 0
+                    ? 100.0 * whnfCacheHits / whnfLookups : 0.0,
+                (unsigned long long)whnfLoopsDetected);
             // Sort by count desc, show top 10.
             std::vector<std::pair<uint64_t, std::string>> sorted;
             for (const auto& [name, count] : kernelProfileCounts) {
@@ -646,9 +803,13 @@ ExpressionPointer buildIotaReduction(
 
 } // namespace
 
-ExpressionPointer weakHeadNormalForm(const Environment& environment,
-                                     ExpressionPointer expression,
-                                     int fuel) {
+namespace {
+
+// Body of WHNF without the caching wrapper. Made anonymous so callers
+// always go through the cached entry point below.
+ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
+                                             ExpressionPointer expression,
+                                             int fuel) {
     while (true) {
         kernelStep("whnf", expression);
         if (--fuel <= 0) {
@@ -828,6 +989,64 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
     }
 }
 
+} // namespace
+
+ExpressionPointer weakHeadNormalForm(const Environment& environment,
+                                     ExpressionPointer expression,
+                                     int fuel) {
+    // Structural-hash memoization. Embedders opt in by setting
+    // kernelCacheEnabled at startup — when true, the cache lives across
+    // all WHNF calls and is automatically wiped at each public addAxiom
+    // / addDefinition / addInductive boundary (since those mutate the
+    // environment that WHNF reads).
+    //
+    // The cache is keyed by structural hash + structurallyEqual so
+    // distinct ExpressionPointers with identical structure share one
+    // entry. That's where the real savings come from on deeply nested
+    // goals: the elaborator hands us many freshly-allocated but
+    // structurally-identical subexpressions, and we reduce each shape
+    // only once.
+    //
+    // Default (kernelCacheEnabled = false) preserves the unmemoised
+    // contract the test suite relies on (e.g. "WHNF throws on fuel
+    // exhaustion" — a cached result would silently bypass the throw).
+    ++whnfCallCount;
+    if (!kernelCacheEnabled) {
+        return weakHeadNormalFormUncached(
+            environment, std::move(expression), fuel);
+    }
+    if (auto cached = whnfCache.find(expression);
+        cached != whnfCache.end()) {
+        ++whnfCacheHits;
+        return cached->second;
+    }
+    // Loop detection: a recursive WHNF call landing on the SAME input
+    // (structurally) before the outer call completed means the reduction
+    // chain has come back to itself — no possible further progress, so
+    // return the input unchanged. Without this the kernel would unfold
+    // δ-recursively until fuel ran out.
+    if (whnfInFlight.find(expression) != whnfInFlight.end()) {
+        ++whnfLoopsDetected;
+        return expression;
+    }
+    ++whnfCacheMisses;
+    ExpressionPointer key = expression;
+    whnfInFlight.insert(key);
+    ExpressionPointer result;
+    try {
+        result = weakHeadNormalFormUncached(
+            environment, std::move(expression), fuel);
+    } catch (...) {
+        whnfInFlight.erase(key);
+        throw;
+    }
+    whnfInFlight.erase(key);
+    // Only successful reductions reach here; if the uncached body threw
+    // (fuel exhaustion, malformed input), the cache stays unpolluted.
+    whnfCache.emplace(std::move(key), result);
+    return result;
+}
+
 namespace {
 
 // Generates a name for an Internal-origin free variable, used by
@@ -967,12 +1186,26 @@ ExpressionPointer deltaReduceLetFreeVariables(ExpressionPointer expression,
     return walk(expression, 0);
 }
 
-bool isDefinitionallyEqual(const Environment& environment,
-                           const Context& context,
-                           ExpressionPointer left,
-                           ExpressionPointer right,
-                           int fuel) {
-    kernelStep("isDefEq", left, right);
+// True if any entry in `context` is a let-style binder (carries a value).
+// Used by the isDefEq cache to skip caching when ζ-reduction makes the
+// answer context-dependent.
+namespace {
+bool contextHasLetBinders(const Context& context) {
+    for (const auto& entry : context) {
+        if (entry.value) return true;
+    }
+    return false;
+}
+
+// Inner implementation. The public wrapper below handles the positive-
+// result cache and the step counter; this function does the actual
+// equality work. Fuel decrement happens here so the cache lookup itself
+// doesn't burn fuel (positive cache hits truly are free).
+bool isDefinitionallyEqualImpl(const Environment& environment,
+                               const Context& context,
+                               ExpressionPointer left,
+                               ExpressionPointer right,
+                               int fuel) {
     if (--fuel <= 0) {
         // Conservative on exhaustion: don't claim equality we can't prove.
         return false;
@@ -1162,6 +1395,61 @@ bool isDefinitionallyEqual(const Environment& environment,
     }
 
     return false;
+}
+
+} // namespace
+
+bool isDefinitionallyEqual(const Environment& environment,
+                           const Context& context,
+                           ExpressionPointer left,
+                           ExpressionPointer right,
+                           int fuel) {
+    ++isDefEqCallCount;
+    kernelStep("isDefEq", left, right);
+    // ζ-reduce let-bound FreeVariables up-front so the cache key is
+    // context-independent. With it inside the body, two calls with the
+    // same expressions but different let-contexts would compute different
+    // answers — but if we substitute the let values into the keys here,
+    // the keys themselves carry the context's relevant content. (For
+    // contexts without let-binders, this is a no-op.)
+    if (kernelCacheEnabled && contextHasLetBinders(context)) {
+        left  = deltaReduceLetFreeVariables(std::move(left),  context);
+        right = deltaReduceLetFreeVariables(std::move(right), context);
+    }
+    // Positive-result cache lookup. We cache only TRUE results (a `false`
+    // may have been a fuel-exhaustion conservative answer; reusing it
+    // elsewhere with more fuel would be unsound).
+    const bool useCache = kernelCacheEnabled;
+    std::pair<ExpressionPointer, ExpressionPointer> cacheKey{left, right};
+    if (useCache) {
+        if (isDefEqTrueCache.find(cacheKey) != isDefEqTrueCache.end()) {
+            ++isDefEqCacheHits;
+            return true;
+        }
+        // Loop detection: re-entering an equality comparison that's
+        // already on the stack means descent didn't make progress. Bail
+        // out with `false`; the outer comparison will then try its other
+        // strategies (η, proof irrelevance) which may still resolve it.
+        if (isDefEqInFlight.find(cacheKey) != isDefEqInFlight.end()) {
+            ++isDefEqLoopsDetected;
+            return false;
+        }
+        ++isDefEqCacheMisses;
+        isDefEqInFlight.insert(cacheKey);
+    }
+    bool answer;
+    try {
+        answer = isDefinitionallyEqualImpl(
+            environment, context, std::move(left), std::move(right), fuel);
+    } catch (...) {
+        if (useCache) isDefEqInFlight.erase(cacheKey);
+        throw;
+    }
+    if (useCache) {
+        isDefEqInFlight.erase(cacheKey);
+        if (answer) isDefEqTrueCache.insert(std::move(cacheKey));
+    }
+    return answer;
 }
 
 bool isSubtype(const Environment& environment,

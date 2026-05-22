@@ -5498,6 +5498,10 @@ int main(int argc, char* argv[]) {
     }
 
     if (argc >= 3 && std::string(argv[1]) == "verify") {
+        // Enable WHNF memoization for the verify command. The test suite
+        // (default argv) doesn't enable it because some integration tests
+        // exercise the unmemoised fuel/throw contract directly.
+        kernelCacheEnabled = true;
         // Two forms:
         //   kernel verify FILE.math FILE.math ...                  (legacy)
         //   kernel verify --source SRC --output OUT.mathv \        (cache form)

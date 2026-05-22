@@ -336,6 +336,20 @@ extern bool kernelProfileEnabled;
 // hides the diverging subterm.
 extern std::size_t kernelDumpWidth;
 
+// When true, weakHeadNormalForm consults and populates a thread-local
+// structural-hash cache. The cache is automatically cleared at every
+// public addAxiom / addDefinition / addInductive boundary (since those
+// mutate the environment that WHNF reads). Default: false — leaves the
+// kernel stateless, important for the test suite which intentionally
+// runs short scenarios that depend on uncached fuel/throw behaviour.
+//
+// Embedders (the `kernel verify` command) should set this to true at
+// startup so the cache covers all kernel calls — both the elaborator's
+// own WHNF/inferType walks and the final addDefinition's body check.
+// On heavy quotient proofs that mention the same subexpression in many
+// positions, this turns O(N^k) work into O(N).
+extern bool kernelCacheEnabled;
+
 // Reduces only the head: enough to see whether the outermost form is a
 // Sort, Pi, Lambda, etc. Unfolds definitions in head position
 // (delta-reduction). Throws TypeError on fuel exhaustion.
