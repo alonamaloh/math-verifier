@@ -5,9 +5,9 @@
 -- is the defining property of Real that distinguishes it from
 -- Rational.
 --
--- The proof is by bisection. Given x₀ ∈ S and upper bound B₀:
+-- The proof is by bisection. Given x0 ∈ S and upper bound B0:
 --   - Build a sequence of nested rational intervals [aₙ, bₙ] with
---     bₙ - aₙ = (B₀ - a₀)/2ⁿ, where:
+--     bₙ - aₙ = (B0 - a0)/2ⁿ, where:
 --       * aₙ is not an upper bound for S (some x ∈ S exceeds it)
 --       * bₙ IS an upper bound for S
 --   - At each step, decide via excluded_middle whether the midpoint
@@ -288,7 +288,7 @@ definition Real.bisectionStep
   }
 
 -- The full bisection sequence: starting from a Rational interval
--- [a₀, b₀] enclosing the bisection setup, generate the nth refined
+-- [a0, b0] enclosing the bisection setup, generate the nth refined
 -- interval by iterating `bisectionStep`.
 definition Real.bisectionIntervals
         (subset : Set(Real)) (initial : Real.BisectionInterval)
@@ -315,14 +315,130 @@ definition Real.bisectionRight
       Real.bisectionIntervals(subset, initial, n))
 
 -- ----------------------------------------------------------------------
--- Headline theorem (stub). The bisection proof uses
--- `exists_rational_below`/`exists_rational_above` to seed the initial
--- rational interval [a₀, b₀] enclosing some chosen x₀ ∈ S and an
--- upper bound B₀ : Real.
+-- Invariants of the bisection sequence. Each step's interval `[aₙ,
+-- bₙ]` satisfies:
+--
+--   I1. `aₙ` is below some element of S (in particular, ≤ x0 ∈ S).
+--   I2. `bₙ` is an upper bound for S.
+--   I3. `bₙ - aₙ = (b0 - a0) / 2ⁿ`.
+--   I4. `|aₘ - aₙ| ≤ (b0 - a0) / 2^min(m, n)` (Cauchy bound).
+--
+-- These are proved by induction on n. Each step's cases on
+-- `Logic.classical_decidable` preserves the invariants in each branch.
+
+-- I1: the lower bound of the bisection interval is below x0 ∈ S.
+-- (This actually says (aₙ : Real) ≤ x0 for the specific x0 we
+-- threaded through `a0`; we keep the statement explicit so the
+-- supremum proof can supply the witness x0 ∈ S.)
+theorem Real.bisectionLeft_below_witness
+        (subset : Set(Real)) (x0 : Real)
+        (initial : Real.BisectionInterval)
+        (initialLeftBelow
+            : (Real.BisectionInterval.left(initial) : Real) ≤ x0)
+        (initialRightAbove
+            : Real.IsUpperBound(
+                  subset,
+                  (Real.BisectionInterval.right(initial) : Real)))
+        (n : Natural)
+        : (Real.bisectionLeft(subset, initial, n) : Real) ≤ x0 :=
+  sorry
+
+-- I2: the upper bound of the bisection interval is an upper bound
+-- for S. Induction on n: the base case is the initial hypothesis;
+-- the step case threads the bisectionStep's `cases` on the classical
+-- decision: the "yes" branch sets right = midpoint, which is exactly
+-- the upper-bound proof we picked that branch by; the "no" branch
+-- preserves right = right(predecessor), which the IH covers.
+theorem Real.bisectionRight_is_upper_bound
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (initialRightAbove
+            : Real.IsUpperBound(
+                  subset,
+                  (Real.BisectionInterval.right(initial) : Real)))
+        (n : Natural)
+        : Real.IsUpperBound(
+              subset,
+              (Real.bisectionRight(subset, initial, n) : Real)) :=
+  sorry
+
+-- I4: the lower-bound sequence is Cauchy at the rational level.
+-- The bound is `|aₘ - aₙ| < ε` once both indices exceed a suitable
+-- N depending on `(b0 - a0)` and ε (geometric series majorant).
+theorem Real.bisectionLeft_is_cauchy
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        : Rational.sequence.IsCauchy(
+              Real.bisectionLeft(subset, initial)) :=
+  sorry
+
+-- The bisection limit. Once the lower-bound sequence is Cauchy, its
+-- Real-level limit is well-defined: package the Cauchy proof and
+-- take the Quotient.mk.
+definition Real.bisectionLimit
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        : Real :=
+  Quotient.mk(
+      CauchyRationalSequence.make(
+          Real.bisectionLeft(subset, initial),
+          Real.bisectionLeft_is_cauchy(subset, initial)))
+
+-- The limit is an upper bound for S. At every n, `bisectionRight(n)`
+-- bounds S from above; the limit `lim aₙ = lim bₙ` is therefore also
+-- an upper bound. Sub-lemma still to prove: limit-of-Cauchy-sequence
+-- is upper bound when each term is.
+theorem Real.bisectionLimit_is_upper_bound
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (initialRightAbove
+            : Real.IsUpperBound(
+                  subset,
+                  (Real.BisectionInterval.right(initial) : Real)))
+        : Real.IsUpperBound(
+              subset,
+              Real.bisectionLimit(subset, initial)) :=
+  sorry
+
+-- The limit is the LEAST upper bound: every other upper bound `B`
+-- satisfies `limit ≤ B`.
+theorem Real.bisectionLimit_is_least
+        (subset : Set(Real)) (x0 : Real)
+        (initial : Real.BisectionInterval)
+        (initialLeftBelow
+            : (Real.BisectionInterval.left(initial) : Real) ≤ x0)
+        (x0InS : x0 ∈ subset)
+        (otherBound : Real)
+        (otherIsUpper : Real.IsUpperBound(subset, otherBound))
+        : Real.bisectionLimit(subset, initial) ≤ otherBound :=
+  sorry
+
+-- ----------------------------------------------------------------------
+-- Headline theorem.
 
 theorem Real.supremum_exists
         (subset : Set(Real))
         (nonempty : Set.IsNonempty(Real, subset))
         (bounded : Real.IsBoundedAbove(subset))
-        : ∃ (s : Real). Real.IsSupremum(subset, s) :=
-  sorry
+        : ∃ (s : Real). Real.IsSupremum(subset, s) := {
+  obtain ⟨x0, x0InS⟩ from nonempty;
+  obtain ⟨B0real, B0IsUpper⟩ from bounded;
+  obtain ⟨a0, a0LeqX0⟩ from Real.exists_rational_below(x0);
+  obtain ⟨b0, B0LeqB0⟩ from Real.exists_rational_above(B0real);
+  let initial : Real.BisectionInterval :=
+      Real.BisectionInterval.make(a0, b0);
+  -- b0 is an upper bound for S: for any y ∈ S, y ≤ B0real ≤ (b0 : Real).
+  claim b0IsUpper
+        : Real.IsUpperBound(subset, (b0 : Real))
+    by function (y : Real) (yInS : y ∈ subset) =>
+         Real.LessOrEqual.transitive(
+             y, B0real, (b0 : Real),
+             B0IsUpper(y, yInS), B0LeqB0);
+  let supValue : Real := Real.bisectionLimit(subset, initial);
+  witness supValue with
+      And.introduction(
+          -- supValue is an upper bound.
+          Real.bisectionLimit_is_upper_bound(subset, initial, b0IsUpper),
+          -- supValue is the least: for any other upper bound `B`, supValue ≤ B.
+          function (otherBound : Real)
+                   (otherIsUpper : Real.IsUpperBound(subset, otherBound)) =>
+            Real.bisectionLimit_is_least(
+                subset, x0, initial, a0LeqX0, x0InS,
+                otherBound, otherIsUpper))
+}
