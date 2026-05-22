@@ -262,17 +262,26 @@ definition Real.BisectionInterval.right
         : Real.BisectionInterval → Rational
   | Real.BisectionInterval.make(_, b) => b
 
--- One bisection step. Classical: split at the midpoint and pick the
--- half consistent with the running invariants.
-definition Real.bisectionStep
+-- One bisection step PARAMETRIZED by the decidability. Splitting
+-- this out from the axiom application lets later proofs case-analyze
+-- on the same decidability variable they need to reduce — when the
+-- decision is in constructor form (Decidable.yes / Decidable.no),
+-- the body's `cases` ι-reduces and the kernel sees `right(step(yes
+-- midIsUpper)) ≡ midpoint`. Without this split, the kernel can't
+-- unify the proof's case-analysis with the one buried inside
+-- `bisectionStep`'s body (both on the opaque axiom result).
+definition Real.bisectionStepWithDec
         (subset : Set(Real)) (state : Real.BisectionInterval)
+        (decision
+            : Logic.Decidable(
+                  Real.IsUpperBound(
+                      subset,
+                      (Rational.halve(
+                           Real.BisectionInterval.left(state)
+                           + Real.BisectionInterval.right(state))
+                       : Real))))
         : Real.BisectionInterval :=
-  cases Logic.classical_decidable(
-            Real.IsUpperBound(
-                subset,
-                (Rational.halve(
-                     Real.BisectionInterval.left(state)
-                     + Real.BisectionInterval.right(state)) : Real))) {
+  cases decision {
     | Logic.Decidable.yes(_) =>
         Real.BisectionInterval.make(
             Real.BisectionInterval.left(state),
@@ -286,6 +295,20 @@ definition Real.bisectionStep
                 + Real.BisectionInterval.right(state)),
             Real.BisectionInterval.right(state))
   }
+
+-- One bisection step. Classical: split at the midpoint and pick the
+-- half consistent with the running invariants.
+definition Real.bisectionStep
+        (subset : Set(Real)) (state : Real.BisectionInterval)
+        : Real.BisectionInterval :=
+  Real.bisectionStepWithDec(
+      subset, state,
+      Logic.classical_decidable(
+          Real.IsUpperBound(
+              subset,
+              (Rational.halve(
+                   Real.BisectionInterval.left(state)
+                   + Real.BisectionInterval.right(state)) : Real))))
 
 -- The full bisection sequence: starting from a Rational interval
 -- [a0, b0] enclosing the bisection setup, generate the nth refined
@@ -349,6 +372,17 @@ theorem Real.bisectionLeft_below_witness
 -- decision: the "yes" branch sets right = midpoint, which is exactly
 -- the upper-bound proof we picked that branch by; the "no" branch
 -- preserves right = right(predecessor), which the IH covers.
+-- The `cases X with decisionEq` form retains the equation
+-- `classical_decidable(...) = Decidable.yes(midIsUpper)` (or `no`)
+-- in each branch. The motive needs to thread the decision variable
+-- through `bisectionStepWithDec` so the goal reduces in each branch.
+-- An earlier attempt via explicit `Equality.transport_proposition`
+-- with the motive `λd. IsUpperBound(s, right(stepWithDec(s, prev, d)))`
+-- caused kernel type-checking to run unboundedly long (got cut off
+-- after 20+ minutes) — likely the universe inference or normalization
+-- of the deeply-nested motive expression. Marked sorry pending
+-- investigation; the proof IS structurally what the comment
+-- describes.
 theorem Real.bisectionRight_is_upper_bound
         (subset : Set(Real)) (initial : Real.BisectionInterval)
         (initialRightAbove
