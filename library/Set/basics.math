@@ -1,0 +1,48 @@
+-- Set/basics.math
+--
+-- A set over a type T is a predicate `T → Proposition`. Members of
+-- the set are exactly the elements satisfying the predicate.
+--
+-- Operators `∈` (membership) and `⊆` (subset) are registered against
+-- `Set` so call sites read as math: `x ∈ S`, `A ⊆ B`. The operator
+-- registry uses wildcard `_` for the LHS of `∈` since membership
+-- carriers are arbitrary.
+
+module Set.basics
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+
+definition Set (T : Type(0)) : Type(1) :=
+  T → Proposition
+
+-- Membership. The `{T}` implicit is inferred from `subject` at call
+-- sites; the operator dispatch infers it the same way.
+definition Set.member {T : Type(0)} (subject : T) (subset : Set(T))
+        : Proposition :=
+  subset(subject)
+
+operator (∈) on (_, Set) := Set.member
+
+definition Set.subset {T : Type(0)} (smaller larger : Set(T))
+        : Proposition :=
+  (subject : T) → subject ∈ smaller → subject ∈ larger
+
+operator (⊆) on (Set, Set) := Set.subset
+
+definition Set.IsNonempty {T : Type(0)} (subset : Set(T))
+        : Proposition :=
+  ∃ (subject : T). subject ∈ subset
+
+theorem Set.subset.reflexive {T : Type(0)} (subset : Set(T))
+        : subset ⊆ subset :=
+  function (subject : T) (memberInSubset : subject ∈ subset) =>
+    memberInSubset
+
+theorem Set.subset.transitive
+        {T : Type(0)} (a b c : Set(T))
+        (aSubB : a ⊆ b) (bSubC : b ⊆ c)
+        : a ⊆ c :=
+  function (subject : T) (memberInA : subject ∈ a) =>
+    bSubC(subject, aSubB(subject, memberInA))

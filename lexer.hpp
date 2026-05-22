@@ -68,6 +68,8 @@ enum class TokenKind {
     Divides,         // "∣" (divides relation on Naturals)
     NotDivides,      // "∤" (negated divides)
     NotLessOrEqual,  // "≰" (negated ≤)
+    ElementOf,       // "∈" (set membership)
+    SubsetOf,        // "⊆" (subset)
     ForAll,          // "∀" (universal-quantifier prefix)
     Exists,          // "∃" (existential-quantifier prefix)
     Arrow,           // "→" or "->"

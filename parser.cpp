@@ -72,6 +72,8 @@ bool isOperatorSymbolToken(TokenKind kind) {
         case TokenKind::Divides:
         case TokenKind::NotDivides:
         case TokenKind::NotLessOrEqual:
+        case TokenKind::ElementOf:
+        case TokenKind::SubsetOf:
             return true;
         default:
             return false;
@@ -1374,7 +1376,9 @@ private:
             || kind == TokenKind::Greater || kind == TokenKind::GreaterOrEqual
             || kind == TokenKind::Divides
             || kind == TokenKind::NotDivides
-            || kind == TokenKind::NotLessOrEqual;
+            || kind == TokenKind::NotLessOrEqual
+            || kind == TokenKind::ElementOf
+            || kind == TokenKind::SubsetOf;
     }
 
     SurfaceExpressionPointer parseRelational() {
@@ -1394,6 +1398,8 @@ private:
                 case TokenKind::Divides:        sym = "∣"; break;
                 case TokenKind::NotDivides:     sym = "∤"; break;
                 case TokenKind::NotLessOrEqual: sym = "≰"; break;
+                case TokenKind::ElementOf:      sym = "∈"; break;
+                case TokenKind::SubsetOf:       sym = "⊆"; break;
                 default: break;
             }
             left = makeSurfaceBinaryOperation(sym, std::move(left),

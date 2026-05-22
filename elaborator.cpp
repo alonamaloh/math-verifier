@@ -465,7 +465,11 @@ private:
     // declaration. The function `F` must exist in scope and have type
     // `T1 → T2 → R` for some result type `R`. `T1` and `T2` must each
     // be the head Constant of a known type (axiomatic or via inductive/
-    // definition).
+    // definition), or the wildcard `_` when the slot's type is generic
+    // (e.g. the LHS of `∈ : T → Set(T) → Prop` for any carrier T).
+    // When a side is `_`, the head check is skipped — at dispatch time,
+    // the lookup falls back to `(sym, _, RightType)` / `(sym, LeftType,
+    // _)` / `(sym, _, _)` if no exact match is found.
     void elaborateOperatorDeclaration(
         const SurfaceOperatorDeclaration& declaration) {
         Frame frame(*this,
@@ -479,10 +483,23 @@ private:
                 "operator dispatch function '"
                 + declaration.functionName + "' is not in scope");
         }
-        // Pull the function's type and verify it's T1 → T2 → R.
+        // Pull the function's type and verify it's T1 → T2 → R. Peel
+        // any leading implicit Pi binders first (declared via `{x : T}`)
+        // so the validation sees the explicit operand slots. Wildcard
+        // sides (`_`) match anything.
         ExpressionPointer functionType = declarationType(*functionDecl);
         ExpressionPointer cursor = weakHeadNormalForm(
             environment_, functionType);
+        bool leftWildcard = (declaration.leftTypeName == "_");
+        bool rightWildcard = (declaration.rightTypeName == "_");
+        int declaredImplicitCount =
+            environment_.implicitArgumentCount(declaration.functionName);
+        for (int i = 0; i < declaredImplicitCount; ++i) {
+            auto* implicitPi = std::get_if<Pi>(&cursor->node);
+            if (!implicitPi) break;
+            cursor = weakHeadNormalForm(
+                environment_, implicitPi->codomain);
+        }
         auto* leftPi = std::get_if<Pi>(&cursor->node);
         if (!leftPi) {
             throwElaborate(
@@ -490,7 +507,8 @@ private:
                 + declaration.functionName
                 + "' must take at least two arguments");
         }
-        if (!typeHasHeadName(leftPi->domain, declaration.leftTypeName)) {
+        if (!leftWildcard
+            && !typeHasHeadName(leftPi->domain, declaration.leftTypeName)) {
             throwElaborate(
                 "operator dispatch function '"
                 + declaration.functionName
@@ -506,7 +524,8 @@ private:
                 + declaration.functionName
                 + "' must take at least two arguments");
         }
-        if (!typeHasHeadName(rightPi->domain, declaration.rightTypeName)) {
+        if (!rightWildcard
+            && !typeHasHeadName(rightPi->domain, declaration.rightTypeName)) {
             throwElaborate(
                 "operator dispatch function '"
                 + declaration.functionName
@@ -13312,38 +13331,20 @@ private:
         ExpressionPointer rightKernel =
             elaborateExpression(rightSurface, localBinders,
                                  leftTypeClosed);
-        auto* leftTypeConstantRaw =
-            std::get_if<Constant>(&leftTypeRaw->node);
-        std::string operandTypeName;
-        if (leftTypeConstantRaw) {
-            operandTypeName = leftTypeConstantRaw->name;
-        } else {
-            ExpressionPointer leftType =
-                weakHeadNormalForm(environment_, leftTypeRaw);
-            auto* leftTypeConstant =
-                std::get_if<Constant>(&leftType->node);
-            operandTypeName =
-                leftTypeConstant ? leftTypeConstant->name : "<unknown>";
-        }
+        // Use `headConstantName` to extract the type head — peels through
+        // Applications so parameterised types like `Set(T)` report `Set`
+        // and `Quotient(IR, IE)` reports `Quotient`. Falls back to WHNF
+        // for definitional aliases whose RHS exposes a different head.
+        std::string operandTypeName = headConstantName(leftTypeRaw);
         std::string targetFunction;
         // First consult the user-declared registry: any
         // `operator (sym) on (T1, T2) := F;` registration wins. This is
         // the extensible path — Rational, Real, Complex, polynomial
-        // rings, etc. all hook in here.
-        std::string rightTypeName;
+        // rings, etc. all hook in here. Wildcard `_` registrations
+        // (e.g. `∈` on `(_, Set)`) match any LHS or RHS type.
         ExpressionPointer rightTypeRaw =
             inferTypeInLocalContext(localBinders, rightKernel);
-        if (auto* rightTypeConstantRaw =
-                std::get_if<Constant>(&rightTypeRaw->node)) {
-            rightTypeName = rightTypeConstantRaw->name;
-        } else {
-            ExpressionPointer rightType =
-                weakHeadNormalForm(environment_, rightTypeRaw);
-            auto* rightTypeConstant =
-                std::get_if<Constant>(&rightType->node);
-            rightTypeName =
-                rightTypeConstant ? rightTypeConstant->name : "<unknown>";
-        }
+        std::string rightTypeName = headConstantName(rightTypeRaw);
         std::string registered = environment_.lookupOperator(
             operatorSymbol, operandTypeName, rightTypeName);
         if (!registered.empty()) {
@@ -13423,6 +13424,30 @@ private:
                 makeConstant("successor"), std::move(leftKernel));
         }
         ExpressionPointer call = makeConstant(targetFunction);
+        // Fill any leading implicit binders the dispatch function may
+        // have. Two patterns are handled:
+        //   (a) `Set.member {T : Type(0)} (x : T) (S : Set(T))` —
+        //       the implicit carrier is the LEFT operand's type T.
+        //   (b) `Set.subset {T : Type(0)} (A : Set(T)) (B : Set(T))` —
+        //       the implicit carrier is the *parameter* of the LEFT
+        //       operand's type `Set(T)`, not `Set(T)` itself.
+        // We pick (b) when leftTypeClosed has shape Application(_, _)
+        // (a parameterised type) and (a) otherwise. Works for the
+        // common cases; an operator with a wholly different implicit
+        // shape would need explicit-arg dispatch via a wrapper.
+        int implicitCount =
+            environment_.implicitArgumentCount(targetFunction);
+        if (implicitCount > 0) {
+            ExpressionPointer implicitFiller = leftTypeClosed;
+            auto* leftTypeApp =
+                std::get_if<Application>(&leftTypeClosed->node);
+            if (leftTypeApp) {
+                implicitFiller = leftTypeApp->argument;
+            }
+            for (int i = 0; i < implicitCount; ++i) {
+                call = makeApplication(std::move(call), implicitFiller);
+            }
+        }
         call = makeApplication(std::move(call), std::move(leftKernel));
         call = makeApplication(std::move(call), std::move(rightKernel));
         return call;

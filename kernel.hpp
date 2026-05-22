@@ -126,16 +126,30 @@ struct Environment {
     }
 
     // Look up a registered operator-dispatch target. Returns the
-    // function name on success, empty string if no registration exists
-    // for that (operator, leftType, rightType) triple.
+    // function name on success, empty string if no registration exists.
+    // Tries the exact (leftType, rightType) match first; falls back to
+    // wildcard `_` registrations in priority order: (left, _), (_,
+    // right), (_, _). This lets polymorphic operators like `∈` (where
+    // the carrier on the LHS is arbitrary) register once with `_` and
+    // dispatch on any concrete LHS type.
     std::string lookupOperator(
         const std::string& operatorSymbol,
         const std::string& leftTypeName,
         const std::string& rightTypeName) const {
-        auto iterator = operatorRegistry.find(
-            std::make_tuple(operatorSymbol, leftTypeName, rightTypeName));
-        return iterator == operatorRegistry.end()
-            ? std::string{} : iterator->second;
+        auto tryKey =
+            [&](const std::string& l, const std::string& r) -> std::string {
+                auto iterator = operatorRegistry.find(
+                    std::make_tuple(operatorSymbol, l, r));
+                return iterator == operatorRegistry.end()
+                    ? std::string{} : iterator->second;
+            };
+        std::string result = tryKey(leftTypeName, rightTypeName);
+        if (!result.empty()) return result;
+        result = tryKey(leftTypeName, "_");
+        if (!result.empty()) return result;
+        result = tryKey("_", rightTypeName);
+        if (!result.empty()) return result;
+        return tryKey("_", "_");
     }
 
     // Look up the list of fully-qualified function names registered
