@@ -39,6 +39,9 @@ import Rational.order
 import Rational.absolute_value
 import Rational.halve
 import Rational.positive
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.linearity
 import Real.sequence
 import Real.basics
 import Real.embedding
@@ -1600,6 +1603,22 @@ theorem Rational.successor_cast (n : Natural)
         : (successor(n) : Rational) = Rational.one + (n : Rational) :=
   Integer.to_rational.add_preserves(Integer.one, (n : Integer))
 
+-- 0 < (successor(n) : Rational). 0 < 1 (strict) ≤ 1 + (n : R) = succ(n).
+theorem Rational.successor_cast_positive (n : Natural)
+        : Rational.zero < (successor(n) : Rational) :=
+  Rational.LessThan.transitive_right(
+      Rational.zero, Rational.one, (successor(n) : Rational),
+      Rational.zero_less_one,
+      rewrite(
+          Equality.symmetry(Rational.successor_cast(n)),
+          rewrite(
+              (ring : Rational.one + Rational.zero = Rational.one),
+              Rational.add_general_LessOrEqual_left(
+                  Rational.one, Rational.zero, (n : Rational),
+                  Rational.LessOrEqual_zero_of_IsNonneg(
+                      (n : Rational),
+                      Rational.from_natural_IsNonneg(n))))))
+
 -- (successor(successor(n)) : Rational) = Rational.one + Rational.one
 -- + (n : Rational). Two applications of add_preserves, bridging
 -- (Integer.one + Integer.one + (n : Integer)) up to Rational.
@@ -1778,45 +1797,706 @@ theorem Real.bisectionWidth_times_succ_le_initial
           IH)
   }
 
+-- ----------------------------------------------------------------------
+-- Natural helper: from `smaller ≤ larger`, extract the difference.
+-- Induct on the proof: reflexivity gives k = 0, step prepends a
+-- successor.
+
+theorem Natural.le_to_add (smaller larger : Natural)
+        : smaller ≤ larger
+          → ∃ (k : Natural). larger = k + smaller
+  | LessOrEqual.reflexivity(commonValue) =>
+      witness 0 with reflexivity(Natural, commonValue)
+  | LessOrEqual.step(_, largerPredecessor, subProof) => {
+      obtain ⟨k', preEq⟩
+          from Natural.le_to_add(smaller, largerPredecessor, subProof);
+      witness successor(k') with
+          congruenceOf(successor, preEq)
+  }
+
+-- Multi-step monotone at ≤: lift bisectionLeft_le_subsequent and the
+-- right/cross variants from "k + N" to "any m ≥ N" via le_to_add.
+
+theorem Real.bisectionLeft_le_at_le
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (initialLeftLeqRight
+            : Real.BisectionInterval.left(initial)
+              ≤ Real.BisectionInterval.right(initial))
+        (N m : Natural) (NLeqM : N ≤ m)
+        : Real.bisectionLeft(subset, initial, N)
+          ≤ Real.bisectionLeft(subset, initial, m) := {
+  obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
+  Equality.transport_proposition(
+      function (z : Natural) =>
+          Real.bisectionLeft(subset, initial, N)
+          ≤ Real.bisectionLeft(subset, initial, z),
+      k + N, m,
+      Equality.symmetry(mEq),
+      Real.bisectionLeft_le_subsequent(
+          subset, initial, initialLeftLeqRight, k, N))
+}
+
+theorem Real.bisectionRight_le_at_le
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (initialLeftLeqRight
+            : Real.BisectionInterval.left(initial)
+              ≤ Real.BisectionInterval.right(initial))
+        (N m : Natural) (NLeqM : N ≤ m)
+        : Real.bisectionRight(subset, initial, m)
+          ≤ Real.bisectionRight(subset, initial, N) := {
+  obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
+  Equality.transport_proposition(
+      function (z : Natural) =>
+          Real.bisectionRight(subset, initial, z)
+          ≤ Real.bisectionRight(subset, initial, N),
+      k + N, m,
+      Equality.symmetry(mEq),
+      Real.bisectionRight_le_predecessor(
+          subset, initial, initialLeftLeqRight, k, N))
+}
+
+theorem Real.bisectionLeft_le_bisectionRight_at_le
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (initialLeftLeqRight
+            : Real.BisectionInterval.left(initial)
+              ≤ Real.BisectionInterval.right(initial))
+        (N m : Natural) (NLeqM : N ≤ m)
+        : Real.bisectionLeft(subset, initial, m)
+          ≤ Real.bisectionRight(subset, initial, N) := {
+  obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
+  Equality.transport_proposition(
+      function (z : Natural) =>
+          Real.bisectionLeft(subset, initial, z)
+          ≤ Real.bisectionRight(subset, initial, N),
+      k + N, m,
+      Equality.symmetry(mEq),
+      Real.bisectionLeft_le_bisectionRight_predecessor(
+          subset, initial, initialLeftLeqRight, k, N))
+}
+
+-- x * 0 = 0. Standard: x*0 + x*0 = x*(0+0) = x*0, so add-cancel
+-- against x*0 gives x*0 = 0.
+theorem Rational.multiply_zero_right (x : Rational)
+        : x * Rational.zero = Rational.zero := {
+  claim doubled
+        : x * Rational.zero + x * Rational.zero
+          = Rational.zero + x * Rational.zero
+    by calc x * Rational.zero + x * Rational.zero
+          = x * (Rational.zero + Rational.zero)
+              by Equality.symmetry(
+                     Rational.distributivity_left(
+                         x, Rational.zero, Rational.zero))
+          = x * Rational.zero
+              by congruenceOf(
+                     function (z : Rational) => x * z,
+                     Rational.add_zero(Rational.zero))
+          = Rational.zero + x * Rational.zero
+              by Equality.symmetry(
+                     Rational.zero_add(x * Rational.zero));
+  Rational.add_cancel_right(
+      x * Rational.zero, Rational.zero, x * Rational.zero, doubled)
+}
+
+-- ----------------------------------------------------------------------
+-- Reciprocal positivity: 0 < x → 0 < reciprocal_function(x).
+-- Standard contradiction: if recip ≤ 0 then x * recip ≤ 0; if
+-- recip = 0 then x * recip = 0. Either contradicts x * recip = 1 > 0.
+
+theorem Rational.reciprocal_function_positive_of_positive
+        (x : Rational) (xPositive : Rational.zero < x)
+        : Rational.zero < Rational.reciprocal_function(x) := {
+  claim xNonzero : ¬(x = Rational.zero)
+    by function (xEqZero : x = Rational.zero) =>
+         Rational.LessThan.distinct(Rational.zero, x, xPositive,
+             Equality.symmetry(xEqZero));
+  claim xRecipEqOne
+        : x * Rational.reciprocal_function(x) = Rational.one
+    by Rational.reciprocal_function_multiplies(x, xNonzero);
+  claim xNonneg : Rational.IsNonneg(x)
+    by Rational.IsNonneg_of_LessOrEqual_zero(x,
+           Rational.LessThan.weaken(Rational.zero, x, xPositive));
+  cases Rational.LessOrEqual.linear(
+            Rational.reciprocal_function(x), Rational.zero) {
+    | Or.introduceLeft(recipLeqZero) => {
+        -- recip ≤ 0: derive x*recip ≤ 0, contradicting x*recip = 1.
+        claim negZeroEqZero : -Rational.zero = Rational.zero
+          by calc -Rational.zero
+                = Rational.zero + -Rational.zero
+                    by Equality.symmetry(
+                           Rational.zero_add(-Rational.zero))
+                = Rational.zero
+                    by Rational.add_negate_right(Rational.zero);
+        claim zeroLeqNegRecip
+              : Rational.zero ≤ -Rational.reciprocal_function(x)
+          by rewrite(
+                 negZeroEqZero,
+                 Rational.LessOrEqual.negate(
+                     Rational.reciprocal_function(x), Rational.zero,
+                     recipLeqZero));
+        claim negRecipNonneg
+              : Rational.IsNonneg(-Rational.reciprocal_function(x))
+          by Rational.IsNonneg_of_LessOrEqual_zero(
+                 -Rational.reciprocal_function(x), zeroLeqNegRecip);
+        claim productNonneg
+              : Rational.IsNonneg(x * -Rational.reciprocal_function(x))
+          by Rational.IsNonneg.multiply(
+                 x, -Rational.reciprocal_function(x),
+                 xNonneg, negRecipNonneg);
+        claim negProductNonneg
+              : Rational.IsNonneg(-(x * Rational.reciprocal_function(x)))
+          by rewrite(
+                 (ring : x * -Rational.reciprocal_function(x)
+                         = -(x * Rational.reciprocal_function(x))),
+                 productNonneg);
+        claim productLeqZero
+              : x * Rational.reciprocal_function(x) ≤ Rational.zero
+          by Rational.LessOrEqual_zero_of_negate_IsNonneg(
+                 x * Rational.reciprocal_function(x), negProductNonneg);
+        claim oneLeqZero : Rational.one ≤ Rational.zero
+          by rewrite(xRecipEqOne, productLeqZero);
+        claim zeroEqOne : Rational.zero = Rational.one
+          by Rational.LessOrEqual.antisymmetric(
+                 Rational.zero, Rational.one,
+                 Rational.LessThan.weaken(Rational.zero, Rational.one,
+                     Rational.zero_less_one),
+                 oneLeqZero);
+        False.eliminate_proposition(
+            Rational.zero < Rational.reciprocal_function(x),
+            Rational.LessThan.distinct(
+                Rational.zero, Rational.one, Rational.zero_less_one,
+                zeroEqOne))
+      }
+    | Or.introduceRight(zeroLeqRecip) =>
+        cases Logic.excluded_middle(
+                  Rational.zero = Rational.reciprocal_function(x)) {
+          | Or.introduceLeft(zeroEqRecip) => {
+              -- recip = 0: x*recip = x*0 = 0 ≠ 1.
+              claim xTimesZeroEqOne : x * Rational.zero = Rational.one
+                by rewrite(
+                       Equality.symmetry(zeroEqRecip),
+                       xRecipEqOne);
+              claim zeroEqOne : Rational.zero = Rational.one
+                by calc Rational.zero
+                      = x * Rational.zero
+                          by Equality.symmetry(
+                                 Rational.multiply_zero_right(x))
+                      = Rational.one
+                          by xTimesZeroEqOne;
+              False.eliminate_proposition(
+                  Rational.zero < Rational.reciprocal_function(x),
+                  Rational.LessThan.distinct(
+                      Rational.zero, Rational.one,
+                      Rational.zero_less_one,
+                      zeroEqOne))
+            }
+          | Or.introduceRight(zeroNotEqRecip) =>
+              And.introduction(zeroLeqRecip, zeroNotEqRecip)
+        }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Archimedean property for two positives: given 0 ≤ c and 0 < ε, find
+-- K with c ≤ (succ(K) : R) * ε. Apply the standard Archimedean lemma
+-- to c * reciprocal(ε), which is nonneg, then multiply both sides by ε.
+
+theorem Rational.archimedean_for_positives
+        (c epsilon : Rational)
+        (cNonneg : Rational.IsNonneg(c))
+        (epsilonPositive : Rational.zero < epsilon)
+        : ∃ (K : Natural). c ≤ (successor(K) : Rational) * epsilon := {
+  claim recipPositive
+        : Rational.zero < Rational.reciprocal_function(epsilon)
+    by Rational.reciprocal_function_positive_of_positive(
+           epsilon, epsilonPositive);
+  claim recipNonneg
+        : Rational.IsNonneg(Rational.reciprocal_function(epsilon))
+    by Rational.IsNonneg_of_LessOrEqual_zero(
+           Rational.reciprocal_function(epsilon),
+           Rational.LessThan.weaken(Rational.zero,
+               Rational.reciprocal_function(epsilon),
+               recipPositive));
+  claim productNonneg
+        : Rational.IsNonneg(c * Rational.reciprocal_function(epsilon))
+    by Rational.IsNonneg.multiply(
+           c, Rational.reciprocal_function(epsilon),
+           cNonneg, recipNonneg);
+  claim absEqSelf
+        : Rational.absolute_value(c * Rational.reciprocal_function(epsilon))
+          = c * Rational.reciprocal_function(epsilon)
+    by Rational.absolute_value_when_nonneg(
+           c * Rational.reciprocal_function(epsilon), productNonneg);
+  obtain ⟨K, absBound⟩
+      from Rational.absolute_value_le_succ_natural(
+               c * Rational.reciprocal_function(epsilon));
+  claim productLeqSucc
+        : c * Rational.reciprocal_function(epsilon)
+          ≤ (successor(K) : Rational)
+    by rewrite(absEqSelf, absBound);
+  claim epsilonNonneg
+        : Rational.LessOrEqual(Rational.zero, epsilon)
+    by Rational.LessThan.weaken(Rational.zero, epsilon, epsilonPositive);
+  claim multipliedBound
+        : (c * Rational.reciprocal_function(epsilon)) * epsilon
+          ≤ (successor(K) : Rational) * epsilon
+    by Rational.LessOrEqual.multiply_by_nonneg_right(
+           c * Rational.reciprocal_function(epsilon),
+           (successor(K) : Rational),
+           epsilon,
+           productLeqSucc,
+           epsilonNonneg);
+  claim epsilonNonzero : ¬(epsilon = Rational.zero)
+    by function (epsilonEqZero : epsilon = Rational.zero) =>
+         Rational.LessThan.distinct(Rational.zero, epsilon,
+             epsilonPositive, Equality.symmetry(epsilonEqZero));
+  claim recipTimesEpsilon
+        : epsilon * Rational.reciprocal_function(epsilon) = Rational.one
+    by Rational.reciprocal_function_multiplies(epsilon, epsilonNonzero);
+  claim lhsSimplify
+        : (c * Rational.reciprocal_function(epsilon)) * epsilon = c
+    by calc (c * Rational.reciprocal_function(epsilon)) * epsilon
+          = c * (Rational.reciprocal_function(epsilon) * epsilon)
+              by Rational.multiply_associative(
+                     c, Rational.reciprocal_function(epsilon), epsilon)
+          = c * (epsilon * Rational.reciprocal_function(epsilon))
+              by congruenceOf(
+                     function (z : Rational) => c * z,
+                     Rational.multiply_commutative(
+                         Rational.reciprocal_function(epsilon), epsilon))
+          = c * Rational.one
+              by congruenceOf(
+                     function (z : Rational) => c * z,
+                     recipTimesEpsilon)
+          = c
+              by Rational.multiply_one(c);
+  witness K with
+      rewrite(lhsSimplify, multipliedBound)
+}
+
+-- ----------------------------------------------------------------------
+-- Strict multiplicative cancellation: from a * c < b * c and 0 < c,
+-- conclude a < b.
+
+theorem Rational.LessThan.multiply_cancel_right_positive
+        (a b c : Rational)
+        (cPositive : Rational.zero < c)
+        (productLessThan : a * c < b * c)
+        : a < b := {
+  cases Rational.LessOrEqual.linear(a, b) {
+    | Or.introduceLeft(aLeqB) =>
+        cases Logic.excluded_middle(a = b) {
+          | Or.introduceLeft(aEqB) => {
+              claim productsEqual : a * c = b * c
+                by congruenceOf(
+                       function (z : Rational) => z * c, aEqB);
+              False.eliminate_proposition(
+                  a < b,
+                  Rational.LessThan.distinct(
+                      a * c, b * c, productLessThan, productsEqual))
+            }
+          | Or.introduceRight(aNotEqB) =>
+              And.introduction(aLeqB, aNotEqB)
+        }
+    | Or.introduceRight(bLeqA) => {
+        claim cNonneg : Rational.LessOrEqual(Rational.zero, c)
+          by Rational.LessThan.weaken(Rational.zero, c, cPositive);
+        claim reversedProduct : b * c ≤ a * c
+          by Rational.LessOrEqual.multiply_by_nonneg_right(
+                 b, a, c, bLeqA, cNonneg);
+        claim productsEqual : a * c = b * c
+          by Rational.LessOrEqual.antisymmetric(
+                 a * c, b * c,
+                 Rational.LessThan.weaken(a * c, b * c, productLessThan),
+                 reversedProduct);
+        False.eliminate_proposition(
+            a < b,
+            Rational.LessThan.distinct(
+                a * c, b * c, productLessThan, productsEqual))
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Strict step: succ(K) * ε < succ(succ(K)) * ε for 0 < ε.
+
+theorem Rational.succ_K_strictly_less_succ_succ_K_times_epsilon
+        (K : Natural) (epsilon : Rational)
+        (epsilonPositive : Rational.zero < epsilon)
+        : (successor(K) : Rational) * epsilon
+          < (successor(successor(K)) : Rational) * epsilon := {
+  claim castEquation
+        : (successor(successor(K)) : Rational)
+          = Rational.one + (successor(K) : Rational)
+    by Rational.successor_cast(successor(K));
+  claim productExpansion
+        : (successor(successor(K)) : Rational) * epsilon
+          = epsilon + (successor(K) : Rational) * epsilon
+    by calc (successor(successor(K)) : Rational) * epsilon
+          = (Rational.one + (successor(K) : Rational)) * epsilon
+              by congruenceOf(
+                     function (z : Rational) => z * epsilon,
+                     castEquation)
+          = Rational.one * epsilon
+            + (successor(K) : Rational) * epsilon
+              by Rational.distributivity_right(
+                     Rational.one, (successor(K) : Rational), epsilon)
+          = epsilon + (successor(K) : Rational) * epsilon
+              by congruenceOf(
+                     function (z : Rational) =>
+                         z + (successor(K) : Rational) * epsilon,
+                     Rational.one_multiply(epsilon));
+  claim shiftedBound
+        : (successor(K) : Rational) * epsilon
+          < (successor(K) : Rational) * epsilon + epsilon
+    by rewrite(
+           Rational.add_zero((successor(K) : Rational) * epsilon),
+           Rational.add_left_preserves_LessThan(
+               Rational.zero, epsilon,
+               (successor(K) : Rational) * epsilon,
+               epsilonPositive));
+  Equality.transport_proposition(
+      function (z : Rational) =>
+          (successor(K) : Rational) * epsilon < z,
+      (successor(K) : Rational) * epsilon + epsilon,
+      (successor(successor(K)) : Rational) * epsilon,
+      calc (successor(K) : Rational) * epsilon + epsilon
+         = epsilon + (successor(K) : Rational) * epsilon
+             by Rational.add_commutative(
+                    (successor(K) : Rational) * epsilon, epsilon)
+         = (successor(successor(K)) : Rational) * epsilon
+             by Equality.symmetry(productExpansion),
+      shiftedBound)
+}
+
+-- ----------------------------------------------------------------------
+-- Cauchy modulus: ∀ ε > 0. ∃ N. bisectionWidth(initial, N) < ε.
+
+theorem Real.exists_bisectionWidth_below
+        (initial : Real.BisectionInterval)
+        (initialWidthNonneg
+            : Rational.IsNonneg(
+                  Real.BisectionInterval.right(initial)
+                  - Real.BisectionInterval.left(initial)))
+        (epsilon : Rational)
+        (epsilonPositive : Rational.zero < epsilon)
+        : ∃ (N : Natural).
+              Real.bisectionWidth(initial, N) < epsilon := {
+  obtain ⟨K, archBound⟩
+      from Rational.archimedean_for_positives(
+               Real.BisectionInterval.right(initial)
+               - Real.BisectionInterval.left(initial),
+               epsilon, initialWidthNonneg, epsilonPositive);
+  claim widthTimesSuccLeq
+        : Real.bisectionWidth(initial, successor(K))
+            * (successor(successor(K)) : Rational)
+          ≤ Real.BisectionInterval.right(initial)
+            - Real.BisectionInterval.left(initial)
+    by Real.bisectionWidth_times_succ_le_initial(
+           initial, initialWidthNonneg, successor(K));
+  claim chained
+        : Real.bisectionWidth(initial, successor(K))
+            * (successor(successor(K)) : Rational)
+          ≤ (successor(K) : Rational) * epsilon
+    by Rational.LessOrEqual.transitive(
+           Real.bisectionWidth(initial, successor(K))
+               * (successor(successor(K)) : Rational),
+           Real.BisectionInterval.right(initial)
+               - Real.BisectionInterval.left(initial),
+           (successor(K) : Rational) * epsilon,
+           widthTimesSuccLeq, archBound);
+  claim strictStep
+        : (successor(K) : Rational) * epsilon
+          < (successor(successor(K)) : Rational) * epsilon
+    by Rational.succ_K_strictly_less_succ_succ_K_times_epsilon(
+           K, epsilon, epsilonPositive);
+  claim widthProductStrict
+        : Real.bisectionWidth(initial, successor(K))
+            * (successor(successor(K)) : Rational)
+          < (successor(successor(K)) : Rational) * epsilon
+    by Rational.LessThan.transitive_left(
+           Real.bisectionWidth(initial, successor(K))
+               * (successor(successor(K)) : Rational),
+           (successor(K) : Rational) * epsilon,
+           (successor(successor(K)) : Rational) * epsilon,
+           chained, strictStep);
+  claim succSuccPositive
+        : Rational.zero < (successor(successor(K)) : Rational)
+    by Rational.successor_cast_positive(successor(K));
+  witness successor(K) with
+      Rational.LessThan.multiply_cancel_right_positive(
+          Real.bisectionWidth(initial, successor(K)),
+          epsilon,
+          (successor(successor(K)) : Rational),
+          succSuccPositive,
+          rewrite(
+              Rational.multiply_commutative(
+                  (successor(successor(K)) : Rational),
+                  epsilon),
+              widthProductStrict))
+}
+
+-- ----------------------------------------------------------------------
+-- Absolute-value bound from interval bounds: -c ≤ x ≤ c → |x| ≤ c.
+
+theorem Rational.absolute_value_LessOrEqual_of_bounds
+        (x c : Rational)
+        (lowerBound : -c ≤ x) (upperBound : x ≤ c)
+        : Rational.absolute_value(x) ≤ c :=
+  cases Rational.IsNonneg_or_negate_IsNonneg(x) {
+    | Or.introduceLeft(xNonneg) =>
+        rewrite(
+            Equality.symmetry(
+                Rational.absolute_value_when_nonneg(x, xNonneg)),
+            upperBound)
+    | Or.introduceRight(negXNonneg) =>
+        rewrite(
+            Equality.symmetry(
+                Rational.absolute_value_when_negate_nonneg(x, negXNonneg)),
+            rewrite(
+                Rational.negate_negate(c),
+                Rational.LessOrEqual.negate(-c, x, lowerBound)))
+  }
+
+-- ----------------------------------------------------------------------
+-- |a_m - a_n| ≤ width(N) when both indices exceed N. Both a_m and a_n
+-- live in [a_N, b_N] by monotone containment; their difference lies in
+-- [-(b_N - a_N), b_N - a_N] = [-width(N), width(N)].
+
+theorem Real.bisectionLeft_diff_bound
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (initialLeftLeqRight
+            : Real.BisectionInterval.left(initial)
+              ≤ Real.BisectionInterval.right(initial))
+        (N m n : Natural) (NLeqM : N ≤ m) (NLeqN : N ≤ n)
+        : Rational.absolute_value(
+              Real.bisectionLeft(subset, initial, m)
+              - Real.bisectionLeft(subset, initial, n))
+          ≤ Real.bisectionWidth(initial, N) := {
+  claim widthEqRightMinusLeft
+        : Real.bisectionWidth(initial, N)
+          = Real.bisectionRight(subset, initial, N)
+            - Real.bisectionLeft(subset, initial, N)
+    by Equality.symmetry(
+           Real.bisection_width_invariant(subset, initial, N));
+  claim leftNLeqM
+        : Real.bisectionLeft(subset, initial, N)
+          ≤ Real.bisectionLeft(subset, initial, m)
+    by Real.bisectionLeft_le_at_le(
+           subset, initial, initialLeftLeqRight, N, m, NLeqM);
+  claim leftNLeqN
+        : Real.bisectionLeft(subset, initial, N)
+          ≤ Real.bisectionLeft(subset, initial, n)
+    by Real.bisectionLeft_le_at_le(
+           subset, initial, initialLeftLeqRight, N, n, NLeqN);
+  claim leftMLeqRight
+        : Real.bisectionLeft(subset, initial, m)
+          ≤ Real.bisectionRight(subset, initial, N)
+    by Real.bisectionLeft_le_bisectionRight_at_le(
+           subset, initial, initialLeftLeqRight, N, m, NLeqM);
+  claim leftNLeqRight
+        : Real.bisectionLeft(subset, initial, n)
+          ≤ Real.bisectionRight(subset, initial, N)
+    by Real.bisectionLeft_le_bisectionRight_at_le(
+           subset, initial, initialLeftLeqRight, N, n, NLeqN);
+  -- left(m) - left(n) ≤ right(N) - left(N) = width(N).
+  claim upperBound
+        : Real.bisectionLeft(subset, initial, m)
+          - Real.bisectionLeft(subset, initial, n)
+          ≤ Real.bisectionRight(subset, initial, N)
+            - Real.bisectionLeft(subset, initial, N)
+    by Rational.LessOrEqual.sum(
+           Real.bisectionLeft(subset, initial, m),
+           Real.bisectionRight(subset, initial, N),
+           -Real.bisectionLeft(subset, initial, n),
+           -Real.bisectionLeft(subset, initial, N),
+           leftMLeqRight,
+           Rational.LessOrEqual.negate(
+               Real.bisectionLeft(subset, initial, N),
+               Real.bisectionLeft(subset, initial, n),
+               leftNLeqN));
+  -- left(n) - left(m) ≤ right(N) - left(N). Negate: left(m) - left(n) ≥ -(width).
+  claim symmetricUpperBound
+        : Real.bisectionLeft(subset, initial, n)
+          - Real.bisectionLeft(subset, initial, m)
+          ≤ Real.bisectionRight(subset, initial, N)
+            - Real.bisectionLeft(subset, initial, N)
+    by Rational.LessOrEqual.sum(
+           Real.bisectionLeft(subset, initial, n),
+           Real.bisectionRight(subset, initial, N),
+           -Real.bisectionLeft(subset, initial, m),
+           -Real.bisectionLeft(subset, initial, N),
+           leftNLeqRight,
+           Rational.LessOrEqual.negate(
+               Real.bisectionLeft(subset, initial, N),
+               Real.bisectionLeft(subset, initial, m),
+               leftNLeqM));
+  claim lowerBound
+        : -(Real.bisectionRight(subset, initial, N)
+            - Real.bisectionLeft(subset, initial, N))
+          ≤ Real.bisectionLeft(subset, initial, m)
+            - Real.bisectionLeft(subset, initial, n)
+    by rewrite(
+           (ring : -(Real.bisectionLeft(subset, initial, n)
+                     - Real.bisectionLeft(subset, initial, m))
+                   = Real.bisectionLeft(subset, initial, m)
+                     - Real.bisectionLeft(subset, initial, n)),
+           Rational.LessOrEqual.negate(
+               Real.bisectionLeft(subset, initial, n)
+                 - Real.bisectionLeft(subset, initial, m),
+               Real.bisectionRight(subset, initial, N)
+                 - Real.bisectionLeft(subset, initial, N),
+               symmetricUpperBound));
+  rewrite(
+      Equality.symmetry(widthEqRightMinusLeft),
+      Rational.absolute_value_LessOrEqual_of_bounds(
+          Real.bisectionLeft(subset, initial, m)
+            - Real.bisectionLeft(subset, initial, n),
+          Real.bisectionRight(subset, initial, N)
+            - Real.bisectionLeft(subset, initial, N),
+          lowerBound, upperBound))
+}
+
 -- I4: the lower-bound sequence is Cauchy at the rational level.
--- Plan: |a_m - a_n| ≤ width(min(m, n)) (from monotone containment +
--- the within-interval invariant), and width(N) → 0 by Archimedean.
--- Still missing: the Cauchy modulus
---   ∀ ε > 0. ∃ N. bisectionWidth(initial, N) < ε
--- which combines bisectionWidth_times_succ_le_initial with Archimedean
--- (absolute_value_le_succ_natural applied to (right - left) * reciprocal(ε))
--- plus a multiplicative cancellation lemma. The multiplicative bound
--- is in place; the modulus is the next chunk.
+-- Combine the |a_m - a_n| ≤ width(N) bound + the Cauchy modulus.
 theorem Real.bisectionLeft_is_cauchy
         (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (initialLeftLeqRight
+            : Real.BisectionInterval.left(initial)
+              ≤ Real.BisectionInterval.right(initial))
         : Rational.sequence.IsCauchy(
               Real.bisectionLeft(subset, initial)) :=
-  sorry
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) => {
+    obtain ⟨N, widthBelowEpsilon⟩
+        from Real.exists_bisectionWidth_below(
+                 initial, initialLeftLeqRight,
+                 epsilon, epsilonPositive);
+    witness N with
+        function (m : Natural) (NLeqM : N ≤ m)
+                 (n : Natural) (NLeqN : N ≤ n) =>
+          Rational.LessThan.transitive_left(
+              Rational.absolute_value(
+                  Real.bisectionLeft(subset, initial, m)
+                  - Real.bisectionLeft(subset, initial, n)),
+              Real.bisectionWidth(initial, N),
+              epsilon,
+              Real.bisectionLeft_diff_bound(
+                  subset, initial, initialLeftLeqRight,
+                  N, m, n, NLeqM, NLeqN),
+              widthBelowEpsilon)
+  }
+
+-- ----------------------------------------------------------------------
+-- The Real-level ≤ on rational embeddings reflects to the Rational
+-- level. (a : Real) ≤ (b : Real) reduces (by the standard Quotient.lift
+-- β chain on Real.subtract/Real.IsNonneg/sequenceFunction at the constant
+-- representatives) to the eventually-nonneg statement on the constant
+-- sequence λn. b - a — i.e., ∀ε > 0. -ε < b - a. From this we conclude
+-- Rational.IsNonneg(b - a) = a ≤ b by case-on-linearity: if b < a
+-- strictly, apply at ε = a - b > 0 and the conclusion `-(a - b) < b - a`
+-- is `b - a < b - a`, contradicting irreflexivity.
+
+theorem Rational.LessOrEqual_of_real_LessOrEqual
+        (a b : Rational)
+        (realLeq : (a : Real) ≤ (b : Real))
+        : a ≤ b :=
+  cases Rational.LessOrEqual.linear(a, b) {
+    | Or.introduceLeft(aLeqB) => aLeqB
+    | Or.introduceRight(bLeqA) =>
+      cases Logic.excluded_middle(a = b) {
+        | Or.introduceLeft(aEqB) =>
+            Equality.transport_proposition(
+                function (z : Rational) => a ≤ z,
+                a, b, aEqB,
+                Rational.LessOrEqual.reflexive(a))
+        | Or.introduceRight(aNotEqB) => {
+            -- b ≤ a AND a ≠ b: derive 0 < a - b for the contradiction.
+            claim diffNonneg
+                  : Rational.LessOrEqual(Rational.zero, a - b)
+              by Rational.LessOrEqual_zero_of_IsNonneg(a - b, bLeqA);
+            claim diffNonzero : ¬(Rational.zero = a - b)
+              by function (zeroEqDiff : Rational.zero = a - b) =>
+                   aNotEqB(
+                       Equality.symmetry(
+                           calc b
+                              = b + Rational.zero
+                                  by Equality.symmetry(Rational.add_zero(b))
+                              = b + (a - b)
+                                  by congruenceOf(
+                                         function (z : Rational) => b + z,
+                                         zeroEqDiff)
+                              = a
+                                  by (ring : b + (a - b) = a)));
+            claim diffPositive : Rational.zero < a - b
+              by And.introduction(diffNonneg, diffNonzero);
+            -- realLeq at ε = a - b yields the contradiction.
+            obtain ⟨N, bound⟩ from realLeq(a - b, diffPositive);
+            claim bMinusASelf : -(a - b) < b - a
+              by bound(N, LessOrEqual.reflexivity(N));
+            claim bMinusALessSelf : b - a < b - a
+              by rewrite(
+                     (ring : -(a - b) = b - a),
+                     bMinusASelf);
+            False.eliminate_proposition(
+                a ≤ b,
+                Rational.LessThan.distinct(
+                    b - a, b - a, bMinusALessSelf,
+                    reflexivity(Rational, b - a)))
+          }
+      }
+  }
 
 -- The bisection limit. Once the lower-bound sequence is Cauchy, its
 -- Real-level limit is well-defined: package the Cauchy proof and
 -- take the Quotient.mk.
 definition Real.bisectionLimit
         (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (initialLeftLeqRight
+            : Real.BisectionInterval.left(initial)
+              ≤ Real.BisectionInterval.right(initial))
         : Real :=
   Quotient.mk(
       CauchyRationalSequence.make(
           Real.bisectionLeft(subset, initial),
-          Real.bisectionLeft_is_cauchy(subset, initial)))
+          Real.bisectionLeft_is_cauchy(
+              subset, initial, initialLeftLeqRight)))
 
 -- The limit is an upper bound for S. At every n, `bisectionRight(n)`
 -- bounds S from above; the limit `lim aₙ = lim bₙ` is therefore also
 -- an upper bound. Sub-lemma still to prove: limit-of-Cauchy-sequence
 -- is upper bound when each term is.
+-- At-rep form: for a Cauchy rep y_rep with mk(y_rep) ∈ subset,
+-- show mk(y_rep) ≤ bisectionLimit. Pattern-match at the rep
+-- exposes (yseq, yIsCauchy) so the at-rep reduces to the
+-- IsEventuallyNonneg(λn. bisectionLeft(n) - yseq(n)) form via the
+-- standard Quotient.lift β chain. Pick K with width(K) < ε/2
+-- (modulus); the pointwise upper bound y ≤ bisectionRight(K) gives
+-- bisectionRight(K) - yseq(j) > -ε/2 for j ≥ M; combine with
+-- bisectionLeft(j) ≥ bisectionLeft(K) = bisectionRight(K) - width(K)
+-- > bisectionRight(K) - ε/2 to get bisectionLeft(j) - yseq(j) > -ε.
+theorem Real.bisectionLimit_is_upper_bound_at_rep_test
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (initialLeftLeqRight
+            : Real.BisectionInterval.left(initial)
+              ≤ Real.BisectionInterval.right(initial))
+        (y_rep : CauchyRationalSequence)
+        : (Quotient.mk(y_rep) : Real)
+          ≤ Real.bisectionLimit(
+                subset, initial, initialLeftLeqRight) := sorry
+
+-- Lift via Quotient.induct on y.
 theorem Real.bisectionLimit_is_upper_bound
         (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (initialLeftLeqRight
+            : Real.BisectionInterval.left(initial)
+              ≤ Real.BisectionInterval.right(initial))
         (initialRightAbove
             : Real.IsUpperBound(
                   subset,
                   (Real.BisectionInterval.right(initial) : Real)))
         : Real.IsUpperBound(
               subset,
-              Real.bisectionLimit(subset, initial)) :=
+              Real.bisectionLimit(subset, initial, initialLeftLeqRight)) :=
   sorry
 
 -- The limit is the LEAST upper bound: every other upper bound `B`
@@ -1826,16 +2506,21 @@ theorem Real.bisectionLimit_is_upper_bound
 theorem Real.bisectionLimit_is_least
         (subset : Set(Real))
         (initial : Real.BisectionInterval)
+        (initialLeftLeqRight
+            : Real.BisectionInterval.left(initial)
+              ≤ Real.BisectionInterval.right(initial))
         (initialLeftBelowSome
             : ∃ (y : Real).
                   And(y ∈ subset,
                       (Real.BisectionInterval.left(initial) : Real) ≤ y))
         (otherBound : Real)
         (otherIsUpper : Real.IsUpperBound(subset, otherBound))
-        : Real.bisectionLimit(subset, initial) ≤ otherBound :=
+        : Real.bisectionLimit(subset, initial, initialLeftLeqRight)
+          ≤ otherBound :=
   Real.LessOrEqual_of_pointwise(
       Real.bisectionLeft(subset, initial),
-      Real.bisectionLeft_is_cauchy(subset, initial),
+      Real.bisectionLeft_is_cauchy(
+          subset, initial, initialLeftLeqRight),
       otherBound,
       function (n : Natural) => {
         obtain ⟨witnessY, yInSAndAnLeqY⟩
@@ -1895,15 +2580,35 @@ theorem Real.supremum_exists
                    (Real.BisectionInterval.left(initial) : Real) ≤ y),
            x0,
            And.introduction(x0InS, a0LeqX0));
-  let supValue : Real := Real.bisectionLimit(subset, initial);
+  -- a0 ≤ b0 as Rationals follows from (a0 : Real) ≤ x0 ≤ B0 ≤ (b0 : Real).
+  -- This is needed for bisectionLeft_is_cauchy and friends. We need
+  -- the Rational-level inequality.
+  claim a0LeqB0AsReal
+        : (Real.BisectionInterval.left(initial) : Real)
+          ≤ (Real.BisectionInterval.right(initial) : Real)
+    by Real.LessOrEqual.transitive(
+           (a0 : Real), x0, (b0 : Real),
+           a0LeqX0,
+           Real.LessOrEqual.transitive(
+               x0, B0real, (b0 : Real),
+               B0IsUpper(x0, x0InS), B0LeqB0));
+  claim initialLeftLeqRight
+        : Real.BisectionInterval.left(initial)
+          ≤ Real.BisectionInterval.right(initial)
+    by Rational.LessOrEqual_of_real_LessOrEqual(
+           Real.BisectionInterval.left(initial),
+           Real.BisectionInterval.right(initial),
+           a0LeqB0AsReal);
+  let supValue : Real :=
+      Real.bisectionLimit(subset, initial, initialLeftLeqRight);
   witness supValue with
       And.introduction(
-          -- supValue is an upper bound.
-          Real.bisectionLimit_is_upper_bound(subset, initial, b0IsUpper),
-          -- supValue is the least: for any other upper bound `B`, supValue ≤ B.
+          Real.bisectionLimit_is_upper_bound(
+              subset, initial, initialLeftLeqRight, b0IsUpper),
           function (otherBound : Real)
                    (otherIsUpper : Real.IsUpperBound(subset, otherBound)) =>
             Real.bisectionLimit_is_least(
-                subset, initial, initialLeftBelowSome,
+                subset, initial, initialLeftLeqRight,
+                initialLeftBelowSome,
                 otherBound, otherIsUpper))
 }
