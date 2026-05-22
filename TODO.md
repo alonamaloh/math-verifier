@@ -255,13 +255,21 @@ the directories that motivate it.
    deep-β/ι matching (expensive) or `isDefinitionallyEqual`-based
    matching with unique-occurrence detection (open design question).
 
-8. **Strict `<` doesn't transport cleanly.** `LessThan` is `And(≤,
+8. **Strict `<` doesn't transport cleanly.** ~~`LessThan` is `And(≤,
    Not(_=_))`, so every transport along `<` manually destructures
-   and rebuilds. See `Rational/order_arithmetic.math:336-356,
-   421-434`. Remedy: either make `<` a single-constructor record
-   with first-class destructure, or add a
-   `by strict_mono(weak_lemma, neq_lemma)` tactic that auto-
-   assembles `And.introduction`.
+   and rebuilds.~~ **Mostly fixed:** the verbose `And.introduction(
+   A, B, x, y)` form was already redundant — the elaborator's
+   leading-argument inference fills A, B from the expected type, so
+   the 2-arg `And.introduction(x, y)` form works at every site where
+   the expected type is an `And`. Library sweep (5cc9900) drops all
+   13 verbose sites. New helper `Rational.LessThan.lift` collapses
+   the strict-mono pattern (weak monotonicity + injection → strict
+   monotonicity) to a 4-arg call.
+
+   Remaining tail: a few sites in `positive.math` etc. that scope-
+   precede `LessThan.weaken`/`distinct` still need `And.left`/
+   `And.right` explicitly. Reordering `Rational/order_arithmetic.math`
+   to define `weaken`/`distinct` earlier would unblock those.
 
 Diff-inference walker + non-calc hook (8dbde1c) was the elaborator
 change that unlocked items 1 (sweep) and 2 (the `claim X : T by P`
