@@ -236,6 +236,85 @@ theorem Real.exists_rational_above (x : Real)
       x)
 
 -- ----------------------------------------------------------------------
+-- Building block #3: the bisection state and step function.
+--
+-- Each step of the bisection holds a Rational interval [a, b]. We
+-- maintain two invariants on this interval (formalised in the
+-- Cauchy + sup proofs below):
+--   * b is an upper bound for S (`(b : Real) ≥ everything in S`).
+--   * a is below some element of S (∃ y ∈ S. (a : Real) ≤ y).
+--
+-- The step's midpoint `m = halve(a + b)` is decided classically:
+-- either `(m : Real)` is itself an upper bound for S — in which case
+-- the new interval is [a, m] — or not, in which case we know some
+-- y ∈ S satisfies `m < y` so the new interval [m, b] still meets
+-- both invariants.
+
+inductive Real.BisectionInterval : Type(0) where
+  | Real.BisectionInterval.make
+      : Rational → Rational → Real.BisectionInterval
+
+definition Real.BisectionInterval.left
+        : Real.BisectionInterval → Rational
+  | Real.BisectionInterval.make(a, _) => a
+
+definition Real.BisectionInterval.right
+        : Real.BisectionInterval → Rational
+  | Real.BisectionInterval.make(_, b) => b
+
+-- One bisection step. Classical: split at the midpoint and pick the
+-- half consistent with the running invariants.
+definition Real.bisectionStep
+        (subset : Set(Real)) (state : Real.BisectionInterval)
+        : Real.BisectionInterval :=
+  cases Logic.classical_decidable(
+            Real.IsUpperBound(
+                subset,
+                (Rational.halve(
+                     Real.BisectionInterval.left(state)
+                     + Real.BisectionInterval.right(state)) : Real))) {
+    | Logic.Decidable.yes(_) =>
+        Real.BisectionInterval.make(
+            Real.BisectionInterval.left(state),
+            Rational.halve(
+                Real.BisectionInterval.left(state)
+                + Real.BisectionInterval.right(state)))
+    | Logic.Decidable.no(_) =>
+        Real.BisectionInterval.make(
+            Rational.halve(
+                Real.BisectionInterval.left(state)
+                + Real.BisectionInterval.right(state)),
+            Real.BisectionInterval.right(state))
+  }
+
+-- The full bisection sequence: starting from a Rational interval
+-- [a₀, b₀] enclosing the bisection setup, generate the nth refined
+-- interval by iterating `bisectionStep`.
+definition Real.bisectionIntervals
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        : Natural → Real.BisectionInterval
+  | zero =>
+      initial
+  | successor(predecessor) =>
+      Real.bisectionStep(
+          subset,
+          Real.bisectionIntervals(subset, initial, predecessor))
+
+-- The lower-bound sequence and upper-bound sequence: projections of
+-- the bisection intervals.
+definition Real.bisectionLeft
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (n : Natural) : Rational :=
+  Real.BisectionInterval.left(
+      Real.bisectionIntervals(subset, initial, n))
+
+definition Real.bisectionRight
+        (subset : Set(Real)) (initial : Real.BisectionInterval)
+        (n : Natural) : Rational :=
+  Real.BisectionInterval.right(
+      Real.bisectionIntervals(subset, initial, n))
+
+-- ----------------------------------------------------------------------
 -- Headline theorem (stub). The bisection proof uses
 -- `exists_rational_below`/`exists_rational_above` to seed the initial
 -- rational interval [a₀, b₀] enclosing some chosen x₀ ∈ S and an
