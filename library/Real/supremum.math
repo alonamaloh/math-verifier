@@ -53,6 +53,56 @@ import Real.linearity
 import Set.basics
 
 -- ----------------------------------------------------------------------
+-- Halving algebra used by the bisection width invariant. Kept local
+-- to this file rather than promoted to `Rational/halve.math` because
+-- `ring` needs `Rational.multiply_negate_left` (defined in
+-- `Rational/order_multiplication.math`, which sits above `halve` in
+-- the import DAG) to handle distributivity over subtraction. Once
+-- the carrier has that lemma transitively, the proofs collapse to
+-- one `halve_doubled` step plus pure-ring distribution.
+
+-- halve(a + a) = a. Unfold halve, distribute (ring), refold, apply
+-- halve_doubled.
+theorem Rational.halve_of_doubled (a : Rational)
+        : Rational.halve(a + a) = a :=
+  calc Rational.halve(a + a)
+     = (a + a) * Rational.one_half
+     = a * Rational.one_half + a * Rational.one_half
+     = Rational.halve(a) + Rational.halve(a)
+     = a
+
+-- halve(x) - halve(y) = halve(x - y). Distributivity over `(1/2)` is
+-- pure ring once `multiply_negate_left` is in scope.
+theorem Rational.halve_subtract_distributive (x y : Rational)
+        : Rational.halve(x) - Rational.halve(y) = Rational.halve(x - y) :=
+  calc Rational.halve(x) - Rational.halve(y)
+     = x * Rational.one_half - y * Rational.one_half
+     = (x - y) * Rational.one_half
+     = Rational.halve(x - y)
+
+-- halve(a + b) - a = halve(b - a). Yes-branch width identity:
+-- new_width = midpoint - left = halve(left + right) - left =
+-- halve(right - left) = halve(old_width). The auto-prover finds each
+-- step via the lemma index (halve_of_doubled, halve_subtract_distributive,
+-- add_subtract_cancel_left).
+theorem Rational.halve_endpoint_left (a b : Rational)
+        : Rational.halve(a + b) - a = Rational.halve(b - a) :=
+  calc Rational.halve(a + b) - a
+     = Rational.halve(a + b) - Rational.halve(a + a)
+     = Rational.halve((a + b) - (a + a))
+     = Rational.halve(b - a)
+
+-- b - halve(a + b) = halve(b - a). No-branch width identity:
+-- new_width = right - midpoint = right - halve(left + right) =
+-- halve(right - left) = halve(old_width).
+theorem Rational.halve_endpoint_right (a b : Rational)
+        : b - Rational.halve(a + b) = Rational.halve(b - a) :=
+  calc b - Rational.halve(a + b)
+     = Rational.halve(b + b) - Rational.halve(a + b)
+     = Rational.halve((b + b) - (a + b))
+     = Rational.halve(b - a)
+
+-- ----------------------------------------------------------------------
 -- Bound vocabulary on Real.
 
 -- `b` is an upper bound for `S` when every element of `S` is ≤ `b`.
