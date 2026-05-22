@@ -870,6 +870,120 @@ theorem Real.bisection_width_invariant
       }
   }
 
+-- ----------------------------------------------------------------------
+-- Limit preserves ≤: if every term of a Cauchy rational sequence is
+-- (as Real) ≤ some Real B, then the limit mk(make(s, _)) is ≤ B.
+--
+-- This is the key "limit-side" lemma — both `bisectionLimit_is_least`
+-- and (the symmetric form for) `bisectionLimit_is_upper_bound` reduce
+-- to it after extracting the pointwise bound from `bisectionLeft`'s
+-- below-witness or `bisectionRight`'s upper-bound invariant.
+--
+-- Proof at make (B = mk(make(b, _))): the goal reduces (via Real.add /
+-- Real.negate / Real.IsNonneg Quotient.lift β-reductions plus
+-- pattern-match ι on add/negate of make) to
+--   Rational.sequence.IsEventuallyNonneg(λj. b(j) - s(j)).
+-- At positive ε:
+--   · Pick N_s from sIsCauchy at halve(ε): |s(m) - s(N_s)| < halve(ε)
+--     for m ≥ N_s.
+--   · Apply pointwiseLeq(N_s) at halve(ε). At constant-(s(N_s)) Real,
+--     the diff sequence is (λj. b(j) - s(N_s)); pick N_b such that
+--     b(j) - s(N_s) > -halve(ε) for j ≥ N_b.
+--   · For j ≥ max(N_s, N_b): from |s(j) - s(N_s)| < halve(ε) extract
+--     `s(N_s) - s(j) > -halve(ε)` (upper bound + LessThan.negate).
+--     Sum with `b(j) - s(N_s) > -halve(ε)`:
+--       (b(j) - s(N_s)) + (s(N_s) - s(j)) > -ε
+--     LHS reduces (by Rational.add_subtract_cancel_left applied
+--     symmetrically) to b(j) - s(j). Done.
+theorem Real.LessOrEqual_of_pointwise_at_make
+        (s : Natural → Rational)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        (b : Natural → Rational)
+        (bIsCauchy : Rational.sequence.IsCauchy(b))
+        (pointwiseLeq
+            : (n : Natural)
+              → (s(n) : Real)
+                  ≤ (Quotient.mk(CauchyRationalSequence.make(b, bIsCauchy)) : Real))
+        : (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real)
+            ≤ (Quotient.mk(CauchyRationalSequence.make(b, bIsCauchy)) : Real) :=
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) => {
+    claim halvedPositive : Rational.zero < Rational.halve(epsilon)
+      by Rational.halve_positive(epsilon, epsilonPositive);
+    obtain ⟨N_s, sCauchyAt⟩
+        from sIsCauchy(Rational.halve(epsilon), halvedPositive);
+    obtain ⟨N_b, bMinusSAt⟩
+        from pointwiseLeq(N_s)(Rational.halve(epsilon), halvedPositive);
+    witness Natural.maximum(N_s, N_b) with
+        function (m : Natural)
+                 (mGeMax : Natural.maximum(N_s, N_b) ≤ m) => {
+          claim m_geq_N_s : N_s ≤ m
+            by Natural.le_through_max_left(N_s, N_b, m, mGeMax);
+          claim m_geq_N_b : N_b ≤ m
+            by Natural.le_through_max_right(N_s, N_b, m, mGeMax);
+          -- |s(m) - s(N_s)| < halve(ε)
+          claim sCauchyAtM
+                : Rational.absolute_value(s(m) - s(N_s))
+                  < Rational.halve(epsilon)
+            by sCauchyAt(m, m_geq_N_s, N_s, LessOrEqual.reflexivity(N_s));
+          -- Upper bound: s(m) - s(N_s) < halve(ε)
+          claim sUpperBound
+                : s(m) - s(N_s) < Rational.halve(epsilon)
+            by And.right(
+                   -Rational.halve(epsilon) < s(m) - s(N_s),
+                   s(m) - s(N_s) < Rational.halve(epsilon),
+                   Rational.absolute_value_LessThan_bounds(
+                       s(m) - s(N_s), Rational.halve(epsilon), sCauchyAtM));
+          -- Flip: -halve(ε) < s(N_s) - s(m). LessThan.negate gives
+          -- -halve(ε) < -(s(m) - s(N_s)), then rewrite via negate_subtract.
+          claim sFlippedBound
+                : -Rational.halve(epsilon) < s(N_s) - s(m)
+            by rewrite(
+                   Rational.negate_subtract(s(m), s(N_s)),
+                   Rational.LessThan.negate(
+                       s(m) - s(N_s), Rational.halve(epsilon), sUpperBound));
+          -- bMinusSAt at m: -halve(ε) < b(m) - s(N_s)
+          claim bBound
+                : -Rational.halve(epsilon) < b(m) - s(N_s)
+            by bMinusSAt(m, m_geq_N_b);
+          -- Sum: -halve(ε) + -halve(ε) < (b(m) - s(N_s)) + (s(N_s) - s(m))
+          --                                            (RHS = b(m) - s(m))
+          claim summedBound
+                : -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  < (b(m) - s(N_s)) + (s(N_s) - s(m))
+            by Rational.LessThan.transitive_right(
+                   -Rational.halve(epsilon) + -Rational.halve(epsilon),
+                   (b(m) - s(N_s)) + -Rational.halve(epsilon),
+                   (b(m) - s(N_s)) + (s(N_s) - s(m)),
+                   Rational.add_preserves_LessThan(
+                       -Rational.halve(epsilon),
+                       b(m) - s(N_s),
+                       -Rational.halve(epsilon),
+                       bBound),
+                   Rational.add_general_LessOrEqual_left(
+                       b(m) - s(N_s),
+                       -Rational.halve(epsilon),
+                       s(N_s) - s(m),
+                       Rational.LessThan.weaken(
+                           -Rational.halve(epsilon),
+                           s(N_s) - s(m),
+                           sFlippedBound)));
+          -- LHS simplifies to -ε, RHS simplifies to b(m) - s(m).
+          claim lhsEq
+                : -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  = -epsilon
+            by calc -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  = -(Rational.halve(epsilon) + Rational.halve(epsilon))
+                  = -epsilon;
+          claim rhsEq
+                : (b(m) - s(N_s)) + (s(N_s) - s(m))
+                  = b(m) - s(m)
+            by ring;
+          -- Apply lhsEq and rhsEq to summedBound to get the goal.
+          rewrite(rhsEq, rewrite(lhsEq, summedBound))
+        }
+  }
+
 -- I4: the lower-bound sequence is Cauchy at the rational level.
 -- The bound is `|aₘ - aₙ| < ε` once both indices exceed a suitable
 -- N depending on `(b0 - a0)` and ε (geometric series majorant).
