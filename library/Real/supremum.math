@@ -2474,15 +2474,143 @@ definition Real.bisectionLimit
 -- bisectionRight(K) - yseq(j) > -ε/2 for j ≥ M; combine with
 -- bisectionLeft(j) ≥ bisectionLeft(K) = bisectionRight(K) - width(K)
 -- > bisectionRight(K) - ε/2 to get bisectionLeft(j) - yseq(j) > -ε.
-theorem Real.bisectionLimit_is_upper_bound_at_rep_test
+-- At-rep form: pattern-match y_rep to expose (yseq, yIsCauchy). Uses
+-- `subset(...)` rather than `... ∈ subset` because the operator
+-- dispatch for `∈` trips on the implicit-T inference when the subject
+-- is a Quotient.mk wrapped in a `: Real` ascription; they're
+-- definitionally equal (∈ desugars to Set.member, which is subset
+-- application).
+theorem Real.bisectionLimit_is_upper_bound_at_rep
         (subset : Set(Real)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
             : Real.BisectionInterval.left(initial)
               ≤ Real.BisectionInterval.right(initial))
-        (y_rep : CauchyRationalSequence)
-        : (Quotient.mk(y_rep) : Real)
-          ≤ Real.bisectionLimit(
-                subset, initial, initialLeftLeqRight) := sorry
+        (initialRightAbove
+            : Real.IsUpperBound(
+                  subset,
+                  (Real.BisectionInterval.right(initial) : Real)))
+        : (y_rep : CauchyRationalSequence)
+          → subset((Quotient.mk(y_rep) : Real))
+          → (Quotient.mk(y_rep) : Real)
+              ≤ Real.bisectionLimit(
+                    subset, initial, initialLeftLeqRight)
+  | CauchyRationalSequence.make(yseq, yIsCauchy), yInSubset =>
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) => {
+    claim halvedPositive : Rational.zero < Rational.halve(epsilon)
+      by Rational.halve_positive(epsilon, epsilonPositive);
+    obtain ⟨K, widthBelow⟩
+        from Real.exists_bisectionWidth_below(
+                 initial, initialLeftLeqRight,
+                 Rational.halve(epsilon), halvedPositive);
+    claim yLeqRightK
+          : (Quotient.mk(CauchyRationalSequence.make(yseq, yIsCauchy))
+              : Real)
+            ≤ (Real.bisectionRight(subset, initial, K) : Real)
+      by Real.bisectionRight_is_upper_bound(
+             subset, initial, initialRightAbove, K,
+             (Quotient.mk(CauchyRationalSequence.make(yseq, yIsCauchy))
+               : Real),
+             yInSubset);
+    obtain ⟨M, pointwiseAt⟩
+        from yLeqRightK(Rational.halve(epsilon), halvedPositive);
+    witness Natural.maximum(K, M) with
+        function (j : Natural)
+                 (jGeMax : Natural.maximum(K, M) ≤ j) => {
+          claim j_geq_K : K ≤ j
+            by Natural.le_through_max_left(K, M, j, jGeMax);
+          claim j_geq_M : M ≤ j
+            by Natural.le_through_max_right(K, M, j, jGeMax);
+          claim leftK_leq_leftJ
+                : Real.bisectionLeft(subset, initial, K)
+                  ≤ Real.bisectionLeft(subset, initial, j)
+            by Real.bisectionLeft_le_at_le(
+                   subset, initial, initialLeftLeqRight, K, j, j_geq_K);
+          claim widthEq
+                : Real.bisectionRight(subset, initial, K)
+                  - Real.bisectionLeft(subset, initial, K)
+                  = Real.bisectionWidth(initial, K)
+            by Real.bisection_width_invariant(subset, initial, K);
+          claim negWidthGtNegHalvedEpsilon
+                : -Rational.halve(epsilon) < -Real.bisectionWidth(initial, K)
+            by Rational.LessThan.negate(
+                   Real.bisectionWidth(initial, K),
+                   Rational.halve(epsilon), widthBelow);
+          claim pointwiseAtJ
+                : -Rational.halve(epsilon)
+                  < Real.bisectionRight(subset, initial, K) - yseq(j)
+            by pointwiseAt(j, j_geq_M);
+          claim summedBound
+                : -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  < (Real.bisectionRight(subset, initial, K) - yseq(j))
+                    + -Real.bisectionWidth(initial, K)
+            by Rational.LessThan.transitive_right(
+                   -Rational.halve(epsilon) + -Rational.halve(epsilon),
+                   (Real.bisectionRight(subset, initial, K) - yseq(j))
+                     + -Rational.halve(epsilon),
+                   (Real.bisectionRight(subset, initial, K) - yseq(j))
+                     + -Real.bisectionWidth(initial, K),
+                   Rational.add_preserves_LessThan(
+                       -Rational.halve(epsilon),
+                       Real.bisectionRight(subset, initial, K) - yseq(j),
+                       -Rational.halve(epsilon),
+                       pointwiseAtJ),
+                   Rational.add_general_LessOrEqual_left(
+                       Real.bisectionRight(subset, initial, K) - yseq(j),
+                       -Rational.halve(epsilon),
+                       -Real.bisectionWidth(initial, K),
+                       Rational.LessThan.weaken(
+                           -Rational.halve(epsilon),
+                           -Real.bisectionWidth(initial, K),
+                           negWidthGtNegHalvedEpsilon)));
+          claim rhsSimplify
+                : (Real.bisectionRight(subset, initial, K) - yseq(j))
+                  + -Real.bisectionWidth(initial, K)
+                  = Real.bisectionLeft(subset, initial, K) - yseq(j)
+            by calc (Real.bisectionRight(subset, initial, K) - yseq(j))
+                    + -Real.bisectionWidth(initial, K)
+                  = (Real.bisectionRight(subset, initial, K)
+                     - Real.bisectionWidth(initial, K))
+                    - yseq(j)
+                  = (Real.bisectionRight(subset, initial, K)
+                     - (Real.bisectionRight(subset, initial, K)
+                        - Real.bisectionLeft(subset, initial, K)))
+                    - yseq(j)
+                      by congruenceOf(
+                             function (z : Rational) =>
+                                 (Real.bisectionRight(subset, initial, K)
+                                  - z)
+                                 - yseq(j),
+                             Equality.symmetry(widthEq))
+                  = Real.bisectionLeft(subset, initial, K) - yseq(j);
+          claim leftKMinusY
+                : -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  < Real.bisectionLeft(subset, initial, K) - yseq(j)
+            by rewrite(rhsSimplify, summedBound);
+          claim weakened
+                : Real.bisectionLeft(subset, initial, K) - yseq(j)
+                  ≤ Real.bisectionLeft(subset, initial, j) - yseq(j)
+            by Rational.add_preserves_LessOrEqual(
+                   Real.bisectionLeft(subset, initial, K),
+                   Real.bisectionLeft(subset, initial, j),
+                   -yseq(j),
+                   leftK_leq_leftJ);
+          claim halvedSumEqEpsilon
+                : -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  = -epsilon
+            by calc -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  = -(Rational.halve(epsilon) + Rational.halve(epsilon))
+                  = -epsilon;
+          rewrite(
+              halvedSumEqEpsilon,
+              Rational.LessThan.transitive_right(
+                  -Rational.halve(epsilon) + -Rational.halve(epsilon),
+                  Real.bisectionLeft(subset, initial, K) - yseq(j),
+                  Real.bisectionLeft(subset, initial, j) - yseq(j),
+                  leftKMinusY,
+                  weakened))
+        }
+  }
 
 -- Lift via Quotient.induct on y.
 theorem Real.bisectionLimit_is_upper_bound
@@ -2497,7 +2625,15 @@ theorem Real.bisectionLimit_is_upper_bound
         : Real.IsUpperBound(
               subset,
               Real.bisectionLimit(subset, initial, initialLeftLeqRight)) :=
-  sorry
+  function (y : Real) (yInSubset : y ∈ subset) =>
+    Quotient.induct(
+        function (yArg : Real) =>
+            subset(yArg)
+            → yArg ≤ Real.bisectionLimit(
+                         subset, initial, initialLeftLeqRight),
+        Real.bisectionLimit_is_upper_bound_at_rep(
+            subset, initial, initialLeftLeqRight, initialRightAbove),
+        y)(yInSubset)
 
 -- The limit is the LEAST upper bound: every other upper bound `B`
 -- satisfies `limit ≤ B`. Pointwise: `bisectionLeft(n) ≤ y_n ≤ otherBound`
