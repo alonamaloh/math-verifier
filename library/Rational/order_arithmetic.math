@@ -265,6 +265,26 @@ theorem Rational.LessThan.distinct
         (x y : Rational) (xLessThanY : x < y) : Not(x = y) :=
   And.right(Rational.LessOrEqual(x, y), Not(x = y), xLessThanY)
 
+-- Lift a strict inequality across a function that preserves ≤ and
+-- whose application is injective on equality witnesses. Eliminates
+-- the boilerplate of manually building `And.introduction` for the
+-- `<`-as-`And(≤, ¬=)` encoding at every strict-monotonicity site.
+--
+-- Reads as: "given `weak`/`injection` for `f`, and `x < y`, you get
+-- `f x < f y`." Caller writes `(fx, fy : Rational)` explicitly so the
+-- helper doesn't depend on `f` being apparent in the call.
+theorem Rational.LessThan.lift
+        (x y fx fy : Rational)
+        (weak : x ≤ y → fx ≤ fy)
+        (injection : fx = fy → x = y)
+        (xLessThanY : x < y)
+        : fx < fy :=
+  And.introduction(
+      weak(Rational.LessThan.weaken(x, y, xLessThanY)),
+      function (fxEqFy : fx = fy) =>
+          Rational.LessThan.distinct(x, y, xLessThanY)(
+              injection(fxEqFy)))
+
 -- Weak-then-strict: x ≤ y ∧ y < z → x < z.
 theorem Rational.LessThan.transitive_left
         (x y z : Rational)
@@ -275,8 +295,6 @@ theorem Rational.LessThan.transitive_left
   claim yNotZ : Not(y = z)
     by Rational.LessThan.distinct(y, z, yLessThanZ);
   And.introduction(
-      Rational.LessOrEqual(x, z),
-      Not(x = z),
       Rational.LessOrEqual.transitive(x, y, z, xLeqY, yLeqZ),
       function (xEqualsZ : x = z) =>
         -- y ≤ z = x, so y ≤ x. Combined with x ≤ y, antisymmetry gives
@@ -303,8 +321,6 @@ theorem Rational.LessThan.transitive_right
   claim xNotY : Not(x = y)
     by Rational.LessThan.distinct(x, y, xLessThanY);
   And.introduction(
-      Rational.LessOrEqual(x, z),
-      Not(x = z),
       Rational.LessOrEqual.transitive(x, y, z, xLeqY, yLeqZ),
       function (xEqualsZ : x = z) =>
         -- x ≤ y AND y ≤ z = x, so x ≤ y ≤ x. Antisymmetry: x = y.
@@ -343,18 +359,14 @@ theorem Rational.add_cancel_right (x y z : Rational)
 -- Additive monotonicity (strict): x < y → x + z < y + z.
 theorem Rational.add_preserves_LessThan
         (x y z : Rational) (xLessY : x < y)
-        : x + z < y + z := {
-  claim xLeqY : x ≤ y
-    by Rational.LessThan.weaken(x, y, xLessY);
-  claim xNotY : Not(x = y)
-    by Rational.LessThan.distinct(x, y, xLessY);
-  And.introduction(
-      Rational.LessOrEqual(x + z, y + z),
-      Not(x + z = y + z),
-      Rational.add_preserves_LessOrEqual(x, y, z, xLeqY),
+        : x + z < y + z :=
+  Rational.LessThan.lift(
+      x, y, x + z, y + z,
+      function (xLeqY : x ≤ y) =>
+          Rational.add_preserves_LessOrEqual(x, y, z, xLeqY),
       function (sumEqual : x + z = y + z) =>
-        xNotY(Rational.add_cancel_right(x, y, z, sumEqual)))
-}
+          Rational.add_cancel_right(x, y, z, sumEqual),
+      xLessY)
 
 -- Left-additive strict: x < y → z + x < z + y. Via commutativity.
 theorem Rational.add_left_preserves_LessThan
@@ -411,17 +423,17 @@ theorem Rational.LessOrEqual.negate
 -- Strict order reverses under negation: x < y → -y < -x.
 theorem Rational.LessThan.negate
         (x y : Rational) (xLessY : x < y) : -y < -x :=
-  And.introduction(
-      -y ≤ -x, Not(-y = -x),
-      Rational.LessOrEqual.negate(x, y,
-          Rational.LessThan.weaken(x, y, xLessY)),
+  Rational.LessThan.lift(
+      x, y, -y, -x,
+      function (xLeqY : x ≤ y) =>
+          Rational.LessOrEqual.negate(x, y, xLeqY),
       function (negYEqNegX : -y = -x) =>
-        -- y = -(-y) = -(-x) = x, contradicting x ≠ y.
-        Rational.LessThan.distinct(x, y, xLessY)(
-            Equality.symmetry(
-                calc y = -(-y)
-                     = -(-x)
-                     = x)))
+          -- y = -(-y) = -(-x) = x, contradicting x ≠ y.
+          Equality.symmetry(
+              calc y = -(-y)
+                   = -(-x)
+                   = x),
+      xLessY)
 
 -- IsNonneg(-x) → x ≤ 0. Dual to LessOrEqual_zero_of_IsNonneg.
 theorem Rational.LessOrEqual_zero_of_negate_IsNonneg

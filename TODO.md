@@ -223,12 +223,14 @@ the directories that motivate it.
    `Real/basics.math` chains noted in the audit are next.
 
 5. **`obtain ⟨a, b, c⟩ from …` cannot flat-destructure nested
-   existentials and conjunctions.** `Natural/division.math:119-179`
+   existentials and conjunctions.** ~~`Natural/division.math:119-179`
    is 60 lines whose math is `let ⟨q, r, eq, bound⟩ := w;
    ⟨succ(q), r, …, …⟩`. The current pattern needs three nested
-   `Exists.eliminate` and an `And.eliminate`. Remedy: allow
-   `let ⟨a, b, c, d⟩ := h` for `h : ∃ a. ∃ b. P ∧ Q`. Likely a small
-   extension of the existing single-level destructure.
+   `Exists.eliminate` and an `And.eliminate`.~~ **Already fixed** —
+   `elaborateCasesExpression` right-associates `⟨a, b, c, d⟩` over
+   any chain of 2-arg single-constructor inductives (`Exists`,
+   `And`, `Sigma`). See division.math:117 (4-element destructure
+   across `∃∃∧`). TODO entry was stale.
 
 6. **`by_induction … using` (prime_divisor v3 style) needs the
    return-type ascription stripped.** Its last 2 lines remain CIC
