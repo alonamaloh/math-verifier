@@ -1,12 +1,23 @@
 #include "kernel.hpp"
+#include "printer.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <functional>
 #include <map>
 #include <string>
 #include <utility>
+#include <vector>
 
 bool kernelCheckInvariants = false;
+
+// Instrumentation knobs. See kernel.hpp for the full contract. Defaults
+// (zero / false) leave the kernel running unchanged; main.cpp populates
+// them from KERNEL_STEP_LIMIT / KERNEL_TRACE / KERNEL_PROFILE env vars.
+uint64_t kernelStepLimit = 0;
+uint64_t kernelTraceInterval = 0;
+bool kernelProfileEnabled = false;
+std::size_t kernelDumpWidth = 240;
 
 namespace {
 
@@ -14,6 +25,161 @@ namespace {
 // call back into inferType) don't recursively re-check their own work.
 // We only run the invariant check at the outermost public-API call.
 thread_local bool isCurrentlyCheckingInvariants = false;
+
+// Per-top-level-call instrumentation state. Reset at the start of each
+// public addAxiom/addDefinition/addInductive entry; used by the WHNF,
+// isDefinitionallyEqual, and inferType bodies to detect runaway work,
+// emit periodic tracing breadcrumbs, and tally δ-reductions.
+//
+// All accesses happen on the same thread that owns the kernel call, so a
+// thread_local is sufficient — no atomics needed.
+thread_local uint64_t kernelStepCounter = 0;
+
+// Most recently observed expressions for each operation. We update these
+// at every step (cheap shared_ptr copies) so that when the step limit
+// fires, the resulting error can include a snippet of where the kernel
+// was working. The "operation tag" identifies which call site we're in.
+thread_local const char* kernelLastOperation = nullptr;
+thread_local ExpressionPointer kernelLastLeft;
+thread_local ExpressionPointer kernelLastRight;
+
+// δ-reduction counts by definition name, populated only when
+// kernelProfileEnabled is true. Emitted from the top-level entry-point
+// wrapper when the call completes.
+thread_local std::map<std::string, uint64_t> kernelProfileCounts;
+
+// Render an expression for a diagnostic message. The full pretty-print
+// can be huge; we truncate to keep error messages and trace breadcrumbs
+// readable.
+std::string renderForDiagnostic(ExpressionPointer expression) {
+    if (!expression) return "<null>";
+    std::string text = prettyPrint(expression);
+    if (text.size() > kernelDumpWidth) {
+        text = text.substr(0, kernelDumpWidth) + " …(+" +
+               std::to_string(text.size() - kernelDumpWidth) + " bytes)";
+    }
+    return text;
+}
+
+// Bump the step counter and, if instrumentation is enabled, emit a
+// breadcrumb every kernelTraceInterval steps and throw when the limit
+// is reached. `operation` identifies the call site (a literal C string
+// like "whnf" or "isDefEq"); `left` and `right` are the expressions
+// currently being worked on (right may be null for unary operations).
+//
+// Inlined hot path: when both knobs are off (the default), this is one
+// integer increment and two compares.
+inline void kernelStep(const char* operation,
+                       ExpressionPointer left,
+                       ExpressionPointer right = nullptr) {
+    ++kernelStepCounter;
+    kernelLastOperation = operation;
+    kernelLastLeft = left;
+    kernelLastRight = right;
+    if (kernelTraceInterval > 0 &&
+        kernelStepCounter % kernelTraceInterval == 0) {
+        std::fprintf(stderr,
+                     "[kernel step %llu] %s\n"
+                     "  left:  %s\n",
+                     (unsigned long long)kernelStepCounter,
+                     operation,
+                     renderForDiagnostic(left).c_str());
+        if (right) {
+            std::fprintf(stderr,
+                         "  right: %s\n",
+                         renderForDiagnostic(right).c_str());
+        }
+    }
+    if (kernelStepLimit > 0 && kernelStepCounter > kernelStepLimit) {
+        // Dump the in-flight δ-profile before throwing — the destructor on
+        // KernelInstrumentationScope WOULD do it on stack unwind, but in
+        // practice the elaborator's outer error handling can swallow the
+        // stderr ordering, so we emit it eagerly here as well.
+        if (kernelProfileEnabled) {
+            std::fprintf(
+                stderr,
+                "[kernel profile, on step-limit] %llu total step(s)\n",
+                (unsigned long long)kernelStepCounter);
+            std::vector<std::pair<uint64_t, std::string>> sorted;
+            for (const auto& [name, count] : kernelProfileCounts) {
+                sorted.emplace_back(count, name);
+            }
+            std::sort(sorted.begin(), sorted.end(),
+                      [](const auto& a, const auto& b) {
+                          return a.first > b.first;
+                      });
+            std::size_t shown = 0;
+            for (const auto& [count, name] : sorted) {
+                if (count < 100) break;
+                if (shown++ >= 15) break;
+                std::fprintf(stderr,
+                             "  δ %-50s %llu\n",
+                             name.c_str(),
+                             (unsigned long long)count);
+            }
+        }
+        std::string message =
+            "kernel step limit (" + std::to_string(kernelStepLimit) +
+            ") exceeded in " + std::string(operation) +
+            "; aborting to prevent unbounded work.\n"
+            "  left:  " + renderForDiagnostic(left);
+        if (right) {
+            message += "\n  right: " + renderForDiagnostic(right);
+        }
+        throw TypeError(std::move(message));
+    }
+}
+
+// Count one δ-reduction of the named constant for profile reporting.
+// No-op when profiling is off.
+inline void kernelCountDelta(const std::string& constantName) {
+    if (kernelProfileEnabled) {
+        ++kernelProfileCounts[constantName];
+    }
+}
+
+// Reset all per-top-level instrumentation state. Called from addAxiom /
+// addDefinition / addInductive before any kernel work runs, and (if
+// profiling is enabled) emits a one-line summary on completion via the
+// KernelInstrumentationScope RAII guard below.
+struct KernelInstrumentationScope {
+    std::string declarationName;
+    explicit KernelInstrumentationScope(std::string name)
+            : declarationName(std::move(name)) {
+        kernelStepCounter = 0;
+        kernelLastOperation = nullptr;
+        kernelLastLeft.reset();
+        kernelLastRight.reset();
+        kernelProfileCounts.clear();
+    }
+    ~KernelInstrumentationScope() {
+        if (kernelProfileEnabled) {
+            std::fprintf(
+                stderr,
+                "[kernel profile] %s: %llu total step(s)\n",
+                declarationName.c_str(),
+                (unsigned long long)kernelStepCounter);
+            // Sort by count desc, show top 10.
+            std::vector<std::pair<uint64_t, std::string>> sorted;
+            for (const auto& [name, count] : kernelProfileCounts) {
+                sorted.emplace_back(count, name);
+            }
+            std::sort(sorted.begin(), sorted.end(),
+                      [](const auto& a, const auto& b) {
+                          return a.first > b.first;
+                      });
+            std::size_t shown = 0;
+            for (const auto& [count, name] : sorted) {
+                if (count < 100) break;
+                if (shown++ >= 10) break;
+                std::fprintf(stderr,
+                             "  δ %-50s %llu\n",
+                             name.c_str(),
+                             (unsigned long long)count);
+            }
+        }
+    }
+};
 
 // Rejects names that are empty, contain control characters, or begin with
 // `@` (reserved by the printer for kernel-internal free variables). Used
@@ -484,6 +650,7 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
                                      ExpressionPointer expression,
                                      int fuel) {
     while (true) {
+        kernelStep("whnf", expression);
         if (--fuel <= 0) {
             throw TypeError(
                 "weakHeadNormalForm: reduction did not terminate within "
@@ -507,6 +674,7 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
                             " universe argument(s); definition declares " +
                             std::to_string(definition->universeParameters.size()));
                     }
+                    kernelCountDelta(constant->name);
                     auto body = definition->body;
                     if (!definition->universeParameters.empty()) {
                         body = substituteUniverseLevels(
@@ -804,6 +972,7 @@ bool isDefinitionallyEqual(const Environment& environment,
                            ExpressionPointer left,
                            ExpressionPointer right,
                            int fuel) {
+    kernelStep("isDefEq", left, right);
     if (--fuel <= 0) {
         // Conservative on exhaustion: don't claim equality we can't prove.
         return false;
@@ -1261,6 +1430,7 @@ void addAxiom(Environment& environment,
     if (environment.declarations.count(name)) {
         throw TypeError("addAxiom: name already declared: " + name);
     }
+    KernelInstrumentationScope instrumentationScope("axiom " + name);
     auto kindOfType = weakHeadNormalForm(
         environment, inferType(environment, {}, declaredType));
     if (!std::holds_alternative<Sort>(kindOfType->node)) {
@@ -1283,6 +1453,7 @@ void addDefinition(Environment& environment,
     if (environment.declarations.count(name)) {
         throw TypeError("addDefinition: name already declared: " + name);
     }
+    KernelInstrumentationScope instrumentationScope("definition " + name);
     auto kindOfType = weakHeadNormalForm(
         environment, inferType(environment, {}, declaredType));
     if (!std::holds_alternative<Sort>(kindOfType->node)) {
@@ -1691,6 +1862,7 @@ void addInductive(Environment& environment, std::string inductiveName,
     if (environment.declarations.count(inductiveName)) {
         throw TypeError("addInductive: name already declared: " + inductiveName);
     }
+    KernelInstrumentationScope instrumentationScope("inductive " + inductiveName);
     // The kind must itself be a well-formed type. Walk the Pi-chain to
     // count Pis and find the terminal Sort.
     auto kindOfKind = weakHeadNormalForm(

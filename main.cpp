@@ -8,6 +8,7 @@
 #include "serialize.hpp"
 #include "surface.hpp"
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -5467,6 +5468,35 @@ int verifyFiles(const std::vector<std::string>& filenames) {
 } // namespace
 
 int main(int argc, char* argv[]) {
+    // Honor the optional kernel-instrumentation env vars before any kernel
+    // work runs. All three default to "off"; setting them costs nothing on
+    // the steady-state hot path beyond a single integer compare.
+    if (const char* limit = std::getenv("KERNEL_STEP_LIMIT")) {
+        char* parseEnd = nullptr;
+        unsigned long long parsed = std::strtoull(limit, &parseEnd, 10);
+        if (parseEnd != limit && *parseEnd == '\0') {
+            kernelStepLimit = parsed;
+        }
+    }
+    if (const char* interval = std::getenv("KERNEL_TRACE")) {
+        char* parseEnd = nullptr;
+        unsigned long long parsed = std::strtoull(interval, &parseEnd, 10);
+        if (parseEnd != interval && *parseEnd == '\0') {
+            kernelTraceInterval = parsed;
+        }
+    }
+    if (const char* profile = std::getenv("KERNEL_PROFILE")) {
+        std::string value = profile;
+        kernelProfileEnabled = (value == "1" || value == "true");
+    }
+    if (const char* width = std::getenv("KERNEL_DUMP_WIDTH")) {
+        char* parseEnd = nullptr;
+        unsigned long long parsed = std::strtoull(width, &parseEnd, 10);
+        if (parseEnd != width && *parseEnd == '\0' && parsed > 0) {
+            kernelDumpWidth = (std::size_t)parsed;
+        }
+    }
+
     if (argc >= 3 && std::string(argv[1]) == "verify") {
         // Two forms:
         //   kernel verify FILE.math FILE.math ...                  (legacy)

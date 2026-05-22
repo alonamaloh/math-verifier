@@ -2,6 +2,7 @@
 
 #include "expression.hpp"
 
+#include <cstdint>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -301,6 +302,39 @@ constexpr int defaultFuel = 10000;
 // cost of type-checking but catches the entire class of "kernel produced
 // internally-inconsistent output" bugs. Off by default; tests enable it.
 extern bool kernelCheckInvariants;
+
+// ---- Optional kernel instrumentation -------------------------------------
+//
+// Three independently-controlled knobs, all opt-in (off = zero cost beyond
+// one branch per kernel-step). Set from env vars in main.cpp before any
+// type-checking runs.
+//
+//   kernelStepLimit:    abort with TypeError when the per-top-level step
+//                       counter exceeds this. 0 = no limit. Useful for
+//                       turning a hang into a localised, debuggable error.
+//
+//   kernelTraceInterval: when > 0, emit one diagnostic line to stderr every
+//                       N steps. Each line names the current operation
+//                       (whnf / isDefEq / inferType) and the head of the
+//                       expression(s) being processed.
+//
+//   kernelProfileEnabled: tally δ-reductions by definition name; on top-
+//                       level call completion, emit a one-line summary if
+//                       any single definition was unfolded more than a
+//                       small threshold. Off by default.
+//
+// The counters are thread_local; the kernel itself is single-threaded but
+// this lets a host embed multiple kernel sessions in different threads.
+// The reset point is each public entry (addAxiom/addDefinition/addInductive)
+// and the diagnostic printing/limit-checking only fires inside those.
+extern uint64_t kernelStepLimit;
+extern uint64_t kernelTraceInterval;
+extern bool kernelProfileEnabled;
+
+// Truncate diagnostic expression dumps to this many characters. Bumped from
+// the default of 240 when investigating an issue where the truncated form
+// hides the diverging subterm.
+extern std::size_t kernelDumpWidth;
 
 // Reduces only the head: enough to see whether the outermost form is a
 // Sort, Pi, Lambda, etc. Unfolds definitions in head position
