@@ -984,6 +984,37 @@ theorem Real.LessOrEqual_of_pointwise_at_make
         }
   }
 
+-- Lift to arbitrary Real B via Quotient.induct: case on B = mk(b_rep),
+-- pattern-match the rep, hand off to the at_make form.
+theorem Real.LessOrEqual_of_pointwise
+        (s : Natural → Rational)
+        (sIsCauchy : Rational.sequence.IsCauchy(s))
+        (B : Real)
+        (pointwiseLeq : (n : Natural) → (s(n) : Real) ≤ B)
+        : (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real)
+            ≤ B :=
+  Quotient.induct(
+      function (BArg : Real) =>
+          ((n : Natural) → (s(n) : Real) ≤ BArg)
+          → (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real)
+              ≤ BArg,
+      function (b_rep : CauchyRationalSequence) =>
+          (cases b_rep {
+             | CauchyRationalSequence.make(b, bIsCauchy) =>
+                 function (ptLeq
+                              : (n : Natural)
+                                → (s(n) : Real)
+                                    ≤ (Quotient.mk(
+                                          CauchyRationalSequence.make(b, bIsCauchy))
+                                        : Real)) =>
+                     Real.LessOrEqual_of_pointwise_at_make(
+                         s, sIsCauchy, b, bIsCauchy, ptLeq)
+           } : ((n : Natural)
+                  → (s(n) : Real) ≤ (Quotient.mk(b_rep) : Real))
+                 → (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real)
+                     ≤ (Quotient.mk(b_rep) : Real)),
+      B)(pointwiseLeq)
+
 -- I4: the lower-bound sequence is Cauchy at the rational level.
 -- The bound is `|aₘ - aₙ| < ε` once both indices exceed a suitable
 -- N depending on `(b0 - a0)` and ε (geometric series majorant).
@@ -1020,17 +1051,46 @@ theorem Real.bisectionLimit_is_upper_bound
   sorry
 
 -- The limit is the LEAST upper bound: every other upper bound `B`
--- satisfies `limit ≤ B`.
+-- satisfies `limit ≤ B`. Pointwise: `bisectionLeft(n) ≤ y_n ≤ otherBound`
+-- via bisectionLeft_below_witness + otherIsUpper applied at the witness.
+-- Then LessOrEqual_of_pointwise lifts the pointwise bound to the limit.
 theorem Real.bisectionLimit_is_least
-        (subset : Set(Real)) (x0 : Real)
+        (subset : Set(Real))
         (initial : Real.BisectionInterval)
-        (initialLeftBelow
-            : (Real.BisectionInterval.left(initial) : Real) ≤ x0)
-        (x0InS : x0 ∈ subset)
+        (initialLeftBelowSome
+            : ∃ (y : Real).
+                  And(y ∈ subset,
+                      (Real.BisectionInterval.left(initial) : Real) ≤ y))
         (otherBound : Real)
         (otherIsUpper : Real.IsUpperBound(subset, otherBound))
         : Real.bisectionLimit(subset, initial) ≤ otherBound :=
-  sorry
+  Real.LessOrEqual_of_pointwise(
+      Real.bisectionLeft(subset, initial),
+      Real.bisectionLeft_is_cauchy(subset, initial),
+      otherBound,
+      function (n : Natural) => {
+        obtain ⟨witnessY, yInSAndAnLeqY⟩
+            from Real.bisectionLeft_below_witness(
+                     subset, initial, initialLeftBelowSome, n);
+        claim yInS : witnessY ∈ subset
+          by And.left(
+                 witnessY ∈ subset,
+                 (Real.bisectionLeft(subset, initial, n) : Real) ≤ witnessY,
+                 yInSAndAnLeqY);
+        claim anLeqY
+              : (Real.bisectionLeft(subset, initial, n) : Real)
+                ≤ witnessY
+          by And.right(
+                 witnessY ∈ subset,
+                 (Real.bisectionLeft(subset, initial, n) : Real) ≤ witnessY,
+                 yInSAndAnLeqY);
+        Real.LessOrEqual.transitive(
+            (Real.bisectionLeft(subset, initial, n) : Real),
+            witnessY,
+            otherBound,
+            anLeqY,
+            otherIsUpper(witnessY, yInS))
+      })
 
 -- ----------------------------------------------------------------------
 -- Headline theorem.
@@ -1053,6 +1113,19 @@ theorem Real.supremum_exists
          Real.LessOrEqual.transitive(
              y, B0real, (b0 : Real),
              B0IsUpper(y, yInS), B0LeqB0);
+  -- Package x0 + a0LeqX0 + x0InS as the existential witness needed
+  -- by bisectionLeft_below_witness / bisectionLimit_is_least.
+  claim initialLeftBelowSome
+        : ∃ (y : Real).
+              And(y ∈ subset,
+                  (Real.BisectionInterval.left(initial) : Real) ≤ y)
+    by Exists.introduce(
+           Real,
+           function (y : Real) =>
+               And(y ∈ subset,
+                   (Real.BisectionInterval.left(initial) : Real) ≤ y),
+           x0,
+           And.introduction(x0InS, a0LeqX0));
   let supValue : Real := Real.bisectionLimit(subset, initial);
   witness supValue with
       And.introduction(
@@ -1062,6 +1135,6 @@ theorem Real.supremum_exists
           function (otherBound : Real)
                    (otherIsUpper : Real.IsUpperBound(subset, otherBound)) =>
             Real.bisectionLimit_is_least(
-                subset, x0, initial, a0LeqX0, x0InS,
+                subset, initial, initialLeftBelowSome,
                 otherBound, otherIsUpper))
 }
