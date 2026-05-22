@@ -46,6 +46,22 @@ chain in roughly the order listed.
   "non-negative on every representative beyond N"). Independent of
   the field issue; useful on its own and a prerequisite for any
   monotonicity lemma. Same apartness wrinkle if you want strict <.
+
+- **Real completeness (sup property).** `Real.supremum_exists` in
+  `Real/supremum.math` — every nonempty subset of Real that's
+  bounded above has a least upper bound. Stub committed (586c028)
+  with vocabulary in place; body is `sorry`.
+  - Set vocabulary (`Set.basics`): `Set(T)`, `Set.member`,
+    `Set.subset`, `Set.IsNonempty`, plus `∈` / `⊆` operators with
+    wildcard dispatch.
+  - Real bounds: `Real.IsUpperBound`, `Real.IsBoundedAbove`,
+    `Real.IsSupremum`.
+  - Plan: bisection on rational midpoints, classical (excluded
+    middle) at each step. Cauchy sequence of `aₙ : Rational`
+    converges to the sup. Sub-lemmas needed: a Rational below any
+    given Real (extract from any Cauchy rep), Real-Cauchy-of-
+    monotone-bounded → Real limit, limit-of-aₙ-is-upper-bound,
+    limit-is-least-upper-bound. ~300-400 lines.
 - **More generic abelian-group / ring / field lemmas** as the
   Real and PAdic proofs surface them. Foundation in
   `Algebra/{group_lemmas,ring_lemmas}.math` covers
