@@ -389,11 +389,103 @@ theorem Real.bisectionRight_is_upper_bound
             : Real.IsUpperBound(
                   subset,
                   (Real.BisectionInterval.right(initial) : Real)))
-        (n : Natural)
-        : Real.IsUpperBound(
-              subset,
-              (Real.bisectionRight(subset, initial, n) : Real)) :=
-  sorry
+        : (n : Natural)
+          → Real.IsUpperBound(
+                subset,
+                (Real.bisectionRight(subset, initial, n) : Real))
+  | zero => initialRightAbove
+  | successor(predecessor) => {
+      claim IH
+            : Real.IsUpperBound(
+                  subset,
+                  (Real.bisectionRight(subset, initial, predecessor) : Real))
+        by Real.bisectionRight_is_upper_bound(
+               subset, initial, initialRightAbove, predecessor);
+      cases Logic.classical_decidable(
+              Real.IsUpperBound(
+                  subset,
+                  (Rational.halve(
+                       Real.BisectionInterval.left(
+                           Real.bisectionIntervals(subset, initial, predecessor))
+                       + Real.BisectionInterval.right(
+                           Real.bisectionIntervals(subset, initial, predecessor)))
+                   : Real))) with decisionEq {
+        | Logic.Decidable.yes(midIsUpper) =>
+            Equality.transport_proposition(
+                function (decision
+                          : Logic.Decidable(
+                                Real.IsUpperBound(
+                                    subset,
+                                    (Rational.halve(
+                                         Real.BisectionInterval.left(
+                                             Real.bisectionIntervals(
+                                                 subset, initial, predecessor))
+                                         + Real.BisectionInterval.right(
+                                             Real.bisectionIntervals(
+                                                 subset, initial, predecessor)))
+                                     : Real)))) =>
+                    Real.IsUpperBound(
+                        subset,
+                        (Real.BisectionInterval.right(
+                             Real.bisectionStepWithDec(
+                                 subset,
+                                 Real.bisectionIntervals(
+                                     subset, initial, predecessor),
+                                 decision))
+                         : Real)),
+                Logic.Decidable.yes(midIsUpper),
+                Logic.classical_decidable(
+                    Real.IsUpperBound(
+                        subset,
+                        (Rational.halve(
+                             Real.BisectionInterval.left(
+                                 Real.bisectionIntervals(
+                                     subset, initial, predecessor))
+                             + Real.BisectionInterval.right(
+                                 Real.bisectionIntervals(
+                                     subset, initial, predecessor)))
+                         : Real))),
+                Equality.symmetry(decisionEq),
+                midIsUpper)
+        | Logic.Decidable.no(midNotUpper) =>
+            Equality.transport_proposition(
+                function (decision
+                          : Logic.Decidable(
+                                Real.IsUpperBound(
+                                    subset,
+                                    (Rational.halve(
+                                         Real.BisectionInterval.left(
+                                             Real.bisectionIntervals(
+                                                 subset, initial, predecessor))
+                                         + Real.BisectionInterval.right(
+                                             Real.bisectionIntervals(
+                                                 subset, initial, predecessor)))
+                                     : Real)))) =>
+                    Real.IsUpperBound(
+                        subset,
+                        (Real.BisectionInterval.right(
+                             Real.bisectionStepWithDec(
+                                 subset,
+                                 Real.bisectionIntervals(
+                                     subset, initial, predecessor),
+                                 decision))
+                         : Real)),
+                Logic.Decidable.no(midNotUpper),
+                Logic.classical_decidable(
+                    Real.IsUpperBound(
+                        subset,
+                        (Rational.halve(
+                             Real.BisectionInterval.left(
+                                 Real.bisectionIntervals(
+                                     subset, initial, predecessor))
+                             + Real.BisectionInterval.right(
+                                 Real.bisectionIntervals(
+                                     subset, initial, predecessor)))
+                         : Real))),
+                Equality.symmetry(decisionEq),
+                IH)
+      }
+  }
 
 -- I4: the lower-bound sequence is Cauchy at the rational level.
 -- The bound is `|aₘ - aₙ| < ε` once both indices exceed a suitable
