@@ -4,64 +4,13 @@ Planned work, in rough priority / dependency order. Once an item
 lands, delete it from this file — the commit history and the project
 state (`README.md`, `CLAUDE.md`) are the record of what was done.
 
-## Library content (in flight)
+## Library content
 
-The math content roadmap. Each item is independently useful; they
-chain in roughly the order listed.
+The math content roadmap. Real is now closed under field ops AND the
+supremum property (`Real.supremum_exists` in `Real/supremum.math`),
+so it's a complete ordered field — fully formalized. PAdic remains
+closed under ring ops + the p-adic norm.
 
-- **Real is a field — fully proved.** `Real.is_field` in
-  `Real/field.math`. No sorry anywhere in the dependency chain.
-  - Path: classical, via `Logic.excluded_middle` (axiom).
-    `Logic/excluded_middle.math` derives double-negation-eliminate,
-    ¬∀ → ∃¬, ¬(A → B) → A ∧ ¬B. `Rational/linearity.math` derives
-    total order linearity + `not_LessThan_implies_LessOrEqual`.
-  - `Real/apartness.math`: `cauchy_apartness_from_zero` extracts
-    (K > 0, M) with K ≤ |sequenceFunction(s, m)| for m ≥ M from
-    ¬CauchyEquivalent(s, constant_zero). ε/2 + triangle + cancel-
-    left.
-  - `Rational/reciprocal_function.math`: a total
-    `Rational.reciprocal_function : Rational → Rational`. Built by
-    Natural-pair recursion at the rep level, lifted via two
-    Quotient.lifts. Respect via uniqueness-of-inverse calc.
-    Multiplication law `x · reciprocal_function(x) = 1` for nonzero
-    x via Quotient.induct + sign_split.
-  - `Real/reciprocal.math`: the pointwise reciprocal sequence built
-    on `Rational.reciprocal_function`, plus the analytic IsCauchy
-    proof. Helpers proved locally:
-    `Rational.reciprocal_function_subtract_identity` (the algebraic
-    identity `1/a - 1/b = (b - a) · (1/a · 1/b)`),
-    `Rational.LessThan.multiply_cancel_right` (strict cancellation,
-    via excluded_middle on `x = y` + LessOrEqual.linear on the other
-    branch). The IsCauchy proof: identity → multiply by s(m)·s(n)
-    → absolute value gives `|ra - rb| · |s(m)| · |s(n)| = |s(n)
-    - s(m)|`; chain `K·K ≤ |s(m)|·|s(n)|` (two
-    multiply_by_nonneg_right steps) with the Cauchy bound at
-    ε·K·K, then strict-cancel K·K.
-  - `Real/field.math`: `Real.zero_not_equal_one` (Quotient.exact at
-    ε = 1), `Real.reciprocal_cauchy_sequence_multiplies` (the product
-    is identically Rational.one beyond apartnessIndex),
-    `Real.reciprocal_exists_for_nonzero`, `Real.is_field`.
-- **Real order.** `Real.LessOrEqual` / `Real.LessThan` (via "eventually
-  ≥ a positive Rational for some Cauchy representative" or
-  "non-negative on every representative beyond N"). Independent of
-  the field issue; useful on its own and a prerequisite for any
-  monotonicity lemma. Same apartness wrinkle if you want strict <.
-
-- **Real completeness (sup property).** `Real.supremum_exists` in
-  `Real/supremum.math` — every nonempty subset of Real that's
-  bounded above has a least upper bound. Stub committed (586c028)
-  with vocabulary in place; body is `sorry`.
-  - Set vocabulary (`Set.basics`): `Set(T)`, `Set.member`,
-    `Set.subset`, `Set.IsNonempty`, plus `∈` / `⊆` operators with
-    wildcard dispatch.
-  - Real bounds: `Real.IsUpperBound`, `Real.IsBoundedAbove`,
-    `Real.IsSupremum`.
-  - Plan: bisection on rational midpoints, classical (excluded
-    middle) at each step. Cauchy sequence of `aₙ : Rational`
-    converges to the sup. Sub-lemmas needed: a Rational below any
-    given Real (extract from any Cauchy rep), Real-Cauchy-of-
-    monotone-bounded → Real limit, limit-of-aₙ-is-upper-bound,
-    limit-is-least-upper-bound. ~300-400 lines.
 - **More generic abelian-group / ring / field lemmas** as the
   Real and PAdic proofs surface them. Foundation in
   `Algebra/{group_lemmas,ring_lemmas}.math` covers
@@ -69,6 +18,55 @@ chain in roughly the order listed.
   `zero_multiply`, `multiply_zero`, `multiply_negate_left/right`,
   `negate_multiply_negate`. Add more here as concrete-carrier
   proofs find themselves wanting them.
+
+## Elaborator quirks (small open issues)
+
+- **`X ∈ S` operator dispatch trips on `(Quotient.mk(rep) : T)`
+  ascription.** The `∈` operator desugars to `Set.member`, whose
+  implicit `{T : Type(0)}` parameter is inferred from the subject's
+  type. When the subject is `Quotient.mk(rep)` short-form wrapped in
+  `(... : Real)`, the elaborator fails the kernel typecheck with
+  "expected Type 0, actual Π Π Proposition" — apparently misaligning
+  Quotient.mk's args with Set.member's implicit T. Workaround used in
+  `supremum.math`: write `S(...)` directly (definitionally equivalent
+  — `∈` → `Set.member` → subset application). Worth fixing.
+
+- **`by_induction … using` (prime_divisor v3 style) needs the
+  return-type ascription stripped.** Its last 2 lines remain CIC
+  plumbing in an otherwise textbook proof. Until that's fixed, new
+  strong-induction proofs should follow v2's style.
+
+- **`by bridge` for pattern-match definitions on quotient reps.**
+  Every binary-op respect proof in `Real/` and `PAdic/` spends ~30
+  lines converting `sequenceFunction(add(rep1, rep2), m)` into
+  `sequenceFunction(rep1, m) + sequenceFunction(rep2, m)` via manual
+  `cases` + `reflexivity`. Remedy: a tactic that exposes a
+  pattern-match definition's β-reduction as a one-step calc rewrite
+  when the matched argument is structurally a constructor.
+
+  **Investigated, not landed.** Two routes failed: (a) library-side
+  at_make refactor — the kernel does ι-reduce, but `rewrite`'s
+  `abstractStructuralOccurrence` matcher does only structural compare
+  without reduction, so the rewrite target can't be found inside the
+  reduced term. (b) Adding WHNF to the matcher — WHNF stops at the
+  outer `Rational.subtract` head and doesn't reach inner
+  `sequenceFunction(make(...))` calls. Real fix needs either
+  deep-β/ι matching (expensive) or `isDefinitionallyEqual`-based
+  matching with unique-occurrence detection (open design question).
+
+- **`rewrite` outside `calc` — reverse-direction + in-place forms.**
+  The 2-arg `rewrite(eq, term)` term-level form covers the
+  witness-transport sites. Still missing: a reverse-direction form
+  (`← L`) and a "rewrite a hypothesis in place" form for `let` /
+  `claim` bindings.
+
+- **`Quotient.mk`-with-ascription in unusual operator positions.**
+  Tracking the boundary of where the short form fires. The `∈`
+  issue above is the latest exemplar. Earlier we found the operand
+  of unary `-`, polymorphic-function args without expected type
+  propagation, and `Equality.transport_proposition`'s carrier slot.
+  Each one is a small inference-driver hole — worth a single
+  consolidated pass once a clean unifier extension is on the table.
 
 ## Calc auto-prover — smaller open follow-ups
 
@@ -193,108 +191,9 @@ Order of operations:
      code).
   3. Sweep the literal-rational construction sites.
 
-## Ergonomics — top friction points
-
-From a full-library audit (2026-05-17). Each item is annotated with
-the directories that motivate it.
-
-1. **Case-on-expression with retained equation.** ~~The function-wrap
-   pattern from `CLAUDE.md` ("`cases` with hypothesis") appears 20+
-   times in `Natural/padic_valuation.math`, 8 times in
-   `Natural/divide.math` alone, plus heavy use elsewhere.~~ **Fixed:**
-   `cases X with <equalityHypothesisName> { | c₁ => … | c₂ => … }`
-   binds `<equalityHypothesisName> : X = c_i` in each arm via the
-   convoy desugaring. Remaining work: sweep the library to apply
-   it to the 50+ function-then-apply sites. (Like the prior
-   `rewrite(eq, term)` sweep, mechanical and per-file.)
-
-2. **`rewrite` only fires inside `calc` steps.** ~~Outside `calc`,
-   users fall back to the 6-arg
-   `Equality.transport_proposition(T, motive, x, y, eq, term)`
-   form.~~ **Partial fix landed:** the 2-arg `rewrite(eq, term)`
-   term-level form desugars to `Equality.transport_proposition(...)`
-   automatically, recovering the motive from `term`'s inferred type.
-   Covers the witness-transport sites (40+ in `Natural/divide.math`
-   etc.). Still missing: a reverse-direction form (`← L`) and a
-   "rewrite a hypothesis in place" form for `let` / `claim` bindings.
-
-3. **Short `Quotient.mk` blocked under `+`, `*`, `=`, `≤`.** ~~Bloats
-   `Integer/ring.math` by ~30% and shows up across `Rational/`
-   files.~~ **Fixed:** binary `+`/`*`/`-`/`=`/`≤`/`<` and unary `-`
-   propagate the outer expected type (when it's a Constant head) to
-   the LEFT operand, and propagate left's inferred type to the RIGHT
-   operand. Removes the 70+ verbose `Quotient.mk(RationalRepresentative,
-   RationalEquivalent, X)` sites — sweep landed in 3846040.
-
-4. **`Or.eliminate` / `Exists.eliminate` / `And.eliminate` re-type
-   the motive.** ~~Pyramids dominate `Natural/prime_split.math`,
-   `Integer/absolute_value_multiplicative.math`, Cauchy-equivalence
-   transitivity in `Real/basics.math`.~~ **Fixed:** the existing
-   `cases X { | Or.introduceLeft(p) => … | Or.introduceRight(q) =>
-   … }` handles `Or` (and other inductives) directly — no new
-   syntax needed. Library sweep landed in aa1607a + 85352d4
-   retiring all 17 non-`cases` `Or.eliminate` sites. Remaining
-   targets if more 4-way / ∃-unpack chains appear: extend the same
-   pattern. The `Integer/absolute_value_multiplicative.math` and
-   `Real/basics.math` chains noted in the audit are next.
-
-5. **`obtain ⟨a, b, c⟩ from …` cannot flat-destructure nested
-   existentials and conjunctions.** ~~`Natural/division.math:119-179`
-   is 60 lines whose math is `let ⟨q, r, eq, bound⟩ := w;
-   ⟨succ(q), r, …, …⟩`. The current pattern needs three nested
-   `Exists.eliminate` and an `And.eliminate`.~~ **Already fixed** —
-   `elaborateCasesExpression` right-associates `⟨a, b, c, d⟩` over
-   any chain of 2-arg single-constructor inductives (`Exists`,
-   `And`, `Sigma`). See division.math:117 (4-element destructure
-   across `∃∃∧`). TODO entry was stale.
-
-6. **`by_induction … using` (prime_divisor v3 style) needs the
-   return-type ascription stripped.** Its last 2 lines remain CIC
-   plumbing in an otherwise textbook proof. Until that's fixed, new
-   strong-induction proofs should follow v2's style.
-
-7. **`by bridge` for pattern-match definitions on quotient reps.**
-   Every binary-op respect proof in `Real/` and `PAdic/` spends ~30
-   lines converting `sequenceFunction(add(rep1, rep2), m)` into
-   `sequenceFunction(rep1, m) + sequenceFunction(rep2, m)` via manual
-   `cases` + `reflexivity`. Remedy: a tactic that exposes a
-   pattern-match definition's β-reduction as a one-step calc rewrite
-   when the matched argument is structurally a constructor.
-
-   **Investigated, not landed.** Two routes failed: (a) library-side
-   at_make refactor — the kernel does ι-reduce, but `rewrite`'s
-   `abstractStructuralOccurrence` matcher does only structural compare
-   without reduction so the rewrite target can't be found inside the
-   reduced term. (b) Adding WHNF to the matcher — WHNF stops at the
-   outer `Rational.subtract` head and doesn't reach inner
-   `sequenceFunction(make(...))` calls. Real fix needs either
-   deep-β/ι matching (expensive) or `isDefinitionallyEqual`-based
-   matching with unique-occurrence detection (open design question).
-
-8. **Strict `<` doesn't transport cleanly.** ~~`LessThan` is `And(≤,
-   Not(_=_))`, so every transport along `<` manually destructures
-   and rebuilds.~~ **Mostly fixed:** the verbose `And.introduction(
-   A, B, x, y)` form was already redundant — the elaborator's
-   leading-argument inference fills A, B from the expected type, so
-   the 2-arg `And.introduction(x, y)` form works at every site where
-   the expected type is an `And`. Library sweep (5cc9900) drops all
-   13 verbose sites. New helper `Rational.LessThan.lift` collapses
-   the strict-mono pattern (weak monotonicity + injection → strict
-   monotonicity) to a 4-arg call.
-
-   Remaining tail: a few sites in `positive.math` etc. that scope-
-   precede `LessThan.weaken`/`distinct` still need `And.left`/
-   `And.right` explicitly. Reordering `Rational/order_arithmetic.math`
-   to define `weaken`/`distinct` earlier would unblock those.
-
-Diff-inference walker + non-calc hook (8dbde1c) was the elaborator
-change that unlocked items 1 (sweep) and 2 (the `claim X : T by P`
-form). Items 3, 4 are now FIXED. Items 1 and 2 sweeps are mechanical
-follow-up.
-
 ## `Algebra/CauchyCompletion`
 
-`Real/*.math` (~2600 lines) and `PAdic/*.math` (~5300 lines) are
+`Real/*.math` (~2800 lines) and `PAdic/*.math` (~5300 lines) are
 ~80% parallel: same Cauchy / bounded definitions, same equivalence
 relation, same Step-1 / Step-2 anchor split in `cauchy_bounded.math`,
 same ε/2-and-triangle pattern in `sum_is_cauchy`, identical lifts
@@ -310,9 +209,8 @@ seminorm parameter can carry its own implicits.
 ## `ring` / `field` tactics — open follow-ups
 
 Ring v2 (distributivity, AC, 0/1 identity, negation, ±1
-cancellation) and the field tactic (`field(h1, h2, …)` with user-
-provided nonzero hypotheses, per-monomial reciprocal contraction)
-have landed. Remaining items, none urgent:
+cancellation) and the field tactic have landed. Remaining items,
+none urgent:
 
 - **Mod-(2⁶⁴ − 59) value-fingerprint prefilter.** Failure-mode
   variant landed (a parenthetical appended to ring/field error
@@ -414,39 +312,6 @@ work entirely in opened forms (matching the other Quotient.*
 desugarings). Reverted to keep `main` clean; resume when there's
 time to debug the index plumbing.
 
-
-## Mixed-relation `calc` chains — DONE
-
-Done in two commits: `elaborator: calc supports mixed =/≤ chains`
-(Phase 1) and `elaborator: calc supports <, ≥, > with strictness
-and direction` (Phase 2). Calc now accepts all five relations as
-step separators with the composition rules from the original table:
-
-| Proving | Allowed in the chain                  |
-|---------|---------------------------------------|
-| `=`     | `=` only                              |
-| `≤`     | `≤` and `=`                           |
-| `<`     | `<`, `≤`, and `=`                     |
-| `≥`     | `≥` and `=`                           |
-| `>`     | `>`, `≥`, and `=`                     |
-
-Strict inequalities escalate the whole chain. Direction is detected
-from the steps; mixing forward (`<`/`≤`) with backward (`>`/`≥`)
-is rejected with a clear error (`=` is allowed in either direction).
-Backward chains are normalised by reversing the endpoint + step
-arrays and flipping `=` step proofs via `Equality.symmetry`.
-
-Composition lemmas are looked up from the operator registry:
-`<T>.LessOrEqual` (its `.transitive` and `.reflexive`) for `≤`, and
-`<T>.LessThan` (its `.transitive_left`, `.transitive_right`,
-`.weaken`) for `<`. Natural's bare `LessOrEqual` inductive is
-handled as a special case (its `.transitive` takes proofs swapped).
-`=` steps get upgraded to `≤` on the fly via
-`Equality.transport_proposition` with motive `λz. a ≤ z` whenever
-the chain isn't all-`=`. `≥`/`>` are also surfaced as expression-
-level operators (a ≥ b desugars to b ≤ a using the same registry
-entry as ≤), so `(h : a ≥ b)` works in theorem types.
-
 ## Opportunistic — smaller items
 
 - **`Quotient.lift_two`.** Sketched in `Logic/quotient.math` but
@@ -454,15 +319,6 @@ entry as ≤), so `(h : a ≥ b)` works in theorem types.
   mismatch through the nested polymorphic lifts. Manual two-step
   lifts (Integer.add pattern) work fine. Revisit when the universe-
   handling code in the elaborator is more robust.
-- **Multi-pattern fix — DONE.** Inner constructor patterns now emit
-  a recursor chain whose motives abstract the destructured position +
-  every later position binder, so dependent equality hypotheses refine
-  under the destructure. The `_after_first…` helper chains in Integer/
-  Rational/PAdic addition/multiplication/negation/basics/cancellation
-  collapsed into single theorems. v1 limitation: inner inductives must
-  be single-constructor, non-indexed, non-recursive (parameterised
-  OK). Multi-constructor inner positions would need cross-row coverage
-  analysis.
 - **PAdic `(p, primality)` → implicit args.** NOT mechanical after
   all. Two blockers found during a sweep attempt:
     (1) **`Rational.padic_*` and `Rational.sequence.*` callees take
