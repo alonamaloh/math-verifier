@@ -75,8 +75,171 @@ definition Real.IsSupremum (subset : Set(Real)) (s : Real)
           → s ≤ otherBound)
 
 -- ----------------------------------------------------------------------
--- The headline theorem. Proof is `sorry` for now — the bisection
--- machinery is being built up below.
+-- Building block #1: every Real has a Rational lower bound.
+--
+-- Given x : Real with Cauchy representative `make(seq, seqCauchy)`,
+-- pick N from the Cauchy witness at ε = 1, then `q := seq(N) - 1` is
+-- below x. Reason: for m ≥ N, `|seq(m) - seq(N)| < 1`, so
+-- `seq(m) > seq(N) - 1 = q`, so the difference sequence
+-- `λn. seq(n) - q` is eventually > 0, hence eventually > -ε for any
+-- positive ε — that's exactly Real.IsNonneg(x - (q : Real)).
+
+theorem Real.exists_rational_below_at_make
+        : (rep : CauchyRationalSequence)
+          → ∃ (q : Rational).
+                (q : Real) ≤ Quotient.mk(rep)
+  | CauchyRationalSequence.make(seq, seqIsCauchy) => {
+      obtain ⟨N, cauchyAt1⟩
+          from seqIsCauchy(Rational.one, Rational.zero_less_one);
+      -- `cauchyAt1 : ∀m ≥ N. ∀n ≥ N. |seq(m) - seq(n)| < 1`.
+      witness seq(N) - Rational.one with
+          -- Goal: (seq(N) - 1 : Real) ≤ Quotient.mk(make(seq, _)).
+          -- LessOrEqual unfolds to Real.IsNonneg of the difference;
+          -- via Quotient.lift this is IsEventuallyNonneg of
+          -- `λn. seq(n) - (seq(N) - 1)` (with the rep destructured
+          -- and (q : Real) reducing to mk(make(λn. q, _))).
+          function (epsilon : Rational)
+                   (epsilonPositive : Rational.zero < epsilon) =>
+            witness N with
+                function (m : Natural) (mGeN : N ≤ m) => {
+                  -- |seq(m) - seq(N)| < 1
+                  claim absBound
+                        : Rational.absolute_value(seq(m) - seq(N))
+                          < Rational.one
+                    by cauchyAt1(m, mGeN, N,
+                                 LessOrEqual.reflexivity(N));
+                  -- -1 < seq(m) - seq(N) from the absolute-value bound.
+                  claim diffBound
+                        : -Rational.one < seq(m) - seq(N)
+                    by And.left(
+                           -Rational.one < seq(m) - seq(N),
+                           seq(m) - seq(N) < Rational.one,
+                           Rational.absolute_value_LessThan_bounds(
+                               seq(m) - seq(N),
+                               Rational.one,
+                               absBound));
+                  -- Add 1 to both sides of `-1 < seq(m) - seq(N)`:
+                  -- `0 < (seq(m) - seq(N)) + 1`, then ring tidies the
+                  -- RHS to `seq(m) - (seq(N) - 1)`. The LHS rewrite
+                  -- uses `add_negate_left` directly (ring v2 can't do
+                  -- the empty-polynomial `-1 + 1 = 0` case).
+                  claim diffPositive
+                        : Rational.zero
+                          < seq(m) - (seq(N) - Rational.one)
+                    by rewrite(
+                           (ring : (seq(m) - seq(N)) + Rational.one
+                                   = seq(m) - (seq(N) - Rational.one)),
+                           rewrite(
+                               Rational.add_negate_left(Rational.one),
+                               Rational.add_preserves_LessThan(
+                                   -Rational.one,
+                                   seq(m) - seq(N),
+                                   Rational.one,
+                                   diffBound)));
+                  -- -ε < 0 < seq(m) - (seq(N) - 1) by transitivity.
+                  Rational.LessThan.transitive_left(
+                      -epsilon, Rational.zero,
+                      seq(m) - (seq(N) - Rational.one),
+                      Rational.LessThan.weaken(
+                          -epsilon, Rational.zero,
+                          Rational.negate_LessThan_zero_of_positive(
+                              epsilon, epsilonPositive)),
+                      diffPositive)
+                }
+   }
+
+-- Lift the at-make form via Quotient.induct.
+theorem Real.exists_rational_below (x : Real)
+        : ∃ (q : Rational). (q : Real) ≤ x :=
+  Quotient.induct(
+      function (xArg : Real) =>
+          ∃ (q : Rational). (q : Real) ≤ xArg,
+      Real.exists_rational_below_at_make,
+      x)
+
+-- ----------------------------------------------------------------------
+-- Building block #2: every Real has a Rational upper bound. Symmetric
+-- to #1 with q := seq(N) + 1; for m ≥ N, |seq(m) - seq(N)| < 1 gives
+-- seq(m) < seq(N) + 1 = q, so q - seq(m) > 0, hence x ≤ (q : Real).
+
+theorem Real.exists_rational_above_at_make
+        : (rep : CauchyRationalSequence)
+          → ∃ (q : Rational).
+                (Quotient.mk(rep) : Real) ≤ (q : Real)
+  | CauchyRationalSequence.make(seq, seqIsCauchy) => {
+      obtain ⟨N, cauchyAt1⟩
+          from seqIsCauchy(Rational.one, Rational.zero_less_one);
+      witness seq(N) + Rational.one with
+          function (epsilon : Rational)
+                   (epsilonPositive : Rational.zero < epsilon) =>
+            witness N with
+                function (m : Natural) (mGeN : N ≤ m) => {
+                  claim absBound
+                        : Rational.absolute_value(seq(m) - seq(N))
+                          < Rational.one
+                    by cauchyAt1(m, mGeN, N,
+                                 LessOrEqual.reflexivity(N));
+                  -- seq(m) - seq(N) < 1 from the absolute-value bound.
+                  claim diffBound
+                        : seq(m) - seq(N) < Rational.one
+                    by And.right(
+                           -Rational.one < seq(m) - seq(N),
+                           seq(m) - seq(N) < Rational.one,
+                           Rational.absolute_value_LessThan_bounds(
+                               seq(m) - seq(N),
+                               Rational.one,
+                               absBound));
+                  -- Negate both sides: from `seq(m) - seq(N) < 1` we
+                  -- get `-1 < -(seq(m) - seq(N)) = seq(N) - seq(m)`.
+                  -- Then add 1 to both sides:
+                  -- `0 < (seq(N) - seq(m)) + 1 = (seq(N) + 1) - seq(m)`.
+                  claim negatedDiff
+                        : -Rational.one < seq(N) - seq(m)
+                    by rewrite(
+                           (ring : -(seq(m) - seq(N))
+                                   = seq(N) - seq(m)),
+                           Rational.LessThan.negate(
+                               seq(m) - seq(N), Rational.one,
+                               diffBound));
+                  claim diffPositive
+                        : Rational.zero
+                          < (seq(N) + Rational.one) - seq(m)
+                    by rewrite(
+                           (ring : (seq(N) - seq(m)) + Rational.one
+                                   = (seq(N) + Rational.one) - seq(m)),
+                           rewrite(
+                               Rational.add_negate_left(Rational.one),
+                               Rational.add_preserves_LessThan(
+                                   -Rational.one,
+                                   seq(N) - seq(m),
+                                   Rational.one,
+                                   negatedDiff)));
+                  -- -ε < 0 < (seq(N) + 1) - seq(m) by transitivity.
+                  Rational.LessThan.transitive_left(
+                      -epsilon, Rational.zero,
+                      (seq(N) + Rational.one) - seq(m),
+                      Rational.LessThan.weaken(
+                          -epsilon, Rational.zero,
+                          Rational.negate_LessThan_zero_of_positive(
+                              epsilon, epsilonPositive)),
+                      diffPositive)
+                }
+   }
+
+-- Lift exists_rational_above_at_make via Quotient.induct.
+theorem Real.exists_rational_above (x : Real)
+        : ∃ (q : Rational). x ≤ (q : Real) :=
+  Quotient.induct(
+      function (xArg : Real) =>
+          ∃ (q : Rational). xArg ≤ (q : Real),
+      Real.exists_rational_above_at_make,
+      x)
+
+-- ----------------------------------------------------------------------
+-- Headline theorem (stub). The bisection proof uses
+-- `exists_rational_below`/`exists_rational_above` to seed the initial
+-- rational interval [a₀, b₀] enclosing some chosen x₀ ∈ S and an
+-- upper bound B₀ : Real.
 
 theorem Real.supremum_exists
         (subset : Set(Real))
