@@ -1,0 +1,86 @@
+-- Real/supremum.math
+--
+-- Least-upper-bound (sup) property for Real: every nonempty subset of
+-- Real that's bounded above has a supremum (least upper bound). This
+-- is the defining property of Real that distinguishes it from
+-- Rational.
+--
+-- The proof is by bisection. Given x₀ ∈ S and upper bound B₀:
+--   - Build a sequence of nested rational intervals [aₙ, bₙ] with
+--     bₙ - aₙ = (B₀ - a₀)/2ⁿ, where:
+--       * aₙ is not an upper bound for S (some x ∈ S exceeds it)
+--       * bₙ IS an upper bound for S
+--   - At each step, decide via excluded_middle whether the midpoint
+--     mₙ = (aₙ + bₙ)/2 is an upper bound; bisect accordingly.
+--   - (aₙ) is Cauchy; its real-valued limit s is the supremum:
+--       * Upper bound: any x ∈ S satisfies x ≤ bₙ for all n, so
+--         x ≤ lim(bₙ) = s.
+--       * Least: any upper bound B satisfies aₙ ≤ B for all n
+--         (since aₙ < some x ≤ B), so s = lim(aₙ) ≤ B.
+--
+-- The construction uses excluded_middle (already imported transitively
+-- via Real.field) — fully classical, consistent with the rest of the
+-- library.
+
+module Real.supremum
+
+import Logic.basics
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.absolute_value
+import Rational.halve
+import Rational.positive
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.order
+import Real.absolute_value
+import Set.basics
+
+-- ----------------------------------------------------------------------
+-- Bound vocabulary on Real.
+
+-- `b` is an upper bound for `S` when every element of `S` is ≤ `b`.
+definition Real.IsUpperBound (subset : Set(Real)) (bound : Real)
+        : Proposition :=
+  (subject : Real) → subject ∈ subset → subject ≤ bound
+
+-- `S` is bounded above when some Real is an upper bound for it.
+definition Real.IsBoundedAbove (subset : Set(Real)) : Proposition :=
+  ∃ (bound : Real). Real.IsUpperBound(subset, bound)
+
+-- `s` is the supremum (least upper bound) of `S` when:
+--   - `s` is an upper bound for `S`, and
+--   - every other upper bound `b` satisfies `s ≤ b`.
+definition Real.IsSupremum (subset : Set(Real)) (s : Real)
+        : Proposition :=
+  And(
+      Real.IsUpperBound(subset, s),
+      (otherBound : Real)
+          → Real.IsUpperBound(subset, otherBound)
+          → s ≤ otherBound)
+
+-- ----------------------------------------------------------------------
+-- The headline theorem. Proof is `sorry` for now — the bisection
+-- machinery is being built up below.
+
+theorem Real.supremum_exists
+        (subset : Set(Real))
+        (nonempty : Set.IsNonempty(Real, subset))
+        (bounded : Real.IsBoundedAbove(subset))
+        : ∃ (s : Real). Real.IsSupremum(subset, s) :=
+  sorry
