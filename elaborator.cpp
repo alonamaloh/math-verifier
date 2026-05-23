@@ -4578,6 +4578,169 @@ private:
         return nullptr;
     }
 
+    // Library rewrite bridge — walks subexpressions of the goal,
+    // queries `lemmaIndex_` for library equality lemmas whose LHS
+    // (or RHS, via the reverse-direction entries) matches each
+    // subexpression. On match, rewrites the goal with the lemma's
+    // other side, recursively proves the rewritten goal, and wraps
+    // with `transport_proposition` (composed with `Equality.symmetry`
+    // for forward-direction lemmas, so the proof goes from
+    // `motive(rewritten)` back to `motive(original)`).
+    //
+    // Walks structurally — recurses into Application children. Other
+    // expression kinds (Pi, Lambda, Let, etc.) are walked only if
+    // they're at the top, not descended; widening that is a follow-
+    // up. Budget shared with the local-equality transport bridge.
+    ExpressionPointer tryLibraryRewriteBridge(
+        ExpressionPointer goalClosed,
+        ExpressionPointer subexpr,
+        const std::vector<LocalBinder>& localBinders,
+        int line, int budget) {
+        // Only attempt matches at COMPOUND subexpressions
+        // (Applications). Bare BVs / Constants would catch
+        // wildcard-shaped lemma patterns (e.g. `(a : T) → a + 0 = a`
+        // reversed against any BV) and rewrite into unhelpful forms,
+        // potentially looping. Skip those at this level but still
+        // recurse into children below.
+        bool subexprIsApplication =
+            std::holds_alternative<Application>(subexpr->node);
+        if (!subexprIsApplication) {
+            // No matching attempt; nothing to recurse into either
+            // (only Apps have children to descend into).
+            return nullptr;
+        }
+        uint64_t key = spineHash(subexpr);
+        auto range = lemmaIndex_.equal_range(key);
+        for (auto iterator = range.first;
+             iterator != range.second; ++iterator) {
+            const RewriteLemma& lemma = iterator->second;
+            ExpressionPointer pattern = lemma.reverseDirection
+                ? lemma.rhs : lemma.lhs;
+            // Skip lemmas whose pattern (LHS or RHS depending on
+            // direction) is a bare BoundVariable — they'd match
+            // anything and produce unhelpful rewrites.
+            if (std::holds_alternative<BoundVariable>(pattern->node)) {
+                continue;
+            }
+            std::vector<ExpressionPointer> bindings(
+                lemma.binderCount);
+            if (!matchAgainstPattern(pattern, subexpr,
+                                       lemma.binderCount, bindings)) {
+                continue;
+            }
+            bool allBound = true;
+            for (auto& b : bindings) {
+                if (!b) { allBound = false; break; }
+            }
+            if (!allBound) continue;
+            ExpressionPointer otherSide = lemma.reverseDirection
+                ? lemma.lhs : lemma.rhs;
+            ExpressionPointer instantiatedOther =
+                instantiateLemmaBinders(otherSide, bindings);
+            // Build rewritten goal: replace `subexpr` with
+            // `instantiatedOther` in `goalClosed`.
+            int occurrences = 0;
+            ExpressionPointer abstractedBody =
+                abstractStructuralOccurrence(
+                    goalClosed, subexpr, /*currentDepth=*/0,
+                    occurrences);
+            if (occurrences == 0) continue;
+            ExpressionPointer rewrittenGoal = substitute(
+                abstractedBody, 0, instantiatedOther);
+            // Recurse to prove rewrittenGoal.
+            ExpressionPointer proofRewritten;
+            try {
+                proofRewritten = lookupClaimByLibrary(
+                    rewrittenGoal, localBinders, line,
+                    budget - 1);
+            } catch (const ElaborateError&) { continue; }
+              catch (const TypeError&) { continue; }
+            // Build the instantiated lemma application:
+            // makeConstant(lemma.lemmaName, {}) applied to the
+            // bindings in outer→inner order. Lemma stored in
+            // lemmaIndex_ has no universe parameters (filtered in
+            // registerGenericRewriteLemma), so universe args = {}.
+            ExpressionPointer lemmaApp = makeConstant(
+                lemma.lemmaName, {});
+            for (int i = lemma.binderCount - 1; i >= 0; --i) {
+                lemmaApp = makeApplication(
+                    lemmaApp, bindings[i]);
+            }
+            // Infer lemmaApp's type to get carrier and the actual
+            // (lhs, rhs) of this instantiation.
+            ExpressionPointer lemmaAppType;
+            try {
+                lemmaAppType = inferTypeInLocalContext(
+                    localBinders, lemmaApp);
+            } catch (const TypeError&) { continue; }
+              catch (const ElaborateError&) { continue; }
+            EqualityComponents eqComps;
+            try {
+                eqComps = extractEqualityComponents(
+                    lemmaAppType,
+                    "library rewrite bridge", line);
+            } catch (const ElaborateError&) { continue; }
+            // Direction: lemmaApp : eqLhs = eqRhs.
+            // Forward match: subexpr = eqLhs, otherSide = eqRhs.
+            //   For transport we need eq : eqRhs → eqLhs, i.e.,
+            //   symm(lemmaApp).
+            // Reverse match: subexpr = eqRhs, otherSide = eqLhs.
+            //   lemmaApp : eqLhs = eqRhs already maps eqLhs(=other)
+            //   to eqRhs(=subexpr) — the direction we want.
+            ExpressionPointer eqForTransport;
+            ExpressionPointer transportLhs;
+            ExpressionPointer transportRhs;
+            if (lemma.reverseDirection) {
+                eqForTransport = lemmaApp;
+                transportLhs = eqComps.leftEndpoint;
+                transportRhs = eqComps.rightEndpoint;
+            } else {
+                eqForTransport = makeConstant(
+                    "Equality.symmetry",
+                    {eqComps.carrierUniverseLevel});
+                eqForTransport = makeApplication(
+                    eqForTransport, eqComps.carrierType);
+                eqForTransport = makeApplication(
+                    eqForTransport, eqComps.leftEndpoint);
+                eqForTransport = makeApplication(
+                    eqForTransport, eqComps.rightEndpoint);
+                eqForTransport = makeApplication(
+                    eqForTransport, lemmaApp);
+                transportLhs = eqComps.rightEndpoint;
+                transportRhs = eqComps.leftEndpoint;
+            }
+            // Motive: λ_ : carrier, abstractedBody.
+            ExpressionPointer motive = makeLambda(
+                "_libRewriteHole", eqComps.carrierType,
+                abstractedBody);
+            // Build transport call. transport(C, motive, lhs, rhs,
+            // eq, proof_motive_lhs) : motive_rhs.
+            ExpressionPointer call = makeConstant(
+                "Equality.transport_proposition",
+                {eqComps.carrierUniverseLevel});
+            call = makeApplication(call, eqComps.carrierType);
+            call = makeApplication(call, motive);
+            call = makeApplication(call, transportLhs);
+            call = makeApplication(call, transportRhs);
+            call = makeApplication(call, eqForTransport);
+            call = makeApplication(call, proofRewritten);
+            return call;
+        }
+        // Recurse structurally into Application children.
+        if (auto* app =
+                std::get_if<Application>(&subexpr->node)) {
+            ExpressionPointer attempt = tryLibraryRewriteBridge(
+                goalClosed, app->function, localBinders,
+                line, budget);
+            if (attempt) return attempt;
+            attempt = tryLibraryRewriteBridge(
+                goalClosed, app->argument, localBinders,
+                line, budget);
+            if (attempt) return attempt;
+        }
+        return nullptr;
+    }
+
     // Conjunction introduction: when the goal is `And(A, B)`,
     // recursively prove each conjunct via the same auto-prover
     // dispatch and combine with `And.introduction`. Strictly more
@@ -4892,7 +5055,10 @@ private:
     //   7. Library scan — for each environment Definition/Axiom whose
     //      Pi-chain conclusion has the same spine head as the goal,
     //      try Step 2's autoFillHintForClaim. First success wins.
-    //   8. Transport bridge — when the goal nearly matches something
+    //   8. Library rewrite bridge — walk subexpressions of the goal;
+    //      query `lemmaIndex_` for library equalities matching each;
+    //      rewrite the goal with the matched lemma and recurse.
+    //   9. Transport bridge — when the goal nearly matches something
     //      provable except for one side of a local equality, rewrite
     //      via transport_proposition and recurse. One-step only
     //      (transportBudget defaults to 1) to bound search cost.
@@ -5014,7 +5180,20 @@ private:
             }
         }
 
-        // (8) Transport bridge. If the goal nearly matches an
+        // (8) Library rewrite bridge — for each library equality
+        // lemma in `lemmaIndex_`, try matching its LHS (or RHS) to
+        // a subexpression of the goal; if a match instantiates all
+        // binders, rewrite the goal with the other side and recurse.
+        // Bounded by the same transportBudget as the local-equality
+        // transport bridge below.
+        if (transportBudget > 0) {
+            ExpressionPointer attempt = tryLibraryRewriteBridge(
+                goalClosed, goalClosed, localBinders,
+                line, transportBudget);
+            if (attempt) return attempt;
+        }
+
+        // (9) Transport bridge. If the goal nearly matches an
         // already-provable shape modulo one side of a local equality,
         // rewrite the goal via transport_proposition and recurse.
         if (transportBudget > 0) {
