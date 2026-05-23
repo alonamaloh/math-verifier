@@ -4578,37 +4578,33 @@ private:
         return nullptr;
     }
 
-    // Library rewrite bridge — walks subexpressions of the goal,
-    // queries `lemmaIndex_` for library equality lemmas whose LHS
-    // (or RHS, via the reverse-direction entries) matches each
-    // subexpression. On match, rewrites the goal with the lemma's
-    // other side, recursively proves the rewritten goal, and wraps
-    // with `transport_proposition` (composed with `Equality.symmetry`
-    // for forward-direction lemmas, so the proof goes from
-    // `motive(rewritten)` back to `motive(original)`).
-    //
-    // Walks structurally — recurses into Application children. Other
-    // expression kinds (Pi, Lambda, Let, etc.) are walked only if
-    // they're at the top, not descended; widening that is a follow-
-    // up. Budget shared with the local-equality transport bridge.
-    ExpressionPointer tryLibraryRewriteBridge(
-        ExpressionPointer goalClosed,
+    // Unified equality fact representation. Both local-hypothesis
+    // equalities and library-lemma equalities (after subexpression
+    // match + instantiation) live here as already-ground
+    // (lhs, rhs, carrier, proof) tuples in the current scope.
+    // Cost-tagged so the bridge tries cheap facts first.
+    struct ContextEquality {
+        int cost;
+        std::string source;
+        ExpressionPointer lhs;
+        ExpressionPointer rhs;
+        ExpressionPointer carrierType;
+        LevelPointer carrierLevel;
+        ExpressionPointer proofExpr;
+    };
+
+    // Helper: walk goal subexpressions looking for library-lemma
+    // matches; instantiate matched lemmas and append as ContextEquality
+    // entries. Mirrors the old `tryLibraryRewriteBridge` walker's
+    // safeguards (skip bare-BV subexprs and bare-BV patterns; only
+    // Applications descended into).
+    void collectLibraryEqualitiesAt(
         ExpressionPointer subexpr,
         const std::vector<LocalBinder>& localBinders,
-        int line, int budget) {
-        // Only attempt matches at COMPOUND subexpressions
-        // (Applications). Bare BVs / Constants would catch
-        // wildcard-shaped lemma patterns (e.g. `(a : T) → a + 0 = a`
-        // reversed against any BV) and rewrite into unhelpful forms,
-        // potentially looping. Skip those at this level but still
-        // recurse into children below.
-        bool subexprIsApplication =
-            std::holds_alternative<Application>(subexpr->node);
-        if (!subexprIsApplication) {
-            // No matching attempt; nothing to recurse into either
-            // (only Apps have children to descend into).
-            return nullptr;
-        }
+        std::vector<ContextEquality>& out) {
+        auto* app =
+            std::get_if<Application>(&subexpr->node);
+        if (!app) return;
         uint64_t key = spineHash(subexpr);
         auto range = lemmaIndex_.equal_range(key);
         for (auto iterator = range.first;
@@ -4616,127 +4612,185 @@ private:
             const RewriteLemma& lemma = iterator->second;
             ExpressionPointer pattern = lemma.reverseDirection
                 ? lemma.rhs : lemma.lhs;
-            // Skip lemmas whose pattern (LHS or RHS depending on
-            // direction) is a bare BoundVariable — they'd match
-            // anything and produce unhelpful rewrites.
-            if (std::holds_alternative<BoundVariable>(pattern->node)) {
-                continue;
-            }
+            if (std::holds_alternative<BoundVariable>(
+                    pattern->node)) continue;
             std::vector<ExpressionPointer> bindings(
                 lemma.binderCount);
-            if (!matchAgainstPattern(pattern, subexpr,
-                                       lemma.binderCount, bindings)) {
-                continue;
-            }
+            if (!matchAgainstPattern(
+                    pattern, subexpr,
+                    lemma.binderCount, bindings)) continue;
             bool allBound = true;
-            for (auto& b : bindings) {
-                if (!b) { allBound = false; break; }
+            for (auto& bn : bindings) {
+                if (!bn) { allBound = false; break; }
             }
             if (!allBound) continue;
-            ExpressionPointer otherSide = lemma.reverseDirection
-                ? lemma.lhs : lemma.rhs;
-            ExpressionPointer instantiatedOther =
-                instantiateLemmaBinders(otherSide, bindings);
-            // Build rewritten goal: replace `subexpr` with
-            // `instantiatedOther` in `goalClosed`.
-            int occurrences = 0;
-            ExpressionPointer abstractedBody =
-                abstractStructuralOccurrence(
-                    goalClosed, subexpr, /*currentDepth=*/0,
-                    occurrences);
-            if (occurrences == 0) continue;
-            ExpressionPointer rewrittenGoal = substitute(
-                abstractedBody, 0, instantiatedOther);
-            // Recurse to prove rewrittenGoal.
-            ExpressionPointer proofRewritten;
-            try {
-                proofRewritten = lookupClaimByLibrary(
-                    rewrittenGoal, localBinders, line,
-                    budget - 1);
-            } catch (const ElaborateError&) { continue; }
-              catch (const TypeError&) { continue; }
-            // Build the instantiated lemma application:
-            // makeConstant(lemma.lemmaName, {}) applied to the
-            // bindings in outer→inner order. Lemma stored in
-            // lemmaIndex_ has no universe parameters (filtered in
-            // registerGenericRewriteLemma), so universe args = {}.
             ExpressionPointer lemmaApp = makeConstant(
                 lemma.lemmaName, {});
             for (int i = lemma.binderCount - 1; i >= 0; --i) {
                 lemmaApp = makeApplication(
                     lemmaApp, bindings[i]);
             }
-            // Infer lemmaApp's type to get carrier and the actual
-            // (lhs, rhs) of this instantiation.
             ExpressionPointer lemmaAppType;
             try {
                 lemmaAppType = inferTypeInLocalContext(
                     localBinders, lemmaApp);
             } catch (const TypeError&) { continue; }
               catch (const ElaborateError&) { continue; }
-            EqualityComponents eqComps;
+            EqualityComponents components;
             try {
-                eqComps = extractEqualityComponents(
-                    lemmaAppType,
-                    "library rewrite bridge", line);
+                components = extractEqualityComponents(
+                    lemmaAppType, "library lemma", 0);
             } catch (const ElaborateError&) { continue; }
-            // Direction: lemmaApp : eqLhs = eqRhs.
-            // Forward match: subexpr = eqLhs, otherSide = eqRhs.
-            //   For transport we need eq : eqRhs → eqLhs, i.e.,
-            //   symm(lemmaApp).
-            // Reverse match: subexpr = eqRhs, otherSide = eqLhs.
-            //   lemmaApp : eqLhs = eqRhs already maps eqLhs(=other)
-            //   to eqRhs(=subexpr) — the direction we want.
-            ExpressionPointer eqForTransport;
-            ExpressionPointer transportLhs;
-            ExpressionPointer transportRhs;
-            if (lemma.reverseDirection) {
-                eqForTransport = lemmaApp;
-                transportLhs = eqComps.leftEndpoint;
-                transportRhs = eqComps.rightEndpoint;
-            } else {
-                eqForTransport = makeConstant(
-                    "Equality.symmetry",
-                    {eqComps.carrierUniverseLevel});
-                eqForTransport = makeApplication(
-                    eqForTransport, eqComps.carrierType);
-                eqForTransport = makeApplication(
-                    eqForTransport, eqComps.leftEndpoint);
-                eqForTransport = makeApplication(
-                    eqForTransport, eqComps.rightEndpoint);
-                eqForTransport = makeApplication(
-                    eqForTransport, lemmaApp);
-                transportLhs = eqComps.rightEndpoint;
-                transportRhs = eqComps.leftEndpoint;
-            }
-            // Motive: λ_ : carrier, abstractedBody.
-            ExpressionPointer motive = makeLambda(
-                "_libRewriteHole", eqComps.carrierType,
-                abstractedBody);
-            // Build transport call. transport(C, motive, lhs, rhs,
-            // eq, proof_motive_lhs) : motive_rhs.
-            ExpressionPointer call = makeConstant(
-                "Equality.transport_proposition",
-                {eqComps.carrierUniverseLevel});
-            call = makeApplication(call, eqComps.carrierType);
-            call = makeApplication(call, motive);
-            call = makeApplication(call, transportLhs);
-            call = makeApplication(call, transportRhs);
-            call = makeApplication(call, eqForTransport);
-            call = makeApplication(call, proofRewritten);
-            return call;
+            // inferTypeInLocalContext returns the type in OPENED
+            // form (FVars for the local binders); close it so the
+            // components live in the same closed scope as goalClosed,
+            // which is what abstractStructuralOccurrence + substitute
+            // expect.
+            int N = static_cast<int>(localBinders.size());
+            ContextEquality eq;
+            eq.cost = 3;
+            eq.source = "library lemma " + lemma.lemmaName;
+            eq.carrierType = closeOverLocalBinders(
+                components.carrierType, localBinders, N);
+            eq.lhs = closeOverLocalBinders(
+                components.leftEndpoint, localBinders, N);
+            eq.rhs = closeOverLocalBinders(
+                components.rightEndpoint, localBinders, N);
+            eq.carrierLevel = components.carrierUniverseLevel;
+            eq.proofExpr = lemmaApp;
+            out.push_back(std::move(eq));
         }
-        // Recurse structurally into Application children.
-        if (auto* app =
-                std::get_if<Application>(&subexpr->node)) {
-            ExpressionPointer attempt = tryLibraryRewriteBridge(
-                goalClosed, app->function, localBinders,
-                line, budget);
-            if (attempt) return attempt;
-            attempt = tryLibraryRewriteBridge(
-                goalClosed, app->argument, localBinders,
-                line, budget);
-            if (attempt) return attempt;
+        // Recurse into Application children.
+        collectLibraryEqualitiesAt(
+            app->function, localBinders, out);
+        collectLibraryEqualitiesAt(
+            app->argument, localBinders, out);
+    }
+
+    std::vector<ContextEquality> collectContextEqualities(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int /*line*/) {
+        std::vector<ContextEquality> result;
+        int N = static_cast<int>(localBinders.size());
+        // Local hypotheses (cost 1) — scan last-bound first so the
+        // most-recent equality wins on ties.
+        for (int b = N - 1; b >= 0; --b) {
+            int lift = N - b;
+            ExpressionPointer hypInScope = liftBoundVariables(
+                localBinders[b].type, lift, 0);
+            ExpressionPointer hypReduced = weakHeadNormalForm(
+                environment_, hypInScope);
+            EqualityComponents components;
+            try {
+                components = extractEqualityComponents(
+                    hypReduced, "local equality", 0);
+            } catch (const ElaborateError&) { continue; }
+            ContextEquality eq;
+            eq.cost = 1;
+            eq.source = "local binder " + localBinders[b].name;
+            eq.carrierType = components.carrierType;
+            eq.lhs = components.leftEndpoint;
+            eq.rhs = components.rightEndpoint;
+            eq.carrierLevel = components.carrierUniverseLevel;
+            eq.proofExpr = makeBoundVariable(N - 1 - b);
+            result.push_back(std::move(eq));
+        }
+        // Library lemmas matched against goal subexpressions
+        // (cost 3) — walks Application subexpressions and queries
+        // `lemmaIndex_` at each.
+        collectLibraryEqualitiesAt(
+            goalClosed, localBinders, result);
+        return result;
+    }
+
+    // Unified context-equality bridge. For every equality in scope
+    // (local or library, ground or instantiated), try rewriting the
+    // goal by replacing one side with the other, recursing on the
+    // rewritten goal. Replaces the two separate strategies (local
+    // transport bridge and library-rewrite bridge) with one code
+    // path so future migration of other strategies to the same
+    // fact-stream model has a precedent. See TODO.md "Hammer
+    // unification" for the broader plan.
+    //
+    // Walks structurally — recurses into Application children. Other
+    // expression kinds (Pi, Lambda, Let, etc.) are walked only if
+    // they're at the top, not descended; widening that is a follow-
+    // up. Budget shared with both old bridges.
+    ExpressionPointer tryContextEqualityBridge(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line, int budget) {
+        if (budget == 0) return nullptr;
+        std::vector<ContextEquality> equalities =
+            collectContextEqualities(
+                goalClosed, localBinders, line);
+        std::sort(equalities.begin(), equalities.end(),
+            [](const ContextEquality& a, const ContextEquality& b) {
+                return a.cost < b.cost;
+            });
+        for (const ContextEquality& eq : equalities) {
+            // Try both rewrite directions:
+            //   direction 0: replace rhs in goal with lhs — uses eq
+            //     directly (transport: motive(lhs) → motive(rhs)).
+            //   direction 1: replace lhs in goal with rhs — uses
+            //     symm(eq) (transport: motive(rhs) → motive(lhs)).
+            for (int direction = 0; direction < 2; ++direction) {
+                ExpressionPointer fromSide =
+                    (direction == 0) ? eq.rhs : eq.lhs;
+                ExpressionPointer toSide =
+                    (direction == 0) ? eq.lhs : eq.rhs;
+                int occurrences = 0;
+                ExpressionPointer abstractedBody =
+                    abstractStructuralOccurrence(
+                        goalClosed, fromSide,
+                        /*currentDepth=*/0, occurrences);
+                if (occurrences == 0) continue;
+                ExpressionPointer rewrittenGoal = substitute(
+                    abstractedBody, 0, toSide);
+                ExpressionPointer proofRewritten;
+                try {
+                    proofRewritten = lookupClaimByLibrary(
+                        rewrittenGoal, localBinders,
+                        line, budget - 1);
+                } catch (const ElaborateError&) { continue; }
+                  catch (const TypeError&) { continue; }
+                ExpressionPointer motive = makeLambda(
+                    "_rewriteHole",
+                    eq.carrierType, abstractedBody);
+                ExpressionPointer eqForTransport;
+                ExpressionPointer transportLhs;
+                ExpressionPointer transportRhs;
+                if (direction == 0) {
+                    eqForTransport = eq.proofExpr;
+                    transportLhs = eq.lhs;
+                    transportRhs = eq.rhs;
+                } else {
+                    eqForTransport = makeConstant(
+                        "Equality.symmetry",
+                        {eq.carrierLevel});
+                    eqForTransport = makeApplication(
+                        eqForTransport, eq.carrierType);
+                    eqForTransport = makeApplication(
+                        eqForTransport, eq.lhs);
+                    eqForTransport = makeApplication(
+                        eqForTransport, eq.rhs);
+                    eqForTransport = makeApplication(
+                        eqForTransport, eq.proofExpr);
+                    transportLhs = eq.rhs;
+                    transportRhs = eq.lhs;
+                }
+                ExpressionPointer call = makeConstant(
+                    "Equality.transport_proposition",
+                    {eq.carrierLevel});
+                call = makeApplication(call, eq.carrierType);
+                call = makeApplication(call, motive);
+                call = makeApplication(call, transportLhs);
+                call = makeApplication(call, transportRhs);
+                call = makeApplication(call, eqForTransport);
+                call = makeApplication(call, proofRewritten);
+                return call;
+            }
         }
         return nullptr;
     }
@@ -5180,83 +5234,17 @@ private:
             }
         }
 
-        // (8) Library rewrite bridge — for each library equality
-        // lemma in `lemmaIndex_`, try matching its LHS (or RHS) to
-        // a subexpression of the goal; if a match instantiates all
-        // binders, rewrite the goal with the other side and recurse.
-        // Bounded by the same transportBudget as the local-equality
-        // transport bridge below.
-        if (transportBudget > 0) {
-            ExpressionPointer attempt = tryLibraryRewriteBridge(
-                goalClosed, goalClosed, localBinders,
+        // (8) Unified equality bridge: rewrite the goal via any
+        // equality fact in context (local hypothesis OR library
+        // lemma matched at a subexpression), then recurse. See
+        // TODO.md "Hammer unification" — this strategy is the
+        // pattern other context-iterating strategies should
+        // eventually follow.
+        {
+            ExpressionPointer attempt = tryContextEqualityBridge(
+                goalClosed, localBinders,
                 line, transportBudget);
             if (attempt) return attempt;
-        }
-
-        // (9) Transport bridge. If the goal nearly matches an
-        // already-provable shape modulo one side of a local equality,
-        // rewrite the goal via transport_proposition and recurse.
-        if (transportBudget > 0) {
-            for (int b = N - 1; b >= 0; --b) {
-                int lift = N - b;
-                ExpressionPointer binderTypeInScope =
-                    liftBoundVariables(
-                        localBinders[b].type, lift, 0);
-                ExpressionPointer reducedBinder = weakHeadNormalForm(
-                    environment_, binderTypeInScope);
-                // Try to decompose as `Equality.{u}(C, lhs, rhs)`.
-                EqualityComponents components;
-                try {
-                    components = extractEqualityComponents(
-                        reducedBinder, "transport bridge", line);
-                } catch (const ElaborateError&) {
-                    continue;
-                }
-                // Try abstracting rhs in the goal — replacement that
-                // takes us to the proof side. (Symmetric direction
-                // could be added; for now we rely on the user
-                // applying Equality.symmetry where needed.)
-                int rhsOccurrences = 0;
-                ExpressionPointer abstractedBody =
-                    abstractStructuralOccurrence(
-                        goalClosed, components.rightEndpoint,
-                        /*currentDepth=*/0, rhsOccurrences);
-                if (rhsOccurrences == 0) continue;
-                // Build the modified goal: substitute the bound hole
-                // with `lhs`. This is what we need to prove
-                // recursively.
-                ExpressionPointer goalAtLhs = substitute(
-                    abstractedBody, 0, components.leftEndpoint);
-                // Recurse with reduced budget.
-                ExpressionPointer proofAtLhs;
-                try {
-                    proofAtLhs = lookupClaimByLibrary(
-                        goalAtLhs, localBinders, line,
-                        transportBudget - 1);
-                } catch (const ElaborateError&) {
-                    continue;
-                } catch (const TypeError&) {
-                    continue;
-                }
-                // Found it. Build the transport call:
-                //   Equality.transport_proposition.{u}(
-                //       C, λ_:C. abstractedBody,
-                //       lhs, rhs, theLocalEquality, proofAtLhs)
-                ExpressionPointer motive = makeLambda(
-                    "_transportHole", components.carrierType,
-                    abstractedBody);
-                ExpressionPointer call = makeConstant(
-                    "Equality.transport_proposition",
-                    {components.carrierUniverseLevel});
-                call = makeApplication(call, components.carrierType);
-                call = makeApplication(call, motive);
-                call = makeApplication(call, components.leftEndpoint);
-                call = makeApplication(call, components.rightEndpoint);
-                call = makeApplication(call,
-                    makeBoundVariable(N - 1 - b));  // the equality
-                call = makeApplication(call, proofAtLhs);
-                return call;
-            }
         }
 
         throwElaborate(
@@ -5267,8 +5255,8 @@ private:
             "goal, no transitivity chain reaches the goal, no "
             "conjunction split decomposes it, no in-scope "
             "contradiction lets us close it, no library theorem "
-            "with this conclusion shape applies, and no one-step "
-            "transport via a local equality succeeds — add "
+            "with this conclusion shape applies, and no context "
+            "equality lets us rewrite to a provable form — add "
             "`by <lemma>` to specify");
     }
 
