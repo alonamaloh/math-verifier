@@ -2108,7 +2108,10 @@ private:
             // `|` ends the body of a pattern-match arm — without
             // this, a bare `claim` as an arm body greedily tries
             // to parse the next pattern's `|` as a proposition.
-            || k == TokenKind::Pipe;
+            || k == TokenKind::Pipe
+            // `case` similarly ends the body of a `by_cases on E
+            // { case … : body  case … : body }` arm.
+            || k == TokenKind::KeywordCase;
     }
 
     // `given (P)` — refer to the unique in-scope hypothesis of type P.
