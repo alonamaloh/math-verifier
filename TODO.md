@@ -58,6 +58,42 @@ closed under ring ops + the p-adic norm.
   small inference-driver hole — worth a single consolidated pass
   once a clean unifier extension is on the table.
 
+## Hammer unification — every strategy through the same fact stream
+
+The auto-prover's dispatch in `lookupClaimByLibrary` currently has
+~8 separate strategies, several of which iterate context but each
+over a different slice (local binders only / `lemmaIndex_` only /
+implicit kernel reductions only). The split is historical, not
+principled. Long-term goal: every strategy that consults context
+goes through one unified "fact stream":
+
+- Local binders (hypotheses, `let`/`suppose` values, anonymous
+  prior `claim`s in the current block).
+- In-module declarations.
+- Imported declarations.
+
+Each fact carries a cost (0 for a `by <name>` cite, 1 for a local
+binder, 2 for an in-module theorem, 3 for an imported theorem),
+and strategies iterate by cost with a budget. Concretely:
+
+- The transitivity bridge currently scans only local binders for
+  `H(_, _)` edges; it should also consider relevant library
+  lemmas (e.g. `successor_less_or_equal(_, _)`).
+- The contradiction strategy currently scans only local binders
+  for `(P, ¬P)` pairs; library lemmas like `Natural.zero_not_successor`
+  paired with constructive `0 = succ(_)` proofs should count too.
+- The transport bridge (local equalities) and the library-rewrite
+  bridge (library equalities) should merge into one "context
+  equality" strategy. **This is the planned starting point for the
+  incremental migration.**
+
+The migration is incremental: validate the abstraction one
+strategy at a time, keep the build green throughout. The two
+equality bridges are the natural first merge (highest payoff,
+existing well-tested machinery on the local side, my recently-
+landed library-rewrite bridge has a scope-tracking bug that the
+merge would fix).
+
 ## Calc auto-prover — smaller open follow-ups
 
 With Phases 1–3 landed (structural hash, `ring` AC-fallback,
