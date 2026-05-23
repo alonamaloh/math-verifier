@@ -14,6 +14,7 @@ import Equality.basics
 import Natural.basics
 import Integer.basics
 import Integer.addition
+import Set.basics
 
 -- Direct: operands typed as Integer. No δ-reduction needed.
 theorem direct_integer_add (a b : Integer) : a + b = Integer.add(a, b) :=
@@ -32,3 +33,32 @@ theorem quotient_mk_add (rep1 rep2 : IntegerRepresentative)
       Integer.add(
           Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep1),
           Quotient.mk(IntegerRepresentative, IntegerEquivalent, rep2)))
+
+-- The `∈` operator dispatches to `Set.member {T} (x : T) (S : Set(T))`.
+-- The implicit `{T}` is inferred from the LEFT operand's type by
+-- unifying `Set.member`'s first explicit argument's type template
+-- (which is BoundVariable(0) → T) against that type.
+--
+-- This case is the regression we care about: the subject is a
+-- `Quotient.mk` wrapped in a `: Integer` ascription. `Integer` δ-
+-- reduces to `Quotient(IntegerRepresentative, IntegerEquivalent)` —
+-- itself an `Application` node. The old heuristic peeled the argument
+-- of any `Application`-shaped type, which wrongly picked
+-- `IntegerEquivalent` as the carrier T and produced an ill-typed
+-- application. The unification-based fix picks the operand's whole
+-- type as the filler.
+theorem quotient_mk_in_set (rep : IntegerRepresentative)
+                            (S : Set(Integer))
+                            (h : (Quotient.mk(IntegerRepresentative,
+                                               IntegerEquivalent, rep)
+                                  : Integer) ∈ S)
+        : (Quotient.mk(IntegerRepresentative,
+                        IntegerEquivalent, rep) : Integer) ∈ S :=
+  h
+
+-- `⊆` (Set.subset) is the other implicit-arg shape:
+--     Set.subset {T} (smaller larger : Set(T))
+-- The first explicit arg's type template is `Set(BoundVariable(0))`,
+-- so unifying it against `Set(Integer)` recovers `T = Integer`.
+theorem set_subset_reflexive_integer (S : Set(Integer)) : S ⊆ S :=
+  Set.subset.reflexive(S)

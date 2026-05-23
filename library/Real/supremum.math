@@ -1883,16 +1883,8 @@ theorem Rational.multiply_zero_right (x : Rational)
           = Rational.zero + x * Rational.zero
     by calc x * Rational.zero + x * Rational.zero
           = x * (Rational.zero + Rational.zero)
-              by Equality.symmetry(
-                     Rational.distributivity_left(
-                         x, Rational.zero, Rational.zero))
           = x * Rational.zero
-              by congruenceOf(
-                     function (z : Rational) => x * z,
-                     Rational.add_zero(Rational.zero))
-          = Rational.zero + x * Rational.zero
-              by Equality.symmetry(
-                     Rational.zero_add(x * Rational.zero));
+          = Rational.zero + x * Rational.zero;
   Rational.add_cancel_right(
       x * Rational.zero, Rational.zero, x * Rational.zero, doubled)
 }
@@ -1922,10 +1914,7 @@ theorem Rational.reciprocal_function_positive_of_positive
         claim negZeroEqZero : -Rational.zero = Rational.zero
           by calc -Rational.zero
                 = Rational.zero + -Rational.zero
-                    by Equality.symmetry(
-                           Rational.zero_add(-Rational.zero))
-                = Rational.zero
-                    by Rational.add_negate_right(Rational.zero);
+                = Rational.zero;
         claim zeroLeqNegRecip
               : Rational.zero ≤ -Rational.reciprocal_function(x)
           by rewrite(
@@ -1978,10 +1967,7 @@ theorem Rational.reciprocal_function_positive_of_positive
               claim zeroEqOne : Rational.zero = Rational.one
                 by calc Rational.zero
                       = x * Rational.zero
-                          by Equality.symmetry(
-                                 Rational.multiply_zero_right(x))
-                      = Rational.one
-                          by xTimesZeroEqOne;
+                      = Rational.one;
               False.eliminate_proposition(
                   Rational.zero < Rational.reciprocal_function(x),
                   Rational.LessThan.distinct(
@@ -2049,26 +2035,13 @@ theorem Rational.archimedean_for_positives
     by function (epsilonEqZero : epsilon = Rational.zero) =>
          Rational.LessThan.distinct(Rational.zero, epsilon,
              epsilonPositive, Equality.symmetry(epsilonEqZero));
-  claim recipTimesEpsilon
-        : epsilon * Rational.reciprocal_function(epsilon) = Rational.one
-    by Rational.reciprocal_function_multiplies(epsilon, epsilonNonzero);
   claim lhsSimplify
         : (c * Rational.reciprocal_function(epsilon)) * epsilon = c
     by calc (c * Rational.reciprocal_function(epsilon)) * epsilon
           = c * (Rational.reciprocal_function(epsilon) * epsilon)
-              by Rational.multiply_associative(
-                     c, Rational.reciprocal_function(epsilon), epsilon)
           = c * (epsilon * Rational.reciprocal_function(epsilon))
-              by congruenceOf(
-                     function (z : Rational) => c * z,
-                     Rational.multiply_commutative(
-                         Rational.reciprocal_function(epsilon), epsilon))
           = c * Rational.one
-              by congruenceOf(
-                     function (z : Rational) => c * z,
-                     recipTimesEpsilon)
-          = c
-              by Rational.multiply_one(c);
+          = c;
   witness K with
       rewrite(lhsSimplify, multipliedBound)
 }
@@ -2086,9 +2059,7 @@ theorem Rational.LessThan.multiply_cancel_right_positive
     | Or.introduceLeft(aLeqB) =>
         cases Logic.excluded_middle(a = b) {
           | Or.introduceLeft(aEqB) => {
-              claim productsEqual : a * c = b * c
-                by congruenceOf(
-                       function (z : Rational) => z * c, aEqB);
+              claim productsEqual : a * c = b * c by aEqB;
               False.eliminate_proposition(
                   a < b,
                   Rational.LessThan.distinct(
@@ -2124,27 +2095,14 @@ theorem Rational.succ_K_strictly_less_succ_succ_K_times_epsilon
         (epsilonPositive : Rational.zero < epsilon)
         : (successor(K) : Rational) * epsilon
           < (successor(successor(K)) : Rational) * epsilon := {
-  claim castEquation
-        : (successor(successor(K)) : Rational)
-          = Rational.one + (successor(K) : Rational)
-    by Rational.successor_cast(successor(K));
   claim productExpansion
         : (successor(successor(K)) : Rational) * epsilon
           = epsilon + (successor(K) : Rational) * epsilon
     by calc (successor(successor(K)) : Rational) * epsilon
           = (Rational.one + (successor(K) : Rational)) * epsilon
-              by congruenceOf(
-                     function (z : Rational) => z * epsilon,
-                     castEquation)
           = Rational.one * epsilon
             + (successor(K) : Rational) * epsilon
-              by Rational.distributivity_right(
-                     Rational.one, (successor(K) : Rational), epsilon)
-          = epsilon + (successor(K) : Rational) * epsilon
-              by congruenceOf(
-                     function (z : Rational) =>
-                         z + (successor(K) : Rational) * epsilon,
-                     Rational.one_multiply(epsilon));
+          = epsilon + (successor(K) : Rational) * epsilon;
   claim shiftedBound
         : (successor(K) : Rational) * epsilon
           < (successor(K) : Rational) * epsilon + epsilon
@@ -2161,10 +2119,7 @@ theorem Rational.succ_K_strictly_less_succ_succ_K_times_epsilon
       (successor(successor(K)) : Rational) * epsilon,
       calc (successor(K) : Rational) * epsilon + epsilon
          = epsilon + (successor(K) : Rational) * epsilon
-             by Rational.add_commutative(
-                    (successor(K) : Rational) * epsilon, epsilon)
-         = (successor(successor(K)) : Rational) * epsilon
-             by Equality.symmetry(productExpansion),
+         = (successor(successor(K)) : Rational) * epsilon,
       shiftedBound)
 }
 
@@ -2420,13 +2375,8 @@ theorem Rational.LessOrEqual_of_real_LessOrEqual
                        Equality.symmetry(
                            calc b
                               = b + Rational.zero
-                                  by Equality.symmetry(Rational.add_zero(b))
                               = b + (a - b)
-                                  by congruenceOf(
-                                         function (z : Rational) => b + z,
-                                         zeroEqDiff)
-                              = a
-                                  by (ring : b + (a - b) = a)));
+                              = a));
             claim diffPositive : Rational.zero < a - b
               by And.introduction(diffNonneg, diffNonzero);
             -- realLeq at ε = a - b yields the contradiction.
@@ -2474,12 +2424,7 @@ definition Real.bisectionLimit
 -- bisectionRight(K) - yseq(j) > -ε/2 for j ≥ M; combine with
 -- bisectionLeft(j) ≥ bisectionLeft(K) = bisectionRight(K) - width(K)
 -- > bisectionRight(K) - ε/2 to get bisectionLeft(j) - yseq(j) > -ε.
--- At-rep form: pattern-match y_rep to expose (yseq, yIsCauchy). Uses
--- `subset(...)` rather than `... ∈ subset` because the operator
--- dispatch for `∈` trips on the implicit-T inference when the subject
--- is a Quotient.mk wrapped in a `: Real` ascription; they're
--- definitionally equal (∈ desugars to Set.member, which is subset
--- application).
+-- At-rep form: pattern-match y_rep to expose (yseq, yIsCauchy).
 theorem Real.bisectionLimit_is_upper_bound_at_rep
         (subset : Set(Real)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
@@ -2490,7 +2435,7 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
                   subset,
                   (Real.BisectionInterval.right(initial) : Real)))
         : (y_rep : CauchyRationalSequence)
-          → subset((Quotient.mk(y_rep) : Real))
+          → (Quotient.mk(y_rep) : Real) ∈ subset
           → (Quotient.mk(y_rep) : Real)
               ≤ Real.bisectionLimit(
                     subset, initial, initialLeftLeqRight)
@@ -2526,11 +2471,6 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
                   ≤ Real.bisectionLeft(subset, initial, j)
             by Real.bisectionLeft_le_at_le(
                    subset, initial, initialLeftLeqRight, K, j, j_geq_K);
-          claim widthEq
-                : Real.bisectionRight(subset, initial, K)
-                  - Real.bisectionLeft(subset, initial, K)
-                  = Real.bisectionWidth(initial, K)
-            by Real.bisection_width_invariant(subset, initial, K);
           claim negWidthGtNegHalvedEpsilon
                 : -Rational.halve(epsilon) < -Real.bisectionWidth(initial, K)
             by Rational.LessThan.negate(
@@ -2576,12 +2516,6 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
                      - (Real.bisectionRight(subset, initial, K)
                         - Real.bisectionLeft(subset, initial, K)))
                     - yseq(j)
-                      by congruenceOf(
-                             function (z : Rational) =>
-                                 (Real.bisectionRight(subset, initial, K)
-                                  - z)
-                                 - yseq(j),
-                             Equality.symmetry(widthEq))
                   = Real.bisectionLeft(subset, initial, K) - yseq(j);
           claim leftKMinusY
                 : -Rational.halve(epsilon) + -Rational.halve(epsilon)

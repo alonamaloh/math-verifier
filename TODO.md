@@ -21,16 +21,6 @@ closed under ring ops + the p-adic norm.
 
 ## Elaborator quirks (small open issues)
 
-- **`X ∈ S` operator dispatch trips on `(Quotient.mk(rep) : T)`
-  ascription.** The `∈` operator desugars to `Set.member`, whose
-  implicit `{T : Type(0)}` parameter is inferred from the subject's
-  type. When the subject is `Quotient.mk(rep)` short-form wrapped in
-  `(... : Real)`, the elaborator fails the kernel typecheck with
-  "expected Type 0, actual Π Π Proposition" — apparently misaligning
-  Quotient.mk's args with Set.member's implicit T. Workaround used in
-  `supremum.math`: write `S(...)` directly (definitionally equivalent
-  — `∈` → `Set.member` → subset application). Worth fixing.
-
 - **`by_induction … using` (prime_divisor v3 style) needs the
   return-type ascription stripped.** Its last 2 lines remain CIC
   plumbing in an otherwise textbook proof. Until that's fixed, new
@@ -61,12 +51,12 @@ closed under ring ops + the p-adic norm.
   `claim` bindings.
 
 - **`Quotient.mk`-with-ascription in unusual operator positions.**
-  Tracking the boundary of where the short form fires. The `∈`
-  issue above is the latest exemplar. Earlier we found the operand
-  of unary `-`, polymorphic-function args without expected type
-  propagation, and `Equality.transport_proposition`'s carrier slot.
-  Each one is a small inference-driver hole — worth a single
-  consolidated pass once a clean unifier extension is on the table.
+  Tracking the boundary of where the short form fires. Known
+  exemplars: the operand of unary `-`, polymorphic-function args
+  without expected type propagation, and
+  `Equality.transport_proposition`'s carrier slot. Each one is a
+  small inference-driver hole — worth a single consolidated pass
+  once a clean unifier extension is on the table.
 
 ## Calc auto-prover — smaller open follow-ups
 
