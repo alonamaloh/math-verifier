@@ -37,7 +37,11 @@ import Logic.quotient
 -- padic_valuation_step(fuel, prime, target): fuel-bounded valuation.
 -- With fuel ≥ floor(log_prime(target)), returns the largest k with
 -- prime^k | target. Recursion is structural on fuel.
-definition Natural.padic_valuation_step
+--
+-- Opaque so downstream proofs cite the characterising lemmas
+-- (`*_zero_when_not_divides`, `*_succ_when_divides`) rather than
+-- relying on kernel ι firing through `cases (modulo p t)`.
+opaque definition Natural.padic_valuation_step
         : (fuel prime target : Natural) → Natural
   | zero,            _,     _      => zero
   | successor(fuel), prime, target =>
@@ -60,6 +64,11 @@ definition Natural.padic_valuation (prime target : Natural) : Natural :=
 -- ----------------------------------------------------------------------
 -- Step-level recursive characterizations.
 
+-- Zero fuel: the step returns 0 unconditionally.
+theorem Natural.padic_valuation_step_zero_fuel (prime target : Natural)
+        : Natural.padic_valuation_step(0, prime, target) = 0 :=
+  unfold Natural.padic_valuation_step in reflexivity(Natural, 0)
+
 -- When modulo(p, n) ≠ 0 (i.e., monus(modulo(p, n), 1) = some succ),
 -- the step returns 0. Used for the "p ∤ n" case.
 theorem Natural.padic_valuation_step_zero_when_not_divides
@@ -67,17 +76,18 @@ theorem Natural.padic_valuation_step_zero_when_not_divides
         (moduloIsSucc : Natural.modulo(prime, target) = successor(predM))
         : Natural.padic_valuation_step(successor(fuel), prime, target)
           = 0 :=
-  Equality.transport_proposition(
-      function (m : Natural) =>
-          (cases m {
-             | zero =>
-                 successor(Natural.padic_valuation_step(
-                               fuel, prime, Natural.divide(prime, target)))
-             | successor(_) => zero
-           } : Natural) = 0,
-      successor(predM), Natural.modulo(prime, target),
-      Equality.symmetry(moduloIsSucc),
-      reflexivity(Natural, 0))
+  unfold Natural.padic_valuation_step in
+    Equality.transport_proposition(
+        function (m : Natural) =>
+            (cases m {
+               | zero =>
+                   successor(Natural.padic_valuation_step(
+                                 fuel, prime, Natural.divide(prime, target)))
+               | successor(_) => zero
+             } : Natural) = 0,
+        successor(predM), Natural.modulo(prime, target),
+        Equality.symmetry(moduloIsSucc),
+        reflexivity(Natural, 0))
 
 -- When modulo(p, n) = 0, the step recurses.
 theorem Natural.padic_valuation_step_succ_when_divides
@@ -86,21 +96,22 @@ theorem Natural.padic_valuation_step_succ_when_divides
         : Natural.padic_valuation_step(successor(fuel), prime, target)
           = successor(Natural.padic_valuation_step(
                           fuel, prime, Natural.divide(prime, target))) :=
-  Equality.transport_proposition(
-      function (m : Natural) =>
-          (cases m {
-             | zero =>
-                 successor(Natural.padic_valuation_step(
-                               fuel, prime, Natural.divide(prime, target)))
-             | successor(_) => zero
-           } : Natural)
-          = successor(Natural.padic_valuation_step(
-                          fuel, prime, Natural.divide(prime, target))),
-      0, Natural.modulo(prime, target),
-      Equality.symmetry(moduloZero),
-      reflexivity(Natural,
-          successor(Natural.padic_valuation_step(
-              fuel, prime, Natural.divide(prime, target)))))
+  unfold Natural.padic_valuation_step in
+    Equality.transport_proposition(
+        function (m : Natural) =>
+            (cases m {
+               | zero =>
+                   successor(Natural.padic_valuation_step(
+                                 fuel, prime, Natural.divide(prime, target)))
+               | successor(_) => zero
+             } : Natural)
+            = successor(Natural.padic_valuation_step(
+                            fuel, prime, Natural.divide(prime, target))),
+        0, Natural.modulo(prime, target),
+        Equality.symmetry(moduloZero),
+        reflexivity(Natural,
+            successor(Natural.padic_valuation_step(
+                fuel, prime, Natural.divide(prime, target)))))
 
 -- ----------------------------------------------------------------------
 -- Helpers about Natural.divide when the modulo is zero.
@@ -685,7 +696,25 @@ theorem Natural.padic_valuation_power_divides
                  | zero => {
                      let refinedMEq : m = prime * 0 :=
                          rewrite(qEq, mEqPrimeQ);
-                     -- m = prime * 0 = 0. v_p(0) = 0. p^0 = 1. 1 | m = 0.
+                     -- m = prime * 0 = 0. v_p(0) = 0 via the zero-fuel
+                     -- characterising lemma. Then p^0 = 1, and 1 | 0.
+                     -- Build divides(p^v_p(0), 0) explicitly by rewriting
+                     -- one_divides(0)'s `1` to `power(v_p(prime, 0), prime)`.
+                     claim vpZero : Natural.padic_valuation(prime, 0) = 0
+                         by Natural.padic_valuation_step_zero_fuel(prime, 0);
+                     claim oneEqPower
+                           : 1 = Natural.power(
+                                     Natural.padic_valuation(prime, 0), prime)
+                         by calc 1
+                              = Natural.power(0, prime)
+                                   by Equality.symmetry(
+                                          Natural.power_zero(prime))
+                              = Natural.power(
+                                    Natural.padic_valuation(prime, 0), prime)
+                                   by congruenceOf(
+                                          function (e : Natural) =>
+                                              Natural.power(e, prime),
+                                          Equality.symmetry(vpZero));
                      Equality.transport_proposition(
                          function (mValue : Natural) =>
                              Natural.divides(
@@ -698,7 +727,7 @@ theorem Natural.padic_valuation_power_divides
                              calc m
                                 = prime * 0
                                 = 0),
-                         Natural.one_divides(0))
+                         rewrite(oneEqPower, Natural.one_divides(0)))
                    }
                  | successor(predQ) => {
                      let refinedMEq : m = prime * successor(predQ) :=
