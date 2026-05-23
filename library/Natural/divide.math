@@ -327,70 +327,46 @@ theorem Natural.modulo_step_lt_divisor
   | successor(f), d, n, dPositive, nLeSuccFuel =>
       -- Case on monus(d, n).
       cases Natural.monus(d, n) with monusEq {
-        | zero =>
+        | zero => {
             -- d ≤ n. modulo_step(succ(f), d, n) = modulo_step(f, d, n - d).
-            -- Apply IH: 1 ≤ d (have), n - d ≤ f.
-            -- From nLeSuccFuel: succ(n) ≤ succ(succ(f)), i.e., n ≤ succ(f).
-            -- Then monus(n, d) ≤ ... need monus(n, d) ≤ f.
-            -- Approach: monus(n, d) ≤ n - 1 ≤ f (when n ≥ 1, d ≥ 1).
-            -- Sub-case on d.
+            -- Recurse on (f, d, n - d). The new fuel-bound precondition
+            -- is succ(monus(n, d)) ≤ succ(f), discharged below by case-
+            -- splitting on d (positive, so non-zero) and n.
+            claim monusBoundedByFuel
+                  : successor(Natural.monus(n, d)) ≤ successor(f)
+                by claim goal by cases on d refining dPositive {
+                    case zero: absurd(dPositive)
+                    case successor(predD):
+                        claim goal by cases on n refining nLeSuccFuel {
+                            case zero:
+                                Natural.successor_less_or_equal_successor(
+                                    0, f, Natural.zero_least(f))
+                            case successor(k):
+                                -- monus(succ(k), succ(predD)) ≡ monus(k, predD)
+                                -- (kernel reduction), and monus(k, predD) ≤ k
+                                -- ≤ f follows from monus_le_self + descending
+                                -- nLeSuccFuel twice.
+                                calc successor(Natural.monus(k, predD))
+                                   ≤ successor(k)
+                                        by Natural.successor_less_or_equal_successor(
+                                               Natural.monus(k, predD), k,
+                                               Natural.monus_le_self(k, predD))
+                                   ≤ successor(f)
+                                        by Natural.less_or_equal_successor_successor_descend(
+                                               successor(k), successor(f),
+                                               nLeSuccFuel)
+                        }
+                };
             rewrite(
                 Equality.symmetry(
-                    Natural.modulo_step_succ_fits(
-                        f, d, n, monusEq)),
+                    Natural.modulo_step_succ_fits(f, d, n, monusEq)),
                 Natural.modulo_step_lt_divisor(
                     f, d, Natural.monus(n, d), dPositive,
-                    -- succ(monus(n, d)) ≤ succ(f).
-                    -- For d ≥ 1, d = succ(d') for some d'. Then
-                    -- monus(n, succ(d')) ≤ ...
-                    (cases d {
-                       | zero =>
-                           -- d = 0 contradicts dPositive.
-                           function (refinedDPositive
-                                       : successor(0) ≤ 0) =>
-                             absurd(refinedDPositive)
-                       | successor(predD) =>
-                           function (refinedDPositive
-                                       : successor(0) ≤ successor(predD)) =>
-                             -- d = succ(predD). monus(n, succ(predD)).
-                             -- Case-split n: monus(0, succ(predD)) = 0;
-                             -- monus(succ(k), succ(predD)) = monus(k, predD) ≤ k.
-                             (cases n {
-                                | zero =>
-                                    function (refinedNLeSuccFuel
-                                                : successor(0) ≤ successor(successor(f))) =>
-                                      Natural.successor_less_or_equal_successor(
-                                          0, f,
-                                          Natural.zero_least(f))
-                                | successor(k) =>
-                                    function (refinedNLeSuccFuel
-                                                : successor(successor(k))
-                                                  ≤ successor(successor(f))) =>
-                                      Natural.successor_less_or_equal_successor(
-                                          Natural.monus(k, predD), f,
-                                          LessOrEqual.transitive(
-                                              Natural.monus(k, predD), k, f,
-                                              Natural.less_or_equal_successor_successor_descend(
-                                                  k, f,
-                                                  Natural.less_or_equal_successor_successor_descend(
-                                                      successor(k),
-                                                      successor(f),
-                                                      refinedNLeSuccFuel)),
-                                              Natural.monus_le_self(k, predD)))
-                              } : (refinedNLeSuccFuel
-                                       : successor(n) ≤ successor(successor(f)))
-                                  → successor(Natural.monus(n, successor(predD)))
-                                    ≤ successor(f))(nLeSuccFuel)
-                     } : (refinedDPositive : successor(0) ≤ d)
-                         → successor(Natural.monus(n, d)) ≤ successor(f))(dPositive)))
+                    monusBoundedByFuel))
+        }
         | successor(predM) =>
-            -- d > n. modulo_step returns n. Need succ(n) ≤ d.
-            -- From monus(d, n) = succ(predM), we have d = n + succ(predM).
-            -- So d ≥ succ(n).
-            -- From monus_zero_implies_decompose with reversed args
-            -- doesn't apply directly. Use a direct argument:
-            -- d = monus(d, n) + min(d, n) ... hmm need a clean lemma.
-            -- Easier: from monus(d, n) > 0, d > n by a monus-positivity lemma.
+            -- d > n. modulo_step returns n; monus_succ_implies_gt
+            -- supplies succ(n) ≤ d directly.
             rewrite(
                 Equality.symmetry(
                     Natural.modulo_step_succ_too_big(

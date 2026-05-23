@@ -2059,15 +2059,27 @@ private:
         if (peek().kind == TokenKind::KeywordBy) {
             consumeAny();  // 'by'
             if (peek().kind == TokenKind::KeywordCases) {
-                consumeAny();  // 'cases'
-                byCases = true;
-                expect(TokenKind::LeftBrace, "after 'by cases'");
-                while (peek().kind == TokenKind::KeywordIn
-                       || peek().kind == TokenKind::KeywordCase) {
-                    arms.push_back(parseStructuredClaimArm());
+                Token casesToken = consumeAny();  // 'cases'
+                // Two flavours:
+                //   `by cases { case A: … case B: … }`           —
+                //       propositional case-split on a disjunction.
+                //   `by cases on E [refining …] { case zero: … }` —
+                //       structural case-split on a constructor (same
+                //       desugaring as `claim P by induction on E …`
+                //       without an IH binder).
+                if (peek().kind == TokenKind::KeywordOn) {
+                    byHint = parseClaimByCasesOnScrutinee(casesToken);
+                    byInduction = true;
+                } else {
+                    byCases = true;
+                    expect(TokenKind::LeftBrace, "after 'by cases'");
+                    while (peek().kind == TokenKind::KeywordIn
+                           || peek().kind == TokenKind::KeywordCase) {
+                        arms.push_back(parseStructuredClaimArm());
+                    }
+                    expect(TokenKind::RightBrace,
+                           "ending 'by cases' arms block");
                 }
-                expect(TokenKind::RightBrace,
-                       "ending 'by cases' arms block");
             } else if (peek().kind == TokenKind::KeywordInduction) {
                 // `claim P by induction on E [with ih] [refining …]
                 // { case zero: …  case successor(k): … }` —
@@ -2129,6 +2141,39 @@ private:
             /*equalityHypothesisName=*/std::string(),
             std::move(refiningNames),
             inductionToken.line, inductionToken.column);
+    }
+
+    // `claim P by cases on E [refining …] { case zero: …  case
+    // successor(k): … }` — structural case-split on a constructor.
+    // Same shape as `claim P by induction on E` but no `with <ih>`
+    // (the `cases` flavour deliberately doesn't bind an IH; users
+    // who want one write `by induction` instead). The opening
+    // `claim P by cases` has already been consumed by the caller.
+    // We share the SurfaceCases / SurfaceCasesWithRefining produced
+    // by the induction path; the elaborator dispatches by passing
+    // the claim's proposition as the expected type.
+    SurfaceExpressionPointer parseClaimByCasesOnScrutinee(
+            const Token& casesToken) {
+        expect(TokenKind::KeywordOn, "after 'by cases'");
+        auto scrutinee = parseExpression();
+        std::vector<std::string> refiningNames =
+            parseOptionalRefiningList();
+        expect(TokenKind::LeftBrace,
+               "after 'by cases on <expr>'");
+        auto clauses = parseCasesClauseBlock(
+            /*ihName=*/std::string(), TokenKind::Colon);
+        expect(TokenKind::RightBrace,
+               "ending 'by cases on <expr>' block");
+        if (refiningNames.empty()) {
+            return makeSurfaceCases(
+                std::move(scrutinee), std::move(clauses),
+                casesToken.line, casesToken.column);
+        }
+        return makeSurfaceCasesWithRefining(
+            std::move(scrutinee), std::move(clauses),
+            /*equalityHypothesisName=*/std::string(),
+            std::move(refiningNames),
+            casesToken.line, casesToken.column);
     }
 
     // A run of one or more `claim`s. Each non-terminal claim (one that
