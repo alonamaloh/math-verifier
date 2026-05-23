@@ -28,17 +28,19 @@ import Equality.basics
 import Logic.basics
 import Logic.exists
 
--- Cap lemma: q ≤ d·q when d ≥ 1. Pattern-match on d; the
--- successor(predD) case uses that multiply(successor(_), _) reduces
--- definitionally on the first argument, so d·q ≡ q + predD·q, and
--- q ≤ q + (anything) by le_add_right.
+-- Cap lemma: q ≤ d·q when d ≥ 1. Cases on d: the zero case is
+-- absurd (no 1 ≤ 0); the successor(predD) case uses that
+-- multiply(successor(_), _) reduces definitionally on the first
+-- argument, so d·q ≡ q + predD·q, and q ≤ q + (anything) by
+-- le_add_right.
 theorem Natural.le_q_d_mult_q
-        : (d q : Natural) → 1 ≤ d
-          → q ≤ d * q
-  | zero, q, oneLessOrEqualZero =>
-      absurd(oneLessOrEqualZero)
-  | successor(predD), q, _ =>
-      Natural.less_or_equal_add_right(q, predD * q)
+        (d q : Natural) (oneLessOrEqualD : 1 ≤ d)
+        : q ≤ d * q :=
+  cases d refining oneLessOrEqualD {
+    | zero            => absurd(oneLessOrEqualD)
+    | successor(predD) =>
+        Natural.less_or_equal_add_right(q, predD * q)
+  }
 
 -- Bounded quotient search. Returns either a witness q ≤ bound with
 -- n = d·q, or a function rejecting every such q.
@@ -134,54 +136,59 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
           }
       }
 
--- Decidable divisibility on Natural. For d = 0, dispatches via
--- decides_equality(n, 0). For d = successor(dPredecessor), runs the bounded search
--- at bound = n; the "not found" branch combines with the cap lemma
--- to rule out any q (because q > n would force d·q > n).
+-- Decidable divisibility on Natural. Cases on d: zero dispatches
+-- via decides_equality(n, 0); successor(predD) runs the bounded
+-- search at bound = n, and the "not found" branch combines with
+-- the cap lemma to rule out any q (because q > n would force
+-- d·q > n).
 theorem Natural.decides_divides
-        : (d n : Natural)
-          → d ∣ n ∨ d ∤ n
-  | zero, n =>
-      claim (n = 0) ∨ (n ≠ 0)
-      claim by cases {
-        in (n = 0) as nEqualsZero:
-            -- 0 ∣ n with witness q = 0: 0 · 0 = 0 = n.
-            Or.introduceLeft(⟨0, nEqualsZero⟩)
-        in (n ≠ 0) as nNotEqualZero:
-            -- A divisibility witness would give n = 0 · q = 0,
-            -- contradicting nNotEqualZero.
-            Or.introduceRight(function (divProof : 0 ∣ n) => {
-              obtain ⟨q, nEqMulZeroQ⟩ from divProof;
-              nNotEqualZero(nEqMulZeroQ)
-            })
+        (d n : Natural) : d ∣ n ∨ d ∤ n :=
+  cases d {
+    | zero => {
+        claim (n = 0) ∨ (n ≠ 0)
+        claim by cases {
+          in (n = 0) as nEqualsZero:
+              -- 0 ∣ n with witness q = 0: 0 · 0 = 0 = n.
+              Or.introduceLeft(⟨0, nEqualsZero⟩)
+          in (n ≠ 0) as nNotEqualZero:
+              -- A divisibility witness would give n = 0 · q = 0,
+              -- contradicting nNotEqualZero.
+              Or.introduceRight(function (divProof : 0 ∣ n) => {
+                obtain ⟨q, nEqMulZeroQ⟩ from divProof;
+                nNotEqualZero(nEqMulZeroQ)
+              })
+        }
       }
-  | successor(predD), n =>
-      claim (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q)
-          ∨ ((q : Natural) → q ≤ n → n ≠ successor(predD) * q)
-          by Natural.search_quotient_witness_up_to(
-                 successor(predD), n, n)
-      claim by cases {
-        in (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q)
-            as foundWitness:
-            -- Witness found; that's the divisor.
-            { obtain ⟨q, _, nEqualsDTimesQuotient⟩ from foundWitness;
-              Or.introduceLeft(⟨q, nEqualsDTimesQuotient⟩) }
-        in ((q : Natural) → q ≤ n → n ≠ successor(predD) * q)
-            as noQuotientInRange:
-            -- A divisibility witness gives some q with n = d · q.
-            -- The cap lemma forces q ≤ d · q = n; then
-            -- noQuotientInRange contradicts.
-            Or.introduceRight(
-                function (divProof : successor(predD) ∣ n) => {
-              obtain ⟨q, nEqualsDTimesQuotient⟩ from divProof;
-              claim qLeN : q ≤ n
-                  by rewrite(
-                         Equality.symmetry(nEqualsDTimesQuotient),
-                         Natural.le_q_d_mult_q(
-                             successor(predD), q,
-                             Natural.successor_less_or_equal_successor(
-                                 0, predD,
-                                 Natural.zero_least(predD))));
-              noQuotientInRange(q, qLeN, nEqualsDTimesQuotient)
-            })
+    | successor(predD) => {
+        claim (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q)
+              ∨ ((q : Natural) → q ≤ n → n ≠ successor(predD) * q)
+            by Natural.search_quotient_witness_up_to(
+                   successor(predD), n, n)
+        claim by cases {
+          in (∃ (q : Natural). q ≤ n ∧ n = successor(predD) * q)
+              as foundWitness:
+              -- Witness found; that's the divisor.
+              { obtain ⟨q, _, nEqualsDTimesQuotient⟩
+                    from foundWitness;
+                Or.introduceLeft(⟨q, nEqualsDTimesQuotient⟩) }
+          in ((q : Natural) → q ≤ n → n ≠ successor(predD) * q)
+              as noQuotientInRange:
+              -- A divisibility witness gives some q with n = d · q.
+              -- The cap lemma forces q ≤ d · q = n; then
+              -- noQuotientInRange contradicts.
+              Or.introduceRight(
+                  function (divProof : successor(predD) ∣ n) => {
+                obtain ⟨q, nEqualsDTimesQuotient⟩ from divProof;
+                claim qLeN : q ≤ n
+                    by rewrite(
+                           Equality.symmetry(nEqualsDTimesQuotient),
+                           Natural.le_q_d_mult_q(
+                               successor(predD), q,
+                               Natural.successor_less_or_equal_successor(
+                                   0, predD,
+                                   Natural.zero_least(predD))));
+                noQuotientInRange(q, qLeN, nEqualsDTimesQuotient)
+              })
+        }
       }
+  }
