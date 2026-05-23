@@ -697,7 +697,32 @@ If those three apply, opacity removes a class of "where did the
 term go" surprises.
 
 Currently opaque: `Natural.monus`, `Natural.divide_step`,
-`Natural.modulo_step`, `Natural.padic_valuation_step`.
+`Natural.modulo_step`, `Natural.padic_valuation_step`,
+`Natural.power`.
+
+### When NOT to mark opaque — the cost / benefit lesson
+
+Tried and reverted: `Natural.distance`. The pattern is the same
+(recursive, defines `distance(0,_)=_`, `distance(succ,succ)=…`)
+but proofs about distance are *computational* — they evaluate
+distance on concrete pieces toward a value, not pattern-match
+against goals that mention distance. Opacity forced ~200 lines of
+bridge rewrites (`Equality.transport_proposition` with explicit
+motives, because intermediate `LessOrEqual.reflexivity(x)` proofs
+had `x` appearing twice and `rewrite` couldn't disambiguate)
+without removing any real surprise.
+
+Heuristic: opacity helps when the proof shape SAYS something
+about `f(args)` and would prefer the kernel not to silently
+restructure it. Opacity hurts when the proof shape COMPUTES
+`f(args)` and benefits from the kernel completing the
+computation.
+
+In practice: convert one candidate, audit the failures, count the
+bridge sites. If most fixes look like "I added an explicit lemma
+citation that makes the proof clearer," keep going. If most fixes
+look like "I wrapped reflexivity in transport_proposition with a
+synthetic motive because two `b`s collided," revert.
 
 ### Discipline at the opacity boundary
 
