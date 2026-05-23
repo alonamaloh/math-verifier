@@ -519,3 +519,24 @@ designing now rather than retrofitting.
 4. **"Obviously" umbrella** — extend dispatch with `linarith`,
    `tauto`, `decide`. The make-or-break automation for textbook
    fidelity.
+
+### Landed (2026-05-22)
+
+- **(1) Auto-prover expansion** — `tryAutoProveEqualityGoal` slotted
+  into `lookupClaimByLibrary`. Reflexivity + diff with
+  `Equality.congruence` + AC rearrangement via `ring` now close
+  bare `claim P;` equality goals at top-level. Best-near-miss
+  diagnostics deliberately deferred (task #5) — the existing
+  4-strategy error message is a coarse summary already.
+- **(2) `suppose P as h;`** — renames the prior `assume h : P;`
+  with Phase 3 vocabulary and the `as`-binder. Same desugaring
+  (block-leading SurfaceLambda).
+- **LEM bridge for RAA** — `tryDoubleNegationElimination` in the
+  `coerceToExpectedTypeViaDiff` path. `suppose ¬P as h; …; claim
+  False` at theorem body now closes a goal stated as P by silently
+  wrapping with `Logic.double_negation_eliminate`. No-op when that
+  lemma isn't in the module's import closure.
+
+Still pending under (2): `choose N such that P(N);`, `let ε > 0` /
+`let ε ∈ ℝ with ε > 0;`. `it suffices to show …` already exists as
+`suffices Q by Reduction;`.
