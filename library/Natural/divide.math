@@ -157,32 +157,66 @@ theorem Natural.monus_zero_implies_decompose
           → dividend = divisor + Natural.monus(dividend, divisor)
   | zero, dividend, _ =>
       -- divisor = 0: dividend = 0 + dividend. monus(dividend, 0) = dividend.
+      -- The final step bridges via `monus_zero` (was the kernel's
+      -- automatic ι; now an explicit lemma because monus is opaque).
       calc dividend
          = 0 + dividend
          = 0 + Natural.monus(dividend, 0)
+              by congruenceOf(
+                     function (m : Natural) => 0 + m,
+                     Equality.symmetry(Natural.monus_zero(dividend)))
   | successor(predDivisor), dividend, monusEqZero =>
       (cases dividend {
          | zero =>
              function (refinedMonusEqZero
-                         : Natural.monus(successor(predDivisor), 0) = 0) =>
-               -- monus(succ predDivisor, zero) β-reduces to succ predDivisor,
-               -- so refinedMonusEqZero is a `succ _ = zero` witness.
-               absurd(refinedMonusEqZero)
+                         : Natural.monus(successor(predDivisor), 0) = 0) => {
+               -- With monus opaque, refinedMonusEqZero stays as
+               -- `monus(succ _, 0) = 0`. Bridge to `succ _ = 0` via
+               -- monus_succ_zero, then absurd.
+               claim succEqZero : successor(predDivisor) = 0
+                   by calc successor(predDivisor)
+                        = Natural.monus(successor(predDivisor), 0)
+                              by Equality.symmetry(
+                                     Natural.monus_succ_zero(predDivisor))
+                        = 0
+                              by refinedMonusEqZero;
+               absurd(succEqZero)
+             }
          | successor(predDividend) =>
              function (refinedMonusEqZero
                          : Natural.monus(successor(predDivisor),
                                          successor(predDividend))
-                           = 0) =>
-               -- Inner monus reduces to monus(predDivisor, predDividend).
-               -- IH on (predDivisor, predDividend).
+                           = 0) => {
+               -- Peel via monus_succ_succ so the IH applies to the
+               -- inner monus(predDivisor, predDividend).
+               claim innerMonusZero
+                     : Natural.monus(predDivisor, predDividend) = 0
+                   by calc Natural.monus(predDivisor, predDividend)
+                        = Natural.monus(successor(predDivisor),
+                                         successor(predDividend))
+                              by Equality.symmetry(
+                                     Natural.monus_succ_succ(
+                                         predDivisor, predDividend))
+                        = 0
+                              by refinedMonusEqZero;
                calc successor(predDividend)
                   = successor(predDivisor
                               + Natural.monus(predDividend, predDivisor))
                          by Natural.monus_zero_implies_decompose(
                                 predDivisor, predDividend,
-                                refinedMonusEqZero)
+                                innerMonusZero)
                   = successor(predDivisor)
                         + Natural.monus(predDividend, predDivisor)
+                  = successor(predDivisor)
+                        + Natural.monus(successor(predDividend),
+                                         successor(predDivisor))
+                         by congruenceOf(
+                                function (m : Natural) =>
+                                    successor(predDivisor) + m,
+                                Equality.symmetry(
+                                    Natural.monus_succ_succ(
+                                        predDividend, predDivisor)))
+             }
        } : (refinedMonusEqZero
                 : Natural.monus(successor(predDivisor), dividend) = 0)
            → dividend
@@ -266,19 +300,36 @@ theorem Natural.divide_modulo_decompose (divisor dividend : Natural)
 -- ----------------------------------------------------------------------
 -- modulo bound and related fuel monotonicity.
 
--- monus(n, d) ≤ n. Truncated subtraction can only decrease.
+-- monus(n, d) ≤ n. Truncated subtraction can only decrease. With
+-- monus opaque, we bridge via the characterising lemmas to align
+-- the kernel goal type with the in-hand proof.
 theorem Natural.monus_le_self
         : (n d : Natural) → Natural.monus(n, d) ≤ n
   | zero, d =>
-      LessOrEqual.reflexivity(0)
+      -- monus(0, d) = 0; LessOrEqual.reflexivity gives 0 ≤ 0.
+      -- Transport substitutes monus(0, d) for the left 0.
+      Equality.transport_proposition(
+          function (m : Natural) => m ≤ 0,
+          0, Natural.monus(0, d),
+          Equality.symmetry(Natural.monus_zero_left(d)),
+          LessOrEqual.reflexivity(0))
   | successor(k), d =>
       (cases d {
          | zero =>
-             LessOrEqual.reflexivity(successor(k))
+             Equality.transport_proposition(
+                 function (m : Natural) => m ≤ successor(k),
+                 successor(k), Natural.monus(successor(k), 0),
+                 Equality.symmetry(Natural.monus_succ_zero(k)),
+                 LessOrEqual.reflexivity(successor(k)))
          | successor(j) =>
-             LessOrEqual.step(
-                 Natural.monus(k, j), k,
-                 Natural.monus_le_self(k, j))
+             Equality.transport_proposition(
+                 function (m : Natural) => m ≤ successor(k),
+                 Natural.monus(k, j),
+                 Natural.monus(successor(k), successor(j)),
+                 Equality.symmetry(Natural.monus_succ_succ(k, j)),
+                 LessOrEqual.step(
+                     Natural.monus(k, j), k,
+                     Natural.monus_le_self(k, j)))
        } : Natural.monus(successor(k), d) ≤ successor(k))
 
 -- Helper: if monus(d, n) = succ(predM), then succ(n) ≤ d.
@@ -287,10 +338,12 @@ theorem Natural.monus_succ_implies_gt
           → Natural.monus(d, n) = successor(predM)
           → successor(n) ≤ d
   | zero, n, predM, monusEq =>
+      -- monus(zero, n) = 0 via monus_zero_left; bridges to
+      -- `succ(predM) = 0`, the absurd shape.
       absurd(
           calc successor(predM)
-             = Natural.monus(zero, n)
-             = 0)
+             = Natural.monus(zero, n)   by Equality.symmetry(monusEq)
+             = 0                        by Natural.monus_zero_left(n))
   | successor(d'), n, predM, monusEq =>
       (cases n {
          | zero =>
@@ -301,11 +354,21 @@ theorem Natural.monus_succ_implies_gt
          | successor(k) =>
              function (refinedMonusEq
                          : Natural.monus(successor(d'), successor(k))
-                           = successor(predM)) =>
+                           = successor(predM)) => {
+               -- Peel the inner monus via monus_succ_succ so the IH
+               -- applies.
+               claim innerMonusEq
+                     : Natural.monus(d', k) = successor(predM)
+                   by calc Natural.monus(d', k)
+                        = Natural.monus(successor(d'), successor(k))
+                              by Equality.symmetry(
+                                     Natural.monus_succ_succ(d', k))
+                        = successor(predM)   by refinedMonusEq;
                Natural.successor_less_or_equal_successor(
                    successor(k), d',
                    Natural.monus_succ_implies_gt(
-                       d', k, predM, refinedMonusEq))
+                       d', k, predM, innerMonusEq))
+             }
        } : (refinedMonusEq : Natural.monus(successor(d'), n)
                              = successor(predM))
            → successor(n) ≤ successor(d'))(monusEq)
@@ -339,22 +402,34 @@ theorem Natural.modulo_step_lt_divisor
                     case successor(predD):
                         claim goal by cases on n refining nLeSuccFuel {
                             case zero:
-                                Natural.successor_less_or_equal_successor(
-                                    0, f, Natural.zero_least(f))
+                                -- monus(0, succ(predD)) = 0 via
+                                -- monus_zero_left; bridge so the
+                                -- succ(0) ≤ succ(f) proof fits the
+                                -- expected succ(monus(0, succ predD))
+                                -- ≤ succ(f) shape.
+                                rewrite(
+                                    Equality.symmetry(
+                                        Natural.monus_zero_left(
+                                            successor(predD))),
+                                    Natural.successor_less_or_equal_successor(
+                                        0, f, Natural.zero_least(f)))
                             case successor(k):
-                                -- monus(succ(k), succ(predD)) ≡ monus(k, predD)
-                                -- (kernel reduction), and monus(k, predD) ≤ k
-                                -- ≤ f follows from monus_le_self + descending
-                                -- nLeSuccFuel twice.
-                                calc successor(Natural.monus(k, predD))
-                                   ≤ successor(k)
-                                        by Natural.successor_less_or_equal_successor(
-                                               Natural.monus(k, predD), k,
-                                               Natural.monus_le_self(k, predD))
-                                   ≤ successor(f)
-                                        by Natural.less_or_equal_successor_successor_descend(
-                                               successor(k), successor(f),
-                                               nLeSuccFuel)
+                                -- monus(succ(k), succ(predD)) = monus(k, predD)
+                                -- via monus_succ_succ (was kernel ι; now
+                                -- an explicit lemma since monus is opaque).
+                                -- Then monus(k, predD) ≤ k ≤ f follows.
+                                rewrite(
+                                    Equality.symmetry(
+                                        Natural.monus_succ_succ(k, predD)),
+                                    calc successor(Natural.monus(k, predD))
+                                       ≤ successor(k)
+                                            by Natural.successor_less_or_equal_successor(
+                                                   Natural.monus(k, predD), k,
+                                                   Natural.monus_le_self(k, predD))
+                                       ≤ successor(f)
+                                            by Natural.less_or_equal_successor_successor_descend(
+                                                   successor(k), successor(f),
+                                                   nLeSuccFuel))
                         }
                 };
             rewrite(
@@ -392,24 +467,34 @@ theorem Natural.modulo_bound
 theorem Natural.monus_add_cancel
         : (a b : Natural) → Natural.monus(a + b, a) = b
   | zero, b =>
-      -- monus(zero + b, zero) = monus(b, zero) = b.
+      -- monus(0 + b, 0) = monus(b, 0) = b. (Natural.add at 0 reduces
+      -- by kernel β; monus_zero supplies the second equation.)
       Natural.monus_zero(b)
   | successor(k), b =>
-      -- monus(succ(k) + b, succ(k)) = monus(succ(k + b), succ(k))
-      --                            = monus(k + b, k).
-      -- By IH.
-      Natural.monus_add_cancel(k, b)
+      -- monus(succ(k) + b, succ(k)) ≡ monus(succ(k + b), succ(k))
+      -- (Natural.add reduces). Then monus_succ_succ peels both
+      -- sides to monus(k + b, k); IH closes it.
+      calc Natural.monus(successor(k) + b, successor(k))
+         = Natural.monus(k + b, k)
+              by Natural.monus_succ_succ(k + b, k)
+         = b
+              by Natural.monus_add_cancel(k, b)
 
 -- Helper: monus(d, d + m) = 0 (d ≤ d + m, so subtraction is zero).
 theorem Natural.monus_self_plus
         : (d m : Natural) → Natural.monus(d, d + m) = 0
   | zero, m =>
-      reflexivity(Natural, 0)
+      -- monus(0, 0 + m) = monus(0, m) (by add at 0) = 0 (monus_zero_left).
+      Natural.monus_zero_left(0 + m)
   | successor(k), m =>
-      -- monus(succ(k), succ(k) + m) = monus(succ(k), succ(k + m))
-      --                            = monus(k, k + m).
-      -- By IH.
-      Natural.monus_self_plus(k, m)
+      -- monus(succ(k), succ(k) + m) ≡ monus(succ(k), succ(k + m))
+      -- by add's first-arg reduction; then monus_succ_succ peels
+      -- both sides; IH closes it.
+      calc Natural.monus(successor(k), successor(k) + m)
+         = Natural.monus(k, k + m)
+              by Natural.monus_succ_succ(k, k + m)
+         = 0
+              by Natural.monus_self_plus(k, m)
 
 -- Step-level: modulo_step(fuel, d, d * q) = 0 when d ≥ 1 and fuel ≥ q.
 theorem Natural.modulo_step_at_multiple

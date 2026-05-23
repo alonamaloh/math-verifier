@@ -1058,10 +1058,12 @@ theorem Natural.padic_valuation_monus_ultrametric_when_ge
 theorem Natural.distance_monus_when_le
         : (b a : Natural) → b ≤ a → Natural.distance(a, b) = Natural.monus(a, b)
   | zero, a, _ =>
-      -- distance(a, 0) = a, monus(a, 0) = a.
+      -- distance(a, 0) = a (kernel reduction); monus(a, 0) = a via
+      -- monus_zero (now an explicit lemma since monus is opaque).
       calc Natural.distance(a, 0)
          = a
          = Natural.monus(a, 0)
+              by Equality.symmetry(Natural.monus_zero(a))
   | successor(predB), a, succPredBLeA =>
       (cases a {
          | zero =>
@@ -1069,13 +1071,16 @@ theorem Natural.distance_monus_when_le
                absurd(refinedLe)
          | successor(predA) =>
              function (refinedLe : successor(predB) ≤ successor(predA)) =>
-               -- distance(succ(predA), succ(predB)) reduces to
-               -- distance(predA, predB). monus(succ(predA), succ(predB))
-               -- reduces to monus(predA, predB).
-               Natural.distance_monus_when_le(
-                   predB, predA,
-                   Natural.less_or_equal_successor_successor_descend(
-                       predB, predA, refinedLe))
+               -- distance(succ, succ) reduces (transparent) to
+               -- distance(_, _); monus(succ, succ) needs the
+               -- explicit monus_succ_succ bridge (opaque).
+               rewrite(
+                   Equality.symmetry(
+                       Natural.monus_succ_succ(predA, predB)),
+                   Natural.distance_monus_when_le(
+                       predB, predA,
+                       Natural.less_or_equal_successor_successor_descend(
+                           predB, predA, refinedLe)))
        } : (refinedLe : successor(predB) ≤ a)
            → Natural.distance(a, successor(predB))
              = Natural.monus(a, successor(predB)))(succPredBLeA)

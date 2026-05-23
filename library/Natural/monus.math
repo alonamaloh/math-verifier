@@ -15,9 +15,17 @@ import Equality.basics
 import Logic.basics
 
 -- monus(a, b) = a -̇ b. Structural on the first argument; inner case
--- on the second when needed (the kernel only reduces multi-constructor
--- patterns when the inner case is explicit).
-definition Natural.monus : Natural → Natural → Natural
+-- on the second when needed.
+--
+-- Declared `opaque` so the kernel won't δ-unfold `monus` during
+-- typechecking. Downstream proofs reason about monus through the
+-- characterising lemmas below (`monus_zero_left`, `monus_zero`,
+-- `monus_succ_succ`) rather than by relying on β/ι firing through
+-- the recursion equations. Insulates the proof structure from the
+-- definitional shape — e.g. `rewrite` finds the un-reduced form
+-- `monus(succ(k), succ(predD))` in goal types because the kernel
+-- leaves it as a stuck `monus(_, _)` application.
+opaque definition Natural.monus : Natural → Natural → Natural
   | zero,         _ => zero
   | successor(k), b =>
       cases b {
@@ -25,36 +33,54 @@ definition Natural.monus : Natural → Natural → Natural
         | successor(j) => Natural.monus(k, j)
       }
 
--- monus(zero, b) = zero (definitional).
-theorem Natural.monus_zero_left (b : Natural) : Natural.monus(0, b) = 0 :=
-  reflexivity(Natural, 0)
+-- ----------------------------------------------------------------------
+-- Characterising lemmas. The `unfold Natural.monus in ...` here is
+-- the ONLY place that peeks at monus's body — every later proof
+-- (in this file and downstream) cites these lemmas instead. That's
+-- the discipline the opacity declaration is meant to enforce.
 
--- monus(successor(k), zero) = successor(k). The kernel sees the outer
--- successor and the inner zero case, reducing the inner `cases` to
--- the constructor branch.
+-- monus(zero, b) = zero.
+theorem Natural.monus_zero_left (b : Natural) : Natural.monus(0, b) = 0 :=
+  unfold Natural.monus in reflexivity(Natural, 0)
+
+-- monus(successor(k), zero) = successor(k).
 theorem Natural.monus_succ_zero (k : Natural)
         : Natural.monus(successor(k), 0) = successor(k) :=
-  reflexivity(Natural, successor(k))
+  unfold Natural.monus in reflexivity(Natural, successor(k))
 
--- monus(a, zero) = a. Case-split a (the kernel doesn't auto-reduce when
--- the second arg isn't a constructor).
+-- monus(successor(k), successor(j)) = monus(k, j). The recursive
+-- step. Lets downstream proofs "subtract a 1 from both sides."
+theorem Natural.monus_succ_succ (k j : Natural)
+        : Natural.monus(successor(k), successor(j)) = Natural.monus(k, j) :=
+  unfold Natural.monus in reflexivity(Natural, Natural.monus(k, j))
+
+-- monus(a, zero) = a. Case-split a; cite monus_zero_left and
+-- monus_succ_zero.
 theorem Natural.monus_zero : (a : Natural) → Natural.monus(a, 0) = a
-  | zero         => reflexivity(zero)
-  | successor(k) => reflexivity(successor(k))
+  | zero         => Natural.monus_zero_left(0)
+  | successor(k) => Natural.monus_succ_zero(k)
 
--- monus(a, a) = zero. Induct on a.
+-- monus(a, a) = zero. Induct on a, using monus_succ_succ to peel
+-- successors from both sides.
 theorem Natural.monus_self : (a : Natural) → Natural.monus(a, a) = 0
-  | zero         => reflexivity(zero)
-  | successor(k) => Natural.monus_self(k)
+  | zero         => Natural.monus_zero_left(0)
+  | successor(k) =>
+      calc Natural.monus(successor(k), successor(k))
+         = Natural.monus(k, k)   by Natural.monus_succ_succ(k, k)
+         = 0                     by Natural.monus_self(k)
 
 -- If a ≤ b, then monus(a, b) = zero. Induct on b, inner case on a.
+-- All access to monus is via the characterising lemmas above —
+-- monus_zero_left for the b=0 / a=0 corners, monus_succ_succ to
+-- peel both sides in the recursive case.
 theorem Natural.le_implies_monus_zero
         : (b a : Natural) → a ≤ b → Natural.monus(a, b) = 0
   | zero, a, aLeqZero =>
-      -- a ≤ 0 forces a = 0; monus(0, 0) reduces to 0.
+      -- a ≤ 0 forces a = 0; then monus(0, 0) = 0. The auto-prover
+      -- derives `a = 0` in scope for the first calc step.
       calc Natural.monus(a, 0)
          = Natural.monus(0, 0)
-         = 0
+         = 0                       by Natural.monus_zero_left(0)
   | successor(predecessorB), a, aLeqSuccB =>
       (cases a {
          | zero =>
@@ -62,11 +88,14 @@ theorem Natural.le_implies_monus_zero
                Natural.monus_zero_left(successor(predecessorB))
          | successor(k) =>
              function (refinedProof : successor(k) ≤ successor(predecessorB)) =>
-               -- monus(succ(k), succ(predecessorB)) reduces to monus(k, predecessorB).
-               -- k ≤ predecessorB by descending the LessOrEqual.
-               Natural.le_implies_monus_zero(
-                   predecessorB, k,
-                   Natural.less_or_equal_successor_successor_descend(
-                       k, predecessorB, refinedProof))
+               -- Peel both sides via monus_succ_succ, then recurse.
+               calc Natural.monus(successor(k), successor(predecessorB))
+                  = Natural.monus(k, predecessorB)
+                       by Natural.monus_succ_succ(k, predecessorB)
+                  = 0
+                       by Natural.le_implies_monus_zero(
+                              predecessorB, k,
+                              Natural.less_or_equal_successor_successor_descend(
+                                  k, predecessorB, refinedProof))
        } : (refinedProof : a ≤ successor(predecessorB))
            → Natural.monus(a, successor(predecessorB)) = 0)(aLeqSuccB)
