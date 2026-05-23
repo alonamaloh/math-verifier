@@ -4411,6 +4411,90 @@ private:
         return makeBoundVariable(N - 1 - matchIndex);
     }
 
+    // Contradiction: if the in-scope hypotheses contain a False
+    // (or a pair `(h : P, h' : Not(P))` that produces False via
+    // `h'(h)`), close ANY goal via `False.eliminate_proposition`.
+    // Two-pass:
+    //   1. Direct False — scan for a hypothesis already of type
+    //      `False`.
+    //   2. Pair — scan for `h : P` paired with `h' : P → False`
+    //      (i.e., `Not(P)`); build `h'(h) : False`.
+    // Tried late in dispatch — if any of the constructive strategies
+    // close the goal, prefer them. Contradiction is the "anything
+    // goes" fallback. Skipped if `False.eliminate_proposition`
+    // isn't in scope.
+    ExpressionPointer tryContradiction(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int /*line*/) {
+        if (!environment_.lookup(
+                "False.eliminate_proposition")) {
+            return nullptr;
+        }
+        int N = static_cast<int>(localBinders.size());
+        Context openedContext =
+            buildContextFromLocalBinders(localBinders);
+        // Pass 1: direct False hypothesis.
+        for (int h = N - 1; h >= 0; --h) {
+            int lift = N - h;
+            ExpressionPointer hTypeOpened = openOverLocalBinders(
+                liftBoundVariables(
+                    localBinders[h].type, lift, 0),
+                localBinders, N);
+            auto* asConst = std::get_if<Constant>(
+                &hTypeOpened->node);
+            if (asConst && asConst->name == "False") {
+                ExpressionPointer call = makeConstant(
+                    "False.eliminate_proposition", {});
+                call = makeApplication(call, goalClosed);
+                call = makeApplication(
+                    call, makeBoundVariable(N - 1 - h));
+                return call;
+            }
+        }
+        // Pass 2: (h : P, h' : Not(P)) pair.
+        for (int h1 = N - 1; h1 >= 0; --h1) {
+            int lift1 = N - h1;
+            ExpressionPointer h1TypeOpened = openOverLocalBinders(
+                liftBoundVariables(
+                    localBinders[h1].type, lift1, 0),
+                localBinders, N);
+            for (int h2 = N - 1; h2 >= 0; --h2) {
+                if (h2 == h1) continue;
+                int lift2 = N - h2;
+                ExpressionPointer h2TypeOpened = openOverLocalBinders(
+                    liftBoundVariables(
+                        localBinders[h2].type, lift2, 0),
+                    localBinders, N);
+                auto* pi = std::get_if<Pi>(&h2TypeOpened->node);
+                if (!pi) continue;
+                // Codomain must be the constant `False` (and so by
+                // construction doesn't reference the Pi binder).
+                auto* codomainConst = std::get_if<Constant>(
+                    &pi->codomain->node);
+                if (!codomainConst
+                    || codomainConst->name != "False") continue;
+                if (!isDefinitionallyEqual(
+                        environment_, openedContext,
+                        pi->domain, h1TypeOpened)) continue;
+                // h2(h1) : False; wrap via eliminate_proposition.
+                ExpressionPointer h1Ref = makeBoundVariable(
+                    N - 1 - h1);
+                ExpressionPointer h2Ref = makeBoundVariable(
+                    N - 1 - h2);
+                ExpressionPointer proofOfFalse =
+                    makeApplication(h2Ref, h1Ref);
+                ExpressionPointer call = makeConstant(
+                    "False.eliminate_proposition", {});
+                call = makeApplication(call, goalClosed);
+                call = makeApplication(
+                    call, std::move(proofOfFalse));
+                return call;
+            }
+        }
+        return nullptr;
+    }
+
     // Disjunction introduction: when the goal is `Or(A, B)`, try
     // to prove `A` via the full auto-prover; if that succeeds, wrap
     // with `Or.introduceLeft`. Else try `B` and wrap with
@@ -4779,10 +4863,13 @@ private:
     //   5. Disjunction introduction — when the goal is `Or(A, B)`,
     //      try `A` first, else `B`; wrap with `Or.introduceLeft` or
     //      `Or.introduceRight` accordingly.
-    //   6. Library scan — for each environment Definition/Axiom whose
+    //   6. Contradiction — if the in-scope hypotheses contain False
+    //      or a `(h : P, h' : Not(P))` pair, close any goal via
+    //      `False.eliminate_proposition`.
+    //   7. Library scan — for each environment Definition/Axiom whose
     //      Pi-chain conclusion has the same spine head as the goal,
     //      try Step 2's autoFillHintForClaim. First success wins.
-    //   7. Transport bridge — when the goal nearly matches something
+    //   8. Transport bridge — when the goal nearly matches something
     //      provable except for one side of a local equality, rewrite
     //      via transport_proposition and recurse. One-step only
     //      (transportBudget defaults to 1) to bound search cost.
@@ -4841,7 +4928,16 @@ private:
             if (attempt) return attempt;
         }
 
-        // (6) Library scan, bucketed by spine head of the conclusion.
+        // (6) Contradiction — if in-scope hypotheses contain False
+        // or a `(h, ¬h)` pair, close the goal via
+        // `False.eliminate_proposition`.
+        {
+            ExpressionPointer attempt = tryContradiction(
+                goalClosed, localBinders, line);
+            if (attempt) return attempt;
+        }
+
+        // (7) Library scan, bucketed by spine head of the conclusion.
         ExpressionPointer goalReduced = weakHeadNormalForm(
             environment_, goalClosed);
         uint64_t goalHash = spineHash(goalReduced);
@@ -4883,7 +4979,7 @@ private:
             }
         }
 
-        // (7) Transport bridge. If the goal nearly matches an
+        // (8) Transport bridge. If the goal nearly matches an
         // already-provable shape modulo one side of a local equality,
         // rewrite the goal via transport_proposition and recurse.
         if (transportBudget > 0) {
@@ -4955,7 +5051,8 @@ private:
             + "`: no in-scope hypothesis matches structurally, no "
             "equality battery (reflexivity / diff / ring) closes the "
             "goal, no transitivity chain reaches the goal, no "
-            "conjunction split decomposes it, no library theorem "
+            "conjunction split decomposes it, no in-scope "
+            "contradiction lets us close it, no library theorem "
             "with this conclusion shape applies, and no one-step "
             "transport via a local equality succeeds — add "
             "`by <lemma>` to specify");
