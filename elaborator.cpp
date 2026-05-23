@@ -14666,21 +14666,25 @@ private:
                 lambda.body, extended, expectedBody,
                 "lambda body");
         }
-        // Unused-name warning for every named binder this lambda
-        // introduces. Checked at the SURFACE level — if the user's
-        // body doesn't textually mention the name, warn. (Kernel-
-        // level would miss cases where the elaborator references
-        // the binder on the user's behalf, e.g. via the bare-
-        // proposition-as-proof coercion finding a hypothesis by
-        // type rather than by name.) The `_` prefix is the opt-out.
-        {
-            const char* form = lambda.fromStatementIntro
-                ? "`suppose ... as`" : "lambda binder";
-            for (const auto& name : lambda.binder.names) {
-                warnIfSurfaceNameUnused(
-                    name, *lambda.body,
-                    lambda.body->line, lambda.body->column, form);
-            }
+        // Unused-name warning. Restricted to `suppose ... as`
+        // statement-level intros — a `suppose P as h;` whose body
+        // ignores `h` is almost always a refactor leftover. Function
+        // lambdas (`function (x : T) (y : U) => body`) deliberately
+        // do NOT trigger this warning, even when `y` goes unused —
+        // C++'s `void foo(int)`-style omission isn't available in
+        // this surface yet, and forcing the user to rename to `_y`
+        // costs as much as just keeping `y`, so the warning would
+        // produce noise without progress. Checked at the SURFACE
+        // level (the user's body must textually reference the name)
+        // because the elaborator may reference a binder on the
+        // user's behalf — e.g. the bare-proposition-as-proof
+        // coercion finds hypotheses by type, not by name.
+        if (lambda.fromStatementIntro
+            && lambda.binder.names.size() == 1) {
+            warnIfSurfaceNameUnused(
+                lambda.binder.names[0], *lambda.body,
+                lambda.body->line, lambda.body->column,
+                "`suppose ... as`");
         }
         ExpressionPointer result = body;
         for (int i = static_cast<int>(lambda.binder.names.size()) - 1;
