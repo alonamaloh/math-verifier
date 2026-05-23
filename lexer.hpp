@@ -37,7 +37,7 @@ enum class TokenKind {
     KeywordByInduction,     // `by_induction` — case-split with IH
     KeywordContradiction,   // `contradiction` — close goal from P / ¬P
     KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
-    KeywordAssume,          // `assume h : P;` — introduce hypothesis as a step
+    KeywordSuppose,         // `suppose P as h;` — introduce hypothesis as a step
     KeywordFrom,            // separator for `obtain ⟨…⟩ from E;`
     KeywordSet,             // `set n := E;` — transparent local definition
     KeywordSorry,           // `sorry` — placeholder for an unwritten proof

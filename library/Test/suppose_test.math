@@ -1,0 +1,55 @@
+-- Tests for the `suppose P as h;` statement form. Replaces the old
+-- `assume h : P;` shape: same desugaring (block-leading SurfaceLambda)
+-- with the Phase 3 vocabulary and `as` binder (`:` reserved for type
+-- ascription elsewhere).
+
+module Test.suppose_test
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+
+-- (1) Single suppose. The block discharges `P → P` via the in-scope
+-- hypothesis match — auto-prover finds `h`.
+theorem suppose_identity (P : Proposition) : P → P := {
+  suppose P as h;
+  claim P
+}
+
+-- (2) Two propositional hypotheses chain at the head of the block.
+-- Each `suppose` adds a lambda intro; the block reads top-to-bottom
+-- as the textbook proof would.
+theorem suppose_curry (P Q : Proposition) : P → Q → P := {
+  suppose P as hP;
+  suppose Q as hQ;
+  claim P
+}
+
+-- (3) Real use: the block argues from one hypothesis to a derived
+-- conclusion via a calc step.
+theorem suppose_with_calc (a b c : Natural) : a = b → a + c = b + c := {
+  suppose a = b as aEqB;
+  claim a + c = b + c
+}
+
+-- (4) Chained suppose plus modus ponens. Auto-prover applies the
+-- implication to the matching hypothesis without a `by` clause.
+theorem suppose_modus_ponens (P Q : Proposition) : P → (P → Q) → Q := {
+  suppose P as hP;
+  suppose P → Q as hImpl;
+  claim Q
+}
+
+-- (5) Mix with a `let` binder. The `let` opens an object slot before
+-- the hypothesis; both fold around the final claim.
+theorem suppose_with_let (a b : Integer) : a = b → b = a := {
+  let bAlias : Integer := b;
+  suppose a = bAlias as aEqB;
+  claim bAlias = a
+}

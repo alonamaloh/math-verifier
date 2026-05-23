@@ -20,7 +20,7 @@ bool isContextualKeyword(TokenKind kind) {
     switch (kind) {
         case TokenKind::KeywordClaim:
         case TokenKind::KeywordObtain:
-        case TokenKind::KeywordAssume:
+        case TokenKind::KeywordSuppose:
         case TokenKind::KeywordSet:
         case TokenKind::KeywordSuffices:
         case TokenKind::KeywordFrom:
@@ -641,16 +641,16 @@ private:
         // forms share the same fold:
         //   `let n : T := V;` / `claim n : T [by V | { proof } | ];`
         //   `let ⟨pat⟩ := V;` / `obtain ⟨pat⟩ from V;`  (destructure)
-        //   `assume h : T;`                              (introduce hypothesis)
+        //   `suppose P as h;`                            (introduce hypothesis)
         // Folded back-to-front around the final expression: pattern-let
         // and obtain produce a `cases` clause, plain let / claim a
-        // `SurfaceLet`, and assume a `SurfaceLambda`.
+        // `SurfaceLet`, and suppose a `SurfaceLambda`.
         struct BlockWrapper {
-            enum Kind { TypedLet, PatternLet, Assume, Set };
+            enum Kind { TypedLet, PatternLet, Suppose, Set };
             Kind kind = TypedLet;
             SurfacePatternPointer pattern;     // PatternLet
-            std::string name;                  // TypedLet, Assume, Set
-            SurfaceExpressionPointer type;     // TypedLet, Assume
+            std::string name;                  // TypedLet, Suppose, Set
+            SurfaceExpressionPointer type;     // TypedLet, Suppose
             SurfaceExpressionPointer value;    // TypedLet, PatternLet, Set
             int line = 0;
             int column = 0;
@@ -664,7 +664,7 @@ private:
         while (peek().kind == TokenKind::KeywordLet
                || peek().kind == TokenKind::KeywordClaim
                || peek().kind == TokenKind::KeywordObtain
-               || peek().kind == TokenKind::KeywordAssume
+               || peek().kind == TokenKind::KeywordSuppose
                || peek().kind == TokenKind::KeywordSet
                || peek().kind == TokenKind::KeywordCalc) {
             // `calc` at statement position has two shapes:
@@ -788,8 +788,8 @@ private:
                 statementToken.kind == TokenKind::KeywordClaim;
             bool isObtain =
                 statementToken.kind == TokenKind::KeywordObtain;
-            bool isAssume =
-                statementToken.kind == TokenKind::KeywordAssume;
+            bool isSuppose =
+                statementToken.kind == TokenKind::KeywordSuppose;
             bool isSet =
                 statementToken.kind == TokenKind::KeywordSet;
             BlockWrapper wrapper;
@@ -805,16 +805,17 @@ private:
                 expect(TokenKind::Assign,
                        "after set name (set n := E;)");
                 wrapper.value = parseExpression();
-            } else if (isAssume) {
+            } else if (isSuppose) {
+                wrapper.kind = BlockWrapper::Suppose;
+                wrapper.type = parseExpression();
+                expect(TokenKind::KeywordAs,
+                       "after suppose proposition (suppose P as h;)");
                 if (!isIdentifierLike(peek().kind)) {
-                    throwHere("expected identifier after 'assume'");
+                    throwHere(
+                        "expected identifier after 'as' in suppose");
                 }
                 Token nameToken = consumeAny();
-                wrapper.kind = BlockWrapper::Assume;
                 wrapper.name = nameToken.lexeme;
-                expect(TokenKind::Colon,
-                       "after assume name (assume h : P;)");
-                wrapper.type = parseExpression();
             } else if (isObtain) {
                 wrapper.kind = BlockWrapper::PatternLet;
                 wrapper.pattern = parsePattern();
@@ -869,7 +870,7 @@ private:
             const char* terminator =
                 isClaim  ? "ending claim statement"
               : isObtain ? "ending obtain statement"
-              : isAssume ? "ending assume statement"
+              : isSuppose ? "ending suppose statement"
               : isSet    ? "ending set statement"
                          : "ending let statement in block body";
             expect(TokenKind::Semicolon, terminator);
@@ -962,7 +963,7 @@ private:
                         std::move(result),
                         iterator->line, iterator->column);
                     break;
-                case BlockWrapper::Assume: {
+                case BlockWrapper::Suppose: {
                     SurfaceBinder binder;
                     binder.names.push_back(std::move(iterator->name));
                     binder.type = std::move(iterator->type);
