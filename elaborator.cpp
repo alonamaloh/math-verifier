@@ -4411,6 +4411,166 @@ private:
         return makeBoundVariable(N - 1 - matchIndex);
     }
 
+    // One-step transitivity bridge: if the goal is `H(a, c)` and
+    // `<H>.transitive` exists in scope, walk hypothesis pairs for
+    // h1 : H(a, b), h2 : H(b, c) and apply the transitive lemma.
+    // Tries both hypothesis-arg orderings to accommodate carriers
+    // whose transitive signature is `(b ≤ c) → (a ≤ b) → a ≤ c`
+    // (Natural) vs `(a ≤ b) → (b ≤ c) → a ≤ c` (Integer, Rational,
+    // Real). Linear search over hypothesis pairs (last-bound first);
+    // first match wins. Returns nullptr on no match.
+    ExpressionPointer tryTransitivityBridge(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int /*line*/) {
+        // Decompose goal STRUCTURALLY (no WHNF) — δ-reducing
+        // definitions like `Integer.LessOrEqual` would unfold the
+        // named head and we'd lose `<head>.transitive`'s lookup.
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, localBinders.size());
+        auto* outerApp = std::get_if<Application>(&goalOpened->node);
+        if (!outerApp) return nullptr;
+        auto* innerApp = std::get_if<Application>(
+            &outerApp->function->node);
+        if (!innerApp) return nullptr;
+        auto* head = std::get_if<Constant>(&innerApp->function->node);
+        if (!head) return nullptr;
+        std::string transitiveName = head->name + ".transitive";
+        if (!environment_.lookup(transitiveName)) return nullptr;
+        ExpressionPointer goalAOpened = innerApp->argument;
+        ExpressionPointer goalCOpened = outerApp->argument;
+        int N = static_cast<int>(localBinders.size());
+        Context openedContext =
+            buildContextFromLocalBinders(localBinders);
+        // Walk hypothesis pairs (no WHNF on hypothesis types — same
+        // unfolding concern as the goal).
+        for (int b1Idx = N - 1; b1Idx >= 0; --b1Idx) {
+            int lift1 = N - b1Idx;
+            ExpressionPointer h1TypeOpened = openOverLocalBinders(
+                liftBoundVariables(
+                    localBinders[b1Idx].type, lift1, 0),
+                localBinders, N);
+            auto* h1Outer = std::get_if<Application>(
+                &h1TypeOpened->node);
+            if (!h1Outer) continue;
+            auto* h1Inner = std::get_if<Application>(
+                &h1Outer->function->node);
+            if (!h1Inner) continue;
+            auto* h1Head = std::get_if<Constant>(
+                &h1Inner->function->node);
+            if (!h1Head || h1Head->name != head->name) continue;
+            ExpressionPointer h1A = h1Inner->argument;
+            ExpressionPointer h1B = h1Outer->argument;
+            bool h1IsAB = isDefinitionallyEqual(
+                environment_, openedContext, h1A, goalAOpened);
+            bool h1IsBC = isDefinitionallyEqual(
+                environment_, openedContext, h1B, goalCOpened);
+            if (!h1IsAB && !h1IsBC) continue;
+            for (int b2Idx = N - 1; b2Idx >= 0; --b2Idx) {
+                if (b2Idx == b1Idx) continue;
+                int lift2 = N - b2Idx;
+                ExpressionPointer h2TypeOpened = openOverLocalBinders(
+                    liftBoundVariables(
+                        localBinders[b2Idx].type, lift2, 0),
+                    localBinders, N);
+                auto* h2Outer = std::get_if<Application>(
+                    &h2TypeOpened->node);
+                if (!h2Outer) continue;
+                auto* h2Inner = std::get_if<Application>(
+                    &h2Outer->function->node);
+                if (!h2Inner) continue;
+                auto* h2Head = std::get_if<Constant>(
+                    &h2Inner->function->node);
+                if (!h2Head
+                    || h2Head->name != head->name) continue;
+                ExpressionPointer h2A = h2Inner->argument;
+                ExpressionPointer h2B = h2Outer->argument;
+                // Pattern: h1 : H(a, mid), h2 : H(mid, c).
+                if (h1IsAB
+                    && isDefinitionallyEqual(
+                           environment_, openedContext, h2A, h1B)
+                    && isDefinitionallyEqual(
+                           environment_, openedContext, h2B,
+                           goalCOpened)) {
+                    ExpressionPointer attempt = buildTransitiveCall(
+                        transitiveName, goalClosed,
+                        h1B, b1Idx, b2Idx, localBinders);
+                    if (attempt) return attempt;
+                }
+                // Pattern: h1 : H(mid, c), h2 : H(a, mid).
+                if (h1IsBC
+                    && isDefinitionallyEqual(
+                           environment_, openedContext, h2B, h1A)
+                    && isDefinitionallyEqual(
+                           environment_, openedContext, h2A,
+                           goalAOpened)) {
+                    ExpressionPointer attempt = buildTransitiveCall(
+                        transitiveName, goalClosed,
+                        h1A, b2Idx, b1Idx, localBinders);
+                    if (attempt) return attempt;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    // Build `<transitiveName>(a, b, c, h_ab, h_bc)` (closed-form
+    // term) and check its type matches `goalClosed`. Tries both
+    // hypothesis-arg orderings since carriers differ in their
+    // transitive signature.
+    ExpressionPointer buildTransitiveCall(
+        const std::string& transitiveName,
+        ExpressionPointer goalClosed,
+        ExpressionPointer midpointOpened,
+        int abBinderIdx, int bcBinderIdx,
+        const std::vector<LocalBinder>& localBinders) {
+        int N = static_cast<int>(localBinders.size());
+        // Recover goal's a and c (no WHNF — caller matched the
+        // unreduced form to find the named head).
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, N);
+        auto* outerApp = std::get_if<Application>(&goalOpened->node);
+        auto* innerApp = std::get_if<Application>(
+            &outerApp->function->node);
+        ExpressionPointer aOpened = innerApp->argument;
+        ExpressionPointer cOpened = outerApp->argument;
+        ExpressionPointer aClosed = closeOverLocalBinders(
+            aOpened, localBinders, N);
+        ExpressionPointer bClosed = closeOverLocalBinders(
+            midpointOpened, localBinders, N);
+        ExpressionPointer cClosed = closeOverLocalBinders(
+            cOpened, localBinders, N);
+        ExpressionPointer hAB = makeBoundVariable(
+            N - 1 - abBinderIdx);
+        ExpressionPointer hBC = makeBoundVariable(
+            N - 1 - bcBinderIdx);
+        Context ctx = buildContextFromLocalBinders(localBinders);
+        for (int order = 0; order < 2; ++order) {
+            ExpressionPointer call = makeConstant(
+                transitiveName, {});
+            call = makeApplication(call, aClosed);
+            call = makeApplication(call, bClosed);
+            call = makeApplication(call, cClosed);
+            if (order == 0) {
+                call = makeApplication(call, hAB);
+                call = makeApplication(call, hBC);
+            } else {
+                call = makeApplication(call, hBC);
+                call = makeApplication(call, hAB);
+            }
+            ExpressionPointer callType;
+            try {
+                callType = inferTypeInLocalContext(
+                    localBinders, call);
+            } catch (const TypeError&) { continue; }
+              catch (const ElaborateError&) { continue; }
+            if (isSubtype(environment_, ctx, callType, goalOpened)) {
+                return call;
+            }
+        }
+        return nullptr;
+    }
+
     // Run autoProveCalcStep on an equality goal — gives the top-
     // level claim path access to reflexivity, single-position diff
     // with `Equality.congruence` wrapping, and AC rearrangement via
@@ -4462,10 +4622,12 @@ private:
     //      autoProveCalcStep (reflexivity, single-position diff with
     //      `Equality.congruence` wrapping, AC rearrangement via ring).
     //      No-op for non-equality goals.
-    //   3. Library scan — for each environment Definition/Axiom whose
+    //   3. Transitivity bridge — for `H(a, c)` goals, scan hypothesis
+    //      pairs for `(H(a, b), H(b, c))` and apply `<H>.transitive`.
+    //   4. Library scan — for each environment Definition/Axiom whose
     //      Pi-chain conclusion has the same spine head as the goal,
     //      try Step 2's autoFillHintForClaim. First success wins.
-    //   4. Transport bridge — when the goal nearly matches something
+    //   5. Transport bridge — when the goal nearly matches something
     //      provable except for one side of a local equality, rewrite
     //      via transport_proposition and recurse. One-step only
     //      (transportBudget defaults to 1) to bound search cost.
@@ -4497,7 +4659,18 @@ private:
             if (attempt) return attempt;
         }
 
-        // (3) Library scan, bucketed by spine head of the conclusion.
+        // (3) Transitivity bridge — for relational goals `H(a, c)`,
+        // search hypothesis pairs (h1 : H(a, b), h2 : H(b, c)) and
+        // apply `<H>.transitive`. No-op when goal isn't a 2-arg
+        // application of a constant head or when the transitive
+        // lemma isn't in scope.
+        {
+            ExpressionPointer attempt = tryTransitivityBridge(
+                goalClosed, localBinders, line);
+            if (attempt) return attempt;
+        }
+
+        // (4) Library scan, bucketed by spine head of the conclusion.
         ExpressionPointer goalReduced = weakHeadNormalForm(
             environment_, goalClosed);
         uint64_t goalHash = spineHash(goalReduced);
@@ -4539,7 +4712,7 @@ private:
             }
         }
 
-        // (4) Transport bridge. If the goal nearly matches an
+        // (5) Transport bridge. If the goal nearly matches an
         // already-provable shape modulo one side of a local equality,
         // rewrite the goal via transport_proposition and recurse.
         if (transportBudget > 0) {
@@ -4610,9 +4783,10 @@ private:
             + prettyPrintInLocalScope(goalClosed, localBinders)
             + "`: no in-scope hypothesis matches structurally, no "
             "equality battery (reflexivity / diff / ring) closes the "
-            "goal, no library theorem with this conclusion shape "
-            "applies, and no one-step transport via a local equality "
-            "succeeds — add `by <lemma>` to specify");
+            "goal, no transitivity-bridge pair chains to the goal, "
+            "no library theorem with this conclusion shape applies, "
+            "and no one-step transport via a local equality succeeds "
+            "— add `by <lemma>` to specify");
     }
 
     // Elaborates `claim [P] by cases { in (A): body  in (B): body }`.

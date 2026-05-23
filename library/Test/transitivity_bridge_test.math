@@ -1,0 +1,40 @@
+-- Tests for the transitivity-bridge auto-prover strategy. When the
+-- goal is H(a, c) and `<H>.transitive` is in scope, the elaborator
+-- walks in-scope hypothesis pairs for (H(a, b), H(b, c)) and applies
+-- the transitive lemma — without the user spelling out the
+-- transitive call.
+
+module Test.transitivity_bridge_test
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.order
+
+-- (1) Natural ≤ transitivity: bare `claim` closes via the bridge.
+-- Auto-prover scans (h1, h2) and finds the matching midpoint b.
+-- Natural's transitive signature has the hyps in reversed order
+-- compared to Integer/Rational; the bridge tries both orderings.
+theorem nat_le_trans (a b c : Natural)
+        (h1 : a ≤ b) (h2 : b ≤ c) : a ≤ c :=
+  claim
+
+-- (2) Midpoint inferred when the user hypotheses use different
+-- naming. The bridge finds h_top : a ≤ m and h_bot : m ≤ c.
+theorem nat_le_trans_unordered_names
+        (a c m : Natural) (h_top : a ≤ m) (h_bot : m ≤ c) : a ≤ c :=
+  claim
+
+-- (3) Integer ≤ transitivity: the head name is `Integer.LessOrEqual`
+-- (Integer's ≤ dispatches to a δ-definition). The bridge matches
+-- structurally — no WHNF on the goal — so the named head survives
+-- and `Integer.LessOrEqual.transitive` is found.
+theorem int_le_trans (x y z : Integer)
+        (hxy : x ≤ y) (hyz : y ≤ z) : x ≤ z :=
+  claim
