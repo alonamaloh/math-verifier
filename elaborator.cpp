@@ -4411,6 +4411,66 @@ private:
         return makeBoundVariable(N - 1 - matchIndex);
     }
 
+    // Disjunction introduction: when the goal is `Or(A, B)`, try
+    // to prove `A` via the full auto-prover; if that succeeds, wrap
+    // with `Or.introduceLeft`. Else try `B` and wrap with
+    // `Or.introduceRight`. Left-biased — if both branches would
+    // succeed, the left one wins.
+    ExpressionPointer tryDisjunctionIntro(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, localBinders.size());
+        auto* outerApp = std::get_if<Application>(&goalOpened->node);
+        if (!outerApp) return nullptr;
+        auto* innerApp = std::get_if<Application>(
+            &outerApp->function->node);
+        if (!innerApp) return nullptr;
+        auto* head = std::get_if<Constant>(&innerApp->function->node);
+        if (!head || head->name != "Or") return nullptr;
+        int N = static_cast<int>(localBinders.size());
+        ExpressionPointer aClosed = closeOverLocalBinders(
+            innerApp->argument, localBinders, N);
+        ExpressionPointer bClosed = closeOverLocalBinders(
+            outerApp->argument, localBinders, N);
+        // Try Or.introduceLeft (prove A).
+        if (environment_.lookup("Or.introduceLeft")) {
+            ExpressionPointer proofA;
+            try {
+                proofA = lookupClaimByLibrary(
+                    aClosed, localBinders, line);
+            } catch (const ElaborateError&) { proofA = nullptr; }
+              catch (const TypeError&) { proofA = nullptr; }
+            if (proofA) {
+                ExpressionPointer call = makeConstant(
+                    "Or.introduceLeft", {});
+                call = makeApplication(call, aClosed);
+                call = makeApplication(call, bClosed);
+                call = makeApplication(call, proofA);
+                return call;
+            }
+        }
+        // Fall through to Or.introduceRight (prove B).
+        if (environment_.lookup("Or.introduceRight")) {
+            ExpressionPointer proofB;
+            try {
+                proofB = lookupClaimByLibrary(
+                    bClosed, localBinders, line);
+            } catch (const ElaborateError&) { proofB = nullptr; }
+              catch (const TypeError&) { proofB = nullptr; }
+            if (proofB) {
+                ExpressionPointer call = makeConstant(
+                    "Or.introduceRight", {});
+                call = makeApplication(call, aClosed);
+                call = makeApplication(call, bClosed);
+                call = makeApplication(call, proofB);
+                return call;
+            }
+        }
+        return nullptr;
+    }
+
     // Conjunction introduction: when the goal is `And(A, B)`,
     // recursively prove each conjunct via the same auto-prover
     // dispatch and combine with `And.introduction`. Strictly more
@@ -4716,10 +4776,13 @@ private:
     //   4. Conjunction introduction — when the goal is `And(A, B)`,
     //      recurse on each conjunct and combine via
     //      `And.introduction`.
-    //   5. Library scan — for each environment Definition/Axiom whose
+    //   5. Disjunction introduction — when the goal is `Or(A, B)`,
+    //      try `A` first, else `B`; wrap with `Or.introduceLeft` or
+    //      `Or.introduceRight` accordingly.
+    //   6. Library scan — for each environment Definition/Axiom whose
     //      Pi-chain conclusion has the same spine head as the goal,
     //      try Step 2's autoFillHintForClaim. First success wins.
-    //   6. Transport bridge — when the goal nearly matches something
+    //   7. Transport bridge — when the goal nearly matches something
     //      provable except for one side of a local equality, rewrite
     //      via transport_proposition and recurse. One-step only
     //      (transportBudget defaults to 1) to bound search cost.
@@ -4770,7 +4833,15 @@ private:
             if (attempt) return attempt;
         }
 
-        // (5) Library scan, bucketed by spine head of the conclusion.
+        // (5) Disjunction introduction — when the goal is `Or(A, B)`,
+        // try proving A; if that fails, try B. Left-biased.
+        {
+            ExpressionPointer attempt = tryDisjunctionIntro(
+                goalClosed, localBinders, line);
+            if (attempt) return attempt;
+        }
+
+        // (6) Library scan, bucketed by spine head of the conclusion.
         ExpressionPointer goalReduced = weakHeadNormalForm(
             environment_, goalClosed);
         uint64_t goalHash = spineHash(goalReduced);
@@ -4812,7 +4883,7 @@ private:
             }
         }
 
-        // (6) Transport bridge. If the goal nearly matches an
+        // (7) Transport bridge. If the goal nearly matches an
         // already-provable shape modulo one side of a local equality,
         // rewrite the goal via transport_proposition and recurse.
         if (transportBudget > 0) {
