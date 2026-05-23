@@ -6634,7 +6634,65 @@ private:
         wrapped = tryDoubleNegationElimination(
             localBinders, term, termTypeClosed, expectedTypeClosed);
         if (wrapped) return wrapped;
+        // Bare-proposition-as-proof. When the user writes a Proposition
+        // value (e.g. `N ≤ m`) where a proof of that proposition was
+        // expected, and the written value is kernel-equal to the
+        // expected type, dispatch the auto-prover. Reads as math:
+        // `pointwiseBound(m, N ≤ m)` instead of `pointwiseBound(m,
+        // given(N ≤ m))` or a contrived named binder. Mitigation
+        // against silently fixing typos: we require kernel-equality
+        // first, so an unrelated proposition still fails loudly.
+        wrapped = tryBarePropositionAsProof(
+            localBinders, term, termTypeOpened, expectedTypeClosed);
+        if (wrapped) return wrapped;
         return term;
+    }
+
+    // Coerce a Proposition-valued term into a proof of itself when
+    // the term equals the expected type. Returns nullptr if either
+    // (a) the term isn't of type Proposition, or (b) the term isn't
+    // kernel-equal to the expected type. On match, runs the
+    // auto-prover and returns the resulting proof — re-wrapping
+    // any ElaborateError with a message keyed to the bare-
+    // proposition slot so the user sees `couldn't prove `<P>` to
+    // fill the argument` rather than a raw dispatch error.
+    ExpressionPointer tryBarePropositionAsProof(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term,
+        ExpressionPointer termTypeOpened,
+        ExpressionPointer expectedTypeClosed) {
+        // termTypeOpened must be the Proposition sort (Sort 0).
+        ExpressionPointer termTypeWhnf = weakHeadNormalForm(
+            environment_, termTypeOpened);
+        auto* termTypeSort = std::get_if<Sort>(&termTypeWhnf->node);
+        if (!termTypeSort) return nullptr;
+        auto* termTypeLevel = std::get_if<LevelConst>(
+            &termTypeSort->level->node);
+        if (!termTypeLevel || termTypeLevel->value != 0) return nullptr;
+        // The written proposition (`term`) must be kernel-equal to
+        // the expected type. Compare in the opened representation so
+        // BoundVariables on both sides align against the same FreeVar
+        // identities — comparing a closed term against an opened one
+        // would always fail.
+        Context openedContext =
+            buildContextFromLocalBinders(localBinders);
+        ExpressionPointer termOpened = openOverLocalBinders(
+            term, localBinders, localBinders.size());
+        ExpressionPointer expectedOpened = openOverLocalBinders(
+            expectedTypeClosed, localBinders, localBinders.size());
+        if (!isDefinitionallyEqual(environment_, openedContext,
+                                     termOpened, expectedOpened)) {
+            return nullptr;
+        }
+        // Dispatch the full auto-prover on the matched proposition.
+        try {
+            return autoProveClaim(
+                expectedTypeClosed, localBinders, /*line=*/0);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        } catch (const TypeError&) {
+            return nullptr;
+        }
     }
 
     // Classical LEM bridge — when `term : Not(Not(P))` and the goal
