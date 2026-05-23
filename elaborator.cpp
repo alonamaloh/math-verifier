@@ -4411,6 +4411,56 @@ private:
         return makeBoundVariable(N - 1 - matchIndex);
     }
 
+    // Conjunction introduction: when the goal is `And(A, B)`,
+    // recursively prove each conjunct via the same auto-prover
+    // dispatch and combine with `And.introduction`. Strictly more
+    // powerful than the library-scan path because each conjunct can
+    // use the FULL auto-prover (not just structural hypothesis
+    // match).
+    //
+    // Recursion guard: relies on `lookupClaimByLibrary`'s normal
+    // termination — each recursive call has a strictly smaller goal
+    // (A or B vs. A ∧ B), so no extra budget needed.
+    ExpressionPointer tryConjunctionIntro(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, localBinders.size());
+        auto* outerApp = std::get_if<Application>(&goalOpened->node);
+        if (!outerApp) return nullptr;
+        auto* innerApp = std::get_if<Application>(
+            &outerApp->function->node);
+        if (!innerApp) return nullptr;
+        auto* head = std::get_if<Constant>(&innerApp->function->node);
+        if (!head || head->name != "And") return nullptr;
+        int N = static_cast<int>(localBinders.size());
+        ExpressionPointer aClosed = closeOverLocalBinders(
+            innerApp->argument, localBinders, N);
+        ExpressionPointer bClosed = closeOverLocalBinders(
+            outerApp->argument, localBinders, N);
+        ExpressionPointer proofA;
+        try {
+            proofA = lookupClaimByLibrary(
+                aClosed, localBinders, line);
+        } catch (const ElaborateError&) { return nullptr; }
+          catch (const TypeError&) { return nullptr; }
+        ExpressionPointer proofB;
+        try {
+            proofB = lookupClaimByLibrary(
+                bClosed, localBinders, line);
+        } catch (const ElaborateError&) { return nullptr; }
+          catch (const TypeError&) { return nullptr; }
+        if (!environment_.lookup("And.introduction")) return nullptr;
+        ExpressionPointer call = makeConstant(
+            "And.introduction", {});
+        call = makeApplication(call, aClosed);
+        call = makeApplication(call, bClosed);
+        call = makeApplication(call, proofA);
+        call = makeApplication(call, proofB);
+        return call;
+    }
+
     // Transitivity bridge: if the goal is `H(a, c)` and
     // `<H>.transitive` exists in scope, perform a bounded BFS over
     // hypotheses of type `H(_, _)` to find a chain a → m1 → … → c,
@@ -4661,12 +4711,15 @@ private:
     //      autoProveCalcStep (reflexivity, single-position diff with
     //      `Equality.congruence` wrapping, AC rearrangement via ring).
     //      No-op for non-equality goals.
-    //   3. Transitivity bridge — for `H(a, c)` goals, scan hypothesis
-    //      pairs for `(H(a, b), H(b, c))` and apply `<H>.transitive`.
-    //   4. Library scan — for each environment Definition/Axiom whose
+    //   3. Transitivity bridge — for `H(a, c)` goals, BFS hypothesis
+    //      graph and fold `<H>.transitive` applications.
+    //   4. Conjunction introduction — when the goal is `And(A, B)`,
+    //      recurse on each conjunct and combine via
+    //      `And.introduction`.
+    //   5. Library scan — for each environment Definition/Axiom whose
     //      Pi-chain conclusion has the same spine head as the goal,
     //      try Step 2's autoFillHintForClaim. First success wins.
-    //   5. Transport bridge — when the goal nearly matches something
+    //   6. Transport bridge — when the goal nearly matches something
     //      provable except for one side of a local equality, rewrite
     //      via transport_proposition and recurse. One-step only
     //      (transportBudget defaults to 1) to bound search cost.
@@ -4709,7 +4762,15 @@ private:
             if (attempt) return attempt;
         }
 
-        // (4) Library scan, bucketed by spine head of the conclusion.
+        // (4) Conjunction introduction — when the goal is `And(A, B)`,
+        // recursively prove each conjunct via the full auto-prover.
+        {
+            ExpressionPointer attempt = tryConjunctionIntro(
+                goalClosed, localBinders, line);
+            if (attempt) return attempt;
+        }
+
+        // (5) Library scan, bucketed by spine head of the conclusion.
         ExpressionPointer goalReduced = weakHeadNormalForm(
             environment_, goalClosed);
         uint64_t goalHash = spineHash(goalReduced);
@@ -4751,7 +4812,7 @@ private:
             }
         }
 
-        // (5) Transport bridge. If the goal nearly matches an
+        // (6) Transport bridge. If the goal nearly matches an
         // already-provable shape modulo one side of a local equality,
         // rewrite the goal via transport_proposition and recurse.
         if (transportBudget > 0) {
@@ -4822,10 +4883,11 @@ private:
             + prettyPrintInLocalScope(goalClosed, localBinders)
             + "`: no in-scope hypothesis matches structurally, no "
             "equality battery (reflexivity / diff / ring) closes the "
-            "goal, no transitivity-bridge pair chains to the goal, "
-            "no library theorem with this conclusion shape applies, "
-            "and no one-step transport via a local equality succeeds "
-            "— add `by <lemma>` to specify");
+            "goal, no transitivity chain reaches the goal, no "
+            "conjunction split decomposes it, no library theorem "
+            "with this conclusion shape applies, and no one-step "
+            "transport via a local equality succeeds — add "
+            "`by <lemma>` to specify");
     }
 
     // Elaborates `claim [P] by cases { in (A): body  in (B): body }`.
