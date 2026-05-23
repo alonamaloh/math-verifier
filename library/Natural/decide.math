@@ -20,13 +20,15 @@ import Natural.strong_recursion
 import Equality.basics
 import Logic.basics
 
--- decidable equality, with zero as the left operand.
+-- decidable equality, with zero as the left operand. Each arm
+-- closes via the auto-prover's disjunction-intro + unified fact
+-- match: zero case finds reflexivity (left branch); successor case
+-- falls through to right branch and finds Natural.zero_not_successor.
 theorem Natural.decides_equality_zero_against
         (other : Natural) : 0 = other ∨ 0 ≠ other :=
   cases other {
-    | zero => Or.introduceLeft(reflexivity(0))
-    | successor(predecessor) =>
-        Or.introduceRight(Natural.zero_not_successor(predecessor))
+    | zero                    => claim
+    | successor(predecessor)  => claim
   }
 
 -- decidable equality, with successor(predecessor) as the left operand,
@@ -39,10 +41,7 @@ theorem Natural.decides_equality_successor_against
         (other : Natural)
         : successor(predecessor) = other ∨ successor(predecessor) ≠ other :=
   cases other {
-    | zero =>
-        Or.introduceRight(
-            function (impossible : successor(predecessor) = 0) =>
-                Natural.successor_not_zero(predecessor, impossible))
+    | zero => claim
     | successor(otherPredecessor) => {
         claim (predecessor = otherPredecessor)
               ∨ (predecessor ≠ otherPredecessor)
@@ -91,9 +90,7 @@ theorem Natural.decides_less_or_equal_successor_against
         (other : Natural)
         : successor(predecessor) ≤ other ∨ successor(predecessor) ≰ other :=
   cases other {
-    | zero =>
-        Or.introduceRight(
-            Natural.not_less_or_equal_successor_zero(predecessor))
+    | zero => claim
     | successor(otherPredecessor) => {
         claim (predecessor ≤ otherPredecessor)
               ∨ (predecessor ≰ otherPredecessor)
