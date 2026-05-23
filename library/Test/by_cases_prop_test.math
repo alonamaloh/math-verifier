@@ -1,0 +1,44 @@
+-- Tests for the new `claim P by cases { case A: body  case B: body }`
+-- syntax — propositional case-split where the disjunction `A ∨ B`
+-- is found OR synthesized by the unified hammer (instead of being
+-- pre-established by the user).
+
+module Test.by_cases_prop_test
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.excluded_middle
+import Equality.basics
+
+-- (1) LEM-synthesised disjunction: cases `P` and `Not(P)` partition
+-- the proposition space. The hammer finds `Logic.excluded_middle`
+-- (which is a library lemma returning `P ∨ Not(P)`) automatically.
+theorem cases_via_lem
+        (P Q : Proposition)
+        (impliesP : P → Q) (impliesNotP : Not(P) → Q) : Q :=
+  claim Q by cases {
+    case P:        impliesP(given(P))
+    case Not(P):   impliesNotP(given(Not(P)))
+  }
+
+-- (2) Cases bound with `as`: the disjunct hypothesis is named.
+theorem cases_as_named
+        (P Q : Proposition)
+        (impliesP : P → Q) (impliesNotP : Not(P) → Q) : Q :=
+  claim Q by cases {
+    case P        as hP:     impliesP(hP)
+    case Not(P)   as hNotP:  impliesNotP(hNotP)
+  }
+
+-- (3) Pre-established disjunction (no LEM needed). When the
+-- disjunction is already in scope as a hypothesis, the hammer
+-- finds it via the unified fact match.
+theorem cases_via_local_disjunction
+        (A B Q : Proposition)
+        (disj : A ∨ B)
+        (impliesA : A → Q) (impliesB : B → Q) : Q :=
+  claim Q by cases {
+    case A as ha:  impliesA(ha)
+    case B as hb:  impliesB(hb)
+  }

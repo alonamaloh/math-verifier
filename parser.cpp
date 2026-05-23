@@ -2025,7 +2025,8 @@ private:
                 consumeAny();  // 'cases'
                 byCases = true;
                 expect(TokenKind::LeftBrace, "after 'by cases'");
-                while (peek().kind == TokenKind::KeywordIn) {
+                while (peek().kind == TokenKind::KeywordIn
+                       || peek().kind == TokenKind::KeywordCase) {
                     arms.push_back(parseStructuredClaimArm());
                 }
                 expect(TokenKind::RightBrace,
@@ -2132,11 +2133,23 @@ private:
     // `as` the hypothesis is anonymous and reachable only via
     // `given (P)` or Step 5's lookup.
     SurfaceStructuredClaimArm parseStructuredClaimArm() {
-        Token inToken = consumeAny();  // 'in'
-        expect(TokenKind::LeftParen, "after 'in'");
-        auto disjunctType = parseExpression();
-        expect(TokenKind::RightParen,
-               "after disjunct type in 'in (T) …'");
+        // Two shapes:
+        //   `in (T) [as h]: body`  — legacy; T parenthesised.
+        //   `case T [as h]: body`  — new; T parsed up to `as`/`:`
+        //                            (parseExpression stops cleanly
+        //                            at either since neither is an
+        //                            expression-position operator).
+        Token armToken = consumeAny();  // 'in' or 'case'
+        SurfaceExpressionPointer disjunctType;
+        if (armToken.kind == TokenKind::KeywordIn) {
+            expect(TokenKind::LeftParen, "after 'in'");
+            disjunctType = parseExpression();
+            expect(TokenKind::RightParen,
+                   "after disjunct type in 'in (T) …'");
+        } else {
+            // 'case T [as h]: body'.
+            disjunctType = parseExpression();
+        }
         std::string binderName;
         if (peek().kind == TokenKind::KeywordAs) {
             consumeAny();  // 'as'
@@ -2151,8 +2164,8 @@ private:
         arm.disjunctType = std::move(disjunctType);
         arm.binderName = std::move(binderName);
         arm.body = std::move(body);
-        arm.line = inToken.line;
-        arm.column = inToken.column;
+        arm.line = armToken.line;
+        arm.column = armToken.column;
         return arm;
     }
 

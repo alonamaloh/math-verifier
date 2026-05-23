@@ -5394,34 +5394,29 @@ private:
                 makeConstant("Or", {}), leftDisjunct),
             rightDisjunct);
 
-        // Find an in-scope hypothesis of that type. Last-bound-first
-        // so the most recent matching disjunction wins.
-        int N = static_cast<int>(localBinders.size());
-        int disjBinderIndex = -1;
-        for (int b = N - 1; b >= 0; --b) {
-            int lift = N - b;
-            ExpressionPointer binderTypeInScope =
-                liftBoundVariables(localBinders[b].type, lift, 0);
-            if (structurallyEqual(
-                    binderTypeInScope, expectedDisjunction)) {
-                disjBinderIndex = b;
-                break;
-            }
-        }
-        if (disjBinderIndex == -1) {
+        // Find OR synthesize the disjunction via the unified hammer
+        // dispatch. This is the same "find or synthesize" function
+        // bare `claim P;` uses — local hypothesis match, library
+        // scan, transitivity, the lot. If nothing in scope proves
+        // the disjunction, the dispatch error message (wrapped by
+        // the Frame above) tells the user exactly what failed.
+        ExpressionPointer disjProof;
+        try {
+            disjProof = lookupClaimByLibrary(
+                expectedDisjunction, localBinders, line);
+        } catch (const ElaborateError&) {
             throwElaborate(
-                "`claim by cases`: no in-scope hypothesis of type `"
+                "couldn't automatically prove `"
                 + prettyPrintInLocalScope(
                       expectedDisjunction, localBinders)
-                + "` — introduce it earlier with a non-terminal "
-                "`claim "
+                + "` to finish off `by cases` — either bring it "
+                "into scope explicitly (`claim "
                 + prettyPrintInLocalScope(leftDisjunct, localBinders)
                 + " ∨ "
                 + prettyPrintInLocalScope(rightDisjunct, localBinders)
-                + "`");
+                + " by …;`), or check that the cases really do "
+                "cover the goal");
         }
-        ExpressionPointer disjProof = makeBoundVariable(
-            N - 1 - disjBinderIndex);
 
         // Build each arm's lambda. Body is elaborated under
         // localBinders + the disjunct hypothesis. The hypothesis
