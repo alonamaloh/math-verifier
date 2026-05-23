@@ -272,8 +272,13 @@ SurfaceExpressionPointer substituteSurfaceName(
             newStep.relation = step.relation;
             newStep.nextExpression = substituteSurfaceName(
                 step.nextExpression, targetName, replacement);
-            newStep.stepProof = substituteSurfaceName(
-                step.stepProof, targetName, replacement);
+            // step.stepProof is null when the user omits `by …`
+            // and lets the auto-prover close the step. Recurse only
+            // when present.
+            newStep.stepProof = step.stepProof
+                ? substituteSurfaceName(
+                      step.stepProof, targetName, replacement)
+                : nullptr;
             newStep.line = step.line;
             newStep.column = step.column;
             newSteps.push_back(std::move(newStep));

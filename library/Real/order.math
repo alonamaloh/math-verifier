@@ -292,26 +292,19 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.add
   -- sequenceFunction_add.
   function (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) => {
+    set sf := CauchyRationalSequence.sequenceFunction;
     obtain ⟨N, pointwiseBound⟩
         from Rational.sequence.IsEventuallyNonneg.add(
-                 CauchyRationalSequence.sequenceFunction(a),
-                 CauchyRationalSequence.sequenceFunction(b),
-                 aNonneg,
-                 bNonneg)(epsilon, epsilonPositive);
+                 sf(a), sf(b), aNonneg, bNonneg)(
+                 epsilon, epsilonPositive);
     witness N with
         function (m : Natural) (N_leq_m : N ≤ m) =>
-          -- pointwiseBound has type -ε < sf(a, m) + sf(b, m).
-          -- Goal: -ε < sf(add(a, b), m). Rewrite using the symmetric
-          -- form of sequenceFunction_add: sf(a, m) + sf(b, m) = sf(add(a, b), m).
-          Equality.transport_proposition(
-              function (z : Rational) => -epsilon < z,
-              CauchyRationalSequence.sequenceFunction(a, m)
-                + CauchyRationalSequence.sequenceFunction(b, m),
-              CauchyRationalSequence.sequenceFunction(
-                  CauchyRationalSequence.add(a, b), m),
-              Equality.symmetry(
-                  CauchyRationalSequence.sequenceFunction_add(a, b, m)),
-              pointwiseBound(m, N_leq_m))
+          -- -ε < sf(a, m) + sf(b, m) (the pointwise bound), and
+          -- sf(a, m) + sf(b, m) = sf(add(a, b), m) (bridge lemma).
+          calc -epsilon
+             < sf(a, m) + sf(b, m)
+                   by pointwiseBound(m, N_leq_m)
+             = sf(CauchyRationalSequence.add(a, b), m)
   }
 
 -- Real.IsNonneg.add: Real-level statement. Lift via Quotient.induct_two.
