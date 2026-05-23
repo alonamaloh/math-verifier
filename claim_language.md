@@ -523,7 +523,7 @@ designing now rather than retrofitting.
 ### Landed (2026-05-22)
 
 - **(1) Auto-prover expansion** — `tryAutoProveEqualityGoal` slotted
-  into `lookupClaimByLibrary`. Reflexivity + diff with
+  into `autoProveClaim`. Reflexivity + diff with
   `Equality.congruence` + AC rearrangement via `ring` now close
   bare `claim P;` equality goals at top-level. Best-near-miss
   diagnostics deliberately deferred (task #5) — the existing
@@ -558,7 +558,7 @@ Still pending under (2): `choose N such that P(N);`, `let ε > 0` /
   Existing `by_induction` (Peano case-split) and `by_induction
   on E using L` (explicit lemma) still work.
 - **(4) Auto-prover umbrella** — the dispatch in
-  `lookupClaimByLibrary` now runs (in order):
+  `autoProveClaim` now runs (in order):
   1. Hypothesis match
   2. Equality battery (reflexivity + diff + ring)
   3. **Transitivity bridge** — bounded BFS over hypothesis edges

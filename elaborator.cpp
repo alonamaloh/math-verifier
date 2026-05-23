@@ -4162,7 +4162,7 @@ private:
         }
 
         if (!claim.byHint) {
-            return lookupClaimByLibrary(
+            return autoProveClaim(
                 goalClosed, localBinders, line);
         }
 
@@ -4186,7 +4186,7 @@ private:
         if (reportRedundantBy_) {
             ExpressionPointer autoAttempt;
             try {
-                autoAttempt = lookupClaimByLibrary(
+                autoAttempt = autoProveClaim(
                     goalClosed, localBinders, line);
             } catch (const ElaborateError&) {
                 autoAttempt = nullptr;
@@ -4571,7 +4571,7 @@ private:
         if (environment_.lookup("Or.introduceLeft")) {
             ExpressionPointer proofA;
             try {
-                proofA = lookupClaimByLibrary(
+                proofA = autoProveClaim(
                     aClosed, localBinders, line);
             } catch (const ElaborateError&) { proofA = nullptr; }
               catch (const TypeError&) { proofA = nullptr; }
@@ -4588,7 +4588,7 @@ private:
         if (environment_.lookup("Or.introduceRight")) {
             ExpressionPointer proofB;
             try {
-                proofB = lookupClaimByLibrary(
+                proofB = autoProveClaim(
                     bClosed, localBinders, line);
             } catch (const ElaborateError&) { proofB = nullptr; }
               catch (const TypeError&) { proofB = nullptr; }
@@ -4890,7 +4890,7 @@ private:
                     abstractedBody, 0, toSide);
                 ExpressionPointer proofRewritten;
                 try {
-                    proofRewritten = lookupClaimByLibrary(
+                    proofRewritten = autoProveClaim(
                         rewrittenGoal, localBinders,
                         line, budget - 1);
                 } catch (const ElaborateError&) { continue; }
@@ -4942,7 +4942,7 @@ private:
     // use the FULL auto-prover (not just structural hypothesis
     // match).
     //
-    // Recursion guard: relies on `lookupClaimByLibrary`'s normal
+    // Recursion guard: relies on `autoProveClaim`'s normal
     // termination — each recursive call has a strictly smaller goal
     // (A or B vs. A ∧ B), so no extra budget needed.
     ExpressionPointer tryConjunctionIntro(
@@ -4965,13 +4965,13 @@ private:
             outerApp->argument, localBinders, N);
         ExpressionPointer proofA;
         try {
-            proofA = lookupClaimByLibrary(
+            proofA = autoProveClaim(
                 aClosed, localBinders, line);
         } catch (const ElaborateError&) { return nullptr; }
           catch (const TypeError&) { return nullptr; }
         ExpressionPointer proofB;
         try {
-            proofB = lookupClaimByLibrary(
+            proofB = autoProveClaim(
                 bClosed, localBinders, line);
         } catch (const ElaborateError&) { return nullptr; }
           catch (const TypeError&) { return nullptr; }
@@ -5256,7 +5256,7 @@ private:
     // v1 skips universe-polymorphic candidates (no universe inference
     // yet) and does a linear scan (acceptable at current library size;
     // an indexed lookup is a planned follow-on).
-    ExpressionPointer lookupClaimByLibrary(
+    ExpressionPointer autoProveClaim(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
         int line,
@@ -5402,7 +5402,7 @@ private:
         // the Frame above) tells the user exactly what failed.
         ExpressionPointer disjProof;
         try {
-            disjProof = lookupClaimByLibrary(
+            disjProof = autoProveClaim(
                 expectedDisjunction, localBinders, line);
         } catch (const ElaborateError&) {
             throwElaborate(

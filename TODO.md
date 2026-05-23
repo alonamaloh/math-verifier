@@ -60,7 +60,7 @@ closed under ring ops + the p-adic norm.
 
 ## Hammer unification — every strategy through the same fact stream
 
-The auto-prover's dispatch in `lookupClaimByLibrary` currently has
+The auto-prover's dispatch in `autoProveClaim` currently has
 ~8 separate strategies, several of which iterate context but each
 over a different slice (local binders only / `lemmaIndex_` only /
 implicit kernel reductions only). The split is historical, not
