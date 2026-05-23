@@ -2104,7 +2104,11 @@ private:
             || k == TokenKind::KeywordAxiom
             || k == TokenKind::KeywordInductive
             || k == TokenKind::KeywordImport
-            || k == TokenKind::KeywordModule;
+            || k == TokenKind::KeywordModule
+            // `|` ends the body of a pattern-match arm — without
+            // this, a bare `claim` as an arm body greedily tries
+            // to parse the next pattern's `|` as a proposition.
+            || k == TokenKind::Pipe;
     }
 
     // `given (P)` — refer to the unique in-scope hypothesis of type P.

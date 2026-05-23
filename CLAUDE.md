@@ -212,7 +212,46 @@ Rule of thumb: prefer `1 + n` when the `+1` is doing arithmetic work
 the reader cares about (`1 ≤ 1 + k`, `1 + k = succ(k)` reductions).
 Keep `successor(n)` when it's a structural placeholder.
 
-## Multi-pattern bindings
+## Prefer `cases` / `by_induction` over pattern-match definitions
+
+The pattern-match definition form (`theorem foo | zero => … |
+successor(k) => …`) is supported but NOT the preferred style.
+Mathematicians don't write proofs as separated equation cases at the
+outer-syntax level — they write a body that opens with "by cases"
+or "by induction on n" and then handles each constructor.
+
+Translation:
+
+```math
+-- Pattern-match (legacy):
+theorem Natural.foo : (n : Natural) → P(n)
+  | zero          => baseProof
+  | successor(k)  => stepProof(k)
+
+-- Preferred — non-recursive case split:
+theorem Natural.foo (n : Natural) : P(n) :=
+  cases n {
+    | zero          => baseProof
+    | successor(k)  => stepProof(k)
+  }
+
+-- Preferred — recursive (k's IH needed in stepProof):
+theorem Natural.foo (n : Natural) : P(n) :=
+  by_induction on n with IH {
+    case zero:           baseProof
+    case successor(k):   stepProof(k, IH)  -- IH : P(k)
+  }
+```
+
+Pattern-match definitions remain unavoidable for direct recursion
+that doesn't fit `by_induction`'s motive shape — for example when
+the conclusion is universally quantified over a parameter that the
+IH must be polymorphic over (`Natural.decides_equality` recursing on
+`a` while the IH must work for all `b`). Use the `cases` body style
+by default; reach for pattern-match definitions only when the
+recursion really demands it.
+
+### Multi-pattern bindings (when the pattern-match form is used)
 
 Constructor patterns at non-scrutinee positions of a pattern-match
 definition properly refine the types of later-bound function args
