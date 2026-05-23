@@ -540,3 +540,41 @@ designing now rather than retrofitting.
 Still pending under (2): `choose N such that P(N);`, `let ε > 0` /
 `let ε ∈ ℝ with ε > 0;`. `it suffices to show …` already exists as
 `suffices Q by Reduction;`.
+
+### Landed (2026-05-23)
+
+- **(2) `suppose P as h;`** — superseded by additional statement forms:
+  - **`choose N such that P(N);`** — Exists-elim via scope lookup,
+    most-recent existential wins. User prepends `claim Exists(...)`
+    to disambiguate. v1 doesn't filter by predicate shape — the
+    user-supplied predicate is documentation.
+  - **`let n ∈ T;` / `let n ∈ T with P;`** — Phase-3 object-intro
+    syntax. `∈` for type/set membership, `with` for the constraint
+    hypothesis. Convention-driven `let ε > 0;` still pending.
+- **(3) `by_strong_induction on E with subject, ih { body }`** —
+  single-step strong induction with carrier-name lookup
+  (`<CarrierType>.strong_induction`). Eliminates the explicit
+  `using Natural.strong_induction` typing for the common case.
+  Existing `by_induction` (Peano case-split) and `by_induction
+  on E using L` (explicit lemma) still work.
+- **(4) Auto-prover umbrella** — the dispatch in
+  `lookupClaimByLibrary` now runs (in order):
+  1. Hypothesis match
+  2. Equality battery (reflexivity + diff + ring)
+  3. **Transitivity bridge** — bounded BFS over hypothesis edges
+     `H(_, _)`, folds `<H>.transitive` applications along the
+     path. Tries both hypothesis-arg orderings to handle Natural's
+     reversed signature vs. Integer/Rational/Real's natural order.
+  4. **Conjunction intro** — `And(A, B)` recursively proves each
+     conjunct, combines via `And.introduction`.
+  5. **Disjunction intro** — `Or(A, B)` tries A first, then B;
+     wraps with `Or.introduceLeft` / `Or.introduceRight`.
+  6. **Contradiction** — detects in-scope `False` or
+     `(h : P, h' : Not(P))` pairs; closes any goal via
+     `False.eliminate_proposition`.
+  7. Library scan (existing — bucket by conclusion spine head)
+  8. Transport bridge (existing — one-step equality rewrite)
+
+Still pending under (4): mixed-relation transitivity
+(`transitive_left` / `transitive_right` for `≤` chained with `<`),
+existential intro with witness search, linear arithmetic, decide.
