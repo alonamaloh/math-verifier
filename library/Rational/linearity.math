@@ -108,12 +108,12 @@ theorem Rational.negate_subtract
 theorem Rational.LessOrEqual.linear
         (left right : Rational)
         : Or(left ≤ right, right ≤ left) :=
-  cases Rational.IsNonneg_or_negate_IsNonneg(right - left) {
-    | Or.introduceLeft(differenceNonneg) =>
+  claim goal by cases {
+    case Rational.IsNonneg(right - left) as differenceNonneg:
         Or.introduceLeft(
             left ≤ right, right ≤ left,
             differenceNonneg)
-    | Or.introduceRight(negatedDifferenceNonneg) =>
+    case Rational.IsNonneg(-(right - left)) as negatedDifferenceNonneg:
         Or.introduceRight(
             left ≤ right, right ≤ left,
             -- right ≤ left = IsNonneg(left - right). We have
@@ -132,18 +132,16 @@ theorem Rational.LessOrEqual.linear
 theorem Rational.not_LessThan_implies_LessOrEqual
         (a b : Rational) (notLessThan : Not(Rational.LessThan(a, b)))
         : b ≤ a :=
-  cases Rational.LessOrEqual.linear(a, b) {
-    | Or.introduceLeft(aLeqB) =>
+  claim goal by cases {
+    case a ≤ b as aLeqB:
         -- a ≤ b. Show a = b, then b ≤ a by reflexivity.
-        cases Logic.excluded_middle(a = b) {
-          | Or.introduceLeft(aEqB) =>
-              -- a = b ⇒ b ≤ a. Transport `a ≤ a` along aEqB on the
-              -- left position with motive `λz. z ≤ a`.
-              Equality.transport_proposition(
-                  function (z : Rational) => z ≤ a,
-                  a, b, aEqB,
-                  Rational.LessOrEqual.reflexive(a))
-          | Or.introduceRight(aNotEqB) =>
+        claim goal by cases {
+          case a = b:
+              -- a = b, so b = a, and a ≤ a is reflexivity.
+              calc b
+                 = a
+                 ≤ a
+          case Not(a = b) as aNotEqB:
               False.eliminate_proposition(
                   b ≤ a,
                   notLessThan(
@@ -151,5 +149,5 @@ theorem Rational.not_LessThan_implies_LessOrEqual
                           a ≤ b, Not(a = b),
                           aLeqB, aNotEqB)))
         }
-    | Or.introduceRight(bLeqA) => bLeqA
+    case b ≤ a as bLeqA: bLeqA
   }

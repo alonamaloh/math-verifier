@@ -3012,10 +3012,53 @@ private:
         return slots;
     }
 
+    // RAII guard pushing an expected type onto goalStack_ at entry
+    // and popping it on exit. Used by elaborateExpression so the
+    // `goal` keyword can resolve to the most-recent active expected
+    // type without each caller having to thread it through.
+    struct GoalScope {
+        std::vector<ExpressionPointer>& stack;
+        bool pushed;
+        GoalScope(std::vector<ExpressionPointer>& s,
+                  ExpressionPointer expectedType)
+            : stack(s), pushed(false) {
+            if (expectedType) {
+                stack.push_back(expectedType);
+                pushed = true;
+            }
+        }
+        ~GoalScope() {
+            if (pushed) stack.pop_back();
+        }
+    };
+
     ExpressionPointer elaborateExpression(
         const SurfaceExpression& expression,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType = nullptr) {
+
+        GoalScope goalScope(goalStack_, expectedType);
+
+        // `goal` — refers to the elaborator's current expected type.
+        // Resolves to the most-recent push on goalStack_. Note: a
+        // bare `goal` here uses the OUTER expected type (the one
+        // active when this elaborateExpression was called) rather
+        // than the one just pushed for this call, because we want
+        // the value of the surrounding goal, not the type of the
+        // SurfaceGoal node itself.
+        if (std::holds_alternative<SurfaceGoal>(expression.node)) {
+            // Walk past the just-pushed frame (if any) to find the
+            // surrounding goal.
+            int top = static_cast<int>(goalStack_.size()) - 1;
+            if (goalScope.pushed) top -= 1;
+            if (top < 0) {
+                throwElaborate(
+                    "`goal` used where no expected type is "
+                    "available — this position doesn't propagate "
+                    "a goal from any enclosing context");
+            }
+            return goalStack_[top];
+        }
 
         if (auto* identifier =
                 std::get_if<SurfaceIdentifier>(&expression.node)) {
@@ -3549,21 +3592,10 @@ private:
             ExpressionPointer letBody =
                 elaborateExpression(*let->body, extended,
                                      bodyExpectedType);
-            // Unused-name warning. The binding's name is user-visible
-            // when it doesn't start with '_' (anonymous calc statements
-            // synthesise `_calc_<line>_<col>` names that aren't
-            // typed by the user). If the body never references the
-            // binding via a BoundVariable, the name is dead — usually
-            // a stale leftover from a refactor.
-            if (reportRedundantBy_ && !let->name.empty()
-                && let->name[0] != '_'
-                && !referencesBoundVariable(letBody, 0)) {
-                std::cerr << "warning: " << moduleName_
-                    << ":" << expression.line
-                    << ":" << expression.column
-                    << ": unused name `" << let->name
-                    << "` — let/claim/as binding never referenced\n";
-            }
+            warnIfBinderUnused(
+                let->name, letBody,
+                expression.line, expression.column,
+                "let / claim / as binding");
             return makeLet(let->name, std::move(letType),
                            std::move(letValue), std::move(letBody));
         }
@@ -3978,6 +4010,16 @@ private:
                 "into scope, or use `obtain ⟨…⟩ from …;` with an "
                 "explicit source.");
         }
+        // Unused-name warning: `choose N such that P(N);` then a
+        // body that never mentions N is dead weight. Check at the
+        // surface level (we destructure-and-elaborate below; the
+        // post-elaboration body is wrapped in two Lambdas, making
+        // a kernel BV check awkward to phrase here).
+        if (choose.body) {
+            warnIfSurfaceNameUnused(
+                choose.name, *choose.body, line, column,
+                "`choose ... such that`");
+        }
         // Build a SurfaceCases destructuring the matched hypothesis.
         SurfaceExpressionPointer scrutinee = makeSurfaceIdentifier(
             localBinders[matchedIndex].name, {}, line, column);
@@ -4164,6 +4206,19 @@ private:
         if (!claim.byHint) {
             return autoProveClaim(
                 goalClosed, localBinders, line);
+        }
+
+        // `claim P by induction on E …` — the byHint is the
+        // SurfaceCases / SurfaceCasesWithRefining the parser
+        // packaged from the `induction on E { case … }` tail.
+        // Elaborate it with the resolved goal as the expected
+        // type so the cases-block motive abstracts over E. No
+        // autoFillHintForClaim pass: the cases form produces a
+        // term of exactly the goal type when the arms cover the
+        // constructors.
+        if (claim.byInduction) {
+            return elaborateExpression(
+                *claim.byHint, localBinders, goalClosed);
         }
 
         ExpressionPointer hintTerm =
@@ -4621,7 +4676,8 @@ private:
     std::vector<ContextFact> collectContextFacts(
         ExpressionPointer /*goalClosed*/,
         const std::vector<LocalBinder>& localBinders,
-        uint64_t goalHash) {
+        uint64_t goalHash,
+        uint64_t goalHashUnreduced) {
         std::vector<ContextFact> facts;
         int N = static_cast<int>(localBinders.size());
         // Local binders (cost 1) — last-bound first, so the most
@@ -4638,6 +4694,14 @@ private:
         }
         // Library / module declarations (cost 3) — only those whose
         // conclusion's spine matches the goal's at SOME peel depth.
+        // Match against BOTH the goal's WHNF-reduced spineHash AND
+        // its un-reduced one: a lemma whose stated conclusion uses a
+        // definitional alias (e.g. `Rational.LessOrEqual.reflexive :
+        // x ≤ x` where `≤` unfolds to `IsNonneg(_ - _)`) is indexed
+        // by the alias `LessOrEqual`, but the goal is WHNF'd to
+        // `IsNonneg`, so a single-hash match misses it. Comparing
+        // both un-reduced and reduced catches the lemma in either
+        // direction.
         // Universe-polymorphic candidates are skipped (universe-arg
         // inference at use-site isn't wired up).
         for (const auto& entry : environment_.declarations) {
@@ -4667,7 +4731,9 @@ private:
             bool anyDepthMatches = false;
             ExpressionPointer depthCursor = declarationType;
             while (true) {
-                if (spineHash(depthCursor) == goalHash) {
+                uint64_t hashAtDepth = spineHash(depthCursor);
+                if (hashAtDepth == goalHash
+                    || hashAtDepth == goalHashUnreduced) {
                     anyDepthMatches = true;
                     break;
                 }
@@ -4698,8 +4764,9 @@ private:
         ExpressionPointer goalReduced = weakHeadNormalForm(
             environment_, goalClosed);
         uint64_t goalHash = spineHash(goalReduced);
+        uint64_t goalHashUnreduced = spineHash(goalClosed);
         std::vector<ContextFact> facts = collectContextFacts(
-            goalClosed, localBinders, goalHash);
+            goalClosed, localBinders, goalHash, goalHashUnreduced);
         std::sort(facts.begin(), facts.end(),
             [](const ContextFact& a, const ContextFact& b) {
                 return a.cost < b.cost;
@@ -5436,6 +5503,9 @@ private:
             extendedBinders.push_back({binderName, domain});
             ExpressionPointer body = elaborateExpression(
                 *arm.body, extendedBinders, goalLifted);
+            warnIfBinderUnused(
+                arm.binderName, body, arm.line, arm.column,
+                "`case ... as`");
             return makeLambda(binderName, domain, body);
         };
         ExpressionPointer leftLambda = buildArmLambda(0, leftDisjunct);
@@ -5746,10 +5816,27 @@ private:
                         "<reason>` to disambiguate.");
                 }
             } else {
-                throwElaborate(
-                    std::string("calc ") + relationSymbol(step.relation)
-                    + " step needs `by <proof>` (no auto-prover for "
-                    "inequality steps yet)");
+                // Non-equality step (≤/</≥/>) without `by`. Dispatch
+                // the step's relation type through the full
+                // autoProveClaim — handles hypothesis match, library
+                // scan (catches `<T>.LessOrEqual.reflexive` when the
+                // endpoints are defeq), conjunction/disjunction
+                // intro, contradiction, etc. Equality battery still
+                // runs for chains like `b = a ≤ a` whose final step
+                // collapses to reflexivity of ≤ at a single point.
+                try {
+                    stepProofKernel = autoProveClaim(
+                        stepRelationType, localBinders, step.line);
+                } catch (const ElaborateError&) {
+                    stepProofKernel = nullptr;
+                }
+                if (!stepProofKernel) {
+                    throwElaborate(
+                        std::string("calc ") + relationSymbol(step.relation)
+                        + " step has no `by <proof>` and the auto-"
+                          "prover couldn't close it from context. "
+                          "Add `by <reason>`.");
+                }
             }
             ExpressionPointer stepProofType = inferTypeInLocalContext(
                 localBinders, stepProofKernel);
@@ -7109,12 +7196,198 @@ private:
     // tree (including bindings[0]) and decrements BV(>=1) — clobbering
     // bindings[0]'s outer-binder references. A single combined walk
     // sidesteps that by treating each binding as opaque once placed.
+    // Emit an "unused name" warning when a binder a user explicitly
+    // named (let, claim, suppose, choose, case … as, by_induction
+    // with ih, etc.) is closed and the body it scopes over never
+    // references it. The body is elaborated under the binder, so a
+    // BV(0) inside `body` refers to the just-introduced name. Names
+    // starting with '_' are anonymous (e.g. synthesised calc names)
+    // and skipped. Gated by `--check-redundant-by` (default on).
+    //
+    // `form` is a short noun phrase describing where the binder came
+    // from — embedded directly into the warning so the user knows
+    // which surface construct to edit (e.g. "let binding",
+    // "`case … as`", "`suppose … as`").
+    void warnIfBinderUnused(
+        const std::string& name,
+        ExpressionPointer bodyUnderBinder,
+        int line, int column,
+        const char* form) {
+        if (!reportRedundantBy_) return;
+        if (name.empty() || name[0] == '_') return;
+        if (referencesBoundVariable(bodyUnderBinder, 0)) return;
+        emitUnusedNameWarning(name, line, column, form);
+    }
+
+    // Variant: check at the surface-AST level by walking the body
+    // expression and looking for any `SurfaceIdentifier` referencing
+    // `name`. Useful when the binder is introduced via a desugaring
+    // (e.g. `choose N such that …;` builds a destructure) and we
+    // don't have a clean post-elaboration body to inspect. False-
+    // negatives are possible if the user shadows `name` inside the
+    // body — that's tolerated; the warning is advisory.
+    void warnIfSurfaceNameUnused(
+        const std::string& name,
+        const SurfaceExpression& body,
+        int line, int column,
+        const char* form) {
+        if (!reportRedundantBy_) return;
+        if (name.empty() || name[0] == '_') return;
+        if (surfaceMentionsName(body, name)) return;
+        emitUnusedNameWarning(name, line, column, form);
+    }
+
+    void emitUnusedNameWarning(
+        const std::string& name, int line, int column,
+        const char* form) {
+        std::cerr << "warning: " << moduleName_
+            << ":" << line << ":" << column
+            << ": unused name `" << name
+            << "` introduced by " << form
+            << " — the body never references it; drop it\n";
+    }
+
+    bool surfaceMentionsName(
+        const SurfaceExpression& expression,
+        const std::string& name) {
+        if (auto* id =
+                std::get_if<SurfaceIdentifier>(&expression.node)) {
+            return id->qualifiedName == name;
+        }
+        if (auto* app =
+                std::get_if<SurfaceApplication>(&expression.node)) {
+            if (surfaceMentionsName(*app->function, name)) return true;
+            for (const auto& arg : app->arguments) {
+                if (arg.value
+                    && surfaceMentionsName(*arg.value, name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (auto* pi =
+                std::get_if<SurfacePiType>(&expression.node)) {
+            if (pi->binder.type
+                && surfaceMentionsName(*pi->binder.type, name))
+                return true;
+            return pi->codomain
+                && surfaceMentionsName(*pi->codomain, name);
+        }
+        if (auto* lambda =
+                std::get_if<SurfaceLambda>(&expression.node)) {
+            if (lambda->binder.type
+                && surfaceMentionsName(*lambda->binder.type, name))
+                return true;
+            return lambda->body
+                && surfaceMentionsName(*lambda->body, name);
+        }
+        if (auto* let =
+                std::get_if<SurfaceLet>(&expression.node)) {
+            if (let->type
+                && surfaceMentionsName(*let->type, name)) return true;
+            if (let->value
+                && surfaceMentionsName(*let->value, name)) return true;
+            return let->body
+                && surfaceMentionsName(*let->body, name);
+        }
+        if (auto* asc =
+                std::get_if<SurfaceAscription>(&expression.node)) {
+            if (asc->expression
+                && surfaceMentionsName(*asc->expression, name))
+                return true;
+            return asc->type
+                && surfaceMentionsName(*asc->type, name);
+        }
+        if (auto* bin =
+                std::get_if<SurfaceBinaryOperation>(&expression.node)) {
+            if (bin->left
+                && surfaceMentionsName(*bin->left, name)) return true;
+            return bin->right
+                && surfaceMentionsName(*bin->right, name);
+        }
+        if (auto* un =
+                std::get_if<SurfaceUnaryOperation>(&expression.node)) {
+            return un->operand
+                && surfaceMentionsName(*un->operand, name);
+        }
+        if (auto* tup =
+                std::get_if<SurfaceAnonymousTuple>(&expression.node)) {
+            for (const auto& c : tup->components) {
+                if (c && surfaceMentionsName(*c, name)) return true;
+            }
+            return false;
+        }
+        if (auto* cas =
+                std::get_if<SurfaceCases>(&expression.node)) {
+            if (cas->scrutinee
+                && surfaceMentionsName(*cas->scrutinee, name))
+                return true;
+            for (const auto& clause : cas->clauses) {
+                if (clause.body
+                    && surfaceMentionsName(*clause.body, name))
+                    return true;
+            }
+            return false;
+        }
+        if (auto* calcNode =
+                std::get_if<SurfaceCalc>(&expression.node)) {
+            if (calcNode->initialExpression
+                && surfaceMentionsName(
+                    *calcNode->initialExpression, name))
+                return true;
+            for (const auto& step : calcNode->steps) {
+                if (step.nextExpression
+                    && surfaceMentionsName(
+                        *step.nextExpression, name)) return true;
+                if (step.stepProof
+                    && surfaceMentionsName(
+                        *step.stepProof, name)) return true;
+            }
+            return false;
+        }
+        if (auto* claim =
+                std::get_if<SurfaceStructuredClaim>(&expression.node)) {
+            if (claim->proposition
+                && surfaceMentionsName(*claim->proposition, name))
+                return true;
+            if (claim->byHint
+                && surfaceMentionsName(*claim->byHint, name))
+                return true;
+            for (const auto& arm : claim->arms) {
+                if (arm.body
+                    && surfaceMentionsName(*arm.body, name))
+                    return true;
+                if (arm.disjunctType
+                    && surfaceMentionsName(
+                        *arm.disjunctType, name)) return true;
+            }
+            return false;
+        }
+        if (auto* choose =
+                std::get_if<SurfaceChoose>(&expression.node)) {
+            if (choose->predicate
+                && surfaceMentionsName(*choose->predicate, name))
+                return true;
+            return choose->body
+                && surfaceMentionsName(*choose->body, name);
+        }
+        if (auto* given =
+                std::get_if<SurfaceGiven>(&expression.node)) {
+            return given->proposition
+                && surfaceMentionsName(*given->proposition, name);
+        }
+        // Leaf / specialised nodes (numeric literal, Type,
+        // Proposition, hammer, sorry, ring, etc.) don't have
+        // identifier subterms to recurse into.
+        return false;
+    }
+
     // Whether `expression` references a BoundVariable at the relative
     // de Bruijn index `targetIndex` (counting outward from the
-    // expression's enclosing scope). Used by the unused-name warning
-    // for SurfaceLet bindings: after elaborating the let body, we
-    // check whether the body has any BV(0) reference (i.e. uses the
-    // just-introduced let binder).
+    // expression's enclosing scope). Used by `warnIfBinderUnused`
+    // for the user-binder unused-name warning: after elaborating
+    // the body, we check whether it has any BV(0) reference (i.e.
+    // uses the just-introduced binder).
     bool referencesBoundVariable(
         ExpressionPointer expression, int targetIndex) {
         if (auto* bv =
@@ -14320,6 +14593,19 @@ private:
                 lambda.body, extended, expectedBody,
                 "lambda body");
         }
+        // Unused-name warning for statement-level intros (`suppose P
+        // as h;`). Function lambdas (`function (x : T) => …`) are
+        // exempt — constant functions and underscore-naming
+        // conventions make unused parameters there often intentional.
+        if (lambda.fromStatementIntro
+            && lambda.binder.names.size() == 1) {
+            // body's deepest reference to the binder is at BV(0)
+            // because we elaborated under exactly one push.
+            warnIfBinderUnused(
+                lambda.binder.names[0], body,
+                lambda.body->line, lambda.body->column,
+                "`suppose ... as`");
+        }
         ExpressionPointer result = body;
         for (int i = static_cast<int>(lambda.binder.names.size()) - 1;
              i >= 0; --i) {
@@ -17639,6 +17925,12 @@ private:
     std::string moduleName_;
     bool reportRedundantBy_ = false;
     std::string currentDeclarationName_;
+    // Stack of expected types active on the current elaboration call
+    // chain. The top of the stack is what the `goal` keyword resolves
+    // to. Pushed at the entry to elaborateExpression whenever the
+    // call carries a non-null expectedType; popped on return via the
+    // GoalScope RAII guard.
+    std::vector<ExpressionPointer> goalStack_;
     // Conventions registered via `convention p [q ...] : T [with …];`
     // declarations. Keyed by name. When a subsequent declaration's
     // signature or body mentions a key as a free identifier, the

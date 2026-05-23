@@ -20,9 +20,9 @@ theorem Logic.double_negation_eliminate
         (proposition : Proposition)
         (notNotProposition : Not(Not(proposition)))
         : proposition :=
-  cases Logic.excluded_middle(proposition) {
-    | Or.introduceLeft(proof) => proof
-    | Or.introduceRight(notProposition) =>
+  claim goal by cases {
+    case proposition       as proof:           proof
+    case Not(proposition)  as notProposition:
         False.eliminate_proposition(
             proposition, notNotProposition(notProposition))
   }
@@ -40,14 +40,14 @@ theorem Logic.not_implies_implies_and_not
         (antecedent consequent : Proposition)
         (notImplication : Not(antecedent → consequent))
         : And(antecedent, Not(consequent)) :=
-  cases Logic.excluded_middle(antecedent) {
-    | Or.introduceLeft(antecedentHolds) =>
+  claim goal by cases {
+    case antecedent      as antecedentHolds:
         And.introduction(
             antecedentHolds,
             function (consequentHolds : consequent) =>
                 notImplication(
                     function (_ : antecedent) => consequentHolds))
-    | Or.introduceRight(notAntecedent) =>
+    case Not(antecedent) as notAntecedent:
         False.eliminate_proposition(
             And(antecedent, Not(consequent)),
             notImplication(

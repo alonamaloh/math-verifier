@@ -1043,7 +1043,8 @@ private:
                     result = makeSurfaceLambda(
                         std::move(binder),
                         std::move(result),
-                        iterator->line, iterator->column);
+                        iterator->line, iterator->column,
+                        /*fromStatementIntro=*/true);
                     break;
                 }
                 case BlockWrapper::Choose: {
@@ -1727,6 +1728,10 @@ private:
             Token token = consumeAny();
             return makeSurfaceProposition(token.line, token.column);
         }
+        if (current.kind == TokenKind::KeywordGoal) {
+            Token token = consumeAny();
+            return makeSurfaceGoal(token.line, token.column);
+        }
         if (current.kind == TokenKind::LeftParen) {
             // `(<op>)` — refer to an operator-symbol-named binder
             // (e.g. `((·) : G → G → G)` bound earlier; in expression
@@ -2013,6 +2018,7 @@ private:
         SurfaceExpressionPointer proposition;
         SurfaceExpressionPointer byHint;
         bool byCases = false;
+        bool byInduction = false;
         std::vector<SurfaceStructuredClaimArm> arms;
         // Bare `claim` / `claim by …` — terminal-shaped, no proposition.
         if (peek().kind != TokenKind::KeywordBy
@@ -2031,6 +2037,17 @@ private:
                 }
                 expect(TokenKind::RightBrace,
                        "ending 'by cases' arms block");
+            } else if (peek().kind == TokenKind::KeywordInduction) {
+                // `claim P by induction on E [with ih] [refining …]
+                // { case zero: …  case successor(k): … }` —
+                // structural induction with the claim's proposition
+                // as expected type. Parser packages the same
+                // SurfaceCases the standalone `by_induction on E …`
+                // form produces; elaborator dispatches by passing
+                // `proposition` as the expectedType when byInduction
+                // is set.
+                byHint = parseClaimByInduction();
+                byInduction = true;
             } else {
                 byHint = parseExpression();
             }
@@ -2038,7 +2055,49 @@ private:
         return makeSurfaceStructuredClaim(
             std::move(proposition), /*label=*/"",
             std::move(byHint), byCases, std::move(arms),
-            claimToken.line, claimToken.column);
+            claimToken.line, claimToken.column, byInduction);
+    }
+
+    // Parses the tail of `claim P by induction on E [with ih]
+    // [refining …] { case …: body … }`. The opening `claim P by`
+    // and the `induction` keyword have already been consumed by the
+    // caller (parseStructuredClaim). Builds the same SurfaceCases /
+    // SurfaceCasesWithRefining the standalone `by_induction on E …
+    // { … }` form produces — only the surrounding wrapper differs.
+    SurfaceExpressionPointer parseClaimByInduction() {
+        Token inductionToken = consumeAny();  // 'induction'
+        expect(TokenKind::KeywordOn, "after 'by induction'");
+        auto scrutinee = parseExpression();
+        // `with ih` is optional; when absent we leave ihName empty
+        // (recursive arms get no user-visible IH binding, matching
+        // the bare `cases` form).
+        std::string ihName;
+        if (peek().kind == TokenKind::KeywordWith) {
+            consumeAny();  // 'with'
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected an identifier (the induction "
+                          "hypothesis name) after 'with'");
+            }
+            ihName = consumeAny().lexeme;
+        }
+        std::vector<std::string> refiningNames =
+            parseOptionalRefiningList();
+        expect(TokenKind::LeftBrace,
+               "after 'by induction on <expr>'");
+        auto clauses = parseCasesClauseBlock(
+            ihName, TokenKind::Colon);
+        expect(TokenKind::RightBrace,
+               "ending 'by induction' block");
+        if (refiningNames.empty()) {
+            return makeSurfaceCases(
+                std::move(scrutinee), std::move(clauses),
+                inductionToken.line, inductionToken.column);
+        }
+        return makeSurfaceCasesWithRefining(
+            std::move(scrutinee), std::move(clauses),
+            /*equalityHypothesisName=*/std::string(),
+            std::move(refiningNames),
+            inductionToken.line, inductionToken.column);
     }
 
     // A run of one or more `claim`s. Each non-terminal claim (one that

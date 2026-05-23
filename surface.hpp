@@ -129,6 +129,13 @@ struct SurfacePiType {
 struct SurfaceLambda {
     SurfaceBinder binder;
     SurfaceExpressionPointer body;
+    // True when this lambda was synthesised by the parser from a
+    // statement-level introduction (`suppose P as h;`). Used by the
+    // elaborator's unused-name warning: a `function (x : T) => ...`
+    // that doesn't reference `x` is often intentional (constant
+    // functions, e.g.), but a `suppose P as h;` whose body ignores
+    // `h` is almost always a leftover from a refactor.
+    bool fromStatementIntro = false;
 };
 struct SurfaceLet {
     std::string name;
@@ -291,6 +298,14 @@ struct SurfaceGiven {
     SurfaceExpressionPointer proposition;
 };
 
+// `goal` — refers to the elaborator's current expected type. Reads
+// as math: "claim goal by cases { … }", "(some_proof : goal)". The
+// elaborator maintains a stack of expected types pushed at every
+// elaborateExpression entry with a non-null expectedType; `goal`
+// resolves to the most-recent push. Errors when the stack is empty
+// (used in a position with no propagating expected type).
+struct SurfaceGoal {};
+
 // `by_strong_induction on <scrutinee> with <subject>, <ih> { body }`
 // — single-step strong induction. The elaborator looks up
 // `<CarrierType>.strong_induction` (where CarrierType is the head
@@ -344,6 +359,14 @@ struct SurfaceStructuredClaim {
     SurfaceExpressionPointer byHint;            // null if no `by`
     bool byCases = false;                       // `by cases { … }`
     std::vector<SurfaceStructuredClaimArm> arms; // arms when byCases
+    // `by induction on E [with ih] [refining …] { case … }` packages
+    // a SurfaceCases (or SurfaceCasesWithRefining) into byHint and
+    // sets byInduction=true. The elaborator dispatches by passing the
+    // claim's proposition as the expected type so the cases-block
+    // motive abstracts over E correctly. The IH name (when given)
+    // and refining list are already baked into the SurfaceCases at
+    // parse time.
+    bool byInduction = false;                   // `by induction on … { … }`
 };
 
 struct SurfaceExpression {
@@ -355,7 +378,7 @@ struct SurfaceExpression {
         SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer, SurfaceSorry,
         SurfaceRing, SurfaceField, SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
-        SurfaceByStrongInduction
+        SurfaceByStrongInduction, SurfaceGoal
     > node;
     int line = 0;
     int column = 0;
@@ -407,9 +430,11 @@ inline SurfaceExpressionPointer makeSurfacePiType(
 }
 inline SurfaceExpressionPointer makeSurfaceLambda(
     SurfaceBinder binder, SurfaceExpressionPointer body,
-    int line, int column) {
+    int line, int column, bool fromStatementIntro = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
-        SurfaceLambda{std::move(binder), std::move(body)}, line, column});
+        SurfaceLambda{std::move(binder), std::move(body),
+                        fromStatementIntro},
+        line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceLet(
     std::string name, SurfaceExpressionPointer type,
@@ -503,17 +528,22 @@ inline SurfaceExpressionPointer makeSurfaceGiven(
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceGiven{std::move(proposition)}, line, column});
 }
+inline SurfaceExpressionPointer makeSurfaceGoal(int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceGoal{}, line, column});
+}
 inline SurfaceExpressionPointer makeSurfaceStructuredClaim(
     SurfaceExpressionPointer proposition,
     std::string label,
     SurfaceExpressionPointer byHint,
     bool byCases,
     std::vector<SurfaceStructuredClaimArm> arms,
-    int line, int column) {
+    int line, int column,
+    bool byInduction = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceStructuredClaim{std::move(proposition), std::move(label),
                                 std::move(byHint), byCases,
-                                std::move(arms)},
+                                std::move(arms), byInduction},
         line, column});
 }
 // Forward-declared above; full SurfaceCasesClause type lives later in

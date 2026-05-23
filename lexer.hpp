@@ -36,6 +36,8 @@ enum class TokenKind {
     KeywordByCases,         // `by_cases` — math-style case-split
     KeywordByInduction,     // `by_induction` — case-split with IH
     KeywordByStrongInduction, // `by_strong_induction` — single-step strong induction
+    KeywordInduction,       // `induction` — after `claim P by`, opens claim-by-induction
+    KeywordGoal,            // `goal` — refers to the elaborator's current expected type
     KeywordContradiction,   // `contradiction` — close goal from P / ¬P
     KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
     KeywordSuppose,         // `suppose P as h;` — introduce hypothesis as a step
