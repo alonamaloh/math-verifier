@@ -40,6 +40,8 @@ enum class TokenKind {
     KeywordGoal,            // `goal` — refers to the elaborator's current expected type
     KeywordDone,            // `done` — bare-`claim` synonym; closes the surrounding goal via auto-prover
     KeywordOkay,            // `okay` — same as `done`. Math-professor style (Aroca).
+    KeywordOpaque,          // `opaque` — modifier on `definition`; blocks δ-unfolding
+    KeywordUnfold,          // `unfold X` — surface tactic to opt into δ-unfolding
     KeywordContradiction,   // `contradiction` — close goal from P / ¬P
     KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
     KeywordSuppose,         // `suppose P as h;` — introduce hypothesis as a step

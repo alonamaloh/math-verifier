@@ -346,6 +346,20 @@ private:
             case TokenKind::KeywordAxiom:      return parseAxiomDeclaration();
             case TokenKind::KeywordDefinition: return parseDefinitionDeclaration(false);
             case TokenKind::KeywordTheorem:    return parseDefinitionDeclaration(true);
+            case TokenKind::KeywordOpaque: {
+                // `opaque definition Name … := body` — consume the
+                // modifier, require `definition`, set the flag.
+                consumeAny();  // 'opaque'
+                if (peek().kind != TokenKind::KeywordDefinition) {
+                    throwHere("expected 'definition' after 'opaque' "
+                              "(theorems can't be opaque — proof "
+                              "irrelevance already hides their body)");
+                }
+                SurfaceDefinitionDeclaration decl =
+                    parseDefinitionDeclaration(false);
+                decl.opaque = true;
+                return decl;
+            }
             case TokenKind::KeywordOperator:   return parseOperatorDeclaration();
             case TokenKind::KeywordOverload:   return parseOverloadDeclaration();
             case TokenKind::KeywordCoercion:   return parseCoercionDeclaration();
@@ -354,7 +368,7 @@ private:
                 throwHere("expected top-level statement keyword "
                           "(import / using / inductive / axiom / "
                           "definition / theorem / operator / overload / "
-                          "convention)");
+                          "convention / opaque)");
         }
     }
 
@@ -1746,6 +1760,31 @@ private:
         if (current.kind == TokenKind::KeywordGoal) {
             Token token = consumeAny();
             return makeSurfaceGoal(token.line, token.column);
+        }
+        if (current.kind == TokenKind::KeywordUnfold) {
+            // `unfold X [, Y, ...] in <body>` — temporarily flips
+            // X (and friends) from opaque to transparent while
+            // elaborating <body>. Restored on return.
+            Token unfoldToken = consumeAny();  // 'unfold'
+            std::vector<std::string> names;
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected an identifier (the definition "
+                          "name to unfold) after 'unfold'");
+            }
+            names.push_back(consumeQualifiedNameString());
+            while (peek().kind == TokenKind::Comma) {
+                consumeAny();  // ','
+                if (!isIdentifierLike(peek().kind)) {
+                    throwHere("expected another identifier after ','");
+                }
+                names.push_back(consumeQualifiedNameString());
+            }
+            expect(TokenKind::KeywordIn,
+                   "after 'unfold <name>[, <name>...]'");
+            auto body = parseExpression();
+            return makeSurfaceUnfold(
+                std::move(names), std::move(body),
+                unfoldToken.line, unfoldToken.column);
         }
         if (current.kind == TokenKind::LeftParen) {
             // `(<op>)` — refer to an operator-symbol-named binder

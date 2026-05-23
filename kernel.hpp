@@ -56,8 +56,18 @@ using Context = std::vector<ContextEntry>;
 // Most declarations in everyday use have no parameters (empty vector).
 struct Axiom       { std::vector<std::string> universeParameters;
                      ExpressionPointer type; };
+// `opacity` controls whether the kernel may δ-unfold this definition
+// during reduction. Transparent (default): treated as today — the body
+// is unfolded freely, enabling β/ι to fire on definitions that compute
+// by pattern-match. Opaque: the kernel refuses to δ-unfold; the
+// Application stays as `<name>(args...)` and is only equal to itself.
+// Proofs that need the body must invoke an explicit `unfold` step at
+// the surface or rely on named lemmas about the definition's
+// extensional behaviour. Cache format v4 adds the byte.
+enum class Opacity : uint8_t { Transparent = 0, Opaque = 1 };
 struct Definition  { std::vector<std::string> universeParameters;
-                     ExpressionPointer type; ExpressionPointer body; };
+                     ExpressionPointer type; ExpressionPointer body;
+                     Opacity opacity = Opacity::Transparent; };
 // An Inductive's `kind` is a Pi-chain ending in a Sort. The first
 // `numParameters` Pis bind parameters (uniform across constructors); the
 // remaining Pis bind indices (allowed to vary per constructor). For
@@ -182,13 +192,15 @@ inline void addAxiom(Environment& environment, std::string name,
 // definitionally, and adds the definition to `environment`.
 void addDefinition(Environment& environment, std::string name,
                    std::vector<std::string> universeParameters,
-                   ExpressionPointer declaredType, ExpressionPointer body);
+                   ExpressionPointer declaredType, ExpressionPointer body,
+                   Opacity opacity = Opacity::Transparent);
 
 inline void addDefinition(Environment& environment, std::string name,
                           ExpressionPointer declaredType,
                           ExpressionPointer body) {
     addDefinition(environment, std::move(name), {},
-                  std::move(declaredType), std::move(body));
+                  std::move(declaredType), std::move(body),
+                  Opacity::Transparent);
 }
 
 // A constructor specification supplied to addInductive: the constructor's

@@ -826,6 +826,15 @@ ExpressionPointer weakHeadNormalFormUncached(const Environment& environment,
         if (auto* constant = std::get_if<Constant>(&expression->node)) {
             if (auto* declaration = environment.lookup(constant->name)) {
                 if (auto* definition = std::get_if<Definition>(declaration)) {
+                    // Opaque definitions block δ-unfolding. The kernel
+                    // treats the Constant as a stuck head (like an
+                    // axiom for reduction purposes); equality requires
+                    // matching head + structurally equal arguments.
+                    // Proofs that need the body must invoke the
+                    // surface `unfold` form or named lemmas.
+                    if (definition->opacity == Opacity::Opaque) {
+                        return expression;
+                    }
                     if (definition->universeParameters.size()
                             != constant->universeArguments.size()) {
                         throw TypeError(
@@ -1733,7 +1742,8 @@ void addDefinition(Environment& environment,
                    std::string name,
                    std::vector<std::string> universeParameters,
                    ExpressionPointer declaredType,
-                   ExpressionPointer body) {
+                   ExpressionPointer body,
+                   Opacity opacity) {
     validateName(name, "addDefinition: definition name");
     for (const auto& parameterName : universeParameters) {
         validateName(parameterName, "addDefinition: universe parameter name");
@@ -1759,7 +1769,8 @@ void addDefinition(Environment& environment,
     environment.declarations.emplace(
         std::move(name),
         Definition{std::move(universeParameters),
-                   std::move(declaredType), std::move(body)});
+                   std::move(declaredType), std::move(body),
+                   opacity});
 }
 
 namespace {

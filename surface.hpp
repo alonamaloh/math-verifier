@@ -306,6 +306,21 @@ struct SurfaceGiven {
 // (used in a position with no propagating expected type).
 struct SurfaceGoal {};
 
+// `unfold <name> in <body>` — temporarily flips `<name>`'s opacity
+// from Opaque to Transparent for the duration of elaborating
+// `<body>`. The kernel then δ-unfolds `<name>` freely, so reductions
+// the opacity normally blocked fire as if the definition were
+// transparent. Restored on return so other proofs still see the
+// opaque view. Used at proof sites that need to peek inside an
+// otherwise-abstract definition (typically to discharge a kernel-
+// computation step like `reflexivity(myDouble(2)) : myDouble(2) =
+// 4` when myDouble is opaque). When applied to a transparent
+// definition the form is a no-op.
+struct SurfaceUnfold {
+    std::vector<std::string> names;   // 1+ names to unfold
+    SurfaceExpressionPointer body;
+};
+
 // `by_strong_induction on <scrutinee> with <subject>, <ih> { body }`
 // — single-step strong induction. The elaborator looks up
 // `<CarrierType>.strong_induction` (where CarrierType is the head
@@ -378,7 +393,7 @@ struct SurfaceExpression {
         SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer, SurfaceSorry,
         SurfaceRing, SurfaceField, SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
-        SurfaceByStrongInduction, SurfaceGoal
+        SurfaceByStrongInduction, SurfaceGoal, SurfaceUnfold
     > node;
     int line = 0;
     int column = 0;
@@ -531,6 +546,14 @@ inline SurfaceExpressionPointer makeSurfaceGiven(
 inline SurfaceExpressionPointer makeSurfaceGoal(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceGoal{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceUnfold(
+    std::vector<std::string> names,
+    SurfaceExpressionPointer body,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceUnfold{std::move(names), std::move(body)},
+        line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceStructuredClaim(
     SurfaceExpressionPointer proposition,
@@ -710,6 +733,14 @@ struct SurfaceDefinitionDeclaration {
     SurfaceExpressionPointer body;   // null if pattern form
     std::vector<SurfacePatternCase> cases;
     bool isTheorem = false;
+    // `opaque definition Name … := body` blocks the kernel from
+    // δ-unfolding `Name` during reduction. Proofs needing the body
+    // must invoke `unfold Name` or rely on named characterising
+    // lemmas. Not allowed on theorems (theorems' bodies are
+    // proofs; proof irrelevance already gives a stronger form of
+    // opacity). Forwarded to the kernel via `addDefinition`'s
+    // Opacity parameter.
+    bool opaque = false;
 };
 
 struct SurfaceImportDeclaration  { std::string moduleName; };

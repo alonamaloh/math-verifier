@@ -12,7 +12,7 @@ constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
 // Format version 2 adds the operator-registry and overload-alias
 // sections at the tail of the file. Files written by version 1 readers
 // are not accepted; on cache-version mismatch the kernel rebuilds.
-constexpr uint32_t cacheVersion = 3;
+constexpr uint32_t cacheVersion = 4;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -286,6 +286,10 @@ void writeDeclaration(Writer& writer, const Declaration& declaration) {
         writeStringVector(writer, definition->universeParameters);
         writeExpression(writer, definition->type);
         writeExpression(writer, definition->body);
+        // Cache format v4 adds an opacity byte. Readers of v3 don't
+        // read this byte; we bumped cacheVersion to 4 to force a
+        // rebuild for cleanliness.
+        writer.writeU8(static_cast<uint8_t>(definition->opacity));
     } else if (auto* inductive = std::get_if<Inductive>(&declaration)) {
         writer.writeU8(2);
         writeStringVector(writer, inductive->universeParameters);
@@ -325,6 +329,9 @@ Declaration readDeclaration(Reader& reader) {
             definition.universeParameters = readStringVector(reader);
             definition.type = readExpression(reader);
             definition.body = readExpression(reader);
+            uint8_t opacityByte = reader.readU8();
+            definition.opacity = (opacityByte == 0)
+                ? Opacity::Transparent : Opacity::Opaque;
             return definition;
         }
         case 2: {

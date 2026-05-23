@@ -1,0 +1,50 @@
+-- Tests for the `opaque definition` modifier and the `unfold` tactic.
+-- A transparent definition (the default) δ-unfolds during kernel
+-- reduction; an opaque one does not. `unfold X in <body>` temporarily
+-- flips X transparent while elaborating <body>.
+
+module Test.opaque_test
+
+import Logic.basics
+import Natural.basics
+import Natural.peano
+import Equality.basics
+
+-- (1) Transparent baseline: `myDoubleT(2)` reduces to 4 by β/ι, so
+-- `reflexivity(4)` closes the goal.
+definition myDoubleT : Natural → Natural
+  | zero         => zero
+  | successor(k) => successor(successor(myDoubleT(k)))
+
+theorem myDoubleT_two : myDoubleT(2) = 4 :=
+  reflexivity(4)
+
+-- (2) Opaque variant of the same function. The kernel refuses to
+-- δ-unfold `myDouble`, so `reflexivity(4)` would now fail —
+-- `myDouble(2)` and `4` are not definitionally equal.
+opaque definition myDouble : Natural → Natural
+  | zero         => zero
+  | successor(k) => successor(successor(myDouble(k)))
+
+-- (3) `unfold myDouble in <body>` opts back in to δ-unfolding for
+-- the duration of <body>. Original opacity is restored afterwards.
+theorem myDouble_two : myDouble(2) = 4 :=
+  unfold myDouble in reflexivity(4)
+
+-- (4) Outside an `unfold`, `myDouble` is still opaque — so a proof
+-- about it needs lemmas, not reflexivity. Verify by proving the
+-- recurrence equation via `unfold` and citing it.
+theorem myDouble_succ (k : Natural)
+        : myDouble(successor(k)) = successor(successor(myDouble(k))) :=
+  unfold myDouble in reflexivity(successor(successor(myDouble(k))))
+
+theorem myDouble_zero : myDouble(zero) = zero :=
+  unfold myDouble in reflexivity(zero)
+
+-- (5) Multi-name unfold: pass a comma-separated list.
+opaque definition myTripleT : Natural → Natural
+  | zero         => zero
+  | successor(k) => successor(successor(successor(myTripleT(k))))
+
+theorem mixed_unfold : myDouble(1) = myTripleT(0) + 2 :=
+  unfold myDouble, myTripleT in reflexivity(2)

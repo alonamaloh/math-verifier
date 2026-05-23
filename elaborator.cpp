@@ -1102,7 +1102,38 @@ private:
         // those forms.
     }
 
+    // RAII guard that restores opacities flipped by `unfold X in …`
+    // forms during a single definition / theorem's elaboration. The
+    // guard runs after the body has been type-checked AND after
+    // addDefinition completes (so the kernel's final check sees the
+    // unfolded view); on exit it restores each affected definition
+    // to its original opacity and truncates the pending-restores
+    // list back to the pre-call size.
+    struct OpacityRestoreScope {
+        Elaborator& self;
+        size_t startSize;
+        explicit OpacityRestoreScope(Elaborator& s)
+            : self(s),
+              startSize(s.pendingOpacityRestores_.size()) {}
+        ~OpacityRestoreScope() {
+            while (self.pendingOpacityRestores_.size() > startSize) {
+                const auto& entry =
+                    self.pendingOpacityRestores_.back();
+                auto it = self.environment_.declarations.find(
+                    entry.first);
+                if (it != self.environment_.declarations.end()) {
+                    if (auto* def =
+                            std::get_if<Definition>(&it->second)) {
+                        def->opacity = entry.second;
+                    }
+                }
+                self.pendingOpacityRestores_.pop_back();
+            }
+        }
+    };
+
     void elaborateDefinition(const SurfaceDefinitionDeclaration& origDecl) {
+        OpacityRestoreScope opacityScope(*this);
         SurfaceDefinitionDeclaration augmented =
             augmentDeclarationWithConventions(origDecl);
         const SurfaceDefinitionDeclaration& declaration = augmented;
@@ -1178,7 +1209,10 @@ private:
         try {
             addDefinition(environment_, declaration.name,
                           finalUniverseParameters(declaration.universeParameters),
-                          std::move(fullType), std::move(fullBody));
+                          std::move(fullType), std::move(fullBody),
+                          declaration.opaque
+                              ? Opacity::Opaque
+                              : Opacity::Transparent);
         } catch (const TypeError& kernelError) {
             rethrowKernelError(kernelError);
         }
@@ -1633,7 +1667,10 @@ private:
         try {
             addDefinition(environment_, declaration.name,
                           finalUniverseParameters(declaration.universeParameters),
-                          std::move(fullType), std::move(fullBody));
+                          std::move(fullType), std::move(fullBody),
+                          declaration.opaque
+                              ? Opacity::Opaque
+                              : Opacity::Transparent);
         } catch (const TypeError& kernelError) {
             rethrowKernelError(kernelError);
         }
@@ -3060,6 +3097,35 @@ private:
             return goalStack_[top];
         }
 
+        if (auto* unfold =
+                std::get_if<SurfaceUnfold>(&expression.node)) {
+            // Flip each named definition's opacity from Opaque to
+            // Transparent and DEFER the restore until the enclosing
+            // theorem / definition finishes (so the kernel's final
+            // typecheck inside `addDefinition` also sees the unfolded
+            // view). Names that don't refer to definitions are a
+            // user error; fail loudly.
+            for (const std::string& name : unfold->names) {
+                auto it = environment_.declarations.find(name);
+                if (it == environment_.declarations.end()) {
+                    throwElaborate(
+                        "unfold: no declaration named `" + name + "`");
+                }
+                auto* def = std::get_if<Definition>(&it->second);
+                if (!def) {
+                    throwElaborate(
+                        "unfold: `" + name + "` is not a definition "
+                        "(unfolding only applies to definitions; "
+                        "axioms / inductives have no body)");
+                }
+                pendingOpacityRestores_.push_back(
+                    {name, def->opacity});
+                def->opacity = Opacity::Transparent;
+            }
+            return elaborateExpression(
+                *unfold->body, localBinders, expectedType);
+        }
+
         if (auto* identifier =
                 std::get_if<SurfaceIdentifier>(&expression.node)) {
             // Special case: bare `reflexivity` with an expected
@@ -4452,12 +4518,24 @@ private:
         int N = static_cast<int>(localBinders.size());
         int matchIndex = -1;
         int duplicateIndex = -1;
+        // Use isDefinitionallyEqual rather than a structural compare:
+        // hypotheses introduced by destructure desugarings (e.g.
+        // `choose N such that P(N);`) carry their predicate type in
+        // (lambda ...)(N) form before β; the user's `given(P(N))` is
+        // β-reduced. Definitional equality bridges the gap.
+        Context openedContext =
+            buildContextFromLocalBinders(localBinders);
+        ExpressionPointer requestedOpened = openOverLocalBinders(
+            requestedTypeClosed, localBinders, N);
         for (int b = N - 1; b >= 0; --b) {
             int lift = N - b;
             ExpressionPointer binderTypeInScope =
                 liftBoundVariables(localBinders[b].type, lift, 0);
-            if (structurallyEqual(binderTypeInScope,
-                                    requestedTypeClosed)) {
+            ExpressionPointer binderTypeOpened = openOverLocalBinders(
+                binderTypeInScope, localBinders, N);
+            if (isDefinitionallyEqual(environment_, openedContext,
+                                        binderTypeOpened,
+                                        requestedOpened)) {
                 if (matchIndex == -1) {
                     matchIndex = b;
                 } else {
@@ -18011,6 +18089,14 @@ private:
     // call carries a non-null expectedType; popped on return via the
     // GoalScope RAII guard.
     std::vector<ExpressionPointer> goalStack_;
+    // `unfold X in <body>` flips X's opacity from Opaque to
+    // Transparent and records the original opacity here. The list is
+    // drained at the end of each top-level definition / theorem so
+    // the kernel's final typecheck (inside addDefinition) also sees
+    // the unfolded view. One theorem's `unfold` doesn't leak to the
+    // next.
+    std::vector<std::pair<std::string, Opacity>>
+        pendingOpacityRestores_;
     // Conventions registered via `convention p [q ...] : T [with …];`
     // declarations. Keyed by name. When a subsequent declaration's
     // signature or body mentions a key as a free identifier, the

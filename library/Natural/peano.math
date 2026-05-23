@@ -12,6 +12,7 @@ module Natural.peano
 import Natural.basics
 import Equality.basics
 import Logic.basics
+import Logic.exists
 
 -- successor(n) ≠ zero. The hammer's constructor-disjointness
 -- heuristic synthesises the proof: build a discriminator
@@ -52,3 +53,14 @@ theorem Natural.two_not_three_plus (n : Natural)
         Natural.successor_injective(zero, successor(n),
             Natural.successor_injective(1, successor(successor(n)),
                 equalityProof)))
+
+-- Every natural is either zero or the successor of some predecessor.
+-- The expected disjunction for splitting a Natural propositionally:
+-- `claim goal by cases { case n = 0: …  case ∃ k. n = successor(k): … }`
+-- — finds this lemma via the unified hammer.
+theorem Natural.zero_or_successor (n : Natural)
+        : n = 0 ∨ ∃ (k : Natural). n = successor(k) :=
+  cases n {
+    | zero         => Or.introduceLeft(reflexivity(0))
+    | successor(k) => Or.introduceRight(⟨k, reflexivity(successor(k))⟩)
+  }
