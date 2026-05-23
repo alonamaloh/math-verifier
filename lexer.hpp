@@ -38,6 +38,8 @@ enum class TokenKind {
     KeywordByStrongInduction, // `by_strong_induction` — single-step strong induction
     KeywordInduction,       // `induction` — after `claim P by`, opens claim-by-induction
     KeywordGoal,            // `goal` — refers to the elaborator's current expected type
+    KeywordDone,            // `done` — bare-`claim` synonym; closes the surrounding goal via auto-prover
+    KeywordOkay,            // `okay` — same as `done`. Math-professor style (Aroca).
     KeywordContradiction,   // `contradiction` — close goal from P / ¬P
     KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
     KeywordSuppose,         // `suppose P as h;` — introduce hypothesis as a step

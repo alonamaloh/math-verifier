@@ -788,8 +788,10 @@ private:
             // If we're at the structured form, leave the wrapper loop;
             // parseExpression() at the end of parseBlockContents picks
             // up the structured-claim chain.
-            if (peek().kind == TokenKind::KeywordClaim
-                && !looksLikeLegacyClaim()) {
+            if ((peek().kind == TokenKind::KeywordClaim
+                 && !looksLikeLegacyClaim())
+                || peek().kind == TokenKind::KeywordDone
+                || peek().kind == TokenKind::KeywordOkay) {
                 break;
             }
             Token statementToken = consumeAny();
@@ -1660,7 +1662,15 @@ private:
         // here, so the two forms don't collide. A claim immediately
         // followed by another `claim` chains via SurfaceLet so the
         // proposition of the first is in scope for the rest.
-        if (current.kind == TokenKind::KeywordClaim) {
+        if (current.kind == TokenKind::KeywordClaim
+            || current.kind == TokenKind::KeywordDone
+            || current.kind == TokenKind::KeywordOkay) {
+            // `done` and `okay` are bare-`claim` synonyms — math-
+            // style closers ("the proof is done here" / Aroca-style
+            // "okay, that proves it"). Both lex distinctly but
+            // dispatch to the same parser path; parseStructuredClaim
+            // detects the alternate spellings and treats them as a
+            // bare claim with no proposition and no `by` hint.
             return parseStructuredClaimSequence();
         }
         if (current.kind == TokenKind::KeywordGiven) {
@@ -2016,15 +2026,31 @@ private:
     //   `claim by Hint`                 — discharge current goal via Hint
     //   `claim by cases { … }`          — discharge by case-split
     //   `claim`                         — discharge current goal by lookup
+    //   `done` / `okay`                 — bare-`claim` synonyms (no
+    //                                     proposition, no `by`); read as
+    //                                     "QED" / Aroca-style "okay".
     // Coexists with block-statement `claim NAME : TYPE [by V];` — that
     // form is handled by parseBlockContents and never reaches here.
     SurfaceExpressionPointer parseStructuredClaim() {
-        Token claimToken = consumeAny();  // 'claim'
+        Token claimToken = consumeAny();  // 'claim' / 'done' / 'okay'
         SurfaceExpressionPointer proposition;
         SurfaceExpressionPointer byHint;
         bool byCases = false;
         bool byInduction = false;
         std::vector<SurfaceStructuredClaimArm> arms;
+        // `done` and `okay` are strictly bare — they don't accept a
+        // proposition or a `by` hint. Return immediately so the
+        // proposition-parse path below doesn't try to swallow the
+        // next token.
+        bool isBareCloser =
+            claimToken.kind == TokenKind::KeywordDone
+            || claimToken.kind == TokenKind::KeywordOkay;
+        if (isBareCloser) {
+            return makeSurfaceStructuredClaim(
+                /*proposition=*/nullptr, /*label=*/"",
+                /*byHint=*/nullptr, /*byCases=*/false, /*arms=*/{},
+                claimToken.line, claimToken.column);
+        }
         // Bare `claim` / `claim by …` — terminal-shaped, no proposition.
         if (peek().kind != TokenKind::KeywordBy
             && !isStructuredClaimTerminator()) {
@@ -2113,7 +2139,14 @@ private:
     // hypothesis lookup and `given (P)`.
     SurfaceExpressionPointer parseStructuredClaimSequence() {
         SurfaceExpressionPointer first = parseStructuredClaim();
-        if (peek().kind != TokenKind::KeywordClaim) {
+        // Chain to a following `claim` / `done` / `okay`. The
+        // latter two are bare-`claim` synonyms; they always end the
+        // chain (parseStructuredClaim returns them with no
+        // proposition).
+        TokenKind next = peek().kind;
+        if (next != TokenKind::KeywordClaim
+            && next != TokenKind::KeywordDone
+            && next != TokenKind::KeywordOkay) {
             return first;
         }
         // First is non-terminal. Must have a proposition for its
