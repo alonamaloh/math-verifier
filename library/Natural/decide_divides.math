@@ -44,35 +44,37 @@ theorem Natural.le_q_d_mult_q
 
 -- Bounded quotient search. Returns either a witness q ≤ bound with
 -- n = d·q, or a function rejecting every such q.
-theorem Natural.search_quotient_witness_up_to (d n : Natural)
-        : (quotientBound : Natural)
-          → Or(∃ (q : Natural). q ≤ quotientBound ∧ n = d * q,
-                (q : Natural)
-                → q ≤ quotientBound
-                → n ≠ d * q)
-  | zero =>
-      claim (n = d * 0) ∨ (n ≠ d * 0)
-      claim by cases {
-        in (n = d * 0) as nEqualsDTimesZero:
-            Or.introduceLeft(
-                Exists.introduce(
-                    0,
-                    And.introduction(
-                        LessOrEqual.reflexivity(0),
-                        nEqualsDTimesZero)))
-        in (n ≠ d * 0) as nNotDTimesZero:
-            Or.introduceRight(
-                function (q : Natural)
-                    (quotientLessOrEqualZero : q ≤ 0)
-                    (nEqualsDTimesQuotient : n = d * q) =>
-                  nNotDTimesZero(
-                      rewrite(
-                          Natural.less_or_equal_zero_implies_equals_zero(
-                              q, quotientLessOrEqualZero),
-                          nEqualsDTimesQuotient)))
+theorem Natural.search_quotient_witness_up_to
+        (d n quotientBound : Natural)
+        : Or(∃ (q : Natural). q ≤ quotientBound ∧ n = d * q,
+              (q : Natural)
+              → q ≤ quotientBound
+              → n ≠ d * q) :=
+  by_induction on quotientBound with IH {
+    case zero: {
+        claim (n = d * 0) ∨ (n ≠ d * 0)
+        claim by cases {
+          in (n = d * 0) as nEqualsDTimesZero:
+              Or.introduceLeft(
+                  Exists.introduce(
+                      0,
+                      And.introduction(
+                          LessOrEqual.reflexivity(0),
+                          nEqualsDTimesZero)))
+          in (n ≠ d * 0) as nNotDTimesZero:
+              Or.introduceRight(
+                  function (q : Natural)
+                      (quotientLessOrEqualZero : q ≤ 0)
+                      (nEqualsDTimesQuotient : n = d * q) =>
+                    nNotDTimesZero(
+                        rewrite(
+                            Natural.less_or_equal_zero_implies_equals_zero(
+                                q, quotientLessOrEqualZero),
+                            nEqualsDTimesQuotient)))
+        }
       }
-  | successor(prevBound) =>
-      cases Natural.search_quotient_witness_up_to(d, n, prevBound) {
+    case successor(prevBound):
+      cases IH {
         | Or.introduceLeft(foundEarlier) => {
             -- Found earlier: propagate, boosting the bound proof.
             obtain ⟨q, qLePrevBound, nEqualsDTimesQuotient⟩ from foundEarlier;
@@ -135,6 +137,7 @@ theorem Natural.search_quotient_witness_up_to (d n : Natural)
             }
           }
       }
+  }
 
 -- Decidable divisibility on Natural. Cases on d: zero dispatches
 -- via decides_equality(n, 0); successor(predD) runs the bounded
