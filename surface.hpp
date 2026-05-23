@@ -382,6 +382,12 @@ struct SurfaceStructuredClaim {
     // and refining list are already baked into the SurfaceCases at
     // parse time.
     bool byInduction = false;                   // `by induction on … { … }`
+    // `by substitution` (no arg) — auto-find equality + body via the
+    // unified equality bridge. `by substituting <eqExpression>` —
+    // narrow the search to the supplied equality. The eqExpression
+    // (if any) is stored in `byHint`; bySubstitution=true is the
+    // discriminator.
+    bool bySubstitution = false;
 };
 
 struct SurfaceExpression {
@@ -562,11 +568,13 @@ inline SurfaceExpressionPointer makeSurfaceStructuredClaim(
     bool byCases,
     std::vector<SurfaceStructuredClaimArm> arms,
     int line, int column,
-    bool byInduction = false) {
+    bool byInduction = false,
+    bool bySubstitution = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceStructuredClaim{std::move(proposition), std::move(label),
                                 std::move(byHint), byCases,
-                                std::move(arms), byInduction},
+                                std::move(arms), byInduction,
+                                bySubstitution},
         line, column});
 }
 // Forward-declared above; full SurfaceCasesClause type lives later in

@@ -4269,9 +4269,18 @@ private:
                 "or provide a proposition: `claim P [by Hint]`)");
         }
 
-        if (!claim.byHint) {
+        if (!claim.byHint && !claim.bySubstitution) {
             return autoProveClaim(
                 goalClosed, localBinders, line);
+        }
+
+        // `claim P by substitution` (no eq supplied) — call the
+        // equality bridge directly. `claim P by substituting <eq>`
+        // — narrow the bridge to the supplied equality (passed via
+        // byHint).
+        if (claim.bySubstitution) {
+            return elaborateClaimBySubstitution(
+                claim, goalClosed, localBinders, line);
         }
 
         // `claim P by induction on E …` — the byHint is the
@@ -5493,6 +5502,139 @@ private:
     //   2. Elaborate each arm's disjunctType.
     //   3. Find an in-scope hypothesis of type `Or armA armB` — that's
     //      the disjunction we case-split on.
+    // `claim P by substitution` / `claim P by substituting <eq>` —
+    // close the goal P via an equality bridge: find (or use the
+    // supplied) equality `eq : a = b`, rewrite P along eq to a
+    // related goal P', and find a proof of P' in the local context
+    // or library. Sugar over `tryContextEqualityBridge` /
+    // `Equality.transport_proposition` with better error messages
+    // and (for the narrowed form) a smaller search space.
+    ExpressionPointer elaborateClaimBySubstitution(
+        const SurfaceStructuredClaim& claim,
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        Frame frame(*this,
+            "claim by substitution at line "
+            + std::to_string(line));
+        // Build the candidate-equality list. Default: every equality
+        // in scope (the existing bridge's pool). Narrowed: a single
+        // equality the user supplied as `by substituting <eq>`.
+        std::vector<ContextEquality> candidates;
+        if (claim.byHint) {
+            // Narrowed form. Elaborate <eq>; extract its components
+            // as a single ContextEquality.
+            ExpressionPointer eqProof = elaborateExpression(
+                *claim.byHint, localBinders);
+            ExpressionPointer eqProofTypeOpened;
+            try {
+                eqProofTypeOpened = inferTypeInLocalContext(
+                    localBinders, eqProof);
+            } catch (const TypeError&) {
+                throwElaborate(
+                    "`by substituting`: the supplied expression "
+                    "doesn't typecheck as a proof");
+            }
+            EqualityComponents components;
+            try {
+                components = extractEqualityComponents(
+                    eqProofTypeOpened,
+                    "by substituting argument", line);
+            } catch (const ElaborateError&) {
+                throwElaborate(
+                    "`by substituting`: the supplied expression's "
+                    "type is not an equality `a = b`");
+            }
+            int N = static_cast<int>(localBinders.size());
+            ContextEquality eq;
+            eq.cost = 1;
+            eq.source = "supplied via `by substituting`";
+            eq.carrierType = closeOverLocalBinders(
+                components.carrierType, localBinders, N);
+            eq.lhs = closeOverLocalBinders(
+                components.leftEndpoint, localBinders, N);
+            eq.rhs = closeOverLocalBinders(
+                components.rightEndpoint, localBinders, N);
+            eq.carrierLevel = components.carrierUniverseLevel;
+            eq.proofExpr = eqProof;
+            candidates.push_back(std::move(eq));
+        } else {
+            candidates = collectContextEqualities(
+                goalClosed, localBinders, line);
+            std::sort(candidates.begin(), candidates.end(),
+                [](const ContextEquality& a, const ContextEquality& b) {
+                    return a.cost < b.cost;
+                });
+        }
+        // For each candidate, both directions, try the bridge.
+        for (const ContextEquality& eq : candidates) {
+            for (int direction = 0; direction < 2; ++direction) {
+                ExpressionPointer fromSide =
+                    (direction == 0) ? eq.rhs : eq.lhs;
+                ExpressionPointer toSide =
+                    (direction == 0) ? eq.lhs : eq.rhs;
+                int occurrences = 0;
+                ExpressionPointer abstractedBody =
+                    abstractStructuralOccurrence(
+                        goalClosed, fromSide,
+                        /*currentDepth=*/0, occurrences);
+                if (occurrences == 0) continue;
+                ExpressionPointer rewrittenGoal = substitute(
+                    abstractedBody, 0, toSide);
+                ExpressionPointer proofRewritten;
+                try {
+                    proofRewritten = autoProveClaim(
+                        rewrittenGoal, localBinders, line);
+                } catch (const ElaborateError&) { continue; }
+                  catch (const TypeError&) { continue; }
+                ExpressionPointer motive = makeLambda(
+                    "_rewriteHole", eq.carrierType, abstractedBody);
+                ExpressionPointer eqForTransport;
+                ExpressionPointer transportLhs;
+                ExpressionPointer transportRhs;
+                if (direction == 0) {
+                    eqForTransport = eq.proofExpr;
+                    transportLhs = eq.lhs;
+                    transportRhs = eq.rhs;
+                } else {
+                    eqForTransport = makeConstant(
+                        "Equality.symmetry", {eq.carrierLevel});
+                    eqForTransport = makeApplication(
+                        eqForTransport, eq.carrierType);
+                    eqForTransport = makeApplication(
+                        eqForTransport, eq.lhs);
+                    eqForTransport = makeApplication(
+                        eqForTransport, eq.rhs);
+                    eqForTransport = makeApplication(
+                        eqForTransport, eq.proofExpr);
+                    transportLhs = eq.rhs;
+                    transportRhs = eq.lhs;
+                }
+                ExpressionPointer call = makeConstant(
+                    "Equality.transport_proposition",
+                    {eq.carrierLevel});
+                call = makeApplication(call, eq.carrierType);
+                call = makeApplication(call, motive);
+                call = makeApplication(call, transportLhs);
+                call = makeApplication(call, transportRhs);
+                call = makeApplication(call, eqForTransport);
+                call = makeApplication(call, proofRewritten);
+                return call;
+            }
+        }
+        if (claim.byHint) {
+            throwElaborate(
+                "`by substituting <eq>` couldn't close the goal: "
+                "no proof in scope matches the rewritten form for "
+                "either direction of the supplied equality");
+        }
+        throwElaborate(
+            "`by substitution` couldn't close the goal: no in-scope "
+            "equality lets the auto-prover reach a provable form "
+            "(consider `by substituting <specific eq>` to narrow, "
+            "or supply an explicit `by <proof>`)");
+    }
+
     //   4. Elaborate each arm body under an anonymous binder of its
     //      disjunct's type; build the two lambdas.
     //   5. Emit `Or.eliminate(A, B, Goal, leftLambda, rightLambda,

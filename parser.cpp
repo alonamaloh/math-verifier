@@ -2076,6 +2076,7 @@ private:
         SurfaceExpressionPointer byHint;
         bool byCases = false;
         bool byInduction = false;
+        bool bySubstitution = false;
         std::vector<SurfaceStructuredClaimArm> arms;
         // `done` and `okay` are strictly bare — they don't accept a
         // proposition or a `by` hint. Return immediately so the
@@ -2119,6 +2120,17 @@ private:
                     expect(TokenKind::RightBrace,
                            "ending 'by cases' arms block");
                 }
+            } else if (peek().kind == TokenKind::KeywordSubstitution) {
+                // `claim P by substitution` — auto-find equality +
+                // body via the unified equality bridge.
+                consumeAny();  // 'substitution'
+                bySubstitution = true;
+            } else if (peek().kind == TokenKind::KeywordSubstituting) {
+                // `claim P by substituting <eqExpression>` — narrow
+                // the bridge to the supplied equality.
+                consumeAny();  // 'substituting'
+                byHint = parseExpression();
+                bySubstitution = true;
             } else if (peek().kind == TokenKind::KeywordInduction) {
                 // `claim P by induction on E [with ih] [refining …]
                 // { case zero: …  case successor(k): … }` —
@@ -2137,7 +2149,8 @@ private:
         return makeSurfaceStructuredClaim(
             std::move(proposition), /*label=*/"",
             std::move(byHint), byCases, std::move(arms),
-            claimToken.line, claimToken.column, byInduction);
+            claimToken.line, claimToken.column, byInduction,
+            bySubstitution);
     }
 
     // Parses the tail of `claim P by induction on E [with ih]

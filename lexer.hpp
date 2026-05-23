@@ -42,6 +42,8 @@ enum class TokenKind {
     KeywordOkay,            // `okay` — same as `done`. Math-professor style (Aroca).
     KeywordOpaque,          // `opaque` — modifier on `definition`; blocks δ-unfolding
     KeywordUnfold,          // `unfold X` — surface tactic to opt into δ-unfolding
+    KeywordSubstitution,    // `by substitution` — auto-find equality + body
+    KeywordSubstituting,    // `by substituting <eq>` — narrow to specified equality
     KeywordContradiction,   // `contradiction` — close goal from P / ¬P
     KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
     KeywordSuppose,         // `suppose P as h;` — introduce hypothesis as a step

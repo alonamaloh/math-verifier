@@ -800,14 +800,24 @@ theorem Natural.padic_valuation_power_divides
                                Natural.padic_valuation(
                                    prime, prime * successor(predQ)),
                                Equality.symmetry(valuationProduct),
-                               -- power(succ(v_p(q)), p) reduces to
-                               -- p * power(v_p(q), p) by definition.
-                               shiftedDivides))
+                               -- power(succ(v_p(q)), p) = p * power(v_p(q), p)
+                               -- via power_succ (was kernel ι; now an
+                               -- explicit lemma since power is opaque).
+                               rewrite(
+                                   Equality.symmetry(
+                                       Natural.power_succ(
+                                           Natural.padic_valuation(
+                                               prime, successor(predQ)),
+                                           prime)),
+                                   shiftedDivides)))
                    }
               }
           }
           in (prime ∤ m) as notDivM:
-              -- v_p(m) = 0. p^0 = 1. 1 | m.
+              -- v_p(m) = 0. p^0 = 1. 1 | m. With power opaque, the
+              -- kernel won't reduce `power(0, prime)` to 1 — bridge
+              -- explicitly via power_zero so the transport's argument
+              -- has the expected `divides(power(0, prime), m)` shape.
               Equality.transport_proposition(
                   function (v : Natural) =>
                       Natural.divides(Natural.power(v, prime), m),
@@ -815,7 +825,9 @@ theorem Natural.padic_valuation_power_divides
                   Equality.symmetry(
                       Natural.padic_valuation_when_not_divides(
                           prime, m, notDivM)),
-                  Natural.one_divides(m))
+                  rewrite(
+                      Equality.symmetry(Natural.power_zero(prime)),
+                      Natural.one_divides(m)))
         })
 
 -- p^j | p^k when j ≤ k. From j ≤ k get a witness r with k = j + r;
@@ -869,8 +881,7 @@ theorem Natural.power_divides_implies_padic_valuation_ge
                n,
                -- p | p^succ(predK) — witness power(predK, p).
                (witness Natural.power(predK, prime) with
-                   reflexivity(Natural,
-                       Natural.power(successor(predK), prime))),
+                   Natural.power_succ(predK, prime)),
                succPDivides);
       let ⟨q, nEqPrimeQ⟩ := pDividesN;
       -- For q = 0 case: n = 0, contradicts n ≥ 1.
@@ -1404,23 +1415,25 @@ theorem Natural.power_monotone_via_r
           a, a + 0,
           Equality.symmetry(Natural.add_zero(a)),
           LessOrEqual.reflexivity(Natural.power(a, p)))
-  | successor(r') =>
-      -- power(a + succ(r'), p) = power(succ(a + r'), p) = p * power(a + r', p)
-      -- by definition.
+  | successor(r') => {
       -- IH: power(a, p) ≤ power(a + r', p).
-      -- power(a + r', p) ≤ p * power(a + r', p) by le_multiply_when_factor_at_least_one.
-      -- Combine.
-      Equality.transport_proposition(
-          function (m : Natural) => Natural.power(a, p) ≤ Natural.power(m, p),
-          successor(a + r'), a + successor(r'),
-          Equality.symmetry(Natural.add_successor(a, r')),
-          LessOrEqual.transitive(
-              Natural.power(a, p),
-              Natural.power(a + r', p),
-              p * Natural.power(a + r', p),
-              Natural.le_multiply_when_factor_at_least_one(
-                  Natural.power(a + r', p), p, pPositive),
-              Natural.power_monotone_via_r(a, p, pPositive, r')))
+      -- le_multiply… gives power(a + r', p) ≤ p * power(a + r', p).
+      -- By transitivity, power(a, p) ≤ p * power(a + r', p).
+      -- power_succ rewrites this to power(succ(a + r'), p);
+      -- add_successor rewrites the indexed `m` to `a + succ(r')`.
+      claim chained : Natural.power(a, p) ≤ p * Natural.power(a + r', p)
+        by LessOrEqual.transitive(
+               Natural.power(a, p),
+               Natural.power(a + r', p),
+               p * Natural.power(a + r', p),
+               Natural.le_multiply_when_factor_at_least_one(
+                   Natural.power(a + r', p), p, pPositive),
+               Natural.power_monotone_via_r(a, p, pPositive, r'));
+      claim Natural.power(a, p) ≤ Natural.power(successor(a + r'), p)
+        by substituting Natural.power_succ(a + r', p)
+      claim Natural.power(a, p) ≤ Natural.power(a + successor(r'), p)
+        by substituting Natural.add_successor(a, r')
+  }
 
 -- Power monotonicity: a ≤ b implies power(a, p) ≤ power(b, p).
 theorem Natural.power_monotone
