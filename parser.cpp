@@ -1688,6 +1688,9 @@ private:
             || current.kind == TokenKind::KeywordByInduction) {
             return parseByCasesOrInduction();
         }
+        if (current.kind == TokenKind::KeywordByStrongInduction) {
+            return parseByStrongInduction();
+        }
         if (current.kind == TokenKind::LeftBrace) {
             // `{ let pat := v; ...; final_expr }` as an expression.
             // Same shape as the theorem-body block form; useful inside
@@ -2223,6 +2226,45 @@ private:
             std::move(scrutinee), std::move(clauses),
             /*equalityHypothesisName=*/std::string(),
             std::move(refiningNames),
+            byToken.line, byToken.column);
+    }
+
+    // `by_strong_induction on E with subject, ih { body }` —
+    // single-step strong induction. Same surface shape as the
+    // explicit `by_induction on E using L with subject, ih { body }`
+    // but with the induction lemma resolved at elaboration time as
+    // `<CarrierTypeName>.strong_induction`.
+    SurfaceExpressionPointer parseByStrongInduction() {
+        Token byToken = consumeAny();  // 'by_strong_induction'
+        expect(TokenKind::KeywordOn,
+               "after 'by_strong_induction'");
+        SurfaceExpressionPointer scrutinee = parseExpression();
+        expect(TokenKind::KeywordWith,
+               "after 'by_strong_induction on <expr>'");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere(
+                "expected the subject name after 'with'");
+        }
+        std::string subjectName = consumeAny().lexeme;
+        expect(TokenKind::Comma,
+               "between subject name and ih name in "
+               "by_strong_induction");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere(
+                "expected the induction hypothesis name "
+                "after ','");
+        }
+        std::string ihName = consumeAny().lexeme;
+        expect(TokenKind::LeftBrace,
+               "after 'by_strong_induction on … with <subject>, <ih>'");
+        SurfaceExpressionPointer body = parseBlockContents();
+        expect(TokenKind::RightBrace,
+               "ending by_strong_induction block");
+        return makeSurfaceByStrongInduction(
+            std::move(scrutinee),
+            std::move(subjectName),
+            std::move(ihName),
+            std::move(body),
             byToken.line, byToken.column);
     }
 

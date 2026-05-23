@@ -3860,7 +3860,73 @@ private:
                 *choose, localBinders, expectedType,
                 expression.line, expression.column);
         }
+        if (auto* strongInduction =
+                std::get_if<SurfaceByStrongInduction>(&expression.node)) {
+            return elaborateByStrongInduction(
+                *strongInduction, localBinders, expectedType,
+                expression.line, expression.column);
+        }
         throw ElaborateError("unhandled surface expression variant");
+    }
+
+    // `by_strong_induction on E with subject, ih { body }` —
+    // single-step strong induction. Extract the scrutinee's carrier
+    // type, build `<CarrierTypeName>.strong_induction` as the
+    // induction lemma, and dispatch to elaborateByInductionUsing.
+    //
+    // Carrier extraction: WHNF the scrutinee's type, peel
+    // Application heads, expect a Constant at the spine. The
+    // strong-induction lemma must live in the module that defines
+    // the type and be named `<TypeName>.strong_induction`.
+    ExpressionPointer elaborateByStrongInduction(
+        const SurfaceByStrongInduction& form,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "by_strong_induction at line " + std::to_string(line));
+        // First-pass scrutinee elaboration just to learn the type.
+        // elaborateByInductionUsing will re-elaborate.
+        ExpressionPointer scrutineeKernel = elaborateExpression(
+            *form.scrutinee, localBinders);
+        ExpressionPointer scrutineeTypeOpened = inferTypeInLocalContext(
+            localBinders, scrutineeKernel);
+        ExpressionPointer scrutineeTypeWhnf = weakHeadNormalForm(
+            environment_, scrutineeTypeOpened);
+        // Peel Application heads to find the spine constant.
+        ExpressionPointer spineHead = scrutineeTypeWhnf;
+        while (auto* app = std::get_if<Application>(&spineHead->node)) {
+            spineHead = app->function;
+        }
+        auto* headConstant = std::get_if<Constant>(&spineHead->node);
+        if (!headConstant) {
+            throwElaborate(
+                "by_strong_induction: scrutinee's type has no "
+                "named carrier (head must be a constant like "
+                "`Natural` or `Integer`)");
+        }
+        std::string lemmaName =
+            headConstant->name + ".strong_induction";
+        if (!environment_.lookup(lemmaName)) {
+            throwElaborate(
+                "by_strong_induction: no `" + lemmaName
+                + "` in scope (expected the strong-induction "
+                  "principle for carrier `" + headConstant->name
+                + "` to be defined under that name; import the "
+                  "module that provides it)");
+        }
+        // Build a SurfaceByInductionUsing wrapping the resolved
+        // lemma name, then dispatch to existing logic.
+        SurfaceExpressionPointer lemmaSurface = makeSurfaceIdentifier(
+            std::move(lemmaName), {}, line, column);
+        SurfaceByInductionUsing wrapped{
+            form.scrutinee,
+            std::move(lemmaSurface),
+            form.subjectName,
+            form.ihName,
+            form.body};
+        return elaborateByInductionUsing(
+            wrapped, localBinders, expectedType, line, column);
     }
 
     // `choose <name> such that <predicate>;` — Exists-elim via scope

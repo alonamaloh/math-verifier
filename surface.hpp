@@ -291,6 +291,22 @@ struct SurfaceGiven {
     SurfaceExpressionPointer proposition;
 };
 
+// `by_strong_induction on <scrutinee> with <subject>, <ih> { body }`
+// — single-step strong induction. The elaborator looks up
+// `<CarrierType>.strong_induction` (where CarrierType is the head
+// of the scrutinee's type) and uses it as the induction lemma.
+// IH binder type is `(k : T) → succ(k) ≤ subject → P(k)` (or
+// whatever the strong-induction lemma's step signature dictates).
+// Body is a single expression proving the conclusion, NOT case-
+// clauses (use the existing `by_induction on E with IH { case … }`
+// for Peano-style case-split).
+struct SurfaceByStrongInduction {
+    SurfaceExpressionPointer scrutinee;
+    std::string subjectName;
+    std::string ihName;
+    SurfaceExpressionPointer body;
+};
+
 // `choose <name> such that <predicate>;` — Exists-elimination via
 // scope lookup. At elaboration:
 //   1. Scan local binders last-first for a hypothesis whose type
@@ -338,7 +354,8 @@ struct SurfaceExpression {
         SurfaceBinaryOperation, SurfaceUnaryOperation,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer, SurfaceSorry,
         SurfaceRing, SurfaceField, SurfaceCalc, SurfaceByInductionUsing,
-        SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose
+        SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
+        SurfaceByStrongInduction
     > node;
     int line = 0;
     int column = 0;
@@ -574,6 +591,20 @@ inline SurfaceExpressionPointer makeSurfaceChoose(
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceChoose{std::move(name), std::move(predicate),
                        std::move(body)},
+        line, column});
+}
+
+inline SurfaceExpressionPointer makeSurfaceByStrongInduction(
+    SurfaceExpressionPointer scrutinee,
+    std::string subjectName,
+    std::string ihName,
+    SurfaceExpressionPointer body,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceByStrongInduction{std::move(scrutinee),
+                                  std::move(subjectName),
+                                  std::move(ihName),
+                                  std::move(body)},
         line, column});
 }
 
