@@ -21,6 +21,7 @@ bool isContextualKeyword(TokenKind kind) {
         case TokenKind::KeywordClaim:
         case TokenKind::KeywordObtain:
         case TokenKind::KeywordSuppose:
+        case TokenKind::KeywordChoose:
         case TokenKind::KeywordSet:
         case TokenKind::KeywordSuffices:
         case TokenKind::KeywordFrom:
@@ -637,21 +638,23 @@ private:
     // Used both by parseBlockBody and recursively by the `suffices`
     // continuation.
     SurfaceExpressionPointer parseBlockContents() {
-        // A leading block statement always wraps the block's tail. Three
+        // A leading block statement always wraps the block's tail. Four
         // forms share the same fold:
         //   `let n : T := V;` / `claim n : T [by V | { proof } | ];`
         //   `let ⟨pat⟩ := V;` / `obtain ⟨pat⟩ from V;`  (destructure)
         //   `suppose P as h;`                            (introduce hypothesis)
+        //   `choose n such that P(n);`                   (Exists-elim w/ lookup)
         // Folded back-to-front around the final expression: pattern-let
         // and obtain produce a `cases` clause, plain let / claim a
-        // `SurfaceLet`, and suppose a `SurfaceLambda`.
+        // `SurfaceLet`, suppose a `SurfaceLambda`, and choose a
+        // `SurfaceChoose` (the elaborator handles the scope lookup).
         struct BlockWrapper {
-            enum Kind { TypedLet, PatternLet, Suppose, Set };
+            enum Kind { TypedLet, PatternLet, Suppose, Choose, Set };
             Kind kind = TypedLet;
             SurfacePatternPointer pattern;     // PatternLet
-            std::string name;                  // TypedLet, Suppose, Set
+            std::string name;                  // TypedLet, Suppose, Choose, Set
             SurfaceExpressionPointer type;     // TypedLet, Suppose
-            SurfaceExpressionPointer value;    // TypedLet, PatternLet, Set
+            SurfaceExpressionPointer value;    // TypedLet, PatternLet, Choose, Set
             int line = 0;
             int column = 0;
         };
@@ -665,6 +668,7 @@ private:
                || peek().kind == TokenKind::KeywordClaim
                || peek().kind == TokenKind::KeywordObtain
                || peek().kind == TokenKind::KeywordSuppose
+               || peek().kind == TokenKind::KeywordChoose
                || peek().kind == TokenKind::KeywordSet
                || peek().kind == TokenKind::KeywordCalc) {
             // `calc` at statement position has two shapes:
@@ -790,6 +794,8 @@ private:
                 statementToken.kind == TokenKind::KeywordObtain;
             bool isSuppose =
                 statementToken.kind == TokenKind::KeywordSuppose;
+            bool isChoose =
+                statementToken.kind == TokenKind::KeywordChoose;
             bool isSet =
                 statementToken.kind == TokenKind::KeywordSet;
             BlockWrapper wrapper;
@@ -816,6 +822,31 @@ private:
                 }
                 Token nameToken = consumeAny();
                 wrapper.name = nameToken.lexeme;
+            } else if (isChoose) {
+                wrapper.kind = BlockWrapper::Choose;
+                if (!isIdentifierLike(peek().kind)) {
+                    throwHere(
+                        "expected identifier after 'choose'");
+                }
+                Token nameToken = consumeAny();
+                wrapper.name = nameToken.lexeme;
+                // `such` and `that` are ordinary identifiers
+                // everywhere except in this slot — text-match here
+                // so they remain usable as variable names elsewhere.
+                if (peek().kind != TokenKind::Identifier
+                    || peek().lexeme != "such") {
+                    throwHere(
+                        "expected 'such' after choose name "
+                        "(choose n such that P(n);)");
+                }
+                consumeAny();
+                if (peek().kind != TokenKind::Identifier
+                    || peek().lexeme != "that") {
+                    throwHere(
+                        "expected 'that' after 'such' in choose");
+                }
+                consumeAny();
+                wrapper.value = parseExpression();
             } else if (isObtain) {
                 wrapper.kind = BlockWrapper::PatternLet;
                 wrapper.pattern = parsePattern();
@@ -871,6 +902,7 @@ private:
                 isClaim  ? "ending claim statement"
               : isObtain ? "ending obtain statement"
               : isSuppose ? "ending suppose statement"
+              : isChoose ? "ending choose statement"
               : isSet    ? "ending set statement"
                          : "ending let statement in block body";
             expect(TokenKind::Semicolon, terminator);
@@ -970,6 +1002,14 @@ private:
                     binder.isImplicit = false;
                     result = makeSurfaceLambda(
                         std::move(binder),
+                        std::move(result),
+                        iterator->line, iterator->column);
+                    break;
+                }
+                case BlockWrapper::Choose: {
+                    result = makeSurfaceChoose(
+                        std::move(iterator->name),
+                        std::move(iterator->value),
                         std::move(result),
                         iterator->line, iterator->column);
                     break;

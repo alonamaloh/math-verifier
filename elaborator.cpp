@@ -3854,7 +3854,90 @@ private:
                 *given, localBinders,
                 expression.line, expression.column);
         }
+        if (auto* choose =
+                std::get_if<SurfaceChoose>(&expression.node)) {
+            return elaborateChoose(
+                *choose, localBinders, expectedType,
+                expression.line, expression.column);
+        }
         throw ElaborateError("unhandled surface expression variant");
+    }
+
+    // `choose <name> such that <predicate>;` — Exists-elim via scope
+    // lookup. Scans local binders last-first for a hypothesis whose
+    // type WHNFs to `Exists(T, motive)`; the most-recent match wins.
+    // Desugars to a `cases ⟨<name>, _choice_pred_…⟩ => <body>` over
+    // that hypothesis.
+    //
+    // v1: the user's predicate is documentation, not a search key —
+    // if the most-recent Exists doesn't match what the user intended,
+    // the body will fail to elaborate when it tries to use the
+    // destructured predicate hypothesis. Predicate-shape filtering
+    // is a planned follow-up.
+    ExpressionPointer elaborateChoose(
+        const SurfaceChoose& choose,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "choose " + choose.name + " at line "
+            + std::to_string(line));
+        int N = static_cast<int>(localBinders.size());
+        int matchedIndex = -1;
+        for (int b = N - 1; b >= 0; --b) {
+            int lift = N - b;
+            ExpressionPointer binderTypeInScope =
+                liftBoundVariables(localBinders[b].type, lift, 0);
+            ExpressionPointer binderTypeOpen = openOverLocalBinders(
+                binderTypeInScope, localBinders, N);
+            ExpressionPointer whnf = weakHeadNormalForm(
+                environment_, binderTypeOpen);
+            // Exists(T, motive) is App(App(Const "Exists"), T, motive).
+            auto* outerApp = std::get_if<Application>(&whnf->node);
+            if (!outerApp) continue;
+            auto* innerApp = std::get_if<Application>(
+                &outerApp->function->node);
+            if (!innerApp) continue;
+            auto* head = std::get_if<Constant>(
+                &innerApp->function->node);
+            if (!head || head->name != "Exists") continue;
+            matchedIndex = b;
+            break;
+        }
+        if (matchedIndex == -1) {
+            throwElaborate(
+                "choose " + choose.name + " such that <pred>: "
+                "no in-scope hypothesis has type Exists(_, _). "
+                "Prepend `claim Exists(...) by …;` to bring one "
+                "into scope, or use `obtain ⟨…⟩ from …;` with an "
+                "explicit source.");
+        }
+        // Build a SurfaceCases destructuring the matched hypothesis.
+        SurfaceExpressionPointer scrutinee = makeSurfaceIdentifier(
+            localBinders[matchedIndex].name, {}, line, column);
+        std::string predHypName =
+            "_choice_pred_" + std::to_string(line) + "_"
+            + std::to_string(column);
+        std::vector<SurfacePatternPointer> patternComponents;
+        patternComponents.push_back(
+            makeSurfacePatternBareName(
+                choose.name, line, column));
+        patternComponents.push_back(
+            makeSurfacePatternBareName(
+                std::move(predHypName), line, column));
+        SurfacePatternPointer tuplePattern = makeSurfacePatternTuple(
+            std::move(patternComponents), line, column);
+        SurfaceCasesClause clause;
+        clause.pattern = std::move(tuplePattern);
+        clause.body = choose.body;
+        clause.line = line;
+        clause.column = column;
+        std::vector<SurfaceCasesClause> clauses;
+        clauses.push_back(std::move(clause));
+        SurfaceExpressionPointer casesExpression = makeSurfaceCases(
+            std::move(scrutinee), std::move(clauses), line, column);
+        return elaborateExpression(
+            *casesExpression, localBinders, expectedType);
     }
 
     // `by_induction on E using L with subject, ih { body }`:

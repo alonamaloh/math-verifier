@@ -38,6 +38,7 @@ enum class TokenKind {
     KeywordContradiction,   // `contradiction` — close goal from P / ¬P
     KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
     KeywordSuppose,         // `suppose P as h;` — introduce hypothesis as a step
+    KeywordChoose,          // `choose N such that P(N);` — Exists-elim via scope lookup
     KeywordFrom,            // separator for `obtain ⟨…⟩ from E;`
     KeywordSet,             // `set n := E;` — transparent local definition
     KeywordSorry,           // `sorry` — placeholder for an unwritten proof

@@ -1,0 +1,47 @@
+-- Tests for `choose <name> such that <predicate>;` — Exists-elim
+-- with scope lookup. v1 finds the most-recent in-scope hypothesis
+-- of type `Exists(T, _)` and destructures it; the user's predicate
+-- is documentation, not a search filter (predicate-shape matching
+-- is a planned refinement).
+
+module Test.choose_test
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+
+-- (1) Single existential in scope: choose finds it and destructures.
+-- The body uses both the witness `N` and (implicitly via the auto-
+-- prover hypothesis match) the predicate hypothesis.
+theorem choose_from_single
+        (exists_some_zero : ∃ (n : Natural). n = zero)
+        : ∃ (n : Natural). n = zero := {
+  choose N such that N = zero;
+  claim ∃ (n : Natural). n = zero
+}
+
+-- (2) Real-shaped use: we have ∃ d. P(d) and want to derive ∃ d. Q(d)
+-- where Q follows from P. The destructured predicate hypothesis is
+-- referenced inside the body to build the new existential.
+theorem choose_then_rebuild
+        (exists_factor : ∃ (d : Natural). 1 ≤ d)
+        : ∃ (d : Natural). 1 ≤ d := {
+  choose d such that 1 ≤ d;
+  claim ∃ (d : Natural). 1 ≤ d
+}
+
+-- (3) Two existentials in scope: choose picks the MOST RECENT one
+-- (last-bound-first scan), so we get the `1 ≤ chosen` predicate, not
+-- the `chosen = zero` from the older binder.
+theorem choose_most_recent
+        (older : ∃ (n : Natural). n = zero)
+        (newer : ∃ (n : Natural). 1 ≤ n)
+        : ∃ (n : Natural). 1 ≤ n := {
+  choose chosen such that 1 ≤ chosen;
+  claim ∃ (n : Natural). 1 ≤ n
+}

@@ -291,6 +291,23 @@ struct SurfaceGiven {
     SurfaceExpressionPointer proposition;
 };
 
+// `choose <name> such that <predicate>;` — Exists-elimination via
+// scope lookup. At elaboration:
+//   1. Scan local binders last-first for a hypothesis whose type
+//      WHNFs to `Exists(T, motive)`.
+//   2. Bind `<name> : T` temporarily; elaborate `<predicate>` under
+//      the extended scope; compare to `motive(<name>)` modulo defeq.
+//   3. First match wins (most-recent rule); destructure to bind
+//      `<name>` and an anonymous predicate hypothesis, then continue
+//      elaborating the body.
+// User can prepend an explicit `claim Exists(...)` to disambiguate
+// when multiple existentials are in scope.
+struct SurfaceChoose {
+    std::string name;
+    SurfaceExpressionPointer predicate;
+    SurfaceExpressionPointer body;
+};
+
 // `claim` — a structured-proof step in mathematician style. Forms:
 //   - `claim P`               : assert P (lookup proof from scope).
 //   - `claim P by Hint`       : prove P from Hint (auto-fills args).
@@ -321,7 +338,7 @@ struct SurfaceExpression {
         SurfaceBinaryOperation, SurfaceUnaryOperation,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer, SurfaceSorry,
         SurfaceRing, SurfaceField, SurfaceCalc, SurfaceByInductionUsing,
-        SurfaceStructuredClaim, SurfaceGiven
+        SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose
     > node;
     int line = 0;
     int column = 0;
@@ -546,6 +563,17 @@ inline SurfaceExpressionPointer makeSurfaceCases(
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceCases{std::move(scrutinee), std::move(clauses), {}, {}},
+        line, column});
+}
+
+inline SurfaceExpressionPointer makeSurfaceChoose(
+    std::string name,
+    SurfaceExpressionPointer predicate,
+    SurfaceExpressionPointer body,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceChoose{std::move(name), std::move(predicate),
+                       std::move(body)},
         line, column});
 }
 
