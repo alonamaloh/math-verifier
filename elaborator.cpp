@@ -4411,21 +4411,27 @@ private:
         return makeBoundVariable(N - 1 - matchIndex);
     }
 
-    // One-step transitivity bridge: if the goal is `H(a, c)` and
-    // `<H>.transitive` exists in scope, walk hypothesis pairs for
-    // h1 : H(a, b), h2 : H(b, c) and apply the transitive lemma.
-    // Tries both hypothesis-arg orderings to accommodate carriers
-    // whose transitive signature is `(b ≤ c) → (a ≤ b) → a ≤ c`
-    // (Natural) vs `(a ≤ b) → (b ≤ c) → a ≤ c` (Integer, Rational,
-    // Real). Linear search over hypothesis pairs (last-bound first);
-    // first match wins. Returns nullptr on no match.
+    // Transitivity bridge: if the goal is `H(a, c)` and
+    // `<H>.transitive` exists in scope, perform a bounded BFS over
+    // hypotheses of type `H(_, _)` to find a chain a → m1 → … → c,
+    // then fold the chain into nested transitive applications.
+    //
+    // Pattern matching is STRUCTURAL (no WHNF on goal or hypothesis
+    // types) — δ-reducing definitions like `Integer.LessOrEqual`
+    // would unfold the named head and we'd lose `<head>.transitive`'s
+    // lookup. `isDefinitionallyEqual` on individual subterms still
+    // sees through reduction when comparing midpoints / endpoints.
+    //
+    // Each transitive call tries both hypothesis-arg orderings since
+    // carriers differ in their transitive signature
+    // (Natural's lemma takes `(b ≤ c) → (a ≤ b) → a ≤ c` while
+    // Integer/Rational/Real's takes `(a ≤ b) → (b ≤ c) → a ≤ c`).
+    //
+    // BFS bounded by MAX_DEPTH (typical path lengths are 1–3).
     ExpressionPointer tryTransitivityBridge(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
         int /*line*/) {
-        // Decompose goal STRUCTURALLY (no WHNF) — δ-reducing
-        // definitions like `Integer.LessOrEqual` would unfold the
-        // named head and we'd lose `<head>.transitive`'s lookup.
         ExpressionPointer goalOpened = openOverLocalBinders(
             goalClosed, localBinders, localBinders.size());
         auto* outerApp = std::get_if<Application>(&goalOpened->node);
@@ -4442,109 +4448,145 @@ private:
         int N = static_cast<int>(localBinders.size());
         Context openedContext =
             buildContextFromLocalBinders(localBinders);
-        // Walk hypothesis pairs (no WHNF on hypothesis types — same
-        // unfolding concern as the goal).
-        for (int b1Idx = N - 1; b1Idx >= 0; --b1Idx) {
-            int lift1 = N - b1Idx;
-            ExpressionPointer h1TypeOpened = openOverLocalBinders(
+
+        // Collect hypothesis edges: (source, target, binderIdx) for
+        // each local binder of type `head(_, _)`.
+        struct HypEdge {
+            ExpressionPointer source;
+            ExpressionPointer target;
+            int binderIdx;
+        };
+        std::vector<HypEdge> edges;
+        for (int b = N - 1; b >= 0; --b) {
+            int lift = N - b;
+            ExpressionPointer hTypeOpened = openOverLocalBinders(
                 liftBoundVariables(
-                    localBinders[b1Idx].type, lift1, 0),
+                    localBinders[b].type, lift, 0),
                 localBinders, N);
-            auto* h1Outer = std::get_if<Application>(
-                &h1TypeOpened->node);
-            if (!h1Outer) continue;
-            auto* h1Inner = std::get_if<Application>(
-                &h1Outer->function->node);
-            if (!h1Inner) continue;
-            auto* h1Head = std::get_if<Constant>(
-                &h1Inner->function->node);
-            if (!h1Head || h1Head->name != head->name) continue;
-            ExpressionPointer h1A = h1Inner->argument;
-            ExpressionPointer h1B = h1Outer->argument;
-            bool h1IsAB = isDefinitionallyEqual(
-                environment_, openedContext, h1A, goalAOpened);
-            bool h1IsBC = isDefinitionallyEqual(
-                environment_, openedContext, h1B, goalCOpened);
-            if (!h1IsAB && !h1IsBC) continue;
-            for (int b2Idx = N - 1; b2Idx >= 0; --b2Idx) {
-                if (b2Idx == b1Idx) continue;
-                int lift2 = N - b2Idx;
-                ExpressionPointer h2TypeOpened = openOverLocalBinders(
-                    liftBoundVariables(
-                        localBinders[b2Idx].type, lift2, 0),
-                    localBinders, N);
-                auto* h2Outer = std::get_if<Application>(
-                    &h2TypeOpened->node);
-                if (!h2Outer) continue;
-                auto* h2Inner = std::get_if<Application>(
-                    &h2Outer->function->node);
-                if (!h2Inner) continue;
-                auto* h2Head = std::get_if<Constant>(
-                    &h2Inner->function->node);
-                if (!h2Head
-                    || h2Head->name != head->name) continue;
-                ExpressionPointer h2A = h2Inner->argument;
-                ExpressionPointer h2B = h2Outer->argument;
-                // Pattern: h1 : H(a, mid), h2 : H(mid, c).
-                if (h1IsAB
-                    && isDefinitionallyEqual(
-                           environment_, openedContext, h2A, h1B)
-                    && isDefinitionallyEqual(
-                           environment_, openedContext, h2B,
-                           goalCOpened)) {
-                    ExpressionPointer attempt = buildTransitiveCall(
-                        transitiveName, goalClosed,
-                        h1B, b1Idx, b2Idx, localBinders);
-                    if (attempt) return attempt;
-                }
-                // Pattern: h1 : H(mid, c), h2 : H(a, mid).
-                if (h1IsBC
-                    && isDefinitionallyEqual(
-                           environment_, openedContext, h2B, h1A)
-                    && isDefinitionallyEqual(
-                           environment_, openedContext, h2A,
-                           goalAOpened)) {
-                    ExpressionPointer attempt = buildTransitiveCall(
-                        transitiveName, goalClosed,
-                        h1A, b2Idx, b1Idx, localBinders);
-                    if (attempt) return attempt;
+            auto* hOuter = std::get_if<Application>(
+                &hTypeOpened->node);
+            if (!hOuter) continue;
+            auto* hInner = std::get_if<Application>(
+                &hOuter->function->node);
+            if (!hInner) continue;
+            auto* hHead = std::get_if<Constant>(
+                &hInner->function->node);
+            if (!hHead || hHead->name != head->name) continue;
+            edges.push_back(
+                {hInner->argument, hOuter->argument, b});
+        }
+        if (edges.empty()) return nullptr;
+
+        // BFS from goalA, target goalC.
+        std::vector<ExpressionPointer> reached;
+        std::vector<int> reachedEdge;
+        std::vector<int> reachedPred;
+        reached.push_back(goalAOpened);
+        reachedEdge.push_back(-1);
+        reachedPred.push_back(-1);
+        int targetReachedIdx = -1;
+        constexpr int MAX_DEPTH = 8;
+        int frontierStart = 0;
+        int frontierEnd = 1;
+        for (int depth = 0;
+             targetReachedIdx == -1 && depth < MAX_DEPTH;
+             ++depth) {
+            for (int i = frontierStart;
+                 i < frontierEnd && targetReachedIdx == -1;
+                 ++i) {
+                ExpressionPointer current = reached[i];
+                for (size_t e = 0; e < edges.size(); ++e) {
+                    if (!isDefinitionallyEqual(
+                            environment_, openedContext,
+                            edges[e].source, current)) continue;
+                    ExpressionPointer target = edges[e].target;
+                    bool already = false;
+                    for (auto& r : reached) {
+                        if (isDefinitionallyEqual(
+                                environment_, openedContext,
+                                r, target)) {
+                            already = true;
+                            break;
+                        }
+                    }
+                    if (already) continue;
+                    reached.push_back(target);
+                    reachedEdge.push_back(
+                        static_cast<int>(e));
+                    reachedPred.push_back(i);
+                    if (isDefinitionallyEqual(
+                            environment_, openedContext,
+                            target, goalCOpened)) {
+                        targetReachedIdx =
+                            static_cast<int>(reached.size()) - 1;
+                        break;
+                    }
                 }
             }
+            frontierStart = frontierEnd;
+            frontierEnd = static_cast<int>(reached.size());
+            if (frontierStart == frontierEnd) break;
         }
-        return nullptr;
+        if (targetReachedIdx == -1) return nullptr;
+
+        // Reconstruct path: list of edge indices from source to target.
+        std::vector<int> pathEdges;
+        {
+            int idx = targetReachedIdx;
+            while (idx > 0) {
+                pathEdges.push_back(reachedEdge[idx]);
+                idx = reachedPred[idx];
+            }
+            std::reverse(pathEdges.begin(), pathEdges.end());
+        }
+        if (pathEdges.empty()) return nullptr;
+
+        // Single-edge path: the hypothesis IS the proof.
+        if (pathEdges.size() == 1) {
+            return makeBoundVariable(
+                N - 1 - edges[pathEdges[0]].binderIdx);
+        }
+
+        // Multi-edge path: fold transitive applications. accumulator
+        // accProof : H(goalA, accTarget) starts with the first edge.
+        ExpressionPointer accProof = makeBoundVariable(
+            N - 1 - edges[pathEdges[0]].binderIdx);
+        ExpressionPointer accTarget = edges[pathEdges[0]].target;
+        for (size_t i = 1; i < pathEdges.size(); ++i) {
+            const HypEdge& nextEdge = edges[pathEdges[i]];
+            ExpressionPointer nextProof = makeBoundVariable(
+                N - 1 - nextEdge.binderIdx);
+            ExpressionPointer combined = buildTransitiveCall(
+                transitiveName,
+                goalAOpened, accTarget, nextEdge.target,
+                accProof, nextProof, localBinders);
+            if (!combined) return nullptr;
+            accProof = combined;
+            accTarget = nextEdge.target;
+        }
+        return accProof;
     }
 
-    // Build `<transitiveName>(a, b, c, h_ab, h_bc)` (closed-form
-    // term) and check its type matches `goalClosed`. Tries both
-    // hypothesis-arg orderings since carriers differ in their
-    // transitive signature.
+    // Build `<transitiveName>(a, b, c, hAB, hBC)` (closed-form term)
+    // with given a/b/c (opened) and hypothesis proofs (closed-form
+    // terms in the current scope). Tries both hypothesis-arg
+    // orderings since carriers differ in transitive signature.
+    // Returns the first ordering that typechecks; nullptr if neither.
     ExpressionPointer buildTransitiveCall(
         const std::string& transitiveName,
-        ExpressionPointer goalClosed,
-        ExpressionPointer midpointOpened,
-        int abBinderIdx, int bcBinderIdx,
+        ExpressionPointer aOpened,
+        ExpressionPointer bOpened,
+        ExpressionPointer cOpened,
+        ExpressionPointer hAB,
+        ExpressionPointer hBC,
         const std::vector<LocalBinder>& localBinders) {
         int N = static_cast<int>(localBinders.size());
-        // Recover goal's a and c (no WHNF — caller matched the
-        // unreduced form to find the named head).
-        ExpressionPointer goalOpened = openOverLocalBinders(
-            goalClosed, localBinders, N);
-        auto* outerApp = std::get_if<Application>(&goalOpened->node);
-        auto* innerApp = std::get_if<Application>(
-            &outerApp->function->node);
-        ExpressionPointer aOpened = innerApp->argument;
-        ExpressionPointer cOpened = outerApp->argument;
         ExpressionPointer aClosed = closeOverLocalBinders(
             aOpened, localBinders, N);
         ExpressionPointer bClosed = closeOverLocalBinders(
-            midpointOpened, localBinders, N);
+            bOpened, localBinders, N);
         ExpressionPointer cClosed = closeOverLocalBinders(
             cOpened, localBinders, N);
-        ExpressionPointer hAB = makeBoundVariable(
-            N - 1 - abBinderIdx);
-        ExpressionPointer hBC = makeBoundVariable(
-            N - 1 - bcBinderIdx);
-        Context ctx = buildContextFromLocalBinders(localBinders);
         for (int order = 0; order < 2; ++order) {
             ExpressionPointer call = makeConstant(
                 transitiveName, {});
@@ -4558,15 +4600,12 @@ private:
                 call = makeApplication(call, hBC);
                 call = makeApplication(call, hAB);
             }
-            ExpressionPointer callType;
             try {
-                callType = inferTypeInLocalContext(
+                (void)inferTypeInLocalContext(
                     localBinders, call);
+                return call;
             } catch (const TypeError&) { continue; }
               catch (const ElaborateError&) { continue; }
-            if (isSubtype(environment_, ctx, callType, goalOpened)) {
-                return call;
-            }
         }
         return nullptr;
     }
