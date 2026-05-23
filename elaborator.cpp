@@ -5664,9 +5664,87 @@ private:
         }
         ExpressionPointer termTypeClosed = closeOverLocalBinders(
             termTypeOpened, localBinders, localBinders.size());
+        // Try the diff-wrap first (equality coercion via
+        // Equality.congruence).
         ExpressionPointer wrapped = tryDiffWrapForEqualityGoal(
             localBinders, term, termTypeClosed, expectedTypeClosed);
-        return wrapped ? wrapped : term;
+        if (wrapped) return wrapped;
+        // Classical LEM bridge: if term : ¬¬P and expected : P, wrap
+        // with Logic.double_negation_eliminate. Lets `suppose ¬P as h;
+        // …; claim False` at theorem body close a goal stated as P,
+        // mirroring textbook reductio ad absurdum.
+        wrapped = tryDoubleNegationElimination(
+            localBinders, term, termTypeClosed, expectedTypeClosed);
+        if (wrapped) return wrapped;
+        return term;
+    }
+
+    // Classical LEM bridge — when `term : Not(Not(P))` and the goal
+    // is `P`, wraps with `Logic.double_negation_eliminate(P, term)`.
+    // Returns nullptr if the term's type isn't Not(Not(_)), if the
+    // inner proposition doesn't match `expectedTypeClosed`, or if
+    // `Logic.double_negation_eliminate` isn't in scope.
+    //
+    // `Not(X)` unfolds to `X → False` (definition in Logic.basics);
+    // we WHNF on each layer so the structural match works whether
+    // the term's type is spelled `Not(Not(P))` or `(P → False) →
+    // False`.
+    ExpressionPointer tryDoubleNegationElimination(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term,
+        ExpressionPointer termTypeClosed,
+        ExpressionPointer expectedTypeClosed) {
+        if (!environment_.lookup(
+                "Logic.double_negation_eliminate")) {
+            return nullptr;
+        }
+        ExpressionPointer termTypeOpened = openOverLocalBinders(
+            termTypeClosed, localBinders, localBinders.size());
+        ExpressionPointer outerWhnf = weakHeadNormalForm(
+            environment_, termTypeOpened);
+        auto* outerPi = std::get_if<Pi>(&outerWhnf->node);
+        if (!outerPi) return nullptr;
+        // The outer Pi's codomain lives under its binder; if it
+        // mentions BoundVariable(0) it isn't a Not-shape. We check
+        // by WHNF'ing and verifying it's the constant `False` (which
+        // doesn't reference the binder).
+        ExpressionPointer outerCodomainWhnf = weakHeadNormalForm(
+            environment_, outerPi->codomain);
+        auto* outerCodomainConst = std::get_if<Constant>(
+            &outerCodomainWhnf->node);
+        if (!outerCodomainConst
+            || outerCodomainConst->name != "False") {
+            return nullptr;
+        }
+        // The inner Pi: domain of the outer is `Not(P) = P → False`.
+        ExpressionPointer innerWhnf = weakHeadNormalForm(
+            environment_, outerPi->domain);
+        auto* innerPi = std::get_if<Pi>(&innerWhnf->node);
+        if (!innerPi) return nullptr;
+        ExpressionPointer innerCodomainWhnf = weakHeadNormalForm(
+            environment_, innerPi->codomain);
+        auto* innerCodomainConst = std::get_if<Constant>(
+            &innerCodomainWhnf->node);
+        if (!innerCodomainConst
+            || innerCodomainConst->name != "False") {
+            return nullptr;
+        }
+        // Inner Pi's domain is the P we need to match. Compare
+        // against the opened expected type.
+        ExpressionPointer expectedOpened = openOverLocalBinders(
+            expectedTypeClosed, localBinders, localBinders.size());
+        Context openedContext =
+            buildContextFromLocalBinders(localBinders);
+        if (!isDefinitionallyEqual(environment_, openedContext,
+                                     innerPi->domain, expectedOpened)) {
+            return nullptr;
+        }
+        // Build the call: Logic.double_negation_eliminate(P, term).
+        ExpressionPointer call = makeConstant(
+            "Logic.double_negation_eliminate", {});
+        call = makeApplication(call, expectedTypeClosed);
+        call = makeApplication(call, term);
+        return call;
     }
 
     ExpressionPointer tryDiffWrapForEqualityGoal(
