@@ -4434,18 +4434,19 @@ private:
         return makeBoundVariable(N - 1 - matchIndex);
     }
 
-    // Contradiction: if the in-scope hypotheses contain a False
-    // (or a pair `(h : P, h' : Not(P))` that produces False via
-    // `h'(h)`), close ANY goal via `False.eliminate_proposition`.
-    // Two-pass:
-    //   1. Direct False — scan for a hypothesis already of type
-    //      `False`.
-    //   2. Pair — scan for `h : P` paired with `h' : P → False`
-    //      (i.e., `Not(P)`); build `h'(h) : False`.
-    // Tried late in dispatch — if any of the constructive strategies
-    // close the goal, prefer them. Contradiction is the "anything
-    // goes" fallback. Skipped if `False.eliminate_proposition`
-    // isn't in scope.
+    // Contradiction: if the most-recent local binder is False, or
+    // pairs with some other in-scope hypothesis to produce False
+    // via h(h') (or h'(h)), close ANY goal via
+    // `False.eliminate_proposition`.
+    //
+    // Restricted to the LAST local binder (cost 0 in the unified
+    // cost model) as one of the pair — the mathematician's
+    // convention is to write the contradictory fact as the
+    // immediately-preceding `claim` and then conclude. Avoids
+    // O(N²) pair search and the noise it would cause; the user
+    // can always write the contradiction-introducing claim before
+    // the close. Skipped if `False.eliminate_proposition` isn't
+    // in scope or no local binders exist.
     ExpressionPointer tryContradiction(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -4455,65 +4456,90 @@ private:
             return nullptr;
         }
         int N = static_cast<int>(localBinders.size());
-        Context openedContext =
-            buildContextFromLocalBinders(localBinders);
-        // Pass 1: direct False hypothesis.
-        for (int h = N - 1; h >= 0; --h) {
-            int lift = N - h;
-            ExpressionPointer hTypeOpened = openOverLocalBinders(
-                liftBoundVariables(
-                    localBinders[h].type, lift, 0),
-                localBinders, N);
+        if (N == 0) return nullptr;
+        int lastIdx = N - 1;
+        int lastLift = N - lastIdx;
+        ExpressionPointer lastTypeOpened = openOverLocalBinders(
+            liftBoundVariables(
+                localBinders[lastIdx].type, lastLift, 0),
+            localBinders, N);
+        // Pass 1: most-recent binder is itself `False`.
+        {
             auto* asConst = std::get_if<Constant>(
-                &hTypeOpened->node);
+                &lastTypeOpened->node);
             if (asConst && asConst->name == "False") {
                 ExpressionPointer call = makeConstant(
                     "False.eliminate_proposition", {});
                 call = makeApplication(call, goalClosed);
                 call = makeApplication(
-                    call, makeBoundVariable(N - 1 - h));
+                    call,
+                    makeBoundVariable(N - 1 - lastIdx));
                 return call;
             }
         }
-        // Pass 2: (h : P, h' : Not(P)) pair.
-        for (int h1 = N - 1; h1 >= 0; --h1) {
-            int lift1 = N - h1;
-            ExpressionPointer h1TypeOpened = openOverLocalBinders(
-                liftBoundVariables(
-                    localBinders[h1].type, lift1, 0),
-                localBinders, N);
-            for (int h2 = N - 1; h2 >= 0; --h2) {
-                if (h2 == h1) continue;
-                int lift2 = N - h2;
-                ExpressionPointer h2TypeOpened = openOverLocalBinders(
-                    liftBoundVariables(
-                        localBinders[h2].type, lift2, 0),
-                    localBinders, N);
-                auto* pi = std::get_if<Pi>(&h2TypeOpened->node);
-                if (!pi) continue;
-                // Codomain must be the constant `False` (and so by
-                // construction doesn't reference the Pi binder).
-                auto* codomainConst = std::get_if<Constant>(
-                    &pi->codomain->node);
-                if (!codomainConst
-                    || codomainConst->name != "False") continue;
-                if (!isDefinitionallyEqual(
-                        environment_, openedContext,
-                        pi->domain, h1TypeOpened)) continue;
-                // h2(h1) : False; wrap via eliminate_proposition.
-                ExpressionPointer h1Ref = makeBoundVariable(
-                    N - 1 - h1);
-                ExpressionPointer h2Ref = makeBoundVariable(
-                    N - 1 - h2);
-                ExpressionPointer proofOfFalse =
-                    makeApplication(h2Ref, h1Ref);
+        Context openedContext =
+            buildContextFromLocalBinders(localBinders);
+        // Pass 2: (last, other) pair where one is `Not(P)` and the
+        // other is `P`. Try BOTH orderings: last is Not(P) paired
+        // with some other = P; or last is P paired with some other
+        // = Not(P).
+        auto buildProofOfFalse =
+            [&](ExpressionPointer notHyp,
+                ExpressionPointer pHyp) -> ExpressionPointer {
                 ExpressionPointer call = makeConstant(
                     "False.eliminate_proposition", {});
                 call = makeApplication(call, goalClosed);
                 call = makeApplication(
-                    call, std::move(proofOfFalse));
+                    call, makeApplication(notHyp, pHyp));
                 return call;
+            };
+        // Case A: last : Not(P). Find some other : P.
+        if (auto* pi =
+                std::get_if<Pi>(&lastTypeOpened->node)) {
+            auto* codomainConst = std::get_if<Constant>(
+                &pi->codomain->node);
+            if (codomainConst
+                && codomainConst->name == "False") {
+                ExpressionPointer expectedP = pi->domain;
+                for (int other = N - 2; other >= 0; --other) {
+                    int lift = N - other;
+                    ExpressionPointer otherType =
+                        openOverLocalBinders(
+                            liftBoundVariables(
+                                localBinders[other].type,
+                                lift, 0),
+                            localBinders, N);
+                    if (isDefinitionallyEqual(
+                            environment_, openedContext,
+                            otherType, expectedP)) {
+                        return buildProofOfFalse(
+                            makeBoundVariable(
+                                N - 1 - lastIdx),
+                            makeBoundVariable(
+                                N - 1 - other));
+                    }
+                }
             }
+        }
+        // Case B: last : P. Find some other : Not(P).
+        for (int other = N - 2; other >= 0; --other) {
+            int lift = N - other;
+            ExpressionPointer otherType = openOverLocalBinders(
+                liftBoundVariables(
+                    localBinders[other].type, lift, 0),
+                localBinders, N);
+            auto* pi = std::get_if<Pi>(&otherType->node);
+            if (!pi) continue;
+            auto* codomainConst = std::get_if<Constant>(
+                &pi->codomain->node);
+            if (!codomainConst
+                || codomainConst->name != "False") continue;
+            if (!isDefinitionallyEqual(
+                    environment_, openedContext,
+                    pi->domain, lastTypeOpened)) continue;
+            return buildProofOfFalse(
+                makeBoundVariable(N - 1 - other),
+                makeBoundVariable(N - 1 - lastIdx));
         }
         return nullptr;
     }
@@ -4573,6 +4599,120 @@ private:
                 call = makeApplication(call, bClosed);
                 call = makeApplication(call, proofB);
                 return call;
+            }
+        }
+        return nullptr;
+    }
+
+    // Unified named-fact representation. A fact carries a proof
+    // term and that proof's type, plus a cost so the matcher tries
+    // cheap facts first. Used by `tryContextFactMatch` to collapse
+    // the old "(1) hypothesis match" and "(7) library scan"
+    // strategies into one stream that doesn't care whether the
+    // proof originated from a local binder or a top-level
+    // declaration.
+    struct ContextFact {
+        int cost;
+        std::string source;
+        ExpressionPointer proofTerm;  // closed in current scope
+        ExpressionPointer type;       // closed in current scope
+    };
+
+    std::vector<ContextFact> collectContextFacts(
+        ExpressionPointer /*goalClosed*/,
+        const std::vector<LocalBinder>& localBinders,
+        uint64_t goalHash) {
+        std::vector<ContextFact> facts;
+        int N = static_cast<int>(localBinders.size());
+        // Local binders (cost 1) — last-bound first, so the most
+        // recent fact wins on ties when the matcher returns.
+        for (int b = N - 1; b >= 0; --b) {
+            int lift = N - b;
+            ContextFact fact;
+            fact.cost = 1;
+            fact.source = "local binder " + localBinders[b].name;
+            fact.proofTerm = makeBoundVariable(N - 1 - b);
+            fact.type = liftBoundVariables(
+                localBinders[b].type, lift, 0);
+            facts.push_back(std::move(fact));
+        }
+        // Library / module declarations (cost 3) — only those whose
+        // conclusion's spine matches the goal's at SOME peel depth.
+        // Universe-polymorphic candidates are skipped (universe-arg
+        // inference at use-site isn't wired up).
+        for (const auto& entry : environment_.declarations) {
+            const std::string& name = entry.first;
+            const auto& declaration = entry.second;
+            ExpressionPointer declarationType;
+            size_t universeParamCount = 0;
+            if (auto* def =
+                    std::get_if<Definition>(&declaration)) {
+                declarationType = def->type;
+                universeParamCount =
+                    def->universeParameters.size();
+            } else if (auto* ax =
+                           std::get_if<Axiom>(&declaration)) {
+                declarationType = ax->type;
+                universeParamCount =
+                    ax->universeParameters.size();
+            } else if (auto* ctor =
+                           std::get_if<Constructor>(&declaration)) {
+                declarationType = ctor->type;
+                universeParamCount =
+                    ctor->universeParameters.size();
+            } else {
+                continue;
+            }
+            if (universeParamCount != 0) continue;
+            bool anyDepthMatches = false;
+            ExpressionPointer depthCursor = declarationType;
+            while (true) {
+                if (spineHash(depthCursor) == goalHash) {
+                    anyDepthMatches = true;
+                    break;
+                }
+                auto* pi = std::get_if<Pi>(&depthCursor->node);
+                if (!pi) break;
+                depthCursor = pi->codomain;
+            }
+            if (!anyDepthMatches) continue;
+            ContextFact fact;
+            fact.cost = 3;
+            fact.source = "library " + name;
+            fact.proofTerm = makeConstant(name, {});
+            fact.type = declarationType;
+            facts.push_back(std::move(fact));
+        }
+        return facts;
+    }
+
+    // Unified named-fact match. Iterates ALL in-scope facts (local
+    // binders + library declarations) by cost; for each, tries
+    // `autoFillHintForClaim` to fill any Pi-binders from the goal +
+    // hypotheses and produce a term of the goal type. Subsumes the
+    // old "direct hypothesis match" and "library scan" strategies.
+    ExpressionPointer tryContextFactMatch(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        ExpressionPointer goalReduced = weakHeadNormalForm(
+            environment_, goalClosed);
+        uint64_t goalHash = spineHash(goalReduced);
+        std::vector<ContextFact> facts = collectContextFacts(
+            goalClosed, localBinders, goalHash);
+        std::sort(facts.begin(), facts.end(),
+            [](const ContextFact& a, const ContextFact& b) {
+                return a.cost < b.cost;
+            });
+        for (const ContextFact& fact : facts) {
+            try {
+                return autoFillHintForClaim(
+                    fact.proofTerm, fact.type, goalClosed,
+                    localBinders, line);
+            } catch (const ElaborateError&) {
+                continue;
+            } catch (const TypeError&) {
+                continue;
             }
         }
         return nullptr;
@@ -5089,8 +5229,12 @@ private:
 
     // Step 5 of the structured-proof feature. `claim P` (no `by`)
     // resolves the goal by:
-    //   1. Direct hypothesis match — a local binder with the goal's
-    //      type wins immediately.
+    //   1. Context fact match — unified iteration over local binders
+    //      and library declarations; each becomes a (proofTerm, type,
+    //      cost) tuple; sorted by cost; for each, autoFillHintForClaim
+    //      fills any Pi-binders from goal + hypotheses. Subsumes the
+    //      old "direct hypothesis match" and "library scan" — same
+    //      code path for both local and library facts.
     //   2. Equality battery — when the goal is an Equality, run
     //      autoProveCalcStep (reflexivity, single-position diff with
     //      `Equality.congruence` wrapping, AC rearrangement via ring).
@@ -5106,16 +5250,9 @@ private:
     //   6. Contradiction — if the in-scope hypotheses contain False
     //      or a `(h : P, h' : Not(P))` pair, close any goal via
     //      `False.eliminate_proposition`.
-    //   7. Library scan — for each environment Definition/Axiom whose
-    //      Pi-chain conclusion has the same spine head as the goal,
-    //      try Step 2's autoFillHintForClaim. First success wins.
-    //   8. Library rewrite bridge — walk subexpressions of the goal;
-    //      query `lemmaIndex_` for library equalities matching each;
-    //      rewrite the goal with the matched lemma and recurse.
-    //   9. Transport bridge — when the goal nearly matches something
-    //      provable except for one side of a local equality, rewrite
-    //      via transport_proposition and recurse. One-step only
-    //      (transportBudget defaults to 1) to bound search cost.
+    //   7. Unified equality bridge — rewrite via any in-scope
+    //      equality (local hypothesis or library lemma matched at a
+    //      goal subexpression) and recurse on the rewritten goal.
     // v1 skips universe-polymorphic candidates (no universe inference
     // yet) and does a linear scan (acceptable at current library size;
     // an indexed lookup is a planned follow-on).
@@ -5124,17 +5261,6 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line,
         int transportBudget = 1) {
-        // (1) Local hypothesis: scan last-bound-first.
-        int N = static_cast<int>(localBinders.size());
-        for (int b = N - 1; b >= 0; --b) {
-            int lift = N - b;
-            ExpressionPointer binderTypeInScope =
-                liftBoundVariables(localBinders[b].type, lift, 0);
-            if (structurallyEqual(binderTypeInScope, goalClosed)) {
-                return makeBoundVariable(N - 1 - b);
-            }
-        }
-
         // (2) Equality battery — reflexivity, single-position diff
         // with congruence wrapping, AC rearrangement via ring. No-op
         // when the goal isn't an Equality.
@@ -5180,61 +5306,17 @@ private:
             if (attempt) return attempt;
         }
 
-        // (7) Library scan, bucketed by spine head of the conclusion.
-        ExpressionPointer goalReduced = weakHeadNormalForm(
-            environment_, goalClosed);
-        uint64_t goalHash = spineHash(goalReduced);
-        for (const auto& entry : environment_.declarations) {
-            const std::string& name = entry.first;
-            const auto& declaration = entry.second;
-            ExpressionPointer declarationType;
-            size_t universeParamCount = 0;
-            if (auto* def = std::get_if<Definition>(&declaration)) {
-                declarationType = def->type;
-                universeParamCount = def->universeParameters.size();
-            } else if (auto* ax = std::get_if<Axiom>(&declaration)) {
-                declarationType = ax->type;
-                universeParamCount = ax->universeParameters.size();
-            } else if (auto* ctor = std::get_if<Constructor>(&declaration)) {
-                declarationType = ctor->type;
-                universeParamCount = ctor->universeParameters.size();
-            } else {
-                continue;
-            }
-            if (universeParamCount != 0) continue;
-            // Peel Pi's down to all depths; accept this candidate if
-            // ANY depth's spine matches the goal. autoFillHintForClaim
-            // iterates depths internally and picks the right one.
-            // Without this, a lemma like `(n : Natural) → 0 ≠ succ(n)`
-            // (tail at full peel = `False`, head Constant) would be
-            // skipped for a goal `0 ≠ succ(predecessor)` (head Pi).
-            bool anyDepthMatches = false;
-            ExpressionPointer depthCursor = declarationType;
-            while (true) {
-                if (spineHash(depthCursor) == goalHash) {
-                    anyDepthMatches = true;
-                    break;
-                }
-                auto* pi = std::get_if<Pi>(&depthCursor->node);
-                if (!pi) break;
-                depthCursor = pi->codomain;
-            }
-            if (!anyDepthMatches) continue;
-            // Try this candidate. autoFillHintForClaim throws on
-            // mismatch; catch and move on to the next.
-            ExpressionPointer hintTerm = makeConstant(name, {});
-            try {
-                return autoFillHintForClaim(
-                    hintTerm, declarationType, goalClosed,
-                    localBinders, line);
-            } catch (const ElaborateError&) {
-                continue;
-            } catch (const TypeError&) {
-                continue;
-            }
+        // (1) Context fact match — unified local-hypothesis +
+        // library scan. Iterates all in-scope facts (local binders
+        // and applicable library declarations) by cost, trying
+        // autoFillHintForClaim on each.
+        {
+            ExpressionPointer attempt = tryContextFactMatch(
+                goalClosed, localBinders, line);
+            if (attempt) return attempt;
         }
 
-        // (8) Unified equality bridge: rewrite the goal via any
+        // (7) Unified equality bridge: rewrite the goal via any
         // equality fact in context (local hypothesis OR library
         // lemma matched at a subexpression), then recurse. See
         // TODO.md "Hammer unification" — this strategy is the
