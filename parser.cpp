@@ -859,6 +859,46 @@ private:
                 expect(TokenKind::Assign,
                        "after let-pattern in block body");
                 wrapper.value = parseExpression();
+            } else if (!isClaim && isIdentifierLike(peek().kind)
+                       && position_ + 1 < tokens_.size()
+                       && tokens_[position_ + 1].kind
+                           == TokenKind::ElementOf) {
+                // `let <name> ∈ <type> [with <constraintPredicate>];`
+                // — Phase 3 object intro with optional constraint
+                // hypothesis. Desugars to one or two SurfaceLambda
+                // wrappers (object binder, then anonymous constraint
+                // binder if `with` is present). `∈` here parallels
+                // set-membership in math; we keep `:` reserved for
+                // type ascription in expressions.
+                Token nameToken = consumeAny();
+                consumeAny();  // '∈'
+                SurfaceExpressionPointer objectType = parseExpression();
+                // Stage the object binder as a Suppose wrapper (the
+                // desugaring is identical to that of `suppose` — a
+                // SurfaceLambda over the body).
+                wrapper.kind = BlockWrapper::Suppose;
+                wrapper.name = nameToken.lexeme;
+                wrapper.type = std::move(objectType);
+                wrappers.push_back(std::move(wrapper));
+                // Optional `with <predicate>` clause adds an extra
+                // wrapper for the anonymous constraint hypothesis;
+                // single `;` at the end closes the whole statement.
+                if (peek().kind == TokenKind::KeywordWith) {
+                    Token withToken = consumeAny();
+                    SurfaceExpressionPointer predicateExpression =
+                        parseExpression();
+                    BlockWrapper constraintWrapper;
+                    constraintWrapper.kind = BlockWrapper::Suppose;
+                    constraintWrapper.name = "_";
+                    constraintWrapper.type =
+                        std::move(predicateExpression);
+                    constraintWrapper.line = withToken.line;
+                    constraintWrapper.column = withToken.column;
+                    wrappers.push_back(std::move(constraintWrapper));
+                }
+                expect(TokenKind::Semicolon,
+                       "ending let-∈ statement");
+                continue;
             } else if (isIdentifierLike(peek().kind)) {
                 Token nameToken = consumeAny();
                 wrapper.kind = BlockWrapper::TypedLet;
