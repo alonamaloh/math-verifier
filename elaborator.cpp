@@ -4262,14 +4262,61 @@ private:
         return makeBoundVariable(N - 1 - matchIndex);
     }
 
+    // Run autoProveCalcStep on an equality goal — gives the top-
+    // level claim path access to reflexivity, single-position diff
+    // with `Equality.congruence` wrapping, and AC rearrangement via
+    // `ring`. Returns nullptr if the goal isn't an Equality or none
+    // of those strategies close it. Cheap to attempt: failure is
+    // fast (extractEqualityComponents throws immediately on non-
+    // Equality types) and silent.
+    ExpressionPointer tryAutoProveEqualityGoal(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, localBinders.size());
+        ExpressionPointer goalWhnf = weakHeadNormalForm(
+            environment_, goalOpened);
+        EqualityComponents components;
+        try {
+            components = extractEqualityComponents(
+                goalWhnf, "auto-prove equality goal", line);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+        ExpressionPointer carrierClosed = closeOverLocalBinders(
+            components.carrierType, localBinders,
+            localBinders.size());
+        ExpressionPointer leftClosed = closeOverLocalBinders(
+            components.leftEndpoint, localBinders,
+            localBinders.size());
+        ExpressionPointer rightClosed = closeOverLocalBinders(
+            components.rightEndpoint, localBinders,
+            localBinders.size());
+        try {
+            return autoProveCalcStep(
+                localBinders, leftClosed, rightClosed,
+                carrierClosed, components.carrierUniverseLevel,
+                goalClosed, line, 0);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        } catch (const TypeError&) {
+            return nullptr;
+        }
+    }
+
     // Step 5 of the structured-proof feature. `claim P` (no `by`)
     // resolves the goal by:
     //   1. Direct hypothesis match — a local binder with the goal's
     //      type wins immediately.
-    //   2. Library scan — for each environment Definition/Axiom whose
+    //   2. Equality battery — when the goal is an Equality, run
+    //      autoProveCalcStep (reflexivity, single-position diff with
+    //      `Equality.congruence` wrapping, AC rearrangement via ring).
+    //      No-op for non-equality goals.
+    //   3. Library scan — for each environment Definition/Axiom whose
     //      Pi-chain conclusion has the same spine head as the goal,
     //      try Step 2's autoFillHintForClaim. First success wins.
-    //   3. Transport bridge — when the goal nearly matches something
+    //   4. Transport bridge — when the goal nearly matches something
     //      provable except for one side of a local equality, rewrite
     //      via transport_proposition and recurse. One-step only
     //      (transportBudget defaults to 1) to bound search cost.
@@ -4292,7 +4339,16 @@ private:
             }
         }
 
-        // (2) Library scan, bucketed by spine head of the conclusion.
+        // (2) Equality battery — reflexivity, single-position diff
+        // with congruence wrapping, AC rearrangement via ring. No-op
+        // when the goal isn't an Equality.
+        {
+            ExpressionPointer attempt = tryAutoProveEqualityGoal(
+                goalClosed, localBinders, line);
+            if (attempt) return attempt;
+        }
+
+        // (3) Library scan, bucketed by spine head of the conclusion.
         ExpressionPointer goalReduced = weakHeadNormalForm(
             environment_, goalClosed);
         uint64_t goalHash = spineHash(goalReduced);
@@ -4334,7 +4390,7 @@ private:
             }
         }
 
-        // (3) Transport bridge. If the goal nearly matches an
+        // (4) Transport bridge. If the goal nearly matches an
         // already-provable shape modulo one side of a local equality,
         // rewrite the goal via transport_proposition and recurse.
         if (transportBudget > 0) {
@@ -4404,8 +4460,9 @@ private:
             "claim `"
             + prettyPrintInLocalScope(goalClosed, localBinders)
             + "`: no in-scope hypothesis matches structurally, no "
-            "library theorem with this conclusion shape applies, "
-            "and no one-step transport via a local equality "
+            "equality battery (reflexivity / diff / ring) closes the "
+            "goal, no library theorem with this conclusion shape "
+            "applies, and no one-step transport via a local equality "
             "succeeds — add `by <lemma>` to specify");
     }
 
@@ -13451,27 +13508,72 @@ private:
         }
         ExpressionPointer call = makeConstant(targetFunction);
         // Fill any leading implicit binders the dispatch function may
-        // have. Two patterns are handled:
+        // have. Two patterns are common:
         //   (a) `Set.member {T : Type(0)} (x : T) (S : Set(T))` —
         //       the implicit carrier is the LEFT operand's type T.
         //   (b) `Set.subset {T : Type(0)} (A : Set(T)) (B : Set(T))` —
         //       the implicit carrier is the *parameter* of the LEFT
         //       operand's type `Set(T)`, not `Set(T)` itself.
-        // We pick (b) when leftTypeClosed has shape Application(_, _)
-        // (a parameterised type) and (a) otherwise. Works for the
-        // common cases; an operator with a wholly different implicit
-        // shape would need explicit-arg dispatch via a wrapper.
+        // We recover the fillers by unifying the LEFT operand's type
+        // against the target function's first-explicit-argument type
+        // template (which has BoundVariable references to the implicit
+        // binders). Works for both patterns above and any
+        // structurally-decomposable shape — in particular, it doesn't
+        // trip when the LEFT operand's type is itself a parameterised
+        // alias like `Real = Quotient(_, _)`.
         int implicitCount =
             environment_.implicitArgumentCount(targetFunction);
         if (implicitCount > 0) {
-            ExpressionPointer implicitFiller = leftTypeClosed;
-            auto* leftTypeApp =
-                std::get_if<Application>(&leftTypeClosed->node);
-            if (leftTypeApp) {
-                implicitFiller = leftTypeApp->argument;
+            std::vector<ExpressionPointer> implicitBindings(implicitCount);
+            bool inferredByUnification = false;
+            if (const Declaration* targetDecl =
+                    environment_.lookup(targetFunction)) {
+                ExpressionPointer cursor = declarationType(*targetDecl);
+                for (int i = 0; i < implicitCount && cursor; ++i) {
+                    auto* pi = std::get_if<Pi>(&cursor->node);
+                    if (!pi) { cursor = nullptr; break; }
+                    cursor = pi->codomain;
+                }
+                if (cursor) {
+                    if (auto* firstExplicit =
+                            std::get_if<Pi>(&cursor->node)) {
+                        if (matchAgainstPattern(
+                                firstExplicit->domain, leftTypeClosed,
+                                implicitCount, implicitBindings)) {
+                            inferredByUnification = true;
+                            for (const auto& binding : implicitBindings) {
+                                if (!binding) {
+                                    inferredByUnification = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            for (int i = 0; i < implicitCount; ++i) {
-                call = makeApplication(std::move(call), implicitFiller);
+            if (inferredByUnification) {
+                // bindings[0] is the INNERMOST implicit (smallest BV
+                // index from inside). Application order is outermost-
+                // first, so apply in reverse.
+                for (int i = implicitCount - 1; i >= 0; --i) {
+                    call = makeApplication(std::move(call),
+                                             implicitBindings[i]);
+                }
+            } else {
+                // Fall back to the legacy single-filler heuristic for
+                // safety. If this fires, the kernel typecheck will
+                // catch a mismatch — better than silently building a
+                // wrong term, no worse than the prior behaviour.
+                ExpressionPointer implicitFiller = leftTypeClosed;
+                auto* leftTypeApp =
+                    std::get_if<Application>(&leftTypeClosed->node);
+                if (leftTypeApp) {
+                    implicitFiller = leftTypeApp->argument;
+                }
+                for (int i = 0; i < implicitCount; ++i) {
+                    call = makeApplication(std::move(call),
+                                             implicitFiller);
+                }
             }
         }
         call = makeApplication(std::move(call), std::move(leftKernel));

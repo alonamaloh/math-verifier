@@ -338,3 +338,184 @@ BoundVariable.
       | LessOrEqual.step(small, large, sub) =>
           Or.introduceRight(Exists.introduce(large, …))
     }
+
+## Phase 3 — Statement-form surface and aggressive auto-prover (planned 2026-05-22)
+
+### Why a new phase
+
+Phases 1 and 2 got us to "the kernel bureaucracy mostly hides itself
+once you write the right calls" — implicit args, anonymous tuples,
+`cases` with motive abstraction, statement-level blocks. The remaining
+gap to *textbook* style is two-fold:
+
+1. **Statement-form proofs** — a textbook proof is a sequence of
+   English-flavoured statements (`Suppose ε > 0. Choose N such that
+   …. Then for all n ≥ N, …`), not a tree of nested expression
+   forms. Phase 1's `claim … by …` is the right idea but we never
+   wired the surrounding constructs (`suppose`, `choose`, `let`-for-
+   ∀-intro, `it suffices to show`).
+2. **Aggressive auto-prover** — most lines in textbook proofs are
+   closed by the reader filling in routine algebra/congruence/
+   transitivity. To match that, every `by`-less slot (not just calc
+   steps) needs to run the same battery: `ring`, diff-inferred
+   congruence, hypothesis match, lemma-index lookup, eventually
+   `linarith`/`tauto`/`decide`.
+
+### Vision
+
+A surface where the user never writes `congruenceOf`,
+`Equality.transport_proposition`, `Equality.transitivity`,
+`Quotient.lift` boilerplate, or any other CIC plumbing. Proofs read
+as a sequence of `claim`s, `calc`s, `suppose`s, `choose`s, and
+`let`s. The kernel is still doing the work; the user just doesn't
+see it.
+
+Same fractal property as Phase 1: the user can drill into any step
+by attaching `by <explicit-proof>` when the auto-prover can't close
+it. Failed steps produce diagnostics good enough that the user knows
+which lemma to add.
+
+### Surface decisions
+
+#### Claims — `T as name by proof`, not `name : T by proof`
+
+The old `claim name : T by proof;` overloaded `:` (type ascription,
+binder type, return type, hypothesis type). New form:
+
+```
+claim T as name by proof;     -- named binding
+claim T by proof;              -- anonymous (auto-prover in scope by type-match)
+claim T;                       -- by inferred; auto-prover runs at top level (option b)
+```
+
+Reads as math: "the proposition `T`, call it `name`, follows by
+`proof`." Consistent with the existing `calc … as name;` form. The
+`claim` keyword stays required for now; may become optional later
+since a bare statement at block position is unambiguous.
+
+#### `suppose` — hypothesis introduction at block head
+
+```
+suppose P as hyp;
+…
+claim Q by …;
+```
+
+If the block ends with a claim of type `Q`, the whole block proves
+`P → Q`. Only at the head of a block — a mid-block `suppose` has no
+clear "stop supposing" point.
+
+Reductio ad absurdum is the special case: `suppose ¬P as hyp; …;
+claim false by …;` proves `P`. Classical LEM is on by default; the
+auto-prover bridges `¬¬P → P` silently. The kernel doesn't change —
+the auto-prover just gains one more rewrite it knows.
+
+`by reductio_ad_absurdum { suppose ¬P as hyp; …; claim false by …; }`
+is sugar for the same shape with documented intent.
+
+#### `let` — object introduction
+
+`let ε > 0;` works ONLY when a `convention` has established `ε`'s
+type. Without a matching convention, the user writes:
+
+```
+let ε ∈ ℝ with ε > 0;
+```
+
+`∈` unifies type-membership and set-membership at the surface (the
+kernel doesn't care — both desugar to a binder plus a hypothesis).
+`with` matches the existing `cases … with`, `convention … with`
+keywords. `such that` rejected as too long for the same role.
+
+#### `choose` — ∃-elimination
+
+```
+claim Exists(N, sequence_eventually_bounded_after(N)) by …;
+choose N such that sequence_eventually_bounded_after(N);
+```
+
+`choose` keeps its own keyword rather than folding into `suppose`
+with destructuring — `choose N such that P(N)` reads more clearly
+than `suppose ⟨N, hyp⟩ : ∃ N. P(N)`.
+
+#### Biconditional — no special syntax
+
+Prove `P → Q` and `Q → P` as two separate (suppose-headed) blocks.
+The auto-prover combines them into `P ↔ Q` when the user states
+that claim.
+
+#### Cases vs. suppose
+
+`suppose` is for single hypothesis introduction. Case analysis goes
+through `by cases { … }`, which gets its own slot in the order of
+work below.
+
+#### Other forms in scope
+
+- `it suffices to show …` — goal rewriting against a known reduction.
+- `by cases { … }` — proves any proposition by case analysis.
+- `by induction { … }` — strong induction by default.
+
+### Auto-prover scope — option (b)
+
+Every `by`-less slot is a tactic call site, not just calc steps.
+Concretely: `claim T;` with no `by` fires the same dispatch as a
+calc step's auto-close path.
+
+Dispatch table (additive — each entry tries independently and stops
+on first success):
+
+1. **Local hypothesis match** — already wired.
+2. **Lemma-index lookup** — already wired.
+3. **Reflexivity** — already wired in many places.
+4. **Diff-inferred congruence** — already wired in calc; lift to
+   top-level by treating `claim T;` as a one-step calc whose
+   endpoint we're trying to reach.
+5. **`ring`** — wire into the dispatch (currently only fires when
+   explicitly invoked as `by ring`).
+6. **Symmetry under `Iff`** — for the auto-combination of P→Q and
+   Q→P into P↔Q.
+7. **Future**: `linarith`, `tauto`, `decide`, then the full
+   "obviously" umbrella.
+
+Goal: existing library proofs that currently use explicit
+`congruenceOf` / `Equality.transitivity` / `Equality.transport_proposition`
+should re-typecheck after stripping those calls.
+
+Tradeoff: failure diagnostics get worse — "I tried 6 tactics, none
+closed this" doesn't tell the user which one was *almost* right.
+Need to track which tactic got furthest on a failed step so the
+error message can point at the most promising near-miss. Worth
+designing now rather than retrofitting.
+
+### Deferred to later phases
+
+- **WLOG** — sugar for `by cases { case x ≤ y => … | case y < x =>
+  by symmetry of the goal, reduce to the first case }`. Surface
+  shape: `wlog x ≤ y by <symmetryProof>;`. The user supplies the
+  symmetry proof; the elaborator handles the case split and reduction.
+  Defer until the surface stabilises and we have feedback.
+- **Math-flavoured errors** — the fully math-rephrased version is
+  research-grade. Tractable subset (pretty-printed goals + a small
+  template library for common shape mismatches like "proved x ≤ y
+  but need x < y") can come later.
+- **Notation extensibility** — current notation suffices for now.
+- **`claim` as an optional keyword** — revisit once we see how dense
+  real proofs get.
+
+### Order of work
+
+1. **Auto-prover expansion (this phase's first step)** — option (b)
+   at top-level `claim` slots; add `ring` and diff-inferred
+   congruence to the dispatch; record "most promising near-miss"
+   for failed steps. Validate by stripping explicit `congruenceOf`
+   calls from a representative library file and re-typechecking.
+2. **Statement-form features** — `suppose`, `choose`, `let ε > 0` /
+   `let ε ∈ ℝ with …`, `it suffices to show`. Mostly parsing +
+   desugaring; the auto-prover already covers the proof obligations.
+3. **`by cases` / `by induction`** — strong induction by default;
+   `by cases` for arbitrary props. Self-contained, builds on (1) for
+   subgoal closure.
+4. **"Obviously" umbrella** — extend dispatch with `linarith`,
+   `tauto`, `decide`. The make-or-break automation for textbook
+   fidelity.
