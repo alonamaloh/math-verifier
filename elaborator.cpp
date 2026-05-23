@@ -4233,12 +4233,16 @@ private:
             return hintTerm;
         }
 
-        // Peel Pi chain, collecting domains outermost-first.
+        // Peel Pi chain, collecting domains outermost-first and the
+        // cursor at each peel depth.
         std::vector<ExpressionPointer> domainsOutermostFirst;
+        std::vector<ExpressionPointer> cursorsAtDepth;
+        cursorsAtDepth.push_back(hintTypeReduced);
         ExpressionPointer cursor = hintTypeReduced;
         while (auto* pi = std::get_if<Pi>(&cursor->node)) {
             domainsOutermostFirst.push_back(pi->domain);
             cursor = pi->codomain;
+            cursorsAtDepth.push_back(cursor);
         }
         int totalBinders =
             static_cast<int>(domainsOutermostFirst.size());
@@ -4252,41 +4256,56 @@ private:
                 + prettyPrintInLocalScope(hintType, localBinders)
                 + "`)");
         }
-        ExpressionPointer tail = cursor;
 
-        // Unify tail against goal. Bindings convention: bindings[i]
-        // is the value for BoundVariable index i in the tail; i = 0
-        // is the innermost binder, i = totalBinders - 1 the
-        // outermost.
-        std::vector<ExpressionPointer> bindings(totalBinders);
-        if (!matchAgainstPattern(tail, goalReduced,
-                                   totalBinders, bindings)) {
-            // Try the unreduced goal too — sometimes the lemma's
-            // tail uses the un-WHNF'd form.
-            std::vector<ExpressionPointer> retryBindings(totalBinders);
-            if (matchAgainstPattern(tail, goalClosed,
-                                     totalBinders, retryBindings)) {
-                bindings = std::move(retryBindings);
-            } else {
-                throwElaborate(
-                    "the `by` hint's conclusion (`"
-                    + prettyPrintInLocalScope(tail, localBinders)
-                    + "`) does not unify with the goal (`"
-                    + prettyPrintInLocalScope(goalClosed, localBinders)
-                    + "`)");
+        // Try matching the goal at each peel depth, deepest first.
+        // At depth k (0 ≤ k ≤ totalBinders) we've peeled k outermost
+        // Pi's; the remaining cursor may still be a Pi (e.g., `Not(P)`
+        // = `P → False` has an "extra" Pi past the explicit binders).
+        // Bindings at depth k has size k; bindings[i] is the value
+        // for BV(i) in cursorsAtDepth[k] (innermost peeled first).
+        int matchedDepth = -1;
+        std::vector<ExpressionPointer> bindings;
+        for (int trialDepth = totalBinders;
+             trialDepth >= 0 && matchedDepth == -1;
+             --trialDepth) {
+            std::vector<ExpressionPointer> trialReduced(trialDepth);
+            if (matchAgainstPattern(
+                    cursorsAtDepth[trialDepth], goalReduced,
+                    trialDepth, trialReduced)) {
+                matchedDepth = trialDepth;
+                bindings = std::move(trialReduced);
+                break;
+            }
+            std::vector<ExpressionPointer> trialUnreduced(trialDepth);
+            if (matchAgainstPattern(
+                    cursorsAtDepth[trialDepth], goalClosed,
+                    trialDepth, trialUnreduced)) {
+                matchedDepth = trialDepth;
+                bindings = std::move(trialUnreduced);
+                break;
             }
         }
+        if (matchedDepth == -1) {
+            throwElaborate(
+                "the `by` hint's conclusion (`"
+                + prettyPrintInLocalScope(
+                      cursorsAtDepth[totalBinders], localBinders)
+                + "`) does not unify with the goal (`"
+                + prettyPrintInLocalScope(goalClosed, localBinders)
+                + "`)");
+        }
 
-        // Fill any binders not determined by unification by
-        // searching local binders for a structurally-equal type.
-        // Process inner-binder-first (bindings[0] is the innermost)
-        // so a slot can depend on outer slots that may already be
-        // bound. Outer-slot positions in `domainsOutermostFirst`
-        // are (totalBinders - 1 - i).
-        for (int innerIndex = 0; innerIndex < totalBinders;
+        // Fill any of the `matchedDepth` peeled-binder slots not
+        // determined by unification by searching local binders for a
+        // structurally-equal type. Process inner-binder-first
+        // (bindings[0] is the innermost peeled) so a slot can depend
+        // on outer slots that may already be bound. At depth k, the
+        // outer slots are in domainsOutermostFirst[0..k-1] and
+        // bindings[i] corresponds to position (matchedDepth - 1 - i).
+        for (int innerIndex = 0; innerIndex < matchedDepth;
              ++innerIndex) {
             if (bindings[innerIndex]) continue;
-            int outermostPosition = totalBinders - 1 - innerIndex;
+            int outermostPosition = matchedDepth - 1 - innerIndex;
             ExpressionPointer domain =
                 domainsOutermostFirst[outermostPosition];
             // The domain references outer binders. From the
@@ -4351,10 +4370,14 @@ private:
         }
 
         // All bindings filled. Build the application: outermost
-        // binder is bindings[totalBinders - 1].
+        // binder is bindings[matchedDepth - 1]. Only the matchedDepth
+        // peeled binders get explicit applications — any remaining
+        // inner Pi's of the lemma form part of the conclusion (which
+        // matched the goal's Pi structure during unification) and
+        // stay as-is in the resulting term's type.
         ExpressionPointer call = hintTerm;
-        for (int p = 0; p < totalBinders; ++p) {
-            int innerIndex = totalBinders - 1 - p;
+        for (int p = 0; p < matchedDepth; ++p) {
+            int innerIndex = matchedDepth - 1 - p;
             call = makeApplication(call, bindings[innerIndex]);
         }
         return call;
@@ -4959,12 +4982,24 @@ private:
                 continue;
             }
             if (universeParamCount != 0) continue;
-            // Peel Pi's to expose the conclusion's spine.
-            ExpressionPointer tail = declarationType;
-            while (auto* pi = std::get_if<Pi>(&tail->node)) {
-                tail = pi->codomain;
+            // Peel Pi's down to all depths; accept this candidate if
+            // ANY depth's spine matches the goal. autoFillHintForClaim
+            // iterates depths internally and picks the right one.
+            // Without this, a lemma like `(n : Natural) → 0 ≠ succ(n)`
+            // (tail at full peel = `False`, head Constant) would be
+            // skipped for a goal `0 ≠ succ(predecessor)` (head Pi).
+            bool anyDepthMatches = false;
+            ExpressionPointer depthCursor = declarationType;
+            while (true) {
+                if (spineHash(depthCursor) == goalHash) {
+                    anyDepthMatches = true;
+                    break;
+                }
+                auto* pi = std::get_if<Pi>(&depthCursor->node);
+                if (!pi) break;
+                depthCursor = pi->codomain;
             }
-            if (spineHash(tail) != goalHash) continue;
+            if (!anyDepthMatches) continue;
             // Try this candidate. autoFillHintForClaim throws on
             // mismatch; catch and move on to the next.
             ExpressionPointer hintTerm = makeConstant(name, {});
@@ -6636,31 +6671,60 @@ private:
     // lemma's binder with de Bruijn index `i` (so `bindings[0]` is the
     // innermost binder). On failure, `bindings` may be partially
     // populated; the caller treats that as "no match".
+    //
+    // `piDepth` tracks how many local Pi binders the matcher has
+    // descended into during recursion. A pattern BV index < piDepth
+    // refers to a descended Pi binder (must match the subject's BV
+    // literally). A pattern BV index in [piDepth, piDepth +
+    // binderCount) refers to lemma metavariable slot
+    // `(index - piDepth)`.
     bool matchAgainstPattern(
         ExpressionPointer pattern,
         ExpressionPointer subject,
         int binderCount,
-        std::vector<ExpressionPointer>& bindings) {
+        std::vector<ExpressionPointer>& bindings,
+        int piDepth = 0) {
         if (auto* patternBV =
                 std::get_if<BoundVariable>(&pattern->node)) {
-            if (patternBV->deBruijnIndex < binderCount) {
-                int slot = patternBV->deBruijnIndex;
+            int idx = patternBV->deBruijnIndex;
+            if (idx >= piDepth && idx < piDepth + binderCount) {
+                int slot = idx - piDepth;
+                // The subject must live in the OUTER scope (no
+                // references to the piDepth local Pi binders); else
+                // the binding would be unground when the lemma is
+                // applied. Detect and bail.
+                if (piDepth > 0
+                    && referencesAnyBoundInRange(
+                           subject, 0, piDepth)) {
+                    return false;
+                }
+                // Shift the subject down by piDepth so it lives in
+                // the same scope as the other bindings (the
+                // lemma-application context).
+                ExpressionPointer shiftedSubject = piDepth > 0
+                    ? liftBoundVariables(subject, -piDepth, 0)
+                    : subject;
                 if (!bindings[slot]) {
-                    bindings[slot] = subject;
+                    bindings[slot] = shiftedSubject;
                     return true;
                 }
-                return structurallyEqual(bindings[slot], subject);
+                return structurallyEqual(
+                    bindings[slot], shiftedSubject);
             }
+            // idx < piDepth: descended Pi binder; idx >=
+            // piDepth + binderCount: outer-scope binder. Either
+            // way, subject must be the same BV index.
+            auto* s = std::get_if<BoundVariable>(&subject->node);
+            return s && s->deBruijnIndex == idx;
         }
         if (pattern->node.index() != subject->node.index()) {
             return false;
         }
         if (auto* p = std::get_if<BoundVariable>(&pattern->node)) {
-            auto* s = std::get_if<BoundVariable>(&subject->node);
-            // Pattern BVs with index >= binderCount refer to binders
-            // outside the lemma — shouldn't occur in a well-formed
-            // top-level lemma, but be defensive: require equal index.
-            return p->deBruijnIndex == s->deBruijnIndex;
+            (void)p;
+            // Handled above; this branch is for the
+            // (pattern is non-BV but subject is BV) reject case.
+            return false;
         }
         if (auto* p = std::get_if<FreeVariable>(&pattern->node)) {
             auto* s = std::get_if<FreeVariable>(&subject->node);
@@ -6673,9 +6737,9 @@ private:
         if (auto* p = std::get_if<Application>(&pattern->node)) {
             auto* s = std::get_if<Application>(&subject->node);
             return matchAgainstPattern(p->function, s->function,
-                                          binderCount, bindings)
+                                          binderCount, bindings, piDepth)
                 && matchAgainstPattern(p->argument, s->argument,
-                                          binderCount, bindings);
+                                          binderCount, bindings, piDepth);
         }
         if (auto* p = std::get_if<Constant>(&pattern->node)) {
             auto* s = std::get_if<Constant>(&subject->node);
@@ -6693,8 +6757,63 @@ private:
             }
             return true;
         }
-        // Pi / Lambda / Let are rare in lemma LHSs and require binder-
-        // index bookkeeping we haven't wired up. Bail conservatively.
+        if (auto* p = std::get_if<Pi>(&pattern->node)) {
+            auto* s = std::get_if<Pi>(&subject->node);
+            // The Pi binder itself is a local fresh variable in both
+            // pattern and subject; recurse into domain at the same
+            // piDepth (the binder isn't visible from its own domain)
+            // and into codomain at piDepth + 1.
+            return matchAgainstPattern(p->domain, s->domain,
+                                          binderCount, bindings, piDepth)
+                && matchAgainstPattern(p->codomain, s->codomain,
+                                          binderCount, bindings,
+                                          piDepth + 1);
+        }
+        // Lambda / Let are rare in lemma LHSs and need extra binder
+        // bookkeeping; bail conservatively.
+        return false;
+    }
+
+    // Does `expression` contain any BoundVariable in the half-open
+    // range `[low, high)` (interpreted in expression's own scope)?
+    // Used by matchAgainstPattern to detect when a candidate metavar
+    // binding would reference a local Pi binder that won't survive
+    // when the lemma is applied in the outer context.
+    bool referencesAnyBoundInRange(
+        ExpressionPointer expression, int low, int high,
+        int currentDepth = 0) {
+        if (auto* bv =
+                std::get_if<BoundVariable>(&expression->node)) {
+            int idx = bv->deBruijnIndex - currentDepth;
+            return idx >= low && idx < high;
+        }
+        if (auto* app =
+                std::get_if<Application>(&expression->node)) {
+            return referencesAnyBoundInRange(
+                       app->function, low, high, currentDepth)
+                || referencesAnyBoundInRange(
+                       app->argument, low, high, currentDepth);
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return referencesAnyBoundInRange(
+                       pi->domain, low, high, currentDepth)
+                || referencesAnyBoundInRange(
+                       pi->codomain, low, high, currentDepth + 1);
+        }
+        if (auto* lam = std::get_if<Lambda>(&expression->node)) {
+            return referencesAnyBoundInRange(
+                       lam->domain, low, high, currentDepth)
+                || referencesAnyBoundInRange(
+                       lam->body, low, high, currentDepth + 1);
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            return referencesAnyBoundInRange(
+                       let->type, low, high, currentDepth)
+                || referencesAnyBoundInRange(
+                       let->value, low, high, currentDepth)
+                || referencesAnyBoundInRange(
+                       let->body, low, high, currentDepth + 1);
+        }
         return false;
     }
 

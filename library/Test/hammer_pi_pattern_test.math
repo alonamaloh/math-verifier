@@ -1,0 +1,28 @@
+-- Tests for the matchAgainstPattern depth-iteration / Pi-handling
+-- extension. Before this change, `claim by Natural.zero_not_successor`
+-- failed because the lemma's tail (`zero ≠ succ(n)` = `Pi (zero =
+-- succ(n)) False`) was peeled all the way to `False`, while the goal
+-- was a Pi — structural mismatch. The new matcher tries multiple
+-- peel depths and at depth 1 the lemma's tail `Pi (zero = succ(BV(0)))
+-- False` matches the goal's Pi shape, binding BV(0) (the original
+-- `n` metavar) to the user-supplied `n`.
+
+module Test.hammer_pi_pattern_test
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+
+-- (1) The motivating case: `0 ≠ succ(n)` via `Natural.zero_not_successor`.
+-- The hammer must peel only one Pi (the `n` quantifier) — peeling the
+-- second (the equality hypothesis of `≠`) over-shoots into `False`
+-- which doesn't match the Pi-shaped goal. Library scan + depth-iterating
+-- unifier close the goal with no `by` clause.
+theorem hammer_zero_not_succ (n : Natural) : 0 ≠ successor(n) :=
+  claim
+
+-- (2) Symmetric: `succ(n) ≠ 0` via `Natural.successor_not_zero`.
+theorem hammer_succ_not_zero (n : Natural) : successor(n) ≠ 0 :=
+  claim
