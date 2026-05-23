@@ -6718,6 +6718,16 @@ private:
             return s && s->deBruijnIndex == idx;
         }
         if (pattern->node.index() != subject->node.index()) {
+            // Kind mismatch — try WHNF on the subject. A δ-defined
+            // head (e.g. `Integer.LessOrEqual` unfolding to an
+            // `Exists`) might expose the shape the pattern wants.
+            ExpressionPointer subjectWhnf = weakHeadNormalForm(
+                environment_, subject);
+            if (subjectWhnf.get() != subject.get()) {
+                return matchAgainstPattern(
+                    pattern, subjectWhnf,
+                    binderCount, bindings, piDepth);
+            }
             return false;
         }
         if (auto* p = std::get_if<BoundVariable>(&pattern->node)) {
@@ -6736,10 +6746,33 @@ private:
         }
         if (auto* p = std::get_if<Application>(&pattern->node)) {
             auto* s = std::get_if<Application>(&subject->node);
-            return matchAgainstPattern(p->function, s->function,
-                                          binderCount, bindings, piDepth)
-                && matchAgainstPattern(p->argument, s->argument,
-                                          binderCount, bindings, piDepth);
+            if (s) {
+                // Structural attempt — bindings is scratch; save in
+                // case we need to retry after WHNF.
+                std::vector<ExpressionPointer> savedBindings =
+                    bindings;
+                if (matchAgainstPattern(
+                        p->function, s->function,
+                        binderCount, bindings, piDepth)
+                    && matchAgainstPattern(
+                        p->argument, s->argument,
+                        binderCount, bindings, piDepth)) {
+                    return true;
+                }
+                bindings = savedBindings;
+            }
+            // Structural failed (or subject kinds disagreed). Try
+            // WHNF on the subject: a δ/ι-reducing head (e.g.
+            // `successor(p) * q` → `q + p*q`) might expose the App
+            // shape the pattern needs. Bail if WHNF is a no-op.
+            ExpressionPointer subjectWhnf = weakHeadNormalForm(
+                environment_, subject);
+            if (subjectWhnf.get() != subject.get()) {
+                return matchAgainstPattern(
+                    pattern, subjectWhnf,
+                    binderCount, bindings, piDepth);
+            }
+            return false;
         }
         if (auto* p = std::get_if<Constant>(&pattern->node)) {
             auto* s = std::get_if<Constant>(&subject->node);
