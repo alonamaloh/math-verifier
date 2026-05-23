@@ -7271,9 +7271,24 @@ private:
         ExpressionPointer bodyUnderBinder,
         int line, int column,
         const char* form) {
+        warnIfBinderUnusedAtIndex(
+            name, bodyUnderBinder, /*relativeIndex=*/0,
+            line, column, form);
+    }
+
+    // Variant taking an explicit relative BV index. Multi-binder
+    // lambdas (`function (x : T) (y : U) => …`) push N binders
+    // before elaborating the body, so binder i (0-based, outer-
+    // first) is at BV(N - 1 - i) relative to that body.
+    void warnIfBinderUnusedAtIndex(
+        const std::string& name,
+        ExpressionPointer bodyUnderBinders,
+        int relativeIndex,
+        int line, int column,
+        const char* form) {
         if (!reportRedundantBy_) return;
         if (name.empty() || name[0] == '_') return;
-        if (referencesBoundVariable(bodyUnderBinder, 0)) return;
+        if (referencesBoundVariable(bodyUnderBinders, relativeIndex)) return;
         emitUnusedNameWarning(name, line, column, form);
     }
 
@@ -14651,18 +14666,21 @@ private:
                 lambda.body, extended, expectedBody,
                 "lambda body");
         }
-        // Unused-name warning for statement-level intros (`suppose P
-        // as h;`). Function lambdas (`function (x : T) => …`) are
-        // exempt — constant functions and underscore-naming
-        // conventions make unused parameters there often intentional.
-        if (lambda.fromStatementIntro
-            && lambda.binder.names.size() == 1) {
-            // body's deepest reference to the binder is at BV(0)
-            // because we elaborated under exactly one push.
-            warnIfBinderUnused(
-                lambda.binder.names[0], body,
-                lambda.body->line, lambda.body->column,
-                "`suppose ... as`");
+        // Unused-name warning for every named binder this lambda
+        // introduces. Checked at the SURFACE level — if the user's
+        // body doesn't textually mention the name, warn. (Kernel-
+        // level would miss cases where the elaborator references
+        // the binder on the user's behalf, e.g. via the bare-
+        // proposition-as-proof coercion finding a hypothesis by
+        // type rather than by name.) The `_` prefix is the opt-out.
+        {
+            const char* form = lambda.fromStatementIntro
+                ? "`suppose ... as`" : "lambda binder";
+            for (const auto& name : lambda.binder.names) {
+                warnIfSurfaceNameUnused(
+                    name, *lambda.body,
+                    lambda.body->line, lambda.body->column, form);
+            }
         }
         ExpressionPointer result = body;
         for (int i = static_cast<int>(lambda.binder.names.size()) - 1;
