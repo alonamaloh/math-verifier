@@ -5591,6 +5591,17 @@ private:
             goalForms.push_back(goalDeepWhnf);
         }
         // For each candidate, both directions, try the bridge.
+        // Track per-attempt outcomes so we can produce a useful
+        // diagnostic when nothing closes — the user wants to know
+        // whether the failure was "no occurrence of the endpoint" or
+        // "occurrence found but rewritten goal not closeable."
+        struct SubstAttempt {
+            const char* direction;
+            int surfaceOccurrences = 0;
+            int deepWhnfOccurrences = 0;
+            bool rewrittenProveFailed = false;
+        };
+        std::vector<SubstAttempt> attemptLog;
         for (const ContextEquality& eq : candidates) {
             for (int direction = 0; direction < 2; ++direction) {
                 ExpressionPointer fromSide =
@@ -5599,22 +5610,48 @@ private:
                     (direction == 0) ? eq.lhs : eq.rhs;
                 int occurrences = 0;
                 ExpressionPointer abstractedBody;
-                for (const ExpressionPointer& goalForm : goalForms) {
-                    occurrences = 0;
+                int surfaceCount = 0;
+                int deepCount = 0;
+                for (size_t formIdx = 0;
+                     formIdx < goalForms.size(); ++formIdx) {
+                    int formOccurrences = 0;
                     abstractedBody = abstractStructuralOccurrence(
-                        goalForm, fromSide,
-                        /*currentDepth=*/0, occurrences);
-                    if (occurrences > 0) break;
+                        goalForms[formIdx], fromSide,
+                        /*currentDepth=*/0, formOccurrences);
+                    if (formIdx == 0) {
+                        surfaceCount = formOccurrences;
+                    } else {
+                        deepCount = formOccurrences;
+                    }
+                    if (formOccurrences > 0) {
+                        occurrences = formOccurrences;
+                        break;
+                    }
                 }
-                if (occurrences == 0) continue;
+                SubstAttempt attempt;
+                attempt.direction = (direction == 0)
+                    ? "rhs → lhs" : "lhs → rhs";
+                attempt.surfaceOccurrences = surfaceCount;
+                attempt.deepWhnfOccurrences = deepCount;
+                if (occurrences == 0) {
+                    attemptLog.push_back(attempt);
+                    continue;
+                }
                 ExpressionPointer rewrittenGoal = substitute(
                     abstractedBody, 0, toSide);
                 ExpressionPointer proofRewritten;
                 try {
                     proofRewritten = autoProveClaim(
                         rewrittenGoal, localBinders, line);
-                } catch (const ElaborateError&) { continue; }
-                  catch (const TypeError&) { continue; }
+                } catch (const ElaborateError&) {
+                    attempt.rewrittenProveFailed = true;
+                    attemptLog.push_back(attempt);
+                    continue;
+                } catch (const TypeError&) {
+                    attempt.rewrittenProveFailed = true;
+                    attemptLog.push_back(attempt);
+                    continue;
+                }
                 ExpressionPointer motive = makeLambda(
                     "_rewriteHole", eq.carrierType, abstractedBody);
                 ExpressionPointer eqForTransport;
@@ -5651,10 +5688,42 @@ private:
             }
         }
         if (claim.byHint) {
+            // For the named form there's a single equality — break down
+            // the per-direction outcomes so the user can distinguish
+            // "endpoint not present" from "endpoint present but
+            // rewritten goal isn't proveable."
+            std::string detail;
+            for (const SubstAttempt& a : attemptLog) {
+                detail += "\n      ";
+                detail += a.direction;
+                detail += ": ";
+                if (a.surfaceOccurrences == 0
+                    && a.deepWhnfOccurrences == 0) {
+                    detail +=
+                        "0 occurrences (surface or deep-WHNF)";
+                } else {
+                    detail += "found " +
+                        std::to_string(std::max(a.surfaceOccurrences,
+                                                  a.deepWhnfOccurrences))
+                        + " occurrence(s)";
+                    if (a.surfaceOccurrences == 0
+                        && a.deepWhnfOccurrences > 0) {
+                        detail +=
+                            " — only after deep-WHNF reduction";
+                    }
+                    if (a.rewrittenProveFailed) {
+                        detail += "; rewritten goal not closeable by "
+                                  "the auto-prover";
+                    }
+                }
+            }
             throwElaborate(
-                "`by substituting <eq>` couldn't close the goal: "
-                "no proof in scope matches the rewritten form for "
-                "either direction of the supplied equality");
+                "`by substituting <eq>` couldn't close the goal."
+                "\n  Direction search:" + detail
+                + "\n  (If a direction shows occurrences but the "
+                  "rewritten goal failed, the rewrite happened — but "
+                  "the auto-prover couldn't discharge the result. "
+                  "Add `by <proof>` to close it manually.)");
         }
         throwElaborate(
             "`by substitution` couldn't close the goal: no in-scope "
@@ -15144,85 +15213,124 @@ private:
         ExpressionPointer leftEndpointWhnf = closeOverLocalBinders(
             leftEndpointBetaOpened, localBinders, localBinders.size());
 
-        auto [c1, b1] = trySearch(termTypeUnreducedClosed, leftEndpoint);
-        int occurrenceCount = c1;
-        ExpressionPointer abstractedBody = std::move(b1);
+        // Try each (term form, endpoint form) combo in priority order
+        // and remember each occurrence count for the failure
+        // diagnostic. The body that wins is the FIRST combo that
+        // returns exactly one occurrence — preferring the user's
+        // surface shape (unreduced × unreduced) when possible — so a
+        // success doesn't drift to a more-reduced form than needed.
+        struct ComboAttempt {
+            const char* label;
+            int count = -1;  // -1 = not attempted
+        };
+        ComboAttempt attempts[6] = {
+            {"unreduced term × unreduced endpoint"},
+            {"unreduced term × β-reduced endpoint"},
+            {"WHNF term × unreduced endpoint"},
+            {"WHNF term × β-reduced endpoint"},
+            {"deep-β term × unreduced endpoint"},
+            {"deep-β term × β-reduced endpoint"},
+        };
+        int occurrenceCount = 0;
+        ExpressionPointer abstractedBody;
+        bool found = false;
 
-        if (occurrenceCount != 1) {
-            auto [c2, b2] =
-                trySearch(termTypeUnreducedClosed, leftEndpointWhnf);
-            if (c2 == 1) {
-                occurrenceCount = c2;
-                abstractedBody = std::move(b2);
+        auto runAttempt =
+            [&](int slot,
+                const ExpressionPointer& termClosed,
+                const ExpressionPointer& lhs) {
+            if (found) return;
+            auto [count, body] = trySearch(termClosed, lhs);
+            attempts[slot].count = count;
+            if (count == 1) {
+                occurrenceCount = count;
+                abstractedBody = std::move(body);
+                found = true;
             }
-        }
+        };
 
-        if (occurrenceCount != 1) {
+        runAttempt(0, termTypeUnreducedClosed, leftEndpoint);
+        runAttempt(1, termTypeUnreducedClosed, leftEndpointWhnf);
+
+        ExpressionPointer termTypeWhnfClosed;
+        if (!found) {
             ExpressionPointer termTypeWhnf = weakHeadNormalForm(
                 environment_, termTypeUnreduced);
-            ExpressionPointer termTypeWhnfClosed = closeOverLocalBinders(
+            termTypeWhnfClosed = closeOverLocalBinders(
                 termTypeWhnf, localBinders, localBinders.size());
-            auto [c3, b3] = trySearch(termTypeWhnfClosed, leftEndpoint);
-            if (c3 == 1) {
-                occurrenceCount = c3;
-                abstractedBody = std::move(b3);
-            } else {
-                auto [c4, b4] =
-                    trySearch(termTypeWhnfClosed, leftEndpointWhnf);
-                if (c4 == 1) {
-                    occurrenceCount = c4;
-                    abstractedBody = std::move(b4);
-                } else if (occurrenceCount == 0) {
-                    // Adopt the deepest result so the error diagnostic
-                    // shows whichever count is most informative.
-                    occurrenceCount = c4 != 0 ? c4 : c3;
-                    abstractedBody =
-                        c4 != 0 ? std::move(b4) : std::move(b3);
-                }
-            }
+            runAttempt(2, termTypeWhnfClosed, leftEndpoint);
+            runAttempt(3, termTypeWhnfClosed, leftEndpointWhnf);
         }
-        if (occurrenceCount != 1) {
+
+        ExpressionPointer termTypeDeepBetaClosed;
+        if (!found) {
             ExpressionPointer termTypeDeepBeta =
                 deepBetaReduce(termTypeUnreduced);
-            ExpressionPointer termTypeDeepBetaClosed = closeOverLocalBinders(
+            termTypeDeepBetaClosed = closeOverLocalBinders(
                 termTypeDeepBeta, localBinders, localBinders.size());
-            auto [c5, b5] = trySearch(termTypeDeepBetaClosed, leftEndpoint);
-            if (c5 == 1) {
-                occurrenceCount = c5;
-                abstractedBody = std::move(b5);
-            } else {
-                auto [c6, b6] =
-                    trySearch(termTypeDeepBetaClosed, leftEndpointWhnf);
-                if (c6 == 1) {
-                    occurrenceCount = c6;
-                    abstractedBody = std::move(b6);
-                } else if (occurrenceCount == 0) {
-                    occurrenceCount = c6 != 0 ? c6 : c5;
-                    abstractedBody =
-                        c6 != 0 ? std::move(b6) : std::move(b5);
+            runAttempt(4, termTypeDeepBetaClosed, leftEndpoint);
+            runAttempt(5, termTypeDeepBetaClosed, leftEndpointWhnf);
+        }
+
+        // If no combo found exactly one occurrence, build a diagnostic
+        // that breaks down each attempt's count so the user can tell
+        // whether they have a 0-occurrence (mismatch), a >1-occurrence
+        // (ambiguity), or both depending on normalisation level.
+        auto buildFailureBreakdown = [&]() {
+            std::string breakdown;
+            for (const ComboAttempt& a : attempts) {
+                if (a.count < 0) continue;
+                breakdown += "\n      ";
+                breakdown += a.label;
+                breakdown += ": ";
+                if (a.count == 0) {
+                    breakdown += "0 occurrences";
+                } else {
+                    breakdown += std::to_string(a.count) +
+                                 " occurrences";
                 }
             }
-        }
+            return breakdown;
+        };
+
         // Use the unreduced form for the diagnostic display.
         ExpressionPointer termTypeOpened = termTypeUnreduced;
-        if (occurrenceCount == 0) {
-            throwElaborate(
-                "rewrite(eq, term): the equality's left endpoint "
-                "does not appear (structurally) in term's type "
-                "(`"
-                + prettyPrintInLocalScope(termTypeOpened, localBinders)
-                + "`); use explicit "
-                "Equality.transport_proposition(...) if a "
-                "non-structural rewrite is intended");
-        }
-        if (occurrenceCount > 1) {
-            throwElaborate(
-                "rewrite(eq, term): the equality's left endpoint "
-                "appears "
-                + std::to_string(occurrenceCount)
-                + " times in term's type — use explicit "
-                "Equality.transport_proposition(...) to "
-                "disambiguate the position");
+        if (!found) {
+            // Decide whether the dominant failure mode was "0 occurrences"
+            // or "too many" so the headline matches what the user will
+            // most likely act on.
+            bool sawZeroOnly = true;
+            int maxCount = 0;
+            for (const ComboAttempt& a : attempts) {
+                if (a.count <= 0) continue;
+                sawZeroOnly = false;
+                if (a.count > maxCount) maxCount = a.count;
+            }
+            std::string headline;
+            if (sawZeroOnly) {
+                headline =
+                    "rewrite(eq, term): the equality's left endpoint "
+                    "does not appear (structurally) in term's type "
+                    "(`"
+                    + prettyPrintInLocalScope(termTypeOpened,
+                                                localBinders)
+                    + "`).";
+            } else {
+                headline =
+                    "rewrite(eq, term): the equality's left endpoint "
+                    "appears "
+                    + std::to_string(maxCount)
+                    + " time(s) in term's type — `rewrite` needs "
+                      "exactly one. Use explicit "
+                      "Equality.transport_proposition(...) to "
+                      "disambiguate the position. (`"
+                    + prettyPrintInLocalScope(termTypeOpened,
+                                                localBinders)
+                    + "`)";
+            }
+            throwElaborate(headline
+                + "\n  Occurrence search:"
+                + buildFailureBreakdown());
         }
         ExpressionPointer motiveLambda = makeLambda(
             "_rewriteHole", carrierType, std::move(abstractedBody));
