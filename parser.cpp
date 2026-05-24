@@ -36,6 +36,13 @@ bool isContextualKeyword(TokenKind kind) {
         case TokenKind::KeywordOperator:
         case TokenKind::KeywordOverload:
         case TokenKind::KeywordCoercion:
+        // `decide` is dispatched from parseAtom for the `decide P { … }`
+        // form, but the bare name is also a long-standing module/file
+        // name component (Natural.decide, Natural.decide_divides). Mark
+        // it contextual so the qualified-name parser accepts it after
+        // `.`; the parseAtom dispatch still claims it in expression
+        // position.
+        case TokenKind::KeywordDecide:
             return true;
         default:
             return false;
@@ -1744,6 +1751,14 @@ private:
         if (current.kind == TokenKind::KeywordGiven) {
             return parseGiven();
         }
+        // `decide P { … }` must short-circuit BEFORE the isIdentifierLike
+        // fallthrough: `decide` is a contextual keyword (so that
+        // `Natural.decide` and similar qualified-name uses still parse),
+        // so the isIdentifierLike check below would otherwise claim it
+        // as a bare identifier.
+        if (current.kind == TokenKind::KeywordDecide) {
+            return parseDecideExpression();
+        }
         if (isIdentifierLike(current.kind)) {
             return parseQualifiedIdentifier();
         }
@@ -1936,6 +1951,71 @@ private:
             std::move(equalityHypothesisName),
             std::move(refiningNames),
             casesToken.line, casesToken.column);
+    }
+
+    // `decide P { | yes m => arm_yes  | no n => arm_no }` —
+    // classical case-split on whether P holds. Either branch may be
+    // first; binder names default to the unused-marker `_` if absent.
+    // The trailing `=>` style is required (the `case … :` math-style
+    // form is not accepted here for the moment — `decide` arms are
+    // tight by design).
+    SurfaceExpressionPointer parseDecideExpression() {
+        Token decideToken = consumeAny();  // 'decide'
+        SurfaceExpressionPointer proposition = parseExpression();
+        expect(TokenKind::LeftBrace, "after `decide P`");
+        std::string yesBinderName;
+        SurfaceExpressionPointer yesBody;
+        std::string noBinderName;
+        SurfaceExpressionPointer noBody;
+        bool sawYes = false;
+        bool sawNo = false;
+        while (peek().kind != TokenKind::RightBrace) {
+            expect(TokenKind::Pipe, "before a `decide` arm");
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected `yes` or `no` after `|` in `decide`");
+            }
+            Token armKind = consumeAny();
+            std::string binderName;
+            if (peek().kind == TokenKind::FatArrow) {
+                binderName = "_";
+            } else {
+                if (!isIdentifierLike(peek().kind)) {
+                    throwHere("expected a binder name (or `=>`) after "
+                              "`" + armKind.lexeme + "` in `decide`");
+                }
+                binderName = consumeAny().lexeme;
+            }
+            expect(TokenKind::FatArrow,
+                   "between `decide` arm header and body");
+            SurfaceExpressionPointer body = parseExpression();
+            if (armKind.lexeme == "yes") {
+                if (sawYes) {
+                    throwHere("two `yes` arms in the same `decide`");
+                }
+                sawYes = true;
+                yesBinderName = std::move(binderName);
+                yesBody = std::move(body);
+            } else if (armKind.lexeme == "no") {
+                if (sawNo) {
+                    throwHere("two `no` arms in the same `decide`");
+                }
+                sawNo = true;
+                noBinderName = std::move(binderName);
+                noBody = std::move(body);
+            } else {
+                throwHere("expected `yes` or `no`, got `"
+                          + armKind.lexeme + "`");
+            }
+        }
+        expect(TokenKind::RightBrace, "ending `decide` expression");
+        if (!sawYes || !sawNo) {
+            throwHere("`decide` needs both a `yes` and a `no` arm");
+        }
+        return makeSurfaceDecide(
+            std::move(proposition),
+            std::move(yesBinderName), std::move(yesBody),
+            std::move(noBinderName), std::move(noBody),
+            decideToken.line, decideToken.column);
     }
 
     // Parses an optional `refining <name>[, <name>]*` clause used by

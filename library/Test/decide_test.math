@@ -1,0 +1,83 @@
+-- `decide P { | yes m => arm_yes  | no n => arm_no }` —
+-- classical case-split on whether P holds. The expected type must
+-- contain `Logic.classical_decidable(P)` structurally (after WHNF);
+-- the elaborator abstracts that occurrence to form the motive,
+-- builds the Logic.Decidable_recursor application, and feeds each
+-- arm a body whose expected type is the goal with the constructor
+-- substituted in — so wrappers like `bisectionStepWithDec(…, decision)`
+-- ι-reduce in each arm and the user just supplies the math witness.
+
+module Test.decide_test
+
+import Logic.basics
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+
+-- A tiny helper that depends on a decidable: returns 0 for yes, 1
+-- for no. Defined via pattern match, so the user-side test below
+-- exercises the canonical use of `decide`: after substituting the
+-- constructor for `classical_decidable(P)`, the arm body's expected
+-- type ι-reduces to `zero = zero` (in the yes arm) or
+-- `successor(zero) = successor(zero)` (in the no arm).
+definition Test.decide_pick (P : Proposition)
+        : Logic.Decidable(P) → Natural
+  | Logic.Decidable.yes(_) => zero
+  | Logic.Decidable.no(_)  => successor(zero)
+
+-- Goal mentions `Logic.classical_decidable(P)` directly (no wrapping
+-- function buried behind δ-reduction). The yes arm sees expected type
+-- `decide_pick(P, yes(_)) = decide_pick(P, yes(_))` which ι-reduces
+-- to `zero = zero`; the no arm sees `successor(zero) = successor(zero)`.
+theorem Test.decide_pick_eq_constructor
+        (P : Proposition)
+        : Test.decide_pick(P, Logic.classical_decidable(P))
+          = Test.decide_pick(P, Logic.classical_decidable(P)) :=
+  decide P {
+    | yes _ => reflexivity(Natural, zero)
+    | no  _ => reflexivity(Natural, successor(zero))
+  }
+
+-- A goal where the arm's witness is the bound proof itself. The
+-- expected branch type ι-reduces to P in the yes arm and Not(P) in
+-- the no arm, so the user just returns the bound binder.
+definition Test.decide_branch (P : Proposition)
+        : Logic.Decidable(P) → Proposition
+  | Logic.Decidable.yes(_) => P
+  | Logic.Decidable.no(_)  => Not(P)
+
+theorem Test.decide_branch_holds
+        (P : Proposition)
+        : Test.decide_branch(P, Logic.classical_decidable(P)) :=
+  decide P {
+    | yes p     => p
+    | no  notP  => notP
+  }
+
+-- A wrapping definition that buries the classical_decidable behind a
+-- δ-reducible step. Mimics `Real.bisectionStep`'s shape so we can
+-- verify the elaborator's WHNF-walker finds the hidden decidable.
+definition Test.wrappedPick (P : Proposition) : Natural :=
+  Test.decide_pick(P, Logic.classical_decidable(P))
+
+theorem Test.decide_through_wrapper
+        (P : Proposition)
+        : Test.wrappedPick(P) = Test.wrappedPick(P) :=
+  decide P {
+    | yes _ => reflexivity(Natural, zero)
+    | no  _ => reflexivity(Natural, successor(zero))
+  }
+
+-- Same but with a let-binding so the proposition syntactically uses
+-- the let-binder while the goal predates the let. Exercises the
+-- ζ-unfolding step.
+theorem Test.decide_with_let
+        (Q : Proposition)
+        : Test.wrappedPick(Q) = Test.wrappedPick(Q) := {
+    let R : Proposition := Q;
+    decide R {
+      | yes _ => reflexivity(Natural, zero)
+      | no  _ => reflexivity(Natural, successor(zero))
+    }
+  }

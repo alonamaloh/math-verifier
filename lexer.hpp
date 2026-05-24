@@ -56,6 +56,7 @@ enum class TokenKind {
     KeywordGiven,           // `given (P)` — look up the in-scope hypothesis of type P
     KeywordAs,              // `in (P) as h:` — name the arm's disjunct hypothesis
     KeywordRefining,        // `cases X refining h, …` — refine listed binders' types per case
+    KeywordDecide,          // `decide P { yes m => …; no n => … }` — classical case-split with auto-transport
 
     // Punctuation
     LeftParen, RightParen,

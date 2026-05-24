@@ -198,6 +198,28 @@ struct SurfaceCases {
 // the use site so the build log surfaces the gap.
 struct SurfaceSorry { };
 
+// `decide P { | yes m => arm_yes  | no n => arm_no }` —
+// classical case-split on whether P holds. Elaborates by binding
+// `_decideScrutinee := Logic.classical_decidable(P)`, abstracting
+// every structural occurrence of that scrutinee in the expected type
+// to form a motive, and applying Logic.Decidable_recursor with the
+// two arms. The arm body's expected type is the goal with the
+// constructor (yes(m) / no(n)) substituted in — so the kernel
+// ι-reduces any wrapping like `bisectionStepWithDec(…, decision)`
+// against the constructor form, and the user just writes the math
+// witness.
+//
+// Either binder may be `_` (the unused-marker name); we still bind a
+// fresh identifier internally so the constructor application is
+// well-typed.
+struct SurfaceDecide {
+    SurfaceExpressionPointer proposition;
+    std::string yesBinderName;
+    SurfaceExpressionPointer yesBody;
+    std::string noBinderName;
+    SurfaceExpressionPointer noBody;
+};
+
 // `ring` — closes an equality goal in a known commutative-ring carrier
 // (Integer, Rational, …) by reifying both sides as polynomial
 // expressions, normalizing them to a canonical sum-of-products form,
@@ -393,7 +415,8 @@ struct SurfaceExpression {
         SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
         SurfaceRing, SurfaceField, SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
-        SurfaceByStrongInduction, SurfaceGoal, SurfaceUnfold
+        SurfaceByStrongInduction, SurfaceGoal, SurfaceUnfold,
+        SurfaceDecide
     > node;
     int line = 0;
     int column = 0;
@@ -500,6 +523,19 @@ inline SurfaceExpressionPointer makeSurfaceAnonymousTuple(
 inline SurfaceExpressionPointer makeSurfaceSorry(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceSorry{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceDecide(
+    SurfaceExpressionPointer proposition,
+    std::string yesBinderName,
+    SurfaceExpressionPointer yesBody,
+    std::string noBinderName,
+    SurfaceExpressionPointer noBody,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceDecide{std::move(proposition),
+                       std::move(yesBinderName), std::move(yesBody),
+                       std::move(noBinderName), std::move(noBody)},
+        line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceRing(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{

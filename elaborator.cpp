@@ -3962,6 +3962,11 @@ private:
             return elaborateSorry(localBinders, expectedType,
                                    expression.line, expression.column);
         }
+        if (auto* decide = std::get_if<SurfaceDecide>(&expression.node)) {
+            return elaborateDecideExpression(
+                *decide, localBinders, expectedType,
+                expression.line, expression.column);
+        }
         if (std::get_if<SurfaceRing>(&expression.node)) {
             return elaborateRing(localBinders, expectedType,
                                   expression.line, expression.column);
@@ -13610,6 +13615,164 @@ private:
         return innerCasesKernel;
     }
 
+    // `decide P { | yes m => arm_yes | no n => arm_no }` — classical
+    // case-split on whether P holds, hiding the auto-transport
+    // bookkeeping the user would otherwise write by hand.
+    //
+    // The expected type Goal must mention `Logic.classical_decidable(P)`
+    // structurally (after WHNF + structural deep-β attempts). We
+    // abstract that occurrence to form a motive
+    //   motive = λ s : Logic.Decidable(P). Goal[s/X]
+    // and build the recursor application
+    //   Logic.Decidable_recursor.{u}(P, motive, λp. arm_yes, λn. arm_no, X)
+    // where `u` is the universe level of Goal (typically 0 since we're
+    // proving a Proposition). Each arm body's expected type is
+    // motive(yes(p)) / motive(no(n)) — which the kernel β/ι-reduces in
+    // surrounding wrappers like `bisectionStepWithDec(…, decision)`,
+    // so the user just writes the math witness without any explicit
+    // transport.
+    ExpressionPointer elaborateDecideExpression(
+        const SurfaceDecide& decide,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "decide expression at line " + std::to_string(line));
+        if (!expectedType) {
+            throwElaborate(
+                "decide P { … } needs an expected type from context");
+        }
+        // (1) Elaborate the proposition P (with expected type
+        // Proposition = Sort(0)).
+        ExpressionPointer propositionKernel = elaborateExpression(
+            *decide.proposition, localBinders, makeSort(makeLevelConst(0)));
+
+        // (2) Build the scrutinee X = Logic.classical_decidable(P).
+        ExpressionPointer scrutineeKernel = makeApplication(
+            makeConstant("Logic.classical_decidable", {}),
+            propositionKernel);
+
+        // (3) Build Logic.Decidable(P) — the scrutinee's type.
+        ExpressionPointer decidablePType = makeApplication(
+            makeConstant("Logic.Decidable", {}),
+            propositionKernel);
+
+        // (4) Abstract every structural occurrence of X in expectedType
+        // to form the motive's body. The user may have written P in
+        // terms of in-scope let-binders (e.g.
+        //   let intervals := bisectionIntervals(…);
+        //   decide IsUpperBound(subset, halve(left(intervals) + right(intervals))) {…}
+        // ) but the goal type predates the let-bindings and inlines
+        // their values. ζ-unfold the target's let-references so its
+        // literal form matches the goal's structure.
+        ExpressionPointer targetReduced = zetaUnfoldLetBinders(
+            scrutineeKernel, localBinders, /*currentDepth=*/0);
+        int occurrences = 0;
+        int whnfFuel = 2048;
+        ExpressionPointer motiveBody = abstractStructuralOccurrenceWithWHNF(
+            expectedType, targetReduced,
+            /*currentDepth=*/0, occurrences, whnfFuel);
+        if (occurrences == 0) {
+            throwElaborate(
+                "decide P { … } at line " + std::to_string(line)
+                + ": Logic.classical_decidable(P) does not appear in "
+                "the goal (even after δ-unfolding at each subterm). "
+                "Goal: " + prettyPrintInLocalScope(expectedType, localBinders)
+                + ". Decided: "
+                + prettyPrintInLocalScope(targetReduced, localBinders));
+        }
+
+        // (5) Infer the motive's universe (Goal's level). For
+        // Proposition-valued Goals this is 0; for Type-valued Goals it
+        // can be higher. Compute by inferring the type of expectedType
+        // and reading its Sort level.
+        LevelPointer motiveLevel;
+        {
+            Context openedContext = buildContextFromLocalBinders(localBinders);
+            ExpressionPointer goalOpenedForLevel = openOverLocalBinders(
+                expectedType, localBinders, localBinders.size());
+            ExpressionPointer goalType = inferType(
+                environment_, openedContext, goalOpenedForLevel);
+            ExpressionPointer goalTypeWHNF = weakHeadNormalForm(
+                environment_, goalType);
+            auto* sortNode = std::get_if<Sort>(&goalTypeWHNF->node);
+            if (!sortNode) {
+                throwElaborate(
+                    "decide P { … } at line " + std::to_string(line)
+                    + ": goal's type does not normalise to a Sort");
+            }
+            motiveLevel = sortNode->level;
+        }
+
+        // (6) Build motive M = Lambda(_decideTarget : Decidable(P), motiveBody).
+        ExpressionPointer motive = makeLambda(
+            "_decideTarget", decidablePType, motiveBody);
+
+        // (7) Build each arm. For yes: lambda over a binder of type P,
+        // body elaborated at motiveBody[yes(P, BV(0))/BV(0)] in the
+        // extended scope. Similarly for no with Not(P).
+        const std::string yesBinder =
+            decide.yesBinderName.empty() ? std::string("_") : decide.yesBinderName;
+        const std::string noBinder =
+            decide.noBinderName.empty() ? std::string("_") : decide.noBinderName;
+
+        // P lifted into the arm's body scope (one binder added).
+        ExpressionPointer propositionLifted =
+            liftBoundVariables(propositionKernel, 1, 0);
+
+        // yes(P_lifted, BV(0)) — the constructor applied to the arm's binder.
+        ExpressionPointer yesAppliedToBinder = makeApplication(
+            makeApplication(
+                makeConstant("Logic.Decidable.yes", {}),
+                propositionLifted),
+            makeBoundVariable(0));
+        // no(P_lifted, BV(0)) — similar.
+        ExpressionPointer noAppliedToBinder = makeApplication(
+            makeApplication(
+                makeConstant("Logic.Decidable.no", {}),
+                propositionLifted),
+            makeBoundVariable(0));
+
+        // The motive's body was built with BV(0) bound to the motive's
+        // target (Decidable(P)) parameter. Substituting that with the
+        // constructor application gives the arm body's expected type
+        // in the extended scope.
+        ExpressionPointer yesArmExpectedType =
+            substitute(motiveBody, 0, yesAppliedToBinder);
+        ExpressionPointer noArmExpectedType =
+            substitute(motiveBody, 0, noAppliedToBinder);
+
+        // Not(P) for the no arm's binder.
+        ExpressionPointer notP = makeApplication(
+            makeConstant("Not", {}), propositionKernel);
+
+        // Yes arm scope: extend with the binder.
+        std::vector<LocalBinder> yesScope = localBinders;
+        yesScope.push_back({yesBinder, propositionKernel});
+        ExpressionPointer yesBodyElab = elaborateExpression(
+            *decide.yesBody, yesScope, yesArmExpectedType);
+        ExpressionPointer yesArm = makeLambda(
+            yesBinder, propositionKernel, yesBodyElab);
+
+        std::vector<LocalBinder> noScope = localBinders;
+        noScope.push_back({noBinder, notP});
+        ExpressionPointer noBodyElab = elaborateExpression(
+            *decide.noBody, noScope, noArmExpectedType);
+        ExpressionPointer noArm = makeLambda(
+            noBinder, notP, noBodyElab);
+
+        // (8) Build the recursor application:
+        // Logic.Decidable_recursor.{u}(P, motive, yesArm, noArm, X).
+        ExpressionPointer recursorCall = makeConstant(
+            "Logic.Decidable_recursor", {motiveLevel});
+        recursorCall = makeApplication(recursorCall, propositionKernel);
+        recursorCall = makeApplication(recursorCall, motive);
+        recursorCall = makeApplication(recursorCall, yesArm);
+        recursorCall = makeApplication(recursorCall, noArm);
+        recursorCall = makeApplication(recursorCall, scrutineeKernel);
+        return recursorCall;
+    }
+
     // `cases scrutinee { | pattern => body | ... }`. Phase 1 covers
     // non-indexed inductives only. Re-uses the existing
     // `buildCaseLambda` helper by synthesizing a minimal pattern-match
@@ -15199,6 +15362,213 @@ private:
                 deepBetaReduce(let->body));
         }
         return expression;
+    }
+
+    // Abstract every occurrence of `target` in `expression`, like
+    // `abstractStructuralOccurrence`, but WHNF the expression at each
+    // recursion level first. This exposes target subterms (like
+    // `Logic.classical_decidable(P)`) that are hidden behind a chain
+    // of δ-unfoldings in the goal — e.g., `bisectionRight(…, succ(n))`
+    // → `right(bisectionIntervals(…, succ(n)))` → `right(bisectionStep(…))`
+    // → `right(bisectionStepWithDec(…, classical_decidable(…)))`.
+    //
+    // Each level WHNFs only the head, so we don't pay for fully
+    // normalising the goal up front (which would expand bisection
+    // proofs to unmanageable sizes). When recursion passes through a
+    // binder, the BoundVariable depth advances; references to the
+    // freshly introduced motive binder (BV(currentDepth)) shift their
+    // free occurrences upward to leave room, mirroring
+    // `abstractStructuralOccurrence`.
+    //
+    // WHNF failures (fuel exhaustion, etc.) leave that subterm in its
+    // current form and continue.
+    // Recursively replace every reference to a let-binder in
+    // `expression` with the binder's value. Used by `decide` so the
+    // user's proposition (which references in-scope `let X := V`
+    // bindings symbolically) lines up with the goal's structure, which
+    // typically predates the let-bindings and has V inlined.
+    ExpressionPointer zetaUnfoldLetBinders(
+        ExpressionPointer expression,
+        const std::vector<LocalBinder>& localBinders,
+        int currentDepth) {
+        if (auto* boundVariable =
+                std::get_if<BoundVariable>(&expression->node)) {
+            int index = boundVariable->deBruijnIndex;
+            if (index >= currentDepth) {
+                int localOffset = index - currentDepth;
+                int arrayIndex =
+                    static_cast<int>(localBinders.size()) - 1 - localOffset;
+                if (arrayIndex >= 0
+                    && arrayIndex
+                       < static_cast<int>(localBinders.size())
+                    && localBinders[arrayIndex].value) {
+                    // The let's value was elaborated in a scope that
+                    // contained the localBinders BELOW it (indices 0
+                    // ..arrayIndex-1) but not the ones ABOVE it. Shift
+                    // its BVs up by the number of binders above it
+                    // plus the current in-expression depth to land in
+                    // our scope. Recursively unfold the value too so
+                    // chained let-bindings collapse fully.
+                    // The let's value V was elaborated in a smaller
+                    // scope (the binders below it, size = arrayIndex).
+                    // Lift V to interpret its BVs in the current
+                    // localBinders scope; recursively unfold any
+                    // chained let-references it contains; then shift
+                    // for the in-expression depth.
+                    int bindersIntroducedSince =
+                        static_cast<int>(localBinders.size())
+                        - arrayIndex;
+                    ExpressionPointer valueInCurrentScope = shift(
+                        localBinders[arrayIndex].value,
+                        bindersIntroducedSince);
+                    ExpressionPointer unfolded = zetaUnfoldLetBinders(
+                        valueInCurrentScope, localBinders,
+                        /*currentDepth=*/0);
+                    return shift(unfolded, currentDepth);
+                }
+            }
+            return expression;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return makePi(pi->displayHint,
+                zetaUnfoldLetBinders(pi->domain, localBinders, currentDepth),
+                zetaUnfoldLetBinders(pi->codomain, localBinders,
+                                      currentDepth + 1));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return makeLambda(lambda->displayHint,
+                zetaUnfoldLetBinders(lambda->domain, localBinders,
+                                      currentDepth),
+                zetaUnfoldLetBinders(lambda->body, localBinders,
+                                      currentDepth + 1));
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return makeApplication(
+                zetaUnfoldLetBinders(application->function, localBinders,
+                                      currentDepth),
+                zetaUnfoldLetBinders(application->argument, localBinders,
+                                      currentDepth));
+        }
+        if (auto* letNode = std::get_if<Let>(&expression->node)) {
+            return makeLet(letNode->displayHint,
+                zetaUnfoldLetBinders(letNode->type, localBinders,
+                                      currentDepth),
+                zetaUnfoldLetBinders(letNode->value, localBinders,
+                                      currentDepth),
+                zetaUnfoldLetBinders(letNode->body, localBinders,
+                                      currentDepth + 1));
+        }
+        return expression;
+    }
+
+    ExpressionPointer abstractStructuralOccurrenceWithWHNF(
+        ExpressionPointer expression,
+        ExpressionPointer target,
+        int currentDepth,
+        int& occurrenceCount,
+        int& whnfFuel) {
+        // Early stop: callers (e.g. `decide`) only need ONE occurrence
+        // to form a motive — further hits in unrelated subterms would
+        // multiply work without changing the answer. The shifted-BV
+        // returned here doesn't end up wired anywhere (the caller
+        // checks occurrenceCount > 0, not the returned tree), so just
+        // return `expression` unchanged once we've already matched.
+        if (occurrenceCount > 0) {
+            return expression;
+        }
+        ExpressionPointer shiftedTarget =
+            currentDepth == 0 ? target : shift(target, currentDepth);
+        // Try structural match on the un-reduced expression first; if it
+        // matches, no need to WHNF (which can be expensive and may not
+        // change the head).
+        if (structurallyEqual(expression, shiftedTarget)) {
+            occurrenceCount++;
+            return makeBoundVariable(currentDepth);
+        }
+        // For Application nodes, try WHNF: δ-unfolding may expose the
+        // target as a subterm (e.g., `bisectionStep(intervals)` δ-unfolds
+        // to `bisectionStepWithDec(intervals, classical_decidable(…))`).
+        // We do this ONLY at Application nodes (Pi/Lambda heads don't
+        // δ-reduce into anything that exposes new structure) and only
+        // while `whnfFuel` is positive (so propositional-definition
+        // chains in the goal can't drive an exponential blowup).
+        ExpressionPointer working = expression;
+        if (whnfFuel > 0 && std::get_if<Application>(&expression->node)) {
+            ExpressionPointer reduced;
+            try {
+                reduced = weakHeadNormalForm(environment_, expression);
+            } catch (const TypeError&) {
+                reduced = expression;
+            }
+            // Only count fuel when WHNF actually changes the term; an
+            // Application whose head is already a constructor (or whose
+            // function is a definition that doesn't ι-reduce because
+            // the scrutinee argument is a free variable) returns the
+            // same expression and would otherwise drain fuel without
+            // exposing anything.
+            if (!structurallyEqual(reduced, expression)) {
+                whnfFuel--;
+                working = reduced;
+                if (structurallyEqual(working, shiftedTarget)) {
+                    occurrenceCount++;
+                    return makeBoundVariable(currentDepth);
+                }
+            }
+        }
+        if (auto* boundVariable =
+                std::get_if<BoundVariable>(&working->node)) {
+            int index = boundVariable->deBruijnIndex;
+            if (index >= currentDepth) {
+                return makeBoundVariable(index + 1);
+            }
+            return working;
+        }
+        if (auto* pi = std::get_if<Pi>(&working->node)) {
+            // Skip WHNF in the domain: domains are types (propositions
+            // or sorts), not the user-value path where
+            // `classical_decidable(P)` lives. Use the cheap structural
+            // walker for the domain so any literal occurrence there
+            // still gets abstracted.
+            ExpressionPointer newDomain = abstractStructuralOccurrence(
+                pi->domain, target, currentDepth, occurrenceCount);
+            return makePi(pi->displayHint, newDomain,
+                abstractStructuralOccurrenceWithWHNF(
+                    pi->codomain, target, currentDepth + 1,
+                    occurrenceCount, whnfFuel));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&working->node)) {
+            // Same domain-skip as for Pi.
+            ExpressionPointer newDomain = abstractStructuralOccurrence(
+                lambda->domain, target, currentDepth, occurrenceCount);
+            return makeLambda(lambda->displayHint, newDomain,
+                abstractStructuralOccurrenceWithWHNF(
+                    lambda->body, target, currentDepth + 1,
+                    occurrenceCount, whnfFuel));
+        }
+        if (auto* application =
+                std::get_if<Application>(&working->node)) {
+            return makeApplication(
+                abstractStructuralOccurrenceWithWHNF(
+                    application->function, target, currentDepth,
+                    occurrenceCount, whnfFuel),
+                abstractStructuralOccurrenceWithWHNF(
+                    application->argument, target, currentDepth,
+                    occurrenceCount, whnfFuel));
+        }
+        if (auto* letNode = std::get_if<Let>(&working->node)) {
+            return makeLet(letNode->displayHint,
+                abstractStructuralOccurrenceWithWHNF(
+                    letNode->type, target, currentDepth,
+                    occurrenceCount, whnfFuel),
+                abstractStructuralOccurrenceWithWHNF(
+                    letNode->value, target, currentDepth,
+                    occurrenceCount, whnfFuel),
+                abstractStructuralOccurrenceWithWHNF(
+                    letNode->body, target, currentDepth + 1,
+                    occurrenceCount, whnfFuel));
+        }
+        return working;
     }
 
     ExpressionPointer abstractStructuralOccurrence(
