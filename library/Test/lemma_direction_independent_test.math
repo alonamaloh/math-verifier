@@ -1,0 +1,47 @@
+-- A library equation `L = R` should close calc steps `L = R` AND
+-- `R = L` without the user having to think about which direction
+-- the lemma was originally stated in. The auto-prover's lemma-index
+-- lookup used to be brittle here: it filled the lemma's binders only
+-- from the side it matched against, so an equation whose binders
+-- lived on only one side (e.g. `add_negate_left(x) : -x + x = 0` —
+-- `x` appears only on the LHS) closed the natural-direction step
+-- but failed on the symmetric one. The fix (a second pattern match
+-- on the other side) closes both.
+
+module Test.lemma_direction_independent_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+
+-- (1) Natural direction: `add_negate_left(1) : -1 + 1 = 0` closes
+-- the calc step `... = -1 + 1 = 0` directly.
+theorem natural_direction (q : Rational) (qIsNegOnePlusOne : q = -(1 : Rational) + (1 : Rational))
+        : q = (0 : Rational) :=
+  calc q
+     = -(1 : Rational) + (1 : Rational)
+     = (0 : Rational)
+
+-- (2) Symmetric direction: the same lemma also closes `0 = -1 + 1`.
+-- This is what used to require `by Equality.symmetry(add_negate_left(1))`.
+theorem symmetric_direction (q : Rational) (qIsZero : q = (0 : Rational))
+        : q = -(1 : Rational) + (1 : Rational) :=
+  calc q
+     = (0 : Rational)
+     = -(1 : Rational) + (1 : Rational)
+
+-- (3) Both directions inside a single calc chain — the auto-prover
+-- handles each step independently and neither needs a `by`.
+theorem both_directions_in_one_chain
+        (a : Rational) (aIsZero : a = (0 : Rational))
+        : -(1 : Rational) + (1 : Rational) = a :=
+  calc -(1 : Rational) + (1 : Rational)
+     = (0 : Rational)
+     = a

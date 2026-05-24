@@ -8098,6 +8098,23 @@ private:
                                        lemma.binderCount, bindings)) {
                 continue;
             }
+            // Symmetric pass: also match `otherSide` against
+            // `subRight` so the lemma's binders get filled from
+            // WHICHEVER side carries them. Without this, a lemma
+            // stated `-x + x = 0` would fire on `-1 + 1 = 0` (the
+            // matched LHS binds x) but NOT on `0 = -1 + 1` (the
+            // matched RHS is bare, leaving x unbound). matchAgainst-
+            // Pattern's set-or-check logic also doubles as the
+            // consistency check that used to live in the
+            // `structurallyEqual(expectedOther, subRight)` line
+            // below — when bindings overlap between the two sides,
+            // re-binding the same slot to the same subterm succeeds,
+            // and a conflict between the two sides correctly rejects
+            // the lemma.
+            if (!matchAgainstPattern(otherSide, subRight,
+                                       lemma.binderCount, bindings)) {
+                continue;
+            }
             // Discharge unbound preconditions outer-to-inner: a binder
             // type at conclusion-frame index i may reference outer
             // binders (index > i), so we need those filled first.
@@ -8178,9 +8195,13 @@ private:
                 if (!binding) { allBound = false; break; }
             }
             if (!allBound) continue;
-            ExpressionPointer expectedOther =
-                instantiateLemmaBinders(otherSide, bindings);
-            if (!structurallyEqual(expectedOther, subRight)) continue;
+            // The two `matchAgainstPattern` calls above already
+            // enforced `otherSide[bindings] = subRight` structurally,
+            // so the redundant re-check that used to live here is
+            // gone. (Propositional preconditions filled by the
+            // discharge pass don't appear in `otherSide` — they're
+            // referenced from binder types, not from the conclusion's
+            // LHS/RHS — so they don't change the check's outcome.)
             // Assemble the lemma application: `lemmaName(binding_for_BV(n-1),
             // …, binding_for_BV(0))` — outer binder first since that's
             // the order of the Π chain.
