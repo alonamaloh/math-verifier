@@ -7,6 +7,10 @@ set -e
 cd "$(dirname "$0")"
 
 LOG=/tmp/library_build.log
+# Force every module to re-verify so the `--check-redundant-by` pass
+# fires across the whole library (incremental builds skip already-up-
+# to-date .mathv files, which would silence the warnings we want).
+find build -name '*.mathv' -delete 2>/dev/null
 make -j 16 library > "$LOG" 2>&1 || {
     echo "build failed; see $LOG"
     exit 1

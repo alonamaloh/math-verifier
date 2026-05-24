@@ -131,15 +131,11 @@ theorem Natural.monus_zero_implies_decompose
           → Natural.monus(divisor, dividend) = 0
           → dividend = divisor + Natural.monus(dividend, divisor)
   | zero, dividend, _ =>
-      -- divisor = 0: dividend = 0 + dividend. monus(dividend, 0) = dividend.
-      -- The final step bridges via `monus_zero` (was the kernel's
-      -- automatic ι; now an explicit lemma because monus is opaque).
+      -- divisor = 0: dividend = 0 + dividend. monus(dividend, 0) =
+      -- dividend (a characterising lemma, since monus is opaque).
       calc dividend
          = 0 + dividend
          = 0 + Natural.monus(dividend, 0)
-              by congruenceOf(
-                     function (m : Natural) => 0 + m,
-                     Equality.symmetry(Natural.monus_zero(dividend)))
   | successor(predDivisor), dividend, monusEqZero =>
       (cases dividend {
          | zero =>
@@ -151,10 +147,7 @@ theorem Natural.monus_zero_implies_decompose
                claim succEqZero : successor(predDivisor) = 0
                    by calc successor(predDivisor)
                         = Natural.monus(successor(predDivisor), 0)
-                              by Equality.symmetry(
-                                     Natural.monus_succ_zero(predDivisor))
-                        = 0
-                              by refinedMonusEqZero;
+                        = 0;
                absurd(succEqZero)
              }
          | successor(predDividend) =>
@@ -169,11 +162,7 @@ theorem Natural.monus_zero_implies_decompose
                    by calc Natural.monus(predDivisor, predDividend)
                         = Natural.monus(successor(predDivisor),
                                          successor(predDividend))
-                              by Equality.symmetry(
-                                     Natural.monus_succ_succ(
-                                         predDivisor, predDividend))
-                        = 0
-                              by refinedMonusEqZero;
+                        = 0;
                calc successor(predDividend)
                   = successor(predDivisor
                               + Natural.monus(predDividend, predDivisor))
@@ -185,12 +174,6 @@ theorem Natural.monus_zero_implies_decompose
                   = successor(predDivisor)
                         + Natural.monus(successor(predDividend),
                                          successor(predDivisor))
-                         by congruenceOf(
-                                function (m : Natural) =>
-                                    successor(predDivisor) + m,
-                                Equality.symmetry(
-                                    Natural.monus_succ_succ(
-                                        predDividend, predDivisor)))
              }
        } : (refinedMonusEqZero
                 : Natural.monus(successor(predDivisor), dividend) = 0)
@@ -205,47 +188,25 @@ theorem Natural.divide_modulo_step_decompose
           → divisor * Natural.divide_step(fuel, divisor, dividend)
                 + Natural.modulo_step(fuel, divisor, dividend)
             = dividend
-  | zero, divisor, dividend => {
-      -- Bridge the opaque divide_step / modulo_step to their
-      -- characterising values via the *_zero_fuel lemmas, then
-      -- the rest is multiplication arithmetic.
-      claim divEq : Natural.divide_step(0, divisor, dividend) = 0
-          by Natural.divide_step_zero_fuel(divisor, dividend);
-      claim modEq : Natural.modulo_step(0, divisor, dividend) = dividend
-          by Natural.modulo_step_zero_fuel(divisor, dividend);
+  | zero, divisor, dividend =>
+      -- Zero fuel: divide_step returns 0, modulo_step returns the
+      -- dividend (via the *_zero_fuel characterising lemmas, found
+      -- by library scan). The rest is multiplication arithmetic.
       calc divisor * Natural.divide_step(0, divisor, dividend)
                + Natural.modulo_step(0, divisor, dividend)
          = divisor * 0
                + Natural.modulo_step(0, divisor, dividend)
-              by congruenceOf(
-                     function (m : Natural) =>
-                         divisor * m
-                             + Natural.modulo_step(0, divisor, dividend),
-                     divEq)
          = divisor * 0 + dividend
-              by congruenceOf(
-                     function (m : Natural) => divisor * 0 + m,
-                     modEq)
          = 0 + dividend
          = dividend
-  }
   | successor(fuel), divisor, dividend =>
       -- Case-split on monus(divisor, dividend) and retain the equation.
       cases Natural.monus(divisor, dividend) with monusEq {
-        | zero => {
-            -- divide_step / modulo_step reduce via *_succ_fits.
-            claim divEq
-                  : Natural.divide_step(successor(fuel), divisor, dividend)
-                    = successor(Natural.divide_step(
-                          fuel, divisor, Natural.monus(dividend, divisor)))
-                by Natural.divide_step_succ_fits(
-                       fuel, divisor, dividend, monusEq);
-            claim modEq
-                  : Natural.modulo_step(successor(fuel), divisor, dividend)
-                    = Natural.modulo_step(
-                          fuel, divisor, Natural.monus(dividend, divisor))
-                by Natural.modulo_step_succ_fits(
-                       fuel, divisor, dividend, monusEq);
+        | zero =>
+            -- divide_step / modulo_step reduce via *_succ_fits — the
+            -- auto-prover finds them in scope via the lemma index
+            -- (`monusEq : monus(divisor, dividend) = 0` is the
+            -- precondition both lemmas need; it's in scope).
             calc divisor
                      * Natural.divide_step(
                            successor(fuel), divisor, dividend)
@@ -257,25 +218,11 @@ theorem Natural.divide_modulo_step_decompose
                  + Natural.modulo_step(
                            successor(fuel),
                            divisor, dividend)
-                       by congruenceOf(
-                              function (m : Natural) =>
-                                  divisor * m
-                                      + Natural.modulo_step(
-                                            successor(fuel), divisor, dividend),
-                              divEq)
                = divisor
                      * successor(Natural.divide_step(
                            fuel, divisor, Natural.monus(dividend, divisor)))
                  + Natural.modulo_step(
                            fuel, divisor, Natural.monus(dividend, divisor))
-                       by congruenceOf(
-                              function (m : Natural) =>
-                                  divisor
-                                      * successor(Natural.divide_step(
-                                            fuel, divisor,
-                                            Natural.monus(dividend, divisor)))
-                                      + m,
-                              modEq)
                = (divisor
                     + divisor
                         * Natural.divide_step(
@@ -293,18 +240,10 @@ theorem Natural.divide_modulo_step_decompose
                               fuel, divisor,
                               Natural.monus(dividend, divisor))
                = dividend
-        }
-        | successor(predM) => {
-            -- divide_step / modulo_step reduce via *_succ_too_big.
-            claim divEq
-                  : Natural.divide_step(successor(fuel), divisor, dividend) = 0
-                by Natural.divide_step_succ_too_big(
-                       fuel, divisor, dividend, predM, monusEq);
-            claim modEq
-                  : Natural.modulo_step(successor(fuel), divisor, dividend)
-                    = dividend
-                by Natural.modulo_step_succ_too_big(
-                       fuel, divisor, dividend, predM, monusEq);
+        | successor(predM) =>
+            -- divide_step / modulo_step reduce via *_succ_too_big —
+            -- the auto-prover finds both, with `monusEq` and `predM`
+            -- in scope satisfying their preconditions.
             calc divisor
                      * Natural.divide_step(
                            successor(fuel), divisor, dividend)
@@ -313,19 +252,9 @@ theorem Natural.divide_modulo_step_decompose
                = divisor * 0
                  + Natural.modulo_step(
                            successor(fuel), divisor, dividend)
-                       by congruenceOf(
-                              function (m : Natural) =>
-                                  divisor * m
-                                      + Natural.modulo_step(
-                                            successor(fuel), divisor, dividend),
-                              divEq)
                = divisor * 0 + dividend
-                       by congruenceOf(
-                              function (m : Natural) => divisor * 0 + m,
-                              modEq)
                = 0 + dividend
                = dividend
-        }
       }
 
 -- Top-level decomposition: divisor * divide(d, n) + modulo(d, n) = n.
@@ -374,8 +303,8 @@ theorem Natural.monus_succ_implies_gt
       -- `succ(predM) = 0`, the absurd shape.
       absurd(
           calc successor(predM)
-             = Natural.monus(zero, n)   by Equality.symmetry(monusEq)
-             = 0                        by Natural.monus_zero_left(n))
+             = Natural.monus(zero, n)
+             = 0)
   | successor(d'), n, predM, monusEq =>
       (cases n {
          | zero =>
@@ -393,9 +322,7 @@ theorem Natural.monus_succ_implies_gt
                      : Natural.monus(d', k) = successor(predM)
                    by calc Natural.monus(d', k)
                         = Natural.monus(successor(d'), successor(k))
-                              by Equality.symmetry(
-                                     Natural.monus_succ_succ(d', k))
-                        = successor(predM)   by refinedMonusEq;
+                        = successor(predM);
                Natural.successor_less_or_equal_successor(
                    successor(k), d',
                    Natural.monus_succ_implies_gt(
