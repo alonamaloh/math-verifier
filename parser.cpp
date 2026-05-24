@@ -798,13 +798,55 @@ private:
             //   - Structured: `claim …` (any of the new structured-proof
             //     forms; chained by parseStructuredClaimSequence).
             // Disambiguate by lookahead — legacy needs `claim NAME :`.
-            // If we're at the structured form, leave the wrapper loop;
-            // parseExpression() at the end of parseBlockContents picks
-            // up the structured-claim chain.
+            // If we're at the structured form, speculatively parse one
+            // structured claim and peek at the next token:
+            //   - `;`  →  mid-block statement. Wrap as an anonymous
+            //              TypedLet so subsequent statements' auto-
+            //              prover finds the proof by hypothesis match.
+            //   - else →  not a statement (no proposition, no `;`,
+            //              or followed by another `claim` for a chain).
+            //              Restore position and let the existing break
+            //              + parseExpression flow handle it (so
+            //              parseStructuredClaimSequence keeps working).
             if ((peek().kind == TokenKind::KeywordClaim
                  && !looksLikeLegacyClaim())
                 || peek().kind == TokenKind::KeywordDone
                 || peek().kind == TokenKind::KeywordOkay) {
+                Token claimToken = peek();
+                size_t savedPosition = position_;
+                int savedAnonymousClaimCounter = anonymousClaimCounter_;
+                SurfaceExpressionPointer claimExpression =
+                    parseStructuredClaim();
+                auto* claimNode = std::get_if<SurfaceStructuredClaim>(
+                    &claimExpression->node);
+                if (claimNode && claimNode->proposition
+                    && peek().kind == TokenKind::Semicolon) {
+                    // `claim P [by …];` mid-block — stash the proof
+                    // under an anonymous name so subsequent statements'
+                    // auto-prover finds it via structural hypothesis
+                    // match.
+                    SurfaceExpressionPointer propositionCopy =
+                        claimNode->proposition;
+                    consumeAny();  // ';'
+                    BlockWrapper wrapper;
+                    wrapper.kind = BlockWrapper::TypedLet;
+                    wrapper.name = "_claim_anon_"
+                        + std::to_string(claimToken.line) + "_"
+                        + std::to_string(claimToken.column);
+                    wrapper.type = std::move(propositionCopy);
+                    wrapper.value = std::move(claimExpression);
+                    wrapper.line = claimToken.line;
+                    wrapper.column = claimToken.column;
+                    wrappers.push_back(std::move(wrapper));
+                    continue;
+                }
+                // Not the statement shape. Rewind and let the normal
+                // break-and-parseExpression path handle it — that path
+                // calls parseStructuredClaimSequence, which is the one
+                // that knows how to chain `claim P` followed by another
+                // `claim` via the implicit anonymous-let.
+                position_ = savedPosition;
+                anonymousClaimCounter_ = savedAnonymousClaimCounter;
                 break;
             }
             Token statementToken = consumeAny();
