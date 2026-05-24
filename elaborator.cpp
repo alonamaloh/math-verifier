@@ -3685,6 +3685,39 @@ private:
             // use it.
             ExpressionPointer ascribedType =
                 elaborateExpression(*ascription->type, localBinders);
+            // Carrier-identity shortcut: `(0 : T)` / `(1 : T)` where T
+            // is a known constant with `T.zero` / `T.one` declared
+            // emit the carrier's named identity directly. Without
+            // this, the ascription would coerce a Natural literal into
+            // T, producing a chain like
+            // `Integer.to_rational(Natural.to_integer(zero))` — equal
+            // to `T.zero` definitionally but opaque to `ring` (and to
+            // any structural-search auto-prover) because the surface
+            // shape is no longer the literal `T.zero`. Only fires when
+            // the ascribed expression is a BARE numeric literal (not a
+            // sub-expression like `1 + d`), so existing
+            // `((1 + d) : Integer)` style ascriptions keep their
+            // Natural-then-coerce semantics.
+            if (auto* numeric = std::get_if<SurfaceNumericLiteral>(
+                    &ascription->expression->node)) {
+                int value = std::stoi(numeric->digits);
+                if (value == 0 || value == 1) {
+                    ExpressionPointer cursor = ascribedType;
+                    while (auto* application =
+                               std::get_if<Application>(&cursor->node)) {
+                        cursor = application->function;
+                    }
+                    if (auto* head =
+                            std::get_if<Constant>(&cursor->node)) {
+                        std::string constantName = head->name
+                            + (value == 0 ? ".zero" : ".one");
+                        if (environment_.lookup(constantName)
+                            != nullptr) {
+                            return makeConstant(constantName);
+                        }
+                    }
+                }
+            }
             ExpressionPointer inner =
                 elaborateExpression(*ascription->expression,
                                      localBinders, ascribedType);

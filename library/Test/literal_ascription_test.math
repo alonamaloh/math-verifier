@@ -1,0 +1,54 @@
+-- `(0 : T)` and `(1 : T)` should produce the carrier's named
+-- identity constants when `T.zero` / `T.one` are in scope, rather
+-- than coercing a Natural literal through the coercion registry.
+-- The two forms are definitionally equal either way, but the
+-- carrier-constant form is what `ring` (and any structural-search
+-- auto-prover) recognises as the additive / multiplicative identity.
+
+module Test.literal_ascription_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.embedding
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.order
+import Rational.ring
+import Rational.algebra
+
+-- (1) `(0 : Integer)` is the kernel constant `Integer.zero`.
+theorem integer_zero_via_ascription
+        : (0 : Integer) = Integer.zero :=
+  reflexivity(Integer, Integer.zero)
+
+-- (2) `(1 : Integer)` is `Integer.one`.
+theorem integer_one_via_ascription
+        : (1 : Integer) = Integer.one :=
+  reflexivity(Integer, Integer.one)
+
+-- (3) `(0 : Rational)` is `Rational.zero` — and ring recognises it
+-- as the additive identity (so `1 + 0 = 1` closes without an
+-- explicit by).
+theorem rational_zero_via_ascription
+        : (0 : Rational) = Rational.zero :=
+  reflexivity(Rational, Rational.zero)
+
+theorem rational_one_plus_zero_via_ring
+        : (1 : Rational) + (0 : Rational) = (1 : Rational) :=
+  ring
+
+-- (4) The shortcut only fires for a BARE numeric literal — when the
+-- ascribed expression is a compound `1 + n` (Natural), the parse
+-- stays Natural-then-coerce. Without this guard, `((1 + d) :
+-- Integer)` would push `Integer` into `1`, making `1 + d` a
+-- type-mismatched mix of Integer.one and a Natural `d`.
+theorem compound_ascription_still_works (d : Natural)
+        : ((1 + d) : Integer) = Natural.to_integer(1 + d) :=
+  reflexivity(Integer, Natural.to_integer(1 + d))
