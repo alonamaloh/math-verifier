@@ -1,0 +1,61 @@
+-- Minimal reproduction of a bug we hit in supremum.math: when an
+-- equality binder comes from `obtain ⟨witness, eq⟩ from existsProof;`,
+-- `claim by substituting eq` rejects it with "supplied expression's
+-- type is not an equality", even though the unnamed `claim by
+-- substitution` form picks the same binder up via context-equality
+-- collection.
+
+module Test.substituting_obtain_test
+
+import Logic.basics
+import Logic.exists
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.monus
+import Equality.basics
+
+-- (1) baseline — equality is a direct binder, `substituting <name>` works.
+theorem direct_binder_substituting
+        (k : Natural) (kEq : k = 0)
+        : 0 = 0 :=
+  claim 0 = 0 by substituting kEq
+
+-- (2) the bug — equality is introduced via `obtain`. Same proof shape;
+-- only the binding mechanism changes.
+theorem obtain_binder_substituting
+        (hypExists : ∃ (k : Natural). k = 0)
+        : 0 = 0 := {
+  obtain ⟨k, kEq⟩ from hypExists;
+  claim 0 = 0 by substituting kEq
+}
+
+-- (3) sanity — unnamed `by substitution` works on the obtain-binder.
+theorem obtain_binder_substitution_unnamed
+        (hypExists : ∃ (k : Natural). k = 0)
+        : 0 = 0 := {
+  obtain ⟨k, kEq⟩ from hypExists;
+  claim 0 = 0 by substitution
+}
+
+-- (4) bug B repro — `claim by substituting` should see structural
+-- occurrences exposed by `unfold`. An `opaque definition` whose body
+-- case-splits on `monus(p, n)` doesn't expose that scrutinee in the
+-- closed goal; the goal's RHS deliberately doesn't mention 0 either
+-- (we ascribe `(_ : Natural)` arithmetic so the LHS / RHS only share
+-- bound variables). Under `unfold` the scrutinee IS visible inside
+-- the recursor's spine. The substituter walks the WHNF tree to find
+-- the `monus(p, n)` slot, substitutes 0 (selecting the zero arm),
+-- and lands on a goal closeable by ι-reduction.
+
+opaque definition Test.boxed_via_cases (p n : Natural) : Natural :=
+  cases Natural.monus(p, n) {
+    | zero         => p
+    | successor(_) => n
+  }
+
+theorem under_unfold_via_cases
+        (p n : Natural) (pFits : Natural.monus(p, n) = 0)
+        : Test.boxed_via_cases(p, n) = p :=
+  unfold Test.boxed_via_cases in claim by substituting pFits

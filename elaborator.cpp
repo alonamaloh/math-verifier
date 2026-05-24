@@ -5560,6 +5560,22 @@ private:
                     return a.cost < b.cost;
                 });
         }
+        // Goal candidates to search: first the closed form as the user
+        // wrote it, then a deep-WHNF normalization (recursive WHNF
+        // through Application spines). Under `unfold X in body`, the
+        // surface goal type still mentions `X(args)`; only after
+        // deep-WHNF does `X`'s body — and the equation's endpoint
+        // buried inside it — become reachable for structural search.
+        // We try the surface form first because it preserves the
+        // user's intended motive shape; the deep form is the fallback
+        // when the surface search comes up empty.
+        std::vector<ExpressionPointer> goalForms;
+        goalForms.push_back(goalClosed);
+        ExpressionPointer goalDeepWhnf =
+            deepWhnfThroughApplications(goalClosed);
+        if (goalDeepWhnf.get() != goalClosed.get()) {
+            goalForms.push_back(goalDeepWhnf);
+        }
         // For each candidate, both directions, try the bridge.
         for (const ContextEquality& eq : candidates) {
             for (int direction = 0; direction < 2; ++direction) {
@@ -5568,10 +5584,14 @@ private:
                 ExpressionPointer toSide =
                     (direction == 0) ? eq.lhs : eq.rhs;
                 int occurrences = 0;
-                ExpressionPointer abstractedBody =
-                    abstractStructuralOccurrence(
-                        goalClosed, fromSide,
+                ExpressionPointer abstractedBody;
+                for (const ExpressionPointer& goalForm : goalForms) {
+                    occurrences = 0;
+                    abstractedBody = abstractStructuralOccurrence(
+                        goalForm, fromSide,
                         /*currentDepth=*/0, occurrences);
+                    if (occurrences > 0) break;
+                }
                 if (occurrences == 0) continue;
                 ExpressionPointer rewrittenGoal = substitute(
                     abstractedBody, 0, toSide);
@@ -14660,6 +14680,12 @@ private:
     EqualityComponents extractEqualityComponents(
         ExpressionPointer equalityType, const char* contextLabel,
         int line) {
+        // WHNF the type so a β-redex (e.g. the predicate body of an
+        // Exists destructured via `obtain ⟨k, eq⟩` — the binder's
+        // type starts as `(λ k'. P k')(k)`) reduces to the
+        // applied-`Equality.{u}` form we expect to destructure below.
+        equalityType =
+            weakHeadNormalForm(environment_, equalityType);
         auto* outerApp = std::get_if<Application>(&equalityType->node);
         if (!outerApp) {
             throw ElaborateError(
@@ -14855,6 +14881,34 @@ private:
     // Lambda binder. Counts matches so the caller can require exactly
     // one. `target` is shifted as we descend into binders so structural
     // comparison stays correct.
+
+    // Recursive WHNF through Application spines. WHNFs the current
+    // expression, then — if the result is an Application — recursively
+    // normalizes its function and argument. This exposes structural
+    // shape that plain `weakHeadNormalForm` leaves alone (it only
+    // reduces the outermost head). Used by `claim by substituting`'s
+    // search as a fallback when the surface goal has no occurrences
+    // of the equation's endpoint, but a deeper reduction would expose
+    // one — e.g. under `unfold X in body`, where `X(args)` in the
+    // surface goal δ-unfolds to a `cases scrutinee { … }` body whose
+    // scrutinee is the substitution target.
+    ExpressionPointer deepWhnfThroughApplications(
+        ExpressionPointer expression) {
+        expression = weakHeadNormalForm(environment_, expression);
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            ExpressionPointer function =
+                deepWhnfThroughApplications(application->function);
+            ExpressionPointer argument =
+                deepWhnfThroughApplications(application->argument);
+            if (function.get() != application->function.get()
+                || argument.get() != application->argument.get()) {
+                return makeApplication(std::move(function),
+                                        std::move(argument));
+            }
+        }
+        return expression;
+    }
 
     // Deep beta-only reduction: rewrites every (λx. body)(arg) redex
     // anywhere in the expression — never δ-unfolds Constants, so

@@ -85,75 +85,37 @@ theorem Natural.modulo_step_zero_fuel (p n : Natural)
   unfold Natural.modulo_step in reflexivity(Natural, n)
 
 -- Successor fuel, p ≤ n (monus(p, n) = 0): strip one p and recurse.
+-- Unfolding `divide_step` exposes a `cases monus(p, n) { … }`;
+-- substituting along `pFits` makes the scrutinee `0`, selecting the
+-- zero arm and closing the goal via ι-reduction.
 theorem Natural.divide_step_succ_fits
         (fuel p n : Natural)
         (pFits : Natural.monus(p, n) = 0)
         : Natural.divide_step(successor(fuel), p, n)
           = successor(Natural.divide_step(fuel, p, Natural.monus(n, p))) :=
-  unfold Natural.divide_step in
-    Equality.transport_proposition(
-        function (m : Natural) =>
-            (cases m {
-               | zero =>
-                   successor(Natural.divide_step(fuel, p, Natural.monus(n, p)))
-               | successor(_) => zero
-             } : Natural)
-            = successor(Natural.divide_step(fuel, p, Natural.monus(n, p))),
-        0, Natural.monus(p, n),
-        Equality.symmetry(pFits),
-        reflexivity(Natural,
-            successor(Natural.divide_step(fuel, p, Natural.monus(n, p)))))
+  unfold Natural.divide_step in claim by substituting pFits
 
 theorem Natural.modulo_step_succ_fits
         (fuel p n : Natural)
         (pFits : Natural.monus(p, n) = 0)
         : Natural.modulo_step(successor(fuel), p, n)
           = Natural.modulo_step(fuel, p, Natural.monus(n, p)) :=
-  unfold Natural.modulo_step in
-    Equality.transport_proposition(
-        function (m : Natural) =>
-            (cases m {
-               | zero => Natural.modulo_step(fuel, p, Natural.monus(n, p))
-               | successor(_) => n
-             } : Natural)
-            = Natural.modulo_step(fuel, p, Natural.monus(n, p)),
-        0, Natural.monus(p, n),
-        Equality.symmetry(pFits),
-        reflexivity(Natural,
-            Natural.modulo_step(fuel, p, Natural.monus(n, p))))
+  unfold Natural.modulo_step in claim by substituting pFits
 
 -- Successor fuel, p > n (monus(p, n) = successor(predM)): no
--- recursion; divide returns 0, modulo carries n.
+-- recursion; divide returns 0, modulo carries n. Substituting along
+-- `pTooBig` selects the `successor(_)` arm.
 theorem Natural.divide_step_succ_too_big
         (fuel p n predM : Natural)
         (pTooBig : Natural.monus(p, n) = successor(predM))
         : Natural.divide_step(successor(fuel), p, n) = 0 :=
-  unfold Natural.divide_step in
-    Equality.transport_proposition(
-        function (m : Natural) =>
-            (cases m {
-               | zero =>
-                   successor(Natural.divide_step(fuel, p, Natural.monus(n, p)))
-               | successor(_) => zero
-             } : Natural) = 0,
-        successor(predM), Natural.monus(p, n),
-        Equality.symmetry(pTooBig),
-        reflexivity(Natural, 0))
+  unfold Natural.divide_step in claim by substituting pTooBig
 
 theorem Natural.modulo_step_succ_too_big
         (fuel p n predM : Natural)
         (pTooBig : Natural.monus(p, n) = successor(predM))
         : Natural.modulo_step(successor(fuel), p, n) = n :=
-  unfold Natural.modulo_step in
-    Equality.transport_proposition(
-        function (m : Natural) =>
-            (cases m {
-               | zero => Natural.modulo_step(fuel, p, Natural.monus(n, p))
-               | successor(_) => n
-             } : Natural) = n,
-        successor(predM), Natural.monus(p, n),
-        Equality.symmetry(pTooBig),
-        reflexivity(Natural, n))
+  unfold Natural.modulo_step in claim by substituting pTooBig
 
 -- ----------------------------------------------------------------------
 -- Divide/modulo correctness: divisor * divide + modulo = dividend.
