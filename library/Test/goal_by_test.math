@@ -1,0 +1,47 @@
+-- `goal by <Hint>` is a math-style synonym for `claim by <Hint>`:
+-- the proposition comes from the expected type either way, and the
+-- only difference is the leading keyword. Reads as "the goal is
+-- closed by …" instead of "claim it via …".
+
+module Test.goal_by_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- (1) `goal by substitution`.
+theorem goal_by_substitution
+        (a b : Natural) (aEqB : a = b) (P : Natural → Proposition)
+        (hyp : P(a))
+        : P(b) :=
+  goal by substitution
+
+-- (2) `goal by substituting <eq>` — narrowed form, names the
+-- equality to use.
+theorem goal_by_substituting
+        (a b c : Natural) (aEqB : a = b) (bEqC : b = c)
+        (P : Natural → Proposition) (hyp : P(b))
+        : P(a) :=
+  goal by substituting aEqB
+
+-- (3) `goal by cases { ... }` — propositional case-split. The
+-- arm hypothesis bindings `as hP` / `as hQ` give the disjunct
+-- proofs names so the arm bodies can cite them.
+theorem goal_by_cases
+        (P Q : Proposition) (disj : P ∨ Q)
+        (impliesP : P → P) (impliesQ : Q → P)
+        : P :=
+  goal by cases {
+    case P  as hP:  impliesP(hP)
+    case Q  as hQ:  impliesQ(hQ)
+  }
+
+-- (4) `goal` alone (no `by`) — still works as the type-level
+-- placeholder for the expected type. Goes through SurfaceGoal,
+-- not parseStructuredClaim.
+theorem goal_alone (a : Natural) (P : Natural → Proposition)
+        (hyp : P(a))
+        : P(a) :=
+  given (P(a))

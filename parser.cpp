@@ -1807,6 +1807,18 @@ private:
         }
         if (current.kind == TokenKind::KeywordGoal) {
             Token token = consumeAny();
+            // `goal by <Hint>` (and all the structured-claim modifier
+            // shapes — `by cases`, `by substituting`, `by induction`,
+            // etc.) is a math-style alias for `claim by <Hint>`. Both
+            // resolve the proposition from expected type, so the only
+            // difference is the leading keyword. We dispatch to
+            // parseStructuredClaimTail (factored below) so the same
+            // modifier-parsing code handles both spellings.
+            if (peek().kind == TokenKind::KeywordBy) {
+                return parseStructuredClaimTail(
+                    token,
+                    /*proposition=*/nullptr);
+            }
             return makeSurfaceGoal(token.line, token.column);
         }
         if (current.kind == TokenKind::KeywordUnfold) {
@@ -2120,12 +2132,6 @@ private:
     // form is handled by parseBlockContents and never reaches here.
     SurfaceExpressionPointer parseStructuredClaim() {
         Token claimToken = consumeAny();  // 'claim' / 'done' / 'okay'
-        SurfaceExpressionPointer proposition;
-        SurfaceExpressionPointer byHint;
-        bool byCases = false;
-        bool byInduction = false;
-        bool bySubstitution = false;
-        std::vector<SurfaceStructuredClaimArm> arms;
         // `done` and `okay` are strictly bare — they don't accept a
         // proposition or a `by` hint. Return immediately so the
         // proposition-parse path below doesn't try to swallow the
@@ -2139,11 +2145,27 @@ private:
                 /*byHint=*/nullptr, /*byCases=*/false, /*arms=*/{},
                 claimToken.line, claimToken.column);
         }
+        SurfaceExpressionPointer proposition;
         // Bare `claim` / `claim by …` — terminal-shaped, no proposition.
         if (peek().kind != TokenKind::KeywordBy
             && !isStructuredClaimTerminator()) {
             proposition = parseExpression();
         }
+        return parseStructuredClaimTail(
+            claimToken, std::move(proposition));
+    }
+
+    // Shared "after the keyword + optional proposition" parser. Called
+    // from parseStructuredClaim and from the `goal by …` entry point
+    // in parseAtom (`goal by Hint` is just `claim by Hint` with a
+    // friendlier reading-as-math keyword).
+    SurfaceExpressionPointer parseStructuredClaimTail(
+        Token claimToken, SurfaceExpressionPointer proposition) {
+        SurfaceExpressionPointer byHint;
+        bool byCases = false;
+        bool byInduction = false;
+        bool bySubstitution = false;
+        std::vector<SurfaceStructuredClaimArm> arms;
         if (peek().kind == TokenKind::KeywordBy) {
             consumeAny();  // 'by'
             if (peek().kind == TokenKind::KeywordCases) {
