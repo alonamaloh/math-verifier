@@ -176,63 +176,56 @@ theorem Real.exists_rational_below_at_make
           → ∃ (q : Rational).
                 (q : Real) ≤ Quotient.mk(rep)
   | CauchyRationalSequence.make(seq, seqIsCauchy) => {
+      -- Pick N from the Cauchy witness at ε = 1; for m, n ≥ N,
+      -- |seq(m) - seq(n)| < 1. The witness rational is q := seq(N) - 1
+      -- — every later term `seq(m)` lies in (seq(N) - 1, seq(N) + 1),
+      -- hence strictly above q.
       obtain ⟨N, cauchyAt1⟩
           from seqIsCauchy(Rational.one, Rational.zero_less_one);
-      -- `cauchyAt1 : ∀m ≥ N. ∀n ≥ N. |seq(m) - seq(n)| < 1`.
-      witness seq(N) - Rational.one with
-          -- Goal: (seq(N) - 1 : Real) ≤ Quotient.mk(make(seq, _)).
-          -- LessOrEqual unfolds to Real.IsNonneg of the difference;
-          -- via Quotient.lift this is IsEventuallyNonneg of
-          -- `λn. seq(n) - (seq(N) - 1)` (with the rep destructured
-          -- and (q : Real) reducing to mk(make(λn. q, _))).
-          function (epsilon : Rational)
-                   (epsilonPositive : Rational.zero < epsilon) =>
-            witness N with
-                function (m : Natural) (mGeN : N ≤ m) => {
-                  -- |seq(m) - seq(N)| < 1
-                  claim absBound
-                        : Rational.absolute_value(seq(m) - seq(N))
-                          < Rational.one
-                    by cauchyAt1(m, mGeN, N,
-                                 LessOrEqual.reflexivity(N));
-                  -- -1 < seq(m) - seq(N) from the absolute-value bound.
-                  claim diffBound
-                        : -Rational.one < seq(m) - seq(N)
-                    by And.left(
-                           -Rational.one < seq(m) - seq(N),
-                           seq(m) - seq(N) < Rational.one,
-                           Rational.absolute_value_LessThan_bounds(
-                               seq(m) - seq(N),
-                               Rational.one,
-                               absBound));
-                  -- Add 1 to both sides of `-1 < seq(m) - seq(N)`:
-                  -- `0 < (seq(m) - seq(N)) + 1`, then ring tidies the
-                  -- RHS to `seq(m) - (seq(N) - 1)`. The LHS rewrite
-                  -- uses `add_negate_left` directly (ring v2 can't do
-                  -- the empty-polynomial `-1 + 1 = 0` case).
-                  claim diffPositive
-                        : Rational.zero
-                          < seq(m) - (seq(N) - Rational.one)
-                    by rewrite(
-                           (ring : (seq(m) - seq(N)) + Rational.one
-                                   = seq(m) - (seq(N) - Rational.one)),
-                           rewrite(
-                               Rational.add_negate_left(Rational.one),
-                               Rational.add_preserves_LessThan(
-                                   -Rational.one,
-                                   seq(m) - seq(N),
-                                   Rational.one,
-                                   diffBound)));
-                  -- -ε < 0 < seq(m) - (seq(N) - 1) by transitivity.
-                  Rational.LessThan.transitive_left(
-                      -epsilon, Rational.zero,
-                      seq(m) - (seq(N) - Rational.one),
-                      Rational.LessThan.weaken(
-                          -epsilon, Rational.zero,
-                          Rational.negate_LessThan_zero_of_positive(
-                              epsilon, epsilonPositive)),
-                      diffPositive)
-                }
+      witness seq(N) - Rational.one with {
+        -- (q : Real) ≤ mk(make(seq, _)) unfolds (via Quotient.lift
+        -- through `LessOrEqual` → `IsNonneg` of the difference) to:
+        -- `∀ ε > 0. ∃ M. ∀ m ≥ M. seq(m) - (seq(N) - 1) > -ε`. Take
+        -- M = N and chain -ε < 0 < seq(m) - (seq(N) - 1).
+        let epsilon ∈ Rational with Rational.zero < epsilon;
+        witness N with {
+          let m ∈ Natural with N ≤ m;
+          claim absBound
+                : Rational.absolute_value(seq(m) - seq(N))
+                  < Rational.one
+            by cauchyAt1(m, given(N ≤ m),
+                         N, LessOrEqual.reflexivity(N));
+          -- absolute_value_LessThan_bounds returns the conjunction
+          -- `-1 < seq(m) - seq(N) ∧ ... < 1`; destructure to name
+          -- only the half we use.
+          obtain ⟨diffBound, _⟩
+              from Rational.absolute_value_LessThan_bounds(
+                       seq(m) - seq(N), Rational.one, absBound);
+          -- 0 = -1 + 1 < (seq(m) - seq(N)) + 1 by adding 1 on the
+          -- right of diffBound, and ring rearranges the RHS to
+          -- `seq(m) - (seq(N) - 1)`.
+          claim diffPositive
+                : Rational.zero
+                  < seq(m) - (seq(N) - Rational.one)
+            by calc Rational.zero
+                  = -Rational.one + Rational.one
+                         by Equality.symmetry(
+                                Rational.add_negate_left(
+                                    Rational.one))
+                  < (seq(m) - seq(N)) + Rational.one
+                         by Rational.add_preserves_LessThan(
+                                diffBound)
+                  = seq(m) - (seq(N) - Rational.one);
+          -- Close -ε < seq(m) - (seq(N) - 1) by chaining through
+          -- 0: -ε < 0 (since ε > 0) and 0 < ... by diffPositive.
+          calc -epsilon
+             < Rational.zero
+                    by Rational.negate_LessThan_zero_of_positive(
+                           given(Rational.zero < epsilon))
+             < seq(m) - (seq(N) - Rational.one)
+                    by diffPositive
+        }
+      }
    }
 
 -- Lift the at-make form via Quotient.induct.
