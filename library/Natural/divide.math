@@ -385,30 +385,21 @@ theorem Natural.divide_modulo_decompose (divisor dividend : Natural)
 theorem Natural.monus_le_self
         : (n d : Natural) → Natural.monus(n, d) ≤ n
   | zero, d =>
-      -- monus(0, d) = 0; LessOrEqual.reflexivity gives 0 ≤ 0.
-      -- Transport substitutes monus(0, d) for the left 0.
-      Equality.transport_proposition(
-          function (m : Natural) => m ≤ 0,
-          0, Natural.monus(0, d),
-          Equality.symmetry(Natural.monus_zero_left(d)),
-          LessOrEqual.reflexivity(0))
+      -- `monus(0, d) = 0` (characterising lemma); substituting turns
+      -- the goal into the reflexive `0 ≤ 0`.
+      claim by substituting Natural.monus_zero_left(d)
   | successor(k), d =>
       (cases d {
          | zero =>
-             Equality.transport_proposition(
-                 function (m : Natural) => m ≤ successor(k),
-                 successor(k), Natural.monus(successor(k), 0),
-                 Equality.symmetry(Natural.monus_succ_zero(k)),
-                 LessOrEqual.reflexivity(successor(k)))
-         | successor(j) =>
-             Equality.transport_proposition(
-                 function (m : Natural) => m ≤ successor(k),
-                 Natural.monus(k, j),
-                 Natural.monus(successor(k), successor(j)),
-                 Equality.symmetry(Natural.monus_succ_succ(k, j)),
-                 LessOrEqual.step(
-                     Natural.monus(k, j), k,
-                     Natural.monus_le_self(k, j)))
+             -- `monus(succ k, 0) = succ k`; reflexive after substituting.
+             claim by substituting Natural.monus_succ_zero(k)
+         | successor(j) => {
+             -- Recurse on (k, j), then bridge via monus_succ_succ to
+             -- align the goal's `monus(succ k, succ j)` slot.
+             claim recursion : Natural.monus(k, j) ≤ k
+               by Natural.monus_le_self(k, j);
+             claim by substituting Natural.monus_succ_succ(k, j)
+           }
        } : Natural.monus(successor(k), d) ≤ successor(k))
 
 -- Helper: if monus(d, n) = succ(predM), then succ(n) ≤ d.

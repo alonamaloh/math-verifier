@@ -1714,24 +1714,17 @@ theorem Real.bisectionWidth_times_succ_le_initial
             ≤ Real.BisectionInterval.right(initial)
               - Real.BisectionInterval.left(initial)
   | zero =>
-      -- width(0) * (1 : R) = (right - left) * 1 = right - left ≤ right - left.
-      -- Transport reflexivity through `initial_width = initial_width * 1`.
-      Equality.transport_proposition(
-          function (w : Rational) =>
-              w ≤ Real.BisectionInterval.right(initial)
-                  - Real.BisectionInterval.left(initial),
-          Real.BisectionInterval.right(initial)
-              - Real.BisectionInterval.left(initial),
-          (Real.BisectionInterval.right(initial)
+      -- width(0) reduces to (right - left); (succ 0 : R) reduces to 1.
+      -- The product · 1 collapses to (right - left), then reflexive.
+      calc Real.bisectionWidth(initial, zero)
+              * (successor(zero) : Rational)
+         = (Real.BisectionInterval.right(initial)
               - Real.BisectionInterval.left(initial))
-              * Rational.one,
-          Equality.symmetry(
-              Rational.multiply_one(
-                  Real.BisectionInterval.right(initial)
-                  - Real.BisectionInterval.left(initial))),
-          Rational.LessOrEqual.reflexive(
-              Real.BisectionInterval.right(initial)
-              - Real.BisectionInterval.left(initial)))
+              * Rational.one
+         = Real.BisectionInterval.right(initial)
+              - Real.BisectionInterval.left(initial)
+         ≤ Real.BisectionInterval.right(initial)
+              - Real.BisectionInterval.left(initial)
   | successor(predecessor) => {
       claim IH
             : Real.bisectionWidth(initial, predecessor)
@@ -1825,15 +1818,14 @@ theorem Real.bisectionLeft_le_at_le
         (N m : Natural) (NLeqM : N ≤ m)
         : Real.bisectionLeft(subset, initial, N)
           ≤ Real.bisectionLeft(subset, initial, m) := {
+  -- Write m as k + N (justified by N ≤ m), then the step-monotone
+  -- lemma at k iterations closes the rewritten goal.
   obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
-  Equality.transport_proposition(
-      function (z : Natural) =>
-          Real.bisectionLeft(subset, initial, N)
-          ≤ Real.bisectionLeft(subset, initial, z),
-      k + N, m,
-      Equality.symmetry(mEq),
-      Real.bisectionLeft_le_subsequent(
-          subset, initial, initialLeftLeqRight, k, N))
+  claim atKPlusN : Real.bisectionLeft(subset, initial, N)
+                   ≤ Real.bisectionLeft(subset, initial, k + N)
+    by Real.bisectionLeft_le_subsequent(
+           subset, initial, initialLeftLeqRight, k, N);
+  claim by substitution
 }
 
 theorem Real.bisectionRight_le_at_le
@@ -1845,14 +1837,11 @@ theorem Real.bisectionRight_le_at_le
         : Real.bisectionRight(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N) := {
   obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
-  Equality.transport_proposition(
-      function (z : Natural) =>
-          Real.bisectionRight(subset, initial, z)
-          ≤ Real.bisectionRight(subset, initial, N),
-      k + N, m,
-      Equality.symmetry(mEq),
-      Real.bisectionRight_le_predecessor(
-          subset, initial, initialLeftLeqRight, k, N))
+  claim atKPlusN : Real.bisectionRight(subset, initial, k + N)
+                   ≤ Real.bisectionRight(subset, initial, N)
+    by Real.bisectionRight_le_predecessor(
+           subset, initial, initialLeftLeqRight, k, N);
+  claim by substitution
 }
 
 theorem Real.bisectionLeft_le_bisectionRight_at_le
@@ -1864,14 +1853,11 @@ theorem Real.bisectionLeft_le_bisectionRight_at_le
         : Real.bisectionLeft(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N) := {
   obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
-  Equality.transport_proposition(
-      function (z : Natural) =>
-          Real.bisectionLeft(subset, initial, z)
-          ≤ Real.bisectionRight(subset, initial, N),
-      k + N, m,
-      Equality.symmetry(mEq),
-      Real.bisectionLeft_le_bisectionRight_predecessor(
-          subset, initial, initialLeftLeqRight, k, N))
+  claim atKPlusN : Real.bisectionLeft(subset, initial, k + N)
+                   ≤ Real.bisectionRight(subset, initial, N)
+    by Real.bisectionLeft_le_bisectionRight_predecessor(
+           subset, initial, initialLeftLeqRight, k, N);
+  claim by substitution
 }
 
 -- x * 0 = 0. Standard: x*0 + x*0 = x*(0+0) = x*0, so add-cancel
@@ -2094,34 +2080,20 @@ theorem Rational.succ_K_strictly_less_succ_succ_K_times_epsilon
         (K : Natural) (epsilon : Rational)
         (epsilonPositive : Rational.zero < epsilon)
         : (successor(K) : Rational) * epsilon
-          < (successor(successor(K)) : Rational) * epsilon := {
-  claim productExpansion
-        : (successor(successor(K)) : Rational) * epsilon
-          = epsilon + (successor(K) : Rational) * epsilon
-    by calc (successor(successor(K)) : Rational) * epsilon
-          = (Rational.one + (successor(K) : Rational)) * epsilon
-          = Rational.one * epsilon
-            + (successor(K) : Rational) * epsilon
-          = epsilon + (successor(K) : Rational) * epsilon;
-  claim shiftedBound
-        : (successor(K) : Rational) * epsilon
-          < (successor(K) : Rational) * epsilon + epsilon
-    by rewrite(
-           Rational.add_zero((successor(K) : Rational) * epsilon),
-           Rational.add_left_preserves_LessThan(
-               Rational.zero, epsilon,
-               (successor(K) : Rational) * epsilon,
-               epsilonPositive));
-  Equality.transport_proposition(
-      function (z : Rational) =>
-          (successor(K) : Rational) * epsilon < z,
-      (successor(K) : Rational) * epsilon + epsilon,
-      (successor(successor(K)) : Rational) * epsilon,
-      calc (successor(K) : Rational) * epsilon + epsilon
-         = epsilon + (successor(K) : Rational) * epsilon
-         = (successor(successor(K)) : Rational) * epsilon,
-      shiftedBound)
-}
+          < (successor(successor(K)) : Rational) * epsilon :=
+  calc (successor(K) : Rational) * epsilon
+     < (successor(K) : Rational) * epsilon + epsilon
+          by rewrite(
+                 Rational.add_zero((successor(K) : Rational) * epsilon),
+                 Rational.add_left_preserves_LessThan(
+                     Rational.zero, epsilon,
+                     (successor(K) : Rational) * epsilon,
+                     epsilonPositive))
+     = epsilon + (successor(K) : Rational) * epsilon
+     = Rational.one * epsilon
+       + (successor(K) : Rational) * epsilon
+     = (Rational.one + (successor(K) : Rational)) * epsilon
+     = (successor(successor(K)) : Rational) * epsilon
 
 -- ----------------------------------------------------------------------
 -- Cauchy modulus: ∀ ε > 0. ∃ N. bisectionWidth(initial, N) < ε.
