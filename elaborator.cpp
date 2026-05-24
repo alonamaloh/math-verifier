@@ -4088,8 +4088,14 @@ private:
         // body that never mentions N is dead weight. Check at the
         // surface level (we destructure-and-elaborate below; the
         // post-elaboration body is wrapped in two Lambdas, making
-        // a kernel BV check awkward to phrase here).
-        if (choose.body) {
+        // a kernel BV check awkward to phrase here). Suppress if the
+        // body contains an auto-prover-using construct (structured
+        // claim, contradiction): the predicate hypothesis `P(N)` is
+        // in scope and the auto-prover may consult it without N
+        // appearing in surface syntax — using N transitively through
+        // the predicate's type.
+        if (choose.body
+            && !surfaceContainsAutoProverInvocation(*choose.body)) {
             warnIfSurfaceNameUnused(
                 choose.name, *choose.body, line, column,
                 "`choose ... such that`");
@@ -7625,6 +7631,114 @@ private:
         if (name.empty() || name[0] == '_') return;
         if (surfaceMentionsName(body, name)) return;
         emitUnusedNameWarning(name, line, column, form);
+    }
+
+    // True if `expression` contains any construct that hands the goal
+    // to the auto-prover at elaboration time (`claim` in any of its
+    // shapes — bare, with proposition, with `by cases`, with
+    // substitution; `contradiction` likewise). Used by the `choose`
+    // unused-name check: when the auto-prover runs inside the body,
+    // it can consume any in-scope hypothesis, so a witness name `N`
+    // bound by `choose N such that P(N);` is potentially used through
+    // the anonymous P(N) hypothesis even if N never appears in the
+    // body's surface tree.
+    bool surfaceContainsAutoProverInvocation(
+        const SurfaceExpression& expression) {
+        if (std::get_if<SurfaceStructuredClaim>(&expression.node)) {
+            return true;
+        }
+        // Walk children of every surface variant we know about,
+        // looking for nested auto-prover-using constructs. Cheapest
+        // by far is reusing surfaceMentionsName's tree walk via a
+        // lambda — but its body is large and special-cased per
+        // variant; easier to walk the same shape here.
+        if (auto* app =
+                std::get_if<SurfaceApplication>(&expression.node)) {
+            if (app->function
+                && surfaceContainsAutoProverInvocation(*app->function))
+                return true;
+            for (const auto& arg : app->arguments) {
+                if (arg.value && surfaceContainsAutoProverInvocation(
+                                      *arg.value))
+                    return true;
+            }
+            return false;
+        }
+        if (auto* lambda =
+                std::get_if<SurfaceLambda>(&expression.node)) {
+            return lambda->body
+                && surfaceContainsAutoProverInvocation(*lambda->body);
+        }
+        if (auto* let = std::get_if<SurfaceLet>(&expression.node)) {
+            if (let->value
+                && surfaceContainsAutoProverInvocation(*let->value))
+                return true;
+            return let->body
+                && surfaceContainsAutoProverInvocation(*let->body);
+        }
+        if (auto* asc =
+                std::get_if<SurfaceAscription>(&expression.node)) {
+            return asc->expression
+                && surfaceContainsAutoProverInvocation(*asc->expression);
+        }
+        if (auto* cas = std::get_if<SurfaceCases>(&expression.node)) {
+            if (cas->scrutinee
+                && surfaceContainsAutoProverInvocation(*cas->scrutinee))
+                return true;
+            for (const auto& clause : cas->clauses) {
+                if (clause.body
+                    && surfaceContainsAutoProverInvocation(
+                            *clause.body))
+                    return true;
+            }
+            return false;
+        }
+        if (auto* calcNode =
+                std::get_if<SurfaceCalc>(&expression.node)) {
+            // A `by`-less calc step IS an auto-prover invocation.
+            for (const auto& step : calcNode->steps) {
+                if (!step.stepProof) return true;
+                if (step.stepProof
+                    && surfaceContainsAutoProverInvocation(
+                            *step.stepProof))
+                    return true;
+            }
+            return calcNode->initialExpression
+                && surfaceContainsAutoProverInvocation(
+                        *calcNode->initialExpression);
+        }
+        if (auto* tup =
+                std::get_if<SurfaceAnonymousTuple>(&expression.node)) {
+            for (const auto& c : tup->components) {
+                if (c && surfaceContainsAutoProverInvocation(*c))
+                    return true;
+            }
+            return false;
+        }
+        if (auto* choose =
+                std::get_if<SurfaceChoose>(&expression.node)) {
+            if (choose->predicate
+                && surfaceContainsAutoProverInvocation(
+                        *choose->predicate))
+                return true;
+            return choose->body
+                && surfaceContainsAutoProverInvocation(*choose->body);
+        }
+        if (auto* given =
+                std::get_if<SurfaceGiven>(&expression.node)) {
+            return given->proposition
+                && surfaceContainsAutoProverInvocation(
+                        *given->proposition);
+        }
+        if (auto* unfold =
+                std::get_if<SurfaceUnfold>(&expression.node)) {
+            return unfold->body
+                && surfaceContainsAutoProverInvocation(*unfold->body);
+        }
+        // Leaves (identifier, numeric literal, sort, type, etc.) and
+        // any variants not enumerated above can't host an auto-prover
+        // call — return false.
+        return false;
     }
 
     void emitUnusedNameWarning(

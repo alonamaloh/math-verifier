@@ -1,0 +1,45 @@
+-- The unused-name warning for `choose N such that P(N);` is too
+-- pessimistic when the body's auto-prover consults the anonymous
+-- predicate hypothesis P(N) — N is used transitively through the
+-- predicate's type even though it never appears in the body's
+-- surface syntax. These tests cover the "should NOT warn" cases.
+
+module Test.choose_unused_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- (1) `choose` whose body is a `claim by substitution` — the
+-- auto-prover consults the anonymous predicate hypothesis, which
+-- mentions `k` in its type. No warning expected.
+theorem choose_used_via_substitution
+        (hypExists : ∃ (k : Natural). k = 0)
+        : 0 = 0 := {
+  choose k such that k = 0;
+  claim 0 = 0 by substitution
+}
+
+-- (2) Same but via bare `claim` (full auto-prover). No warning
+-- expected — the auto-prover finds the predicate in scope.
+theorem choose_used_via_bare_claim
+        (hypExists : ∃ (k : Natural). k = 0)
+        : 0 = 0 := {
+  choose k such that k = 0;
+  claim 0 = 0
+}
+
+-- (3) Sanity: when the body genuinely doesn't use the predicate,
+-- the warning still fires. (Commented out — uncommenting would
+-- produce a warning we'd then need to silence.)
+--
+-- theorem choose_truly_unused
+--         (hypExists : ∃ (k : Natural). k = 0)
+--         : 1 = 1 :=
+--   {
+--     choose k such that k = 0;
+--     reflexivity(1)
+--   }
