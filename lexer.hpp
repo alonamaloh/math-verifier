@@ -33,7 +33,6 @@ enum class TokenKind {
     KeywordClaim,
     KeywordWitness,
     KeywordSuffices,
-    KeywordByCases,         // `by_cases` — math-style case-split
     KeywordByInduction,     // `by_induction` — case-split with IH
     KeywordByStrongInduction, // `by_strong_induction` — single-step strong induction
     KeywordInduction,       // `induction` — after `claim P by`, opens claim-by-induction
@@ -63,7 +62,6 @@ enum class TokenKind {
     LeftBrace, RightBrace,
     LeftAngle, RightAngle,    // "⟨" / "⟩" — anonymous tuples
     Comma, Colon, Semicolon, Pipe,
-    Question,                 // "?" — hammer placeholder (Phase 3)
     Dot,
     DotLeftBrace,    // ".{"  introduces universe-argument list
     Assign,          // ":="

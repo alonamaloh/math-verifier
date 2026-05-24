@@ -193,12 +193,6 @@ struct SurfaceCases {
     std::vector<std::string> refiningNames;
 };
 
-// `?` — placeholder for a proof the elaborator should fill in. Phase 3
-// tries simple hammer steps: hypothesis match against local binders
-// and reflexivity-match for `Equality(A, x, x)` goals. Requires an
-// expected type from context.
-struct SurfaceHammer { };
-
 // `sorry` — placeholder for an unwritten proof. Desugars at elaboration
 // time to `Internal.sorry.{u}(<expectedType>)` and emits a warning at
 // the use site so the build log surfaces the gap.
@@ -396,7 +390,7 @@ struct SurfaceExpression {
         SurfaceApplication, SurfacePiType, SurfaceLambda,
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation,
-        SurfaceAnonymousTuple, SurfaceCases, SurfaceHammer, SurfaceSorry,
+        SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
         SurfaceRing, SurfaceField, SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
         SurfaceByStrongInduction, SurfaceGoal, SurfaceUnfold
@@ -502,10 +496,6 @@ inline SurfaceExpressionPointer makeSurfaceAnonymousTuple(
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceAnonymousTuple{std::move(components)}, line, column});
-}
-inline SurfaceExpressionPointer makeSurfaceHammer(int line, int column) {
-    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
-        SurfaceHammer{}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceSorry(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{

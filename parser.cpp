@@ -7,15 +7,15 @@
 namespace {
 
 // Tactic-block keywords that are contextual: they have meaning only at
-// specific positions inside `{ ... }` block bodies, `by_cases` / `by_
-// induction` constructs, or `obtain ... from ...` statements. Outside
-// those contexts they have no syntactic role at all, so the parser
-// accepts them as ordinary identifiers — letting mathematicians use
-// `claim`, `case`, `with`, etc. as binder or variable names. (The
-// "wide" tactic keywords `cases`, `calc`, `witness`, `by_cases`, and
-// `by_induction` still dispatch to special parsers from `parseAtom`,
-// so they remain reserved everywhere; freeing them would require
-// expression-position backtracking.)
+// specific positions inside `{ ... }` block bodies, `by_induction`
+// constructs, or `obtain ... from ...` statements. Outside those
+// contexts they have no syntactic role at all, so the parser accepts
+// them as ordinary identifiers — letting mathematicians use `claim`,
+// `case`, `with`, etc. as binder or variable names. (The "wide" tactic
+// keywords `cases`, `calc`, `witness`, and `by_induction` still
+// dispatch to special parsers from `parseAtom`, so they remain
+// reserved everywhere; freeing them would require expression-position
+// backtracking.)
 bool isContextualKeyword(TokenKind kind) {
     switch (kind) {
         case TokenKind::KeywordClaim:
@@ -133,8 +133,7 @@ SurfaceExpressionPointer substituteSurfaceName(
     }
     if (std::get_if<SurfaceNumericLiteral>(&node.node)
         || std::get_if<SurfaceType>(&node.node)
-        || std::get_if<SurfaceProposition>(&node.node)
-        || std::get_if<SurfaceHammer>(&node.node)) {
+        || std::get_if<SurfaceProposition>(&node.node)) {
         return expression;
     }
     if (auto* application = std::get_if<SurfaceApplication>(&node.node)) {
@@ -636,8 +635,8 @@ private:
     // forms supported:
     //   - `let pat := value;`            (tuple-pattern destructure)
     //   - `let name : type := value;`    (typed binding)
-    //   - `claim name : type [by expr];` (let synonym; hammer fills if
-    //                                     no `by`)
+    //   - `claim name : type [by expr];` (let synonym; auto-prover
+    //                                     fills if no `by`)
     //   - `witness expr with proof;`     (terminal; builds ⟨expr, proof⟩
     //                                     for ∃-shaped goals)
     //   - `suffices Q by Reduction;`     (then the rest of the block
@@ -944,11 +943,18 @@ private:
                         // block, so parseExpression handles it.
                         wrapper.value = parseExpression();
                     } else {
-                        // No `by` or `{`: the hammer fills the proof.
-                        // We build a `?` placeholder so the standard
-                        // let-binding path sees the same machinery.
-                        wrapper.value = makeSurfaceHammer(
-                            statementToken.line, statementToken.column);
+                        // No `by` or `{`: defer to the auto-prover. Wrap
+                        // the binding's expected type in an anonymous
+                        // structured-claim node; the elaborator routes
+                        // bare structured-claims through autoProveClaim.
+                        wrapper.value = makeSurfaceStructuredClaim(
+                            /*proposition=*/nullptr,
+                            /*label=*/"",
+                            /*byHint=*/nullptr,
+                            /*byCases=*/false,
+                            /*arms=*/{},
+                            statementToken.line,
+                            statementToken.column);
                     }
                 } else {
                     expect(TokenKind::Assign, "after let type");
@@ -997,23 +1003,29 @@ private:
         } else if (peek().kind == TokenKind::KeywordApply) {
             // `apply Expr;` — terminal block statement. Reads as "we
             // apply Lemma, producing this conclusion". The expression
-            // (with any `?` placeholders the hammer fills) becomes the
-            // block's trailing value. No new semantics beyond letting
-            // the user mark the conclusion with the math keyword.
+            // becomes the block's trailing value. No new semantics
+            // beyond letting the user mark the conclusion with the
+            // math keyword.
             consumeAny();  // 'apply'
             finalExpression = parseExpression();
             if (peek().kind == TokenKind::Semicolon) {
                 consumeAny();
             }
         } else if (peek().kind == TokenKind::KeywordContradiction) {
-            // `contradiction;` — terminal. The trailing expression is
-            // a `?` hammer placeholder; the elaborator's contradiction
-            // strategy scans the local context for a pair (H : P,
-            // H' : ¬P) and builds `False.eliminate*(goal, H'(H))`.
+            // `contradiction;` — terminal. Defers the proof to the
+            // auto-prover, which scans the local context for a pair
+            // (H : P, H' : ¬P) and closes the goal via
+            // `False.eliminate*(goal, H'(H))`.
             Token contradictionToken = consumeAny();
             if (peek().kind == TokenKind::Semicolon) consumeAny();
-            finalExpression = makeSurfaceHammer(
-                contradictionToken.line, contradictionToken.column);
+            finalExpression = makeSurfaceStructuredClaim(
+                /*proposition=*/nullptr,
+                /*label=*/"",
+                /*byHint=*/nullptr,
+                /*byCases=*/false,
+                /*arms=*/{},
+                contradictionToken.line,
+                contradictionToken.column);
         } else if (parsedFinalCalc) {
             // The wrapper loop already parsed a `calc` and discovered it
             // wasn't followed by `as` or `;`, so it's the block's final
@@ -1714,9 +1726,8 @@ private:
         if (current.kind == TokenKind::KeywordWitness) {
             return parseWitnessExpression();
         }
-        if (current.kind == TokenKind::KeywordByCases
-            || current.kind == TokenKind::KeywordByInduction) {
-            return parseByCasesOrInduction();
+        if (current.kind == TokenKind::KeywordByInduction) {
+            return parseByInduction();
         }
         if (current.kind == TokenKind::KeywordByStrongInduction) {
             return parseByStrongInduction();
@@ -1726,11 +1737,6 @@ private:
             // Same shape as the theorem-body block form; useful inside
             // case clauses or anywhere an expression is expected.
             return parseBlockBody();
-        }
-        if (current.kind == TokenKind::Question) {
-            Token questionToken = consumeAny();
-            return makeSurfaceHammer(questionToken.line,
-                                      questionToken.column);
         }
         if (current.kind == TokenKind::KeywordSorry) {
             Token sorryToken = consumeAny();
@@ -1879,9 +1885,9 @@ private:
     }
 
     // Parses an optional `refining <name>[, <name>]*` clause used by
-    // `cases`, `by_cases`, and `by_induction` to mark in-scope binders
-    // whose types should be refined per arm. Empty vector if the
-    // keyword isn't present.
+    // `cases` and `by_induction` to mark in-scope binders whose types
+    // should be refined per arm. Empty vector if the keyword isn't
+    // present.
     std::vector<std::string> parseOptionalRefiningList() {
         std::vector<std::string> names;
         if (peek().kind != TokenKind::KeywordRefining) {
@@ -2304,7 +2310,7 @@ private:
             // this, a bare `claim` as an arm body greedily tries
             // to parse the next pattern's `|` as a proposition.
             || k == TokenKind::Pipe
-            // `case` similarly ends the body of a `by_cases on E
+            // `case` similarly ends the body of a `cases E
             // { case … : body  case … : body }` arm.
             || k == TokenKind::KeywordCase;
     }
@@ -2363,21 +2369,17 @@ private:
         return arm;
     }
 
-    // `by_cases on E { case P: body; … }`, or
     // `by_induction on E with ih { case P: body; … }`, or
-    // `by_induction on E using L with subject, ih { body }`. All three
-    // parse as regular expressions so they can sit anywhere a value
-    // belongs (and be applied to further arguments via parseApplication).
-    SurfaceExpressionPointer parseByCasesOrInduction() {
-        Token byToken = consumeAny();
-        bool isInduction =
-            byToken.kind == TokenKind::KeywordByInduction;
-        expect(TokenKind::KeywordOn,
-               isInduction ? "after 'by_induction'"
-                           : "after 'by_cases'");
+    // `by_induction on E using L with subject, ih { body }`. Both parse
+    // as regular expressions so they can sit anywhere a value belongs
+    // (and be applied to further arguments via parseApplication).
+    // (Structural case-split without an IH uses `cases E { … }` — see
+    // parseCasesExpression.)
+    SurfaceExpressionPointer parseByInduction() {
+        Token byToken = consumeAny();  // 'by_induction'
+        expect(TokenKind::KeywordOn, "after 'by_induction'");
         auto scrutinee = parseExpression();
-        if (isInduction
-            && peek().kind == TokenKind::KeywordUsing) {
+        if (peek().kind == TokenKind::KeywordUsing) {
             consumeAny();  // 'using'
             auto inductionLemma = parseExpression();
             expect(TokenKind::KeywordWith,
@@ -2407,30 +2409,22 @@ private:
                 std::move(inductionBody),
                 byToken.line, byToken.column);
         }
-        std::string ihName;
-        if (isInduction) {
-            expect(TokenKind::KeywordWith,
-                   "after 'by_induction on <expr>'");
-            if (!isIdentifierLike(peek().kind)) {
-                throwHere("expected an identifier (the "
-                          "induction hypothesis name) after "
-                          "'with'");
-            }
-            ihName = consumeAny().lexeme;
+        expect(TokenKind::KeywordWith,
+               "after 'by_induction on <expr>'");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected an identifier (the "
+                      "induction hypothesis name) after 'with'");
         }
+        std::string ihName = consumeAny().lexeme;
         // Optional `refining <name>[, <name>]*`: each listed in-scope
         // binder has its type refined per arm. See parseOptionalRefiningList.
         std::vector<std::string> refiningNames =
             parseOptionalRefiningList();
         expect(TokenKind::LeftBrace,
-               isInduction
-                   ? "after 'by_induction on <expr> with <ih>'"
-                   : "after 'by_cases on <expr>'");
+               "after 'by_induction on <expr> with <ih>'");
         auto clauses = parseCasesClauseBlock(
             ihName, TokenKind::Colon);
-        expect(TokenKind::RightBrace,
-               isInduction ? "ending by_induction block"
-                           : "ending by_cases block");
+        expect(TokenKind::RightBrace, "ending by_induction block");
         if (refiningNames.empty()) {
             return makeSurfaceCases(
                 std::move(scrutinee), std::move(clauses),

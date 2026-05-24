@@ -34,7 +34,6 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"claim",         TokenKind::KeywordClaim},
         {"witness",       TokenKind::KeywordWitness},
         {"suffices",      TokenKind::KeywordSuffices},
-        {"by_cases",      TokenKind::KeywordByCases},
         {"by_induction",  TokenKind::KeywordByInduction},
         {"by_strong_induction", TokenKind::KeywordByStrongInduction},
         {"induction",     TokenKind::KeywordInduction},
@@ -185,7 +184,6 @@ private:
             case ',':  advanceOne(); return {TokenKind::Comma,       ",", startLine, startColumn};
             case ':':  advanceOne(); return {TokenKind::Colon,       ":", startLine, startColumn};
             case ';':  advanceOne(); return {TokenKind::Semicolon,   ";", startLine, startColumn};
-            case '?':  advanceOne(); return {TokenKind::Question,    "?", startLine, startColumn};
             case '|':  advanceOne(); return {TokenKind::Pipe,        "|", startLine, startColumn};
             case '.':  advanceOne(); return {TokenKind::Dot,         ".", startLine, startColumn};
             case '+':  advanceOne(); return {TokenKind::Plus,        "+", startLine, startColumn};
@@ -315,7 +313,6 @@ bool isKeyword(TokenKind kind) {
         case TokenKind::KeywordClaim:
         case TokenKind::KeywordWitness:
         case TokenKind::KeywordSuffices:
-        case TokenKind::KeywordByCases:
         case TokenKind::KeywordByInduction:
         case TokenKind::KeywordByStrongInduction:
         case TokenKind::KeywordInduction:
@@ -367,7 +364,6 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::KeywordClaim:         return "'claim'";
         case TokenKind::KeywordWitness:       return "'witness'";
         case TokenKind::KeywordSuffices:      return "'suffices'";
-        case TokenKind::KeywordByCases:       return "'by_cases'";
         case TokenKind::KeywordByInduction:   return "'by_induction'";
         case TokenKind::KeywordByStrongInduction:
             return "'by_strong_induction'";
@@ -404,7 +400,6 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::Comma:                return "','";
         case TokenKind::Colon:                return "':'";
         case TokenKind::Semicolon:            return "';'";
-        case TokenKind::Question:             return "'?'";
         case TokenKind::Pipe:                 return "'|'";
         case TokenKind::Dot:                  return "'.'";
         case TokenKind::DotLeftBrace:         return "'.{'";
