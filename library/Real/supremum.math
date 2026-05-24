@@ -442,6 +442,25 @@ theorem Real.bisectionLeft_below_witness
                     (Real.bisectionLeft(subset, initial, n) : Real) ≤ y)
   | zero => initialLeftBelowSome
   | successor(predecessor) => {
+      let intervals : Real.BisectionInterval :=
+          Real.bisectionIntervals(subset, initial, predecessor);
+      let midReal : Real :=
+          (Rational.halve(
+               Real.BisectionInterval.left(intervals)
+               + Real.BisectionInterval.right(intervals)) : Real);
+      let midDecidable
+            : Logic.Decidable(Real.IsUpperBound(subset, midReal)) :=
+          Logic.classical_decidable(Real.IsUpperBound(subset, midReal));
+      let belowWitnessClaim
+            : Logic.Decidable(Real.IsUpperBound(subset, midReal))
+              → Proposition :=
+          function (decision
+                    : Logic.Decidable(Real.IsUpperBound(subset, midReal))) =>
+              ∃ (y : Real).
+                  And(y ∈ subset,
+                      (Real.BisectionInterval.left(
+                           Real.bisectionStepWithDec(subset, intervals, decision))
+                       : Real) ≤ y);
       claim IH
             : ∃ (y : Real).
                   And(y ∈ subset,
@@ -449,169 +468,49 @@ theorem Real.bisectionLeft_below_witness
                           ≤ y)
         by Real.bisectionLeft_below_witness(
                subset, initial, initialLeftBelowSome, predecessor);
-      cases Logic.classical_decidable(
-              Real.IsUpperBound(
-                  subset,
-                  (Rational.halve(
-                       Real.BisectionInterval.left(
-                           Real.bisectionIntervals(subset, initial, predecessor))
-                       + Real.BisectionInterval.right(
-                           Real.bisectionIntervals(subset, initial, predecessor)))
-                   : Real))) with decisionEq {
+      cases midDecidable with decisionEq {
         | Logic.Decidable.yes(midIsUpper) =>
             -- a_{n+1} = a_n. Transport IH along the decision equation.
             Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor)))
-                                     : Real)))) =>
-                    ∃ (y : Real).
-                        And(y ∈ subset,
-                            (Real.BisectionInterval.left(
-                                 Real.bisectionStepWithDec(
-                                     subset,
-                                     Real.bisectionIntervals(
-                                         subset, initial, predecessor),
-                                     decision))
-                             : Real) ≤ y),
+                belowWitnessClaim,
                 Logic.Decidable.yes(midIsUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor)))
-                         : Real))),
+                midDecidable,
                 Equality.symmetry(decisionEq),
                 IH)
         | Logic.Decidable.no(midNotUpper) => {
             -- a_{n+1} = midpoint. midNotUpper : ¬IsUpperBound(subset,
-            -- midpoint). IsUpperBound unfolds to `(y : Real) → y ∈ S
-            -- → y ≤ midpoint`, so `not_forall_implies_exists_not` plus
-            -- `not_implies_implies_and_not` gives us some y with
-            -- (y ∈ S) and ¬(y ≤ midpoint). Then `not_LessOrEqual_implies`
-            -- flips to midpoint ≤ y.
+            -- midReal). IsUpperBound unfolds to `(y : Real) → y ∈ S
+            -- → y ≤ midReal`, so not_forall_implies_exists_not plus
+            -- not_implies_implies_and_not give some y with y ∈ S and
+            -- ¬(y ≤ midReal). Then not_LessOrEqual_implies flips to
+            -- midReal ≤ y.
             obtain ⟨witnessReal, witnessImpFails⟩
                 from Logic.not_forall_implies_exists_not(
                          Real,
                          function (y : Real) =>
-                             y ∈ subset
-                             → y ≤ (Rational.halve(
-                                        Real.BisectionInterval.left(
-                                            Real.bisectionIntervals(
-                                                subset, initial, predecessor))
-                                        + Real.BisectionInterval.right(
-                                            Real.bisectionIntervals(
-                                                subset, initial, predecessor)))
-                                    : Real),
+                             y ∈ subset → y ≤ midReal,
                          midNotUpper);
             obtain ⟨witnessInS, witnessNotLeqMid⟩
                 from Logic.not_implies_implies_and_not(
                          witnessReal ∈ subset,
-                         witnessReal
-                             ≤ (Rational.halve(
-                                    Real.BisectionInterval.left(
-                                        Real.bisectionIntervals(
-                                            subset, initial, predecessor))
-                                    + Real.BisectionInterval.right(
-                                        Real.bisectionIntervals(
-                                            subset, initial, predecessor)))
-                                 : Real),
+                         witnessReal ≤ midReal,
                          witnessImpFails);
-            claim midLeqWitness
-                  : (Rational.halve(
-                         Real.BisectionInterval.left(
-                             Real.bisectionIntervals(
-                                 subset, initial, predecessor))
-                         + Real.BisectionInterval.right(
-                             Real.bisectionIntervals(
-                                 subset, initial, predecessor)))
-                     : Real)
-                    ≤ witnessReal
+            claim midLeqWitness : midReal ≤ witnessReal
               by Real.not_LessOrEqual_implies(
-                     witnessReal,
-                     (Rational.halve(
-                          Real.BisectionInterval.left(
-                              Real.bisectionIntervals(
-                                  subset, initial, predecessor))
-                          + Real.BisectionInterval.right(
-                              Real.bisectionIntervals(
-                                  subset, initial, predecessor)))
-                      : Real),
-                     witnessNotLeqMid);
+                     witnessReal, midReal, witnessNotLeqMid);
             claim existentialAtMid
                   : ∃ (y : Real).
-                        And(y ∈ subset,
-                            (Rational.halve(
-                                 Real.BisectionInterval.left(
-                                     Real.bisectionIntervals(
-                                         subset, initial, predecessor))
-                                 + Real.BisectionInterval.right(
-                                     Real.bisectionIntervals(
-                                         subset, initial, predecessor)))
-                             : Real)
-                                ≤ y)
+                        And(y ∈ subset, midReal ≤ y)
               by Exists.introduce(
                      Real,
                      function (y : Real) =>
-                         And(y ∈ subset,
-                             (Rational.halve(
-                                  Real.BisectionInterval.left(
-                                      Real.bisectionIntervals(
-                                          subset, initial, predecessor))
-                                  + Real.BisectionInterval.right(
-                                      Real.bisectionIntervals(
-                                          subset, initial, predecessor)))
-                              : Real)
-                                 ≤ y),
+                         And(y ∈ subset, midReal ≤ y),
                      witnessReal,
                      And.introduction(witnessInS, midLeqWitness));
             Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor)))
-                                     : Real)))) =>
-                    ∃ (y : Real).
-                        And(y ∈ subset,
-                            (Real.BisectionInterval.left(
-                                 Real.bisectionStepWithDec(
-                                     subset,
-                                     Real.bisectionIntervals(
-                                         subset, initial, predecessor),
-                                     decision))
-                             : Real) ≤ y),
+                belowWitnessClaim,
                 Logic.Decidable.no(midNotUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor)))
-                         : Real))),
+                midDecidable,
                 Equality.symmetry(decisionEq),
                 existentialAtMid)
         }
@@ -621,20 +520,16 @@ theorem Real.bisectionLeft_below_witness
 -- I2: the upper bound of the bisection interval is an upper bound
 -- for S. Induction on n: the base case is the initial hypothesis;
 -- the step case threads the bisectionStep's `cases` on the classical
--- decision: the "yes" branch sets right = midpoint, which is exactly
+-- decision. The "yes" branch sets right = midpoint, which is exactly
 -- the upper-bound proof we picked that branch by; the "no" branch
 -- preserves right = right(predecessor), which the IH covers.
+--
 -- The `cases X with decisionEq` form retains the equation
 -- `classical_decidable(...) = Decidable.yes(midIsUpper)` (or `no`)
--- in each branch. The motive needs to thread the decision variable
--- through `bisectionStepWithDec` so the goal reduces in each branch.
--- An earlier attempt via explicit `Equality.transport_proposition`
--- with the motive `λd. IsUpperBound(s, right(stepWithDec(s, prev, d)))`
--- caused kernel type-checking to run unboundedly long (got cut off
--- after 20+ minutes) — likely the universe inference or normalization
--- of the deeply-nested motive expression. Marked sorry pending
--- investigation; the proof IS structurally what the comment
--- describes.
+-- in each branch. We then rewrite each branch's witness back into the
+-- goal — the type ascription on the witness pins down a structural
+-- occurrence of the decision constructor for the rewrite matcher,
+-- and the kernel ι-reduces `bisectionStepWithDec` on it.
 theorem Real.bisectionRight_is_upper_bound
         (subset : Set(Real)) (initial : Real.BisectionInterval)
         (initialRightAbove
@@ -647,6 +542,8 @@ theorem Real.bisectionRight_is_upper_bound
                 (Real.bisectionRight(subset, initial, n) : Real))
   | zero => initialRightAbove
   | successor(predecessor) => {
+      let intervals : Real.BisectionInterval :=
+          Real.bisectionIntervals(subset, initial, predecessor);
       claim IH
             : Real.IsUpperBound(
                   subset,
@@ -657,85 +554,39 @@ theorem Real.bisectionRight_is_upper_bound
               Real.IsUpperBound(
                   subset,
                   (Rational.halve(
-                       Real.BisectionInterval.left(
-                           Real.bisectionIntervals(subset, initial, predecessor))
-                       + Real.BisectionInterval.right(
-                           Real.bisectionIntervals(subset, initial, predecessor)))
+                       Real.BisectionInterval.left(intervals)
+                       + Real.BisectionInterval.right(intervals))
                    : Real))) with decisionEq {
-        | Logic.Decidable.yes(midIsUpper) =>
-            Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor)))
-                                     : Real)))) =>
-                    Real.IsUpperBound(
+        | Logic.Decidable.yes(midIsUpper) => {
+            -- The kernel ι-reduces right(bisectionStepWithDec(..., yes(_)))
+            -- to the midpoint, so midIsUpper has this type. We restate it
+            -- explicitly so the rewrite matcher below finds the
+            -- `yes(midIsUpper)` slot structurally.
+            claim midUpperAtYesBranch
+                  : Real.IsUpperBound(
                         subset,
                         (Real.BisectionInterval.right(
                              Real.bisectionStepWithDec(
-                                 subset,
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor),
-                                 decision))
-                         : Real)),
-                Logic.Decidable.yes(midIsUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor)))
-                         : Real))),
-                Equality.symmetry(decisionEq),
-                midIsUpper)
-        | Logic.Decidable.no(midNotUpper) =>
-            Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor)))
-                                     : Real)))) =>
-                    Real.IsUpperBound(
+                                 subset, intervals,
+                                 Logic.Decidable.yes(midIsUpper)))
+                         : Real))
+              by midIsUpper;
+            rewrite(Equality.symmetry(decisionEq), midUpperAtYesBranch)
+          }
+        | Logic.Decidable.no(midNotUpper) => {
+            -- Symmetric: right(bisectionStepWithDec(..., no(_))) ι-reduces
+            -- to right(intervals) = bisectionRight(predecessor), which IH covers.
+            claim rightUpperAtNoBranch
+                  : Real.IsUpperBound(
                         subset,
                         (Real.BisectionInterval.right(
                              Real.bisectionStepWithDec(
-                                 subset,
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor),
-                                 decision))
-                         : Real)),
-                Logic.Decidable.no(midNotUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor)))
-                         : Real))),
-                Equality.symmetry(decisionEq),
-                IH)
+                                 subset, intervals,
+                                 Logic.Decidable.no(midNotUpper)))
+                         : Real))
+              by IH;
+            rewrite(Equality.symmetry(decisionEq), rightUpperAtNoBranch)
+          }
       }
   }
 
@@ -762,131 +613,84 @@ theorem Real.bisection_width_invariant
           Real.BisectionInterval.right(initial)
           - Real.BisectionInterval.left(initial))
   | successor(predecessor) => {
+      let intervals : Real.BisectionInterval :=
+          Real.bisectionIntervals(subset, initial, predecessor);
+      let midDecidable
+            : Logic.Decidable(
+                  Real.IsUpperBound(
+                      subset,
+                      (Rational.halve(
+                           Real.BisectionInterval.left(intervals)
+                           + Real.BisectionInterval.right(intervals))
+                       : Real))) :=
+          Logic.classical_decidable(
+              Real.IsUpperBound(
+                  subset,
+                  (Rational.halve(
+                       Real.BisectionInterval.left(intervals)
+                       + Real.BisectionInterval.right(intervals))
+                   : Real)));
+      let widthClaim
+            : Logic.Decidable(
+                  Real.IsUpperBound(
+                      subset,
+                      (Rational.halve(
+                           Real.BisectionInterval.left(intervals)
+                           + Real.BisectionInterval.right(intervals))
+                       : Real)))
+              → Proposition :=
+          function (decision
+                    : Logic.Decidable(
+                          Real.IsUpperBound(
+                              subset,
+                              (Rational.halve(
+                                   Real.BisectionInterval.left(intervals)
+                                   + Real.BisectionInterval.right(intervals))
+                               : Real)))) =>
+              Real.BisectionInterval.right(
+                  Real.bisectionStepWithDec(subset, intervals, decision))
+              - Real.BisectionInterval.left(
+                    Real.bisectionStepWithDec(subset, intervals, decision))
+              = Rational.halve(Real.bisectionWidth(initial, predecessor));
       claim IH
             : Real.bisectionRight(subset, initial, predecessor)
                 - Real.bisectionLeft(subset, initial, predecessor)
               = Real.bisectionWidth(initial, predecessor)
         by Real.bisection_width_invariant(subset, initial, predecessor);
-      cases Logic.classical_decidable(
-              Real.IsUpperBound(
-                  subset,
-                  (Rational.halve(
-                       Real.BisectionInterval.left(
-                           Real.bisectionIntervals(subset, initial, predecessor))
-                       + Real.BisectionInterval.right(
-                           Real.bisectionIntervals(subset, initial, predecessor)))
-                   : Real))) with decisionEq {
+      cases midDecidable with decisionEq {
         | Logic.Decidable.yes(midIsUpper) =>
             -- After ι-reduction: new_right = midpoint, new_left = left(prev).
             -- midpoint - left(prev) = halve(right(prev) - left(prev))
-            --                        = halve(width(predecessor))   [via IH]
+            --                       = halve(width(predecessor))   [via IH]
             Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor)))
-                                     : Real)))) =>
-                    Real.BisectionInterval.right(
-                        Real.bisectionStepWithDec(
-                            subset,
-                            Real.bisectionIntervals(
-                                subset, initial, predecessor),
-                            decision))
-                    - Real.BisectionInterval.left(
-                          Real.bisectionStepWithDec(
-                              subset,
-                              Real.bisectionIntervals(
-                                  subset, initial, predecessor),
-                              decision))
-                    = Rational.halve(Real.bisectionWidth(initial, predecessor)),
+                widthClaim,
                 Logic.Decidable.yes(midIsUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor)))
-                         : Real))),
+                midDecidable,
                 Equality.symmetry(decisionEq),
                 calc Rational.halve(
-                         Real.BisectionInterval.left(
-                             Real.bisectionIntervals(subset, initial, predecessor))
-                         + Real.BisectionInterval.right(
-                             Real.bisectionIntervals(subset, initial, predecessor)))
-                     - Real.BisectionInterval.left(
-                           Real.bisectionIntervals(subset, initial, predecessor))
+                         Real.BisectionInterval.left(intervals)
+                         + Real.BisectionInterval.right(intervals))
+                     - Real.BisectionInterval.left(intervals)
                    = Rational.halve(
-                         Real.BisectionInterval.right(
-                             Real.bisectionIntervals(subset, initial, predecessor))
-                         - Real.BisectionInterval.left(
-                             Real.bisectionIntervals(subset, initial, predecessor)))
+                         Real.BisectionInterval.right(intervals)
+                         - Real.BisectionInterval.left(intervals))
                    = Rational.halve(Real.bisectionWidth(initial, predecessor)))
         | Logic.Decidable.no(midNotUpper) =>
             -- After ι-reduction: new_right = right(prev), new_left = midpoint.
             -- right(prev) - midpoint = halve(right(prev) - left(prev))
             --                        = halve(width(predecessor))
             Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor)))
-                                     : Real)))) =>
-                    Real.BisectionInterval.right(
-                        Real.bisectionStepWithDec(
-                            subset,
-                            Real.bisectionIntervals(
-                                subset, initial, predecessor),
-                            decision))
-                    - Real.BisectionInterval.left(
-                          Real.bisectionStepWithDec(
-                              subset,
-                              Real.bisectionIntervals(
-                                  subset, initial, predecessor),
-                              decision))
-                    = Rational.halve(Real.bisectionWidth(initial, predecessor)),
+                widthClaim,
                 Logic.Decidable.no(midNotUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor)))
-                         : Real))),
+                midDecidable,
                 Equality.symmetry(decisionEq),
-                calc Real.BisectionInterval.right(
-                         Real.bisectionIntervals(subset, initial, predecessor))
+                calc Real.BisectionInterval.right(intervals)
                      - Rational.halve(
-                           Real.BisectionInterval.left(
-                               Real.bisectionIntervals(subset, initial, predecessor))
-                           + Real.BisectionInterval.right(
-                               Real.bisectionIntervals(subset, initial, predecessor)))
+                           Real.BisectionInterval.left(intervals)
+                           + Real.BisectionInterval.right(intervals))
                    = Rational.halve(
-                         Real.BisectionInterval.right(
-                             Real.bisectionIntervals(subset, initial, predecessor))
-                         - Real.BisectionInterval.left(
-                             Real.bisectionIntervals(subset, initial, predecessor)))
+                         Real.BisectionInterval.right(intervals)
+                         - Real.BisectionInterval.left(intervals))
                    = Rational.halve(Real.bisectionWidth(initial, predecessor)))
       }
   }
@@ -1169,113 +973,73 @@ theorem Real.bisectionLeq_invariant
             ≤ Real.bisectionRight(subset, initial, n)
   | zero => initialLeftLeqRight
   | successor(predecessor) => {
+      let intervals : Real.BisectionInterval :=
+          Real.bisectionIntervals(subset, initial, predecessor);
+      let midDecidable
+            : Logic.Decidable(
+                  Real.IsUpperBound(
+                      subset,
+                      (Rational.halve(
+                           Real.BisectionInterval.left(intervals)
+                           + Real.BisectionInterval.right(intervals))
+                       : Real))) :=
+          Logic.classical_decidable(
+              Real.IsUpperBound(
+                  subset,
+                  (Rational.halve(
+                       Real.BisectionInterval.left(intervals)
+                       + Real.BisectionInterval.right(intervals))
+                   : Real)));
+      let leqClaim
+            : Logic.Decidable(
+                  Real.IsUpperBound(
+                      subset,
+                      (Rational.halve(
+                           Real.BisectionInterval.left(intervals)
+                           + Real.BisectionInterval.right(intervals))
+                       : Real)))
+              → Proposition :=
+          function (decision
+                    : Logic.Decidable(
+                          Real.IsUpperBound(
+                              subset,
+                              (Rational.halve(
+                                   Real.BisectionInterval.left(intervals)
+                                   + Real.BisectionInterval.right(intervals))
+                               : Real)))) =>
+              Real.BisectionInterval.left(
+                  Real.bisectionStepWithDec(subset, intervals, decision))
+              ≤ Real.BisectionInterval.right(
+                    Real.bisectionStepWithDec(subset, intervals, decision));
       claim IH
             : Real.bisectionLeft(subset, initial, predecessor)
               ≤ Real.bisectionRight(subset, initial, predecessor)
         by Real.bisectionLeq_invariant(
                subset, initial, initialLeftLeqRight, predecessor);
-      cases Logic.classical_decidable(
-              Real.IsUpperBound(
-                  subset,
-                  (Rational.halve(
-                       Real.BisectionInterval.left(
-                           Real.bisectionIntervals(subset, initial, predecessor))
-                       + Real.BisectionInterval.right(
-                           Real.bisectionIntervals(subset, initial, predecessor)))
-                   : Real))) with decisionEq {
+      cases midDecidable with decisionEq {
         | Logic.Decidable.yes(midIsUpper) =>
             -- new_left = left(prev), new_right = midpoint.
             -- left(prev) ≤ midpoint by halve_left_le_sum + IH.
             Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor)))
-                                     : Real)))) =>
-                    Real.BisectionInterval.left(
-                        Real.bisectionStepWithDec(
-                            subset,
-                            Real.bisectionIntervals(
-                                subset, initial, predecessor),
-                            decision))
-                    ≤ Real.BisectionInterval.right(
-                          Real.bisectionStepWithDec(
-                              subset,
-                              Real.bisectionIntervals(
-                                  subset, initial, predecessor),
-                              decision)),
+                leqClaim,
                 Logic.Decidable.yes(midIsUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor)))
-                         : Real))),
+                midDecidable,
                 Equality.symmetry(decisionEq),
                 Rational.halve_left_le_sum(
-                    Real.BisectionInterval.left(
-                        Real.bisectionIntervals(subset, initial, predecessor)),
-                    Real.BisectionInterval.right(
-                        Real.bisectionIntervals(subset, initial, predecessor)),
+                    Real.BisectionInterval.left(intervals),
+                    Real.BisectionInterval.right(intervals),
                     IH))
         | Logic.Decidable.no(midNotUpper) =>
             -- new_left = midpoint, new_right = right(prev).
             -- midpoint ≤ right(prev) by halve_sum_le_right + IH.
             Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, predecessor)))
-                                     : Real)))) =>
-                    Real.BisectionInterval.left(
-                        Real.bisectionStepWithDec(
-                            subset,
-                            Real.bisectionIntervals(
-                                subset, initial, predecessor),
-                            decision))
-                    ≤ Real.BisectionInterval.right(
-                          Real.bisectionStepWithDec(
-                              subset,
-                              Real.bisectionIntervals(
-                                  subset, initial, predecessor),
-                              decision)),
+                leqClaim,
                 Logic.Decidable.no(midNotUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, predecessor)))
-                         : Real))),
+                midDecidable,
                 Equality.symmetry(decisionEq),
                 Rational.halve_sum_le_right(
-                    Real.BisectionInterval.left(
-                        Real.bisectionIntervals(subset, initial, predecessor)),
-                    Real.BisectionInterval.right(
-                        Real.bisectionIntervals(subset, initial, predecessor)),
+                    Real.BisectionInterval.left(intervals),
+                    Real.BisectionInterval.right(intervals),
                     IH))
       }
   }
@@ -1292,97 +1056,68 @@ theorem Real.bisectionLeft_step_monotone
         (n : Natural)
         : Real.bisectionLeft(subset, initial, n)
           ≤ Real.bisectionLeft(subset, initial, 1 + n) := {
+      let intervals : Real.BisectionInterval :=
+          Real.bisectionIntervals(subset, initial, n);
+      let midDecidable
+            : Logic.Decidable(
+                  Real.IsUpperBound(
+                      subset,
+                      (Rational.halve(
+                           Real.BisectionInterval.left(intervals)
+                           + Real.BisectionInterval.right(intervals))
+                       : Real))) :=
+          Logic.classical_decidable(
+              Real.IsUpperBound(
+                  subset,
+                  (Rational.halve(
+                       Real.BisectionInterval.left(intervals)
+                       + Real.BisectionInterval.right(intervals))
+                   : Real)));
+      let leftMonotoneClaim
+            : Logic.Decidable(
+                  Real.IsUpperBound(
+                      subset,
+                      (Rational.halve(
+                           Real.BisectionInterval.left(intervals)
+                           + Real.BisectionInterval.right(intervals))
+                       : Real)))
+              → Proposition :=
+          function (decision
+                    : Logic.Decidable(
+                          Real.IsUpperBound(
+                              subset,
+                              (Rational.halve(
+                                   Real.BisectionInterval.left(intervals)
+                                   + Real.BisectionInterval.right(intervals))
+                               : Real)))) =>
+              Real.bisectionLeft(subset, initial, n)
+              ≤ Real.BisectionInterval.left(
+                    Real.bisectionStepWithDec(subset, intervals, decision));
       claim withinInterval
             : Real.bisectionLeft(subset, initial, n)
               ≤ Real.bisectionRight(subset, initial, n)
         by Real.bisectionLeq_invariant(
                subset, initial, initialLeftLeqRight, n);
-      cases Logic.classical_decidable(
-              Real.IsUpperBound(
-                  subset,
-                  (Rational.halve(
-                       Real.BisectionInterval.left(
-                           Real.bisectionIntervals(subset, initial, n))
-                       + Real.BisectionInterval.right(
-                           Real.bisectionIntervals(subset, initial, n)))
-                   : Real))) with decisionEq {
+      cases midDecidable with decisionEq {
         | Logic.Decidable.yes(midIsUpper) =>
             -- new_left = left(n). Reflexivity.
             Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, n))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, n)))
-                                     : Real)))) =>
-                    Real.bisectionLeft(subset, initial, n)
-                    ≤ Real.BisectionInterval.left(
-                          Real.bisectionStepWithDec(
-                              subset,
-                              Real.bisectionIntervals(
-                                  subset, initial, n),
-                              decision)),
+                leftMonotoneClaim,
                 Logic.Decidable.yes(midIsUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, n))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, n)))
-                         : Real))),
+                midDecidable,
                 Equality.symmetry(decisionEq),
                 Rational.LessOrEqual.reflexive(
                     Real.bisectionLeft(subset, initial, n)))
         | Logic.Decidable.no(midNotUpper) =>
             -- new_left = midpoint. left(n) ≤ midpoint by halve_left_le_sum.
             Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, n))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, n)))
-                                     : Real)))) =>
-                    Real.bisectionLeft(subset, initial, n)
-                    ≤ Real.BisectionInterval.left(
-                          Real.bisectionStepWithDec(
-                              subset,
-                              Real.bisectionIntervals(
-                                  subset, initial, n),
-                              decision)),
+                leftMonotoneClaim,
                 Logic.Decidable.no(midNotUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, n))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, n)))
-                         : Real))),
+                midDecidable,
                 Equality.symmetry(decisionEq),
                 Rational.halve_left_le_sum(
-                    Real.BisectionInterval.left(
-                        Real.bisectionIntervals(subset, initial, n)),
-                    Real.BisectionInterval.right(
-                        Real.bisectionIntervals(subset, initial, n)),
+                    Real.BisectionInterval.left(intervals),
+                    Real.BisectionInterval.right(intervals),
                     withinInterval))
       }
   }
@@ -1395,95 +1130,66 @@ theorem Real.bisectionRight_step_monotone
         (n : Natural)
         : Real.bisectionRight(subset, initial, 1 + n)
           ≤ Real.bisectionRight(subset, initial, n) := {
+      let intervals : Real.BisectionInterval :=
+          Real.bisectionIntervals(subset, initial, n);
+      let midDecidable
+            : Logic.Decidable(
+                  Real.IsUpperBound(
+                      subset,
+                      (Rational.halve(
+                           Real.BisectionInterval.left(intervals)
+                           + Real.BisectionInterval.right(intervals))
+                       : Real))) :=
+          Logic.classical_decidable(
+              Real.IsUpperBound(
+                  subset,
+                  (Rational.halve(
+                       Real.BisectionInterval.left(intervals)
+                       + Real.BisectionInterval.right(intervals))
+                   : Real)));
+      let rightMonotoneClaim
+            : Logic.Decidable(
+                  Real.IsUpperBound(
+                      subset,
+                      (Rational.halve(
+                           Real.BisectionInterval.left(intervals)
+                           + Real.BisectionInterval.right(intervals))
+                       : Real)))
+              → Proposition :=
+          function (decision
+                    : Logic.Decidable(
+                          Real.IsUpperBound(
+                              subset,
+                              (Rational.halve(
+                                   Real.BisectionInterval.left(intervals)
+                                   + Real.BisectionInterval.right(intervals))
+                               : Real)))) =>
+              Real.BisectionInterval.right(
+                  Real.bisectionStepWithDec(subset, intervals, decision))
+              ≤ Real.bisectionRight(subset, initial, n);
       claim withinInterval
             : Real.bisectionLeft(subset, initial, n)
               ≤ Real.bisectionRight(subset, initial, n)
         by Real.bisectionLeq_invariant(
                subset, initial, initialLeftLeqRight, n);
-      cases Logic.classical_decidable(
-              Real.IsUpperBound(
-                  subset,
-                  (Rational.halve(
-                       Real.BisectionInterval.left(
-                           Real.bisectionIntervals(subset, initial, n))
-                       + Real.BisectionInterval.right(
-                           Real.bisectionIntervals(subset, initial, n)))
-                   : Real))) with decisionEq {
+      cases midDecidable with decisionEq {
         | Logic.Decidable.yes(midIsUpper) =>
             -- new_right = midpoint. midpoint ≤ right(n) by halve_sum_le_right.
             Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, n))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, n)))
-                                     : Real)))) =>
-                    Real.BisectionInterval.right(
-                        Real.bisectionStepWithDec(
-                            subset,
-                            Real.bisectionIntervals(
-                                subset, initial, n),
-                            decision))
-                    ≤ Real.bisectionRight(subset, initial, n),
+                rightMonotoneClaim,
                 Logic.Decidable.yes(midIsUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, n))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, n)))
-                         : Real))),
+                midDecidable,
                 Equality.symmetry(decisionEq),
                 Rational.halve_sum_le_right(
-                    Real.BisectionInterval.left(
-                        Real.bisectionIntervals(subset, initial, n)),
-                    Real.BisectionInterval.right(
-                        Real.bisectionIntervals(subset, initial, n)),
+                    Real.BisectionInterval.left(intervals),
+                    Real.BisectionInterval.right(intervals),
                     withinInterval))
         | Logic.Decidable.no(midNotUpper) =>
             -- new_right = right(n). Reflexivity.
             Equality.transport_proposition(
-                function (decision
-                          : Logic.Decidable(
-                                Real.IsUpperBound(
-                                    subset,
-                                    (Rational.halve(
-                                         Real.BisectionInterval.left(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, n))
-                                         + Real.BisectionInterval.right(
-                                             Real.bisectionIntervals(
-                                                 subset, initial, n)))
-                                     : Real)))) =>
-                    Real.BisectionInterval.right(
-                        Real.bisectionStepWithDec(
-                            subset,
-                            Real.bisectionIntervals(
-                                subset, initial, n),
-                            decision))
-                    ≤ Real.bisectionRight(subset, initial, n),
+                rightMonotoneClaim,
                 Logic.Decidable.no(midNotUpper),
-                Logic.classical_decidable(
-                    Real.IsUpperBound(
-                        subset,
-                        (Rational.halve(
-                             Real.BisectionInterval.left(
-                                 Real.bisectionIntervals(
-                                     subset, initial, n))
-                             + Real.BisectionInterval.right(
-                                 Real.bisectionIntervals(
-                                     subset, initial, n)))
-                         : Real))),
+                midDecidable,
                 Equality.symmetry(decisionEq),
                 Rational.LessOrEqual.reflexive(
                     Real.bisectionRight(subset, initial, n)))
