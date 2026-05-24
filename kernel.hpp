@@ -362,6 +362,16 @@ extern std::size_t kernelDumpWidth;
 // positions, this turns O(N^k) work into O(N).
 extern bool kernelCacheEnabled;
 
+// Drop every cached WHNF / isDefEq result. Must be called whenever the
+// environment mutates in a way that could change reduction (e.g. an
+// opacity flip via `unfold`, or the matching restore): a cached TRUE
+// `isDefEq` computed under transparent opacity is unsound to reuse
+// once opacity is restored to opaque. `addDefinition` already wipes
+// the cache via KernelInstrumentationScope; this entry point is for
+// the cases where the environment changes WITHOUT going through
+// `addDefinition`.
+void invalidateKernelCaches();
+
 // Reduces only the head: enough to see whether the outermost form is a
 // Sort, Pi, Lambda, etc. Unfolds definitions in head position
 // (delta-reduction). Throws TypeError on fuel exhaustion.

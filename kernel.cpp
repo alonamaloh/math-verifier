@@ -22,6 +22,9 @@ bool kernelProfileEnabled = false;
 std::size_t kernelDumpWidth = 240;
 bool kernelCacheEnabled = false;
 
+// invalidateKernelCaches() is defined later in this file, after the
+// cache structures it touches; declared in kernel.hpp.
+
 namespace {
 
 // Thread-local guard so that the postcondition checks (which themselves
@@ -146,6 +149,20 @@ thread_local std::unordered_set<
     ExpressionPairStructuralEqual> isDefEqInFlight;
 thread_local uint64_t isDefEqLoopsDetected = 0;
 thread_local uint64_t whnfLoopsDetected = 0;
+
+// Implementation note: this function is declared in `kernel.hpp` (no
+// namespace), so we close the anonymous namespace, define it, and
+// reopen the namespace.
+} // namespace
+void invalidateKernelCaches() {
+    if (kernelCacheEnabled) {
+        whnfCache.clear();
+        isDefEqTrueCache.clear();
+        whnfInFlight.clear();
+        isDefEqInFlight.clear();
+    }
+}
+namespace {
 
 // Diagnostic counters for the cache, reported under KERNEL_PROFILE.
 thread_local uint64_t whnfCacheHits = 0;

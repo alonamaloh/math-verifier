@@ -1115,6 +1115,7 @@ private:
             : self(s),
               startSize(s.pendingOpacityRestores_.size()) {}
         ~OpacityRestoreScope() {
+            bool anyRestored = false;
             while (self.pendingOpacityRestores_.size() > startSize) {
                 const auto& entry =
                     self.pendingOpacityRestores_.back();
@@ -1124,9 +1125,16 @@ private:
                     if (auto* def =
                             std::get_if<Definition>(&it->second)) {
                         def->opacity = entry.second;
+                        anyRestored = true;
                     }
                 }
                 self.pendingOpacityRestores_.pop_back();
+            }
+            if (anyRestored) {
+                // Reduction depends on opacity, and the kernel's WHNF /
+                // isDefEq caches were populated during the just-finished
+                // unfold scope under the now-stale transparent view.
+                invalidateKernelCaches();
             }
         }
     };
@@ -3121,6 +3129,12 @@ private:
                     {name, def->opacity});
                 def->opacity = Opacity::Transparent;
             }
+            // Reduction depends on opacity, and the kernel's WHNF /
+            // isDefEq caches don't track that — drop them so a stale
+            // TRUE result computed under opaque opacity doesn't fool
+            // the body's equality checks under the new transparent
+            // view (or vice versa on the restore).
+            invalidateKernelCaches();
             return elaborateExpression(
                 *unfold->body, localBinders, expectedType);
         }

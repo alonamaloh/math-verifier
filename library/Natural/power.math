@@ -36,48 +36,39 @@ theorem Natural.power_succ (k p : Natural)
         : Natural.power(successor(k), p) = p * Natural.power(k, p) :=
   unfold Natural.power in reflexivity(Natural, p * Natural.power(k, p))
 
--- p^1 = p. From power_succ + power_zero + multiply_one.
+-- p^1 = p. Stepping through power_succ + power_zero + multiply_one;
+-- the auto-prover finds each lemma by library scan.
 theorem Natural.power_one (p : Natural) : Natural.power(successor(0), p) = p :=
   calc Natural.power(successor(0), p)
-     = p * Natural.power(0, p)   by Natural.power_succ(0, p)
-     = p * 1                     by congruenceOf(
-                                        function (m : Natural) => p * m,
-                                        Natural.power_zero(p))
-     = p                         by Natural.multiply_one(p)
+     = p * Natural.power(0, p)
+     = p * 1
+     = p
 
--- p^(a + b) = p^a * p^b. With exponent first: power(a + b, p) = power(a, p) * power(b, p).
--- Induct on a; opaqueness means the recursive step uses power_succ
--- to peel a successor instead of riding the kernel's ι.
+-- p^(a + b) = p^a * p^b. With exponent first: power(a + b, p) =
+-- power(a, p) * power(b, p). Induct on a; opaqueness means the
+-- recursive step uses power_succ to peel a successor instead of
+-- riding the kernel's ι.
 theorem Natural.power_add
         : (a b p : Natural) → Natural.power(a + b, p)
                               = Natural.power(a, p) * Natural.power(b, p)
   | zero, b, p =>
-      -- power(0 + b, p) = power(b, p) (kernel β on +). Then
-      -- power(b, p) = 1 * power(b, p) (one_multiply, symmetry)
-      -- = power(0, p) * power(b, p) (rewrite via power_zero).
+      -- 0 + b reduces to b; one_multiply restores the leading 1 and
+      -- power_zero recasts it as power(0, p).
       calc Natural.power(0 + b, p)
          = Natural.power(b, p)
          = 1 * Natural.power(b, p)
-              by Equality.symmetry(
-                     Natural.one_multiply(Natural.power(b, p)))
          = Natural.power(0, p) * Natural.power(b, p)
-              by congruenceOf(
-                     function (m : Natural) => m * Natural.power(b, p),
-                     Equality.symmetry(Natural.power_zero(p)))
   | successor(k), b, p =>
+      -- successor(k) + b reduces to successor(k + b); peel via
+      -- power_succ, recurse via the IH, then re-roll the leading
+      -- successor on the right.
       calc Natural.power(successor(k) + b, p)
          = Natural.power(successor(k + b), p)
          = p * Natural.power(k + b, p)
-              by Natural.power_succ(k + b, p)
          = p * (Natural.power(k, p) * Natural.power(b, p))
-              by congruenceOf(
-                     function (m : Natural) => p * m,
-                     Natural.power_add(k, b, p))
+              by Natural.power_add(k, b, p)
          = (p * Natural.power(k, p)) * Natural.power(b, p)
          = Natural.power(successor(k), p) * Natural.power(b, p)
-              by congruenceOf(
-                     function (m : Natural) => m * Natural.power(b, p),
-                     Equality.symmetry(Natural.power_succ(k, p)))
 
 -- Subtraction-witness extractor for `1 ≤ p^k`: provides a Natural m
 -- with p^k = succ(m). Useful for showing strict positivity.
@@ -97,16 +88,9 @@ theorem Natural.power_succ_form
       ⟨c + p * m,
        calc Natural.power(successor(j), p)
           = p * Natural.power(j, p)
-                by Natural.power_succ(j, p)
           = p * successor(m)
-                by congruenceOf(
-                       function (m' : Natural) => p * m',
-                       powerIsSucc)
           = p + p * m
           = (1 + c) + p * m
-                by congruenceOf(
-                       function (q : Natural) => q + p * m,
-                       pEqualsOnePlusC)
           = successor(c + p * m)⟩
     }
 
