@@ -515,6 +515,12 @@ Math-reading rationale: a textbook proof reads "by calculation: A = B
 exactly. The anonymous form matches "by a calculation: A = B = C; now
 …" where the auxiliary fact is used implicitly.
 
+Lint: if you write `calc … as NAME;` and NAME is never *textually*
+referenced in the rest of the block, the elaborator warns "drop the
+`as NAME` to use the anonymous form" (downstream calc steps consume
+the equation by type-match either way, so the name is dead weight).
+Pick `as NAME` only when a later step or claim spells the name out.
+
 ## `rewrite(lemma)` / `rewrite(lemma, term)`
 
 Two forms, disambiguated by argument count.

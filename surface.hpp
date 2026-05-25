@@ -142,6 +142,16 @@ struct SurfaceLet {
     SurfaceExpressionPointer type;
     SurfaceExpressionPointer value;
     SurfaceExpressionPointer body;
+    // True when this binding came from `calc … as NAME;` with an
+    // explicit user-supplied NAME (not from the anonymous
+    // `calc …;` form, whose synthesised `_calc_<line>_<col>` name
+    // is already excluded from unused-name checks). The auto-prover
+    // can discharge subsequent calc-step `by`s via type-match
+    // against the let-binder, satisfying the kernel-level BV(0)
+    // reference even when the body never *textually* references
+    // NAME — so the surface-text check below catches the case
+    // where the `as NAME` adds noise without adding readability.
+    bool fromCalcAsBinding = false;
 };
 struct SurfaceAscription {
     SurfaceExpressionPointer expression;
@@ -493,10 +503,12 @@ inline SurfaceExpressionPointer makeSurfaceLambda(
 inline SurfaceExpressionPointer makeSurfaceLet(
     std::string name, SurfaceExpressionPointer type,
     SurfaceExpressionPointer value, SurfaceExpressionPointer body,
-    int line, int column) {
+    int line, int column,
+    bool fromCalcAsBinding = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceLet{std::move(name), std::move(type),
-                   std::move(value), std::move(body)},
+                   std::move(value), std::move(body),
+                   fromCalcAsBinding},
         line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceAscription(

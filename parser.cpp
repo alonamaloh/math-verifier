@@ -681,6 +681,12 @@ private:
             std::string name;                  // TypedLet, Suppose, Choose, Set
             SurfaceExpressionPointer type;     // TypedLet, Suppose, NoteGoal
             SurfaceExpressionPointer value;    // TypedLet, PatternLet, Choose, Set, NoteAssertion
+            // Only set for TypedLet wrappers that came from `calc … as NAME;`
+            // with an explicit user-supplied NAME. Propagated onto the
+            // resulting SurfaceLet so the elaborator can emit the
+            // "explicit `as NAME` is redundant" warning when the body
+            // never textually references the name.
+            bool fromCalcAsBinding = false;
             int line = 0;
             int column = 0;
         };
@@ -718,12 +724,14 @@ private:
                     break;
                 }
                 std::string statementName;
+                bool fromCalcAsBinding = false;
                 if (peek().kind == TokenKind::KeywordAs) {
                     consumeAny();  // 'as'
                     if (!isIdentifierLike(peek().kind)) {
                         throwHere("expected identifier after 'as'");
                     }
                     statementName = consumeAny().lexeme;
+                    fromCalcAsBinding = true;
                 } else {
                     // Anonymous: synthesise a name that won't collide.
                     statementName = "_calc_"
@@ -798,6 +806,7 @@ private:
                 wrapper.name = std::move(statementName);
                 wrapper.type = std::move(typeExpression);
                 wrapper.value = std::move(calcExpression);
+                wrapper.fromCalcAsBinding = fromCalcAsBinding;
                 wrapper.line = calcToken.line;
                 wrapper.column = calcToken.column;
                 wrappers.push_back(std::move(wrapper));
@@ -1160,7 +1169,8 @@ private:
                         std::move(iterator->type),
                         std::move(iterator->value),
                         std::move(result),
-                        iterator->line, iterator->column);
+                        iterator->line, iterator->column,
+                        iterator->fromCalcAsBinding);
                     break;
                 case BlockWrapper::Suppose: {
                     SurfaceBinder binder;

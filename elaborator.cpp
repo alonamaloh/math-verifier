@@ -3686,6 +3686,30 @@ private:
                 let->name, letBody,
                 expression.line, expression.column,
                 "let / claim / as binding");
+            // `calc … as NAME;` warns specifically when NAME is never
+            // *textually* mentioned in the body. The BV check above
+            // already passes when downstream calc-step auto-prover
+            // calls consume the binding by type-match (a use without
+            // the user typing the name) — but in that case the
+            // anonymous `calc …;` form would behave identically and
+            // the `as NAME` is just visual noise. Surface-text check
+            // catches that.
+            if (let->fromCalcAsBinding
+                && reportRedundantBy_
+                && !let->name.empty()
+                && let->name[0] != '_'
+                && let->body
+                && !surfaceMentionsName(*let->body, let->name)) {
+                std::cerr << "warning: " << moduleName_
+                    << ":" << expression.line
+                    << ":" << expression.column
+                    << ": `calc ... as " << let->name
+                    << "` is never textually referenced — drop the"
+                    << " `as " << let->name
+                    << "` to use the anonymous `calc ...;` form"
+                       " (downstream calc steps still find this"
+                       " equation by type-match)\n";
+            }
             return makeLet(let->name, std::move(letType),
                            std::move(letValue), std::move(letBody));
         }
