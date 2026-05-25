@@ -3682,33 +3682,63 @@ private:
             ExpressionPointer letBody =
                 elaborateExpression(*let->body, extended,
                                      bodyExpectedType);
-            warnIfBinderUnused(
-                let->name, letBody,
-                expression.line, expression.column,
-                "let / claim / as binding");
-            // `calc … as NAME;` warns specifically when NAME is never
-            // *textually* mentioned in the body. The BV check above
-            // already passes when downstream calc-step auto-prover
-            // calls consume the binding by type-match (a use without
-            // the user typing the name) — but in that case the
-            // anonymous `calc …;` form would behave identically and
-            // the `as NAME` is just visual noise. Surface-text check
-            // catches that.
-            if (let->fromCalcAsBinding
-                && reportRedundantBy_
-                && !let->name.empty()
-                && let->name[0] != '_'
-                && let->body
-                && !surfaceMentionsName(*let->body, let->name)) {
-                std::cerr << "warning: " << moduleName_
-                    << ":" << expression.line
-                    << ":" << expression.column
-                    << ": `calc ... as " << let->name
-                    << "` is never textually referenced — drop the"
-                    << " `as " << let->name
-                    << "` to use the anonymous `calc ...;` form"
-                       " (downstream calc steps still find this"
-                       " equation by type-match)\n";
+            // Surface-text unused-name check on every named SurfaceLet
+            // (covers `let X := V;`, legacy `claim X : T by V;`, and
+            // `calc … as X;` desugaring). The kernel-level BV(0) check
+            // is too lenient here: a downstream auto-prover call that
+            // consumes the binding by type-match registers as BV(0)
+            // referenced, even though the user never typed X — in
+            // which case the anonymous form would behave identically
+            // and the name is dead weight. Surface-text catches that.
+            // Anonymous synthesised names (prefix `_`) are skipped by
+            // warnIfSurfaceNameUnused itself.
+            if (let->body) {
+                if (let->fromCalcAsBinding) {
+                    // Specialised message: the fix is to drop the
+                    // `as NAME` postfix, not the calc itself.
+                    if (reportRedundantBy_
+                        && !let->name.empty()
+                        && let->name[0] != '_'
+                        && !surfaceMentionsName(
+                            *let->body, let->name)) {
+                        std::cerr << "warning: " << moduleName_
+                            << ":" << expression.line
+                            << ":" << expression.column
+                            << ": `calc ... as " << let->name
+                            << "` is never textually referenced —"
+                               " drop the `as " << let->name
+                            << "` to use the anonymous `calc ...;`"
+                               " form (downstream calc steps still"
+                               " find this equation by type-match)\n";
+                    }
+                } else if (reportRedundantBy_
+                           && !let->name.empty()
+                           && let->name[0] != '_'
+                           && !surfaceMentionsName(
+                               *let->body, let->name)) {
+                    // `let X := V;` / `claim X : T by V;` whose name
+                    // is never typed in the body. Three ways to fix:
+                    //   1. Drop the binding entirely (the value/claim
+                    //      is dead — nothing in scope after needs it).
+                    //   2. If the auto-prover is consuming it by type-
+                    //      match, switch to the anonymous form
+                    //      (`claim T by V;`) — same effect, no name.
+                    //   3. If the claim is documentation only (for the
+                    //      reader's benefit, not the kernel's), switch
+                    //      to `note T;` — the auto-prover still has to
+                    //      close it, but the intent is clearly
+                    //      "observe that …" rather than "introduce a
+                    //      named hypothesis."
+                    std::cerr << "warning: " << moduleName_
+                        << ":" << expression.line
+                        << ":" << expression.column
+                        << ": unused name `" << let->name
+                        << "` introduced by let / claim binding —"
+                           " drop it, or switch to anonymous form"
+                           " (`claim T by V;`) if the auto-prover"
+                           " consumes it, or to `note T;` if it's"
+                           " for the reader\n";
+                }
             }
             return makeLet(let->name, std::move(letType),
                            std::move(letValue), std::move(letBody));
