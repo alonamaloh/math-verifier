@@ -159,6 +159,19 @@ historical reasons; migration is a planned cleanup.
 - `IsX` (predicate) and `X_is_Y` (witness) conventions match the
   algebraic-instance pattern in `library/Rational/instances.math`.
 
+## Line width
+
+Up to ~110 columns is fine; ~120 is OK when keeping a calc step on
+one line aids readability. Don't aggressively wrap to fit 80 — the
+extra vertical sprawl from wrapped `Rational.absolute_value` or
+`Rational.halve(epsilon)` chains is its own readability cost. Wrap
+when the line genuinely needs it (a multi-argument function call
+where each arg is itself complex), not because of a column limit.
+
+When a calc step's expression is long, prefer a sensible single
+wrap (e.g. break at `=` between LHS and RHS of one step) over
+splitting each operand across lines.
+
 ## Prefer `1 + n` over `successor(n)` in expressions
 
 `successor(n)` is the Peano constructor; `1 + n` is the same value in

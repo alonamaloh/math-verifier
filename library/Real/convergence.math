@@ -73,130 +73,110 @@ definition Real.SequenceConvergent (s : Natural → Real) : Proposition :=
 -- `∀δ > 0. ∃ N. ∀ m ≥ N. |sf(s_rep, m)| < ε + δ`. Pick ε = δ = halve(δ_outer)
 -- and the bound becomes `|sf(s_rep, m)| < δ_outer`.
 
--- First a small rep-level helper: from the hypothesis applied at a
--- positive Rational ε, extract the rep-level "for every inner δ > 0
--- eventually |sf(s_rep, m)| < ε + δ" statement.
+-- Rep-level helper: from `|x| < (ε : Real)` (a Real-level less-than),
+-- extract the Rational-level pointwise bound `∃ N. ∀m ≥ N. |s(m)| < ε`.
+--
+-- The Real-side unfolding gives the two-quantifier IsEventuallyNonneg
+-- shape `∀δ > 0. ∃ N. ∀m ≥ N. -δ < ε - |s(m)|`. We apply that at
+-- ε := halve(ε) (and δ := halve(ε)) and rearrange the resulting
+-- `-halve(ε) < halve(ε) - |s(m)|` into `|s(m)| < ε` using
+-- `halve_doubled`. The rearrangement lives here so callers see only
+-- the clean one-quantifier shape.
 theorem Real.cauchy_almost_zero_from_absolute_bound
         : (s_rep : CauchyRationalSequence)
-          → (epsilon : Rational) → (Rational.zero < epsilon)
-          → Real.absolute_value((Quotient.mk(s_rep) : Real))
-                < (epsilon : Real)
-          → (delta : Rational) → Rational.zero < delta →
+          → ((epsilon : Rational) → Rational.zero < epsilon
+              → Real.absolute_value((Quotient.mk(s_rep) : Real))
+                  < (epsilon : Real))
+          → (epsilon : Rational) → Rational.zero < epsilon →
               ∃ (N : Natural).
                 (m : Natural) → N ≤ m →
-                  -delta < epsilon
-                            - Rational.absolute_value(
-                                  CauchyRationalSequence.sequenceFunction(
-                                      s_rep, m))
+                  Rational.absolute_value(
+                      CauchyRationalSequence.sequenceFunction(s_rep, m))
+                    < epsilon
   | CauchyRationalSequence.make(s, sCauchy),
-    epsilon, epsilonPositive, absLessThan,
-    delta, deltaPositive =>
-      -- After pattern-matching on s_rep, every Quotient.lift β-reduces:
-      --   Real.absolute_value(mk(make(s, _))) = mk(abs(make(s, _)))
-      --     = mk(make(λn. |s(n)|, _))
-      --   (ε : Real) = mk(make(λn. ε, _))
-      --   (ε : Real) - |x| = mk(make(λn. ε + -|s(n)|, _))
-      -- Real.IsNonneg of this is IsEventuallyNonneg(λn. ε - |s(n)|),
-      -- i.e., the desired ∀δ > 0. ∃ N. ∀ m ≥ N. -δ < ε - |s(n)|.
-      Real.LessThan.weaken(
-          Real.absolute_value((Quotient.mk(
-              CauchyRationalSequence.make(s, sCauchy)) : Real)),
-          (epsilon : Real),
-          absLessThan)(
-          delta, deltaPositive)
+    almostZeroAtAllPositives,
+    epsilon, epsilonPositive => {
+      -- Apply the Real-side hypothesis at halve(ε), giving
+      -- |x| < (halve(ε) : Real). After pattern-matching on s_rep, the
+      -- Quotient.lift β-chain reduces this to IsEventuallyNonneg
+      -- (halve(ε) - |s(·)|) — i.e., ∀δ > 0, eventually
+      -- -δ < halve(ε) - |s(m)|. We instantiate at δ := halve(ε) too.
+      claim halvedPositive : Rational.zero < Rational.halve(epsilon)
+        by Rational.halve_positive(epsilon, epsilonPositive);
+      obtain ⟨N, boundAtN⟩
+          from Real.LessThan.weaken(
+                   Real.absolute_value((Quotient.mk(
+                       CauchyRationalSequence.make(s, sCauchy)) : Real)),
+                   (Rational.halve(epsilon) : Real),
+                   almostZeroAtAllPositives(
+                       Rational.halve(epsilon), halvedPositive))(
+                   Rational.halve(epsilon), halvedPositive);
+      witness N with
+          function (m : Natural) (N_leq_m : N ≤ m) => {
+            let absSM : Rational := Rational.absolute_value(s(m));
+            -- boundAtN(m, N_leq_m) : -halve(ε) < halve(ε) - absSM.
+            -- Add (absSM + halve(ε)) to both sides:
+            --   LHS reduces to absSM (ring),
+            --   RHS reduces to halve(ε) + halve(ε) = ε (halve_doubled).
+            -- `ring` doesn't yet handle coefficient-2 monomials, so the
+            -- RHS rewrite is done by an explicit calc chain. We keep
+            -- `Rational.halve(epsilon)` un-abbreviated because the
+            -- `halve_doubled` rewrite below matches `halve(ε) + halve(ε)`
+            -- structurally; the rewrite matcher does not ζ-unfold a
+            -- let-bound abbreviation back to that shape.
+            claim rawBound : -Rational.halve(epsilon) < Rational.halve(epsilon) - absSM
+              by boundAtN(m, N_leq_m);
+            claim shiftedBound : absSM < Rational.halve(epsilon) + Rational.halve(epsilon)
+              by rewrite(
+                     (ring : -Rational.halve(epsilon) + (absSM + Rational.halve(epsilon))
+                            = absSM),
+                     rewrite(
+                         calc (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
+                            = (Rational.halve(epsilon) + -absSM) + (absSM + Rational.halve(epsilon))
+                            = Rational.halve(epsilon) + (-absSM + (absSM + Rational.halve(epsilon)))
+                            = Rational.halve(epsilon) + ((-absSM + absSM) + Rational.halve(epsilon))
+                            = Rational.halve(epsilon) + (Rational.zero + Rational.halve(epsilon))
+                            = Rational.halve(epsilon) + Rational.halve(epsilon),
+                         Rational.add_preserves_LessThan(
+                             -Rational.halve(epsilon),
+                             Rational.halve(epsilon) - absSM,
+                             absSM + Rational.halve(epsilon),
+                             rawBound)));
+            -- halve(ε) + halve(ε) = ε.
+            rewrite(
+                Rational.halve_doubled(epsilon),
+                shiftedBound)
+          }
+    }
 
--- Rep-level helper: a CauchyRationalSequence whose absolute-value
--- sequence is bounded below ε + δ for every choice of positive ε and δ
--- is equivalent (in the Cauchy quotient) to the constant-zero
--- sequence. The witness: at outer δ_outer, apply the hypothesis at
--- ε = halve(δ_outer) and inner δ = halve(δ_outer), giving
--- |s(m)| < halve(δ_outer) + halve(δ_outer) = δ_outer.
+-- Rep-level: a CauchyRationalSequence whose absolute value is
+-- eventually below every positive ε is equivalent (in the Cauchy
+-- quotient) to the constant-zero sequence. This is essentially the
+-- definition of CauchyEquivalent-to-zero modulo `s(m) - 0 = s(m)`.
 theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
         : (s_rep : CauchyRationalSequence)
-          → ((epsilon : Rational) → Rational.zero < epsilon
-              → (delta : Rational) → Rational.zero < delta →
-                  ∃ (N : Natural).
-                    (m : Natural) → N ≤ m →
-                      -delta < epsilon
-                                - Rational.absolute_value(
-                                      CauchyRationalSequence.sequenceFunction(
-                                          s_rep, m)))
+          → ((epsilon : Rational) → Rational.zero < epsilon →
+                ∃ (N : Natural).
+                  (m : Natural) → N ≤ m →
+                    Rational.absolute_value(
+                        CauchyRationalSequence.sequenceFunction(s_rep, m))
+                      < epsilon)
           → CauchyEquivalent(s_rep, Rational.to_cauchy_constant(Rational.zero))
   | CauchyRationalSequence.make(s, _),
-    almostZero =>
-      function (epsilon_outer : Rational)
-               (epsilon_outerPositive : Rational.zero < epsilon_outer) => {
-        claim halvedPositive : Rational.zero < Rational.halve(epsilon_outer)
-          by Rational.halve_positive(epsilon_outer, epsilon_outerPositive);
-        obtain ⟨N, boundAtN⟩
-            from almostZero(
-                     Rational.halve(epsilon_outer), halvedPositive,
-                     Rational.halve(epsilon_outer), halvedPositive);
+    absoluteAlmostZero =>
+      function (epsilon : Rational)
+               (epsilonPositive : Rational.zero < epsilon) => {
+        obtain ⟨N, absBoundAtN⟩
+            from absoluteAlmostZero(epsilon, epsilonPositive);
         witness N with
             function (m : Natural) (N_leq_m : N ≤ m) => {
-              -- boundAtN(m, N_leq_m)
-              --   : -halve(ε) < halve(ε) - |s(m)|
-              -- Rearrange: |s(m)| < halve(ε) + halve(ε) = ε.
-              claim rawBound
-                    : -Rational.halve(epsilon_outer)
-                      < Rational.halve(epsilon_outer)
-                        - Rational.absolute_value(s(m))
-                by boundAtN(m, N_leq_m);
-              -- Add |s(m)| + halve(ε) to both sides:
-              --   |s(m)| < halve(ε) + halve(ε).
-              -- Goal at the end: |s(m) - 0| < ε. Since s(m) - 0 = s(m),
-              -- it suffices to bound |s(m)| < ε.
-              -- From -halve(ε) < halve(ε) - |s(m)|, add (|s(m)| +
-              -- halve(ε)) to both sides. The LHS reduces to |s(m)| by
-              -- ring; the RHS reduces to halve(ε) + halve(ε), which is
-              -- ε by halve_doubled. We do the RHS rewrite manually
-              -- (split into the two halve(ε)'s) since `ring` doesn't
-              -- yet handle coefficient-2 monomials.
-              claim shiftedBound
-                    : Rational.absolute_value(s(m))
-                      < Rational.halve(epsilon_outer)
-                        + Rational.halve(epsilon_outer)
-                by rewrite(
-                       (ring : -Rational.halve(epsilon_outer)
-                                + (Rational.absolute_value(s(m))
-                                   + Rational.halve(epsilon_outer))
-                              = Rational.absolute_value(s(m))),
-                       rewrite(
-                           calc (Rational.halve(epsilon_outer)
-                                  - Rational.absolute_value(s(m)))
-                                  + (Rational.absolute_value(s(m))
-                                     + Rational.halve(epsilon_outer))
-                              = (Rational.halve(epsilon_outer)
-                                  + -Rational.absolute_value(s(m)))
-                                  + (Rational.absolute_value(s(m))
-                                     + Rational.halve(epsilon_outer))
-                              = Rational.halve(epsilon_outer)
-                                + (-Rational.absolute_value(s(m))
-                                   + (Rational.absolute_value(s(m))
-                                      + Rational.halve(epsilon_outer)))
-                              = Rational.halve(epsilon_outer)
-                                + ((-Rational.absolute_value(s(m))
-                                     + Rational.absolute_value(s(m)))
-                                    + Rational.halve(epsilon_outer))
-                              = Rational.halve(epsilon_outer)
-                                + (Rational.zero
-                                   + Rational.halve(epsilon_outer))
-                              = Rational.halve(epsilon_outer)
-                                + Rational.halve(epsilon_outer),
-                           Rational.add_preserves_LessThan(
-                               -Rational.halve(epsilon_outer),
-                               Rational.halve(epsilon_outer)
-                                 - Rational.absolute_value(s(m)),
-                               Rational.absolute_value(s(m))
-                                 + Rational.halve(epsilon_outer),
-                               rawBound)));
-              -- halve(ε) + halve(ε) = ε.
-              claim absBound
-                    : Rational.absolute_value(s(m)) < epsilon_outer
-                by rewrite(
-                       Rational.halve_doubled(epsilon_outer),
-                       shiftedBound);
-              -- |s(m) - 0| = |s(m)| < ε.
+              -- |s(m) - 0| = |s(m)| < ε. The `claim` coerces
+              -- absBoundAtN(m, N_leq_m)'s inferred type
+              -- (`|sequenceFunction(make(s, _), m)| < ε`) to the
+              -- β/ι-equal `|s(m)| < ε` so the rewrite matcher below
+              -- can find `|s(m)|` structurally.
+              claim absBoundOnS : Rational.absolute_value(s(m)) < epsilon
+                by absBoundAtN(m, N_leq_m);
               rewrite(
                   congruenceOf(
                       Rational.absolute_value,
@@ -205,7 +185,7 @@ theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
                              = s(m) + -Rational.zero
                              = s(m) + Rational.zero
                              = s(m))),
-                  absBound)
+                  absBoundOnS)
             }
       }
 
@@ -234,12 +214,7 @@ theorem Real.eq_of_absolute_value_less_than_all_positive
               Rational.to_cauchy_constant(Rational.zero),
               CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero(
                   s_rep,
-                  function (epsilon : Rational)
-                           (epsilonPositive : Rational.zero < epsilon) =>
-                    Real.cauchy_almost_zero_from_absolute_bound(
-                        s_rep,
-                        epsilon, epsilonPositive,
-                        atRep(epsilon, epsilonPositive)))),
+                  Real.cauchy_almost_zero_from_absolute_bound(s_rep, atRep))),
       x)(hypothesis)
 
 -- ----------------------------------------------------------------------
