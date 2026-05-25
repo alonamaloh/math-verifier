@@ -204,15 +204,14 @@ theorem Real.exists_rational_below_at_make
           -- 0 = -1 + 1 < (seq(m) - seq(N)) + 1 by adding 1 on the
           -- right of diffBound, and ring rearranges the RHS to
           -- `seq(m) - (seq(N) - 1)`.
-          claim diffPositive
-                : (0 : Rational)
+          claim (0 : Rational)
                   < seq(m) - (seq(N) - (1 : Rational))
             by calc (0 : Rational)
                   = -(1 : Rational) + (1 : Rational)
                   < (seq(m) - seq(N)) + (1 : Rational)
                   = seq(m) - (seq(N) - (1 : Rational));
           -- Close -ε < seq(m) - (seq(N) - 1) by chaining through 0:
-          -- -ε < 0 (since ε > 0) and 0 < ... by diffPositive.
+          -- -ε < 0 (since ε > 0) and 0 < ... by the claim above.
           calc -epsilon
              < (0 : Rational)
              < seq(m) - (seq(N) - (1 : Rational))
@@ -557,11 +556,16 @@ theorem Real.bisection_width_invariant
   | successor(predecessor) => {
       let intervals : Real.BisectionInterval :=
           Real.bisectionIntervals(subset, initial, predecessor);
-      claim IH
-            : Real.bisectionRight(subset, initial, predecessor)
-                - Real.bisectionLeft(subset, initial, predecessor)
-              = Real.bisectionWidth(initial, predecessor)
-        by Real.bisection_width_invariant(subset, initial, predecessor);
+      -- IH: width invariant at the previous step. Used by the auto-
+      -- prover to close the final calc step in each `decide` arm.
+      -- Named `let` (not anonymous `claim`) because the structured-
+      -- claim path can't resolve the self-recursive reference to
+      -- Real.bisection_width_invariant — let's raw-expression value
+      -- elaborates against the in-progress fixpoint binder.
+      let _IH : Real.bisectionRight(subset, initial, predecessor)
+                  - Real.bisectionLeft(subset, initial, predecessor)
+                = Real.bisectionWidth(initial, predecessor) :=
+          Real.bisection_width_invariant(subset, initial, predecessor);
       decide Real.IsUpperBound(
                  subset,
                  (Rational.halve(
@@ -1291,8 +1295,8 @@ theorem Real.bisectionLeft_le_at_le
   -- Write m as k + N (justified by N ≤ m), then the step-monotone
   -- lemma at k iterations closes the rewritten goal.
   obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
-  claim atKPlusN : Real.bisectionLeft(subset, initial, N)
-                   ≤ Real.bisectionLeft(subset, initial, k + N)
+  claim Real.bisectionLeft(subset, initial, N)
+        ≤ Real.bisectionLeft(subset, initial, k + N)
     by Real.bisectionLeft_le_subsequent(
            subset, initial, initialLeftLeqRight, k, N);
   claim by substitution
@@ -1307,8 +1311,8 @@ theorem Real.bisectionRight_le_at_le
         : Real.bisectionRight(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N) := {
   obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
-  claim atKPlusN : Real.bisectionRight(subset, initial, k + N)
-                   ≤ Real.bisectionRight(subset, initial, N)
+  claim Real.bisectionRight(subset, initial, k + N)
+        ≤ Real.bisectionRight(subset, initial, N)
     by Real.bisectionRight_le_predecessor(
            subset, initial, initialLeftLeqRight, k, N);
   claim by substitution
@@ -1323,8 +1327,8 @@ theorem Real.bisectionLeft_le_bisectionRight_at_le
         : Real.bisectionLeft(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N) := {
   obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
-  claim atKPlusN : Real.bisectionLeft(subset, initial, k + N)
-                   ≤ Real.bisectionRight(subset, initial, N)
+  claim Real.bisectionLeft(subset, initial, k + N)
+        ≤ Real.bisectionRight(subset, initial, N)
     by Real.bisectionLeft_le_bisectionRight_predecessor(
            subset, initial, initialLeftLeqRight, k, N);
   claim by substitution
@@ -1415,7 +1419,7 @@ theorem Rational.reciprocal_function_positive_of_positive
         decide (0 : Rational) = Rational.reciprocal_function(x) {
           | yes zeroEqRecip => {
               -- recip = 0: x*recip = x*0 = 0 ≠ 1.
-              claim xTimesZeroEqOne : x * (0 : Rational) = (1 : Rational)
+              claim x * (0 : Rational) = (1 : Rational)
                 by rewrite(
                        Equality.symmetry(zeroEqRecip),
                        xRecipEqOne);
@@ -1486,7 +1490,7 @@ theorem Rational.archimedean_for_positives
            epsilon,
            productLeqSucc,
            epsilonNonneg);
-  claim epsilonNonzero : ¬(epsilon = (0 : Rational))
+  claim ¬(epsilon = (0 : Rational))
     by function (epsilonEqZero : epsilon = (0 : Rational)) =>
          Rational.LessThan.distinct((0 : Rational), epsilon,
              epsilonPositive, Equality.symmetry(epsilonEqZero));

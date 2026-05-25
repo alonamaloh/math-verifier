@@ -129,7 +129,7 @@ theorem Natural.divide_positive_when_divides
      = prime * Natural.divide(prime, target) + 0
      = prime * Natural.divide(prime, target)
          + Natural.modulo(prime, target)
-     = target                                                as productEqTarget;
+     = target;
   cases Natural.divide(prime, target) with refinedDivideEq {
     | zero =>
         -- prime * 0 = 0, so target = 0, contradicting targetPositive.
@@ -283,9 +283,6 @@ theorem Natural.padic_valuation_step_fuel_stable
                                   calc Natural.padic_valuation_step(successor(f1'), prime, n)
                                      = 0
                                      = Natural.padic_valuation_step(successor(f2'), prime, n)
-                                           by Equality.symmetry(
-                                                  Natural.padic_valuation_step_zero_when_not_divides(
-                                                      f2', prime, n, predM, refinedModuloEq))
                             }
                     } : (refinedNLeF2 : n ≤ f2)
                         → Natural.padic_valuation_step(successor(f1'), prime, n)
@@ -355,7 +352,7 @@ theorem Natural.padic_valuation_strip
            Natural.divides_self_multiple(prime, quotient));
   -- From decompose + moduloZero, prime * divide(prime, prime*quotient) = prime * quotient.
   -- Cancel the prime factor (primePositive) to get divide = quotient.
-  claim divideEqQuotient : Natural.divide(prime, prime * quotient) = quotient
+  claim Natural.divide(prime, prime * quotient) = quotient
     by Natural.multiply_cancel_left(
            prime, Natural.divide(prime, prime * quotient), quotient,
            primePositive,
@@ -488,10 +485,8 @@ theorem Natural.padic_valuation_multiplicative
                 calc a'
                    = prime * Natural.divide(prime, a')
                        + Natural.modulo(prime, a')
-                         by Equality.symmetry(
-                                Natural.divide_modulo_decompose(prime, a'))
                    = prime * Natural.divide(prime, a') + 0
-                   = prime * Natural.divide(prime, a')           as aEqPrimeDivide;
+                   = prime * Natural.divide(prime, a');
                 -- IH on (divide(p, a'), b'): need succ(divide + b') ≤ n.
                 claim recursiveSumLeN
                       : successor(Natural.divide(prime, a') + b') ≤ n
@@ -499,11 +494,10 @@ theorem Natural.padic_valuation_multiplicative
                          sumEq,
                          Natural.successor_add_preserves_le(
                              b', a', Natural.divide(prime, a'), succDivideALeA));
-                claim recursedEq
-                      : Natural.padic_valuation(
-                            prime, Natural.divide(prime, a') * b')
-                        = Natural.padic_valuation(prime, Natural.divide(prime, a'))
-                              + Natural.padic_valuation(prime, b')
+                claim Natural.padic_valuation(
+                          prime, Natural.divide(prime, a') * b')
+                      = Natural.padic_valuation(prime, Natural.divide(prime, a'))
+                            + Natural.padic_valuation(prime, b')
                   by inductionHypothesis(
                          Natural.divide(prime, a') + b',
                          recursiveSumLeN,
@@ -555,10 +549,8 @@ theorem Natural.padic_valuation_multiplicative
                       calc b'
                          = prime * Natural.divide(prime, b')
                              + Natural.modulo(prime, b')
-                               by Equality.symmetry(
-                                      Natural.divide_modulo_decompose(prime, b'))
                          = prime * Natural.divide(prime, b') + 0
-                         = prime * Natural.divide(prime, b')         as bEqPrimeDivide;
+                         = prime * Natural.divide(prime, b');
                       -- IH on (a', divide(p, b')): need succ(a' + divide) ≤ n.
                       -- a' + divide < a' + b' = n; specifically succ(a' + divide) ≤ a' + b'.
                       claim recursiveSumLeN
@@ -579,12 +571,11 @@ theorem Natural.padic_valuation_multiplicative
                                        Natural.successor_add_preserves_le(
                                            a', b', Natural.divide(prime, b'),
                                            succDivideBLeB))));
-                      claim recursedEq
-                            : Natural.padic_valuation(
-                                  prime, a' * Natural.divide(prime, b'))
-                              = Natural.padic_valuation(prime, a')
-                                    + Natural.padic_valuation(
-                                          prime, Natural.divide(prime, b'))
+                      claim Natural.padic_valuation(
+                                prime, a' * Natural.divide(prime, b'))
+                            = Natural.padic_valuation(prime, a')
+                                  + Natural.padic_valuation(
+                                        prime, Natural.divide(prime, b'))
                         by inductionHypothesis(
                                a' + Natural.divide(prime, b'),
                                recursiveSumLeN,
@@ -621,31 +612,30 @@ theorem Natural.padic_valuation_multiplicative
                     }
                   in (prime ∤ b') as notDivB: {
                       -- prime ∤ a' ∧ prime ∤ b' → prime ∤ (a' * b').
-                      claim notDivProduct : prime ∤ (a' * b')
-                        by function (productDivides : prime ∣ a' * b') =>
-                               {
-                               claim (prime ∣ a') ∨ (prime ∣ b')
-                                   by Natural.prime_divides_product(
-                                          prime, a', b', primality,
-                                          productDivides)
-                               claim by cases {
-                                 in (prime ∣ a') as primeDivA: notDivA(primeDivA)
-                                 in (prime ∣ b') as primeDivB: notDivB(primeDivB)
-                               }
-                               };
+                      -- Named `let` (not anonymous `claim`) because the
+                      -- structured-claim elaboration path doesn't
+                      -- propagate the expected type into the nested
+                      -- function-body `claim by cases` — the let-form's
+                      -- raw-expression value bypasses that wrapping.
+                      let _notDivProduct : prime ∤ (a' * b') :=
+                          function (productDivides : prime ∣ a' * b') =>
+                              {
+                              claim (prime ∣ a') ∨ (prime ∣ b')
+                                  by Natural.prime_divides_product(
+                                         prime, a', b', primality,
+                                         productDivides)
+                              claim by cases {
+                                in (prime ∣ a') as primeDivA: notDivA(primeDivA)
+                                in (prime ∣ b') as primeDivB: notDivB(primeDivB)
+                              }
+                              };
                       -- All three valuations are zero.
                       calc Natural.padic_valuation(prime, a' * b')
                          = 0
                          = 0 + 0
                          = Natural.padic_valuation(prime, a') + 0
-                                by Equality.symmetry(
-                                       Natural.padic_valuation_when_not_divides(
-                                           prime, a', notDivA))
                          = Natural.padic_valuation(prime, a')
                              + Natural.padic_valuation(prime, b')
-                                by Equality.symmetry(
-                                       Natural.padic_valuation_when_not_divides(
-                                           prime, b', notDivB))
                     }
                 }
           },
@@ -694,21 +684,17 @@ theorem Natural.padic_valuation_power_divides
               let ⟨q, mEqPrimeQ⟩ := pDividesM;
               cases q with qEq {
                  | zero => {
-                     let refinedMEq : m = prime * 0 :=
-                         rewrite(qEq, mEqPrimeQ);
                      -- m = prime * 0 = 0. v_p(0) = 0 via the zero-fuel
                      -- characterising lemma. Then p^0 = 1, and 1 | 0.
                      -- Build divides(p^v_p(0), 0) explicitly by rewriting
                      -- one_divides(0)'s `1` to `power(v_p(prime, 0), prime)`.
-                     claim vpZero : Natural.padic_valuation(prime, 0) = 0
-                         by Natural.padic_valuation_step_zero_fuel(prime, 0);
+                     claim m = prime * 0;
+                     claim Natural.padic_valuation(prime, 0) = 0;
                      claim oneEqPower
                            : 1 = Natural.power(
                                      Natural.padic_valuation(prime, 0), prime)
                          by calc 1
                               = Natural.power(0, prime)
-                                   by Equality.symmetry(
-                                          Natural.power_zero(prime))
                               = Natural.power(
                                     Natural.padic_valuation(prime, 0), prime);
                      Equality.transport_proposition(
@@ -884,8 +870,8 @@ theorem Natural.power_divides_implies_padic_valuation_ge
       -- For q = succ(predQ): apply strip + IH.
       cases q with qEq {
          | zero => {
-             let refinedNEq : n = prime * 0 :=
-                 rewrite(qEq, nEqPrimeQ);
+             -- n = prime * 0 = 0, contradicting nPositive.
+             claim n = prime * 0;
              absurd(
                  rewrite(
                      calc n
@@ -894,8 +880,7 @@ theorem Natural.power_divides_implies_padic_valuation_ge
                      nPositive))
            }
          | successor(predQ) => {
-             let refinedNEq : n = prime * successor(predQ) :=
-                 rewrite(qEq, nEqPrimeQ);
+             claim n = prime * successor(predQ);
              claim succQPositive : 1 ≤ successor(predQ)
                by Natural.successor_positive(predQ);
              -- p^succ(predK) | n = p * succ(predQ). Hence
@@ -1175,16 +1160,16 @@ theorem Natural.monus_add_distributes
         (a c b d : Natural) (aLeC : a ≤ c) (bLeD : b ≤ d)
         : Natural.monus(c + d, a + b)
           = Natural.monus(c, a) + Natural.monus(d, b) := {
-  claim cDecompose : c = a + Natural.monus(c, a)
+  claim c = a + Natural.monus(c, a)
     by Natural.monus_zero_implies_decompose(
            a, c, Natural.le_implies_monus_zero(c, a, aLeC));
-  claim dDecompose : d = b + Natural.monus(d, b)
+  claim d = b + Natural.monus(d, b)
     by Natural.monus_zero_implies_decompose(
            b, d, Natural.le_implies_monus_zero(d, b, bLeD));
   calc c + d
        = (a + Natural.monus(c, a)) + d
        = (a + Natural.monus(c, a)) + (b + Natural.monus(d, b))
-       = (a + b) + (Natural.monus(c, a) + Natural.monus(d, b))    as sumDecompose;
+       = (a + b) + (Natural.monus(c, a) + Natural.monus(d, b));
   calc Natural.monus(c + d, a + b)
      = Natural.monus(
            (a + b) + (Natural.monus(c, a) + Natural.monus(d, b)),
@@ -1220,10 +1205,10 @@ theorem Natural.distance_sum_cross_le_le
         (a1 a2 b1 b2 : Natural) (a1LeA2 : a1 ≤ a2) (b2LeB1 : b2 ≤ b1)
         : Natural.distance(a1 + b1, a2 + b2)
           = Natural.distance(Natural.monus(b1, b2), Natural.monus(a2, a1)) := {
-  claim a2Decompose : a2 = a1 + Natural.monus(a2, a1)
+  claim a2 = a1 + Natural.monus(a2, a1)
     by Natural.monus_zero_implies_decompose(
            a1, a2, Natural.le_implies_monus_zero(a2, a1, a1LeA2));
-  claim b1Decompose : b1 = b2 + Natural.monus(b1, b2)
+  claim b1 = b2 + Natural.monus(b1, b2)
     by Natural.monus_zero_implies_decompose(
            b2, b1, Natural.le_implies_monus_zero(b1, b2, b2LeB1));
   calc Natural.distance(a1 + b1, a2 + b2)
@@ -1261,7 +1246,7 @@ theorem Natural.divides_distance_sum
               -- distance(a1+b1, a2+b2) = monus(a2+b2, a1+b1)
               --                       = monus(a2, a1) + monus(b2, b1)
               --                       = distance(a1, a2) + distance(b1, b2).
-              claim sumLe : a1 + b1 ≤ a2 + b2
+              claim a1 + b1 ≤ a2 + b2
                 by Natural.le_add_le(a1, a2, b1, b2, a1LeA2, b1LeB2);
               rewrite(
                   calc Natural.distance(a1, a2) + Natural.distance(b1, b2)
@@ -1318,7 +1303,7 @@ theorem Natural.divides_distance_sum
               -- Same direction (a2 ≤ a1, b2 ≤ b1). distance is in
               -- terms of monus(a1, a2) and monus(b1, b2). By the
               -- same distributivity / divides_add chain as the first case.
-              claim sumLe : a2 + b2 ≤ a1 + b1
+              claim a2 + b2 ≤ a1 + b1
                 by Natural.le_add_le(a2, a1, b2, b1, a2LeA1, b2LeB1);
               rewrite(
                   calc Natural.distance(a1, a2) + Natural.distance(b1, b2)
@@ -1416,14 +1401,18 @@ theorem Natural.power_monotone_via_r
       -- By transitivity, power(a, p) ≤ p * power(a + r', p).
       -- power_succ rewrites this to power(succ(a + r'), p);
       -- add_successor rewrites the indexed `m` to `a + succ(r')`.
-      claim chained : Natural.power(a, p) ≤ p * Natural.power(a + r', p)
-        by LessOrEqual.transitive(
-               Natural.power(a, p),
-               Natural.power(a + r', p),
-               p * Natural.power(a + r', p),
-               Natural.le_multiply_when_factor_at_least_one(
-                   Natural.power(a + r', p), p, pPositive),
-               Natural.power_monotone_via_r(a, p, pPositive, r'));
+      -- Named `let` (not anonymous `claim`) because the structured-
+      -- claim path can't resolve the self-recursive reference to
+      -- Natural.power_monotone_via_r — let's raw-expression value
+      -- elaborates against the in-progress fixpoint binder.
+      let _chained : Natural.power(a, p) ≤ p * Natural.power(a + r', p) :=
+          LessOrEqual.transitive(
+              Natural.power(a, p),
+              Natural.power(a + r', p),
+              p * Natural.power(a + r', p),
+              Natural.le_multiply_when_factor_at_least_one(
+                  Natural.power(a + r', p), p, pPositive),
+              Natural.power_monotone_via_r(a, p, pPositive, r'));
       claim Natural.power(a, p) ≤ Natural.power(successor(a + r'), p)
         by substituting Natural.power_succ(a + r', p)
       claim Natural.power(a, p) ≤ Natural.power(a + successor(r'), p)
