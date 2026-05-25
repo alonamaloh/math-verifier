@@ -651,6 +651,28 @@ returns its final non-`;`-terminated expression.
   (kernel sees through it; see the `let` section above).
 - `suppose <proposition> as <name>;` — introduce a hypothesis as a
   step (useful for breaking implication arrows into named pieces).
+- `take <name> : <type>;` — introduce a Pi-binder of the given type
+  from the expected type. Reads as the math-prose "take an arbitrary
+  <name> of type <type>" / "let <name> ∈ <type> be given". Use
+  `take` over `function (name : type) =>` whenever the binder is
+  the textbook "fix a variable" move; reserve `function` for genuine
+  lambdas that aren't intros. Semantically identical to a single-
+  binder `suppose … as …` (both wrap the rest of the block in a
+  lambda) but reads as the universal/Pi side rather than the
+  hypothesis-naming side.
+- `note goal : <type>;` — assert the current expected type is
+  definitionally equal to `<type>` and continue. Reads as
+  "we need to show that …" / "the goal is …". A no-op at the term
+  level — pure scaffolding that documents the goal at a point where
+  the reader benefits from seeing it (right after `take`s, after a
+  `cases` split, before a long calc). The elaborator runs
+  `isDefinitionallyEqual` and reports a mismatch with both forms in
+  the error.
+- `note <proposition>;` — assert `<proposition>` is closable by the
+  auto-prover at the current point and continue. Reads as "note
+  that …" / "observe that …" — a parenthetical aside in math prose.
+  Useful when the reader benefits from seeing the intermediate
+  fact even though the surrounding proof would close without it.
 - `unfold <Foo> in <body>` — temporarily mark `Foo` transparent
   inside `<body>` (for opaque definitions; see the opaque section).
 

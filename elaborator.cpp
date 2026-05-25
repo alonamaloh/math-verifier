@@ -3978,6 +3978,11 @@ private:
                 *decide, localBinders, expectedType,
                 expression.line, expression.column);
         }
+        if (auto* note = std::get_if<SurfaceNote>(&expression.node)) {
+            return elaborateNoteExpression(
+                *note, localBinders, expectedType,
+                expression.line, expression.column);
+        }
         if (std::get_if<SurfaceRing>(&expression.node)) {
             return elaborateRing(localBinders, expectedType,
                                   expression.line, expression.column);
@@ -7842,6 +7847,13 @@ private:
             return unfold->body
                 && surfaceContainsAutoProverInvocation(*unfold->body);
         }
+        if (auto* note =
+                std::get_if<SurfaceNote>(&expression.node)) {
+            // `note <prop>;` itself invokes the auto-prover.
+            if (note->proposition) return true;
+            return note->body
+                && surfaceContainsAutoProverInvocation(*note->body);
+        }
         // Leaves (identifier, numeric literal, sort, type, etc.) and
         // any variants not enumerated above can't host an auto-prover
         // call — return false.
@@ -7986,6 +7998,17 @@ private:
                 std::get_if<SurfaceGiven>(&expression.node)) {
             return given->proposition
                 && surfaceMentionsName(*given->proposition, name);
+        }
+        if (auto* note =
+                std::get_if<SurfaceNote>(&expression.node)) {
+            if (note->goalType
+                && surfaceMentionsName(*note->goalType, name))
+                return true;
+            if (note->proposition
+                && surfaceMentionsName(*note->proposition, name))
+                return true;
+            return note->body
+                && surfaceMentionsName(*note->body, name);
         }
         // Leaf / specialised nodes (numeric literal, Type,
         // Proposition, hammer, sorry, ring, etc.) don't have
@@ -13682,6 +13705,80 @@ private:
                 makeBoundVariable(refiningBoundVariableIndices[i]));
         }
         return innerCasesKernel;
+    }
+
+    // `note goal : T;` / `note <prop>;` — elaboration-time assertions
+    // that don't change the proof state. Both desugar to the rest of
+    // the block elaborated at the unchanged expected type, but the
+    // elaborator runs a check first:
+    //   `note goal : T` — check that the declared T is definitionally
+    //     equal to the current expected type. On mismatch, error
+    //     pointing at the noted form vs the actual goal.
+    //   `note P` — elaborate P as a Proposition and run the
+    //     auto-prover on it. If the prover can't close P, error.
+    // The returned term is the body's elaboration: nothing about the
+    // assertion remains in the produced kernel term.
+    ExpressionPointer elaborateNoteExpression(
+        const SurfaceNote& note,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int /*column*/) {
+        Frame frame(*this,
+            "note at line " + std::to_string(line),
+            localBinders, expectedType, line, /*column=*/0);
+        if (note.goalType) {
+            if (!expectedType) {
+                throwElaborate(
+                    "`note goal : T` needs an expected type from "
+                    "context (none available at line "
+                    + std::to_string(line) + ")");
+            }
+            ExpressionPointer declaredKernel = elaborateExpression(
+                *note.goalType, localBinders);
+            Context openedContext =
+                buildContextFromLocalBinders(localBinders);
+            ExpressionPointer declaredOpen = openOverLocalBinders(
+                declaredKernel, localBinders, localBinders.size());
+            ExpressionPointer expectedOpen = openOverLocalBinders(
+                expectedType, localBinders, localBinders.size());
+            if (!isDefinitionallyEqual(
+                    environment_, openedContext,
+                    declaredOpen, expectedOpen)) {
+                throwElaborate(
+                    std::string("`note goal :` mismatch at line ")
+                    + std::to_string(line) + ":\n"
+                    + "  noted form:    "
+                    + prettyPrintInLocalScope(declaredKernel, localBinders)
+                    + "\n  actual goal:   "
+                    + prettyPrintInLocalScope(expectedType, localBinders));
+            }
+        } else if (note.proposition) {
+            ExpressionPointer propKernel = elaborateExpression(
+                *note.proposition, localBinders,
+                makeSort(makeLevelConst(0)));
+            try {
+                (void)autoProveClaim(propKernel, localBinders, line);
+            } catch (const ElaborateError&) {
+                throwElaborate(
+                    std::string("`note <proposition>` at line ")
+                    + std::to_string(line)
+                    + ": the auto-prover could not close the noted "
+                    "proposition: "
+                    + prettyPrintInLocalScope(propKernel, localBinders));
+            } catch (const TypeError&) {
+                throwElaborate(
+                    std::string("`note <proposition>` at line ")
+                    + std::to_string(line)
+                    + ": the auto-prover raised a type error on the "
+                    "noted proposition: "
+                    + prettyPrintInLocalScope(propKernel, localBinders));
+            }
+        } else {
+            throwElaborate(
+                "internal: SurfaceNote with neither goalType nor "
+                "proposition set");
+        }
+        return elaborateExpression(*note.body, localBinders, expectedType);
     }
 
     // `decide P { | yes m => arm_yes | no n => arm_no }` — classical

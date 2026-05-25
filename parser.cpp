@@ -674,12 +674,13 @@ private:
         // `SurfaceLet`, suppose a `SurfaceLambda`, and choose a
         // `SurfaceChoose` (the elaborator handles the scope lookup).
         struct BlockWrapper {
-            enum Kind { TypedLet, PatternLet, Suppose, Choose, Set };
+            enum Kind { TypedLet, PatternLet, Suppose, Choose, Set,
+                        NoteGoal, NoteAssertion };
             Kind kind = TypedLet;
             SurfacePatternPointer pattern;     // PatternLet
             std::string name;                  // TypedLet, Suppose, Choose, Set
-            SurfaceExpressionPointer type;     // TypedLet, Suppose
-            SurfaceExpressionPointer value;    // TypedLet, PatternLet, Choose, Set
+            SurfaceExpressionPointer type;     // TypedLet, Suppose, NoteGoal
+            SurfaceExpressionPointer value;    // TypedLet, PatternLet, Choose, Set, NoteAssertion
             int line = 0;
             int column = 0;
         };
@@ -695,6 +696,8 @@ private:
                || peek().kind == TokenKind::KeywordSuppose
                || peek().kind == TokenKind::KeywordChoose
                || peek().kind == TokenKind::KeywordSet
+               || peek().kind == TokenKind::KeywordTake
+               || peek().kind == TokenKind::KeywordNote
                || peek().kind == TokenKind::KeywordCalc) {
             // `calc` at statement position has two shapes:
             //   - `calc … as NAME;`  (named binding for downstream use)
@@ -867,6 +870,10 @@ private:
                 statementToken.kind == TokenKind::KeywordChoose;
             bool isSet =
                 statementToken.kind == TokenKind::KeywordSet;
+            bool isTake =
+                statementToken.kind == TokenKind::KeywordTake;
+            bool isNote =
+                statementToken.kind == TokenKind::KeywordNote;
             BlockWrapper wrapper;
             wrapper.line = statementToken.line;
             wrapper.column = statementToken.column;
@@ -880,6 +887,44 @@ private:
                 expect(TokenKind::Assign,
                        "after set name (set n := E;)");
                 wrapper.value = parseExpression();
+            } else if (isTake) {
+                // `take <name> : <type>;` — introduce a Pi-binder by
+                // inspecting the expected type. Semantically identical
+                // to `suppose <type> as <name>;` (both wrap the rest of
+                // the block in `function (name : type) => …`), but
+                // reads as "take an arbitrary name of type type" —
+                // the math-prose phrasing for fixing a variable.
+                if (!isIdentifierLike(peek().kind)) {
+                    throwHere("expected identifier after 'take'");
+                }
+                Token nameToken = consumeAny();
+                expect(TokenKind::Colon,
+                       "after take name (take n : T;)");
+                wrapper.kind = BlockWrapper::Suppose;
+                wrapper.name = nameToken.lexeme;
+                wrapper.type = parseExpression();
+            } else if (isNote) {
+                // `note goal : <type>;` — assert the current expected
+                // type is definitionally equal to <type>. Reads as
+                // math-prose "we need to show that …".
+                //
+                // `note <proposition>;` — assert that the proposition
+                // is closable by the auto-prover. Reads as "note that
+                // …" / "observe that …" — a parenthetical aside.
+                //
+                // Both are no-ops at the term level; the elaborator
+                // runs the check then continues with the rest of the
+                // block unchanged.
+                if (peek().kind == TokenKind::KeywordGoal) {
+                    consumeAny();  // 'goal'
+                    expect(TokenKind::Colon,
+                           "after 'note goal' (note goal : T;)");
+                    wrapper.kind = BlockWrapper::NoteGoal;
+                    wrapper.type = parseExpression();
+                } else {
+                    wrapper.kind = BlockWrapper::NoteAssertion;
+                    wrapper.value = parseExpression();
+                }
             } else if (isSuppose) {
                 wrapper.kind = BlockWrapper::Suppose;
                 wrapper.type = parseExpression();
@@ -1129,6 +1174,20 @@ private:
                         /*fromStatementIntro=*/true);
                     break;
                 }
+                case BlockWrapper::NoteGoal:
+                    result = makeSurfaceNote(
+                        std::move(iterator->type),
+                        /*proposition=*/nullptr,
+                        std::move(result),
+                        iterator->line, iterator->column);
+                    break;
+                case BlockWrapper::NoteAssertion:
+                    result = makeSurfaceNote(
+                        /*goalType=*/nullptr,
+                        std::move(iterator->value),
+                        std::move(result),
+                        iterator->line, iterator->column);
+                    break;
                 case BlockWrapper::Choose: {
                     result = makeSurfaceChoose(
                         std::move(iterator->name),

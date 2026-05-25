@@ -57,6 +57,8 @@ enum class TokenKind {
     KeywordAs,              // `in (P) as h:` — name the arm's disjunct hypothesis
     KeywordRefining,        // `cases X refining h, …` — refine listed binders' types per case
     KeywordDecide,          // `decide P { yes m => …; no n => … }` — classical case-split with auto-transport
+    KeywordTake,            // `take h : T;` — introduce a Pi-binder (math-style "take an arbitrary h : T")
+    KeywordNote,            // `note goal : T;` / `note P;` — elaboration-time assertion / goal restatement
 
     // Punctuation
     LeftParen, RightParen,

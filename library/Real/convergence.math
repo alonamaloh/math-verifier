@@ -111,35 +111,37 @@ theorem Real.cauchy_almost_zero_from_absolute_bound
                    almostZeroAtAllPositives(
                        Rational.halve(epsilon), halvedPositive))(
                    Rational.halve(epsilon), halvedPositive);
-      witness N with
-          function (m : Natural) (N_leq_m : N ≤ m) => {
-            let absSM : Rational := abs(s(m));
-            -- boundAtN gives -halve(ε) < halve(ε) - absSM. Add
-            -- (absSM + halve(ε)) to both sides; the LHS becomes absSM
-            -- and the RHS becomes halve(ε) + halve(ε), so absSM < ε via
-            -- halve_doubled. We walk this as a mixed = / < / = calc.
-            claim rawBound : -Rational.halve(epsilon) < Rational.halve(epsilon) - absSM
-              by boundAtN(m, N_leq_m);
+      witness N with {
+          take m : Natural;
+          take N_leq_m : N ≤ m;
+          note goal : abs(s(m)) < epsilon;
+          let absSM : Rational := abs(s(m));
+          -- boundAtN gives -halve(ε) < halve(ε) - absSM. Add
+          -- (absSM + halve(ε)) to both sides; the LHS becomes absSM
+          -- and the RHS becomes halve(ε) + halve(ε), so absSM < ε via
+          -- halve_doubled. We walk this as a mixed = / < / = calc.
+          claim rawBound : -Rational.halve(epsilon) < Rational.halve(epsilon) - absSM
+            by boundAtN(m, N_leq_m);
             -- The middle = step (RHS simplification) hits ring v2's
             -- "coefficient ±k for k > 1" limit because the canonical
             -- form of `(h - a) + (a + h)` collects to `2h`. Hand-walked
             -- via a calc chain that uses only single-monomial steps.
-            calc (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
-               = (Rational.halve(epsilon) + -absSM) + (absSM + Rational.halve(epsilon))
-               = Rational.halve(epsilon) + ((-absSM + absSM) + Rational.halve(epsilon))
-               = Rational.halve(epsilon) + (Rational.zero + Rational.halve(epsilon))
-               = Rational.halve(epsilon) + Rational.halve(epsilon)                          as rhsSimplifies;
-            calc absSM
-               = -Rational.halve(epsilon) + (absSM + Rational.halve(epsilon))
-               < (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
-                   by Rational.add_preserves_LessThan(
-                          -Rational.halve(epsilon),
-                          Rational.halve(epsilon) - absSM,
-                          absSM + Rational.halve(epsilon),
-                          rawBound)
-               = Rational.halve(epsilon) + Rational.halve(epsilon)
-               = epsilon
-          }
+          calc (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
+             = (Rational.halve(epsilon) + -absSM) + (absSM + Rational.halve(epsilon))
+             = Rational.halve(epsilon) + ((-absSM + absSM) + Rational.halve(epsilon))
+             = Rational.halve(epsilon) + (Rational.zero + Rational.halve(epsilon))
+             = Rational.halve(epsilon) + Rational.halve(epsilon)                          as rhsSimplifies;
+          calc absSM
+             = -Rational.halve(epsilon) + (absSM + Rational.halve(epsilon))
+             < (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
+                 by Rational.add_preserves_LessThan(
+                        -Rational.halve(epsilon),
+                        Rational.halve(epsilon) - absSM,
+                        absSM + Rational.halve(epsilon),
+                        rawBound)
+             = Rational.halve(epsilon) + Rational.halve(epsilon)
+             = epsilon
+      }
     }
 
 -- Rep-level: a CauchyRationalSequence whose absolute value is
@@ -156,30 +158,31 @@ theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
                       < epsilon)
           → CauchyEquivalent(s_rep, Rational.to_cauchy_constant(Rational.zero))
   | CauchyRationalSequence.make(s, _),
-    absoluteAlmostZero =>
-      function (epsilon : Rational)
-               (epsilonPositive : Rational.zero < epsilon) => {
+    absoluteAlmostZero => {
+        take epsilon : Rational;
+        take epsilonPositive : Rational.zero < epsilon;
         obtain ⟨N, absBoundAtN⟩
             from absoluteAlmostZero(epsilon, epsilonPositive);
-        witness N with
-            function (m : Natural) (N_leq_m : N ≤ m) => {
-              -- |s(m) - 0| = |s(m)| < ε. The `claim` coerces
-              -- absBoundAtN(m, N_leq_m)'s inferred type
-              -- (`|sequenceFunction(make(s, _), m)| < ε`) to the
-              -- β/ι-equal `|s(m)| < ε` so the rewrite matcher below
-              -- can find `|s(m)|` structurally.
-              claim absBoundOnS : abs(s(m)) < epsilon
-                by absBoundAtN(m, N_leq_m);
-              rewrite(
-                  congruenceOf(
-                      Rational.absolute_value,
-                      Equality.symmetry(
-                          calc s(m) - Rational.zero
-                             = s(m) + Rational.zero
-                             = s(m))),
-                  absBoundOnS)
-            }
-      }
+        witness N with {
+            take m : Natural;
+            take N_leq_m : N ≤ m;
+            -- |s(m) - 0| = |s(m)| < ε. The `claim` coerces
+            -- absBoundAtN(m, N_leq_m)'s inferred type
+            -- (`|sequenceFunction(make(s, _), m)| < ε`) to the
+            -- β/ι-equal `|s(m)| < ε` so the rewrite matcher below
+            -- can find `|s(m)|` structurally.
+            claim absBoundOnS : abs(s(m)) < epsilon
+              by absBoundAtN(m, N_leq_m);
+            rewrite(
+                congruenceOf(
+                    Rational.absolute_value,
+                    Equality.symmetry(
+                        calc s(m) - Rational.zero
+                           = s(m) + Rational.zero
+                           = s(m))),
+                absBoundOnS)
+        }
+    }
 
 -- The headline lemma at the Real level: from `∀ε > 0. |x| < (ε : Real)`,
 -- conclude `x = Real.zero`. Lift via Quotient.induct.

@@ -1,0 +1,47 @@
+-- `take h : T;` introduces a Pi-binder via the elaborator's
+-- statement-form goal inspection. Semantically the same as
+-- `function (h : T) =>` but reads as "take an arbitrary h of type T".
+--
+-- `note goal : T;` asserts the current expected type is definitionally
+-- equal to T (math-prose "we need to show that …"). `note <prop>;`
+-- asserts the proposition can be closed by the auto-prover ("note
+-- that …" / "observe that …"). Both are no-ops at the term level —
+-- the elaborator runs the check and continues.
+
+module Test.take_note_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- Simplest case: `take` introduces the universally quantified binder.
+theorem Test.take_id : (n : Natural) → n = n := {
+    take n : Natural;
+    reflexivity(Natural, n)
+}
+
+-- Two `take`s in sequence. Reads as "take m, take n, [proof]".
+theorem Test.take_two : (m n : Natural) → m = m → n = n := {
+    take m : Natural;
+    take n : Natural;
+    take _ : m = m;
+    reflexivity(Natural, n)
+}
+
+-- `note goal : T;` restates the current expected type. Passes when the
+-- noted form is definitionally equal to the actual goal.
+theorem Test.note_goal_succeeds : (n : Natural) → n = n := {
+    take n : Natural;
+    note goal : n = n;
+    reflexivity(Natural, n)
+}
+
+-- `note <prop>;` runs the auto-prover and continues if it closes.
+-- Here the proposition `0 = 0` is trivially closable by reflexivity.
+theorem Test.note_assertion_succeeds : (n : Natural) → n = n := {
+    take n : Natural;
+    note zero = zero;
+    reflexivity(Natural, n)
+}

@@ -198,6 +198,22 @@ struct SurfaceCases {
 // the use site so the build log surfaces the gap.
 struct SurfaceSorry { };
 
+// `note goal : T;` and `note <proposition>;` — elaboration-time
+// assertions that don't change the proof state but cause a check.
+// `note goal : T` asserts that the current expected type is
+// definitionally equal to `T` (math-prose "we need to show that …");
+// `note <proposition>` asserts that the proposition is closable by
+// the auto-prover (math-prose "note that …" / "observe that …").
+//
+// Exactly one of `goalType` and `proposition` is non-null. `body`
+// is the remainder of the block — elaborated at the unchanged
+// expected type once the check passes.
+struct SurfaceNote {
+    SurfaceExpressionPointer goalType;       // `note goal : T;`
+    SurfaceExpressionPointer proposition;    // `note P;`
+    SurfaceExpressionPointer body;
+};
+
 // `decide P { | yes m => arm_yes  | no n => arm_no }` —
 // classical case-split on whether P holds. Elaborates by binding
 // `_decideScrutinee := Logic.classical_decidable(P)`, abstracting
@@ -416,7 +432,7 @@ struct SurfaceExpression {
         SurfaceRing, SurfaceField, SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
         SurfaceByStrongInduction, SurfaceGoal, SurfaceUnfold,
-        SurfaceDecide
+        SurfaceDecide, SurfaceNote
     > node;
     int line = 0;
     int column = 0;
@@ -523,6 +539,16 @@ inline SurfaceExpressionPointer makeSurfaceAnonymousTuple(
 inline SurfaceExpressionPointer makeSurfaceSorry(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceSorry{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceNote(
+    SurfaceExpressionPointer goalType,
+    SurfaceExpressionPointer proposition,
+    SurfaceExpressionPointer body,
+    int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceNote{std::move(goalType), std::move(proposition),
+                     std::move(body)},
+        line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceDecide(
     SurfaceExpressionPointer proposition,
