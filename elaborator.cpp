@@ -117,6 +117,17 @@ public:
     // `--check-redundant-by` CLI flag.
     void setReportRedundantBy(bool flag) { reportRedundantBy_ = flag; }
 
+    // When true, after elaborating a calc chain, check each internal
+    // step's endpoint to see whether the auto-prover could close the
+    // combined step (prev-prev → next) without going through it. If
+    // yes, emit a warning so the user can remove the redundant
+    // intermediate. Off by default — the per-step auto-prover
+    // attempts are expensive on long chains. Drives the
+    // `--check-redundant-calc-steps` CLI flag.
+    void setReportRedundantCalcSteps(bool flag) {
+        reportRedundantCalcSteps_ = flag;
+    }
+
     void runModule(const SurfaceModule& module) {
         moduleName_ = module.moduleName;
         // Seed the rewrite-lemma index from theorems loaded via .mathv
@@ -6279,6 +6290,64 @@ private:
             steps.push_back({step.relation, stepProofKernel});
             endpointKernels.push_back(nextKernel);
             previousKernel = nextKernel;
+        }
+
+        // Optional check: look for redundant intermediate calc steps.
+        // For each internal step (one that isn't the first or last
+        // endpoint), see whether the auto-prover can close the
+        // combined neighbouring step directly. If yes, warn — the
+        // user can usually delete the intermediate `= midpoint` line
+        // without losing kernel acceptance. Restricted to all-`=`
+        // adjacent pairs for now (mixed `=`/`≤`/`<` combinations need
+        // per-case relation arithmetic). Off by default — the
+        // auto-prover dispatch is expensive on long chains.
+        if (reportRedundantCalcSteps_) {
+            for (size_t k = 1; k + 1 <= steps.size(); ++k) {
+                // steps[k-1] takes endpointKernels[k-1] -> endpointKernels[k].
+                // steps[k]   takes endpointKernels[k]   -> endpointKernels[k+1].
+                // We're asking: can the auto-prover close endpointKernels[k-1]
+                // (= endpointKernels[k+1]) directly? Only check when both
+                // steps are Equality so the combined relation is unambiguous.
+                if (steps[k - 1].relation != CalcRelation::Equality
+                    || steps[k].relation != CalcRelation::Equality) {
+                    continue;
+                }
+                ExpressionPointer combinedRelation = makeApplication(
+                    makeApplication(
+                        makeApplication(
+                            makeConstant("Equality", {carrierLevel}),
+                            carrierType),
+                        endpointKernels[k - 1]),
+                    endpointKernels[k + 1]);
+                ExpressionPointer autoAttempt;
+                try {
+                    autoAttempt = autoProveCalcStep(
+                        localBinders,
+                        endpointKernels[k - 1],
+                        endpointKernels[k + 1],
+                        carrierType, carrierLevel,
+                        combinedRelation,
+                        calc.steps[k - 1].line, calc.steps[k - 1].column);
+                } catch (const ElaborateError&) {
+                    autoAttempt = nullptr;
+                } catch (const TypeError&) {
+                    autoAttempt = nullptr;
+                }
+                if (autoAttempt) {
+                    // The redundant ENDPOINT is endpointKernels[k] — it's
+                    // the target of steps[k-1] and is written on that
+                    // step's line. Removing that line collapses steps
+                    // (k-1, k) into one step from endpoint (k-1) to
+                    // endpoint (k+1), which the auto-prover can close.
+                    std::cerr << "warning: " << moduleName_
+                        << ":" << calc.steps[k - 1].line
+                        << ":" << calc.steps[k - 1].column
+                        << ": calc intermediate target at this line is "
+                        "redundant — removing it lets the auto-prover "
+                        "close the combined step (next endpoint at line "
+                        << calc.steps[k].line << ")\n";
+                }
+            }
         }
 
         // Determine overall chain direction and strictness.
@@ -18527,6 +18596,7 @@ private:
     std::vector<std::string>& importedModules_;
     std::string moduleName_;
     bool reportRedundantBy_ = false;
+    bool reportRedundantCalcSteps_ = false;
     std::string currentDeclarationName_;
     // Stack of expected types active on the current elaboration call
     // chain. The top of the stack is what the `goal` keyword resolves
@@ -18625,8 +18695,10 @@ ExpressionPointer elaborateExpression(const SurfaceExpression& expression,
 void elaborateModule(const SurfaceModule& module,
                      Environment& environment,
                      std::vector<std::string>& importedModules,
-                     bool reportRedundantBy) {
+                     bool reportRedundantBy,
+                     bool reportRedundantCalcSteps) {
     Elaborator elaborator(environment, importedModules);
     elaborator.setReportRedundantBy(reportRedundantBy);
+    elaborator.setReportRedundantCalcSteps(reportRedundantCalcSteps);
     elaborator.runModule(module);
 }

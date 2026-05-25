@@ -464,6 +464,16 @@ match via the lemma index. The naturalProduct claim in
 `PAdic/absolute_value.math` went from 5-deep transitivity to a 4-link
 calc with ZERO `by` clauses this way.
 
+Sibling diagnostic: pass `--check-redundant-calc-steps` to the
+verifier (off by default — the per-pair auto-prover dispatch is
+expensive on long chains) to also warn when an intermediate calc
+TERM (not just a `by` annotation) is redundant — i.e., the
+auto-prover can close the combined step from the previous endpoint
+directly to the next-next endpoint. The warning cites the line of
+the redundant intermediate so you know which `= midpoint` to
+delete. Useful for trimming over-written calc proofs after the
+auto-prover gains a new rule.
+
 Two-step transitivity (`Equality.transitivity(stepA, stepB)`) is
 borderline — a 3-link calc is the same length. Use whichever reads
 more clearly; calc usually wins because the intermediate form is named.

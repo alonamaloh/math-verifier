@@ -40,4 +40,5 @@ ExpressionPointer elaborateExpression(const SurfaceExpression& expression,
 void elaborateModule(const SurfaceModule& module,
                      Environment& environment,
                      std::vector<std::string>& importedModules,
-                     bool reportRedundantBy = false);
+                     bool reportRedundantBy = false,
+                     bool reportRedundantCalcSteps = false);

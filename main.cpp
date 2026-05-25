@@ -5150,7 +5150,8 @@ void loadCacheRecursive(Environment& environment,
 int verifyWithCache(const std::string& sourcePath,
                     const std::vector<std::string>& dependencyCachePaths,
                     const std::string& outputCachePath,
-                    bool reportRedundantBy = false) {
+                    bool reportRedundantBy = false,
+                    bool reportRedundantCalcSteps = false) {
     Environment environment;
     std::set<std::string> alreadyLoaded;
 
@@ -5208,7 +5209,7 @@ int verifyWithCache(const std::string& sourcePath,
         auto module = parseModule(tokens);
         moduleName = module.moduleName;
         elaborateModule(module, environment, importedModules,
-                         reportRedundantBy);
+                         reportRedundantBy, reportRedundantCalcSteps);
     } catch (const LexError& error) {
         std::cerr << "lex error in " << sourcePath << ": "
                   << error.what() << "\n";
@@ -5545,6 +5546,7 @@ int main(int argc, char* argv[]) {
         std::string outputCachePath;
         std::vector<std::string> dependencyCachePaths;
         bool reportRedundantBy = false;
+        bool reportRedundantCalcSteps = false;
         enum class State { None, Source, Output, Deps } state = State::None;
         for (int i = 2; i < argc; ++i) {
             std::string argument = argv[i];
@@ -5553,6 +5555,11 @@ int main(int argc, char* argv[]) {
             if (argument == "--deps")        { state = State::Deps;   continue; }
             if (argument == "--check-redundant-by") {
                 reportRedundantBy = true;
+                state = State::None;
+                continue;
+            }
+            if (argument == "--check-redundant-calc-steps") {
+                reportRedundantCalcSteps = true;
                 state = State::None;
                 continue;
             }
@@ -5570,7 +5577,8 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         return verifyWithCache(sourcePath, dependencyCachePaths,
-                               outputCachePath, reportRedundantBy);
+                               outputCachePath, reportRedundantBy,
+                               reportRedundantCalcSteps);
     }
     if (argc >= 3 && std::string(argv[1]) == "deps") {
         // kernel deps [--cache-root DIR] SOURCE.math [SOURCE.math ...]
