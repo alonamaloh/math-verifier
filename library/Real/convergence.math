@@ -114,38 +114,35 @@ theorem Real.cauchy_almost_zero_from_absolute_bound
       witness N with
           function (m : Natural) (N_leq_m : N ≤ m) => {
             let absSM : Rational := abs(s(m));
-            -- boundAtN(m, N_leq_m) : -halve(ε) < halve(ε) - absSM.
-            -- Add (absSM + halve(ε)) to both sides:
-            --   LHS reduces to absSM (ring),
-            --   RHS reduces to halve(ε) + halve(ε) = ε (halve_doubled).
-            -- `ring` doesn't yet handle coefficient-2 monomials, so the
-            -- RHS rewrite is done by an explicit calc chain. We keep
-            -- `Rational.halve(epsilon)` un-abbreviated because the
-            -- `halve_doubled` rewrite below matches `halve(ε) + halve(ε)`
-            -- structurally; the rewrite matcher does not ζ-unfold a
-            -- let-bound abbreviation back to that shape.
+            -- boundAtN gives -halve(ε) < halve(ε) - absSM. Add
+            -- (absSM + halve(ε)) to both sides; the LHS becomes absSM
+            -- and the RHS becomes halve(ε) + halve(ε), so absSM < ε via
+            -- halve_doubled. We walk this as a mixed = / < / = calc.
             claim rawBound : -Rational.halve(epsilon) < Rational.halve(epsilon) - absSM
               by boundAtN(m, N_leq_m);
-            claim shiftedBound : absSM < Rational.halve(epsilon) + Rational.halve(epsilon)
-              by rewrite(
-                     (ring : -Rational.halve(epsilon) + (absSM + Rational.halve(epsilon))
-                            = absSM),
-                     rewrite(
-                         calc (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
-                            = (Rational.halve(epsilon) + -absSM) + (absSM + Rational.halve(epsilon))
-                            = Rational.halve(epsilon) + (-absSM + (absSM + Rational.halve(epsilon)))
-                            = Rational.halve(epsilon) + ((-absSM + absSM) + Rational.halve(epsilon))
-                            = Rational.halve(epsilon) + (Rational.zero + Rational.halve(epsilon))
-                            = Rational.halve(epsilon) + Rational.halve(epsilon),
-                         Rational.add_preserves_LessThan(
-                             -Rational.halve(epsilon),
-                             Rational.halve(epsilon) - absSM,
-                             absSM + Rational.halve(epsilon),
-                             rawBound)));
-            -- halve(ε) + halve(ε) = ε.
-            rewrite(
-                Rational.halve_doubled(epsilon),
-                shiftedBound)
+            -- The middle = step (RHS simplification) hits ring v2's
+            -- "coefficient ±k for k > 1" limit because the canonical
+            -- form of `(h - a) + (a + h)` collects to `2h`. Hand-walked
+            -- via a calc chain that uses only single-monomial steps.
+            claim rhsSimplifies
+                  : (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
+                    = Rational.halve(epsilon) + Rational.halve(epsilon)
+              by calc (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
+                    = (Rational.halve(epsilon) + -absSM) + (absSM + Rational.halve(epsilon))
+                    = Rational.halve(epsilon) + (-absSM + (absSM + Rational.halve(epsilon)))
+                    = Rational.halve(epsilon) + ((-absSM + absSM) + Rational.halve(epsilon))
+                    = Rational.halve(epsilon) + (Rational.zero + Rational.halve(epsilon))
+                    = Rational.halve(epsilon) + Rational.halve(epsilon);
+            calc absSM
+               = -Rational.halve(epsilon) + (absSM + Rational.halve(epsilon))
+               < (Rational.halve(epsilon) - absSM) + (absSM + Rational.halve(epsilon))
+                   by Rational.add_preserves_LessThan(
+                          -Rational.halve(epsilon),
+                          Rational.halve(epsilon) - absSM,
+                          absSM + Rational.halve(epsilon),
+                          rawBound)
+               = Rational.halve(epsilon) + Rational.halve(epsilon)
+               = epsilon
           }
     }
 

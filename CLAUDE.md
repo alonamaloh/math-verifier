@@ -161,16 +161,12 @@ historical reasons; migration is a planned cleanup.
 
 ## Line width
 
-Up to ~110 columns is fine; ~120 is OK when keeping a calc step on
-one line aids readability. Don't aggressively wrap to fit 80 — the
-extra vertical sprawl from wrapped `Rational.absolute_value` or
-`Rational.halve(epsilon)` chains is its own readability cost. Wrap
-when the line genuinely needs it (a multi-argument function call
-where each arg is itself complex), not because of a column limit.
-
-When a calc step's expression is long, prefer a sensible single
-wrap (e.g. break at `=` between LHS and RHS of one step) over
-splitting each operand across lines.
+Don't wrap until column 140. Wrapped lines hurt readability — the
+extra vertical sprawl from a wrapped `Rational.absolute_value(...)`
+or `Rational.halve(epsilon)` chain is its own readability cost, and
+modern screens display 140-column lines without effort. Wrap when
+the line genuinely needs it (a multi-argument function call where
+each arg is itself complex), not because of a column limit.
 
 ## Prefer `1 + n` over `successor(n)` in expressions
 
