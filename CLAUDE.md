@@ -295,6 +295,43 @@ The elaborator desugars this to the convoy pattern (`function (caseScrutinee : T
 
 Constructor patterns with arguments (e.g. `successor(predecessor)`) are reconstructed as expressions for the equation type; tuple patterns aren't yet supported.
 
+## `decide P { yes m => … | no n => … }` — classical case-split
+
+The canonical form for classical case-splits. Replaces both:
+
+- `cases Logic.excluded_middle(P) { | Or.introduceLeft(m) => … | Or.introduceRight(n) => … }` (for plain "P or not P" reasoning at the proposition level), AND
+- `cases Logic.classical_decidable(P) with decisionEq { | Decidable.yes(m) => transport(…, m) | Decidable.no(n) => transport(…, n) }` (for the bisection-style pattern where the goal contains `bisectionStepWithDec(…, classical_decidable(P))` and we want each arm checked at the ι-reduced shape).
+
+```math
+-- Simple proposition-level case split (no goal abstraction needed):
+decide x = Real.zero {
+  | yes xEqZero  => Or.introduceLeft(IsNonneg(x), IsNonneg(-x), rewrite(…))
+  | no  xNotZero => /* recurse with the inequality */
+}
+
+-- Bisection-style: the goal `Real.IsUpperBound(subset, right(bisectionStep(…)))`
+-- has `classical_decidable(IsUpperBound(subset, midpoint))` buried five δ
+-- unfoldings deep. The elaborator finds it (head-directed WHNF walker)
+-- and abstracts the motive automatically — each arm proves its
+-- ι-reduced shape.
+decide Real.IsUpperBound(subset, (midpoint : Real)) {
+  | yes midIsUpper => midIsUpper      -- new_right = midpoint
+  | no  _          => IH              -- new_right = right(predecessor)
+}
+```
+
+Semantics: builds `Logic.Decidable_recursor(P, motive, λp. arm_yes, λn. arm_no, Logic.classical_decidable(P))`. The motive abstracts every structural occurrence of `Logic.classical_decidable(P)` in the goal (after δ unfolds chained definitions like `bisectionStep`); if none appears, motive defaults to `λ_. Goal` and each arm proves the goal directly with `p` / `notP` in scope.
+
+What it eliminates:
+- The motive-as-lambda boilerplate (`function (decision : Logic.Decidable(…)) => …`).
+- The explicit `Equality.transport_proposition(…)` call wrapping each arm.
+- The `with decisionEq` equation plumbing.
+- The `Or.introduceLeft` / `Or.introduceRight` constructor names.
+
+When `decide` doesn't apply: the goal mentions some OTHER decidable expression (not the user's `P`), so the head-directed search finds no `classical_decidable(P)` and the motive falls back to constant. That's fine — it's the same as the old `cases Logic.excluded_middle(P)` pattern, just spelled more clearly. Either binder name may be `_`.
+
+Error diagnostic: if the assembled `Decidable_recursor` application doesn't typecheck, the elaborator pre-checks it and dumps each of the 5 arg slots (proposition / motive / yes case / no case / scrutinee) with its inferred type, so the error points at which slot is the culprit. Generic kernel "Application: argument type does not match Pi domain" errors anywhere in the file now also print `expected type:` and `actual type:` lines.
+
 ## `ring` — try it first
 
 `ring` (currently v2: polynomial normalisation, distributivity,
@@ -571,6 +608,50 @@ Concretely:
   legible and lets a reader skim the claims to see the shape before
   reading the inner proofs.
 
+### Statement-level proof sugar
+
+Inside a `{ … }` proof block, the following statement forms compose
+naturally and read as math prose. All end with `;` and the block
+returns its final non-`;`-terminated expression.
+
+- `claim <name> : <type> by <proof>;` — assert and discharge.
+  Synonym: `goal <name> by <proof>` (when the type comes from the
+  surrounding expected type), `done` / `okay` (bare claim,
+  auto-prover closes the goal).
+- `claim <type> by <hint>;` — anonymous claim. Hints include `by
+  substitution` (auto-find equality + body), `by substituting
+  <eqProof>` (narrowed to a supplied equation), `by cases { … }`,
+  `by cases on E { case A: … case B: … }`, `by induction { … }`.
+- `obtain ⟨a, b⟩ from <existentialOrAnd>;` — destructure an
+  `∃ x. P(x)` or `And(A, B)` into named binders.
+- `choose N such that P(N);` — sugar for `obtain ⟨N, _⟩` followed
+  by a `claim P(N) by …`; reads as the textbook phrasing.
+- `let <name> ∈ <type> [with <predicate>];` — introduce a typed
+  variable that can later be refined.
+- `let <name> [: <type>] := <value>;` — ζ-tracked abbreviation
+  (kernel sees through it; see the `let` section above).
+- `suppose <proposition> as <name>;` — introduce a hypothesis as a
+  step (useful for breaking implication arrows into named pieces).
+- `unfold <Foo> in <body>` — temporarily mark `Foo` transparent
+  inside `<body>` (for opaque definitions; see the opaque section).
+
+Outermost-arm shorthands for case-splits:
+
+- `by_induction on n with IH { case zero: … case successor(k): … }` —
+  preferred over a pattern-match definition.
+- `by_induction on n with IH refining h1, h2 { … }` — also refine
+  the listed in-scope binders' types per case (so hypotheses about
+  `n` get the right shape in each arm).
+- `by_induction on n using <strongRecursionLemma> { … }` — route
+  the recursion through a user-supplied recursion principle.
+- `by_strong_induction on n with IH { … }` — strong induction on a
+  Natural; IH has type `(k : Natural) → k < n → P(k)`.
+
+The bare keywords `done`, `okay`, `goal` are pure aliases — pick
+whichever spells the proof's intent. "the proof is done here"
+(`done`), "okay, that proves it" (`okay`), "the goal is closed by
+…" (`goal by …`).
+
 The remaining subsections are about *CIC noise* — bureaucracy that
 the kernel demands but a mathematician would never write. Those
 should be hidden behind named helpers; the rules below collect the
@@ -637,26 +718,29 @@ inside an `at_make` theorem subsumes it without the auxiliary
 definition. A previous draft of the triangle-inequality proof spent
 200 lines on this pattern; the at-make refactor took 40.
 
-### `let` does not ζ-reduce across calc steps
+### `let` and ζ — current status
 
-```math
-let halvedEpsilon : Rational := Rational.halve(epsilon);
-…
-calc -halvedEpsilon + -halvedEpsilon
-   = -(halvedEpsilon + halvedEpsilon)
-       by Equality.symmetry(
-              Rational.negate_add(halvedEpsilon, halvedEpsilon))
-   = -epsilon
-       by congruenceOf(Rational.negate,
-              Rational.halve_doubled(epsilon))
-```
+The 2026-era kernel does ζ-unfold let-binders in
+`isDefinitionallyEqual` (the auto-prover, the rewrite matcher, and
+the `decide` walker all see through them, per the section above on
+let-for-local-abbreviations). The old advice "don't use `let` for
+value abbreviations" — driven by a kernel that didn't ζ-track
+let-binders through `congruenceOf`'s motive checks — no longer
+applies.
 
-The calc fails at the second step: the kernel sees
-`Rational.halve_doubled(epsilon) : Rational.halve(epsilon) +
-Rational.halve(epsilon) = epsilon` and won't ζ-unfold
-`halvedEpsilon` to align the types. Don't use `let` for value
-abbreviations — write the long names out, or factor the repeated
-expression into its own top-level theorem.
+Use `let` freely for value abbreviations. The one remaining caveat:
+when constructing a term whose IMPLICIT arguments are inferred from a
+sibling expression, the elaborator may infer the implicit using the
+ζ-unfolded form rather than the let-bound name. For example,
+`Logic.Decidable.yes(midIsUpper)` inside
+`Real.bisectionStepWithDec(subset, intervals, _)` infers its implicit
+`P` from the third arg's signature (which references the unfolded
+form), not from `midIsUpper`'s declared type (which may reference a
+let-bound `midReal`). Two terms result that are kernel-equal but not
+structurally equal — fine for the kernel, but matters if the
+surface tactic does literal subterm matching. The decide elaborator
+handles this by ζ-unfolding the target up front; other code paths
+may need explicit ζ-unfold or `claim`-binding to align shapes.
 
 ## `opaque definition` — hide a function's body from kernel reduction
 
