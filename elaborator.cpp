@@ -13667,10 +13667,12 @@ private:
         // literal form matches the goal's structure.
         ExpressionPointer targetReduced = zetaUnfoldLetBinders(
             scrutineeKernel, localBinders, /*currentDepth=*/0);
+        std::string targetHeadName =
+            applicationHeadConstantName(targetReduced);
         int occurrences = 0;
         int whnfFuel = 2048;
         ExpressionPointer motiveBody = abstractStructuralOccurrenceWithWHNF(
-            expectedType, targetReduced,
+            expectedType, targetReduced, targetHeadName,
             /*currentDepth=*/0, occurrences, whnfFuel);
         if (occurrences == 0) {
             throwElaborate(
@@ -15462,57 +15464,185 @@ private:
         return expression;
     }
 
+    // Return the head constant name of an Application chain, or empty
+    // string if the head isn't a Constant. `f(a, b, c)` returns "f".
+    std::string applicationHeadConstantName(
+        ExpressionPointer expression) const {
+        ExpressionPointer cursor = expression;
+        while (auto* app = std::get_if<Application>(&cursor->node)) {
+            cursor = app->function;
+        }
+        if (auto* c = std::get_if<Constant>(&cursor->node)) {
+            return c->name;
+        }
+        return std::string();
+    }
+
+    // Does `expression` syntactically reference `targetHeadName` as a
+    // Constant somewhere? Used to seed unfoldExposesHead.
+    bool expressionReferencesConstant(
+        ExpressionPointer expression,
+        const std::string& targetHeadName,
+        std::unordered_set<std::string>& visiting) {
+        if (auto* c = std::get_if<Constant>(&expression->node)) {
+            if (c->name == targetHeadName) return true;
+            return unfoldExposesHead(c->name, targetHeadName, visiting);
+        }
+        if (auto* app =
+                std::get_if<Application>(&expression->node)) {
+            return expressionReferencesConstant(
+                       app->function, targetHeadName, visiting)
+                || expressionReferencesConstant(
+                       app->argument, targetHeadName, visiting);
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return expressionReferencesConstant(
+                       pi->domain, targetHeadName, visiting)
+                || expressionReferencesConstant(
+                       pi->codomain, targetHeadName, visiting);
+        }
+        if (auto* lam = std::get_if<Lambda>(&expression->node)) {
+            return expressionReferencesConstant(
+                       lam->domain, targetHeadName, visiting)
+                || expressionReferencesConstant(
+                       lam->body, targetHeadName, visiting);
+        }
+        if (auto* letNode = std::get_if<Let>(&expression->node)) {
+            return expressionReferencesConstant(
+                       letNode->type, targetHeadName, visiting)
+                || expressionReferencesConstant(
+                       letNode->value, targetHeadName, visiting)
+                || expressionReferencesConstant(
+                       letNode->body, targetHeadName, visiting);
+        }
+        return false;
+    }
+
+    // Does WHNF-unfolding `constantName` produce a term that
+    // syntactically (transitively, through other transparent
+    // definitions) references `targetHeadName`? Memoised: each
+    // constant is walked once per target. Used by the `decide` walker
+    // to skip Applications whose head is provably irrelevant
+    // (Real.LessOrEqual, Set.member, etc., when the target is
+    // Logic.classical_decidable).
+    //
+    // The `visiting` set guards against cycles in mutually recursive
+    // definitions — a constant currently being computed contributes
+    // `false` to its own caller to avoid an infinite loop; the cached
+    // result then reflects only what was reachable WITHOUT the cycle.
+    bool unfoldExposesHead(
+        const std::string& constantName,
+        const std::string& targetHeadName,
+        std::unordered_set<std::string>& visiting) {
+        if (constantName == targetHeadName) return true;
+        const std::string cacheKey =
+            constantName + "|" + targetHeadName;
+        auto cached = unfoldExposesHeadCache_.find(cacheKey);
+        if (cached != unfoldExposesHeadCache_.end()) {
+            return cached->second;
+        }
+        if (visiting.count(constantName)) return false;
+        visiting.insert(constantName);
+        bool result = false;
+        const Declaration* declaration =
+            environment_.lookup(constantName);
+        if (declaration) {
+            if (auto* def = std::get_if<Definition>(declaration)) {
+                // Opaque definitions can't be δ-unfolded by WHNF, so
+                // their body never gets exposed.
+                if (def->opacity == Opacity::Transparent) {
+                    result = expressionReferencesConstant(
+                        def->body, targetHeadName, visiting);
+                }
+            }
+        }
+        visiting.erase(constantName);
+        unfoldExposesHeadCache_[cacheKey] = result;
+        return result;
+    }
+
     ExpressionPointer abstractStructuralOccurrenceWithWHNF(
         ExpressionPointer expression,
         ExpressionPointer target,
+        const std::string& targetHeadName,
         int currentDepth,
         int& occurrenceCount,
         int& whnfFuel) {
-        // Early stop: callers (e.g. `decide`) only need ONE occurrence
-        // to form a motive — further hits in unrelated subterms would
-        // multiply work without changing the answer. The shifted-BV
-        // returned here doesn't end up wired anywhere (the caller
-        // checks occurrenceCount > 0, not the returned tree), so just
-        // return `expression` unchanged once we've already matched.
-        if (occurrenceCount > 0) {
-            return expression;
-        }
+        // We can't early-stop after the first match: the motive must
+        // abstract EVERY occurrence so motive(constructor) reduces
+        // uniformly when the kernel ι-reduces in each arm.
         ExpressionPointer shiftedTarget =
             currentDepth == 0 ? target : shift(target, currentDepth);
         // Try structural match on the un-reduced expression first; if it
         // matches, no need to WHNF (which can be expensive and may not
-        // change the head).
+        // change the head). For Application-headed expressions whose
+        // head is the target's head (e.g. both are `classical_decidable`
+        // applications), fall back to full definitional equality —
+        // kernel WHNF often leaves the term in an intermediate form
+        // (Let-binders, partial β-substitutions, recursor wrappings)
+        // that doesn't match structurally but IS the same proposition.
         if (structurallyEqual(expression, shiftedTarget)) {
             occurrenceCount++;
             return makeBoundVariable(currentDepth);
         }
-        // For Application nodes, try WHNF: δ-unfolding may expose the
-        // target as a subterm (e.g., `bisectionStep(intervals)` δ-unfolds
-        // to `bisectionStepWithDec(intervals, classical_decidable(…))`).
-        // We do this ONLY at Application nodes (Pi/Lambda heads don't
-        // δ-reduce into anything that exposes new structure) and only
-        // while `whnfFuel` is positive (so propositional-definition
-        // chains in the goal can't drive an exponential blowup).
-        ExpressionPointer working = expression;
-        if (whnfFuel > 0 && std::get_if<Application>(&expression->node)) {
-            ExpressionPointer reduced;
-            try {
-                reduced = weakHeadNormalForm(environment_, expression);
-            } catch (const TypeError&) {
-                reduced = expression;
-            }
-            // Only count fuel when WHNF actually changes the term; an
-            // Application whose head is already a constructor (or whose
-            // function is a definition that doesn't ι-reduce because
-            // the scrutinee argument is a free variable) returns the
-            // same expression and would otherwise drain fuel without
-            // exposing anything.
-            if (!structurallyEqual(reduced, expression)) {
-                whnfFuel--;
-                working = reduced;
-                if (structurallyEqual(working, shiftedTarget)) {
+        if (!targetHeadName.empty()) {
+            std::string thisHeadName =
+                applicationHeadConstantName(expression);
+            if (thisHeadName == targetHeadName) {
+                // Open the local binders so isDefinitionallyEqual can
+                // walk through let-binder ζ-reductions etc. The caller
+                // passed expressions in closed (BoundVariable) form
+                // against this localBinders scope.
+                // (We use a fresh empty context since the comparison
+                // is at depth `currentDepth` and the kernel's defeq
+                // doesn't need extra context for closed expressions —
+                // it can handle BoundVariable refs directly.)
+                Context emptyContext;
+                if (isDefinitionallyEqual(
+                        environment_, emptyContext,
+                        expression, shiftedTarget)) {
                     occurrenceCount++;
                     return makeBoundVariable(currentDepth);
+                }
+            }
+        }
+        // For Application nodes, conditionally WHNF: δ-unfolding may
+        // expose the target as a subterm. Only WHNF if the head's
+        // definition transitively references `targetHeadName` —
+        // otherwise we'd waste fuel expanding propositional chains
+        // (Real.LessOrEqual, Set.member, etc.) that can never produce
+        // a `Logic.classical_decidable(…)` subterm.
+        ExpressionPointer working = expression;
+        if (whnfFuel > 0
+            && std::get_if<Application>(&expression->node)) {
+            std::string headName =
+                applicationHeadConstantName(expression);
+            // Always WHNF an Application whose head isn't a Constant —
+            // that's a β-redex (Application of Lambda) and reducing it
+            // is essentially free; if we don't, the head-relevance gate
+            // never gets a chance to fire on the result. For
+            // Constant-headed Applications, only WHNF if the head's
+            // definition transitively references the target's head.
+            bool maybeRelevant = headName.empty();
+            if (!maybeRelevant && !targetHeadName.empty()) {
+                std::unordered_set<std::string> visiting;
+                maybeRelevant = unfoldExposesHead(
+                    headName, targetHeadName, visiting);
+            }
+            if (maybeRelevant) {
+                ExpressionPointer reduced;
+                try {
+                    reduced = weakHeadNormalForm(environment_, expression);
+                } catch (const TypeError&) {
+                    reduced = expression;
+                }
+                if (!structurallyEqual(reduced, expression)) {
+                    whnfFuel--;
+                    working = reduced;
+                    if (structurallyEqual(working, shiftedTarget)) {
+                        occurrenceCount++;
+                        return makeBoundVariable(currentDepth);
+                    }
                 }
             }
         }
@@ -15534,8 +15664,8 @@ private:
                 pi->domain, target, currentDepth, occurrenceCount);
             return makePi(pi->displayHint, newDomain,
                 abstractStructuralOccurrenceWithWHNF(
-                    pi->codomain, target, currentDepth + 1,
-                    occurrenceCount, whnfFuel));
+                    pi->codomain, target, targetHeadName,
+                    currentDepth + 1, occurrenceCount, whnfFuel));
         }
         if (auto* lambda = std::get_if<Lambda>(&working->node)) {
             // Same domain-skip as for Pi.
@@ -15543,30 +15673,28 @@ private:
                 lambda->domain, target, currentDepth, occurrenceCount);
             return makeLambda(lambda->displayHint, newDomain,
                 abstractStructuralOccurrenceWithWHNF(
-                    lambda->body, target, currentDepth + 1,
-                    occurrenceCount, whnfFuel));
+                    lambda->body, target, targetHeadName,
+                    currentDepth + 1, occurrenceCount, whnfFuel));
         }
         if (auto* application =
                 std::get_if<Application>(&working->node)) {
             return makeApplication(
                 abstractStructuralOccurrenceWithWHNF(
-                    application->function, target, currentDepth,
-                    occurrenceCount, whnfFuel),
+                    application->function, target, targetHeadName,
+                    currentDepth, occurrenceCount, whnfFuel),
                 abstractStructuralOccurrenceWithWHNF(
-                    application->argument, target, currentDepth,
-                    occurrenceCount, whnfFuel));
+                    application->argument, target, targetHeadName,
+                    currentDepth, occurrenceCount, whnfFuel));
         }
         if (auto* letNode = std::get_if<Let>(&working->node)) {
-            return makeLet(letNode->displayHint,
-                abstractStructuralOccurrenceWithWHNF(
-                    letNode->type, target, currentDepth,
-                    occurrenceCount, whnfFuel),
-                abstractStructuralOccurrenceWithWHNF(
-                    letNode->value, target, currentDepth,
-                    occurrenceCount, whnfFuel),
-                abstractStructuralOccurrenceWithWHNF(
-                    letNode->body, target, currentDepth + 1,
-                    occurrenceCount, whnfFuel));
+            // ζ-substitute the let's value into the body before
+            // recursing — otherwise the body's BV(0) references to the
+            // let-binder don't match the target's literal form.
+            ExpressionPointer substituted = substitute(
+                letNode->body, 0, letNode->value);
+            return abstractStructuralOccurrenceWithWHNF(
+                substituted, target, targetHeadName,
+                currentDepth, occurrenceCount, whnfFuel);
         }
         return working;
     }
@@ -18356,6 +18484,13 @@ private:
         std::vector<SurfaceConventionProposition> propositions;
     };
     std::unordered_map<std::string, ConventionEntry> conventionRegistry_;
+    // Memoized result of "does definition X's body transitively
+    // reference constant Y as a head?" — used by the `decide`
+    // elaborator's WHNF walker to skip Applications whose head
+    // can't δ-unfold to expose the target. Keyed by
+    // "<X>|<Y>" (a flat string so std::unordered_map works).
+    mutable std::unordered_map<std::string, bool>
+        unfoldExposesHeadCache_;
     // Phase 3 lemma index. Each registered rewrite lemma — anything of
     // shape `Π x₁ … xₙ. Equality.{u}(carrier, LHS, RHS)` with no
     // universe parameters — is keyed by `spineHash(LHS)` (and again by
