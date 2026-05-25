@@ -13675,13 +13675,15 @@ private:
             expectedType, targetReduced, targetHeadName,
             /*currentDepth=*/0, occurrences, whnfFuel);
         if (occurrences == 0) {
-            throwElaborate(
-                "decide P { … } at line " + std::to_string(line)
-                + ": Logic.classical_decidable(P) does not appear in "
-                "the goal (even after δ-unfolding at each subterm). "
-                "Goal: " + prettyPrintInLocalScope(expectedType, localBinders)
-                + ". Decided: "
-                + prettyPrintInLocalScope(targetReduced, localBinders));
+            // No occurrence of `Logic.classical_decidable(P)` in the
+            // goal — use a constant motive `λs. Goal`. The arms each
+            // prove the goal directly without reduction. This is the
+            // proposition-only case (the user just wants `if P then …
+            // else …` reasoning, no value-level branching threaded
+            // through the goal). Lift expectedType by 1 to leave a
+            // free BV(0) for the motive's target parameter.
+            motiveBody = liftBoundVariables(
+                expectedType, /*increment=*/1, /*threshold=*/0);
         }
 
         // (5) Infer the motive's universe (Goal's level). For

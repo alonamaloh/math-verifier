@@ -1412,9 +1412,8 @@ theorem Rational.reciprocal_function_positive_of_positive
                 zeroEqOne))
       }
     | Or.introduceRight(zeroLeqRecip) =>
-        cases Logic.excluded_middle(
-                  (0 : Rational) = Rational.reciprocal_function(x)) {
-          | Or.introduceLeft(zeroEqRecip) => {
+        decide (0 : Rational) = Rational.reciprocal_function(x) {
+          | yes zeroEqRecip => {
               -- recip = 0: x*recip = x*0 = 0 ≠ 1.
               claim xTimesZeroEqOne : x * (0 : Rational) = (1 : Rational)
                 by rewrite(
@@ -1431,7 +1430,7 @@ theorem Rational.reciprocal_function_positive_of_positive
                       Rational.zero_less_one,
                       zeroEqOne))
             }
-          | Or.introduceRight(zeroNotEqRecip) =>
+          | no zeroNotEqRecip =>
               And.introduction(zeroLeqRecip, zeroNotEqRecip)
         }
   }
@@ -1513,15 +1512,15 @@ theorem Rational.LessThan.multiply_cancel_right_positive
         : a < b := {
   cases Rational.LessOrEqual.linear(a, b) {
     | Or.introduceLeft(aLeqB) =>
-        cases Logic.excluded_middle(a = b) {
-          | Or.introduceLeft(aEqB) => {
+        decide a = b {
+          | yes aEqB => {
               claim productsEqual : a * c = b * c by aEqB;
               False.eliminate_proposition(
                   a < b,
                   Rational.LessThan.distinct(
                       a * c, b * c, productLessThan, productsEqual))
             }
-          | Or.introduceRight(aNotEqB) =>
+          | no aNotEqB =>
               And.introduction(aLeqB, aNotEqB)
         }
     | Or.introduceRight(bLeqA) => {
@@ -1800,13 +1799,13 @@ theorem Rational.LessOrEqual_of_real_LessOrEqual
   cases Rational.LessOrEqual.linear(a, b) {
     | Or.introduceLeft(aLeqB) => aLeqB
     | Or.introduceRight(bLeqA) =>
-      cases Logic.excluded_middle(a = b) {
-        | Or.introduceLeft(aEqB) =>
+      decide a = b {
+        | yes aEqB =>
             Equality.transport_proposition(
                 function (z : Rational) => a ≤ z,
                 a, b, aEqB,
                 Rational.LessOrEqual.reflexive(a))
-        | Or.introduceRight(aNotEqB) => {
+        | no aNotEqB => {
             -- b ≤ a AND a ≠ b: derive 0 < a - b for the contradiction.
             claim diffNonneg
                   : Rational.LessOrEqual((0 : Rational), a - b)

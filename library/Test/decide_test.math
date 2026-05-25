@@ -81,3 +81,17 @@ theorem Test.decide_with_let
       | no  _ => reflexivity(Natural, successor(zero))
     }
   }
+
+-- Constant-motive case: the goal doesn't mention `classical_decidable(P)`
+-- anywhere. `decide` falls back to a constant motive (`λ_. Goal`) and
+-- each arm just proves the goal directly, with `p` / `notP` available
+-- as a hypothesis. Useful for in-Proposition reasoning where we want
+-- "if P then ... else ..." but the goal doesn't depend computationally
+-- on the decision.
+theorem Test.decide_constant_motive
+        (Q : Proposition) (someQ : Or(Q, Not(Q)) → Natural)
+        : Natural :=
+  decide Q {
+    | yes q   => someQ(Or.introduceLeft(Q, Not(Q), q))
+    | no notQ => someQ(Or.introduceRight(Q, Not(Q), notQ))
+  }
