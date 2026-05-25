@@ -7908,6 +7908,14 @@ private:
             return note->body
                 && surfaceContainsAutoProverInvocation(*note->body);
         }
+        if (auto* decide =
+                std::get_if<SurfaceDecide>(&expression.node)) {
+            if (decide->yesBody
+                && surfaceContainsAutoProverInvocation(*decide->yesBody))
+                return true;
+            return decide->noBody
+                && surfaceContainsAutoProverInvocation(*decide->noBody);
+        }
         // Leaves (identifier, numeric literal, sort, type, etc.) and
         // any variants not enumerated above can't host an auto-prover
         // call — return false.
@@ -8063,6 +8071,17 @@ private:
                 return true;
             return note->body
                 && surfaceMentionsName(*note->body, name);
+        }
+        if (auto* decide =
+                std::get_if<SurfaceDecide>(&expression.node)) {
+            if (decide->proposition
+                && surfaceMentionsName(*decide->proposition, name))
+                return true;
+            if (decide->yesBody
+                && surfaceMentionsName(*decide->yesBody, name))
+                return true;
+            return decide->noBody
+                && surfaceMentionsName(*decide->noBody, name);
         }
         // Leaf / specialised nodes (numeric literal, Type,
         // Proposition, hammer, sorry, ring, etc.) don't have
