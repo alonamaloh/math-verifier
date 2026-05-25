@@ -5227,6 +5227,14 @@ int verifyWithCache(const std::string& sourcePath,
     } catch (const TypeError& error) {
         std::cerr << sourcePath << ":1:1: type error: "
                   << error.what() << "\n";
+        if (error.expectedType) {
+            std::cerr << "  expected type: "
+                      << prettyPrint(error.expectedType) << "\n";
+        }
+        if (error.actualType) {
+            std::cerr << "  actual type:   "
+                      << prettyPrint(error.actualType) << "\n";
+        }
         return 1;
     } catch (const std::exception& error) {
         std::cerr << sourcePath << ":1:1: error: "
@@ -5451,6 +5459,20 @@ int verifyFiles(const std::vector<std::string>& filenames) {
         } catch (const TypeError& error) {
             std::cerr << filename << ":1:1: type error: "
                       << error.what() << "\n";
+            // The kernel populates expectedType / actualType on
+            // mismatch-shaped TypeErrors (Application arg vs Pi
+            // domain, Let value vs declared type, etc.). Surfacing
+            // them turns "Application: argument type does not match
+            // Pi domain" — useless on its own — into a diagnostic
+            // that points at the actual type mismatch.
+            if (error.expectedType) {
+                std::cerr << "  expected type: "
+                          << prettyPrint(error.expectedType) << "\n";
+            }
+            if (error.actualType) {
+                std::cerr << "  actual type:   "
+                          << prettyPrint(error.actualType) << "\n";
+            }
             return 1;
         } catch (const std::exception& error) {
             std::cerr << "error in " << filename << ": "

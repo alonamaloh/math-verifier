@@ -13736,13 +13736,26 @@ private:
             makeBoundVariable(0));
 
         // The motive's body was built with BV(0) bound to the motive's
-        // target (Decidable(P)) parameter. Substituting that with the
-        // constructor application gives the arm body's expected type
-        // in the extended scope.
+        // target (Decidable(P)) parameter, with localBinder refs at
+        // BV(1..N). We want the arm's expected type in the extended
+        // scope `localBinders + [armBinder]`, where BV(0) is the arm
+        // binder and BV(1..N) are the localBinders.
+        //
+        // `substitute(motiveBody, 0, value)` β-reduces, replacing
+        // BV(0) with `value` AND decrementing every other BV by 1 (as
+        // if the motive's binder is being removed). That would mis-
+        // align the localBinder refs in the extended scope. To keep
+        // them aligned, first lift motiveBody by 1 above its motive-
+        // target binder (BV(0) stays, BV(K+1) → BV(K+2)); then
+        // substitute, which restores BV(K+2) → BV(K+1) — exactly the
+        // localBinder slots in the extended scope.
+        ExpressionPointer motiveBodyLifted =
+            liftBoundVariables(motiveBody, /*increment=*/1,
+                                /*threshold=*/1);
         ExpressionPointer yesArmExpectedType =
-            substitute(motiveBody, 0, yesAppliedToBinder);
+            substitute(motiveBodyLifted, 0, yesAppliedToBinder);
         ExpressionPointer noArmExpectedType =
-            substitute(motiveBody, 0, noAppliedToBinder);
+            substitute(motiveBodyLifted, 0, noAppliedToBinder);
 
         // Not(P) for the no arm's binder.
         ExpressionPointer notP = makeApplication(
@@ -13772,6 +13785,61 @@ private:
         recursorCall = makeApplication(recursorCall, yesArm);
         recursorCall = makeApplication(recursorCall, noArm);
         recursorCall = makeApplication(recursorCall, scrutineeKernel);
+        // Pre-typecheck the assembled application to produce a
+        // detailed error before the kernel's generic "Application:
+        // argument type does not match Pi domain" message hits. We
+        // open over localBinders so inferType can walk freely; on
+        // failure, dump every arg with its expected/actual types so
+        // the diagnostic points at which slot is the culprit.
+        try {
+            Context openedContext =
+                buildContextFromLocalBinders(localBinders);
+            ExpressionPointer openedCall = openOverLocalBinders(
+                recursorCall, localBinders, localBinders.size());
+            (void)inferType(environment_, openedContext, openedCall);
+        } catch (const TypeError& kernelError) {
+            const std::string scope =
+                std::string("decide expression at line ")
+                + std::to_string(line);
+            std::string detail;
+            detail += scope + ":\n  kernel rejected the assembled\n"
+                      "  Logic.Decidable_recursor application —\n  ";
+            detail += kernelError.what();
+            detail += "\n\n  Args, in application order:\n";
+            const std::vector<std::pair<std::string, ExpressionPointer>>
+                argSlots = {
+                    {"(1) proposition P", propositionKernel},
+                    {"(2) motive (Decidable(P) -> Sort u)", motive},
+                    {"(3) yes case ((p:P) -> motive(yes P p))", yesArm},
+                    {"(4) no case ((np:Not P) -> motive(no P np))", noArm},
+                    {"(5) scrutinee (Decidable P)", scrutineeKernel},
+                };
+            for (const auto& slot : argSlots) {
+                detail += "    " + slot.first + ":\n";
+                detail += "      term: "
+                       + prettyPrintInLocalScope(slot.second, localBinders)
+                       + "\n";
+                try {
+                    Context ctx =
+                        buildContextFromLocalBinders(localBinders);
+                    ExpressionPointer openedSlot = openOverLocalBinders(
+                        slot.second, localBinders, localBinders.size());
+                    ExpressionPointer slotType = inferType(
+                        environment_, ctx, openedSlot);
+                    ExpressionPointer slotTypeClosed = closeOverLocalBinders(
+                        slotType, localBinders, localBinders.size());
+                    detail += "      type: "
+                           + prettyPrintInLocalScope(
+                                 slotTypeClosed, localBinders)
+                           + "\n";
+                } catch (const TypeError& ignored) {
+                    detail += "      type: <could not infer: ";
+                    detail += ignored.what();
+                    detail += ">\n";
+                }
+            }
+            throwElaborate(detail);
+        }
         return recursorCall;
     }
 

@@ -448,19 +448,6 @@ theorem Real.bisectionLeft_below_witness
           (Rational.halve(
                Real.BisectionInterval.left(intervals)
                + Real.BisectionInterval.right(intervals)) : Real);
-      let midDecidable
-            : Logic.Decidable(Real.IsUpperBound(subset, midReal)) :=
-          Logic.classical_decidable(Real.IsUpperBound(subset, midReal));
-      let belowWitnessClaim
-            : Logic.Decidable(Real.IsUpperBound(subset, midReal))
-              → Proposition :=
-          function (decision
-                    : Logic.Decidable(Real.IsUpperBound(subset, midReal))) =>
-              ∃ (y : Real).
-                  And(y ∈ subset,
-                      (Real.BisectionInterval.left(
-                           Real.bisectionStepWithDec(subset, intervals, decision))
-                       : Real) ≤ y);
       claim IH
             : ∃ (y : Real).
                   And(y ∈ subset,
@@ -468,22 +455,15 @@ theorem Real.bisectionLeft_below_witness
                           ≤ y)
         by Real.bisectionLeft_below_witness(
                subset, initial, initialLeftBelowSome, predecessor);
-      cases midDecidable with decisionEq {
-        | Logic.Decidable.yes(midIsUpper) =>
-            -- a_{n+1} = a_n. Transport IH along the decision equation.
-            Equality.transport_proposition(
-                belowWitnessClaim,
-                Logic.Decidable.yes(midIsUpper),
-                midDecidable,
-                Equality.symmetry(decisionEq),
-                IH)
-        | Logic.Decidable.no(midNotUpper) => {
-            -- a_{n+1} = midpoint. midNotUpper : ¬IsUpperBound(subset,
-            -- midReal). IsUpperBound unfolds to `(y : Real) → y ∈ S
-            -- → y ≤ midReal`, so not_forall_implies_exists_not plus
-            -- not_implies_implies_and_not give some y with y ∈ S and
-            -- ¬(y ≤ midReal). Then not_LessOrEqual_implies flips to
-            -- midReal ≤ y.
+      decide Real.IsUpperBound(subset, midReal) {
+        | yes _ =>
+            -- a_{n+1} = a_n. IH applies directly.
+            IH
+        | no  midNotUpper => {
+            -- a_{n+1} = midpoint. IsUpperBound unfolds to
+            -- `(y : Real) → y ∈ S → y ≤ midReal`; not_forall_implies_exists_not
+            -- + not_implies_implies_and_not give some y with y ∈ S and
+            -- ¬(y ≤ midReal); not_LessOrEqual_implies flips to midReal ≤ y.
             obtain ⟨witnessReal, witnessImpFails⟩
                 from Logic.not_forall_implies_exists_not(
                          Real,
@@ -498,21 +478,12 @@ theorem Real.bisectionLeft_below_witness
             claim midLeqWitness : midReal ≤ witnessReal
               by Real.not_LessOrEqual_implies(
                      witnessReal, midReal, witnessNotLeqMid);
-            claim existentialAtMid
-                  : ∃ (y : Real).
-                        And(y ∈ subset, midReal ≤ y)
-              by Exists.introduce(
-                     Real,
-                     function (y : Real) =>
-                         And(y ∈ subset, midReal ≤ y),
-                     witnessReal,
-                     And.introduction(witnessInS, midLeqWitness));
-            Equality.transport_proposition(
-                belowWitnessClaim,
-                Logic.Decidable.no(midNotUpper),
-                midDecidable,
-                Equality.symmetry(decisionEq),
-                existentialAtMid)
+            Exists.introduce(
+                Real,
+                function (y : Real) =>
+                    And(y ∈ subset, midReal ≤ y),
+                witnessReal,
+                And.introduction(witnessInS, midLeqWitness))
         }
       }
   }
