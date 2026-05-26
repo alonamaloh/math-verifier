@@ -166,21 +166,13 @@ theorem CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero
         witness N with {
             take m : Natural;
             take N_leq_m : N ≤ m;
-            -- |s(m) - 0| = |s(m)| < ε. The `claim` coerces
-            -- absBoundAtN(m, N_leq_m)'s inferred type
-            -- (`|sequenceFunction(make(s, _), m)| < ε`) to the
-            -- β/ι-equal `|s(m)| < ε` so the rewrite matcher below
-            -- can find `|s(m)|` structurally.
-            claim absBoundOnS : abs(s(m)) < epsilon
-              by absBoundAtN(m, N_leq_m);
-            rewrite(
-                congruenceOf(
-                    Rational.absolute_value,
-                    Equality.symmetry(
-                        calc s(m) - Rational.zero
-                           = s(m) + Rational.zero
-                           = s(m))),
-                absBoundOnS)
+            -- CauchyEquivalent unfolds the goal at index m to
+            --   |s(m) - 0| < ε.
+            -- The chain s(m) - 0 = s(m) (a ring identity) bridges
+            -- to |s(m)| < ε, which absBoundAtN gives directly.
+            calc abs(s(m) - Rational.zero)
+               = abs(s(m))             by (ring : s(m) - Rational.zero = s(m))
+               < epsilon               by absBoundAtN(m, N_leq_m)
         }
     }
 

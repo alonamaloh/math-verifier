@@ -11528,7 +11528,11 @@ private:
     //   3. Re-sort to match canonical(-innerPoly) (signatures are
     //      unchanged by sign flip, so the order is the same).
     //
-    // Edge case: innerPoly empty → negate(zero) which we don't support.
+    // Edge case: innerPoly empty → negate(zero). Derived from
+    //   sym(addZeroRight(-0))   : -0 = -0 + 0
+    //   addNegateLeft(0)        : -0 + 0 = 0
+    //   trans                   : -0 = 0
+    // (No primitive `negate_zero` axiom is required.)
     ExpressionPointer proveNegateMerge(
         const RingPolynomial& innerPoly,
         const RingV2Context& context,
@@ -11536,9 +11540,30 @@ private:
         ExpressionPointer carrierType = context.carrierType;
         LevelPointer universeLevel = context.carrierUniverseLevel;
         if (innerPoly.empty()) {
-            throwElaborate(
-                "`ring` (v2): negation of zero polynomial requires "
-                "`negate_zero` which is not in scope");
+            demandAxiomName(axiomNames.addZeroRight,
+                              "add_zero/add_identity_right",
+                              context.carrierName);
+            demandAxiomName(axiomNames.addNegateLeft,
+                              "add_negate_left", context.carrierName);
+            ExpressionPointer zeroConst =
+                makeConstant(context.zeroName);
+            ExpressionPointer negateZero = buildRingNegate(
+                context.negateName, zeroConst);
+            ExpressionPointer addZeroAtNegZero =
+                makeApplication(
+                    makeConstant(axiomNames.addZeroRight), negateZero);
+            ExpressionPointer negZeroPlusZero = buildRingOp(
+                context.addName, negateZero, zeroConst);
+            ExpressionPointer step1 = buildEqualitySymmetry(
+                universeLevel, carrierType,
+                negZeroPlusZero, negateZero, addZeroAtNegZero);
+            ExpressionPointer step2 =
+                makeApplication(
+                    makeConstant(axiomNames.addNegateLeft), zeroConst);
+            return buildEqualityTransitivity(
+                universeLevel, carrierType,
+                negateZero, negZeroPlusZero, zeroConst,
+                step1, step2);
         }
         ExpressionPointer innerCanonical =
             buildCanonicalPolynomial(innerPoly, context);
