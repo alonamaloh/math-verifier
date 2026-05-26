@@ -8746,6 +8746,92 @@ private:
         return 0;
     }
 
+    // Z/p numerical fast-fail for `ring`. Walks `expression` treating
+    // ring operations (.add / .multiply / .negate / .subtract) as
+    // arithmetic over Z/p, and any other subexpression as an opaque
+    // atom whose Z/p value is keyed off its bottom-up structural hash
+    // (so the same atom on both sides maps to the same value).
+    //
+    // Sound as a one-sided filter: ring proves polynomial identities,
+    // which hold in every commutative ring including Z/p. So if the
+    // two sides disagree mod p, ring CANNOT succeed and we can bail.
+    // Schwartz-Zippel: distinct polynomials of degree d disagree at
+    // random points with probability >= 1 - d/p, which for p ~ 2^61 is
+    // essentially 1 for any polynomial we'd see in a calc step.
+    //
+    // The carrier's add/multiply/etc. names are derived from the
+    // carrier name; if any of them aren't recognised constants the
+    // expression is treated as an atom.
+    uint64_t evalRingMod(
+        ExpressionPointer expression,
+        const std::string& addName,
+        const std::string& multiplyName,
+        const std::string& negateName,
+        const std::string& subtractName,
+        const std::string& zeroName,
+        const std::string& oneName,
+        uint64_t modulus) {
+        if (matchRingZero(expression, zeroName)) return 0;
+        if (matchRingOne(expression, oneName)) return 1 % modulus;
+        ExpressionPointer left, right;
+        if (matchBinaryRingOp(expression, addName, left, right)) {
+            uint64_t l = evalRingMod(left, addName, multiplyName,
+                negateName, subtractName, zeroName, oneName, modulus);
+            uint64_t r = evalRingMod(right, addName, multiplyName,
+                negateName, subtractName, zeroName, oneName, modulus);
+            return (l + r) % modulus;
+        }
+        if (matchBinaryRingOp(expression, multiplyName, left, right)) {
+            uint64_t l = evalRingMod(left, addName, multiplyName,
+                negateName, subtractName, zeroName, oneName, modulus);
+            uint64_t r = evalRingMod(right, addName, multiplyName,
+                negateName, subtractName, zeroName, oneName, modulus);
+            return (uint64_t)(((__uint128_t)l * r) % modulus);
+        }
+        if (matchBinaryRingOp(expression, subtractName, left, right)) {
+            uint64_t l = evalRingMod(left, addName, multiplyName,
+                negateName, subtractName, zeroName, oneName, modulus);
+            uint64_t r = evalRingMod(right, addName, multiplyName,
+                negateName, subtractName, zeroName, oneName, modulus);
+            return (l + modulus - r) % modulus;
+        }
+        ExpressionPointer inner;
+        if (matchUnaryRingNegate(expression, negateName, inner)) {
+            uint64_t v = evalRingMod(inner, addName, multiplyName,
+                negateName, subtractName, zeroName, oneName, modulus);
+            return (modulus - v) % modulus;
+        }
+        // Atom: use the cached bottom-up structural hash. Two
+        // structurally-equal atoms have the same hash, so they get the
+        // same Z/p value on both sides of the equation.
+        return expression->hash % modulus;
+    }
+
+    // Returns true if both sides MIGHT be equal as polynomials (the
+    // Z/p eval doesn't rule it out); false if Z/p says ring will fail.
+    // Uses a Mersenne prime that fits in uint64_t.
+    bool ringFastFailAgrees(
+        ExpressionPointer leftEndpoint,
+        ExpressionPointer rightEndpoint,
+        const std::string& carrierName) {
+        // 2^61 - 1, a Mersenne prime. Largest fitting comfortably in
+        // uint64_t so (a * b) % p in __uint128_t stays sound.
+        constexpr uint64_t kModulus = (1ULL << 61) - 1;
+        const std::string addName       = carrierName + ".add";
+        const std::string multiplyName  = carrierName + ".multiply";
+        const std::string negateName    = carrierName + ".negate";
+        const std::string subtractName  = carrierName + ".subtract";
+        const std::string zeroName      = carrierName + ".zero";
+        const std::string oneName       = carrierName + ".one";
+        uint64_t leftValue = evalRingMod(
+            leftEndpoint, addName, multiplyName, negateName,
+            subtractName, zeroName, oneName, kModulus);
+        uint64_t rightValue = evalRingMod(
+            rightEndpoint, addName, multiplyName, negateName,
+            subtractName, zeroName, oneName, kModulus);
+        return leftValue == rightValue;
+    }
+
     // `ring` — close an `e1 = e2` goal in a commutative ring.
     // v1: handles pure-multiplication rearrangement.
     ExpressionPointer elaborateRing(
@@ -8763,6 +8849,20 @@ private:
         EqualityComponents goal =
             extractEqualityComponents(expectedType, "ring", line);
         std::string carrierName = headConstantName(goal.carrierType);
+        // Z/p numerical fast-fail. If the two sides disagree as
+        // polynomials over Z/p, ring CANNOT prove them equal — bail
+        // immediately without doing the expensive symbolic normalise
+        // + polynomial-dict comparison work. See `evalRingMod` for
+        // soundness rationale (Schwartz-Zippel).
+        if (!ringFastFailAgrees(
+                goal.leftEndpoint, goal.rightEndpoint, carrierName)) {
+            throwElaborate(
+                "`ring`: the two sides do not agree mod 2^61 - 1 — "
+                "they are not equal as commutative-ring expressions"
+                + buildFingerprintDiagnostic(
+                      goal.leftEndpoint, goal.rightEndpoint,
+                      carrierName));
+        }
         // Try the multiplicative axioms first; if the goal isn't a
         // pure product, try the additive axioms. Either is acceptable
         // — both reduce to the same insertion-sort + reassociate
