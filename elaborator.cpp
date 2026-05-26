@@ -4471,8 +4471,27 @@ private:
                 *claim.byHint, localBinders, goalClosed);
         }
 
-        ExpressionPointer hintTerm =
-            elaborateExpression(*claim.byHint, localBinders);
+        // When the byHint is syntactically a lambda or a block (i.e.
+        // a SurfaceLambda or a SurfaceLet chain), elaborate it WITH
+        // the resolved goal as the expected type. Both shapes have
+        // an inner expression — the lambda's body, the block's tail
+        // — that may itself need an expected type to elaborate
+        // (e.g. a nested bare `claim by cases`, which motive-
+        // abstracts over its expected type). Without the propagation
+        // the inner form has nothing to abstract over and errors.
+        //
+        // Other byHint shapes (applications, identifiers, etc.) keep
+        // the no-expected-type path so `autoFillHintForClaim` can
+        // peel a partial-application byHint's Pi chain and fill
+        // missing args. Forcing expected type on a partial app would
+        // make the kernel reject the Pi-typed result mid-elaboration,
+        // before autoFillHintForClaim gets to bridge the gap.
+        bool propagateExpectedTypeToHint =
+            std::holds_alternative<SurfaceLambda>(claim.byHint->node)
+            || std::holds_alternative<SurfaceLet>(claim.byHint->node);
+        ExpressionPointer hintTerm = elaborateExpression(
+            *claim.byHint, localBinders,
+            propagateExpectedTypeToHint ? goalClosed : nullptr);
         // `inferTypeInLocalContext` returns an OPENED type;
         // `autoFillHintForClaim` expects closed form throughout
         // (matchAgainstPattern / instantiateLemmaBinders are
@@ -4485,9 +4504,9 @@ private:
         ExpressionPointer result = autoFillHintForClaim(
             hintTerm, hintType, goalClosed, localBinders, line);
 
-        // `--check-redundant-by`: speculatively try the no-`by`
-        // Step 5 lookup. If it would also discharge the same goal,
-        // warn that the hint is redundant.
+        // `--check-redundant-by`: speculatively run the bare-`claim`
+        // auto-prover on the same goal. If it would also discharge
+        // the goal, warn that the hint is redundant.
         if (reportRedundantBy_) {
             ExpressionPointer autoAttempt;
             try {
@@ -4501,8 +4520,8 @@ private:
             if (autoAttempt) {
                 std::cerr << "warning: " << moduleName_
                     << ":" << line
-                    << ": redundant `by` on `claim` — Step 5 "
-                    "lookup closes the goal without help\n";
+                    << ": redundant `by` on `claim` — auto-prover"
+                       " closes the goal without help\n";
             }
         }
         return result;
