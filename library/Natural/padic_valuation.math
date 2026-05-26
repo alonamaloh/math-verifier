@@ -478,13 +478,15 @@ theorem Natural.padic_valuation_multiplicative
                        + Natural.modulo(prime, a')
                    = prime * Natural.divide(prime, a') + 0
                    = prime * Natural.divide(prime, a');
-                -- IH on (divide(p, a'), b'): need succ(divide + b') ≤ n.
+                -- IH on (divide(p, a'), b'): succ(divide + b') ≤ a' + b' = n.
                 claim recursiveSumLeN
                       : successor(Natural.divide(prime, a') + b') ≤ n
-                  by rewrite(
-                         sumEq,
-                         Natural.successor_add_preserves_le(
-                             b', a', Natural.divide(prime, a'), succDivideALeA));
+                  by calc successor(Natural.divide(prime, a') + b')
+                       ≤ a' + b'
+                            by Natural.successor_add_preserves_le(
+                                   b', a', Natural.divide(prime, a'),
+                                   succDivideALeA)
+                       = n;
                 claim Natural.padic_valuation(
                           prime, Natural.divide(prime, a') * b')
                       = Natural.padic_valuation(prime, Natural.divide(prime, a'))
@@ -542,26 +544,19 @@ theorem Natural.padic_valuation_multiplicative
                              + Natural.modulo(prime, b')
                          = prime * Natural.divide(prime, b') + 0
                          = prime * Natural.divide(prime, b');
-                      -- IH on (a', divide(p, b')): need succ(a' + divide) ≤ n.
-                      -- a' + divide < a' + b' = n; specifically succ(a' + divide) ≤ a' + b'.
+                      -- IH on (a', divide(p, b')): succ(a' + div) ≤ n.
+                      -- Chain commutes and the ≤ from successor_add_preserves_le,
+                      -- then close with sumEq : a' + b' = n.
                       claim recursiveSumLeN
                             : successor(a' + Natural.divide(prime, b')) ≤ n
-                        by rewrite(
-                               sumEq,
-                               -- succ(a' + div) ≤ a' + b' from succ(div) ≤ b'.
-                               -- successor_add_preserves_le gives succ(d+x) ≤ a+x
-                               -- from succ(d) ≤ a; here d = div, x = a', a = b'.
-                               -- We want succ(a' + div) ≤ a' + b'. Use commutative.
-                               rewrite(
-                                   congruenceOf(
-                                       successor,
-                                       Natural.add_commutative(
-                                           Natural.divide(prime, b'), a')),
-                                   rewrite(
-                                       Natural.add_commutative(b', a'),
-                                       Natural.successor_add_preserves_le(
-                                           a', b', Natural.divide(prime, b'),
-                                           succDivideBLeB))));
+                        by calc successor(a' + Natural.divide(prime, b'))
+                             = successor(Natural.divide(prime, b') + a')
+                             ≤ b' + a'
+                                  by Natural.successor_add_preserves_le(
+                                         a', b', Natural.divide(prime, b'),
+                                         succDivideBLeB)
+                             = a' + b'
+                             = n;
                       claim Natural.padic_valuation(
                                 prime, a' * Natural.divide(prime, b'))
                             = Natural.padic_valuation(prime, a')
