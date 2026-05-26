@@ -9532,6 +9532,54 @@ private:
         return head != nullptr && head->name == oneName;
     }
 
+    // True if `expression` is a Natural literal `successor^k(zero)`
+    // for some k >= 0. Sets `value` to k on match.
+    bool tryParseNaturalLiteral(
+        ExpressionPointer expression, int& value) {
+        int count = 0;
+        ExpressionPointer cursor = expression;
+        while (auto* app = std::get_if<Application>(&cursor->node)) {
+            auto* head =
+                std::get_if<Constant>(&app->function->node);
+            if (!head || head->name != "successor") return false;
+            ++count;
+            cursor = app->argument;
+        }
+        auto* head = std::get_if<Constant>(&cursor->node);
+        if (!head || head->name != "zero") return false;
+        value = count;
+        return true;
+    }
+
+    // Recognise `Natural.to_integer(successor^k(zero))` as the integer
+    // constant k for the Integer carrier. Sets `value` to k on match.
+    // Other carriers (Rational, Real) aren't currently recognised
+    // here -- their embeddings compose multiple steps, and lifting the
+    // proof through each step needs the carrier's own preservation
+    // lemmas (Integer.to_rational.{zero,one,add}_preserves exist;
+    // Rational.to_real.{...}_preserves don't yet).
+    bool tryParseCarrierEmbeddedNaturalLiteral(
+        ExpressionPointer expression,
+        const RingV2Context& context,
+        int& value) {
+        if (context.carrierName != "Integer") return false;
+        auto* app = std::get_if<Application>(&expression->node);
+        if (!app) return false;
+        auto* head = std::get_if<Constant>(&app->function->node);
+        if (!head || head->name != "Natural.to_integer") return false;
+        return tryParseNaturalLiteral(app->argument, value);
+    }
+
+    // Build the Natural-level kernel for `successor^k(zero)`.
+    ExpressionPointer buildNaturalLiteralKernel(int value) {
+        ExpressionPointer expr = makeConstant("zero");
+        for (int i = 0; i < value; ++i) {
+            expr = makeApplication(
+                makeConstant("successor"), std::move(expr));
+        }
+        return expr;
+    }
+
     // Convert a kernel expression to a RingPolynomial, registering
     // opaque subterms as atoms along the way. Recursive: add /
     // multiply / negate are unfolded; zero and one are bottomed out;
@@ -9590,16 +9638,23 @@ private:
             ringPolynomialNegate(polynomial);
             return polynomial;
         }
+        // Carrier-embedded Natural literal: `Natural.to_integer(succ^k(zero))`
+        // normalises to poly [{}: k] (k unit copies of the carrier's
+        // one). proveMultiplyMerge's unit-strip pass takes care of
+        // collapsing the `Integer.one * x` products that arise when
+        // distributing `(2 : Integer) * x` into `x + x`.
+        {
+            int literalValue = 0;
+            if (tryParseCarrierEmbeddedNaturalLiteral(
+                    expression, context, literalValue)) {
+                RingPolynomial polynomial;
+                if (literalValue > 0) {
+                    polynomial[RingMonomialSignature{}] = literalValue;
+                }
+                return polynomial;
+            }
+        }
         // Otherwise: an opaque atom.
-        // (Carrier-embedded Natural literals like `(2 : Integer)`
-        // currently fall through to this atom case. Recognising them
-        // as poly[{}: 2] is easy and was prototyped, but invoking it
-        // for `(2 : Integer) * x = x + x` runs into a separate
-        // proveMultiplyMerge limitation: `Integer.one * x` doesn't
-        // collapse to `x`, so the distributed `one * x + one * x`
-        // can't merge with `x + x`. Future work: extend
-        // proveMultiplyMerge to drop `1 *` prefixes via
-        // multiply_one_left, then literal recognition lands cleanly.)
         return ringPolynomialAtom(context, expression);
     }
 
@@ -10181,6 +10236,21 @@ private:
                     step12, mergeProof);
             }
         }
+        // Carrier-embedded Natural literal: build the polynomial as
+        // [{}: k] and the proof inductively.
+        {
+            int literalValue = 0;
+            if (tryParseCarrierEmbeddedNaturalLiteral(
+                    expression, context, literalValue)) {
+                RingPolynomial polynomial;
+                if (literalValue > 0) {
+                    polynomial[RingMonomialSignature{}] = literalValue;
+                }
+                polynomialOut = polynomial;
+                return proveIntegerLiteralEqualsCanonical(
+                    literalValue, context);
+            }
+        }
         // Otherwise: an opaque atom. Its canonical kernel is itself.
         polynomialOut = ringPolynomialAtom(context, expression);
         ExpressionPointer canonicalKernel =
@@ -10191,6 +10261,102 @@ private:
                 "atom itself (internal error)");
         }
         return buildReflexivity(universeLevel, carrierType, expression);
+    }
+
+    // Prove `Natural.to_integer(successor^k(zero))` equals the
+    // canonical kernel of the polynomial [{}: k] for the Integer
+    // carrier.
+    //
+    // For k = 0: Natural.to_integer.zero_preserves directly.
+    // For k = 1: Natural.to_integer.one_preserves directly.
+    // For k > 1: chain Natural.to_integer.add_preserves(succ^j(zero),
+    //   successor(zero)) with the recursive proof at j and a
+    //   congruence wrapper that rewrites the resulting
+    //   `to_integer(succ^j(zero)) + to_integer(succ(zero))` to
+    //   `c_j + Integer.one` where c_j is the canonical at j (a
+    //   left-associated sum of j Integer.ones).
+    //
+    // Currently Integer-only. Other carriers fall through to the
+    // atom case in proveEqualsCanonical_impl above.
+    ExpressionPointer proveIntegerLiteralEqualsCanonical(
+        int literalValue, const RingV2Context& context) {
+        LevelPointer universeLevel = context.carrierUniverseLevel;
+        ExpressionPointer carrierType = context.carrierType;
+        ExpressionPointer oneConst = makeConstant(context.oneName);
+        if (literalValue == 0) {
+            return makeConstant("Natural.to_integer.zero_preserves");
+        }
+        if (literalValue == 1) {
+            return makeConstant("Natural.to_integer.one_preserves");
+        }
+        ExpressionPointer cJ = oneConst;
+        ExpressionPointer currentProof = makeConstant(
+            "Natural.to_integer.one_preserves");
+        for (int j = 1; j < literalValue; ++j) {
+            ExpressionPointer naturalJ = buildNaturalLiteralKernel(j);
+            ExpressionPointer naturalOne = buildNaturalLiteralKernel(1);
+            ExpressionPointer toIntegerJ = makeApplication(
+                makeConstant("Natural.to_integer"), naturalJ);
+            ExpressionPointer toIntegerOne = makeApplication(
+                makeConstant("Natural.to_integer"), naturalOne);
+            // add_preserves(succ^j(zero), succ(zero)) :
+            //   to_integer(succ^j(zero) + succ(zero))
+            //     = to_integer(succ^j(zero)) + to_integer(succ(zero))
+            // LHS defeq to_integer(succ^{j+1}(zero)) (kernel reduces
+            // succ^j(zero) + succ(zero) to succ^{j+1}(zero)).
+            ExpressionPointer addPreserves = makeApplication(
+                makeApplication(
+                    makeConstant("Natural.to_integer.add_preserves"),
+                    naturalJ),
+                naturalOne);
+            ExpressionPointer formA = makeApplication(
+                makeConstant("Natural.to_integer"),
+                buildNaturalLiteralKernel(j + 1));
+            ExpressionPointer formB = buildRingOp(
+                context.addName, toIntegerJ, toIntegerOne);
+            // Rewrite the right summand: to_integer(succ(zero)) -> Integer.one
+            // via one_preserves, congruence under λz. toIntegerJ + z.
+            ExpressionPointer toIntegerJLifted =
+                liftBoundVariables(toIntegerJ, 1, 0);
+            ExpressionPointer lambdaRight = makeLambda(
+                "_lit_z", carrierType,
+                buildRingOp(context.addName, toIntegerJLifted,
+                              makeBoundVariable(0)));
+            ExpressionPointer onePreserves = makeConstant(
+                "Natural.to_integer.one_preserves");
+            ExpressionPointer congrRight =
+                buildEqualityCongruenceSameCarrier(
+                    universeLevel, carrierType, lambdaRight,
+                    toIntegerOne, oneConst, onePreserves);
+            ExpressionPointer formC = buildRingOp(
+                context.addName, toIntegerJ, oneConst);
+            // Rewrite the left summand: to_integer(succ^j(zero)) -> c_j
+            // via currentProof, congruence under λz. z + Integer.one.
+            ExpressionPointer oneLifted =
+                liftBoundVariables(oneConst, 1, 0);
+            ExpressionPointer lambdaLeft = makeLambda(
+                "_lit_z", carrierType,
+                buildRingOp(context.addName,
+                              makeBoundVariable(0), oneLifted));
+            ExpressionPointer congrLeft =
+                buildEqualityCongruenceSameCarrier(
+                    universeLevel, carrierType, lambdaLeft,
+                    toIntegerJ, cJ, currentProof);
+            ExpressionPointer formD = buildRingOp(
+                context.addName, cJ, oneConst);
+            // Chain: formA = formB (addPreserves) = formC (congrRight)
+            //           = formD (congrLeft).
+            ExpressionPointer stepAB = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                formA, formB, formC,
+                addPreserves, congrRight);
+            currentProof = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                formA, formC, formD,
+                stepAB, congrLeft);
+            cJ = formD;
+        }
+        return currentProof;
     }
 
     ExpressionPointer proveEqualsCanonical(
@@ -10261,11 +10427,19 @@ private:
         }
         // Both non-empty.  Build the flat summand list from leftPoly
         // and rightPoly's canonical forms.  Each entry is a fully-
-        // rendered signed monomial kernel.
+        // rendered signed monomial kernel.  We use
+        // polynomialToSignedMonomials on BOTH sides so coefficient-k
+        // entries explode into k unit monomials; the right side used
+        // to push raw (sig, coef) pairs, which broke the bySig
+        // bookkeeping below for k > 1.
         std::vector<SignedMonomial> combinedMonomials =
             polynomialToSignedMonomials(leftPoly);
-        for (const auto& entry : rightPoly) {
-            combinedMonomials.push_back({entry.first, entry.second});
+        {
+            std::vector<SignedMonomial> rightSigned =
+                polynomialToSignedMonomials(rightPoly);
+            combinedMonomials.insert(combinedMonomials.end(),
+                                       rightSigned.begin(),
+                                       rightSigned.end());
         }
         std::vector<ExpressionPointer> combinedKernels;
         combinedKernels.reserve(combinedMonomials.size());
@@ -11472,6 +11646,70 @@ private:
             }
             innerProductForm = outerApp->argument;
             wrappedInNegate = true;
+        }
+        // Unit-strip: if either Mi or Mj is `oneConst` (built from an
+        // empty signature), the inner product `Mi * Mj` simplifies via
+        // multiply_one_left/right. The flatten/sort path below assumes
+        // both factors are honest atom-products of equal arity to the
+        // target; the unit case breaks that (Mi or Mj contributes zero
+        // factors), so we handle it here and return early.
+        //
+        // This is what lets ring goals like `Integer.one * x = x`
+        // elaborate -- and, transitively, what unblocks numeric-literal
+        // recognition in the normaliser, since a literal `k` reduces
+        // to `Integer.one + ... + Integer.one` and multiplies into
+        // `Integer.one * x + ... + Integer.one * x`.
+        {
+            bool leftIsUnit = leftMono.signature.empty();
+            bool rightIsUnit = rightMono.signature.empty();
+            if (leftIsUnit || rightIsUnit) {
+                ExpressionPointer newInner;
+                ExpressionPointer rewriteProof;
+                if (leftIsUnit) {
+                    // `Integer.one * Mj = Mj` via one_multiply(Mj).
+                    // (Also covers leftIsUnit && rightIsUnit: Mj is
+                    // itself `Integer.one`, and the lemma still applies.)
+                    demandAxiomName(axiomNames.oneMultiplyLeft,
+                                      "one_multiply", context.carrierName);
+                    rewriteProof = makeApplication(
+                        makeConstant(axiomNames.oneMultiplyLeft), Mj);
+                    newInner = Mj;
+                } else {
+                    // `Mi * Integer.one = Mi` via multiply_one(Mi).
+                    demandAxiomName(axiomNames.multiplyOneRight,
+                                      "multiply_one", context.carrierName);
+                    rewriteProof = makeApplication(
+                        makeConstant(axiomNames.multiplyOneRight), Mi);
+                    newInner = Mi;
+                }
+                ExpressionPointer newForm;
+                ExpressionPointer chainStep;
+                if (wrappedInNegate) {
+                    ExpressionPointer lambdaBody = buildRingNegate(
+                        context.negateName, makeBoundVariable(0));
+                    ExpressionPointer lambda = makeLambda(
+                        "_ring_unitstrip_z", carrierType, lambdaBody);
+                    chainStep = buildEqualityCongruenceSameCarrier(
+                        universeLevel, carrierType, lambda,
+                        innerProductForm, newInner, rewriteProof);
+                    newForm = buildRingNegate(
+                        context.negateName, newInner);
+                } else {
+                    chainStep = rewriteProof;
+                    newForm = newInner;
+                }
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    startForm, currentForm, newForm,
+                    currentProof, chainStep);
+                currentForm = newForm;
+                if (!structurallyEqual(currentForm, targetMonomial)) {
+                    throwElaborate(
+                        "`ring` (v2): unit-strip produced form does not "
+                        "match canonical target (internal error)");
+                }
+                return currentProof;
+            }
         }
         // Flatten the inner product and sort factors.
         std::vector<ExpressionPointer> innerFactors;
