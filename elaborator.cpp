@@ -9663,10 +9663,12 @@ private:
     }
 
     // Build the canonical-form kernel expression for a polynomial.
-    // Empty polynomial → `zero`. Single monomial → that monomial.
-    // Multiple monomials → left-associated sum in std::map order
-    // (i.e., ordered by lex of factor signature, which is determined
-    // by subtree hashes — so the order is stable but unspecified).
+    // Empty polynomial → `zero`. Each entry (sig, coef) contributes
+    // |coef| copies of the unit monomial; the whole polynomial is
+    // the left-associated sum of all unit monomials in std::map sig
+    // order. So [{x}:2, {y}:1] canonicalizes to ((x + x) + y), not
+    // ((1+1)*x + y) — every monomial in the canonical form has
+    // coefficient ±1.
     ExpressionPointer buildCanonicalPolynomial(
         const RingPolynomial& polynomial,
         const RingV2Context& context) {
@@ -9674,10 +9676,14 @@ private:
             return makeConstant(context.zeroName);
         }
         std::vector<ExpressionPointer> monomials;
-        monomials.reserve(polynomial.size());
         for (const auto& entry : polynomial) {
-            monomials.push_back(buildCanonicalMonomial(
-                entry.first, entry.second, context));
+            int coef = entry.second;
+            int sign = coef > 0 ? +1 : -1;
+            int magnitude = coef > 0 ? coef : -coef;
+            for (int i = 0; i < magnitude; ++i) {
+                monomials.push_back(buildCanonicalMonomial(
+                    entry.first, sign, context));
+            }
         }
         ExpressionPointer accumulator = monomials[0];
         for (size_t i = 1; i < monomials.size(); ++i) {
@@ -9838,12 +9844,25 @@ private:
         int sign;  // +1 or -1
     };
 
+    // Explode each polynomial entry (sig, coef) into |coef| unit
+    // signed monomials, each with sign = sign(coef). The canonical
+    // form of a polynomial is a left-associated sum of these unit
+    // monomials, so coefficient k > 1 shows up as k repeated
+    // (sig, ±1) entries rather than as a `(1+1+...+1) * factors`
+    // product. This keeps proof generation in proveAddMerge etc.
+    // sign-agnostic: each entry is always ±1, and group-merging is
+    // just "this signature has p positives and q negatives, net
+    // (p - q) of sign sign(p - q), with min(p, q) cancel pairs".
     std::vector<SignedMonomial> polynomialToSignedMonomials(
         const RingPolynomial& polynomial) {
         std::vector<SignedMonomial> output;
-        output.reserve(polynomial.size());
         for (const auto& entry : polynomial) {
-            output.push_back({entry.first, entry.second});
+            int coef = entry.second;
+            int sign = coef > 0 ? +1 : -1;
+            int magnitude = coef > 0 ? coef : -coef;
+            for (int i = 0; i < magnitude; ++i) {
+                output.push_back({entry.first, sign});
+            }
         }
         return output;
     }
@@ -10293,20 +10312,30 @@ private:
         }
         // Survivors first, in canonical signature order. Cancel pairs
         // collected to the side.
+        //
+        // Each group's `signs` vector consists of ±1 entries (one per
+        // unit monomial). Count positives vs negatives: min(p, n)
+        // pairs cancel, leaving |p - n| copies of sign(p - n) as
+        // survivors. The merged polynomial's coefficient for this
+        // signature is exactly (p - n), so the survivor count agrees
+        // with mergedPoly[sig].
         std::vector<std::pair<RingMonomialSignature, int>> cancelPairs;
         for (const auto& [sig, signs] : bySig) {
-            if (signs.size() == 1) {
-                sortedSignedMonomials.push_back({sig, signs[0]});
-            } else if (signs.size() == 2
-                       && signs[0] + signs[1] == 0) {
-                // (M, -M) — collect for cancellation. The merged-poly
-                // does not contain this signature.
+            int positives = 0;
+            int negatives = 0;
+            for (int s : signs) {
+                if (s > 0) ++positives;
+                else if (s < 0) ++negatives;
+            }
+            int net = positives - negatives;
+            int cancellations = std::min(positives, negatives);
+            int survivorSign = (net > 0) ? +1 : -1;
+            int survivorCount = (net > 0) ? net : -net;
+            for (int i = 0; i < survivorCount; ++i) {
+                sortedSignedMonomials.push_back({sig, survivorSign});
+            }
+            for (int i = 0; i < cancellations; ++i) {
                 cancelPairs.push_back({sig, +1});
-            } else {
-                throwElaborate(
-                    "`ring` (v2): proveAddMerge encountered a signature "
-                    "with " + std::to_string(signs.size())
-                    + " entries — coefficient guard should have caught this");
             }
         }
         // Verify: surviving monomials, in std::map signature order,
@@ -11963,21 +11992,9 @@ private:
                 + buildFingerprintDiagnostic(
                       leftEndpoint, rightEndpoint, carrierName));
         }
-        // Coefficient guard: v2's proof emitter only supports
-        // coefficients in {-1, 0, +1}. Drop into a clear error if a
-        // larger coefficient survives (e.g., `a + a` collected to 2·a).
-        for (const auto& entry : leftPolynomial) {
-            if (entry.second != -1 && entry.second != 1) {
-                throwElaborate(
-                    "`ring` (v2): the canonical form has a monomial "
-                    "with coefficient " + std::to_string(entry.second)
-                    + " — v2 only handles coefficients in {-1, +1} for "
-                    "now (collected like-terms with larger multipliers "
-                    "are a follow-up)"
-                    + buildFingerprintDiagnostic(
-                          leftEndpoint, rightEndpoint, carrierName));
-            }
-        }
+        // No coefficient guard: the canonical form expands every
+        // (sig, coef) entry into |coef| unit monomials, so the
+        // proof generators only ever see signs in {-1, +1}.
         // Resolve carrier-specific axiom names. Names that aren't
         // needed for this particular goal are allowed to remain
         // unresolved; the merge helpers `demandAxiomName` only what
