@@ -132,20 +132,19 @@ theorem Natural.divide_positive_when_divides
      = target;
   cases Natural.divide(prime, target) with refinedDivideEq {
     | zero =>
-        -- prime * 0 = 0, so target = 0, contradicting targetPositive.
+        -- prime * 0 = 0, so target = 0; chain through targetPositive
+        -- to get 1 ≤ 0, which `absurd` recognises directly.
         absurd(
-            rewrite(
-                calc target
-                   = prime * Natural.divide(prime, target)
-                   = prime * 0
-                   = 0,
-                targetPositive))
+            calc successor(0)
+               ≤ target                                       by targetPositive
+               = prime * Natural.divide(prime, target)
+               = prime * 0
+               = 0)
     | successor(q') =>
-        -- divide = successor(q') ≥ 1. Transport from successor(q') back.
-        rewrite(
-            Equality.symmetry(refinedDivideEq),
-            Natural.successor_less_or_equal_successor(
-                0, q', Natural.zero_least(q')))
+        -- divide = succ(q'), and 1 ≤ succ(q') is successor_positive.
+        calc successor(0)
+           ≤ successor(q')
+           = Natural.divide(prime, target)
   }
 }
 
@@ -848,11 +847,10 @@ theorem Natural.power_divides_implies_padic_valuation_ge
              -- n = prime * 0 = 0, contradicting nPositive.
              claim n = prime * 0;
              absurd(
-                 rewrite(
-                     calc n
-                        = prime * 0
-                        = 0,
-                     nPositive))
+                 calc successor(0)
+                    ≤ n           by nPositive
+                    = prime * 0
+                    = 0)
            }
          | successor(predQ) => {
              claim n = prime * successor(predQ);
@@ -895,16 +893,16 @@ theorem Natural.power_divides_implies_padic_valuation_ge
                       prime, primeAtLeastTwo,
                       predK, successor(predQ),
                       succQPositive, pPredKDividesQ);
-             -- v_p(n) = v_p(p * succ(predQ)) = succ(v_p(succ(predQ))) by strip.
-             -- So we want succ(predK) ≤ succ(v_p(succ(predQ))).
-             rewrite(
-                 calc successor(Natural.padic_valuation(prime, successor(predQ)))
-                    = Natural.padic_valuation(prime, prime * successor(predQ))
-                    = Natural.padic_valuation(prime, n),
-                 Natural.successor_less_or_equal_successor(
-                     predK,
-                     Natural.padic_valuation(prime, successor(predQ)),
-                     ihResult))
+             -- succ(predK) ≤ succ(v_p(succ(predQ))) by IH; then chain
+             -- through the strip: succ(v_p(s)) = v_p(p*s) = v_p(n).
+             calc successor(predK)
+                ≤ successor(Natural.padic_valuation(prime, successor(predQ)))
+                     by Natural.successor_less_or_equal_successor(
+                            predK,
+                            Natural.padic_valuation(prime, successor(predQ)),
+                            ihResult)
+                = Natural.padic_valuation(prime, prime * successor(predQ))
+                = Natural.padic_valuation(prime, n)
            }
       }
     }
@@ -951,7 +949,7 @@ theorem Natural.padic_valuation_ultrametric_when_le
 }
 
 -- Symmetric form: when v_p(b) ≤ v_p(a), v_p(b) ≤ v_p(a + b).
--- Derived from the previous via add_commutative.
+-- Reduce to the previous via add_commutative on both ends.
 theorem Natural.padic_valuation_ultrametric_when_ge
         (prime : Natural)
         (primeAtLeastTwo : successor(successor(0)) ≤ prime)
@@ -961,15 +959,15 @@ theorem Natural.padic_valuation_ultrametric_when_ge
             Natural.padic_valuation(prime, b)
               ≤ Natural.padic_valuation(prime, a))
         : Natural.padic_valuation(prime, b)
-          ≤ Natural.padic_valuation(prime, a + b) :=
-  rewrite(
-      Natural.add_commutative(b, a),
-      Natural.padic_valuation_ultrametric_when_le(
-          prime, primeAtLeastTwo, b, a,
-          rewrite(
-              Natural.add_commutative(a, b),
-              sumPositive),
-          valuationLe))
+          ≤ Natural.padic_valuation(prime, a + b) := {
+  claim sumCommuted : successor(0) ≤ b + a
+    by rewrite(Natural.add_commutative(a, b), sumPositive);
+  calc Natural.padic_valuation(prime, b)
+     ≤ Natural.padic_valuation(prime, b + a)
+        by Natural.padic_valuation_ultrametric_when_le(
+              prime, primeAtLeastTwo, b, a, sumCommuted, valuationLe)
+     = Natural.padic_valuation(prime, a + b)
+}
 
 -- Subtraction preserves divides: if d | a and d | b and b ≤ a, then
 -- d | monus(a, b). Uses monus_zero_implies_decompose to express
@@ -1088,33 +1086,28 @@ theorem Natural.distance_monus_when_ge
      = Natural.distance(b, a)
      = Natural.monus(b, a)
 
--- Helper: a ≤ c implies a + b ≤ c + b. By induction on the proof of a ≤ c.
+-- Helper: a ≤ c implies a + b ≤ c + b. From the subtraction witness
+-- c = a + r, the chain a + b ≤ (a + b) + r = (a + r) + b = c + b
+-- closes the goal.
 theorem Natural.le_add_preserves_left
         (a c b : Natural) (aLeC : a ≤ c)
         : a + b ≤ c + b := {
-  -- From a ≤ c get witness r : c = a + r. Then a + b ≤ a + r + b = c + b.
   let ⟨r, cEqAplusR⟩ := Natural.subtraction_witness(a, c, aLeC);
-  rewrite(
-      Equality.symmetry(cEqAplusR),
-      -- a + b ≤ (a + r) + b. (a + r) + b = a + (r + b) by assoc; same as a + (b + r) by commutativity.
-      -- Use less_or_equal_add_right: a + b ≤ (a + b) + r.
-      rewrite(
-          -- (a + b) + r = (a + r) + b via assoc and commutativity.
-          calc (a + b) + r
-             = (a + r) + b,
-          Natural.less_or_equal_add_right(a + b, r)))
+  calc a + b
+     ≤ (a + b) + r     by Natural.less_or_equal_add_right(a + b, r)
+     = (a + r) + b
+     = c + b
 }
 
--- And on the right: b ≤ d implies a + b ≤ a + d. Same proof, via
--- add_commutative.
+-- And on the right: by commutativity on both sides, reduce to
+-- le_add_preserves_left.
 theorem Natural.le_add_preserves_right
         (a b d : Natural) (bLeD : b ≤ d)
         : a + b ≤ a + d :=
-  rewrite(
-      Natural.add_commutative(b, a),
-      rewrite(
-          Natural.add_commutative(d, a),
-          Natural.le_add_preserves_left(b, d, a, bLeD)))
+  calc a + b
+     = b + a
+     ≤ d + a       by Natural.le_add_preserves_left(b, d, a, bLeD)
+     = a + d
 
 -- a ≤ c ∧ b ≤ d → a + b ≤ c + d.
 theorem Natural.le_add_le
@@ -1340,19 +1333,18 @@ theorem Integer.divides_absolute_value_natural_sum
 theorem Natural.le_multiply_when_factor_at_least_one
         (x p : Natural) (pPositive : successor(0) ≤ p)
         : x ≤ p * x := {
-  claim pDecompose : p = successor(0) + Natural.monus(p, successor(0))
+  claim p = successor(0) + Natural.monus(p, successor(0))
     by Natural.monus_zero_implies_decompose(
            successor(0), p,
            Natural.le_implies_monus_zero(p, successor(0), pPositive));
-  rewrite(
-      Equality.symmetry(pDecompose),
-      -- (1 + monus(p, 1)) * x = x + monus(p, 1) * x. Then x ≤ that.
-      rewrite(
-          calc x + Natural.monus(p, successor(0)) * x
-             = successor(0) * x + Natural.monus(p, successor(0)) * x
-             = (successor(0) + Natural.monus(p, successor(0))) * x,
-          Natural.less_or_equal_add_right(
-              x, Natural.monus(p, successor(0)) * x)))
+  -- x ≤ x + monus(p,1)*x = 1*x + monus(p,1)*x = (1 + monus(p,1))*x = p*x.
+  calc x
+     ≤ x + Natural.monus(p, successor(0)) * x
+          by Natural.less_or_equal_add_right(
+                 x, Natural.monus(p, successor(0)) * x)
+     = successor(0) * x + Natural.monus(p, successor(0)) * x
+     = (successor(0) + Natural.monus(p, successor(0))) * x
+     = p * x
 }
 
 -- Power is monotone in the exponent (when base p ≥ 1).
