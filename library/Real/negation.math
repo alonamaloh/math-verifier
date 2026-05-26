@@ -62,27 +62,31 @@ theorem Real.negate_respects
               from equivalenceHypothesis(epsilon, epsilonPositive);
           witness N with
               function (m : Natural) (N_leq_m : N ≤ m) =>
-                -- Step the original bound at index m through two rewrites:
-                -- (1) |sf(rep1, m) - sf(rep1Prime, m)| = |-sf(rep1, m) - -sf(rep1Prime, m)|
-                --     by symmetry of absolute_value_of_subtract_of_negates;
-                -- (2) -sf(., m) = sf(neg(.), m) by symmetry of sequenceFunction_negate
-                --     (two applications, one per sequence).
-                rewrite(
-                    Equality.symmetry(
-                        CauchyRationalSequence.sequenceFunction_negate(
-                            rep1Prime, m)),
-                    rewrite(
-                        Equality.symmetry(
-                            CauchyRationalSequence.sequenceFunction_negate(
-                                rep1, m)),
-                        rewrite(
-                            Equality.symmetry(
-                                Rational.absolute_value_of_subtract_of_negates(
-                                    CauchyRationalSequence.sequenceFunction(
-                                        rep1, m),
-                                    CauchyRationalSequence.sequenceFunction(
-                                        rep1Prime, m))),
-                            origAtN(m, N_leq_m))))
+                -- Walk the bound on |sf(rep1, m) - sf(rep1Prime, m)| down to
+                -- the same bound on the negated sequences:
+                --   |sf(neg(rep1), m) - sf(neg(rep1Prime), m)|
+                --     = |-sf(rep1, m) - -sf(rep1Prime, m)|  (push neg through sf, twice)
+                --     = |sf(rep1, m)  - sf(rep1Prime, m)|   (|-a - -b| = |a - b|)
+                --     < epsilon                              (the original ε-bound)
+                calc abs(
+                         CauchyRationalSequence.sequenceFunction(
+                             CauchyRationalSequence.negate(rep1), m)
+                         - CauchyRationalSequence.sequenceFunction(
+                             CauchyRationalSequence.negate(rep1Prime), m))
+                   = abs(-CauchyRationalSequence.sequenceFunction(rep1, m)
+                         - CauchyRationalSequence.sequenceFunction(
+                               CauchyRationalSequence.negate(rep1Prime), m))
+                       by CauchyRationalSequence.sequenceFunction_negate(rep1, m)
+                   = abs(-CauchyRationalSequence.sequenceFunction(rep1, m)
+                         - -CauchyRationalSequence.sequenceFunction(rep1Prime, m))
+                       by CauchyRationalSequence.sequenceFunction_negate(rep1Prime, m)
+                   = abs(CauchyRationalSequence.sequenceFunction(rep1, m)
+                         - CauchyRationalSequence.sequenceFunction(rep1Prime, m))
+                       by Rational.absolute_value_of_subtract_of_negates(
+                              CauchyRationalSequence.sequenceFunction(rep1, m),
+                              CauchyRationalSequence.sequenceFunction(rep1Prime, m))
+                   < epsilon
+                       by origAtN(m, N_leq_m)
         } : ∃ (N : Natural).
               (m : Natural) → N ≤ m →
                 abs(

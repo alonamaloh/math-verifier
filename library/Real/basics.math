@@ -66,10 +66,9 @@ theorem CauchyEquivalent.reflexive
                (epsilonPositive : Rational.zero < epsilon) =>
         witness zero with
             function (m : Natural) (_ : zero ≤ m) =>
-              rewrite(
-                  Equality.symmetry(
-                      Rational.absolute_value_subtract_self(s(m))),
-                  epsilonPositive)
+              calc abs(s(m) - s(m))
+                 = Rational.zero   by Rational.absolute_value_subtract_self(s(m))
+                 < epsilon         by epsilonPositive
 
 -- CauchyEquivalent is symmetric. Use the abstract
 -- `sequenceFunction(...)` projector everywhere rather than
@@ -84,11 +83,17 @@ theorem CauchyEquivalent.symmetric
     obtain ⟨N, aEquivb_at_N⟩ from aEquivb(epsilon, epsilonPositive);
     witness N with
         function (m : Natural) (N_leq_m : N ≤ m) =>
-          rewrite(
-              Rational.absolute_value_subtract_swap(
-                  CauchyRationalSequence.sequenceFunction(a, m),
-                  CauchyRationalSequence.sequenceFunction(b, m)),
-              aEquivb_at_N(m, N_leq_m))
+          calc abs(
+                   CauchyRationalSequence.sequenceFunction(b, m)
+                   - CauchyRationalSequence.sequenceFunction(a, m))
+             = abs(
+                   CauchyRationalSequence.sequenceFunction(a, m)
+                   - CauchyRationalSequence.sequenceFunction(b, m))
+                 by Rational.absolute_value_subtract_swap(
+                        CauchyRationalSequence.sequenceFunction(b, m),
+                        CauchyRationalSequence.sequenceFunction(a, m))
+             < epsilon
+                 by aEquivb_at_N(m, N_leq_m)
   }
 
 -- Algebra helper: (a - b) + (b - c) = a - c.
@@ -112,50 +117,34 @@ theorem CauchyEquivalent.transitive
                      Rational.halve_positive(epsilon, epsilonPositive));
     witness Natural.maximum(N_ab, N_bc) with
         function (m : Natural)
-                 (m_ge_max : Natural.maximum(N_ab, N_bc) ≤ m) =>
-          Rational.LessThan.transitive_left(
-              abs(
-                  CauchyRationalSequence.sequenceFunction(a, m)
-                  - CauchyRationalSequence.sequenceFunction(c, m)),
-              abs(
-                  CauchyRationalSequence.sequenceFunction(a, m)
-                  - CauchyRationalSequence.sequenceFunction(b, m))
-                  + abs(
-                        CauchyRationalSequence.sequenceFunction(b, m)
-                        - CauchyRationalSequence.sequenceFunction(c, m)),
-              epsilon,
-              -- Step 1: ≤ via triangle + subtract_chain.
-              rewrite(
-                  congruenceOf(
-                      Rational.absolute_value,
-                      Rational.subtract_chain(
-                          CauchyRationalSequence.sequenceFunction(a, m),
-                          CauchyRationalSequence.sequenceFunction(b, m),
-                          CauchyRationalSequence.sequenceFunction(c, m))),
-                  Rational.triangle_inequality(
-                      CauchyRationalSequence.sequenceFunction(a, m)
-                      - CauchyRationalSequence.sequenceFunction(b, m),
-                      CauchyRationalSequence.sequenceFunction(b, m)
-                      - CauchyRationalSequence.sequenceFunction(c, m))),
-              -- Step 2: < via add_strict_strict + halve_doubled.
-              rewrite(
-                  Rational.halve_doubled(epsilon),
-                  Rational.LessThan.add_strict_strict(
-                      abs(
-                          CauchyRationalSequence.sequenceFunction(a, m)
-                          - CauchyRationalSequence.sequenceFunction(b, m)),
-                      abs(
-                          CauchyRationalSequence.sequenceFunction(b, m)
-                          - CauchyRationalSequence.sequenceFunction(c, m)),
-                      Rational.halve(epsilon),
-                      abBound(m,
-                          LessOrEqual.transitive(
-                              N_ab, Natural.maximum(N_ab, N_bc), m,
-                              m_ge_max,
-                              Natural.left_le_max(N_ab, N_bc))),
-                      bcBound(m,
-                          LessOrEqual.transitive(
-                              N_bc, Natural.maximum(N_ab, N_bc), m,
-                              m_ge_max,
-                              Natural.right_le_max(N_ab, N_bc))))))
+                 (m_ge_max : Natural.maximum(N_ab, N_bc) ≤ m) => {
+          let sa : Rational := CauchyRationalSequence.sequenceFunction(a, m);
+          let sb : Rational := CauchyRationalSequence.sequenceFunction(b, m);
+          let sc : Rational := CauchyRationalSequence.sequenceFunction(c, m);
+          claim abBoundAtM : abs(sa - sb) < Rational.halve(epsilon)
+              by abBound(m,
+                     LessOrEqual.transitive(
+                         N_ab, Natural.maximum(N_ab, N_bc), m,
+                         m_ge_max,
+                         Natural.left_le_max(N_ab, N_bc)));
+          claim bcBoundAtM : abs(sb - sc) < Rational.halve(epsilon)
+              by bcBound(m,
+                     LessOrEqual.transitive(
+                         N_bc, Natural.maximum(N_ab, N_bc), m,
+                         m_ge_max,
+                         Natural.right_le_max(N_ab, N_bc)));
+          -- |a-c| = |(a-b)+(b-c)| ≤ |a-b|+|b-c| < ε/2 + ε/2 = ε.
+          calc abs(sa - sc)
+             = abs((sa - sb) + (sb - sc))
+                 by Equality.symmetry(Rational.subtract_chain(sa, sb, sc))
+             ≤ abs(sa - sb) + abs(sb - sc)
+                 by Rational.triangle_inequality(sa - sb, sb - sc)
+             < Rational.halve(epsilon) + Rational.halve(epsilon)
+                 by Rational.LessThan.add_strict_strict(
+                        abs(sa - sb), abs(sb - sc),
+                        Rational.halve(epsilon),
+                        abBoundAtM, bcBoundAtM)
+             = epsilon
+                 by Rational.halve_doubled(epsilon)
+        }
   }

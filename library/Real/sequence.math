@@ -28,6 +28,7 @@ import Rational.multiplication
 import Rational.negation
 import Rational.ring
 import Rational.order
+import Rational.order_arithmetic
 import Rational.absolute_value
 
 -- A sequence of Rationals: a function ℕ → ℚ.
@@ -82,11 +83,9 @@ theorem Rational.sequence.negate_is_cauchy
     witness N with
         function (m : Natural) (N_leq_m : N ≤ m)
                  (n : Natural) (N_leq_n : N ≤ n) =>
-          rewrite(
-              Equality.symmetry(
-                  Rational.absolute_value_of_subtract_of_negates(
-                      s(m), s(n))),
-              sCauchy_at_N(m, N_leq_m, n, N_leq_n))
+          calc abs(-s(m) - -s(n))
+             = abs(s(m) - s(n))   by Rational.absolute_value_of_subtract_of_negates(s(m), s(n))
+             < epsilon            by sCauchy_at_N(m, N_leq_m, n, N_leq_n)
   }
 
 -- Constant sequence is Cauchy: |q - q| = 0 < ε.
@@ -96,10 +95,9 @@ theorem Rational.sequence.constant_is_cauchy (q : Rational)
     witness 0 with
         function (m : Natural) (_ : 0 ≤ m)
                  (n : Natural) (_ : 0 ≤ n) =>
-          rewrite(
-              Equality.symmetry(
-                  Rational.absolute_value_subtract_self(q)),
-              epsilonPositive)
+          calc abs(q - q)
+             = Rational.zero   by Rational.absolute_value_subtract_self(q)
+             < epsilon         by epsilonPositive
 
 -- Constant sequence converges to its constant value. Same shape.
 theorem Rational.sequence.constant_converges_to_itself (q : Rational)
@@ -108,7 +106,6 @@ theorem Rational.sequence.constant_converges_to_itself (q : Rational)
   function (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) =>
     witness 0 with
         function (m : Natural) (_ : 0 ≤ m) =>
-          rewrite(
-              Equality.symmetry(
-                  Rational.absolute_value_subtract_self(q)),
-              epsilonPositive)
+          calc abs(q - q)
+             = Rational.zero   by Rational.absolute_value_subtract_self(q)
+             < epsilon         by epsilonPositive

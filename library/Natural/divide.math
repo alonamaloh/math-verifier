@@ -514,20 +514,20 @@ theorem Natural.modulo_step_at_multiple
                --   = modulo_step(f, d, monus(d + d*q', d))
                --   = modulo_step(f, d, d * q')   (via monus_add_cancel)
                --   = 0 (by IH on q' with f ≥ q').
-               rewrite(
-                   Equality.symmetry(Natural.multiply_successor(d, q')),
-                   calc Natural.modulo_step(successor(f), d, d + d * q')
-                      = Natural.modulo_step(f, d, Natural.monus(d + d * q', d))
-                            by Natural.modulo_step_succ_fits(
-                                   f, d, d + d * q',
-                                   Natural.monus_self_plus(d, d * q'))
-                      = Natural.modulo_step(f, d, d * q')
-                      = 0
-                            by Natural.modulo_step_at_multiple(
-                                   q', f, d, dPositive,
-                                   Natural.less_or_equal_successor_successor_descend(
-                                       successor(q'), successor(f),
-                                       refinedQLeSuccFuel)))
+               calc Natural.modulo_step(successor(f), d, d * successor(q'))
+                  = Natural.modulo_step(successor(f), d, d + d * q')
+                        by Natural.multiply_successor(d, q')
+                  = Natural.modulo_step(f, d, Natural.monus(d + d * q', d))
+                        by Natural.modulo_step_succ_fits(
+                               f, d, d + d * q',
+                               Natural.monus_self_plus(d, d * q'))
+                  = Natural.modulo_step(f, d, d * q')
+                  = 0
+                        by Natural.modulo_step_at_multiple(
+                               q', f, d, dPositive,
+                               Natural.less_or_equal_successor_successor_descend(
+                                   successor(q'), successor(f),
+                                   refinedQLeSuccFuel))
        } : (refinedQLeSuccFuel : successor(successor(q')) ≤ successor(fuel))
            → Natural.modulo_step(fuel, d, d * successor(q')) = 0)(succQLeSuccFuel)
 
@@ -551,27 +551,25 @@ theorem Natural.divides_implies_modulo_zero
                 Natural.successor_less_or_equal_successor(
                     q, divisor * q,
                     -- q ≤ divisor * q for divisor ≥ 1.
-                    rewrite(
-                        Natural.one_multiply(q),
-                        -- successor(zero) * q ≤ divisor * q via multiply_le_preserves.
-                        -- Use add-style: divisor * q = q + (divisor - 1) * q.
-                        rewrite(
-                            -- 1 * q + (d - 1) * q = d * q.
-                            calc successor(0) * q
-                                     + Natural.monus(divisor, successor(0)) * q
-                               = (successor(0)
-                                  + Natural.monus(divisor, successor(0))) * q
-                               = divisor * q
-                                      -- 1 + monus(d, 1) = d (since d ≥ 1).
-                                      by Equality.symmetry(
-                                             Natural.monus_zero_implies_decompose(
-                                                 successor(0), divisor,
-                                                 Natural.le_implies_monus_zero(
-                                                     divisor, successor(0),
-                                                     divisorPositive))),
-                            Natural.less_or_equal_add_right(
-                                successor(0) * q,
-                                Natural.monus(divisor, successor(0)) * q))))))
+                    -- Chain: q = 1*q ≤ 1*q + monus(d,1)*q = (1 + monus(d,1))*q = d*q.
+                    calc q
+                       = successor(0) * q
+                              by Equality.symmetry(Natural.one_multiply(q))
+                       ≤ successor(0) * q
+                             + Natural.monus(divisor, successor(0)) * q
+                              by Natural.less_or_equal_add_right(
+                                     successor(0) * q,
+                                     Natural.monus(divisor, successor(0)) * q)
+                       = (successor(0)
+                          + Natural.monus(divisor, successor(0))) * q
+                       = divisor * q
+                              -- 1 + monus(d, 1) = d (since d ≥ 1).
+                              by Equality.symmetry(
+                                     Natural.monus_zero_implies_decompose(
+                                         successor(0), divisor,
+                                         Natural.le_implies_monus_zero(
+                                             divisor, successor(0),
+                                             divisorPositive))))))
 }
 
 -- If modulo(d, n) = 0, then d divides n. The decomposition gives

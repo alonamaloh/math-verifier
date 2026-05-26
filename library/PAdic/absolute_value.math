@@ -1224,14 +1224,14 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
                   nx * ((1 + dy) : Integer)))
      = Natural.padic_valuation(p, (1 + kx) * (1 + dy))
      = Natural.padic_valuation(p, (1 + kx))
-         + Natural.padic_valuation(p, (1 + dy))                      as vAFormulaSucc;
+         + Natural.padic_valuation(p, (1 + dy));
   -- v_p(|B|_Nat) = v_p(succ(ky)) + v_p(succ(dx)).
   calc Natural.padic_valuation(
            p, Integer.absolute_value_natural(
                   ny * ((1 + dx) : Integer)))
      = Natural.padic_valuation(p, (1 + ky) * (1 + dx))
      = Natural.padic_valuation(p, (1 + ky))
-         + Natural.padic_valuation(p, (1 + dx))                      as vBFormulaSucc;
+         + Natural.padic_valuation(p, (1 + dx));
   -- v_p(|A|_Nat) ≤ v_p(|B|_Nat), from vALeqVB via the formula bridges.
   claim valuationLe
         : Natural.padic_valuation(
@@ -1240,8 +1240,17 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
           ≤ Natural.padic_valuation(
                 p, Integer.absolute_value_natural(
                        ny * ((1 + dx) : Integer)))
-    by rewrite(Equality.symmetry(vBFormulaSucc),
-               rewrite(Equality.symmetry(vAFormulaSucc), vALeqVB));
+    by calc Natural.padic_valuation(
+                p, Integer.absolute_value_natural(
+                       nx * ((1 + dy) : Integer)))
+          = Natural.padic_valuation(p, (1 + kx))
+              + Natural.padic_valuation(p, (1 + dy))
+          ≤ Natural.padic_valuation(p, (1 + ky))
+              + Natural.padic_valuation(p, (1 + dx))
+                by vALeqVB
+          = Natural.padic_valuation(
+                p, Integer.absolute_value_natural(
+                       ny * ((1 + dx) : Integer)));
   -- Ultrametric: v_p(|A|) ≤ v_p(|A+B|).
   claim ultraIneq
         : Natural.padic_valuation(
@@ -1257,19 +1266,27 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
            ny * ((1 + dx) : Integer),
            sumAbsPositive, valuationLe);
   -- v_p(|sum|_Nat) = v_p(succ(kSum)) via eqAbsSum + congruenceOf.
-  claim vSumIsVKSum
-        : Natural.padic_valuation(
-              p, Integer.absolute_value_natural(
-                     nx * ((1 + dy) : Integer)
-                     + ny * ((1 + dx) : Integer)))
-          = Natural.padic_valuation(p, (1 + kSum))
-    by eqAbsSum;
+  claim Natural.padic_valuation(
+            p, Integer.absolute_value_natural(
+                   nx * ((1 + dy) : Integer)
+                   + ny * ((1 + dx) : Integer)))
+        = Natural.padic_valuation(p, (1 + kSum));
   -- Combine: v_p(succ(kx)) + v_p(succ(dy)) ≤ v_p(succ(kSum)).
   claim vASumLeVKSum
         : Natural.padic_valuation(p, (1 + kx))
             + Natural.padic_valuation(p, (1 + dy))
           ≤ Natural.padic_valuation(p, (1 + kSum))
-    by rewrite(vSumIsVKSum, rewrite(vAFormulaSucc, ultraIneq));
+    by calc Natural.padic_valuation(p, (1 + kx))
+              + Natural.padic_valuation(p, (1 + dy))
+          = Natural.padic_valuation(
+                p, Integer.absolute_value_natural(
+                       nx * ((1 + dy) : Integer)))
+          ≤ Natural.padic_valuation(
+                p, Integer.absolute_value_natural(
+                       nx * ((1 + dy) : Integer)
+                       + ny * ((1 + dx) : Integer)))
+                by ultraIneq
+          = Natural.padic_valuation(p, (1 + kSum));
   -- v_p(succ(dy + dx · succ(dy))) = v_p(succ(dx)) + v_p(succ(dy)).
   -- This uses padic_valuation_multiplicative on succ(dx) and succ(dy),
   -- whose product is definitionally succ(dy + dx · succ(dy)).
@@ -1324,19 +1341,18 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
            Natural.padic_valuation(p, (1 + kx)),
            exponentLe);
   -- Bridge LHS: padic_av(x+y) = mk(make((p^... : Int), ...)).
-  claim lhsForm
-        : Rational.padic_absolute_value(
-              p, primality,
-              (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
-              + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational))
-          = Quotient.mk(RationalRepresentative.make(
-                    (Natural.power(
-                         Natural.padic_valuation(p, (1 + dy + dx * (1 + dy))), p)
-                         : Integer),
-                    Natural.monus(
-                        Natural.power(
-                            Natural.padic_valuation(p, (1 + kSum)), p),
-                        1)))
+  claim Rational.padic_absolute_value(
+            p, primality,
+            (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
+            + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational))
+        = Quotient.mk(RationalRepresentative.make(
+                  (Natural.power(
+                       Natural.padic_valuation(p, (1 + dy + dx * (1 + dy))), p)
+                       : Integer),
+                  Natural.monus(
+                      Natural.power(
+                          Natural.padic_valuation(p, (1 + kSum)), p),
+                      1)))
     by Rational.padic_absolute_value_at_succ(
            p,
            nx * ((1 + dy) : Integer)
@@ -1344,18 +1360,17 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
            dy + dx * (1 + dy),
            kSum, eqAbsSum);
   -- Bridge RHS: |x|_p = mk(make((p^... : Int), ...)).
-  claim rhsXForm
-        : Rational.padic_absolute_value(
-              p, primality,
-              Quotient.mk(RationalRepresentative.make(nx, dx)))
-          = Quotient.mk(RationalRepresentative.make(
-                    (Natural.power(
-                         Natural.padic_valuation(p, (1 + dx)), p)
-                         : Integer),
-                    Natural.monus(
-                        Natural.power(
-                            Natural.padic_valuation(p, (1 + kx)), p),
-                        1)))
+  claim Rational.padic_absolute_value(
+            p, primality,
+            Quotient.mk(RationalRepresentative.make(nx, dx)))
+        = Quotient.mk(RationalRepresentative.make(
+                  (Natural.power(
+                       Natural.padic_valuation(p, (1 + dx)), p)
+                       : Integer),
+                  Natural.monus(
+                      Natural.power(
+                          Natural.padic_valuation(p, (1 + kx)), p),
+                      1)))
     by Rational.padic_absolute_value_at_succ(p, nx, dx, kx, eqAbsNx);
   -- Transport helperAResult to: padic_av(x+y) ≤ |x|_p.
   claim padicAvSumLeX
@@ -1366,8 +1381,30 @@ theorem Rational.padic_absolute_value_triangle_at_reps_wlog_case_a
           ≤ Rational.padic_absolute_value(
                 p, primality,
                 Quotient.mk(RationalRepresentative.make(nx, dx)))
-    by rewrite(Equality.symmetry(lhsForm),
-           rewrite(Equality.symmetry(rhsXForm), helperAResult));
+    by calc Rational.padic_absolute_value(
+                p, primality,
+                (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
+                + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational))
+          = Quotient.mk(RationalRepresentative.make(
+                    (Natural.power(
+                         Natural.padic_valuation(p, (1 + dy + dx * (1 + dy))), p)
+                         : Integer),
+                    Natural.monus(
+                        Natural.power(
+                            Natural.padic_valuation(p, (1 + kSum)), p),
+                        1)))
+          ≤ Quotient.mk(RationalRepresentative.make(
+                    (Natural.power(
+                         Natural.padic_valuation(p, (1 + dx)), p)
+                         : Integer),
+                    Natural.monus(
+                        Natural.power(
+                            Natural.padic_valuation(p, (1 + kx)), p),
+                        1)))
+                by helperAResult
+          = Rational.padic_absolute_value(
+                p, primality,
+                Quotient.mk(RationalRepresentative.make(nx, dx)));
   -- |y|_p ≥ 0.
   claim padicAvYNonneg
         : Rational.zero
@@ -1481,40 +1518,43 @@ theorem Rational.padic_absolute_value_triangle_at_reps_when_all_succ
                eqAbsNy, eqAbsNx, eqAbsSumSwapped, vBLevA);
       -- Transport via add_commutative on both sides:
       --   y + x = x + y, |y|_p + |x|_p = |x|_p + |y|_p.
-      claim sumSwap
-            : (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational)
-                + Quotient.mk(RationalRepresentative.make(nx, dx))
-              = Quotient.mk(RationalRepresentative.make(nx, dx))
-                  + Quotient.mk(RationalRepresentative.make(ny, dy))
-        by Rational.add_commutative(
-               Quotient.mk(RationalRepresentative.make(ny, dy)),
-               Quotient.mk(RationalRepresentative.make(nx, dx)));
-      claim rhsSwap
-            : Rational.padic_absolute_value(
-                  p, primality,
-                  Quotient.mk(RationalRepresentative.make(ny, dy)))
-                + Rational.padic_absolute_value(
-                      p, primality,
-                      Quotient.mk(RationalRepresentative.make(nx, dx)))
-              = Rational.padic_absolute_value(
+      claim (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational)
+              + Quotient.mk(RationalRepresentative.make(nx, dx))
+            = Quotient.mk(RationalRepresentative.make(nx, dx))
+                + Quotient.mk(RationalRepresentative.make(ny, dy));
+      claim Rational.padic_absolute_value(
+                p, primality,
+                Quotient.mk(RationalRepresentative.make(ny, dy)))
+              + Rational.padic_absolute_value(
                     p, primality,
                     Quotient.mk(RationalRepresentative.make(nx, dx)))
-                  + Rational.padic_absolute_value(
-                        p, primality,
-                        Quotient.mk(RationalRepresentative.make(ny, dy)))
-        by Rational.add_commutative(
-               Rational.padic_absolute_value(
+            = Rational.padic_absolute_value(
+                  p, primality,
+                  Quotient.mk(RationalRepresentative.make(nx, dx)))
+                + Rational.padic_absolute_value(
+                      p, primality,
+                      Quotient.mk(RationalRepresentative.make(ny, dy)));
+      calc Rational.padic_absolute_value(
+               p, primality,
+               (Quotient.mk(RationalRepresentative.make(nx, dx)) : Rational)
+               + (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational))
+         = Rational.padic_absolute_value(
+               p, primality,
+               (Quotient.mk(RationalRepresentative.make(ny, dy)) : Rational)
+               + Quotient.mk(RationalRepresentative.make(nx, dx)))
+         ≤ Rational.padic_absolute_value(
+               p, primality,
+               Quotient.mk(RationalRepresentative.make(ny, dy)))
+             + Rational.padic_absolute_value(
                    p, primality,
-                   Quotient.mk(RationalRepresentative.make(ny, dy))),
-               Rational.padic_absolute_value(
+                   Quotient.mk(RationalRepresentative.make(nx, dx)))
+               by swappedResult
+         = Rational.padic_absolute_value(
+               p, primality,
+               Quotient.mk(RationalRepresentative.make(nx, dx)))
+             + Rational.padic_absolute_value(
                    p, primality,
-                   Quotient.mk(RationalRepresentative.make(nx, dx))));
-      rewrite(
-          congruenceOf(
-              function (m : Rational) =>
-                  Rational.padic_absolute_value(p, primality, m),
-              sumSwap),
-          rewrite(rhsSwap, swappedResult))
+                   Quotient.mk(RationalRepresentative.make(ny, dy)))
     }
   }
 

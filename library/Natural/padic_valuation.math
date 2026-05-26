@@ -732,6 +732,9 @@ theorem Natural.padic_valuation_power_divides
                                 successor(predQ),
                                 qDivResult);
                        -- Bridge: p * p^v_p(q) = p^(succ(v_p(q))) = p^v_p(p*q) = p^v_p(m).
+                       -- Outer transport keeps the explicit motive (it
+                       -- replaces m' in two positions); inner one collapses
+                       -- to a single `rewrite` since its motive uses v once.
                        Equality.transport_proposition(
                            function (m' : Natural) =>
                                Natural.divides(
@@ -741,16 +744,7 @@ theorem Natural.padic_valuation_power_divides
                                    m'),
                            prime * successor(predQ), m,
                            Equality.symmetry(refinedMEq),
-                           Equality.transport_proposition(
-                               function (v : Natural) =>
-                                   Natural.divides(
-                                       Natural.power(v, prime),
-                                       prime * successor(predQ)),
-                               successor(
-                                   Natural.padic_valuation(
-                                       prime, successor(predQ))),
-                               Natural.padic_valuation(
-                                   prime, prime * successor(predQ)),
+                           rewrite(
                                Equality.symmetry(valuationProduct),
                                -- power(succ(v_p(q)), p) = p * power(v_p(q), p)
                                -- via power_succ (was kernel ι; now an
@@ -768,12 +762,9 @@ theorem Natural.padic_valuation_power_divides
           in (prime ∤ m) as notDivM:
               -- v_p(m) = 0. p^0 = 1. 1 | m. With power opaque, the
               -- kernel won't reduce `power(0, prime)` to 1 — bridge
-              -- explicitly via power_zero so the transport's argument
+              -- explicitly via power_zero so the rewrite's argument
               -- has the expected `divides(power(0, prime), m)` shape.
-              Equality.transport_proposition(
-                  function (v : Natural) =>
-                      Natural.divides(Natural.power(v, prime), m),
-                  0, Natural.padic_valuation(prime, m),
+              rewrite(
                   Equality.symmetry(
                       Natural.padic_valuation_when_not_divides(
                           prime, m, notDivM)),
@@ -1261,15 +1252,25 @@ theorem Natural.divides_distance_sum
                 by rewrite(
                        Natural.distance_monus_when_le(a2, a1, a2LeA1),
                        dDividesDistanceA);
+              -- Chain monus → distance(a2+b2, a1+b1) → distance(a1+b1, a2+b2)
+              -- into a single equality, then rewrite the divides claim once.
+              claim distancesEqual
+                    : Natural.distance(Natural.monus(b2, b1),
+                                       Natural.monus(a1, a2))
+                      = Natural.distance(a1 + b1, a2 + b2)
+                by calc Natural.distance(Natural.monus(b2, b1),
+                                          Natural.monus(a1, a2))
+                     = Natural.distance(a2 + b2, a1 + b1)
+                          by Equality.symmetry(
+                                 Natural.distance_sum_cross_le_le(
+                                     a2, a1, b2, b1, a2LeA1, b1LeB2))
+                     = Natural.distance(a1 + b1, a2 + b2)
+                          by Natural.distance_symmetric(a2 + b2, a1 + b1);
               rewrite(
-                  Natural.distance_symmetric(a2 + b2, a1 + b1),
-                  rewrite(
-                      Equality.symmetry(
-                          Natural.distance_sum_cross_le_le(
-                              a2, a1, b2, b1, a2LeA1, b1LeB2)),
-                      Natural.divides_distance(
-                          d, Natural.monus(b2, b1), Natural.monus(a1, a2),
-                          dDividesMonusB2B1, dDividesMonusA1A2)))
+                  distancesEqual,
+                  Natural.divides_distance(
+                      d, Natural.monus(b2, b1), Natural.monus(a1, a2),
+                      dDividesMonusB2B1, dDividesMonusA1A2))
             }
           in (b2 ≤ b1) as b2LeB1: {
               -- Same direction (a2 ≤ a1, b2 ≤ b1). distance is in
@@ -1361,11 +1362,9 @@ theorem Natural.power_monotone_via_r
         (a p : Natural) (pPositive : successor(0) ≤ p)
         : (r : Natural) → Natural.power(a, p) ≤ Natural.power(a + r, p)
   | zero =>
-      Equality.transport_proposition(
-          function (m : Natural) => Natural.power(a, p) ≤ Natural.power(m, p),
-          a, a + 0,
-          Equality.symmetry(Natural.add_zero(a)),
-          LessOrEqual.reflexivity(Natural.power(a, p)))
+      calc Natural.power(a, p)
+         ≤ Natural.power(a, p)        by LessOrEqual.reflexivity(Natural.power(a, p))
+         = Natural.power(a + 0, p)    by Equality.symmetry(Natural.add_zero(a))
   | successor(r') => {
       -- IH: power(a, p) ≤ power(a + r', p).
       -- le_multiply… gives power(a + r', p) ≤ p * power(a + r', p).

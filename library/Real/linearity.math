@@ -102,20 +102,20 @@ theorem Real.cauchy_sign_eventually_positive_branch
                  cauchyAtM));
     -- Add sequence(signIndex) to both sides of the strict inequality:
     -- seq(signIndex) + (-lowerBound) < seq(signIndex) + (seq(m) -
-    -- seq(signIndex)) — and the RHS simplifies to seq(m) by ring.
+    -- seq(signIndex)) — and ring simplifies both sides.
     claim seqMLowerBound
           : sequence(signIndex) - lowerBound < sequence(m)
-      by rewrite(
-             (ring : sequence(signIndex) + (sequence(m) - sequence(signIndex))
-                     = sequence(m)),
-             rewrite(
-                 (ring : sequence(signIndex) + -lowerBound
-                         = sequence(signIndex) - lowerBound),
-                 Rational.add_left_preserves_LessThan(
-                     -lowerBound,
-                     sequence(m) - sequence(signIndex),
-                     sequence(signIndex),
-                     diffLowerBound)));
+      by calc sequence(signIndex) - lowerBound
+            = sequence(signIndex) + -lowerBound
+                by ring
+            < sequence(signIndex) + (sequence(m) - sequence(signIndex))
+                by Rational.add_left_preserves_LessThan(
+                       -lowerBound,
+                       sequence(m) - sequence(signIndex),
+                       sequence(signIndex),
+                       diffLowerBound)
+            = sequence(m)
+                by ring;
     -- seq(signIndex) - lowerBound ≥ 0 (from the hypothesis lowerBound
     -- ≤ seq(signIndex)).
     claim signIndexMinusBoundNonneg
@@ -141,9 +141,9 @@ theorem Real.cauchy_sign_eventually_positive_branch
                  Rational.zero, sequence(m), seqAtMPositive));
     -- |seq(m)| = seq(m), so the apartness bound becomes lowerBound ≤
     -- seq(m).
-    rewrite(
-        Rational.absolute_value_when_nonneg(sequence(m), seqAtMIsNonneg),
-        apartnessAtM)
+    calc lowerBound
+       ≤ abs(sequence(m))   by apartnessAtM
+       = sequence(m)        by Rational.absolute_value_when_nonneg(sequence(m), seqAtMIsNonneg)
   }
 
 -- Symmetric step lemma (negative branch). seq(signIndex) ≤ -lowerBound
@@ -232,10 +232,10 @@ theorem Real.cauchy_sign_eventually_negative_branch
              apartnessAtM);
     -- Negate both sides: -(-seq(m)) ≤ -lowerBound, i.e., seq(m) ≤
     -- -lowerBound (after the double-negate reduction).
-    rewrite(
-        Rational.negate_negate(sequence(m)),
-        Rational.LessOrEqual.negate(
-            lowerBound, -sequence(m), boundLeqNegSeq))
+    calc sequence(m)
+       = -(-sequence(m))   by Equality.symmetry(Rational.negate_negate(sequence(m)))
+       ≤ -lowerBound       by Rational.LessOrEqual.negate(
+                                  lowerBound, -sequence(m), boundLeqNegSeq)
   }
 
 -- ----------------------------------------------------------------------
