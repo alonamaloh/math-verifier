@@ -47,15 +47,15 @@ convention p : Natural with primality : Natural.is_prime(p)
 -- splitting through |q| - q and noting both nonneg components agree.
 
 -- At a Rational nonneg, q ≤ |q|. Provable via Quotient.induct + the
--- representative-level fact `Integer.IsNonneg(n) → Integer.absolute_value(n) = n`.
+-- representative-level fact `Integer.IsNonneg(n) → abs(n) = n`.
 
--- Bridge: Integer.absolute_value(n) = n when IsNonneg(n).
+-- Bridge: abs(n) = n when IsNonneg(n).
 theorem Integer.absolute_value_of_nonneg (n : Integer)
         (nNonneg : Integer.IsNonneg(n))
-        : Integer.absolute_value(n) = n := {
+        : abs(n) = n := {
     obtain ⟨k, nEqK⟩ from nNonneg;
-    calc Integer.absolute_value(n)
-       = Integer.absolute_value((k : Integer))
+    calc abs(n)
+       = abs((k : Integer))
        = (k : Integer)
        = n
 }
@@ -66,24 +66,24 @@ theorem Integer.absolute_value_of_nonneg (n : Integer)
 -- `|n| · succ(d) = n · succ(d)` (using Integer.absolute_value_of_nonneg).
 theorem Rational.absolute_value_of_nonneg (q : Rational)
         (qNonneg : Rational.IsNonneg(q))
-        : Rational.absolute_value(q) = q :=
+        : abs(q) = q :=
   Quotient.induct(
       function (y : Rational) =>
-          Rational.IsNonneg(y) → Rational.absolute_value(y) = y,
+          Rational.IsNonneg(y) → abs(y) = y,
       function (rep : RationalRepresentative) =>
         (cases rep {
            | RationalRepresentative.make(n, d) =>
                function (nIsNonneg : Integer.IsNonneg(n)) =>
                  Quotient.sound(
                      RationalRepresentative.make(
-                         Integer.absolute_value(n), d),
+                         abs(n), d),
                      RationalRepresentative.make(n, d),
                      congruenceOf(
                          function (m : Integer) =>
                              m * (successor(d) : Integer),
                          Integer.absolute_value_of_nonneg(n, nIsNonneg)))
          } : Rational.IsNonneg(Quotient.mk(rep))
-             → Rational.absolute_value(Quotient.mk(rep))
+             → abs((Quotient.mk(rep) : Rational))
                = Quotient.mk(rep)),
       q)(qNonneg)
 
