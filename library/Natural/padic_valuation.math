@@ -158,21 +158,18 @@ theorem Natural.divide_lt_when_divides
         (targetPositive : successor(0) ≤ target)
         (moduloZero : Natural.modulo(prime, target) = 0)
         : successor(Natural.divide(prime, target)) ≤ target := {
-  calc prime * Natural.divide(prime, target)
-     = prime * Natural.divide(prime, target) + 0
-     = prime * Natural.divide(prime, target)
-         + Natural.modulo(prime, target)
-     = target                                                as productEqTarget;
-  claim dividePositive : successor(0) ≤ Natural.divide(prime, target)
+  let div : Natural := Natural.divide(prime, target);
+  claim dividePositive : successor(0) ≤ div
     by Natural.divide_positive_when_divides(
            prime, target, targetPositive, moduloZero);
-  -- successor(divide) ≤ prime * divide  (since 2 ≤ prime, 1 ≤ divide).
-  -- Transport via productEqTarget : prime * divide = target.
-  rewrite(
-      productEqTarget,
-      Natural.successor_less_or_equal_multiply(
-          prime, Natural.divide(prime, target),
-          primeAtLeastTwo, dividePositive))
+  -- succ(div) ≤ prime * div (since 2 ≤ prime, 1 ≤ div);
+  -- prime * div + modulo = target with modulo = 0.
+  calc successor(div)
+     ≤ prime * div                                    by Natural.successor_less_or_equal_multiply(
+                                                             prime, div, primeAtLeastTwo, dividePositive)
+     = prime * div + 0
+     = prime * div + Natural.modulo(prime, target)
+     = target
 }
 
 -- ----------------------------------------------------------------------
@@ -400,32 +397,27 @@ theorem Natural.padic_valuation_strip
 -- ----------------------------------------------------------------------
 -- Multiplicativity of `padic_valuation`.
 
--- Small helper: if succ(d) ≤ a, then succ(d + b) ≤ a + b. Definitional
--- reductions of add on succ first arg make this a transport plus a
--- successor-step. Induction on b.
+-- Small helper: if succ(d) ≤ a, then succ(d + b) ≤ a + b. By
+-- induction on b. The base and step are each a 3-link mixed-relation
+-- calc: bridge each side through add_zero / add_successor, with the
+-- ≤ link supplied by the hypothesis (base) or by lifting the IH
+-- through successor_less_or_equal_successor (step).
 theorem Natural.successor_add_preserves_le
-        : (b a d : Natural)
-          → successor(d) ≤ a
-          → successor(d + b) ≤ a + b
-  | zero, a, d, succDLeA =>
-      rewrite(
-          Equality.symmetry(Natural.add_zero(a)),
-          rewrite(
-              Equality.symmetry(Natural.add_zero(d)),
-              succDLeA))
-  | successor(b'), a, d, succDLeA =>
-      -- IH on b' gives succ(d + b') ≤ a + b'. By successor_preserves,
-      -- succ(succ(d + b')) ≤ succ(a + b'). Then rewrite both sides via
-      -- add_successor symmetry to express in terms of succ(b').
-      rewrite(
-          Equality.symmetry(Natural.add_successor(a, b')),
-          rewrite(
-              congruenceOf(
-                  successor,
-                  Equality.symmetry(Natural.add_successor(d, b'))),
-              Natural.successor_less_or_equal_successor(
-                  successor(d + b'), a + b',
-                  Natural.successor_add_preserves_le(b', a, d, succDLeA))))
+        (b a d : Natural) (succDLeA : successor(d) ≤ a)
+        : successor(d + b) ≤ a + b :=
+  by_induction on b with IH {
+    case zero:
+        calc successor(d + 0)
+           = successor(d)
+           ≤ a                    by succDLeA
+           = a + 0
+    case successor(b'):
+        calc successor(d + successor(b'))
+           = successor(successor(d + b'))
+           ≤ successor(a + b')              by Natural.successor_less_or_equal_successor(
+                                                   successor(d + b'), a + b', IH)
+           = a + successor(b')
+  }
 
 -- Main theorem: v_p(a · b) = v_p(a) + v_p(b) for prime p, a ≥ 1, b ≥ 1.
 --
