@@ -117,6 +117,15 @@ public:
     // `--check-redundant-by` CLI flag.
     void setReportRedundantBy(bool flag) { reportRedundantBy_ = flag; }
 
+    // When true, the redundant-by check also fires on non-equality
+    // calc steps (≤/</≥/>). Off by default because for large files
+    // it can be expensive (the per-step lemma-index lookup iterates
+    // all environment declarations). Drives the
+    // `--check-redundant-by-non-eq` CLI flag.
+    void setReportRedundantByNonEq(bool flag) {
+        reportRedundantByNonEq_ = flag;
+    }
+
     // When true, after elaborating a calc chain, check each internal
     // step's endpoint to see whether the auto-prover could close the
     // combined step (prev-prev → next) without going through it. If
@@ -6214,15 +6223,30 @@ private:
             if (step.stepProof) {
                 stepProofKernel = elaborateExpression(
                     *step.stepProof, localBinders, stepRelationType);
-                if (reportRedundantBy_
-                    && step.relation == CalcRelation::Equality) {
+                bool checkThisStep = reportRedundantBy_
+                    && (step.relation == CalcRelation::Equality
+                        || reportRedundantByNonEq_);
+                if (checkThisStep) {
                     ExpressionPointer autoAttempt;
                     try {
-                        autoAttempt = autoProveCalcStep(
-                            localBinders, previousKernel, nextKernel,
-                            carrierType, carrierLevel,
-                            stepRelationType,
-                            step.line, step.column);
+                        if (step.relation == CalcRelation::Equality) {
+                            autoAttempt = autoProveCalcStep(
+                                localBinders, previousKernel, nextKernel,
+                                carrierType, carrierLevel,
+                                stepRelationType,
+                                step.line, step.column);
+                        } else {
+                            // Non-= step (≤/</≥/>): use only the cheap
+                            // pattern-matching path (tryContextFactMatch
+                            // does a spine-hash lookup over the
+                            // environment, then a bounded
+                            // autoFillHintForClaim per candidate). Still
+                            // expensive for large files — gated behind
+                            // --check-redundant-by-non-eq so default
+                            // builds don't pay the cost.
+                            autoAttempt = tryContextFactMatch(
+                                stepRelationType, localBinders, step.line);
+                        }
                     } catch (const ElaborateError&) {
                         autoAttempt = nullptr;
                     } catch (const TypeError&) {
@@ -6233,7 +6257,7 @@ private:
                             << ":" << step.line << ":" << step.column
                             << ": redundant `by` on calc step — "
                             "auto-prover closes it without help\n";
-                    } else {
+                    } else if (step.relation == CalcRelation::Equality) {
                         // Auto-prover couldn't close on its own, but
                         // maybe the user wrote `by congruenceOf(λ, L)`
                         // and `by L` alone would close via the diff-
@@ -19151,6 +19175,7 @@ private:
     std::vector<std::string>& importedModules_;
     std::string moduleName_;
     bool reportRedundantBy_ = false;
+    bool reportRedundantByNonEq_ = false;
     bool reportRedundantCalcSteps_ = false;
     std::string currentDeclarationName_;
     // Stack of expected types active on the current elaboration call
@@ -19251,9 +19276,11 @@ void elaborateModule(const SurfaceModule& module,
                      Environment& environment,
                      std::vector<std::string>& importedModules,
                      bool reportRedundantBy,
-                     bool reportRedundantCalcSteps) {
+                     bool reportRedundantCalcSteps,
+                     bool reportRedundantByNonEq) {
     Elaborator elaborator(environment, importedModules);
     elaborator.setReportRedundantBy(reportRedundantBy);
     elaborator.setReportRedundantCalcSteps(reportRedundantCalcSteps);
+    elaborator.setReportRedundantByNonEq(reportRedundantByNonEq);
     elaborator.runModule(module);
 }

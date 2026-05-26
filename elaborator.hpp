@@ -41,4 +41,5 @@ void elaborateModule(const SurfaceModule& module,
                      Environment& environment,
                      std::vector<std::string>& importedModules,
                      bool reportRedundantBy = false,
-                     bool reportRedundantCalcSteps = false);
+                     bool reportRedundantCalcSteps = false,
+                     bool reportRedundantByNonEq = false);
