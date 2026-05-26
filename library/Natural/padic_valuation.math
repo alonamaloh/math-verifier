@@ -733,8 +733,34 @@ theorem Natural.padic_valuation_power_divides
                                 qDivResult);
                        -- Bridge: p * p^v_p(q) = p^(succ(v_p(q))) = p^v_p(p*q) = p^v_p(m).
                        -- Outer transport keeps the explicit motive (it
-                       -- replaces m' in two positions); inner one collapses
-                       -- to a single `rewrite` since its motive uses v once.
+                       -- replaces m' in two positions); flatten the inner
+                       -- two rewrites into sequential `claim`s so the
+                       -- shape evolution is legible step-by-step.
+                       claim succPowerDivides
+                             : Natural.divides(
+                                   Natural.power(
+                                       successor(
+                                           Natural.padic_valuation(
+                                               prime, successor(predQ))),
+                                       prime),
+                                   prime * successor(predQ))
+                         by rewrite(
+                                Equality.symmetry(
+                                    Natural.power_succ(
+                                        Natural.padic_valuation(
+                                            prime, successor(predQ)),
+                                        prime)),
+                                shiftedDivides);
+                       claim valuationPowerDividesProduct
+                             : Natural.divides(
+                                   Natural.power(
+                                       Natural.padic_valuation(
+                                           prime, prime * successor(predQ)),
+                                       prime),
+                                   prime * successor(predQ))
+                         by rewrite(
+                                Equality.symmetry(valuationProduct),
+                                succPowerDivides);
                        Equality.transport_proposition(
                            function (m' : Natural) =>
                                Natural.divides(
@@ -744,18 +770,7 @@ theorem Natural.padic_valuation_power_divides
                                    m'),
                            prime * successor(predQ), m,
                            Equality.symmetry(refinedMEq),
-                           rewrite(
-                               Equality.symmetry(valuationProduct),
-                               -- power(succ(v_p(q)), p) = p * power(v_p(q), p)
-                               -- via power_succ (was kernel ι; now an
-                               -- explicit lemma since power is opaque).
-                               rewrite(
-                                   Equality.symmetry(
-                                       Natural.power_succ(
-                                           Natural.padic_valuation(
-                                               prime, successor(predQ)),
-                                           prime)),
-                                   shiftedDivides)))
+                           valuationPowerDividesProduct)
                    }
               }
           }
@@ -764,13 +779,18 @@ theorem Natural.padic_valuation_power_divides
               -- kernel won't reduce `power(0, prime)` to 1 — bridge
               -- explicitly via power_zero so the rewrite's argument
               -- has the expected `divides(power(0, prime), m)` shape.
-              rewrite(
-                  Equality.symmetry(
-                      Natural.padic_valuation_when_not_divides(
-                          prime, m, notDivM)),
-                  rewrite(
-                      Equality.symmetry(Natural.power_zero(prime)),
-                      Natural.one_divides(m)))
+              -- Flatten the two rewrites into sequential `claim`s.
+              {
+                claim powerZeroDivides : Natural.divides(Natural.power(0, prime), m)
+                  by rewrite(
+                         Equality.symmetry(Natural.power_zero(prime)),
+                         Natural.one_divides(m));
+                rewrite(
+                    Equality.symmetry(
+                        Natural.padic_valuation_when_not_divides(
+                            prime, m, notDivM)),
+                    powerZeroDivides)
+              }
         })
 
 -- p^j | p^k when j ≤ k. From j ≤ k get a witness r with k = j + r;
@@ -948,7 +968,9 @@ theorem Natural.padic_valuation_ultrametric_when_ge
         : Natural.padic_valuation(prime, b)
           ≤ Natural.padic_valuation(prime, a + b) := {
   claim sumCommuted : successor(0) ≤ b + a
-    by rewrite(Natural.add_commutative(a, b), sumPositive);
+    by calc successor(0)
+          ≤ a + b     by sumPositive
+          = b + a     by Natural.add_commutative(a, b);
   calc Natural.padic_valuation(prime, b)
      ≤ Natural.padic_valuation(prime, b + a)
         by Natural.padic_valuation_ultrametric_when_le(
@@ -1054,13 +1076,16 @@ theorem Natural.distance_monus_when_le
                -- distance(succ, succ) reduces (transparent) to
                -- distance(_, _); monus(succ, succ) needs the
                -- explicit monus_succ_succ bridge (opaque).
-               rewrite(
-                   Equality.symmetry(
-                       Natural.monus_succ_succ(predA, predB)),
-                   Natural.distance_monus_when_le(
-                       predB, predA,
-                       Natural.less_or_equal_successor_successor_descend(
-                           predB, predA, refinedLe)))
+               calc Natural.distance(successor(predA), successor(predB))
+                  = Natural.distance(predA, predB)
+                  = Natural.monus(predA, predB)
+                       by Natural.distance_monus_when_le(
+                              predB, predA,
+                              Natural.less_or_equal_successor_successor_descend(
+                                  predB, predA, refinedLe))
+                  = Natural.monus(successor(predA), successor(predB))
+                       by Equality.symmetry(
+                              Natural.monus_succ_succ(predA, predB))
        } : (refinedLe : successor(predB) ≤ a)
            → Natural.distance(a, successor(predB))
              = Natural.monus(a, successor(predB)))(succPredBLeA)

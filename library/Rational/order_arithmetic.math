@@ -285,19 +285,20 @@ theorem Rational.LessThan.transitive_left
     by Rational.LessThan.distinct(y, z, yLessThanZ);
   And.introduction(
       Rational.LessOrEqual.transitive(x, y, z, xLeqY, yLeqZ),
-      function (xEqualsZ : x = z) =>
+      function (xEqualsZ : x = z) => {
         -- y ≤ z = x, so y ≤ x. Combined with x ≤ y, antisymmetry gives
         -- x = y, then x = z gives y = z — contradicts yNotZ.
+        claim yLeqX : y ≤ x
+          by calc y
+                ≤ z   by yLeqZ
+                = x   by Equality.symmetry(xEqualsZ);
         yNotZ(
             calc y
-               = x
-                      by Equality.symmetry(
-                             Rational.LessOrEqual.antisymmetric(x, y,
-                                 xLeqY,
-                                 rewrite(
-                                     Equality.symmetry(xEqualsZ),
-                                     yLeqZ)))
-               = z))
+               = x   by Equality.symmetry(
+                            Rational.LessOrEqual.antisymmetric(x, y,
+                                xLeqY, yLeqX))
+               = z)
+      })
 }
 
 -- Strict-then-weak: x < y ∧ y ≤ z → x < z. Symmetric to the above.
@@ -311,15 +312,15 @@ theorem Rational.LessThan.transitive_right
     by Rational.LessThan.distinct(x, y, xLessThanY);
   And.introduction(
       Rational.LessOrEqual.transitive(x, y, z, xLeqY, yLeqZ),
-      function (xEqualsZ : x = z) =>
+      function (xEqualsZ : x = z) => {
         -- x ≤ y AND y ≤ z = x, so x ≤ y ≤ x. Antisymmetry: x = y.
         -- Contradicts xNotY.
-        xNotY(
-            Rational.LessOrEqual.antisymmetric(x, y,
-                xLeqY,
-                rewrite(
-                    Equality.symmetry(xEqualsZ),
-                    yLeqZ))))
+        claim yLeqX : y ≤ x
+          by calc y
+                ≤ z   by yLeqZ
+                = x   by Equality.symmetry(xEqualsZ);
+        xNotY(Rational.LessOrEqual.antisymmetric(x, y, xLeqY, yLeqX))
+      })
 }
 
 -- Additive monotonicity (weak): x ≤ y → x + z ≤ y + z. Since

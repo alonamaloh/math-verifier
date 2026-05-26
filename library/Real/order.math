@@ -97,11 +97,16 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
                       CauchyRationalSequence.sequenceFunction(b, m)
                       - CauchyRationalSequence.sequenceFunction(a, m))
                   < Rational.halve(epsilon)
-            by rewrite(
-                   Rational.absolute_value_subtract_swap(
-                       CauchyRationalSequence.sequenceFunction(a, m),
-                       CauchyRationalSequence.sequenceFunction(b, m)),
-                   eqBoundAtM);
+            by calc abs(
+                       CauchyRationalSequence.sequenceFunction(b, m)
+                       - CauchyRationalSequence.sequenceFunction(a, m))
+                  = abs(
+                        CauchyRationalSequence.sequenceFunction(a, m)
+                        - CauchyRationalSequence.sequenceFunction(b, m))
+                      by Rational.absolute_value_subtract_swap(
+                             CauchyRationalSequence.sequenceFunction(b, m),
+                             CauchyRationalSequence.sequenceFunction(a, m))
+                  < Rational.halve(epsilon)   by eqBoundAtM;
           -- Extract the lower bound: -(ε/2) < sf(b, m) - sf(a, m).
           claim swappedDelta
                 : -Rational.halve(epsilon)
@@ -384,13 +389,9 @@ theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
                    s(m), epsilon, sLowerAtM, sUpperAtM);
           -- Final step: |s(m) - 0| = |s(m)| < ε. s(m) - 0 = s(m) by
           -- add_zero applied to (s(m) + -0) (definition of subtract).
-          rewrite(
-              congruenceOf(
-                  Rational.absolute_value,
-                  Equality.symmetry(
-                      calc s(m) - Rational.zero
-                         = s(m))),
-              absBound)
+          calc abs(s(m) - Rational.zero)
+             = abs(s(m))   by (calc s(m) - Rational.zero = s(m))
+             < epsilon     by absBound
         }
   }
 
@@ -549,9 +550,9 @@ theorem Real.LessThan.add_strict_strict
                 Real.LessOrEqual.antisymmetric(a + b, c + b,
                     Real.LessThan.weaken(a + b, c + b, leftStep),
                     -- c + b ≤ c + d = a + b.
-                    rewrite(
-                        Equality.symmetry(sumEqual),
-                        Real.LessThan.weaken(c + b, c + d, rightStep))))))
+                    (calc c + b
+                        ≤ c + d   by Real.LessThan.weaken(c + b, c + d, rightStep)
+                        = a + b   by Equality.symmetry(sumEqual))))))
 }
 
 -- Real.LessThan.transitive_left: x ≤ y, y < z → x < z.
@@ -570,9 +571,9 @@ theorem Real.LessThan.transitive_left
                = x       by Equality.symmetry(
                                 Real.LessOrEqual.antisymmetric(x, y,
                                     xLeqY,
-                                    rewrite(
-                                        Equality.symmetry(xEqualsZ),
-                                        Real.LessThan.weaken(y, z, yLessThanZ))))
+                                    (calc y
+                                        ≤ z   by Real.LessThan.weaken(y, z, yLessThanZ)
+                                        = x   by Equality.symmetry(xEqualsZ))))
                = z))
 
 -- Real.LessThan.transitive_right: x < y, y ≤ z → x < z.
@@ -587,6 +588,6 @@ theorem Real.LessThan.transitive_right
         Real.LessThan.distinct(x, y, xLessThanY)(
             Real.LessOrEqual.antisymmetric(x, y,
                 Real.LessThan.weaken(x, y, xLessThanY),
-                rewrite(
-                    Equality.symmetry(xEqualsZ),
-                    yLeqZ))))
+                (calc y
+                    ≤ z   by yLeqZ
+                    = x   by Equality.symmetry(xEqualsZ)))))
