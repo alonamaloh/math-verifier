@@ -9591,6 +9591,15 @@ private:
             return polynomial;
         }
         // Otherwise: an opaque atom.
+        // (Carrier-embedded Natural literals like `(2 : Integer)`
+        // currently fall through to this atom case. Recognising them
+        // as poly[{}: 2] is easy and was prototyped, but invoking it
+        // for `(2 : Integer) * x = x + x` runs into a separate
+        // proveMultiplyMerge limitation: `Integer.one * x` doesn't
+        // collapse to `x`, so the distributed `one * x + one * x`
+        // can't merge with `x + x`. Future work: extend
+        // proveMultiplyMerge to drop `1 *` prefixes via
+        // multiply_one_left, then literal recognition lands cleanly.)
         return ringPolynomialAtom(context, expression);
     }
 
