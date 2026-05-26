@@ -17166,15 +17166,32 @@ private:
             "overload '" + aliasName + "' resolution at line "
             + std::to_string(line));
         // Elaborate arguments and infer their head-type names.
+        // When the argument surface is a SurfaceAscription
+        // `(expr : T)`, derive the head name from T directly rather
+        // than from inferType on the elaborated kernel term. The
+        // ascription is the user's explicit label, and inferType
+        // unfolds carrier aliases (e.g. `Real` -> `Quotient(...)`),
+        // which would lose the label needed to pick the carrier-
+        // specific overload. Concretely: `abs((Quotient.mk(rep) :
+        // Real))` would otherwise match the Quotient head (no
+        // candidate) instead of Real.
         std::vector<ExpressionPointer> argumentKernels;
         std::vector<std::string> argumentTypeNames;
         for (const auto& argumentSurface : argumentSurfaces) {
             ExpressionPointer argumentKernel =
                 elaborateExpression(*argumentSurface, localBinders);
             argumentKernels.push_back(argumentKernel);
-            ExpressionPointer argumentTypeRaw =
-                inferTypeInLocalContext(localBinders, argumentKernel);
-            std::string typeName = headConstantName(argumentTypeRaw);
+            std::string typeName;
+            if (auto* ascription = std::get_if<SurfaceAscription>(
+                    &argumentSurface->node)) {
+                ExpressionPointer ascribedType = elaborateExpression(
+                    *ascription->type, localBinders);
+                typeName = headConstantName(ascribedType);
+            } else {
+                ExpressionPointer argumentTypeRaw =
+                    inferTypeInLocalContext(localBinders, argumentKernel);
+                typeName = headConstantName(argumentTypeRaw);
+            }
             argumentTypeNames.push_back(std::move(typeName));
         }
         // Find candidates whose first N parameter-type names match.
