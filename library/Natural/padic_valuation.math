@@ -1220,31 +1220,47 @@ theorem Natural.divides_distance_sum
                       Natural.distance(b1, b2),
                       dDividesDistanceA, dDividesDistanceB))
             }
-          in (b2 ≤ b1) as b2LeB1:
-              -- Cross direction (a1 ≤ a2, b2 ≤ b1). distance(a1+b1, a2+b2)
-              -- = distance(monus(b1, b2), monus(a2, a1)). Then divides_distance.
+          in (b2 ≤ b1) as b2LeB1: {
+              -- Cross direction (a1 ≤ a2, b2 ≤ b1). The monus forms
+              -- of each divides hypothesis combine via
+              -- divides_distance, then the chain
+              -- distance(a1+b1, a2+b2) = distance(monus(b1,b2),
+              -- monus(a2,a1)) (cross-le-le) bridges to the goal.
+              claim dDividesMonusB1B2 : d ∣ Natural.monus(b1, b2)
+                by rewrite(
+                       Natural.distance_monus_when_le(b2, b1, b2LeB1),
+                       dDividesDistanceB);
+              claim dDividesMonusA2A1 : d ∣ Natural.monus(a2, a1)
+                by rewrite(
+                       Natural.distance_monus_when_ge(a1, a2, a1LeA2),
+                       dDividesDistanceA);
               rewrite(
                   Equality.symmetry(
                       Natural.distance_sum_cross_le_le(
                           a1, a2, b1, b2, a1LeA2, b2LeB1)),
                   Natural.divides_distance(
                       d, Natural.monus(b1, b2), Natural.monus(a2, a1),
-                      rewrite(
-                          Natural.distance_monus_when_le(b2, b1, b2LeB1),
-                          dDividesDistanceB),
-                      rewrite(
-                          Natural.distance_monus_when_ge(a1, a2, a1LeA2),
-                          dDividesDistanceA)))
+                      dDividesMonusB1B2, dDividesMonusA2A1))
+            }
         }
         }
     in (a2 ≤ a1) as a2LeA1:
         {
         claim (b1 ≤ b2) ∨ (b2 ≤ b1)
         claim by cases {
-          in (b1 ≤ b2) as b1LeB2:
-              -- Cross direction (a2 ≤ a1, b1 ≤ b2). Symmetric to AB case.
-              -- distance(a1+b1, a2+b2) = distance(a2+b2, a1+b1) by symmetry.
-              -- = distance(monus(b2, b1), monus(a1, a2)).
+          in (b1 ≤ b2) as b1LeB2: {
+              -- Cross direction (a2 ≤ a1, b1 ≤ b2). Symmetric to the
+              -- (a1 ≤ a2, b2 ≤ b1) case, with one extra transport via
+              -- distance_symmetric to swap distance(a1+b1, a2+b2) and
+              -- distance(a2+b2, a1+b1).
+              claim dDividesMonusB2B1 : d ∣ Natural.monus(b2, b1)
+                by rewrite(
+                       Natural.distance_monus_when_ge(b1, b2, b1LeB2),
+                       dDividesDistanceB);
+              claim dDividesMonusA1A2 : d ∣ Natural.monus(a1, a2)
+                by rewrite(
+                       Natural.distance_monus_when_le(a2, a1, a2LeA1),
+                       dDividesDistanceA);
               rewrite(
                   Natural.distance_symmetric(a2 + b2, a1 + b1),
                   rewrite(
@@ -1253,12 +1269,8 @@ theorem Natural.divides_distance_sum
                               a2, a1, b2, b1, a2LeA1, b1LeB2)),
                       Natural.divides_distance(
                           d, Natural.monus(b2, b1), Natural.monus(a1, a2),
-                          rewrite(
-                              Natural.distance_monus_when_ge(b1, b2, b1LeB2),
-                              dDividesDistanceB),
-                          rewrite(
-                              Natural.distance_monus_when_le(a2, a1, a2LeA1),
-                              dDividesDistanceA))))
+                          dDividesMonusB2B1, dDividesMonusA1A2)))
+            }
           in (b2 ≤ b1) as b2LeB1: {
               -- Same direction (a2 ≤ a1, b2 ≤ b1). distance is in
               -- terms of monus(a1, a2) and monus(b1, b2). By the
