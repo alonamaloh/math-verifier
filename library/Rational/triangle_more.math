@@ -149,22 +149,24 @@ theorem Rational.absolute_value_LessThan_bounds
                      by Rational.negate_LessThan_zero_of_positive(c, zeroLessC)
                  ≤ x
                      by Rational.LessOrEqual_zero_of_IsNonneg(x, xNonneg),
-              rewrite(
-                  Rational.absolute_value_when_nonneg(x, xNonneg),
-                  absLessThan))
+              calc x
+                 = abs(x)
+                 < c
+                     by absLessThan)
       | Or.introduceRight(negXNonneg) =>
           -- |x| = -x; so -x < c. Negate to get -c < -(-x) = x. And
           -- x < c follows from x ≤ 0 < c.
           ({
             claim negXLessC : -x < c
-                by rewrite(
-                       Rational.absolute_value_when_negate_nonneg(
-                           x, negXNonneg),
-                       absLessThan);
+                by calc -x
+                      = abs(x)
+                      < c
+                          by absLessThan;
             And.introduction(
-                rewrite(
-                    Rational.negate_negate(x),
-                    Rational.LessThan.negate(-x, c, negXLessC)),
+                calc -c
+                   < -(-x)
+                       by Rational.LessThan.negate(-x, c, negXLessC)
+                   = x,
                 calc x
                    ≤ Rational.zero
                        by Rational.LessOrEqual_zero_of_negate_IsNonneg(
@@ -190,22 +192,22 @@ theorem Rational.absolute_value_difference_le
           : abs(a)
             ≤ abs(a - b)
               + abs(b)
-        by rewrite(
-               congruenceOf(Rational.absolute_value,
-                   (ring : (a - b) + b = a)),
-               Rational.triangle_inequality(a - b, b));
+        by calc abs(a)
+              = abs((a - b) + b)
+                  by (ring : a = (a - b) + b)
+              ≤ abs(a - b) + abs(b)
+                  by Rational.triangle_inequality(a - b, b);
     -- Add -|b| to both sides; the RHS (|a - b| + |b|) + -|b| reduces
     -- to |a - b| by ring.
-    rewrite(
-        (ring : (abs(a - b)
-                 + abs(b))
-                + -abs(b)
-              = abs(a - b)),
-        Rational.add_preserves_LessOrEqual(
-            abs(a),
-            abs(a - b) + abs(b),
-            -abs(b),
-            triangleStep))
+    calc abs(a) - abs(b)
+       = abs(a) + -abs(b)
+       ≤ (abs(a - b) + abs(b)) + -abs(b)
+           by Rational.add_preserves_LessOrEqual(
+                  abs(a),
+                  abs(a - b) + abs(b),
+                  -abs(b),
+                  triangleStep)
+       = abs(a - b)
 }
 
 -- ----------------------------------------------------------------------
@@ -224,43 +226,27 @@ theorem Rational.absolute_value_reverse_triangle
             abs(a) - abs(b)) {
     | Or.introduceLeft(diffNonneg) =>
         -- Branch 1: IsNonneg(|a| - |b|), so ||a| - |b|| = |a| - |b| ≤ |a - b|.
-        rewrite(
-            Equality.symmetry(
-                Rational.absolute_value_when_nonneg(
-                    abs(a)
-                        - abs(b),
-                    diffNonneg)),
-            Rational.absolute_value_difference_le(a, b))
+        calc abs(
+                 abs(a)
+                 - abs(b))
+           = abs(a)
+             - abs(b)
+           ≤ abs(a - b)
+               by Rational.absolute_value_difference_le(a, b)
     | Or.introduceRight(negDiffNonneg) =>
         -- Branch 2: IsNonneg(-(|a| - |b|)), so ||a| - |b|| = |b| - |a|.
         -- Bound by |b - a| via absolute_value_difference_le.
         -- Then |b - a| = |a - b| via absolute_value_subtract_swap.
-        ({
-          calc abs(
-                   abs(a)
-                   - abs(b))
-             = -(abs(a)
+        calc abs(
+                 abs(a)
                  - abs(b))
-             = abs(b)
-               - abs(a)                          as absEq;
-          claim swappedBound
-                : abs(b)
-                  - abs(a)
-                  ≤ abs(b - a)
-            by Rational.absolute_value_difference_le(b, a);
-          claim swappedAbsEq
-                : abs(b - a)
-                  = abs(a - b)
-            by Rational.absolute_value_subtract_swap(b, a);
-          rewrite(
-              Equality.symmetry(absEq),
-              rewrite(
-                  swappedAbsEq,
-                  swappedBound))
-        } : abs(
-                abs(a)
-                - abs(b))
-            ≤ abs(a - b))
+           = -(abs(a)
+               - abs(b))
+           = abs(b)
+             - abs(a)
+           ≤ abs(b - a)
+               by Rational.absolute_value_difference_le(b, a)
+           = abs(a - b)
   }
 
 -- ----------------------------------------------------------------------
@@ -275,18 +261,16 @@ theorem Rational.absolute_value_LessThan_of_bounds
   cases Rational.IsNonneg_or_negate_IsNonneg(x) {
     | Or.introduceLeft(xNonneg) =>
         -- Branch 1: x is IsNonneg, so |x| = x < c directly.
-        rewrite(
-            Equality.symmetry(
-                Rational.absolute_value_when_nonneg(x, xNonneg)),
-            upperBound)
+        calc abs(x)
+           = x
+           < c
+               by upperBound
     | Or.introduceRight(negXNonneg) =>
         -- Branch 2: -x is IsNonneg, so |x| = -x. From -c < x, negate
         -- both sides to get -x < c.
-        rewrite(
-            Equality.symmetry(
-                Rational.absolute_value_when_negate_nonneg(x, negXNonneg)),
-            -- -x < -(-c) = c.
-            rewrite(
-                Rational.negate_negate(c),
-                Rational.LessThan.negate(-c, x, lowerBound)))
+        calc abs(x)
+           = -x
+           < -(-c)
+               by Rational.LessThan.negate(-c, x, lowerBound)
+           = c
   }

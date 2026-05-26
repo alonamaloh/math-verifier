@@ -101,11 +101,11 @@ theorem Rational.LessOrEqual.multiply_by_nonneg_left
         (a b c : Rational) (aLeqB : a ≤ b)
         (cNonneg : Rational.LessOrEqual(Rational.zero, c))
         : c * a ≤ c * b :=
-  rewrite(
-      Rational.multiply_commutative(a, c),
-      rewrite(
-          Rational.multiply_commutative(b, c),
-          Rational.LessOrEqual.multiply_by_nonneg_right(a, b, c, aLeqB, cNonneg)))
+  calc c * a
+     = a * c
+     ≤ b * c
+         by Rational.LessOrEqual.multiply_by_nonneg_right(a, b, c, aLeqB, cNonneg)
+     = c * b
 
 -- ----------------------------------------------------------------------
 -- Foundational positivity helpers.
@@ -345,14 +345,14 @@ theorem Rational.absolute_value_le_succ_natural_at_representative
               (successor(Integer.absolute_value_natural(n)) : Rational)) :=
   -- |q| at rep = mk(make(Integer.absolute_value(n), d)) which equals
   -- mk(make((K : I), d)) via the abs_value_natural_is_image bridge.
-  rewrite(
-      Equality.symmetry(
-          congruenceOf(
-              function (m : Integer) =>
-                  (Quotient.mk(RationalRepresentative.make(m, d)) : Rational),
-              Integer.absolute_value_natural_is_image(n))),
-      Rational.absolute_value_natural_form_le_succ(
-          Integer.absolute_value_natural(n), d))
+  calc abs((Quotient.mk(RationalRepresentative.make(n, d)) : Rational))
+     = (Quotient.mk(RationalRepresentative.make(
+                        (Integer.absolute_value_natural(n) : Integer), d))
+           : Rational)
+         by Integer.absolute_value_natural_is_image(n)
+     ≤ (successor(Integer.absolute_value_natural(n)) : Rational)
+         by Rational.absolute_value_natural_form_le_succ(
+                Integer.absolute_value_natural(n), d)
 
 -- The headline Archimedean property: for any Rational q, there is a
 -- Natural K with |q| ≤ (succ(K) : Rational).
@@ -382,11 +382,11 @@ theorem Rational.absolute_value_le_succ_natural (q : Rational)
 theorem Rational.add_general_LessOrEqual_left
         (b c d : Rational) (cLeqD : c ≤ d)
         : b + c ≤ b + d :=
-  rewrite(
-      Rational.add_commutative(c, b),
-      rewrite(
-          Rational.add_commutative(d, b),
-          Rational.add_preserves_LessOrEqual(c, d, b, cLeqD)))
+  calc b + c
+     = c + b
+     ≤ d + b
+         by Rational.add_preserves_LessOrEqual(c, d, b, cLeqD)
+     = b + d
 
 -- a ≤ b ∧ c ≤ d → a + c ≤ b + d.
 theorem Rational.LessOrEqual.sum
@@ -671,12 +671,18 @@ theorem Rational.multiply_positive_positive
                                                            = n_y
                                                                * (successor(0) : Integer))));
                             -- Transport to the (succ k_x, succ k_y) form.
-                            rewrite(
-                                Equality.symmetry(n_x_eq),
-                                rewrite(
-                                    Equality.symmetry(n_y_eq),
-                                    Rational.multiply_positive_at_representatives(
-                                        k_x, k_y, d_x, d_y)))
+                            calc Rational.zero
+                               < Quotient.mk(RationalRepresentative.make(
+                                                 (successor(k_x) : Integer), d_x))
+                                     * Quotient.mk(RationalRepresentative.make(
+                                                       (successor(k_y) : Integer), d_y))
+                                   by Rational.multiply_positive_at_representatives(
+                                          k_x, k_y, d_x, d_y)
+                               = Quotient.mk(RationalRepresentative.make(n_x, d_x))
+                                     * Quotient.mk(RationalRepresentative.make(
+                                                       (successor(k_y) : Integer), d_y))
+                               = Quotient.mk(RationalRepresentative.make(n_x, d_x))
+                                     * Quotient.mk(RationalRepresentative.make(n_y, d_y))
                           } : Rational.zero
                                 < Quotient.mk(RationalRepresentative.make(
                                                   n_x, d_x))

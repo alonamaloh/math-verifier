@@ -124,14 +124,15 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
                 : -epsilon
                   < CauchyRationalSequence.sequenceFunction(a, m)
                     + -Rational.halve(epsilon)
-            by rewrite(
-                   calc -Rational.halve(epsilon) + -Rational.halve(epsilon)
-                      = -(Rational.halve(epsilon) + Rational.halve(epsilon))
-                      = -epsilon,
-                   Rational.add_preserves_LessThan(
-                       -Rational.halve(epsilon),
-                       CauchyRationalSequence.sequenceFunction(a, m),
-                       -Rational.halve(epsilon), aBoundAtM));
+            by calc -epsilon
+                  = -(Rational.halve(epsilon) + Rational.halve(epsilon))
+                  = -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  < CauchyRationalSequence.sequenceFunction(a, m)
+                      + -Rational.halve(epsilon)
+                      by Rational.add_preserves_LessThan(
+                             -Rational.halve(epsilon),
+                             CauchyRationalSequence.sequenceFunction(a, m),
+                             -Rational.halve(epsilon), aBoundAtM);
           -- sf(a, m) + -(ε/2) < sf(b, m). Add sf(a, m) to swappedDelta
           -- on the left; the RHS sf(a, m) + (sf(b, m) - sf(a, m))
           -- reduces to sf(b, m) by ring.
@@ -139,17 +140,18 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
                 : CauchyRationalSequence.sequenceFunction(a, m)
                   + -Rational.halve(epsilon)
                   < CauchyRationalSequence.sequenceFunction(b, m)
-            by rewrite(
-                   (ring : CauchyRationalSequence.sequenceFunction(a, m)
-                          + (CauchyRationalSequence.sequenceFunction(b, m)
-                             - CauchyRationalSequence.sequenceFunction(a, m))
-                        = CauchyRationalSequence.sequenceFunction(b, m)),
-                   Rational.add_left_preserves_LessThan(
-                       -Rational.halve(epsilon),
-                       CauchyRationalSequence.sequenceFunction(b, m)
-                       - CauchyRationalSequence.sequenceFunction(a, m),
-                       CauchyRationalSequence.sequenceFunction(a, m),
-                       swappedDelta));
+            by calc CauchyRationalSequence.sequenceFunction(a, m)
+                    + -Rational.halve(epsilon)
+                  < CauchyRationalSequence.sequenceFunction(a, m)
+                      + (CauchyRationalSequence.sequenceFunction(b, m)
+                         - CauchyRationalSequence.sequenceFunction(a, m))
+                      by Rational.add_left_preserves_LessThan(
+                             -Rational.halve(epsilon),
+                             CauchyRationalSequence.sequenceFunction(b, m)
+                             - CauchyRationalSequence.sequenceFunction(a, m),
+                             CauchyRationalSequence.sequenceFunction(a, m),
+                             swappedDelta)
+                  = CauchyRationalSequence.sequenceFunction(b, m);
           Rational.LessThan.transitive_right(
               -epsilon,
               CauchyRationalSequence.sequenceFunction(a, m)
@@ -261,13 +263,13 @@ theorem Rational.sequence.IsEventuallyNonneg.add
           -- step1: -ε < s(m) + -(ε/2). Add -(ε/2) to sAt; identify
           -- -(ε/2) + -(ε/2) with -ε.
           claim step1 : -epsilon < s(m) + -Rational.halve(epsilon)
-            by rewrite(
-                   calc -Rational.halve(epsilon) + -Rational.halve(epsilon)
-                      = -(Rational.halve(epsilon) + Rational.halve(epsilon))
-                      = -epsilon,
-                   Rational.add_preserves_LessThan(
-                       -Rational.halve(epsilon), s(m),
-                       -Rational.halve(epsilon), sAt));
+            by calc -epsilon
+                  = -(Rational.halve(epsilon) + Rational.halve(epsilon))
+                  = -Rational.halve(epsilon) + -Rational.halve(epsilon)
+                  < s(m) + -Rational.halve(epsilon)
+                      by Rational.add_preserves_LessThan(
+                             -Rational.halve(epsilon), s(m),
+                             -Rational.halve(epsilon), sAt);
           -- step2: s(m) + -(ε/2) < s(m) + t(m). Left-additive of tAt.
           claim step2 : s(m) + -Rational.halve(epsilon) < s(m) + t(m)
             by Rational.add_left_preserves_LessThan(
@@ -372,12 +374,10 @@ theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
             by negSLowerBound(m,
                    Natural.le_through_max_right(N_s, N_negS, m, mGeMax));
           claim sUpperAtM : s(m) < epsilon
-            by rewrite(
-                   Rational.negate_negate(epsilon),
-                   rewrite(
-                       Rational.negate_negate(s(m)),
-                       Rational.LessThan.negate(-epsilon, -s(m),
-                           negSLowerAtM)));
+            by calc s(m)
+                  = -(-s(m))
+                  < -(-epsilon)   by Rational.LessThan.negate(-epsilon, -s(m), negSLowerAtM)
+                  = epsilon;
           -- Combine: |s(m)| < ε.
           claim absBound : abs(s(m)) < epsilon
             by Rational.absolute_value_LessThan_of_bounds(
@@ -517,11 +517,10 @@ theorem Real.add_left_preserves_LessThan
 theorem Real.add_preserves_LessOrEqual_left
         (x y z : Real) (xLeqY : x ≤ y)
         : z + x ≤ z + y :=
-  rewrite(
-      Real.add_commutative(y, z),
-      rewrite(
-          Real.add_commutative(x, z),
-          Real.add_preserves_LessOrEqual(x, y, z, xLeqY)))
+  calc z + x
+     = x + z
+     ≤ y + z       by Real.add_preserves_LessOrEqual(x, y, z, xLeqY)
+     = z + y
 
 -- Combined strict-strict sum: a < c ∧ b < d → a + b < c + d. Standard
 -- chain through (a + b) < (c + b) < (c + d).
