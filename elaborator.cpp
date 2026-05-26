@@ -2788,6 +2788,59 @@ private:
                 cases->refiningNames,
                 node.line, node.column);
         }
+        if (auto* claim = std::get_if<SurfaceStructuredClaim>(&node.node)) {
+            // Anonymous `claim T by V;` desugars to a SurfaceLet whose
+            // value is this SurfaceStructuredClaim. Without recursing
+            // through the claim's sub-expressions, a recursive call
+            // sitting in `byHint` (or in `proposition` / an arm) would
+            // survive untouched and trip the kernel's "undefined
+            // constant: <thisDeclName>" check at elaboration time. See
+            // QUIRK.md (claim-anonymous-self-recursion) for the
+            // historical context.
+            SurfaceExpressionPointer rewrittenProposition =
+                claim->proposition
+                    ? rewriteRecursiveCalls(claim->proposition,
+                                             thisDeclName,
+                                             recursiveArgToHypothesis,
+                                             outerBinderCount)
+                    : nullptr;
+            SurfaceExpressionPointer rewrittenByHint =
+                claim->byHint
+                    ? rewriteRecursiveCalls(claim->byHint,
+                                             thisDeclName,
+                                             recursiveArgToHypothesis,
+                                             outerBinderCount)
+                    : nullptr;
+            std::vector<SurfaceStructuredClaimArm> rewrittenArms;
+            for (const auto& arm : claim->arms) {
+                SurfaceStructuredClaimArm rewrittenArm;
+                rewrittenArm.disjunctType = arm.disjunctType
+                    ? rewriteRecursiveCalls(arm.disjunctType,
+                                             thisDeclName,
+                                             recursiveArgToHypothesis,
+                                             outerBinderCount)
+                    : nullptr;
+                rewrittenArm.binderName = arm.binderName;
+                rewrittenArm.body = arm.body
+                    ? rewriteRecursiveCalls(arm.body, thisDeclName,
+                                             recursiveArgToHypothesis,
+                                             outerBinderCount)
+                    : nullptr;
+                rewrittenArm.line = arm.line;
+                rewrittenArm.column = arm.column;
+                rewrittenArms.push_back(std::move(rewrittenArm));
+            }
+            auto rewrittenNode = makeSurfaceStructuredClaim(
+                std::move(rewrittenProposition),
+                claim->label,
+                std::move(rewrittenByHint),
+                claim->byCases,
+                std::move(rewrittenArms),
+                node.line, node.column,
+                claim->byInduction,
+                claim->bySubstitution);
+            return rewrittenNode;
+        }
         if (auto* calc = std::get_if<SurfaceCalc>(&node.node)) {
             auto rewrittenInitial = rewriteRecursiveCalls(
                 calc->initialExpression, thisDeclName,
