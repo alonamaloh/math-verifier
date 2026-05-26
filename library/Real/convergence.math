@@ -238,176 +238,85 @@ theorem Real.eq_of_sub_eq_zero
 -- less_than_all_positive gives L1 - L2 = Real.zero; eq_of_sub_eq_zero
 -- finishes.
 --
--- The whole argument is staged as a sequence of `claim` lines for
--- readability. We do the bulk of the analytic work at the rep level
--- (claim-by-claim through the at_make helper for the central
--- triangle/halving step), since stating `|L1 - L2| < (ε : Real)` and
--- composing it through Real-level <-arithmetic would require several
--- Real-level order lemmas we don't currently have.
+-- The whole argument lives at the Real level: pick N1, N2 from the
+-- two convergence proofs at ε/2, take m = max(N1, N2), then by
+-- triangle inequality at Real level
+--   |L1 - L2| ≤ |L1 - s(m)| + |s(m) - L2| < ε/2 + ε/2 = ε.
+-- Since this holds for every positive Rational ε, by
+-- eq_of_absolute_value_less_than_all_positive applied to (L1 - L2)
+-- we get L1 - L2 = 0, and eq_of_sub_eq_zero finishes.
 
--- At constructor reps: the pointwise `|L1(m) - s(m) + (s(m) - L2(m))|
---   ≤ |L1(m) - s(m)| + |s(m) - L2(m)|` argument over the underlying
--- Cauchy rational sequences. This is the analytic heart, written
--- once and reused inside the Real-level uniqueness proof via lift.
--- Here `s : Natural → Real` is held abstract; only `L1`, `L2` are
--- destructured to reps.
-
-theorem Real.SequenceConverges.unique_at_make
-        (s : Natural → Real)
-        (rep_L1 rep_L2 : CauchyRationalSequence)
-        (convergesToL1
-            : Real.SequenceConverges(s, (Quotient.mk(rep_L1) : Real)))
-        (convergesToL2
-            : Real.SequenceConverges(s, (Quotient.mk(rep_L2) : Real)))
-        : (Quotient.mk(rep_L1) : Real) = Quotient.mk(rep_L2) := {
-      -- It suffices to show L1 - L2 = 0. Apply
-      -- eq_of_absolute_value_less_than_all_positive to (L1 - L2).
-      claim differenceIsZero
-            : (Quotient.mk(rep_L1) : Real) - (Quotient.mk(rep_L2) : Real)
-              = Real.zero
-        by Real.eq_of_absolute_value_less_than_all_positive(
-               (Quotient.mk(rep_L1) : Real) - (Quotient.mk(rep_L2) : Real),
-               function (epsilon : Rational)
-                        (epsilonPositive : Rational.zero < epsilon) => {
-                 -- Pick m = max(N1, N2) where N1, N2 are the ε/2
-                 -- convergence indices. Then |L1 - s(m)| < ε/2 and
-                 -- |s(m) - L2| < ε/2, so by triangle
-                 --   |L1 - L2| ≤ |L1 - s(m)| + |s(m) - L2|
-                 --            < ε/2 + ε/2 = ε.
-                 claim halvedEpsilonPositive
-                       : Rational.zero < Rational.halve(epsilon)
-                   by Rational.halve_positive(epsilon, epsilonPositive);
-                 obtain ⟨N1, boundFromL1⟩
-                     from convergesToL1(
-                              Rational.halve(epsilon),
-                              halvedEpsilonPositive);
-                 obtain ⟨N2, boundFromL2⟩
-                     from convergesToL2(
-                              Rational.halve(epsilon),
-                              halvedEpsilonPositive);
-                 -- Step 1. Specialise both bounds at m = max(N1, N2).
-                 claim boundAtL1
-                       : abs(
-                             s(Natural.maximum(N1, N2))
-                             - (Quotient.mk(rep_L1) : Real))
-                         < (Rational.halve(epsilon) : Real)
-                   by boundFromL1(
-                          Natural.maximum(N1, N2),
-                          Natural.left_le_max(N1, N2));
-                 claim boundAtL2
-                       : abs(
-                             s(Natural.maximum(N1, N2))
-                             - (Quotient.mk(rep_L2) : Real))
-                         < (Rational.halve(epsilon) : Real)
-                   by boundFromL2(
-                          Natural.maximum(N1, N2),
-                          Natural.right_le_max(N1, N2));
-                 -- Step 2. Rewrite the L1 bound via |s - L| = |L - s|.
-                 claim swappedBoundAtL1
-                       : abs(
-                             (Quotient.mk(rep_L1) : Real)
-                             - s(Natural.maximum(N1, N2)))
-                         < (Rational.halve(epsilon) : Real)
-                   by rewrite(
-                          Real.absolute_value_subtract_swap(
-                              s(Natural.maximum(N1, N2)),
-                              (Quotient.mk(rep_L1) : Real)),
-                          boundAtL1);
-                 -- Step 3. Sum the two strict bounds:
-                 --   |L1 - s(m)| + |s(m) - L2| < halve(ε) + halve(ε).
-                 claim sumOfBounds
-                       : abs(
-                             (Quotient.mk(rep_L1) : Real)
-                             - s(Natural.maximum(N1, N2)))
-                         + abs(
-                               s(Natural.maximum(N1, N2))
-                               - (Quotient.mk(rep_L2) : Real))
-                         < (Rational.halve(epsilon) : Real)
-                           + (Rational.halve(epsilon) : Real)
-                   by Real.LessThan.add_strict_strict(
-                          abs(
-                              (Quotient.mk(rep_L1) : Real)
-                              - s(Natural.maximum(N1, N2))),
-                          abs(
-                              s(Natural.maximum(N1, N2))
-                              - (Quotient.mk(rep_L2) : Real)),
-                          (Rational.halve(epsilon) : Real),
-                          (Rational.halve(epsilon) : Real),
-                          swappedBoundAtL1,
-                          boundAtL2);
-                 -- Step 4. halve(ε) + halve(ε) = ε at Real level.
-                 -- Via the embedding-homomorphism + halve_doubled.
-                 calc (Rational.halve(epsilon) : Real)
-                        + (Rational.halve(epsilon) : Real)
-                    = ((Rational.halve(epsilon)
-                        + Rational.halve(epsilon)) : Real)
-                    = (epsilon : Real)                              as halvedDoubleEqualsEpsilon;
-                 -- Step 5. The triangle-inequality step:
-                 --   |L1 - L2| = |(L1 - s(m)) + (s(m) - L2)|
-                 --             ≤ |L1 - s(m)| + |s(m) - L2|.
-                 claim triangleStep
-                       : abs(
-                             (Quotient.mk(rep_L1) : Real)
-                             - (Quotient.mk(rep_L2) : Real))
-                         ≤ abs(
-                               (Quotient.mk(rep_L1) : Real)
-                               - s(Natural.maximum(N1, N2)))
-                           + abs(
-                                 s(Natural.maximum(N1, N2))
-                                 - (Quotient.mk(rep_L2) : Real))
-                   by rewrite(
-                          -- Rewrite |L1 - L2| as
-                          --   |(L1 - s(m)) + (s(m) - L2)| via
-                          -- (L1 - s(m)) + (s(m) - L2) = L1 - L2 by ring
-                          -- (Real now has negate_add).
-                          congruenceOf(
-                              Real.absolute_value,
-                              (ring : ((Quotient.mk(rep_L1) : Real)
-                                       - s(Natural.maximum(N1, N2)))
-                                      + (s(Natural.maximum(N1, N2))
-                                         - (Quotient.mk(rep_L2) : Real))
-                                    = (Quotient.mk(rep_L1) : Real)
-                                      - (Quotient.mk(rep_L2) : Real))),
-                          Real.triangle_inequality(
-                              (Quotient.mk(rep_L1) : Real)
-                              - s(Natural.maximum(N1, N2)),
-                              s(Natural.maximum(N1, N2))
-                              - (Quotient.mk(rep_L2) : Real)));
-                 -- Step 6. Chain ≤ with < then rewrite the bound to ε.
-                 rewrite(
-                     halvedDoubleEqualsEpsilon,
-                     Real.LessThan.transitive_left(
-                         abs(
-                             (Quotient.mk(rep_L1) : Real)
-                             - (Quotient.mk(rep_L2) : Real)),
-                         abs(
-                             (Quotient.mk(rep_L1) : Real)
-                             - s(Natural.maximum(N1, N2)))
-                         + abs(
-                               s(Natural.maximum(N1, N2))
-                               - (Quotient.mk(rep_L2) : Real)),
-                         (Rational.halve(epsilon) : Real)
-                         + (Rational.halve(epsilon) : Real),
-                         triangleStep,
-                         sumOfBounds))
-               });
-      Real.eq_of_sub_eq_zero(
-          (Quotient.mk(rep_L1) : Real),
-          (Quotient.mk(rep_L2) : Real),
-          differenceIsZero)
-    }
-
--- Real-level uniqueness, via Quotient.induct_two on the two limits.
 theorem Real.SequenceConverges.unique
         (s : Natural → Real)
         (L1 L2 : Real)
         (convergesToL1 : Real.SequenceConverges(s, L1))
         (convergesToL2 : Real.SequenceConverges(s, L2))
-        : L1 = L2 :=
-  Quotient.induct_two(
-      function (L1Arg L2Arg : Real) =>
-          Real.SequenceConverges(s, L1Arg)
-          → Real.SequenceConverges(s, L2Arg)
-          → L1Arg = L2Arg,
-      Real.SequenceConverges.unique_at_make(s),
-      L1, L2)(convergesToL1)(convergesToL2)
+        : L1 = L2 := {
+  claim differenceIsZero : L1 - L2 = Real.zero
+    by Real.eq_of_absolute_value_less_than_all_positive(
+           L1 - L2,
+           {
+             take epsilon : Rational;
+             take epsilonPositive : Rational.zero < epsilon;
+             claim halvedEpsilonPositive
+                   : Rational.zero < Rational.halve(epsilon)
+               by Rational.halve_positive(epsilon, epsilonPositive);
+             obtain ⟨N1, boundFromL1⟩
+                 from convergesToL1(
+                          Rational.halve(epsilon),
+                          halvedEpsilonPositive);
+             obtain ⟨N2, boundFromL2⟩
+                 from convergesToL2(
+                          Rational.halve(epsilon),
+                          halvedEpsilonPositive);
+             let m : Natural := Natural.maximum(N1, N2);
+             -- Step 1. Specialise both bounds at m.
+             claim boundAtL1 : abs(s(m) - L1) < (Rational.halve(epsilon) : Real)
+               by boundFromL1(m, Natural.left_le_max(N1, N2));
+             claim boundAtL2 : abs(s(m) - L2) < (Rational.halve(epsilon) : Real)
+               by boundFromL2(m, Natural.right_le_max(N1, N2));
+             -- Step 2. Rewrite the L1 bound via |s - L| = |L - s|.
+             claim swappedBoundAtL1
+                   : abs(L1 - s(m)) < (Rational.halve(epsilon) : Real)
+               by rewrite(
+                      Real.absolute_value_subtract_swap(s(m), L1),
+                      boundAtL1);
+             -- Step 3. Sum the two strict bounds:
+             --   |L1 - s(m)| + |s(m) - L2| < halve(ε) + halve(ε).
+             claim sumOfBounds
+                   : abs(L1 - s(m)) + abs(s(m) - L2)
+                     < (Rational.halve(epsilon) : Real)
+                       + (Rational.halve(epsilon) : Real)
+               by Real.LessThan.add_strict_strict(
+                      abs(L1 - s(m)),
+                      abs(s(m) - L2),
+                      (Rational.halve(epsilon) : Real),
+                      (Rational.halve(epsilon) : Real),
+                      swappedBoundAtL1, boundAtL2);
+             -- Step 4. halve(ε) + halve(ε) = ε at Real level.
+             calc (Rational.halve(epsilon) : Real)
+                    + (Rational.halve(epsilon) : Real)
+                = ((Rational.halve(epsilon) + Rational.halve(epsilon)) : Real)
+                = (epsilon : Real)                                  as halvedDoubleEqualsEpsilon;
+             -- Step 5. Triangle inequality on L1 - L2:
+             --   |L1 - L2| = |(L1 - s(m)) + (s(m) - L2)|
+             --             ≤ |L1 - s(m)| + |s(m) - L2|.
+             claim triangleStep
+                   : abs(L1 - L2) ≤ abs(L1 - s(m)) + abs(s(m) - L2)
+               by rewrite(
+                      congruenceOf(
+                          Real.absolute_value,
+                          (ring : (L1 - s(m)) + (s(m) - L2) = L1 - L2)),
+                      Real.triangle_inequality(L1 - s(m), s(m) - L2));
+             -- Step 6. Chain ≤ with < then rewrite the bound to ε.
+             rewrite(
+                 halvedDoubleEqualsEpsilon,
+                 Real.LessThan.transitive_left(
+                     abs(L1 - L2),
+                     abs(L1 - s(m)) + abs(s(m) - L2),
+                     (Rational.halve(epsilon) : Real)
+                     + (Rational.halve(epsilon) : Real),
+                     triangleStep, sumOfBounds))
+           });
+  Real.eq_of_sub_eq_zero(L1, L2, differenceIsZero)
+}
