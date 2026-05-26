@@ -10409,6 +10409,23 @@ private:
             remainingKernels.pop_back();
             ExpressionPointer M = remainingKernels.back();
             remainingKernels.pop_back();
+            // Total-cancellation tail: the final pair has no prefix
+            // before it. currentForm is just `M + (-M)`; reduce
+            // directly to `0` via add_negate_right(M), no
+            // associativity / add_zero needed.
+            if (remainingKernels.empty()) {
+                ExpressionPointer addNegProof = makeConstant(
+                    axiomNames.addNegateRight);
+                addNegProof = makeApplication(addNegProof, M);
+                ExpressionPointer zeroConst = makeConstant(
+                    context.zeroName);
+                chainProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    leftPlusRight, currentForm, zeroConst,
+                    chainProof, addNegProof);
+                currentForm = zeroConst;
+                continue;
+            }
             ExpressionPointer prefix;
             bool prefixSingle = (remainingKernels.size() == 1);
             if (prefixSingle) {
@@ -10471,21 +10488,11 @@ private:
             currentForm = prefix;
         }
         // After all cancellations, currentForm should be the merged
-        // canonical form (sortedKernels of just the survivors,
-        // left-associated). Or if zero survivors remain, it's zero.
-        // Check structural equality with mergedCanonical.
-        if (remainingKernels.empty()) {
-            // All summands cancelled. The current chain ends at `prefix`
-            // from the last step — but the last step needed at least
-            // one survivor as prefix (we'd have crashed otherwise).
-            // So this branch shouldn't trigger here; mergedPoly was non-empty.
-            // Actually wait: if all summands cancel, mergedPoly is empty,
-            // and mergedCanonical is zero. The above loop ASSUMED there's
-            // a prefix to drop the zero into. We'd need a special case.
-            throwElaborate(
-                "`ring` (v2): proveAddMerge total-cancellation case "
-                "(empty merged polynomial) is not implemented");
-        }
+        // canonical form. For partial cancellation: sortedKernels of
+        // just the survivors, left-associated. For total cancellation
+        // (all summands cancel): the zero constant, set by the
+        // final-pair branch above. Either way, structural equality
+        // with mergedCanonical should hold.
         if (!structurallyEqual(currentForm, mergedCanonical)) {
             throwElaborate(
                 "`ring` (v2): proveAddMerge ended with shape mismatched "
