@@ -7213,6 +7213,14 @@ private:
         ExpressionPointer wrapped = tryDiffWrapForEqualityGoal(
             localBinders, term, termTypeClosed, expectedTypeClosed);
         if (wrapped) return wrapped;
+        // Diff-bridge via a local equality hypothesis: when inferred
+        // and expected types differ at a single position (a, b) and
+        // `a = b` or `b = a` is in scope, wrap with
+        // Equality.transport_proposition. Lets the user write the
+        // bare term and skip explicit `rewrite(...)`.
+        wrapped = tryDiffBridgeViaContextEquality(
+            localBinders, term, termTypeClosed, expectedTypeClosed);
+        if (wrapped) return wrapped;
         // Classical LEM bridge: if term : ¬¬P and expected : P, wrap
         // with Logic.double_negation_eliminate. Lets `suppose ¬P as h;
         // …; claim False` at theorem body close a goal stated as P,
@@ -7347,6 +7355,294 @@ private:
         call = makeApplication(call, expectedTypeClosed);
         call = makeApplication(call, term);
         return call;
+    }
+
+    // Walk two expressions in parallel through Application structure,
+    // collecting every leaf-level position where they differ. A leaf
+    // here is anything that isn't an Application — Constant, BV, FV,
+    // Sort, Pi, Lambda, Let (we don't descend into binders). If all
+    // collected diffs share the SAME pair (a, b) — i.e., the
+    // expressions agree everywhere except at occurrences of a single
+    // common subterm difference — return (a, b). Otherwise (no diff,
+    // or multiple distinct diff pairs) return (nullptr, nullptr).
+    //
+    // This catches both:
+    //   * "single-position diff" (one slot differs, like `f(a)` vs `f(b)`)
+    //   * "abstract-all diff" (the same pair differs at multiple
+    //     positions, like `g(a, a)` vs `g(b, b)` — diff is (a, b) at
+    //     two slots).
+    // It does NOT catch heterogeneous diffs (e.g., `(a, b)` vs `(b, a)`
+    // — the elaborator can't synthesize a single bridging equation
+    // for those).
+    std::pair<ExpressionPointer, ExpressionPointer>
+    findUniqueDiffPair(
+        ExpressionPointer left, ExpressionPointer right) {
+        ExpressionPointer pairA;
+        ExpressionPointer pairB;
+        bool failed = false;
+        std::function<void(ExpressionPointer, ExpressionPointer)> walk =
+            [&](ExpressionPointer l, ExpressionPointer r) {
+                if (failed) return;
+                if (structurallyEqual(l, r)) return;
+                auto* leftApp =
+                    std::get_if<Application>(&l->node);
+                auto* rightApp =
+                    std::get_if<Application>(&r->node);
+                if (!leftApp || !rightApp) {
+                    if (!pairA) {
+                        pairA = l;
+                        pairB = r;
+                    } else if (!structurallyEqual(l, pairA)
+                               || !structurallyEqual(r, pairB)) {
+                        failed = true;
+                    }
+                    return;
+                }
+                walk(leftApp->function, rightApp->function);
+                walk(leftApp->argument, rightApp->argument);
+            };
+        walk(left, right);
+        if (failed || !pairA) return {nullptr, nullptr};
+        return {pairA, pairB};
+    }
+
+    // When `term`'s inferred type doesn't match the expected type but
+    // they differ at a unique single position by subterms (a, b), and
+    // a `a = b` or `b = a` equation lives in the local context, wrap
+    // `term` with `Equality.transport_proposition(λz. T_expected[b ↦ z],
+    // a, b, eq_or_sym(eq), term)` so the user can write the term
+    // naturally without an explicit `rewrite`.
+    //
+    // Search scope: local binders only (not library lemmas) — keeps
+    // the check cheap on every type-coercion attempt.
+    ExpressionPointer tryDiffBridgeViaContextEquality(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer term,
+        ExpressionPointer termTypeClosed,
+        ExpressionPointer expectedTypeClosed) {
+        if (!environment_.lookup("Equality.transport_proposition")) {
+            return nullptr;
+        }
+        // Open both types so we can run the diff walker (FreeVariables
+        // in place of de Bruijn indices for the surrounding binders).
+        ExpressionPointer termTypeOpened = openOverLocalBinders(
+            termTypeClosed, localBinders, localBinders.size());
+        ExpressionPointer expectedOpened = openOverLocalBinders(
+            expectedTypeClosed, localBinders, localBinders.size());
+        auto whnf = [&](ExpressionPointer e) {
+            return weakHeadNormalForm(environment_, e);
+        };
+        ExpressionPointer termTypeWhnf = whnf(termTypeOpened);
+        ExpressionPointer expectedWhnf = whnf(expectedOpened);
+        struct Pair { ExpressionPointer t; ExpressionPointer e; };
+        Pair tries[4] = {
+            {termTypeOpened, expectedOpened},
+            {termTypeWhnf,   expectedOpened},
+            {termTypeOpened, expectedWhnf},
+            {termTypeWhnf,   expectedWhnf},
+        };
+        ExpressionPointer diffInferredOpened, diffExpectedOpened;
+        ExpressionPointer expectedFormUsed = expectedOpened;
+        for (const Pair& p : tries) {
+            auto pr = findUniqueDiffPair(p.t, p.e);
+            if (pr.first && pr.second) {
+                diffInferredOpened = pr.first;
+                diffExpectedOpened = pr.second;
+                expectedFormUsed = p.e;
+                break;
+            }
+        }
+        if (!diffInferredOpened || !diffExpectedOpened) return nullptr;
+
+        // Find an equation in local context whose endpoints match the
+        // diff pair (forward or symmetric). On match, return a closed-
+        // form Equality components record + the bound-variable proof
+        // (or its symmetry wrap), all ready to splice into the
+        // transport_proposition call.
+        struct EqCandidate {
+            ExpressionPointer carrierTypeOpened;
+            LevelPointer carrierLevel;
+            // Built in closed scope (BoundVariable to local binder).
+            ExpressionPointer proofClosed;
+        };
+        auto findEquationInContext = [&]() -> std::optional<EqCandidate> {
+            int N = static_cast<int>(localBinders.size());
+            for (int b = N - 1; b >= 0; --b) {
+                ExpressionPointer binderTypeOpened = openOverLocalBinders(
+                    localBinders[b].type, localBinders, (size_t)b);
+                ExpressionPointer binderTypeWhnf =
+                    weakHeadNormalForm(environment_, binderTypeOpened);
+                EqualityComponents components;
+                try {
+                    components = extractEqualityComponents(
+                        binderTypeWhnf,
+                        "diff-bridge equality candidate", 0);
+                } catch (const ElaborateError&) {
+                    continue;
+                }
+                bool forwardMatch =
+                    structurallyEqual(
+                        components.leftEndpoint, diffInferredOpened)
+                    && structurallyEqual(
+                        components.rightEndpoint, diffExpectedOpened);
+                bool symmetricMatch =
+                    structurallyEqual(
+                        components.leftEndpoint, diffExpectedOpened)
+                    && structurallyEqual(
+                        components.rightEndpoint, diffInferredOpened);
+                if (!forwardMatch && !symmetricMatch) continue;
+                ExpressionPointer hypProofClosed =
+                    makeBoundVariable(N - 1 - b);
+                // Close the diff endpoints for use in the symmetry
+                // wrap (when needed) and for the eventual transport.
+                ExpressionPointer diffInferredClosed =
+                    closeOverLocalBinders(diffInferredOpened,
+                        localBinders, localBinders.size());
+                ExpressionPointer diffExpectedClosed =
+                    closeOverLocalBinders(diffExpectedOpened,
+                        localBinders, localBinders.size());
+                ExpressionPointer carrierTypeClosed =
+                    closeOverLocalBinders(components.carrierType,
+                        localBinders, localBinders.size());
+                ExpressionPointer proofClosed;
+                if (forwardMatch) {
+                    proofClosed = std::move(hypProofClosed);
+                } else {
+                    ExpressionPointer sym = makeConstant(
+                        "Equality.symmetry",
+                        {components.carrierUniverseLevel});
+                    sym = makeApplication(
+                        std::move(sym), carrierTypeClosed);
+                    sym = makeApplication(
+                        std::move(sym), std::move(diffExpectedClosed));
+                    sym = makeApplication(
+                        std::move(sym),
+                        // Re-close (already closed but cheap).
+                        closeOverLocalBinders(diffInferredOpened,
+                            localBinders, localBinders.size()));
+                    sym = makeApplication(
+                        std::move(sym), std::move(hypProofClosed));
+                    proofClosed = std::move(sym);
+                }
+                EqCandidate result;
+                result.carrierTypeOpened = components.carrierType;
+                result.carrierLevel = components.carrierUniverseLevel;
+                result.proofClosed = std::move(proofClosed);
+                return result;
+            }
+            return std::nullopt;
+        };
+
+        auto candidate = findEquationInContext();
+        if (!candidate) return nullptr;
+
+        // Close the diff pair and carrier for splicing into the final
+        // call. From here on we work in CLOSED form so the motive
+        // lambda we build has BV(0) referring to its own binder (and
+        // other BVs referring to the surrounding local binders,
+        // shifted by 1 to make room).
+        ExpressionPointer diffInferredClosed = closeOverLocalBinders(
+            diffInferredOpened, localBinders, localBinders.size());
+        ExpressionPointer diffExpectedClosed = closeOverLocalBinders(
+            diffExpectedOpened, localBinders, localBinders.size());
+        ExpressionPointer carrierTypeClosed = closeOverLocalBinders(
+            candidate->carrierTypeOpened, localBinders,
+            localBinders.size());
+
+        // Choose the closed form of expectedType corresponding to
+        // whichever form the diff walker used. The diff walker may
+        // have used the WHNF expansion; we mirror that by WHNF-ing
+        // the closed form (kernel WHNF over an empty context is the
+        // same shape as WHNF over the local context modulo FVs).
+        Context openedContext = buildContextFromLocalBinders(localBinders);
+        ExpressionPointer expectedFormUsedClosed = expectedTypeClosed;
+        if (expectedFormUsed.get() == expectedWhnf.get()) {
+            expectedFormUsedClosed = weakHeadNormalForm(
+                environment_, expectedTypeClosed);
+        }
+        // termType closed form, in the same combo as the diff walker
+        // used (unreduced vs WHNF).
+        ExpressionPointer termTypeFormClosed = termTypeClosed;
+        // (We don't bother re-WHNFing termType here; the isDefEq check
+        // below sees through definitional unfoldings either way.)
+
+        // Compute total occurrences using `abstractStructuralOccurrence`
+        // on the closed form (target = diffExpectedClosed). The body
+        // it produces has BV(0) at every matched position with other
+        // BVs shifted up by 1 — exactly the form needed inside a
+        // lambda wrapper.
+        int totalOccurrences = 0;
+        ExpressionPointer probeBody = abstractStructuralOccurrence(
+            expectedFormUsedClosed, diffExpectedClosed,
+            /*currentDepth=*/0, totalOccurrences);
+        (void)probeBody;
+        if (totalOccurrences == 0) return nullptr;
+
+        std::vector<uint32_t> masksToTry;
+        if (totalOccurrences <= 16) {
+            uint32_t allMask = (1u << totalOccurrences) - 1;
+            masksToTry.push_back(allMask);
+            for (int i = 0; i < totalOccurrences; ++i) {
+                if ((1u << i) != allMask) {
+                    masksToTry.push_back(1u << i);
+                }
+            }
+            for (uint32_t s = 1; s < allMask; ++s) {
+                if (__builtin_popcount(s) >= 2) {
+                    masksToTry.push_back(s);
+                }
+            }
+        } else {
+            masksToTry.push_back((uint32_t)((1ull << 16) - 1));
+        }
+
+        for (uint32_t mask : masksToTry) {
+            int counter = 0;
+            ExpressionPointer motiveBodyClosed =
+                abstractStructuralOccurrenceMasked(
+                    expectedFormUsedClosed, diffExpectedClosed,
+                    /*currentDepth=*/0, counter, mask);
+            // motive(diffInferred): substitute diffInferredClosed
+            // for BV(0). Then compare with termType in opened form.
+            ExpressionPointer motiveAppliedClosed = substitute(
+                motiveBodyClosed, 0, diffInferredClosed);
+            ExpressionPointer motiveAppliedOpened = openOverLocalBinders(
+                motiveAppliedClosed, localBinders, localBinders.size());
+            if (!isDefinitionallyEqual(environment_, openedContext,
+                    motiveAppliedOpened, termTypeOpened)) {
+                continue;
+            }
+            ExpressionPointer motiveLambda = makeLambda(
+                "_diffBridge", carrierTypeClosed,
+                std::move(motiveBodyClosed));
+            ExpressionPointer call = makeConstant(
+                "Equality.transport_proposition",
+                {candidate->carrierLevel});
+            call = makeApplication(std::move(call), carrierTypeClosed);
+            call = makeApplication(std::move(call), std::move(motiveLambda));
+            call = makeApplication(std::move(call), diffInferredClosed);
+            call = makeApplication(std::move(call), diffExpectedClosed);
+            call = makeApplication(std::move(call), candidate->proofClosed);
+            call = makeApplication(std::move(call), term);
+            // Sanity-check: the constructed term must type-check and
+            // its inferred type must match the expected type. If not,
+            // this candidate motive was wrong; try the next subset.
+            try {
+                ExpressionPointer callType =
+                    inferTypeInLocalContext(localBinders, call);
+                ExpressionPointer callTypeOpened = openOverLocalBinders(
+                    callType, localBinders, localBinders.size());
+                if (isDefinitionallyEqual(environment_, openedContext,
+                        callTypeOpened, expectedOpened)) {
+                    return call;
+                }
+            } catch (const TypeError&) {
+                // fall through to next mask
+            } catch (const ElaborateError&) {
+                // fall through to next mask
+            }
+        }
+        return nullptr;
     }
 
     ExpressionPointer tryDiffWrapForEqualityGoal(
