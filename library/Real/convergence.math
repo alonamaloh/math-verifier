@@ -180,26 +180,14 @@ theorem Real.eq_of_absolute_value_less_than_all_positive
         (hypothesis : (epsilon : Rational) → Rational.zero < epsilon →
                           abs(x) < (epsilon : Real))
         : x = Real.zero :=
-  Quotient.induct(
-      function (xArg : Real) =>
-          ((epsilon : Rational) → Rational.zero < epsilon →
-              abs(xArg) < (epsilon : Real))
-          → xArg = Real.zero,
-      function (s_rep : CauchyRationalSequence) =>
-        function (atRep : (epsilon : Rational) → Rational.zero < epsilon →
-                              abs((Quotient.mk(s_rep) : Real))
-                                < (epsilon : Real)) =>
-          -- Conclude (Quotient.mk(s_rep) : Real) = Real.zero via
-          -- Quotient.sound, using equivalent_zero_of_absolute_value_almost_zero
-          -- to turn the hypothesis into a Cauchy-equivalence proof.
-          Quotient.sound(
-              CauchyRationalSequence, CauchyEquivalent,
-              s_rep,
-              Rational.to_cauchy_constant(Rational.zero),
-              CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero(
-                  s_rep,
-                  Real.cauchy_almost_zero_from_absolute_bound(s_rep, atRep))),
-      x)(hypothesis)
+  cases x refining hypothesis { | s_rep =>
+    Quotient.sound(
+        CauchyRationalSequence, CauchyEquivalent,
+        s_rep,
+        Rational.to_cauchy_constant(Rational.zero),
+        CauchyRationalSequence.equivalent_zero_of_absolute_value_almost_zero(
+            s_rep,
+            Real.cauchy_almost_zero_from_absolute_bound(s_rep, hypothesis))) }
 
 -- ----------------------------------------------------------------------
 -- `x - y = 0 → x = y` on Real. A small ring corollary: add y to both
