@@ -8764,6 +8764,7 @@ private:
     // expression is treated as an atom.
     uint64_t evalRingMod(
         ExpressionPointer expression,
+        const std::string& carrierName,
         const std::string& addName,
         const std::string& multiplyName,
         const std::string& negateName,
@@ -8775,31 +8776,56 @@ private:
         if (matchRingOne(expression, oneName)) return 1 % modulus;
         ExpressionPointer left, right;
         if (matchBinaryRingOp(expression, addName, left, right)) {
-            uint64_t l = evalRingMod(left, addName, multiplyName,
-                negateName, subtractName, zeroName, oneName, modulus);
-            uint64_t r = evalRingMod(right, addName, multiplyName,
-                negateName, subtractName, zeroName, oneName, modulus);
+            uint64_t l = evalRingMod(left, carrierName, addName,
+                multiplyName, negateName, subtractName, zeroName,
+                oneName, modulus);
+            uint64_t r = evalRingMod(right, carrierName, addName,
+                multiplyName, negateName, subtractName, zeroName,
+                oneName, modulus);
             return (l + r) % modulus;
         }
         if (matchBinaryRingOp(expression, multiplyName, left, right)) {
-            uint64_t l = evalRingMod(left, addName, multiplyName,
-                negateName, subtractName, zeroName, oneName, modulus);
-            uint64_t r = evalRingMod(right, addName, multiplyName,
-                negateName, subtractName, zeroName, oneName, modulus);
+            uint64_t l = evalRingMod(left, carrierName, addName,
+                multiplyName, negateName, subtractName, zeroName,
+                oneName, modulus);
+            uint64_t r = evalRingMod(right, carrierName, addName,
+                multiplyName, negateName, subtractName, zeroName,
+                oneName, modulus);
             return (uint64_t)(((__uint128_t)l * r) % modulus);
         }
         if (matchBinaryRingOp(expression, subtractName, left, right)) {
-            uint64_t l = evalRingMod(left, addName, multiplyName,
-                negateName, subtractName, zeroName, oneName, modulus);
-            uint64_t r = evalRingMod(right, addName, multiplyName,
-                negateName, subtractName, zeroName, oneName, modulus);
+            uint64_t l = evalRingMod(left, carrierName, addName,
+                multiplyName, negateName, subtractName, zeroName,
+                oneName, modulus);
+            uint64_t r = evalRingMod(right, carrierName, addName,
+                multiplyName, negateName, subtractName, zeroName,
+                oneName, modulus);
             return (l + modulus - r) % modulus;
         }
         ExpressionPointer inner;
         if (matchUnaryRingNegate(expression, negateName, inner)) {
-            uint64_t v = evalRingMod(inner, addName, multiplyName,
-                negateName, subtractName, zeroName, oneName, modulus);
+            uint64_t v = evalRingMod(inner, carrierName, addName,
+                multiplyName, negateName, subtractName, zeroName,
+                oneName, modulus);
             return (modulus - v) % modulus;
+        }
+        // Carrier-embedded Natural literal: must mirror what ring V2
+        // recognises, else V2 would canonicalise it to a literal while
+        // the Z/p eval treats it as an atom — leading to a spurious
+        // disagreement. For the Integer carrier:
+        // `Natural.to_integer(successor^k(zero))` is integer literal k.
+        if (carrierName == "Integer") {
+            if (auto* app =
+                    std::get_if<Application>(&expression->node)) {
+                auto* head =
+                    std::get_if<Constant>(&app->function->node);
+                if (head && head->name == "Natural.to_integer") {
+                    int value = 0;
+                    if (tryParseNaturalLiteral(app->argument, value)) {
+                        return ((uint64_t)value) % modulus;
+                    }
+                }
+            }
         }
         // Atom: use the cached bottom-up structural hash. Two
         // structurally-equal atoms have the same hash, so they get the
@@ -8824,11 +8850,11 @@ private:
         const std::string zeroName      = carrierName + ".zero";
         const std::string oneName       = carrierName + ".one";
         uint64_t leftValue = evalRingMod(
-            leftEndpoint, addName, multiplyName, negateName,
-            subtractName, zeroName, oneName, kModulus);
+            leftEndpoint, carrierName, addName, multiplyName,
+            negateName, subtractName, zeroName, oneName, kModulus);
         uint64_t rightValue = evalRingMod(
-            rightEndpoint, addName, multiplyName, negateName,
-            subtractName, zeroName, oneName, kModulus);
+            rightEndpoint, carrierName, addName, multiplyName,
+            negateName, subtractName, zeroName, oneName, kModulus);
         return leftValue == rightValue;
     }
 
