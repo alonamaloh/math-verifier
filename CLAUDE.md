@@ -83,10 +83,23 @@ Quotient.lift(RationalRepresentative, RationalEquivalent, Rational,
                q)
 ```
 
-### Quotient.induct(motive, atRep, q)
+### Quotient.induct(motive, atRep, q) — and motive inference
+
+The motive can be omitted (or written as `_`) when it would be
+recoverable from the surrounding goal type by abstracting the
+scrutinee(s). This is the default-style for any quotient elimination
+whose goal mentions the scrutinees.
 
 ```math
--- Short (preferred): T, R inferred from q.
+-- Shortest form: motive inferred. Goal is abstracted over q to form
+-- the motive.
+Quotient.induct(atRep, q)
+
+-- Equivalent with explicit `_` (sometimes clearer in code review).
+Quotient.induct(_, atRep, q)
+
+-- Verbose, when you want a specific motive shape (e.g. to thread
+-- additional hypotheses).
 Quotient.induct(
     function (xArg : Rational) => P(xArg),
     function (rep : RationalRepresentative) => proofAtRep(rep),
@@ -95,14 +108,93 @@ Quotient.induct(
 
 ### Quotient.induct_two(motive, atRep, q1, q2)
 
-Same pattern, 4 args. For binary laws.
+Same pattern, 3 or 4 args. For binary laws.
+
+```math
+Quotient.induct_two(at_make_lemma, x, y)
+```
 
 ### Quotient.induct_three(motive, atRep, q1, q2, q3)
 
-5 args, for ternary laws (associativity, distributivity). This was
-added to avoid the awkward `function (yArg) (zArg) =>
-Quotient.induct_two(yArg, zArg)` lambda-wrap that the older library
-files use. New 3-arg laws should prefer `induct_three`.
+4 or 5 args, for ternary laws (associativity, distributivity).
+
+```math
+Quotient.induct_three(at_make_lemma, x, y, z)
+```
+
+## Patterns in binders — `take`, `suppose`, `cases` on quotients
+
+The unifying principle: a binder accepts a pattern, and the elaborator
+picks the eliminator from the type. This is the standard idiom for
+"WLOG pick a representative" / "let n = k + 1" intros.
+
+### `cases` on a quotient — direct destructure
+
+The pattern can be a bare name (bind the rep), a constructor pattern
+over the carrier type (destructure the rep), or the explicit
+`Quotient.mk(<inner>)` wrap (legacy).
+
+```math
+-- Bare name: bind rep_x to the representative.
+cases x { | rep_x => …use rep_x… }
+
+-- Constructor pattern: destructure the rep directly.
+cases x { | IntegerRepresentative.make(a, b) =>
+    …use a and b… }
+
+-- Two-binder cases nest naturally:
+cases x { | IntegerRepresentative.make(a, b) =>
+  cases y { | IntegerRepresentative.make(c, d) =>
+    …use a, b, c, d… } }
+```
+
+### `cases x refining h1, h2 { … }` — destructure with hypothesis refinement
+
+When you've named hypotheses about `x` (e.g. `xPos : 0 < x`), use
+`refining` to thread them through the destructure so the inner body
+sees their refined types. Works on inductive scrutinees AND quotient
+scrutinees (with a single refining name; multi-name on a quotient is
+not yet wired up).
+
+```math
+theorem Rational.multiply_positive_positive
+        (x y : Rational) (xPos : 0 < x) (yPos : 0 < y)
+        : 0 < x * y :=
+  cases x refining xPos { | RationalRepresentative.make(n_x, d_x) =>
+    cases y refining yPos { | RationalRepresentative.make(n_y, d_y) =>
+      …use xPos (now refined to 0 < [n_x/d_x]) … } }
+```
+
+### `take x as <pattern> : T;` — statement-level intro with destructure
+
+In a `{ … }` block body, `take x as <pattern> : T;` introduces a
+Pi-binder of type T and immediately destructures it. Equivalent to
+`take x : T; cases x { | <pattern> => <rest> };`. Dispatch is
+type-directed: inductive T uses cases; quotient T uses the
+quotient-cases path above.
+
+```math
+theorem Integer.triangle_inequality
+        : (x y : Integer)
+          → abs(x + y) ≤ abs(x) + abs(y) := {
+  take x as IntegerRepresentative.make(a, b) : Integer;
+  take y as IntegerRepresentative.make(c, d) : Integer;
+  Integer.triangle_inequality_at_representatives(a, b, c, d)
+}
+```
+
+### `suppose <P> as <pattern>;` — destructure on intro for hypotheses
+
+Symmetric form for propositional intros. The pattern can be a bare
+name (current behavior) or a tuple/constructor pattern (destructure
+into named pieces).
+
+```math
+suppose ∃ (n : Natural). P(n) as ⟨witness, proof⟩;
+-- equivalent to:
+-- suppose ∃ (n : Natural). P(n) as h;
+-- obtain ⟨witness, proof⟩ from h;
+```
 
 ## Name-bound conventions
 
