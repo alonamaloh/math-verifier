@@ -14927,6 +14927,19 @@ private:
             applicationHeadConstantName(targetReduced);
         int occurrences = 0;
         int whnfFuel = 2048;
+        motiveWalkerCache_.clear();
+        // MATH_DECIDE_CONSTANT_MOTIVE=1: skip the WHNF walker entirely
+        // and always use the constant motive `λ_. Goal`. The arms must
+        // prove Goal directly; the kernel's lazy defeq handles any
+        // ι-reduction implicitly when checking the arm's body against
+        // Goal. For supremum.math, this would avoid the 28-s-per-call
+        // motiveAbstraction cost — IF the user's arm proofs survive
+        // without the ι-pre-reduction the explicit motive provides.
+        const char* constMotiveFlag =
+            std::getenv("MATH_DECIDE_CONSTANT_MOTIVE");
+        bool forceConstantMotive = constMotiveFlag
+            && constMotiveFlag[0] != '\0'
+            && constMotiveFlag[0] != '0';
         ExpressionPointer motiveBody;
         const char* sizeFlag = std::getenv("MATH_DECIDE_SIZES");
         bool dumpSizes = sizeFlag && sizeFlag[0] != '\0'
@@ -14936,7 +14949,13 @@ private:
             expectedSize = countExpressionNodes(expectedType);
             targetSize = countExpressionNodes(targetReduced);
         }
-        {
+        if (forceConstantMotive) {
+            // Skip the walker; use the constant motive directly.
+            // (Same lift as the existing fallback path below.)
+            motiveBody = liftBoundVariables(
+                expectedType, /*increment=*/1, /*threshold=*/0);
+            occurrences = 0;
+        } else {
             TimedScope _inner(*this, "decide:motiveAbstraction");
             motiveBody = abstractStructuralOccurrenceWithWHNF(
                 expectedType, targetReduced, targetHeadName,
@@ -16930,6 +16949,46 @@ private:
     }
 
     ExpressionPointer abstractStructuralOccurrenceWithWHNF(
+        ExpressionPointer expression,
+        ExpressionPointer target,
+        const std::string& targetHeadName,
+        int currentDepth,
+        int& occurrenceCount,
+        int& whnfFuel) {
+        // Memoization at depth 0 (the dominant case). Keyed by raw
+        // expression pointer — safe because Expression is immutable
+        // and the target is fixed for one decide call. Skips the
+        // recursive walk entirely on cache hit. Cache is cleared at
+        // the start of each elaborateDecide.
+        if (currentDepth == 0) {
+            auto cached = motiveWalkerCache_.find(expression.get());
+            if (cached != motiveWalkerCache_.end()) {
+                occurrenceCount += cached->second.occurrenceDelta;
+                whnfFuel -= cached->second.whnfFuelDelta;
+                return cached->second.result;
+            }
+        }
+        int occurrenceBefore = occurrenceCount;
+        int whnfFuelBefore = whnfFuel;
+        // Inner work — produces the result; the wrapper below caches
+        // it (at depth 0 only) before returning.
+        ExpressionPointer result =
+            abstractStructuralOccurrenceWithWHNF_inner(
+                expression, target, targetHeadName,
+                currentDepth, occurrenceCount, whnfFuel);
+        if (currentDepth == 0) {
+            MotiveWalkerCacheEntry entry;
+            entry.result = result;
+            entry.occurrenceDelta = occurrenceCount - occurrenceBefore;
+            entry.whnfFuelDelta = whnfFuelBefore - whnfFuel;
+            motiveWalkerCache_[expression.get()] = std::move(entry);
+        }
+        return result;
+    }
+
+    // Inner implementation. The wrapper above handles depth-0
+    // memoization; this function does the actual work.
+    ExpressionPointer abstractStructuralOccurrenceWithWHNF_inner(
         ExpressionPointer expression,
         ExpressionPointer target,
         const std::string& targetHeadName,
@@ -20063,6 +20122,21 @@ private:
     };
     std::unordered_map<std::string, TacticStats> tacticStats_;
     bool tacticTimingEnabled_ = false;
+
+    // Per-decide-invocation memoization for the motive walker
+    // (abstractStructuralOccurrenceWithWHNF). The walker visits the
+    // same subterms repeatedly when WHNF unfolds expose recurring
+    // structure. Caching by raw expression pointer at depth 0 (the
+    // dominant case — depth > 0 only occurs inside Pi/Lambda/Let
+    // binders, which are rare in the user-value path) collapses the
+    // duplicated work. Cleared at the start of each elaborateDecide.
+    struct MotiveWalkerCacheEntry {
+        ExpressionPointer result;
+        int occurrenceDelta;
+        int whnfFuelDelta;  // amount of fuel CONSUMED by this call
+    };
+    std::unordered_map<Expression*, MotiveWalkerCacheEntry>
+        motiveWalkerCache_;
     bool reportRedundantBy_ = false;
     bool reportRedundantByNonEq_ = false;
     bool reportRedundantCalcSteps_ = false;
