@@ -14862,15 +14862,15 @@ private:
             int outerIdx = refiningBoundVariableIndices[i];
             wrappedExpectedType = abstractOverBoundVariable(
                 wrappedExpectedType, outerIdx);
-            // T_i itself may reference any refining binder we already
-            // moved into the chain (those at j > i, which were
-            // processed first because we iterate in reverse). Apply
-            // the same abstractions to T_i.
+            // T_i is the type of h_i and belongs in the scope at the
+            // position where Pi(h_i_new, T_i, ...) is being inserted.
+            // The chain places h_1 outermost, h_2 inside it, ..., h_N
+            // innermost — so each subsequent outer-abstract (in future
+            // iterations) will descend through this Pi's domain at
+            // currentDepth=0 and lift its outer BVs by 1, naturally
+            // shifting T_i by the number of refining Pis above it.
+            // No extra lifting is needed here.
             ExpressionPointer domain = refiningTypesAtOuterDepth[i];
-            for (int j = refiningCount - 1; j > i; --j) {
-                domain = abstractOverBoundVariable(
-                    domain, refiningBoundVariableIndices[j]);
-            }
             wrappedExpectedType = makePi(
                 cases.refiningNames[i],
                 std::move(domain),

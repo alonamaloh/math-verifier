@@ -153,8 +153,7 @@ cases x { | IntegerRepresentative.make(a, b) =>
 When you've named hypotheses about `x` (e.g. `xPos : 0 < x`), use
 `refining` to thread them through the destructure so the inner body
 sees their refined types. Works on inductive scrutinees AND quotient
-scrutinees (with a single refining name; multi-name on a quotient is
-not yet wired up).
+scrutinees, with any number of refining names.
 
 ```math
 theorem Rational.multiply_positive_positive

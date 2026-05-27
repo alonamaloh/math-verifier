@@ -414,30 +414,21 @@ theorem Real.LessThan.distinct
         (x y : Real) (xLessThanY : x < y) : Not(x = y) :=
   And.right(Real.LessOrEqual(x, y), Not(x = y), xLessThanY)
 
--- Real-level: x ≥ 0 and -x ≥ 0 implies x = Real.zero. Lift via
--- Quotient.induct.
+-- Real-level: x ≥ 0 and -x ≥ 0 implies x = Real.zero. Take a
+-- representative; sequence-level antisymmetry gives the equivalence
+-- to the constant-zero sequence, which lifts via Quotient.sound.
 theorem Real.IsNonneg_and_negate_IsNonneg_implies_zero
         (x : Real)
         (xNonneg : Real.IsNonneg(x))
         (negXNonneg : Real.IsNonneg(-x))
         : x = Real.zero :=
-  Quotient.induct(
-      function (xArg : Real) =>
-          Real.IsNonneg(xArg) → Real.IsNonneg(-xArg)
-          → xArg = Real.zero,
-      function (rep : CauchyRationalSequence) =>
-        function (xNonneg' : CauchyRationalSequence.IsEventuallyNonneg(rep))
-                 (negXNonneg' : CauchyRationalSequence.IsEventuallyNonneg(
-                                    CauchyRationalSequence.negate(rep))) =>
-          -- Conclude (Quotient.mk(rep) : Real) = Real.zero via
-          -- Quotient.sound. Real.zero = mk(to_cauchy_constant(zero)).
-          Quotient.sound(
-              CauchyRationalSequence, CauchyEquivalent,
-              rep,
-              Rational.to_cauchy_constant(Rational.zero),
-              CauchyRationalSequence.equivalent_zero_of_IsEventuallyNonneg_both(
-                  rep, xNonneg', negXNonneg')),
-      x)(xNonneg)(negXNonneg)
+  cases x refining xNonneg, negXNonneg { | rep =>
+    Quotient.sound(
+        CauchyRationalSequence, CauchyEquivalent,
+        rep,
+        Rational.to_cauchy_constant(Rational.zero),
+        CauchyRationalSequence.equivalent_zero_of_IsEventuallyNonneg_both(
+            rep, xNonneg, negXNonneg)) }
 
 -- Real.LessOrEqual.antisymmetric : x ≤ y, y ≤ x → x = y. From
 -- IsNonneg(y - x) and IsNonneg(x - y) = IsNonneg(-(y - x)) we get
