@@ -558,151 +558,97 @@ theorem Rational.multiply_positive_at_representatives
       productNonzero)
 }
 
--- Multiplication preserves strict positivity. Quotient.induct on both
--- arguments and extract strict-positive witnesses for the numerators.
+-- Multiplication preserves strict positivity. Take representatives
+-- x = [n_x/d_x], y = [n_y/d_y]; strict-positive witnesses give
+-- n_x = succ(k_x), n_y = succ(k_y), then succ * succ > 0 at the
+-- representative level proves the result.
 theorem Rational.multiply_positive_positive
         (x y : Rational) (xPos : Rational.zero < x) (yPos : Rational.zero < y)
         : Rational.zero < x * y :=
-  Quotient.induct_two(
-      function (xArg yArg : Rational) =>
-          Rational.zero < xArg → Rational.zero < yArg
-          → Rational.zero < xArg * yArg,
-      function (rep_x rep_y : RationalRepresentative) =>
-          (cases rep_x {
-             | RationalRepresentative.make(n_x, d_x) =>
-                 (cases rep_y {
-                    | RationalRepresentative.make(n_y, d_y) =>
-                        function (xArgPos : Rational.zero
-                                              < Quotient.mk(
-                                                    RationalRepresentative,
-                                                    RationalEquivalent,
-                                                    RationalRepresentative.make(
-                                                        n_x, d_x)))
-                                 (yArgPos : Rational.zero
-                                              < Quotient.mk(
-                                                    RationalRepresentative,
-                                                    RationalEquivalent,
-                                                    RationalRepresentative.make(
-                                                        n_y, d_y))) =>
-                          -- Extract n_x = succ(k_x), n_y = succ(k_y).
-                          ({
-                            obtain ⟨k_x, n_x_eq⟩ from
-                              Rational.strict_positive_witness_at_representative(
-                                  n_x, d_x,
-                                  Rational.IsNonneg_of_LessOrEqual_zero(
-                                      Quotient.mk(RationalRepresentative.make(
-                                                      n_x, d_x)),
-                                      Rational.LessThan.weaken(
-                                          Rational.zero,
-                                          Quotient.mk(RationalRepresentative.make(
-                                                          n_x, d_x)),
-                                          xArgPos)),
-                                  function (zeroEqNx : n_x = Integer.zero) =>
-                                    Rational.LessThan.distinct(
-                                        Rational.zero,
-                                        Quotient.mk(RationalRepresentative.make(
-                                                        n_x, d_x)),
-                                        xArgPos)(
-                                        calc Rational.zero
-                                           = Quotient.mk(
-                                                 RationalRepresentative,
-                                                 RationalEquivalent,
-                                                 RationalRepresentative.make(
-                                                     Integer.zero, 0))
-                                           = Quotient.mk(
-                                                 RationalRepresentative,
-                                                 RationalEquivalent,
-                                                 RationalRepresentative.make(
-                                                     n_x, d_x))
-                                                 by Quotient.sound(
-                                                        RationalRepresentative,
-                                                        RationalEquivalent,
-                                                        RationalRepresentative.make(
-                                                            Integer.zero, 0),
-                                                        RationalRepresentative.make(
-                                                            n_x, d_x),
-                                                        calc Integer.zero
-                                                               * (successor(d_x) : Integer)
-                                                           = n_x
-                                                           = n_x
-                                                               * (successor(0) : Integer))));
-                            obtain ⟨k_y, n_y_eq⟩ from
-                              Rational.strict_positive_witness_at_representative(
-                                  n_y, d_y,
-                                  Rational.IsNonneg_of_LessOrEqual_zero(
-                                      Quotient.mk(RationalRepresentative.make(
-                                                      n_y, d_y)),
-                                      Rational.LessThan.weaken(
-                                          Rational.zero,
-                                          Quotient.mk(RationalRepresentative.make(
-                                                          n_y, d_y)),
-                                          yArgPos)),
-                                  function (zeroEqNy : n_y = Integer.zero) =>
-                                    Rational.LessThan.distinct(
-                                        Rational.zero,
-                                        Quotient.mk(RationalRepresentative.make(
-                                                        n_y, d_y)),
-                                        yArgPos)(
-                                        -- Show: Rational.zero = mk(make(n_y, d_y))
-                                        -- given n_y = Integer.zero.
-                                        calc Rational.zero
-                                           = Quotient.mk(
-                                                 RationalRepresentative,
-                                                 RationalEquivalent,
-                                                 RationalRepresentative.make(
-                                                     Integer.zero, 0))
-                                           = Quotient.mk(
-                                                 RationalRepresentative,
-                                                 RationalEquivalent,
-                                                 RationalRepresentative.make(
-                                                     n_y, d_y))
-                                                 by Quotient.sound(
-                                                        RationalRepresentative,
-                                                        RationalEquivalent,
-                                                        RationalRepresentative.make(
-                                                            Integer.zero, 0),
-                                                        RationalRepresentative.make(
-                                                            n_y, d_y),
-                                                        -- 0 · succ(d_y) = n_y · succ(0).
-                                                        -- Both = 0 (since n_y = 0).
-                                                        calc Integer.zero
-                                                               * (successor(d_y) : Integer)
-                                                           = n_y
-                                                           = n_y
-                                                               * (successor(0) : Integer))));
-                            -- Transport to the (succ k_x, succ k_y) form.
-                            calc Rational.zero
-                               < Quotient.mk(RationalRepresentative.make(
-                                                 (successor(k_x) : Integer), d_x))
-                                     * Quotient.mk(RationalRepresentative.make(
-                                                       (successor(k_y) : Integer), d_y))
-                                   by Rational.multiply_positive_at_representatives(
-                                          k_x, k_y, d_x, d_y)
-                               = Quotient.mk(RationalRepresentative.make(n_x, d_x))
-                                     * Quotient.mk(RationalRepresentative.make(
-                                                       (successor(k_y) : Integer), d_y))
-                               = Quotient.mk(RationalRepresentative.make(n_x, d_x))
-                                     * Quotient.mk(RationalRepresentative.make(n_y, d_y))
-                          } : Rational.zero
-                                < Quotient.mk(RationalRepresentative.make(
-                                                  n_x, d_x))
-                                  * Quotient.mk(RationalRepresentative.make(
-                                                    n_y, d_y)))
-                  } : Rational.zero
-                          < Quotient.mk(RationalRepresentative.make(n_x, d_x))
-                      → Rational.zero
-                          < Quotient.mk(rep_y)
-                      → Rational.zero
-                          < Quotient.mk(RationalRepresentative.make(n_x, d_x))
-                              * Quotient.mk(rep_y))
-           } : Rational.zero
-                   < Quotient.mk(rep_x)
-               → Rational.zero
-                   < Quotient.mk(rep_y)
-               → Rational.zero
-                   < Quotient.mk(rep_x)
-                       * Quotient.mk(rep_y)),
-      x, y)(xPos)(yPos)
+  cases x refining xPos { | RationalRepresentative.make(n_x, d_x) =>
+    cases y refining yPos { | RationalRepresentative.make(n_y, d_y) => {
+      obtain ⟨k_x, n_x_eq⟩ from
+        Rational.strict_positive_witness_at_representative(
+            n_x, d_x,
+            Rational.IsNonneg_of_LessOrEqual_zero(
+                Quotient.mk(RationalRepresentative.make(n_x, d_x)),
+                Rational.LessThan.weaken(
+                    Rational.zero,
+                    Quotient.mk(RationalRepresentative.make(n_x, d_x)),
+                    xPos)),
+            function (zeroEqNx : n_x = Integer.zero) =>
+              Rational.LessThan.distinct(
+                  Rational.zero,
+                  Quotient.mk(RationalRepresentative.make(n_x, d_x)),
+                  xPos)(
+                  calc Rational.zero
+                     = Quotient.mk(
+                           RationalRepresentative,
+                           RationalEquivalent,
+                           RationalRepresentative.make(Integer.zero, 0))
+                     = Quotient.mk(
+                           RationalRepresentative,
+                           RationalEquivalent,
+                           RationalRepresentative.make(n_x, d_x))
+                           by Quotient.sound(
+                                  RationalRepresentative,
+                                  RationalEquivalent,
+                                  RationalRepresentative.make(
+                                      Integer.zero, 0),
+                                  RationalRepresentative.make(n_x, d_x),
+                                  calc Integer.zero
+                                          * (successor(d_x) : Integer)
+                                      = n_x
+                                      = n_x
+                                          * (successor(0) : Integer))));
+      obtain ⟨k_y, n_y_eq⟩ from
+        Rational.strict_positive_witness_at_representative(
+            n_y, d_y,
+            Rational.IsNonneg_of_LessOrEqual_zero(
+                Quotient.mk(RationalRepresentative.make(n_y, d_y)),
+                Rational.LessThan.weaken(
+                    Rational.zero,
+                    Quotient.mk(RationalRepresentative.make(n_y, d_y)),
+                    yPos)),
+            function (zeroEqNy : n_y = Integer.zero) =>
+              Rational.LessThan.distinct(
+                  Rational.zero,
+                  Quotient.mk(RationalRepresentative.make(n_y, d_y)),
+                  yPos)(
+                  calc Rational.zero
+                     = Quotient.mk(
+                           RationalRepresentative,
+                           RationalEquivalent,
+                           RationalRepresentative.make(Integer.zero, 0))
+                     = Quotient.mk(
+                           RationalRepresentative,
+                           RationalEquivalent,
+                           RationalRepresentative.make(n_y, d_y))
+                           by Quotient.sound(
+                                  RationalRepresentative,
+                                  RationalEquivalent,
+                                  RationalRepresentative.make(
+                                      Integer.zero, 0),
+                                  RationalRepresentative.make(n_y, d_y),
+                                  calc Integer.zero
+                                          * (successor(d_y) : Integer)
+                                      = n_y
+                                      = n_y
+                                          * (successor(0) : Integer))));
+      -- Transport to the (succ k_x, succ k_y) form.
+      calc Rational.zero
+         < Quotient.mk(RationalRepresentative.make(
+                           (successor(k_x) : Integer), d_x))
+               * Quotient.mk(RationalRepresentative.make(
+                                 (successor(k_y) : Integer), d_y))
+             by Rational.multiply_positive_at_representatives(
+                    k_x, k_y, d_x, d_y)
+         = Quotient.mk(RationalRepresentative.make(n_x, d_x))
+               * Quotient.mk(RationalRepresentative.make(
+                                 (successor(k_y) : Integer), d_y))
+         = Quotient.mk(RationalRepresentative.make(n_x, d_x))
+               * Quotient.mk(RationalRepresentative.make(n_y, d_y))
+    } } }
 
 -- The ε construction: given ε > 0 and Natural K, produce a positive
 -- δ with (succ(K) : R) · δ ≤ ε. Witness: δ := ε · (1/succ(K)).

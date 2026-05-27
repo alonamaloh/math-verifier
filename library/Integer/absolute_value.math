@@ -110,16 +110,14 @@ theorem Integer.negate_negate_at_representative
       reflexivity(IntegerRepresentative,
           IntegerRepresentative.make(a, b))
 
--- -(-x) = x on Integer.
+-- -(-x) = x on Integer. Take a representative rep for x; the equation
+-- at the rep lifts to the quotient via congruence on `mk`.
 theorem Integer.negate_negate (x : Integer) : -(-x) = x :=
-  Quotient.induct(
-      function (y : Integer) => -(-y) = y,
-      function (rep : IntegerRepresentative) =>
-          congruenceOf(
-              function (r : IntegerRepresentative) =>
-                  (Quotient.mk(r) : Integer),
-              Integer.negate_negate_at_representative(rep)),
-      x)
+  cases x { | rep =>
+    congruenceOf(
+        function (r : IntegerRepresentative) =>
+            (Quotient.mk(r) : Integer),
+        Integer.negate_negate_at_representative(rep)) }
 
 -- -(p + q) = -p + -q at the representative level. Both sides reduce
 -- to make(β + δ, α + γ) when p = mk(make(α, β)), q = mk(make(γ, δ)).
@@ -135,17 +133,14 @@ theorem Integer.negate_add_at_representatives
       reflexivity(IntegerRepresentative,
           IntegerRepresentative.make(beta + delta, alpha + gamma))
 
--- -(p + q) = -p + -q on Integer. Quotient.induct_two to handle both
--- arguments.
+-- -(p + q) = -p + -q on Integer. Take representatives for both p and q.
 theorem Integer.negate_add (p q : Integer) : -(p + q) = -p + -q :=
-  Quotient.induct_two(
-      function (a b : Integer) => -(a + b) = -a + -b,
-      function (rep_p rep_q : IntegerRepresentative) =>
-          congruenceOf(
-              function (r : IntegerRepresentative) =>
-                  (Quotient.mk(r) : Integer),
-              Integer.negate_add_at_representatives(rep_p, rep_q)),
-      p, q)
+  cases p { | rep_p =>
+    cases q { | rep_q =>
+      congruenceOf(
+          function (r : IntegerRepresentative) =>
+              (Quotient.mk(r) : Integer),
+          Integer.negate_add_at_representatives(rep_p, rep_q)) } }
 
 -- ----------------------------------------------------------------------
 -- Triangle inequality.
@@ -190,36 +185,14 @@ theorem Integer.triangle_inequality_at_representatives
           Natural.distance(a, b) + Natural.distance(c, d),
           Natural.distance_add_triangle(a, b, c, d)))
 
--- |x + y| ≤ |x| + |y| on Integer. Lift via Quotient.induct_two.
+-- |x + y| ≤ |x| + |y| on Integer. Take representatives x = [(a, b)],
+-- y = [(c, d)]; the result follows from the at-representatives lemma.
 theorem Integer.triangle_inequality (x y : Integer)
         : Integer.absolute_value(x + y)
           ≤ Integer.absolute_value(x) + Integer.absolute_value(y) :=
-  Quotient.induct_two(
-      function (p q : Integer) =>
-          Integer.absolute_value(p + q)
-            ≤ Integer.absolute_value(p) + Integer.absolute_value(q),
-      function (rep_p rep_q : IntegerRepresentative) =>
-          (cases rep_p {
-             | IntegerRepresentative.make(a, b) =>
-                 (cases rep_q {
-                    | IntegerRepresentative.make(c, d) =>
-                        Integer.triangle_inequality_at_representatives(
-                            a, b, c, d)
-                  } : Integer.absolute_value(
-                          Quotient.mk(IntegerRepresentative.make(a, b))
-                          + Quotient.mk(rep_q))
-                      ≤ Integer.absolute_value(
-                            Quotient.mk(IntegerRepresentative.make(a, b)))
-                        + Integer.absolute_value(
-                              Quotient.mk(rep_q)))
-           } : Integer.absolute_value(
-                   Quotient.mk(rep_p)
-                   + Quotient.mk(rep_q))
-               ≤ Integer.absolute_value(
-                     Quotient.mk(rep_p))
-                 + Integer.absolute_value(
-                       Quotient.mk(rep_q))),
-      x, y)
+  cases x { | IntegerRepresentative.make(a, b) =>
+    cases y { | IntegerRepresentative.make(c, d) =>
+      Integer.triangle_inequality_at_representatives(a, b, c, d) } }
 
 
 -- x - y = -(y - x). Single ring identity; the auto-prover closes
