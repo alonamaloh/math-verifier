@@ -30,20 +30,12 @@ import Integer.negation
 -- 0)) — all by definitional reduction since multiply and add reduce on
 -- their first arguments when that argument is `zero`.
 
-theorem Integer.multiply_zero_left_at_representative
-        : (rep : IntegerRepresentative)
-          → Integer.zero * Quotient.mk(
-                        IntegerRepresentative, IntegerEquivalent, rep) = Integer.zero
-  | IntegerRepresentative.make(a, b) =>
-      reflexivity(Integer, Integer.zero)
-
+-- Take a representative x = [(a, b)]. Both sides β-reduce to
+-- Integer.zero — leaf is reflexivity.
 theorem Integer.multiply_zero_left (x : Integer)
         : Integer.zero * x = Integer.zero :=
-  Quotient.induct(
-      function (x : Integer) =>
-          Integer.zero * x = Integer.zero,
-      Integer.multiply_zero_left_at_representative,
-      x)
+  cases x { | IntegerRepresentative.make(a, b) =>
+    reflexivity(Integer, Integer.zero) }
 
 theorem Integer.multiply_zero_right (x : Integer)
         : x * Integer.zero = Integer.zero :=
@@ -61,42 +53,16 @@ theorem Integer.multiply_zero_right (x : Integer)
 --                 = mk(make(a·d + b·c, a·c + b·d))
 -- Both reduce to the same representative — leaf is reflexivity.
 
-theorem Integer.multiply_negate_right_at_representatives
-        : (rep1 rep2 : IntegerRepresentative)
-          → Quotient.mk(
-                        IntegerRepresentative, IntegerEquivalent, rep1) * -Quotient.mk(
-                            IntegerRepresentative, IntegerEquivalent, rep2) = -(Quotient.mk(
-                            IntegerRepresentative, IntegerEquivalent, rep1) * Quotient.mk(
-                            IntegerRepresentative, IntegerEquivalent, rep2))
-  | IntegerRepresentative.make(a, b),
-    IntegerRepresentative.make(c, d) =>
-      reflexivity(Integer,
-          Quotient.mk(
-              IntegerRepresentative, IntegerEquivalent,
-              IntegerRepresentative.make(a * d + b * c, a * c + b * d)))
-
-theorem Integer.multiply_negate_right_after_first
-        (rep1 : IntegerRepresentative) (y : Integer)
-        : Quotient.mk(
-                      IntegerRepresentative, IntegerEquivalent, rep1) * -y = -(Quotient.mk(
-                          IntegerRepresentative, IntegerEquivalent, rep1) * y) :=
-  Quotient.induct(
-      function (y : Integer) =>
-          Quotient.mk(
-                      IntegerRepresentative, IntegerEquivalent, rep1) * -y = -(Quotient.mk(
-                          IntegerRepresentative, IntegerEquivalent, rep1) * y),
-      function (rep2 : IntegerRepresentative) =>
-          Integer.multiply_negate_right_at_representatives(rep1, rep2),
-      y)
-
+-- Take representatives x = [(a, b)], y = [(c, d)]; both sides reduce
+-- to mk(make(a*d + b*c, a*c + b*d)) by kernel β. Leaf is reflexivity.
 theorem Integer.multiply_negate_right (x y : Integer)
         : x * -y = -(x * y) :=
-  Quotient.induct(
-      function (x : Integer) =>
-          x * -y = -(x * y),
-      function (rep1 : IntegerRepresentative) =>
-          Integer.multiply_negate_right_after_first(rep1, y),
-      x)
+  cases x { | IntegerRepresentative.make(a, b) =>
+    cases y { | IntegerRepresentative.make(c, d) =>
+      reflexivity(Integer,
+          (Quotient.mk(
+               IntegerRepresentative.make(a * d + b * c, a * c + b * d))
+              : Integer)) } }
 
 -- Left companion via commutativity.
 theorem Integer.multiply_negate_left (x y : Integer)
