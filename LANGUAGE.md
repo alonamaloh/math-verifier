@@ -182,6 +182,39 @@ motive search finds buried `classical_decidable(P)` occurrences (e.g.
 inside `bisectionStepWithDec`) and abstracts them, so each arm proves
 the ι-reduced shape automatically.
 
+### Collapsing Quotient-lifted ring laws (the "triple-helper" antipattern)
+
+A common older idiom in this library: a ring law on a quotient
+carrier (Integer, Rational, Real, PAdic) was proved by stacking three
+or four helper theorems:
+
+1. `Foo_at_representatives` — the Quotient.sound at the rep level.
+2. `Foo_after_first_second` — `Quotient.induct` over the third arg with
+   an explicit motive (uses `_at_representatives` at the leaf).
+3. `Foo_after_first` — `Quotient.induct` over the second arg
+   (uses `_after_first_second` at the leaf).
+4. `Foo` (the main theorem) — `Quotient.induct` over the first arg
+   (uses `_after_first` at the leaf).
+
+This entire chain collapses to **one proof** with nested
+`cases x { | Constructor.make(…) => … }` blocks:
+
+```math
+theorem Integer.add_commutative (x y : Integer)
+        : x + y = y + x :=
+  cases x { | IntegerRepresentative.make(a, b) =>
+    cases y { | IntegerRepresentative.make(c, d) =>
+      Quotient.sound(
+          IntegerRepresentative.make(a + c, b + d),
+          IntegerRepresentative.make(c + a, d + b),
+          Integer.add_commutative_natural(a, b, c, d)) } }
+```
+
+The kernel's `Quotient.lift` β-reduces both sides at the leaf to the
+representative form; `Quotient.sound` closes the equivalence using a
+plain Natural-level kernel theorem. The motive-passing
+`Quotient.induct` chain is unnecessary — `cases` does it implicitly.
+
 ### Quotient destructure — pick a representative
 
 For a quotient scrutinee (`x : Integer`, `x : Rational`, `x : Real`,
