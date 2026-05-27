@@ -3317,6 +3317,7 @@ private:
                         positionalArguments[0],
                         positionalArguments[1],
                         localBinders,
+                        expectedType,
                         expression.line, expression.column);
                 }
                 if (name == "simplify" && argumentCount >= 1) {
@@ -16526,6 +16527,78 @@ private:
         return working;
     }
 
+    // Variant of `abstractStructuralOccurrence` that abstracts a
+    // SUBSET of matching occurrences, selected by index (left-to-right
+    // in-order). `positionCounter` is the running counter (in/out);
+    // each match increments it; the match at index i gets abstracted
+    // iff `mask & (1u << i)` is set. Unselected matches stay as the
+    // original expression. Used by the multi-occurrence rewrite path
+    // (when the expected type is known and disambiguates which subset
+    // of positions the user wants substituted).
+    ExpressionPointer abstractStructuralOccurrenceMasked(
+        ExpressionPointer expression,
+        ExpressionPointer target,
+        int currentDepth,
+        int& positionCounter,
+        uint32_t mask) {
+        ExpressionPointer shiftedTarget =
+            currentDepth == 0 ? target : shift(target, currentDepth);
+        if (structurallyEqual(expression, shiftedTarget)) {
+            int thisIndex = positionCounter++;
+            if (thisIndex < 32 && (mask & (1u << thisIndex))) {
+                return makeBoundVariable(currentDepth);
+            }
+            // Not selected: keep the occurrence as the original
+            // expression. BVs inside the original still need shifting
+            // by the surrounding lambda we'll add, but `shift` handles
+            // that — except here the expression IS the target itself,
+            // which is closed in the outer scope; no further BV shift
+            // needed since `target` is closed (it lives in the user's
+            // scope, not inside any newly-introduced lambda).
+            return expression;
+        }
+        if (auto* boundVariable =
+                std::get_if<BoundVariable>(&expression->node)) {
+            int index = boundVariable->deBruijnIndex;
+            if (index >= currentDepth) {
+                return makeBoundVariable(index + 1);
+            }
+            return expression;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return makePi(pi->displayHint,
+                abstractStructuralOccurrenceMasked(pi->domain, target,
+                    currentDepth, positionCounter, mask),
+                abstractStructuralOccurrenceMasked(pi->codomain, target,
+                    currentDepth + 1, positionCounter, mask));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return makeLambda(lambda->displayHint,
+                abstractStructuralOccurrenceMasked(lambda->domain, target,
+                    currentDepth, positionCounter, mask),
+                abstractStructuralOccurrenceMasked(lambda->body, target,
+                    currentDepth + 1, positionCounter, mask));
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return makeApplication(
+                abstractStructuralOccurrenceMasked(application->function,
+                    target, currentDepth, positionCounter, mask),
+                abstractStructuralOccurrenceMasked(application->argument,
+                    target, currentDepth, positionCounter, mask));
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            return makeLet(let->displayHint,
+                abstractStructuralOccurrenceMasked(let->type, target,
+                    currentDepth, positionCounter, mask),
+                abstractStructuralOccurrenceMasked(let->value, target,
+                    currentDepth, positionCounter, mask),
+                abstractStructuralOccurrenceMasked(let->body, target,
+                    currentDepth + 1, positionCounter, mask));
+        }
+        return expression;
+    }
+
     ExpressionPointer abstractStructuralOccurrence(
         ExpressionPointer expression,
         ExpressionPointer target,
@@ -16607,6 +16680,7 @@ private:
         SurfaceExpressionPointer equalityProofSurface,
         SurfaceExpressionPointer termSurface,
         const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
         int line, int /*column*/) {
         Frame frame(*this,
             "rewrite (term-level) at line " + std::to_string(line));
@@ -16788,6 +16862,84 @@ private:
 
         // Use the unreduced form for the diagnostic display.
         ExpressionPointer termTypeOpened = termTypeUnreduced;
+
+        // Multi-occurrence fallback: when the standard "exactly one"
+        // search fails AND the caller provided an expected type, try
+        // subset enumeration. For each (term form, endpoint form)
+        // combo and each non-empty subset of the matching positions,
+        // build the candidate motive and check whether motive(b) is
+        // definitionally equal to the expected type. Use the first
+        // match. Subsets are enumerated in "abstract all → singletons
+        // → pairs+" order so the mathematically-natural choice (all
+        // positions substituted) wins when applicable.
+        if (!found && expectedType) {
+            ExpressionPointer expectedTypeOpened = openOverLocalBinders(
+                expectedType, localBinders, localBinders.size());
+            Context openedContext =
+                buildContextFromLocalBinders(localBinders);
+            struct SearchCombo {
+                ExpressionPointer termClosed;
+                ExpressionPointer lhs;
+            };
+            std::vector<SearchCombo> combosBySlot;
+            combosBySlot.push_back({termTypeUnreducedClosed, leftEndpoint});
+            combosBySlot.push_back({termTypeUnreducedClosed, leftEndpointWhnf});
+            if (termTypeWhnfClosed) {
+                combosBySlot.push_back({termTypeWhnfClosed, leftEndpoint});
+                combosBySlot.push_back({termTypeWhnfClosed, leftEndpointWhnf});
+            } else {
+                combosBySlot.push_back({});
+                combosBySlot.push_back({});
+            }
+            if (termTypeDeepBetaClosed) {
+                combosBySlot.push_back({termTypeDeepBetaClosed, leftEndpoint});
+                combosBySlot.push_back({termTypeDeepBetaClosed, leftEndpointWhnf});
+            } else {
+                combosBySlot.push_back({});
+                combosBySlot.push_back({});
+            }
+            for (int slot = 0; slot < 6 && !found; ++slot) {
+                int count = attempts[slot].count;
+                if (count < 2 || count > 16) continue;
+                const SearchCombo& combo = combosBySlot[slot];
+                if (!combo.termClosed) continue;
+                uint32_t allMask = (1u << count) - 1;
+                std::vector<uint32_t> subsetsToTry;
+                subsetsToTry.push_back(allMask);
+                for (int i = 0; i < count; ++i) {
+                    if ((1u << i) != allMask) {
+                        subsetsToTry.push_back(1u << i);
+                    }
+                }
+                for (uint32_t s = 1; s < allMask; ++s) {
+                    if (__builtin_popcount(s) >= 2) {
+                        subsetsToTry.push_back(s);
+                    }
+                }
+                for (uint32_t mask : subsetsToTry) {
+                    int positionCounter = 0;
+                    ExpressionPointer candidateBody =
+                        abstractStructuralOccurrenceMasked(
+                            combo.termClosed, combo.lhs,
+                            /*currentDepth=*/0, positionCounter, mask);
+                    // motive(b): substitute rightEndpoint for the new
+                    // depth-0 binder in the abstracted body.
+                    ExpressionPointer resultTypeClosed =
+                        substitute(candidateBody, 0, rightEndpoint);
+                    ExpressionPointer resultTypeOpened =
+                        openOverLocalBinders(resultTypeClosed,
+                            localBinders, localBinders.size());
+                    if (isDefinitionallyEqual(environment_, openedContext,
+                            resultTypeOpened, expectedTypeOpened)) {
+                        abstractedBody = std::move(candidateBody);
+                        occurrenceCount = count;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
+
         if (!found) {
             // Decide whether the dominant failure mode was "0 occurrences"
             // or "too many" so the headline matches what the user will
@@ -16814,7 +16966,9 @@ private:
                     "appears "
                     + std::to_string(maxCount)
                     + " time(s) in term's type — `rewrite` needs "
-                      "exactly one. Use explicit "
+                      "exactly one (or, when the expected type is "
+                      "known, a subset whose substitution matches "
+                      "the expected type). Use explicit "
                       "Equality.transport_proposition(...) to "
                       "disambiguate the position. (`"
                     + prettyPrintInLocalScope(termTypeOpened,
