@@ -21,20 +21,47 @@ from pathlib import Path
 REPO_ROOT = Path("/Users/alvaro/claude/math")
 MARKER_PREFIX = "-- WARN:"
 
+# Files where extra checks (`--check-redundant-by-non-eq`,
+# `--check-redundant-calc-steps`) take too long to be useful in a
+# default cleanup pass. Skip the per-file verify by faking up an
+# unchanged `.mathv` from the existing cache before the build, so make
+# treats them as up-to-date. Standalone targets: pass --skip to also
+# skip them.
+SLOW_FILES = [
+    "library/Real/supremum.math",
+    "library/PAdic/absolute_value.math",
+]
 
-def force_full_build(extra_flags=None):
+
+def force_full_build(extra_flags=None, skip_slow=False):
     subprocess.run(
         ["sh", "-c", "find build -name '*.mathv' -delete 2>/dev/null"],
         cwd=REPO_ROOT,
     )
+    if skip_slow:
+        # First do a regular build so the slow files' .mathv exist.
+        # Then delete every OTHER .mathv to force re-verify of the rest
+        # with the extra flags. The slow files' .mathv stay valid so
+        # make won't re-verify them.
+        subprocess.run(
+            ["make", "-j", "16", "library"],
+            cwd=REPO_ROOT, capture_output=True, text=True,
+        )
+        for path in REPO_ROOT.glob("build/library/**/*.mathv"):
+            rel = str(path.relative_to(REPO_ROOT))
+            src = rel.replace("build/", "", 1).replace(".mathv", ".math")
+            if src in SLOW_FILES:
+                continue
+            path.unlink()
     args = ["make", "-j", "16", "library"]
     if extra_flags:
         args.append(f"VERIFY_FLAGS={extra_flags}")
     return subprocess.run(args, cwd=REPO_ROOT, capture_output=True, text=True)
 
 
-def collect_warnings(extra_flags=None):
-    result = force_full_build(extra_flags=extra_flags)
+def collect_warnings(extra_flags=None, skip_slow=False):
+    result = force_full_build(
+        extra_flags=extra_flags, skip_slow=skip_slow)
     if result.returncode != 0:
         sys.stderr.write("baseline build failed:\n")
         sys.stderr.write(result.stderr or result.stdout)
@@ -102,12 +129,15 @@ def insert_markers(file_path: Path, warnings_for_file):
 
 
 def main():
-    extra_flags = (
-        "--check-redundant-by --check-redundant-calc-steps"
-        if "--calc-steps" in sys.argv
-        else None
-    )
-    warnings = collect_warnings(extra_flags=extra_flags)
+    flags = ["--check-redundant-by"]
+    if "--calc-steps" in sys.argv:
+        flags.append("--check-redundant-calc-steps")
+    if "--non-eq" in sys.argv:
+        flags.append("--check-redundant-by-non-eq")
+    extra_flags = " ".join(flags)
+    skip_slow = "--skip-slow" in sys.argv or "--non-eq" in sys.argv
+    warnings = collect_warnings(
+        extra_flags=extra_flags, skip_slow=skip_slow)
     print(f"{len(warnings)} warning(s) across "
           f"{len({w[0] for w in warnings})} file(s)")
     if not warnings:

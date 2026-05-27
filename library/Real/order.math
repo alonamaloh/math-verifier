@@ -471,89 +471,6 @@ theorem Real.LessOrEqual.antisymmetric
          = x)
 }
 
--- ----------------------------------------------------------------------
--- Additive monotonicity on Real: x ≤ y → x + z ≤ y + z, and the
--- strict / cancellation variants.
-
--- (y + z) - (x + z) = y - x, so IsNonneg evidence transfers.
-theorem Real.add_preserves_LessOrEqual
-        (x y z : Real) (xLeqY : x ≤ y)
-        : x + z ≤ y + z :=
-  rewrite((ring : y - x = (y + z) - (x + z)), xLeqY)
-
--- x + z = y + z → x = y. By ring + Equality.symmetry.
-theorem Real.add_cancel_right
-        (x y z : Real) (sumEquality : x + z = y + z)
-        : x = y :=
-  calc x
-     = (x + z) - z
-     = (y + z) - z
-     = y
-
--- Strict additive monotonicity: x < y → x + z < y + z.
-theorem Real.add_preserves_LessThan
-        (x y z : Real) (xLessY : x < y)
-        : x + z < y + z :=
-  And.introduction(
-      Real.add_preserves_LessOrEqual(x, y, z,
-          Real.LessThan.weaken(x, y, xLessY)),
-      function (sumEqual : x + z = y + z) =>
-        Real.LessThan.distinct(x, y, xLessY)(
-            Real.add_cancel_right(x, y, z, sumEqual)))
-
--- Left additive strict: x < y → z + x < z + y. Via commutativity.
--- (Would be `calc z + x = x + z < y + z = z + y` but
--- Real.LessThan.transitive_right is declared further down.)
-theorem Real.add_left_preserves_LessThan
-        (x y z : Real) (xLessY : x < y)
-        : z + x < z + y :=
-  rewrite(
-      Real.add_commutative(y, z),
-      rewrite(
-          Real.add_commutative(x, z),
-          Real.add_preserves_LessThan(x, y, z, xLessY)))
-
--- Weak left additive: a ≤ b → z + a ≤ z + b. Same shape.
-theorem Real.add_preserves_LessOrEqual_left
-        (x y z : Real) (xLeqY : x ≤ y)
-        : z + x ≤ z + y :=
-  calc z + x
-     = x + z
-     ≤ y + z
-     = z + y
-
--- Combined strict-strict sum: a < c ∧ b < d → a + b < c + d. Standard
--- chain through (a + b) < (c + b) < (c + d).
-theorem Real.LessThan.add_strict_strict
-        (a b c d : Real)
-        (aLessC : a < c) (bLessD : b < d)
-        : a + b < c + d := {
-  -- a + b < c + b.
-  claim leftStep : a + b < c + b
-    by Real.add_preserves_LessThan(a, c, b, aLessC);
-  -- c + b < c + d.
-  claim rightStep : c + b < c + d
-    by Real.add_left_preserves_LessThan(b, d, c, bLessD);
-  -- Combine via Real.LessThan.transitive_left (proved next), but to
-  -- avoid forward reference, inline the And construction directly:
-  And.introduction(
-      Real.LessOrEqual.transitive(a + b, c + b, c + d,
-          Real.LessThan.weaken(a + b, c + b, leftStep),
-          Real.LessThan.weaken(c + b, c + d, rightStep)),
-      function (sumEqual : a + b = c + d) =>
-        -- a + b = c + d, combined with a + b ≤ c + b ≤ c + d, gives
-        -- via antisymmetry a + b = c + b, then add_cancel a = c —
-        -- contradicting a < c's distinct part.
-        Real.LessThan.distinct(a, c, aLessC)(
-            Real.add_cancel_right(a, c, b,
-                Real.LessOrEqual.antisymmetric(a + b, c + b,
-                    Real.LessThan.weaken(a + b, c + b, leftStep),
-                    -- c + b ≤ c + d = a + b.
-                    (calc c + b
-                        ≤ c + d   by Real.LessThan.weaken(c + b, c + d, rightStep)
-                        = a + b)))))
-}
-
 -- Real.LessThan.transitive_left: x ≤ y, y < z → x < z.
 theorem Real.LessThan.transitive_left
         (x y z : Real)
@@ -590,3 +507,61 @@ theorem Real.LessThan.transitive_right
                 (calc y
                     ≤ z   by yLeqZ
                     = x))))
+
+-- ----------------------------------------------------------------------
+-- Additive monotonicity on Real: x ≤ y → x + z ≤ y + z, and the
+-- strict / cancellation variants.
+
+-- (y + z) - (x + z) = y - x, so IsNonneg evidence transfers.
+theorem Real.add_preserves_LessOrEqual
+        (x y z : Real) (xLeqY : x ≤ y)
+        : x + z ≤ y + z :=
+  rewrite((ring : y - x = (y + z) - (x + z)), xLeqY)
+
+-- x + z = y + z → x = y. By ring + Equality.symmetry.
+theorem Real.add_cancel_right
+        (x y z : Real) (sumEquality : x + z = y + z)
+        : x = y :=
+  calc x
+     = (x + z) - z
+     = (y + z) - z
+     = y
+
+-- Strict additive monotonicity: x < y → x + z < y + z.
+theorem Real.add_preserves_LessThan
+        (x y z : Real) (xLessY : x < y)
+        : x + z < y + z :=
+  And.introduction(
+      Real.add_preserves_LessOrEqual(x, y, z,
+          Real.LessThan.weaken(x, y, xLessY)),
+      function (sumEqual : x + z = y + z) =>
+        Real.LessThan.distinct(x, y, xLessY)(
+            Real.add_cancel_right(x, y, z, sumEqual)))
+
+-- Left additive strict: x < y → z + x < z + y. Via commutativity.
+theorem Real.add_left_preserves_LessThan
+        (x y z : Real) (xLessY : x < y)
+        : z + x < z + y :=
+  calc z + x
+     = x + z
+     < y + z
+     = z + y
+
+-- Weak left additive: a ≤ b → z + a ≤ z + b. Same shape.
+theorem Real.add_preserves_LessOrEqual_left
+        (x y z : Real) (xLeqY : x ≤ y)
+        : z + x ≤ z + y :=
+  calc z + x
+     = x + z
+     ≤ y + z
+     = z + y
+
+-- Combined strict-strict sum: a < c ∧ b < d → a + b < c + d.
+-- Chain through (a + b) < (c + b) < (c + d) using transitivity.
+theorem Real.LessThan.add_strict_strict
+        (a b c d : Real)
+        (aLessC : a < c) (bLessD : b < d)
+        : a + b < c + d :=
+  calc a + b
+     < c + b   by Real.add_preserves_LessThan(a, c, b, aLessC)
+     < c + d   by Real.add_left_preserves_LessThan(b, d, c, bLessD)
