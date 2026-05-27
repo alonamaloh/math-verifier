@@ -677,7 +677,10 @@ private:
             enum Kind { TypedLet, PatternLet, Suppose, Choose, Set,
                         NoteGoal, NoteAssertion };
             Kind kind = TypedLet;
-            SurfacePatternPointer pattern;     // PatternLet
+            SurfacePatternPointer pattern;     // PatternLet, Suppose
+                                               // (when set on Suppose,
+                                               // wrap body in cases on
+                                               // the introduced binder)
             std::string name;                  // TypedLet, Suppose, Choose, Set
             SurfaceExpressionPointer type;     // TypedLet, Suppose, NoteGoal
             SurfaceExpressionPointer value;    // TypedLet, PatternLet, Choose, Set, NoteAssertion
@@ -897,20 +900,29 @@ private:
                        "after set name (set n := E;)");
                 wrapper.value = parseExpression();
             } else if (isTake) {
-                // `take <name> : <type>;` — introduce a Pi-binder by
-                // inspecting the expected type. Semantically identical
-                // to `suppose <type> as <name>;` (both wrap the rest of
-                // the block in `function (name : type) => …`), but
-                // reads as "take an arbitrary name of type type" —
-                // the math-prose phrasing for fixing a variable.
+                // `take <name> [as <pattern>] : <type>;` — introduce a
+                // Pi-binder of type `<type>` named `<name>`. With the
+                // optional `as <pattern>`, immediately destructure the
+                // introduced binder via `cases <name> { | <pattern> => …}`.
+                // The dispatch is type-directed at elaborate time: for
+                // an inductive `<type>`, the standard cases path fires;
+                // for a `Quotient(T, R)`, the quotient-cases path fires
+                // (representative pattern). Reads as "let <name> be
+                // <pattern>" / "let <name> = (a, b)".
                 if (!isIdentifierLike(peek().kind)) {
                     throwHere("expected identifier after 'take'");
                 }
                 Token nameToken = consumeAny();
+                SurfacePatternPointer destructurePattern;
+                if (peek().kind == TokenKind::KeywordAs) {
+                    consumeAny();  // 'as'
+                    destructurePattern = parsePattern();
+                }
                 expect(TokenKind::Colon,
-                       "after take name (take n : T;)");
+                       "after take name (take n : T; or take n as <pat> : T;)");
                 wrapper.kind = BlockWrapper::Suppose;
                 wrapper.name = nameToken.lexeme;
+                wrapper.pattern = std::move(destructurePattern);
                 wrapper.type = parseExpression();
             } else if (isNote) {
                 // `note goal : <type>;` — assert the current expected
@@ -935,16 +947,26 @@ private:
                     wrapper.value = parseExpression();
                 }
             } else if (isSuppose) {
+                // `suppose <type> as <name>;` introduces a hypothesis.
+                // With a complex `as <pattern>` (constructor or tuple
+                // pattern), introduce a fresh hypothesis binder and
+                // immediately destructure via `cases <fresh> { | <pat>
+                // => body }`. Reads as "suppose ∃x. P(x), say
+                // ⟨w, p⟩." with the destructure inline.
                 wrapper.kind = BlockWrapper::Suppose;
                 wrapper.type = parseExpression();
                 expect(TokenKind::KeywordAs,
                        "after suppose proposition (suppose P as h;)");
-                if (!isIdentifierLike(peek().kind)) {
-                    throwHere(
-                        "expected identifier after 'as' in suppose");
+                SurfacePatternPointer asPattern = parsePattern();
+                if (auto* bare = std::get_if<SurfacePatternBareName>(
+                        &asPattern->node)) {
+                    wrapper.name = bare->name;
+                } else {
+                    wrapper.name = "_supposed_"
+                        + std::to_string(statementToken.line) + "_"
+                        + std::to_string(statementToken.column);
+                    wrapper.pattern = std::move(asPattern);
                 }
-                Token nameToken = consumeAny();
-                wrapper.name = nameToken.lexeme;
             } else if (isChoose) {
                 wrapper.kind = BlockWrapper::Choose;
                 if (!isIdentifierLike(peek().kind)) {
@@ -1173,6 +1195,29 @@ private:
                         iterator->fromCalcAsBinding);
                     break;
                 case BlockWrapper::Suppose: {
+                    // With a destructure pattern (`take n as <pat> : T;`):
+                    // wrap the rest of the block in
+                    // `cases <name> { | <pat> => <result> }` first, then
+                    // wrap that in the Pi-intro lambda. The cases
+                    // elaboration dispatches on T's head (inductive →
+                    // standard cases; Quotient → quotient-cases path).
+                    if (iterator->pattern) {
+                        SurfaceExpressionPointer scrutinee =
+                            makeSurfaceIdentifier(iterator->name, {},
+                                                   iterator->line,
+                                                   iterator->column);
+                        SurfaceCasesClause innerClause;
+                        innerClause.pattern = iterator->pattern;
+                        innerClause.body = std::move(result);
+                        innerClause.line = iterator->line;
+                        innerClause.column = iterator->column;
+                        std::vector<SurfaceCasesClause> innerClauses;
+                        innerClauses.push_back(std::move(innerClause));
+                        result = makeSurfaceCases(
+                            std::move(scrutinee),
+                            std::move(innerClauses),
+                            iterator->line, iterator->column);
+                    }
                     SurfaceBinder binder;
                     binder.names.push_back(std::move(iterator->name));
                     binder.type = std::move(iterator->type);

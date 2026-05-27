@@ -3560,30 +3560,49 @@ private:
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
-                if (name == "Quotient.induct" && argumentCount == 3) {
+                if (name == "Quotient.induct"
+                    && (argumentCount == 2 || argumentCount == 3)) {
+                    // 2-arg form: motive inferred from expected type.
+                    SurfaceExpressionPointer motiveArg =
+                        argumentCount == 3 ? positionalArguments[0] : nullptr;
+                    int atRepIndex = argumentCount == 3 ? 1 : 0;
+                    int qIndex = argumentCount == 3 ? 2 : 1;
                     return desugarQuotientInduct(
-                        positionalArguments[0],
-                        positionalArguments[1],
-                        positionalArguments[2],
+                        motiveArg,
+                        positionalArguments[atRepIndex],
+                        positionalArguments[qIndex],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
-                if (name == "Quotient.induct_two" && argumentCount == 4) {
+                if (name == "Quotient.induct_two"
+                    && (argumentCount == 3 || argumentCount == 4)) {
+                    SurfaceExpressionPointer motiveArg =
+                        argumentCount == 4 ? positionalArguments[0] : nullptr;
+                    int atRepIndex = argumentCount == 4 ? 1 : 0;
+                    int q1Index = argumentCount == 4 ? 2 : 1;
+                    int q2Index = argumentCount == 4 ? 3 : 2;
                     return desugarQuotientInductTwo(
-                        positionalArguments[0],
-                        positionalArguments[1],
-                        positionalArguments[2],
-                        positionalArguments[3],
+                        motiveArg,
+                        positionalArguments[atRepIndex],
+                        positionalArguments[q1Index],
+                        positionalArguments[q2Index],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
-                if (name == "Quotient.induct_three" && argumentCount == 5) {
+                if (name == "Quotient.induct_three"
+                    && (argumentCount == 4 || argumentCount == 5)) {
+                    SurfaceExpressionPointer motiveArg =
+                        argumentCount == 5 ? positionalArguments[0] : nullptr;
+                    int atRepIndex = argumentCount == 5 ? 1 : 0;
+                    int q1Index = argumentCount == 5 ? 2 : 1;
+                    int q2Index = argumentCount == 5 ? 3 : 2;
+                    int q3Index = argumentCount == 5 ? 4 : 3;
                     return desugarQuotientInductThree(
-                        positionalArguments[0],
-                        positionalArguments[1],
-                        positionalArguments[2],
-                        positionalArguments[3],
-                        positionalArguments[4],
+                        motiveArg,
+                        positionalArguments[atRepIndex],
+                        positionalArguments[q1Index],
+                        positionalArguments[q2Index],
+                        positionalArguments[q3Index],
                         localBinders, expectedType,
                         expression.line, expression.column);
                 }
@@ -14392,37 +14411,68 @@ private:
         if (cases.clauses.size() != 1) {
             throwElaborate(
                 "quotient-cases takes exactly one clause "
-                "(`Quotient.mk(rep) => …`), got "
+                "(`<rep> => …` or `Quotient.mk(<rep>) => …`), got "
                 + std::to_string(cases.clauses.size()));
         }
         const SurfaceCasesClause& clause = cases.clauses[0];
 
-        // Pattern must be `Quotient.mk(rep_name)` — a constructor
-        // pattern with name "Quotient.mk" and exactly one bare-name
-        // argument (the representative binder).
-        auto* constructorPattern = std::get_if<SurfacePatternConstructor>(
-            &clause.pattern->node);
-        if (!constructorPattern
-            || constructorPattern->constructorName != "Quotient.mk") {
-            throwElaborate(
-                "quotient-cases pattern must be `Quotient.mk(rep_name)`");
+        // Accepted pattern shapes (where <pat_inner> is itself a bare
+        // name or a constructor pattern over the carrier type):
+        //   - <bare_name>                      — bind rep, no destructure
+        //   - Quotient.mk(<pat_inner>)         — explicit wrap (legacy)
+        //   - <Constructor.…>(args)            — destructure rep directly
+        //
+        // For the non-bare-name inner patterns, we synthesise a fresh
+        // representative binder name and wrap the user's body in
+        // `cases <fresh> { | <pat_inner> => <body> }` so the underlying
+        // structural-recursor elaboration handles the destructure.
+        std::string representativeName;
+        SurfacePatternPointer innerDestructurePattern;  // non-null iff
+                                                         // we need to
+                                                         // wrap the body
+        {
+            auto* bareName = std::get_if<SurfacePatternBareName>(
+                &clause.pattern->node);
+            auto* constructorPattern =
+                std::get_if<SurfacePatternConstructor>(&clause.pattern->node);
+            if (bareName) {
+                // `cases x { | rep_x => body }`: no destructure.
+                representativeName = bareName->name;
+            } else if (constructorPattern
+                && constructorPattern->constructorName == "Quotient.mk") {
+                if (constructorPattern->arguments.size() != 1) {
+                    throwElaborate(
+                        "quotient-cases: `Quotient.mk` pattern takes "
+                        "one argument (the representative), got "
+                        + std::to_string(
+                            constructorPattern->arguments.size()));
+                }
+                auto* innerBareName = std::get_if<SurfacePatternBareName>(
+                    &constructorPattern->arguments[0]->node);
+                if (innerBareName) {
+                    representativeName = innerBareName->name;
+                } else {
+                    representativeName = "_quotientRep_"
+                        + std::to_string(clause.line) + "_"
+                        + std::to_string(clause.column);
+                    innerDestructurePattern =
+                        constructorPattern->arguments[0];
+                }
+            } else if (constructorPattern) {
+                // `cases x { | <Constructor>(args) => body }` —
+                // destructure directly. Synthesise the rep binder.
+                representativeName = "_quotientRep_"
+                    + std::to_string(clause.line) + "_"
+                    + std::to_string(clause.column);
+                innerDestructurePattern = clause.pattern;
+            } else {
+                throwElaborate(
+                    "quotient-cases pattern must be a bare name "
+                    "(binding the representative), a constructor "
+                    "pattern over the carrier type (destructures the "
+                    "representative), or `Quotient.mk(<inner>)`");
+            }
         }
-        if (constructorPattern->arguments.size() != 1) {
-            throwElaborate(
-                "quotient-cases: `Quotient.mk` pattern takes one "
-                "argument (the representative-binder name), got "
-                + std::to_string(
-                    constructorPattern->arguments.size()));
-        }
-        auto* bareNamePattern = std::get_if<SurfacePatternBareName>(
-            &constructorPattern->arguments[0]->node);
-        if (!bareNamePattern) {
-            throwElaborate(
-                "quotient-cases: the argument inside `Quotient.mk(…)` "
-                "must be a bare identifier that names the "
-                "representative");
-        }
-        std::string representativeName = bareNamePattern->name;
 
         // Build the motive: `λ q : Quotient.{u}(T, R) ⇒
         // expectedType[scrutinee := q]`. We abstract the scrutinee's
@@ -14456,9 +14506,30 @@ private:
         ExpressionPointer bodyExpectedType =
             makeApplication(motiveInner, mkAppliedToRep);
 
+        // If the user supplied a destructure pattern on the rep,
+        // synthesize a `cases <fresh_rep> { | <inner_pattern> => <body> }`
+        // wrap before elaborating; otherwise elaborate the body directly.
+        SurfaceExpressionPointer bodySurface = clause.body;
+        if (innerDestructurePattern) {
+            SurfaceExpressionPointer scrutineeIdentifier =
+                makeSurfaceIdentifier(representativeName, {},
+                                       clause.line, clause.column);
+            SurfaceCasesClause innerClause;
+            innerClause.pattern = innerDestructurePattern;
+            innerClause.body = bodySurface;
+            innerClause.line = clause.line;
+            innerClause.column = clause.column;
+            std::vector<SurfaceCasesClause> innerClauses;
+            innerClauses.push_back(std::move(innerClause));
+            bodySurface = makeSurfaceCases(
+                std::move(scrutineeIdentifier),
+                std::move(innerClauses),
+                clause.line, clause.column);
+        }
+
         // Elaborate the body in the extended local context.
         ExpressionPointer bodyKernel =
-            elaborateExpression(*clause.body, innerBinders,
+            elaborateExpression(*bodySurface, innerBinders,
                                  bodyExpectedType);
 
         // Wrap the body in the representative-case lambda.
@@ -19105,43 +19176,85 @@ private:
         return call;
     }
 
+    // True when `surface` is the bare `_` placeholder identifier.
+    bool isUnderscorePlaceholder(SurfaceExpressionPointer surface) const {
+        if (!surface) return true;
+        auto* id = std::get_if<SurfaceIdentifier>(&surface->node);
+        return id && id->qualifiedName == "_";
+    }
+
+    // Synthesize a `Quotient.induct` motive by abstracting `qKernel` in
+    // `expectedType`. Returns `Lambda(q' : Quotient(T, R), goal[q ↦ q'])`
+    // in closed form. Caller is responsible for providing a non-null
+    // `expectedType`.
+    ExpressionPointer inferQuotientMotive(
+        ExpressionPointer expectedType,
+        ExpressionPointer qKernel,
+        ExpressionPointer qTypeOpenedAsDomain,
+        const std::vector<LocalBinder>& localBinders) {
+        std::string qHeadName = applicationHeadConstantName(qKernel);
+        int occurrences = 0;
+        int whnfFuel = 2048;
+        motiveWalkerCache_.clear();
+        ExpressionPointer motiveBody = abstractStructuralOccurrenceWithWHNF(
+            expectedType, qKernel, qHeadName,
+            /*currentDepth=*/0, occurrences, whnfFuel);
+        if (occurrences == 0) {
+            // Goal doesn't structurally mention `q`. Constant motive: lift
+            // the goal by 1 so BV(0) is reserved for the motive's binder.
+            motiveBody = liftBoundVariables(expectedType, +1, 0);
+        }
+        ExpressionPointer qTypeClosed = closeOverLocalBinders(
+            qTypeOpenedAsDomain, localBinders, localBinders.size());
+        return makeLambda("_quotientTarget", qTypeClosed, motiveBody);
+    }
+
     // `Quotient.induct(motive, f, q)` — desugars to
     // `Quotient.induct.{u}(T, R, motive, f, q)`. Recovers T, R from
-    // `motive`'s domain `Quotient(T, R)`.
+    // `q`'s type `Quotient(T, R)`. `motiveSurface` may be `nullptr` (the
+    // 2-arg form `Quotient.induct(f, q)`) or the bare `_` identifier,
+    // in which case the motive is inferred from the expected type by
+    // abstracting `q`.
     ExpressionPointer desugarQuotientInduct(
         SurfaceExpressionPointer motiveSurface,
         SurfaceExpressionPointer fSurface,
         SurfaceExpressionPointer qSurface,
         const std::vector<LocalBinder>& localBinders,
-        ExpressionPointer /*expectedType*/,
+        ExpressionPointer expectedType,
         int line, int /*column*/) {
         Frame frame(*this,
             "Quotient.induct at line " + std::to_string(line));
-        ExpressionPointer motiveKernel = elaborateExpression(
-            *motiveSurface, localBinders);
-        ExpressionPointer motiveTypeOpened = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, motiveKernel));
-        auto* motivePi = std::get_if<Pi>(&motiveTypeOpened->node);
-        if (!motivePi) {
-            throwElaborate(
-                "Quotient.induct(motive, f, q): motive must be a "
-                "function `Quotient(T, R) → Proposition`");
-        }
+        bool inferMotive = isUnderscorePlaceholder(motiveSurface);
+        ExpressionPointer qKernel = elaborateExpression(
+            *qSurface, localBinders);
+        ExpressionPointer qTypeOpened = weakHeadNormalForm(environment_,
+            inferTypeInLocalContext(localBinders, qKernel));
         QuotientDecomposition decomp;
-        if (!tryDecomposeQuotient(motivePi->domain, decomp)) {
+        if (!tryDecomposeQuotient(qTypeOpened, decomp)) {
             throwElaborate(
-                "Quotient.induct(motive, f, q): motive's domain must "
-                "be a `Quotient(T, R)` type");
+                "Quotient.induct: q's type must be `Quotient(T, R)`");
         }
         ExpressionPointer carrierType = closeOverLocalBinders(
             decomp.carrierType, localBinders, localBinders.size());
         ExpressionPointer relation = closeOverLocalBinders(
             decomp.relation, localBinders, localBinders.size());
         LevelPointer uLevel = decomp.universeLevel;
+        ExpressionPointer motiveKernel;
+        if (inferMotive) {
+            if (!expectedType) {
+                throwElaborate(
+                    "Quotient.induct with inferred motive (2-arg form or "
+                    "`_` in the motive slot) needs an expected type from "
+                    "context");
+            }
+            motiveKernel = inferQuotientMotive(
+                expectedType, qKernel, qTypeOpened, localBinders);
+        } else {
+            motiveKernel = elaborateExpression(
+                *motiveSurface, localBinders);
+        }
         ExpressionPointer fKernel = elaborateExpression(
             *fSurface, localBinders);
-        ExpressionPointer qKernel = elaborateExpression(
-            *qSurface, localBinders);
         ExpressionPointer call = makeConstant(
             "Quotient.induct", {uLevel});
         call = makeApplication(std::move(call), carrierType);
@@ -19152,20 +19265,76 @@ private:
         return call;
     }
 
+    // Synthesize a `Quotient.induct_two` motive by sequentially
+    // abstracting q2 (innermost) and q1 (outermost). Returns
+    // `Lambda(q1' : Q1, Lambda(q2' : Q2, goal[q1 ↦ q1', q2 ↦ q2']))` in
+    // closed form. After the two abstract calls, q1 occurrences in the
+    // expectedType are at BV(1) and q2 occurrences are at BV(0); local
+    // binders are shifted by +2.
+    ExpressionPointer inferQuotientMotiveTwo(
+        ExpressionPointer expectedType,
+        ExpressionPointer q1Kernel,
+        ExpressionPointer q2Kernel,
+        ExpressionPointer q1TypeOpenedAsDomain,
+        ExpressionPointer q2TypeOpenedAsDomain,
+        const std::vector<LocalBinder>& localBinders) {
+        // Step 1: abstract q2 → BV(0). LocalBinder BVs lifted by +1.
+        std::string q2HeadName = applicationHeadConstantName(q2Kernel);
+        int occurrences2 = 0;
+        int whnfFuel = 4096;
+        motiveWalkerCache_.clear();
+        ExpressionPointer afterQ2 = abstractStructuralOccurrenceWithWHNF(
+            expectedType, q2Kernel, q2HeadName,
+            /*currentDepth=*/0, occurrences2, whnfFuel);
+        if (occurrences2 == 0) {
+            afterQ2 = liftBoundVariables(expectedType, +1, 0);
+        }
+        // Step 2: wrap in Lambda for q2'.
+        ExpressionPointer q2TypeClosed = closeOverLocalBinders(
+            q2TypeOpenedAsDomain, localBinders, localBinders.size());
+        ExpressionPointer innerLambda = makeLambda(
+            "_quotientTarget2", q2TypeClosed, afterQ2);
+        // Step 3: abstract q1 in the wrapped expression. The walker
+        // descends into the inner Lambda at depth=1; q1 matches there
+        // become BV(1), so after the outer wrap they refer to the outer
+        // binder. The inner-Lambda's BV(0) (q2 abstraction) is below
+        // depth=1, stays at BV(0). LocalBinder BVs (already at +1 from
+        // step 1) are at >= 1 inside, so lifted to +2.
+        std::string q1HeadName = applicationHeadConstantName(q1Kernel);
+        motiveWalkerCache_.clear();
+        int occurrences1 = 0;
+        ExpressionPointer afterQ1 = abstractStructuralOccurrenceWithWHNF(
+            innerLambda, q1Kernel, q1HeadName,
+            /*currentDepth=*/0, occurrences1, whnfFuel);
+        if (occurrences1 == 0) {
+            // q1 doesn't appear in the goal. Lift the entire inner
+            // lambda by 1 above threshold 0 to make room for the outer
+            // binder.
+            afterQ1 = liftBoundVariables(innerLambda, +1, 0);
+        }
+        // Step 4: wrap in Lambda for q1'.
+        ExpressionPointer q1TypeClosed = closeOverLocalBinders(
+            q1TypeOpenedAsDomain, localBinders, localBinders.size());
+        return makeLambda("_quotientTarget1", q1TypeClosed, afterQ1);
+    }
+
     // `Quotient.induct_two(motive, f, q1, q2)` — recovers T1, R1, T2,
     // R2 from `q1` and `q2`'s types (each of the form `Quotient(Ti, Ri)`)
     // and emits `Quotient.induct_two.{u, v}(T1, R1, T2, R2, motive, f,
-    // q1, q2)`.
+    // q1, q2)`. `motiveSurface` may be `nullptr` (the 3-arg form
+    // `Quotient.induct_two(f, q1, q2)`) or the bare `_` identifier,
+    // in which case the motive is inferred from the expected type.
     ExpressionPointer desugarQuotientInductTwo(
         SurfaceExpressionPointer motiveSurface,
         SurfaceExpressionPointer fSurface,
         SurfaceExpressionPointer q1Surface,
         SurfaceExpressionPointer q2Surface,
         const std::vector<LocalBinder>& localBinders,
-        ExpressionPointer /*expectedType*/,
+        ExpressionPointer expectedType,
         int line, int /*column*/) {
         Frame frame(*this,
             "Quotient.induct_two at line " + std::to_string(line));
+        bool inferMotive = isUnderscorePlaceholder(motiveSurface);
         ExpressionPointer q1Kernel = elaborateExpression(
             *q1Surface, localBinders);
         ExpressionPointer q2Kernel = elaborateExpression(
@@ -19191,8 +19360,21 @@ private:
             d2.carrierType, localBinders, localBinders.size());
         ExpressionPointer relation2 = closeOverLocalBinders(
             d2.relation, localBinders, localBinders.size());
-        ExpressionPointer motiveKernel = elaborateExpression(
-            *motiveSurface, localBinders);
+        ExpressionPointer motiveKernel;
+        if (inferMotive) {
+            if (!expectedType) {
+                throwElaborate(
+                    "Quotient.induct_two with inferred motive (3-arg form "
+                    "or `_` in the motive slot) needs an expected type "
+                    "from context");
+            }
+            motiveKernel = inferQuotientMotiveTwo(
+                expectedType, q1Kernel, q2Kernel,
+                q1TypeOpened, q2TypeOpened, localBinders);
+        } else {
+            motiveKernel = elaborateExpression(
+                *motiveSurface, localBinders);
+        }
         ExpressionPointer fKernel = elaborateExpression(
             *fSurface, localBinders);
         ExpressionPointer call = makeConstant(
@@ -19212,6 +19394,53 @@ private:
     // T2, R2, T3, R3 from `q1`, `q2`, `q3`'s types and emits
     // `Quotient.induct_three.{u, v, w}(T1, R1, T2, R2, T3, R3, motive,
     //                                    f, q1, q2, q3)`.
+    // Synthesize a `Quotient.induct_three` motive by abstracting q3,
+    // q2, q1 from innermost to outermost. Returns
+    // `Lambda(q1', Lambda(q2', Lambda(q3', goal[...])))` in closed form,
+    // where q3 → BV(0), q2 → BV(1), q1 → BV(2) and local binders are
+    // shifted by +3.
+    ExpressionPointer inferQuotientMotiveThree(
+        ExpressionPointer expectedType,
+        ExpressionPointer q1Kernel,
+        ExpressionPointer q2Kernel,
+        ExpressionPointer q3Kernel,
+        ExpressionPointer q1TypeOpenedAsDomain,
+        ExpressionPointer q2TypeOpenedAsDomain,
+        ExpressionPointer q3TypeOpenedAsDomain,
+        const std::vector<LocalBinder>& localBinders) {
+        int whnfFuel = 8192;
+        // q3 (innermost).
+        std::string q3HeadName = applicationHeadConstantName(q3Kernel);
+        int occ3 = 0;
+        motiveWalkerCache_.clear();
+        ExpressionPointer body = abstractStructuralOccurrenceWithWHNF(
+            expectedType, q3Kernel, q3HeadName, 0, occ3, whnfFuel);
+        if (occ3 == 0) body = liftBoundVariables(expectedType, +1, 0);
+        ExpressionPointer q3TypeClosed = closeOverLocalBinders(
+            q3TypeOpenedAsDomain, localBinders, localBinders.size());
+        body = makeLambda("_quotientTarget3", q3TypeClosed, body);
+        // q2.
+        std::string q2HeadName = applicationHeadConstantName(q2Kernel);
+        int occ2 = 0;
+        motiveWalkerCache_.clear();
+        ExpressionPointer afterQ2 = abstractStructuralOccurrenceWithWHNF(
+            body, q2Kernel, q2HeadName, 0, occ2, whnfFuel);
+        if (occ2 == 0) afterQ2 = liftBoundVariables(body, +1, 0);
+        ExpressionPointer q2TypeClosed = closeOverLocalBinders(
+            q2TypeOpenedAsDomain, localBinders, localBinders.size());
+        body = makeLambda("_quotientTarget2", q2TypeClosed, afterQ2);
+        // q1.
+        std::string q1HeadName = applicationHeadConstantName(q1Kernel);
+        int occ1 = 0;
+        motiveWalkerCache_.clear();
+        ExpressionPointer afterQ1 = abstractStructuralOccurrenceWithWHNF(
+            body, q1Kernel, q1HeadName, 0, occ1, whnfFuel);
+        if (occ1 == 0) afterQ1 = liftBoundVariables(body, +1, 0);
+        ExpressionPointer q1TypeClosed = closeOverLocalBinders(
+            q1TypeOpenedAsDomain, localBinders, localBinders.size());
+        return makeLambda("_quotientTarget1", q1TypeClosed, afterQ1);
+    }
+
     ExpressionPointer desugarQuotientInductThree(
         SurfaceExpressionPointer motiveSurface,
         SurfaceExpressionPointer fSurface,
@@ -19219,10 +19448,11 @@ private:
         SurfaceExpressionPointer q2Surface,
         SurfaceExpressionPointer q3Surface,
         const std::vector<LocalBinder>& localBinders,
-        ExpressionPointer /*expectedType*/,
+        ExpressionPointer expectedType,
         int line, int /*column*/) {
         Frame frame(*this,
             "Quotient.induct_three at line " + std::to_string(line));
+        bool inferMotive = isUnderscorePlaceholder(motiveSurface);
         ExpressionPointer q1Kernel = elaborateExpression(
             *q1Surface, localBinders);
         ExpressionPointer q2Kernel = elaborateExpression(
@@ -19260,8 +19490,21 @@ private:
             d3.carrierType, localBinders, localBinders.size());
         ExpressionPointer relation3 = closeOverLocalBinders(
             d3.relation, localBinders, localBinders.size());
-        ExpressionPointer motiveKernel = elaborateExpression(
-            *motiveSurface, localBinders);
+        ExpressionPointer motiveKernel;
+        if (inferMotive) {
+            if (!expectedType) {
+                throwElaborate(
+                    "Quotient.induct_three with inferred motive (4-arg "
+                    "form or `_` in the motive slot) needs an expected "
+                    "type from context");
+            }
+            motiveKernel = inferQuotientMotiveThree(
+                expectedType, q1Kernel, q2Kernel, q3Kernel,
+                q1TypeOpened, q2TypeOpened, q3TypeOpened, localBinders);
+        } else {
+            motiveKernel = elaborateExpression(
+                *motiveSurface, localBinders);
+        }
         ExpressionPointer fKernel = elaborateExpression(
             *fSurface, localBinders);
         ExpressionPointer call = makeConstant(

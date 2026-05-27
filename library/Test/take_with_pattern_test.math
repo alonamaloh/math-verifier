@@ -1,0 +1,81 @@
+-- Test `take x as <pattern> : T;` and `suppose <type> as <pattern>;`
+-- statement-level sugar. The pattern is destructured immediately, with
+-- elaborator dispatch on T's head (inductive → cases; Quotient → quotient
+-- representative cases).
+
+module Test.take_with_pattern_test
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Logic.exists
+import Natural.basics
+import Integer.basics
+import Integer.addition
+
+-- (1) `take` with quotient pattern: destructure x as a representative
+-- right at the intro.
+theorem take_quotient_destructure : (x : Integer) → x = x := {
+  take x as IntegerRepresentative.make(a, b) : Integer;
+  reflexivity(Integer,
+      (Quotient.mk(IntegerRepresentative.make(a, b)) : Integer))
+}
+
+-- (2) `take` with quotient pattern, two binders.
+theorem take_quotient_two_destructure
+        : (x y : Integer) → x + y = x + y := {
+  take x as IntegerRepresentative.make(a, b) : Integer;
+  take y as IntegerRepresentative.make(c, d) : Integer;
+  reflexivity(Integer,
+      (Quotient.mk(IntegerRepresentative.make(a, b)) : Integer)
+      + (Quotient.mk(IntegerRepresentative.make(c, d)) : Integer))
+}
+
+-- (3) `take` without pattern still works (regression).
+theorem take_no_pattern : (x : Integer) → x = x := {
+  take x : Integer;
+  reflexivity(Integer, x)
+}
+
+-- (4) `suppose` with And destructure pattern.
+theorem suppose_and_destructure
+        (P Q : Proposition)
+        : And(P, Q) → P := {
+  suppose And(P, Q) as ⟨p, q⟩;
+  p
+}
+
+-- (5) `suppose` with Exists destructure.
+theorem suppose_exists_destructure
+        (P : Natural → Proposition)
+        : (∃ (n : Natural). P(n)) → ∃ (m : Natural). P(m) := {
+  suppose ∃ (n : Natural). P(n) as ⟨witnessValue, witnessProof⟩;
+  witness witnessValue with witnessProof
+}
+
+-- (6) `suppose` with bare name (regression).
+theorem suppose_bare_name
+        (P : Proposition)
+        : P → P := {
+  suppose P as h;
+  h
+}
+
+-- (7) `obtain Constructor.make(a, b) from h;` — destructure an inductive
+-- value (non-Quotient) via obtain. Tests the existing PatternLet → cases
+-- dispatch on a single-constructor inductive.
+theorem obtain_inductive_destructure
+        (h : IntegerRepresentative)
+        : IntegerRepresentative := {
+  obtain IntegerRepresentative.make(a, b) from h;
+  IntegerRepresentative.make(a, b)
+}
+
+-- (8) `obtain Constructor.make(a, b) from h;` where h is a Quotient
+-- value. Goes through the cases-on-Quotient path (Stage A). Equivalent
+-- to `take h as Constructor.make(a, b)` for a given h.
+theorem obtain_quotient_destructure (x : Integer) : x = x := {
+  obtain IntegerRepresentative.make(a, b) from x;
+  reflexivity(Integer,
+      (Quotient.mk(IntegerRepresentative.make(a, b)) : Integer))
+}
