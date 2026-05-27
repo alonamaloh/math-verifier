@@ -2,6 +2,8 @@
 
 #include "printer.hpp"
 
+#include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <set>
 #include <string>
@@ -109,7 +111,81 @@ public:
     Elaborator(Environment& environment,
                std::vector<std::string>& importedModules)
         : environment_(environment),
-          importedModules_(importedModules) {}
+          importedModules_(importedModules) {
+        const char* tacticFlag = std::getenv("MATH_TIME_TACTICS");
+        tacticTimingEnabled_ = tacticFlag && tacticFlag[0] != '\0'
+            && tacticFlag[0] != '0';
+    }
+
+    ~Elaborator() {
+        if (!tacticTimingEnabled_ || tacticStats_.empty()) return;
+        // Dump in descending order of total time.
+        std::vector<std::pair<std::string, TacticStats>> rows(
+            tacticStats_.begin(), tacticStats_.end());
+        std::sort(rows.begin(), rows.end(),
+            [](const auto& a, const auto& b) {
+                return a.second.totalMicros > b.second.totalMicros;
+            });
+        long long grandTotalMicros = 0;
+        for (const auto& r : rows) grandTotalMicros += r.second.totalMicros;
+        std::cerr << "[tactic] " << moduleName_
+                  << " — strategy timings (grand total "
+                  << (grandTotalMicros / 1000) << " ms):\n";
+        for (const auto& r : rows) {
+            double pct = grandTotalMicros > 0
+                ? 100.0 * r.second.totalMicros / grandTotalMicros : 0.0;
+            double avgUs = r.second.invocations > 0
+                ? (double)r.second.totalMicros / r.second.invocations : 0.0;
+            std::cerr << "  " << r.first
+                      << ": inv=" << r.second.invocations
+                      << " ok=" << r.second.successes
+                      << " total=" << (r.second.totalMicros / 1000) << " ms"
+                      << " (" << (int)pct << "%)"
+                      << " avg=" << (int)avgUs << " us\n";
+        }
+    }
+
+    // Run a strategy and track its timing + success rate. The
+    // strategy must return ExpressionPointer (nullptr on miss). When
+    // MATH_TIME_TACTICS isn't set, this is a no-op wrapper.
+    template <typename F>
+    ExpressionPointer runTactic(const std::string& name, F&& fn) {
+        if (!tacticTimingEnabled_) return fn();
+        ++tacticStats_[name].invocations;
+        auto t0 = std::chrono::steady_clock::now();
+        ExpressionPointer result = fn();
+        auto t1 = std::chrono::steady_clock::now();
+        tacticStats_[name].totalMicros +=
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                t1 - t0).count();
+        if (result) ++tacticStats_[name].successes;
+        return result;
+    }
+
+    // RAII helper to time a scope (e.g. an elaborator function) and
+    // attribute the total to a named bucket in `tacticStats_`. Counts
+    // each entry as an invocation; doesn't track success/failure (the
+    // function may throw or do anything). No-op when timing isn't on.
+    struct TimedScope {
+        Elaborator& self_;
+        const std::string name_;
+        std::chrono::steady_clock::time_point t0_;
+        bool active_;
+        TimedScope(Elaborator& self, const char* name)
+            : self_(self), name_(name), active_(self.tacticTimingEnabled_) {
+            if (active_) {
+                ++self_.tacticStats_[name_].invocations;
+                t0_ = std::chrono::steady_clock::now();
+            }
+        }
+        ~TimedScope() {
+            if (!active_) return;
+            auto t1 = std::chrono::steady_clock::now();
+            self_.tacticStats_[name_].totalMicros +=
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    t1 - t0_).count();
+        }
+    };
 
     // When true, every `by <proof>` annotation on a calc step is
     // also tried with the auto-prover; if the auto-prover closes the
@@ -144,9 +220,48 @@ public:
         // elaboration get registered incrementally in
         // elaborateDefinition / elaboratePatternMatchDefinition.
         seedAlgebraicRegistryFromEnvironment();
+        const char* timeFlag = std::getenv("MATH_TIME_DECLARATIONS");
+        bool timeDeclarations = timeFlag && timeFlag[0] != '\0'
+            && timeFlag[0] != '0';
         for (const auto& statement : module.statements) {
-            elaborateTopStatement(statement);
+            if (timeDeclarations) {
+                auto t0 = std::chrono::steady_clock::now();
+                elaborateTopStatement(statement);
+                auto t1 = std::chrono::steady_clock::now();
+                long long elapsedMs =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        t1 - t0).count();
+                // Emit only non-trivial timings to keep noise low.
+                if (elapsedMs >= 50) {
+                    std::string label = topStatementLabel(statement);
+                    std::cerr << "[time] " << moduleName_
+                              << " " << label
+                              << ": " << elapsedMs << " ms\n";
+                }
+            } else {
+                elaborateTopStatement(statement);
+            }
         }
+    }
+
+    // Extract a short identifier from a top-level statement for
+    // use in timing diagnostics. Falls back to "?" if the statement
+    // kind doesn't have a name field.
+    std::string topStatementLabel(
+        const SurfaceTopStatement& statement) {
+        if (auto* d = std::get_if<SurfaceDefinitionDeclaration>(&statement)) {
+            return d->name;
+        }
+        if (auto* a = std::get_if<SurfaceAxiomDeclaration>(&statement)) {
+            return a->name;
+        }
+        if (auto* i = std::get_if<SurfaceInductiveDeclaration>(&statement)) {
+            return i->name;
+        }
+        if (auto* imp = std::get_if<SurfaceImportDeclaration>(&statement)) {
+            return std::string("import ") + imp->moduleName;
+        }
+        return "?";
     }
 
     // Walk the pre-loaded environment and run shape detection on
@@ -5623,8 +5738,9 @@ private:
         // with congruence wrapping, AC rearrangement via ring. No-op
         // when the goal isn't an Equality.
         {
-            ExpressionPointer attempt = tryAutoProveEqualityGoal(
-                goalClosed, localBinders, line);
+            ExpressionPointer attempt = runTactic("equalityBattery",
+                [&] { return tryAutoProveEqualityGoal(
+                    goalClosed, localBinders, line); });
             if (attempt) return attempt;
         }
 
@@ -5634,24 +5750,27 @@ private:
         // application of a constant head or when the transitive
         // lemma isn't in scope.
         {
-            ExpressionPointer attempt = tryTransitivityBridge(
-                goalClosed, localBinders, line);
+            ExpressionPointer attempt = runTactic("transitivityBridge",
+                [&] { return tryTransitivityBridge(
+                    goalClosed, localBinders, line); });
             if (attempt) return attempt;
         }
 
         // (4) Conjunction introduction — when the goal is `And(A, B)`,
         // recursively prove each conjunct via the full auto-prover.
         {
-            ExpressionPointer attempt = tryConjunctionIntro(
-                goalClosed, localBinders, line);
+            ExpressionPointer attempt = runTactic("conjunctionIntro",
+                [&] { return tryConjunctionIntro(
+                    goalClosed, localBinders, line); });
             if (attempt) return attempt;
         }
 
         // (5) Disjunction introduction — when the goal is `Or(A, B)`,
         // try proving A; if that fails, try B. Left-biased.
         {
-            ExpressionPointer attempt = tryDisjunctionIntro(
-                goalClosed, localBinders, line);
+            ExpressionPointer attempt = runTactic("disjunctionIntro",
+                [&] { return tryDisjunctionIntro(
+                    goalClosed, localBinders, line); });
             if (attempt) return attempt;
         }
 
@@ -5659,8 +5778,9 @@ private:
         // or a `(h, ¬h)` pair, close the goal via
         // `False.eliminate_proposition`.
         {
-            ExpressionPointer attempt = tryContradiction(
-                goalClosed, localBinders, line);
+            ExpressionPointer attempt = runTactic("contradiction",
+                [&] { return tryContradiction(
+                    goalClosed, localBinders, line); });
             if (attempt) return attempt;
         }
 
@@ -5669,8 +5789,9 @@ private:
         // and applicable library declarations) by cost, trying
         // autoFillHintForClaim on each.
         {
-            ExpressionPointer attempt = tryContextFactMatch(
-                goalClosed, localBinders, line);
+            ExpressionPointer attempt = runTactic("contextFactMatch",
+                [&] { return tryContextFactMatch(
+                    goalClosed, localBinders, line); });
             if (attempt) return attempt;
         }
 
@@ -5681,9 +5802,10 @@ private:
         // pattern other context-iterating strategies should
         // eventually follow.
         {
-            ExpressionPointer attempt = tryContextEqualityBridge(
-                goalClosed, localBinders,
-                line, transportBudget);
+            ExpressionPointer attempt = runTactic("contextEqualityBridge",
+                [&] { return tryContextEqualityBridge(
+                    goalClosed, localBinders,
+                    line, transportBudget); });
             if (attempt) return attempt;
         }
 
@@ -7189,6 +7311,7 @@ private:
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer term,
         ExpressionPointer expectedTypeClosed) {
+        TimedScope _scope(*this, "coerceToExpectedTypeViaDiff");
         ExpressionPointer termTypeOpened;
         try {
             termTypeOpened = inferTypeInLocalContext(
@@ -14708,6 +14831,7 @@ private:
         int line, int /*column*/) {
         Frame frame(*this,
             "decide expression at line " + std::to_string(line));
+        TimedScope _scope(*this, "elaborateDecide");
         if (!expectedType) {
             throwElaborate(
                 "decide P { … } needs an expected type from context");
@@ -14741,9 +14865,13 @@ private:
             applicationHeadConstantName(targetReduced);
         int occurrences = 0;
         int whnfFuel = 2048;
-        ExpressionPointer motiveBody = abstractStructuralOccurrenceWithWHNF(
-            expectedType, targetReduced, targetHeadName,
-            /*currentDepth=*/0, occurrences, whnfFuel);
+        ExpressionPointer motiveBody;
+        {
+            TimedScope _inner(*this, "decide:motiveAbstraction");
+            motiveBody = abstractStructuralOccurrenceWithWHNF(
+                expectedType, targetReduced, targetHeadName,
+                /*currentDepth=*/0, occurrences, whnfFuel);
+        }
         if (occurrences == 0) {
             // No occurrence of `Logic.classical_decidable(P)` in the
             // goal — use a constant motive `λs. Goal`. The arms each
@@ -14762,6 +14890,7 @@ private:
         // and reading its Sort level.
         LevelPointer motiveLevel;
         {
+            TimedScope _inner(*this, "decide:motiveLevel");
             Context openedContext = buildContextFromLocalBinders(localBinders);
             ExpressionPointer goalOpenedForLevel = openOverLocalBinders(
                 expectedType, localBinders, localBinders.size());
@@ -14833,20 +14962,25 @@ private:
         ExpressionPointer notP = makeApplication(
             makeConstant("Not", {}), propositionKernel);
 
-        // Yes arm scope: extend with the binder.
-        std::vector<LocalBinder> yesScope = localBinders;
-        yesScope.push_back({yesBinder, propositionKernel});
-        ExpressionPointer yesBodyElab = elaborateExpression(
-            *decide.yesBody, yesScope, yesArmExpectedType);
-        ExpressionPointer yesArm = makeLambda(
-            yesBinder, propositionKernel, yesBodyElab);
+        ExpressionPointer yesArm;
+        ExpressionPointer noArm;
+        {
+            TimedScope _inner(*this, "decide:elaborateArms");
+            // Yes arm scope: extend with the binder.
+            std::vector<LocalBinder> yesScope = localBinders;
+            yesScope.push_back({yesBinder, propositionKernel});
+            ExpressionPointer yesBodyElab = elaborateExpression(
+                *decide.yesBody, yesScope, yesArmExpectedType);
+            yesArm = makeLambda(
+                yesBinder, propositionKernel, yesBodyElab);
 
-        std::vector<LocalBinder> noScope = localBinders;
-        noScope.push_back({noBinder, notP});
-        ExpressionPointer noBodyElab = elaborateExpression(
-            *decide.noBody, noScope, noArmExpectedType);
-        ExpressionPointer noArm = makeLambda(
-            noBinder, notP, noBodyElab);
+            std::vector<LocalBinder> noScope = localBinders;
+            noScope.push_back({noBinder, notP});
+            ExpressionPointer noBodyElab = elaborateExpression(
+                *decide.noBody, noScope, noArmExpectedType);
+            noArm = makeLambda(
+                noBinder, notP, noBodyElab);
+        }
 
         // (8) Build the recursor application:
         // Logic.Decidable_recursor.{u}(P, motive, yesArm, noArm, X).
@@ -14863,7 +14997,22 @@ private:
         // open over localBinders so inferType can walk freely; on
         // failure, dump every arg with its expected/actual types so
         // the diagnostic points at which slot is the culprit.
+        // Pre-typecheck: only run when MATH_DECIDE_PRETYPECHECK=1 — it
+        // doubles the kernel's defeq work on the assembled term, and
+        // for files like Real/supremum.math that's ~16 seconds per
+        // decide call. Default off; user opts in when they hit an
+        // opaque "argument type does not match Pi domain" error and
+        // want the slot-by-slot diagnostic.
+        const char* preTypecheckFlag =
+            std::getenv("MATH_DECIDE_PRETYPECHECK");
+        bool runPreTypecheck = preTypecheckFlag
+            && preTypecheckFlag[0] != '\0'
+            && preTypecheckFlag[0] != '0';
+        if (!runPreTypecheck) {
+            return recursorCall;
+        }
         try {
+            TimedScope _inner(*this, "decide:preTypecheck");
             Context openedContext =
                 buildContextFromLocalBinders(localBinders);
             ExpressionPointer openedCall = openOverLocalBinders(
@@ -16996,6 +17145,7 @@ private:
         int line, int /*column*/) {
         Frame frame(*this,
             "rewrite (term-level) at line " + std::to_string(line));
+        TimedScope _scope(*this, "desugarRewriteTerm");
         ExpressionPointer equalityProofKernel = elaborateExpression(
             *equalityProofSurface, localBinders);
         ExpressionPointer equalityProofTypeOpened = weakHeadNormalForm(
@@ -17314,6 +17464,7 @@ private:
         int line, int /*column*/) {
         Frame frame(*this,
             "rewrite at line " + std::to_string(line));
+        TimedScope _scope(*this, "desugarRewrite");
         if (!expectedType) {
             throwElaborate(
                 "rewrite needs an expected type from context — use it "
@@ -19766,6 +19917,16 @@ private:
     Environment& environment_;
     std::vector<std::string>& importedModules_;
     std::string moduleName_;
+    // Tactic stats — tracks per-strategy invocations, successes, and
+    // cumulative time. Enabled by MATH_TIME_TACTICS=1 env var. Dumped
+    // by ~Elaborator if any tactic was instrumented.
+    struct TacticStats {
+        long long invocations = 0;
+        long long successes = 0;
+        long long totalMicros = 0;
+    };
+    std::unordered_map<std::string, TacticStats> tacticStats_;
+    bool tacticTimingEnabled_ = false;
     bool reportRedundantBy_ = false;
     bool reportRedundantByNonEq_ = false;
     bool reportRedundantCalcSteps_ = false;
