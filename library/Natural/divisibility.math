@@ -24,32 +24,21 @@ definition Natural.divides(divisor dividend : Natural) : Proposition :=
 -- (reversed).
 theorem Natural.divides_reflexive(naturalNumber : Natural)
         : naturalNumber ∣ naturalNumber :=
-  Exists.introduce(
-    Natural,
-    function (quotient : Natural) => naturalNumber = naturalNumber * quotient,
-    1,
-    Equality.symmetry(Natural.multiply_one(naturalNumber)))
+  ⟨1, Equality.symmetry(Natural.multiply_one(naturalNumber))⟩
 
 -- One divides every natural: the quotient is the natural itself, and
 -- the proof that `naturalNumber = 1 * naturalNumber` comes from
 -- one_multiply (reversed).
 theorem Natural.one_divides(naturalNumber : Natural)
         : 1 ∣ naturalNumber :=
-  Exists.introduce(
-    Natural,
-    function (quotient : Natural) => naturalNumber = 1 * quotient,
-    naturalNumber,
-    Equality.symmetry(Natural.one_multiply(naturalNumber)))
+  ⟨naturalNumber,
+   Equality.symmetry(Natural.one_multiply(naturalNumber))⟩
 
 -- Every natural divides zero: the quotient is zero, and the proof
 -- that `0 = candidate * 0` comes from multiply_zero (reversed).
 theorem Natural.divides_zero(candidate : Natural)
         : candidate ∣ 0 :=
-  Exists.introduce(
-    Natural,
-    function (quotient : Natural) => 0 = candidate * quotient,
-    0,
-    Equality.symmetry(Natural.multiply_zero(candidate)))
+  ⟨0, Equality.symmetry(Natural.multiply_zero(candidate))⟩
 
 -- Divisibility is transitive: if a | b and b | c, then a | c. With
 -- witnesses q1 (b = a*q1) and q2 (c = b*q2), the witness for a | c
@@ -63,12 +52,11 @@ theorem Natural.divides_transitive_helper
         (firstEquality : b = a * firstQuotient)
         : b ∣ c → a ∣ c
   | Exists.introduce(secondQuotient, secondEquality) =>
-      Exists.introduce(
-          firstQuotient * secondQuotient,
-          calc c
-             = b * secondQuotient
-             = (a * firstQuotient) * secondQuotient
-             = a * (firstQuotient * secondQuotient))
+      ⟨firstQuotient * secondQuotient,
+       calc c
+          = b * secondQuotient
+          = (a * firstQuotient) * secondQuotient
+          = a * (firstQuotient * secondQuotient)⟩
 
 theorem Natural.divides_transitive (a b c : Natural)
         : a ∣ b
@@ -167,37 +155,28 @@ theorem Natural.divides_one_of_consecutive_helper
           → successor(d * q1) = d * q2
           → d ∣ 1
   | zero, q2, equalityProof =>
-      Exists.introduce(
-          Natural,
-          function (quotient : Natural) => 1 = d * quotient,
-          q2,
-          calc successor(0)
-             = successor(d * 0)
-             = d * q2)
+      ⟨q2, calc successor(0)
+              = successor(d * 0)
+              = d * q2⟩
   | successor(q1Predecessor), q2, equalityProof =>
-      (cases q2 {
+      cases q2 refining equalityProof {
         | zero =>
-            function (zeroEquality :
-                successor(d * successor(q1Predecessor)) = d * 0) =>
-              absurd(
-                  calc successor(d * successor(q1Predecessor))
-                     = d * 0
-                     = 0)
+            absurd(
+                calc successor(d * successor(q1Predecessor))
+                   = d * 0
+                   = 0)
         | successor(q2Predecessor) =>
-            function (successorEquality :
-                successor(d * successor(q1Predecessor)) = d * successor(q2Predecessor)) =>
-              Natural.divides_one_of_consecutive_helper(
-                  d, q1Predecessor, q2Predecessor,
-                  Natural.add_cancel_left(
-                      d, successor(d * q1Predecessor),
-                      d * q2Predecessor,
-                      calc d + successor(d * q1Predecessor)
-                         = successor(d + d * q1Predecessor)
-                         = successor(d * successor(q1Predecessor))
-                         = d * successor(q2Predecessor)
-                         = d + d * q2Predecessor))
-      } : successor(d * successor(q1Predecessor)) = d * q2
-          → d ∣ 1)(equalityProof)
+            Natural.divides_one_of_consecutive_helper(
+                d, q1Predecessor, q2Predecessor,
+                Natural.add_cancel_left(
+                    d, successor(d * q1Predecessor),
+                    d * q2Predecessor,
+                    calc d + successor(d * q1Predecessor)
+                       = successor(d + d * q1Predecessor)
+                       = successor(d * successor(q1Predecessor))
+                       = d * successor(q2Predecessor)
+                       = d + d * q2Predecessor))
+      }
 
 -- If d divides both a and a+1, then d divides 1. Destructure both
 -- divisibility witnesses (a = d*q1, successor(a) = d*q2) into the equation
