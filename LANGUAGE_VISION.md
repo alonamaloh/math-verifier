@@ -162,6 +162,25 @@ This would be the natural extension. Currently you have to write
 `cases rep { | IntegerRepresentative.make(a, b) => <rest> }`, which
 reads less directly. The let form would be a parser-level desugar.
 
+### 3.5. `?` for goal-driven argument inference — landed
+
+A `?` in a positional argument asks the elaborator to fill that slot
+by unifying against the goal type and the supplied non-`?` args' types.
+Strictly more powerful than making the args implicit at the declaration
+site, because it uses the goal type too — and it's opt-in per call
+site, so the lemma's declared form is unchanged.
+
+The next step in this direction is **named arguments** with unnamed
+positions defaulting to `?`. That would let the user write things like
+
+```math
+Natural.successor_injective(eq: twoEqualsThreePlus)
+```
+
+— supply the named arg, infer everything else. This is a bigger
+change (parser, lookup, error messages) but the foundation `?`
+provides is what makes it well-defined.
+
 ### 4. The `_at_make` helper convention
 
 A typical recurring pattern: prove the rep-level fact as a

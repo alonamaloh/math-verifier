@@ -337,6 +337,36 @@ inferred argument when you want the call shape to be explicit:
 Quotient.induct(_, atRep, q)         -- same as Quotient.induct(atRep, q)
 ```
 
+### `?` — goal-driven argument inference
+
+A `?` in a positional argument asks the elaborator to fill that slot
+by unifying the lemma's conclusion against the goal type and the
+lemma's argument types against the supplied (non-`?`) args' types.
+
+```math
+-- Without `?` — every argument explicit:
+claim oneEqualsTwoPlus : 1 = successor(successor(n))
+  by Natural.successor_injective(1, successor(successor(n)),
+                                  twoEqualsThreePlus);
+
+-- With `?` — the two Natural args are recoverable from the goal:
+claim oneEqualsTwoPlus : 1 = successor(successor(n))
+  by Natural.successor_injective(?, ?, twoEqualsThreePlus);
+```
+
+`?` works wherever:
+- The call is a known function (or `axiom`/`definition`) by name.
+- The goal type and/or the supplied non-`?` args' types contain enough
+  information to fix every `?` position by structural unification.
+
+When the inference fails, the elaborator reports which positions
+couldn't be resolved and shows the expected return type.
+
+This is **strictly more powerful** than declaring args as implicit
+`{a b : Natural}`: implicit args use only the supplied args' types,
+while `?` uses the goal type as well. It's also opt-in per call site —
+the lemma's declared form is unchanged.
+
 ## Opaque definitions and unfolds
 
 `opaque definition Foo : … := …` hides `Foo`'s body from kernel
