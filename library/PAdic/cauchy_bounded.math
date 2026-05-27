@@ -67,25 +67,14 @@ theorem Integer.absolute_value_of_nonneg (n : Integer)
 theorem Rational.absolute_value_of_nonneg (q : Rational)
         (qNonneg : Rational.IsNonneg(q))
         : abs(q) = q :=
-  Quotient.induct(
-      function (y : Rational) =>
-          Rational.IsNonneg(y) → abs(y) = y,
-      function (rep : RationalRepresentative) =>
-        (cases rep {
-           | RationalRepresentative.make(n, d) =>
-               function (nIsNonneg : Integer.IsNonneg(n)) =>
-                 Quotient.sound(
-                     RationalRepresentative.make(
-                         abs(n), d),
-                     RationalRepresentative.make(n, d),
-                     congruenceOf(
-                         function (m : Integer) =>
-                             m * (successor(d) : Integer),
-                         Integer.absolute_value_of_nonneg(n, nIsNonneg)))
-         } : Rational.IsNonneg(Quotient.mk(rep))
-             → abs((Quotient.mk(rep) : Rational))
-               = Quotient.mk(rep)),
-      q)(qNonneg)
+  cases q refining qNonneg { | RationalRepresentative.make(n, d) =>
+    Quotient.sound(
+        RationalRepresentative.make(abs(n), d),
+        RationalRepresentative.make(n, d),
+        congruenceOf(
+            function (m : Integer) =>
+                m * (successor(d) : Integer),
+            Integer.absolute_value_of_nonneg(n, qNonneg))) }
 
 -- Archimedean property restricted to nonneg Rationals: 0 ≤ q implies
 -- ∃ K. q ≤ succ(K). Use `Rational.absolute_value_le_succ_natural` on q
