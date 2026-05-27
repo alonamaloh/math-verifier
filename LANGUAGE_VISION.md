@@ -170,6 +170,25 @@ Strictly more powerful than making the args implicit at the declaration
 site, because it uses the goal type too — and it's opt-in per call
 site, so the lemma's declared form is unchanged.
 
+**Limitation found through library use: nested `?` calls don't share
+unification state.** When the user writes
+
+```math
+LessOrEqual.transitive(?, ?, ?,
+    And.left(?, ?, allPrime(head, …)),
+    Natural.one_less_or_equal_two)
+```
+
+the inner `And.left(?, ?, …)` is elaborated against an expected type
+that itself contains the outer's metavariables. The current
+`inferCallWithHoles` is per-call: each call has its own metavariable
+set, no shared state with parent or sibling calls. So `And.left`'s
+inference of A from `allPrime(…)`'s type doesn't propagate back to
+fix the outer transitivity's `b`. Workaround: spell the outer Naturals
+explicitly. A proper fix would be a single shared metavariable scope
+across the whole call expression — i.e. one unification problem rather
+than one-per-call. That's a real refactor of the inference engine.
+
 The next step in this direction is **named arguments** with unnamed
 positions defaulting to `?`. That would let the user write things like
 
