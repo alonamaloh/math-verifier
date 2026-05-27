@@ -73,40 +73,35 @@ theorem Natural.multiply_cancel_right
       Equality.symmetry(bEqualsZero)
   }
   | successor(predA), b, c, positivity, equation =>
-      (cases b {
-        | zero =>
-            function (caseEquation
-                        : successor(predA) * c = 0 * c) => {
-              -- successor(predA) · c = 0. By the helper, successor(predA) = 0.
-              -- But that's absurd.
-              calc successor(predA) * c
-                      = 0    as productZero;
-              claim successorEqualsZero
-                    : successor(predA) = 0
-                by Natural.multiply_equals_zero_with_positive_right(
-                       successor(predA), c, positivity, productZero);
-              absurd(successorEqualsZero)
-            }
-        | successor(predB) =>
-            function (caseEquation
-                        : successor(predA) * c
-                          = successor(predB) * c) => {
-              -- successor(predA) · c = c + predA · c.
-              -- successor(predB) · c = c + predB · c.
-              -- After add_cancel_left: predA · c = predB · c. Recurse.
-              calc c + predA * c
-                      = c + predB * c    as cancelable;
-              claim reduced
-                    : predA * c = predB * c
-                by Natural.add_cancel_left(
-                       c, predA * c, predB * c, cancelable);
-              claim predsEqual
-                    : predA = predB
-                by Natural.multiply_cancel_right(
-                       predA, predB, c, positivity, reduced);
-              congruenceOf(successor, predsEqual)
-            }
-      } : successor(predA) * c = b * c → successor(predA) = b)(equation)
+      cases b refining equation {
+        | zero => {
+            -- successor(predA) · c = 0. By the helper, successor(predA) = 0.
+            -- But that's absurd.
+            calc successor(predA) * c
+                    = 0    as productZero;
+            claim successorEqualsZero
+                  : successor(predA) = 0
+              by Natural.multiply_equals_zero_with_positive_right(
+                     successor(predA), c, positivity, productZero);
+            absurd(successorEqualsZero)
+          }
+        | successor(predB) => {
+            -- successor(predA) · c = c + predA · c.
+            -- successor(predB) · c = c + predB · c.
+            -- After add_cancel_left: predA · c = predB · c. Recurse.
+            calc c + predA * c
+                    = c + predB * c    as cancelable;
+            claim reduced
+                  : predA * c = predB * c
+              by Natural.add_cancel_left(
+                     c, predA * c, predB * c, cancelable);
+            claim predsEqual
+                  : predA = predB
+              by Natural.multiply_cancel_right(
+                     predA, predB, c, positivity, reduced);
+            congruenceOf(successor, predsEqual)
+          }
+      }
 
 -- Mirror cancellation on the left: c · a = c · b with c ≥ 1 forces a
 -- = b. Derived from the right version by multiply_commutative.
