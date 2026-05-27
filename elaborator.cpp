@@ -254,6 +254,11 @@ public:
             && cacheFlag[0] != '0';
         bool previousKernelCache = kernelCacheEnabled;
         if (enableKernelCache) kernelCacheEnabled = true;
+        const char* hcFlag = std::getenv("MATH_HASH_CONS");
+        bool enableHashCons = hcFlag && hcFlag[0] != '\0'
+            && hcFlag[0] != '0';
+        bool previousHashCons = g_hashConsEnabled;
+        if (enableHashCons) g_hashConsEnabled = true;
         const char* kpFlag = std::getenv("MATH_KERNEL_PROFILE");
         bool enableKernelProfile = kpFlag && kpFlag[0] != '\0'
             && kpFlag[0] != '0';
@@ -283,6 +288,7 @@ public:
         }
         if (enableKernelCache) kernelCacheEnabled = previousKernelCache;
         if (enableKernelProfile) kernelProfileEnabled = previousKernelProfile;
+        if (enableHashCons) g_hashConsEnabled = previousHashCons;
         if (timeDeclarations || tacticTimingEnabled_) {
             struct rusage ru;
             if (getrusage(RUSAGE_SELF, &ru) == 0) {

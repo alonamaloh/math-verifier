@@ -21,9 +21,40 @@ uint64_t kernelTraceInterval = 0;
 bool kernelProfileEnabled = false;
 std::size_t kernelDumpWidth = 240;
 bool kernelCacheEnabled = false;
+bool g_hashConsEnabled = false;
 
 // invalidateKernelCaches() is defined later in this file, after the
 // cache structures it touches; declared in kernel.hpp.
+
+namespace hash_cons_detail {
+struct ExpressionHasher {
+    size_t operator()(const ExpressionPointer& p) const {
+        return static_cast<size_t>(p->hash);
+    }
+};
+struct ExpressionEqualer {
+    bool operator()(const ExpressionPointer& a,
+                    const ExpressionPointer& b) const {
+        return structurallyEqual(a, b);
+    }
+};
+// Global hash-cons table. Strong-ref so entries live forever once
+// inserted — fine for one-shot verify runs (process exits at the
+// end), but a long-running tool would want weak refs + periodic
+// cleanup. Memory is bounded by the number of distinct subterms
+// across the whole run.
+std::unordered_set<ExpressionPointer,
+                   ExpressionHasher,
+                   ExpressionEqualer>
+    table;
+}  // namespace hash_cons_detail
+
+ExpressionPointer internExpression(ExpressionPointer candidate) {
+    if (!g_hashConsEnabled) return candidate;
+    auto [iterator, inserted] =
+        hash_cons_detail::table.insert(candidate);
+    return *iterator;
+}
 
 namespace {
 

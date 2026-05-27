@@ -62,6 +62,34 @@ struct Expression {
         : node(std::forward<Alternative>(alternative)) {}
 };
 
+// Hash-cons table for Expression nodes. Each make* helper calls
+// internExpression with the freshly-allocated candidate; if a
+// structurally-equal Expression already exists in the table, that
+// pre-existing pointer is returned and the candidate is discarded.
+// Otherwise the candidate is inserted and returned.
+//
+// Consequences:
+//   * structurallyEqual(a, b) ≡ (a.get() == b.get()) becomes the
+//     common case — the structural recursion only triggers on hash
+//     collisions.
+//   * Repeated substitution of the same subterm into many positions
+//     shares storage instead of duplicating, so motive trees built by
+//     WHNF-unfolded Quotient.lift bodies (the main supremum
+//     bottleneck) collapse from O(N positions × tree size) to
+//     O(unique subterm count).
+//   * Memory grows monotonically over a verify run, but is bounded by
+//     the number of distinct subterms — orders of magnitude smaller
+//     than the worst-case substitution blowup.
+//
+// Defined in kernel.cpp because the table's equaler needs
+// `structurallyEqual` (also defined there).
+ExpressionPointer internExpression(ExpressionPointer candidate);
+// Toggle for hash-consing. Default off until perf-tested across the
+// library. main.cpp sets this to true for the `verify` command (when
+// the env var `MATH_HASH_CONS` is set or unconditionally if we land
+// it as default-on).
+extern bool g_hashConsEnabled;
+
 inline ExpressionPointer makeBoundVariable(int index) {
     auto expression = std::make_shared<Expression>(BoundVariable{index});
     expression->hash = subtree_hash::mix(
@@ -69,7 +97,7 @@ inline ExpressionPointer makeBoundVariable(int index) {
                            subtree_hash::kTagBoundVariable),
         static_cast<uint64_t>(index));
     expression->maxFreeBoundVariable = index;
-    return expression;
+    return expression;  // Leaf — don't intern (per-alloc cost > sharing benefit)
 }
 inline ExpressionPointer makeFreeVariable(std::string name) {
     uint64_t nameHash = subtree_hash::hashString(name);
@@ -81,7 +109,7 @@ inline ExpressionPointer makeFreeVariable(std::string name) {
                                subtree_hash::kTagFreeVariable),
             nameHash),
         static_cast<uint64_t>(FreeVariableOrigin::User));
-    return expression;
+    return expression;  // Leaf — don't intern
 }
 // Note: no public builder exists for Internal-origin FreeVariables — they
 // are an implementation detail of the kernel (isDefinitionallyEqual binder
@@ -98,7 +126,7 @@ inline ExpressionPointer makeSort(LevelPointer level) {
         subtree_hash::mix(subtree_hash::kSeed,
                            subtree_hash::kTagSort),
         levelHash);
-    return expression;
+    return expression;  // Leaf — don't intern
 }
 inline ExpressionPointer makeSort(int rawLevel) {
     return makeSort(makeLevelConst(rawLevel));
@@ -136,7 +164,7 @@ inline ExpressionPointer makePi(std::string displayHint,
             domainHash),
         codomainHash);
     expression->maxFreeBoundVariable = maxFree;
-    return expression;
+    return internExpression(std::move(expression));
 }
 inline ExpressionPointer makeLambda(std::string displayHint,
                                 ExpressionPointer domain,
@@ -157,7 +185,7 @@ inline ExpressionPointer makeLambda(std::string displayHint,
             domainHash),
         bodyHash);
     expression->maxFreeBoundVariable = maxFree;
-    return expression;
+    return internExpression(std::move(expression));
 }
 inline ExpressionPointer makeApplication(ExpressionPointer function,
                                      ExpressionPointer argument) {
@@ -175,7 +203,7 @@ inline ExpressionPointer makeApplication(ExpressionPointer function,
             functionHash),
         argumentHash);
     expression->maxFreeBoundVariable = maxFree;
-    return expression;
+    return internExpression(std::move(expression));
 }
 inline ExpressionPointer makeConstant(std::string name,
                                       std::vector<LevelPointer> universeArguments) {
@@ -193,7 +221,7 @@ inline ExpressionPointer makeConstant(std::string name,
                                subtree_hash::kTagConstant),
             nameHash),
         universeHash);
-    return expression;
+    return expression;  // Constant — don't intern (cheap leaves)
 }
 inline ExpressionPointer makeConstant(std::string name) {
     return makeConstant(std::move(name), {});
@@ -224,5 +252,5 @@ inline ExpressionPointer makeLet(std::string displayHint,
             valueHash),
         bodyHash);
     expression->maxFreeBoundVariable = maxFree;
-    return expression;
+    return internExpression(std::move(expression));
 }
