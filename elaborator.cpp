@@ -7423,6 +7423,22 @@ private:
         if (!environment_.lookup("Equality.transport_proposition")) {
             return nullptr;
         }
+        // Normalize both type inputs to canonical closed form via an
+        // open-then-close round-trip. Some callers pass types that
+        // are already partly-opened (e.g. `pi->domain` from an
+        // inferred head type carries FVs for the local binders); the
+        // open step is a no-op on those FVs, and the close step
+        // converts every matching FV back to its BV. For truly-closed
+        // inputs, open creates FVs and close puts them right back,
+        // also a no-op. Either way the result is canonically closed.
+        termTypeClosed = closeOverLocalBinders(
+            openOverLocalBinders(termTypeClosed, localBinders,
+                                 localBinders.size()),
+            localBinders, localBinders.size());
+        expectedTypeClosed = closeOverLocalBinders(
+            openOverLocalBinders(expectedTypeClosed, localBinders,
+                                 localBinders.size()),
+            localBinders, localBinders.size());
         // Open both types so we can run the diff walker (FreeVariables
         // in place of de Bruijn indices for the surrounding binders).
         ExpressionPointer termTypeOpened = openOverLocalBinders(
