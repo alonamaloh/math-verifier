@@ -3893,22 +3893,53 @@ private:
             return elaborateLambda(*lambda, localBinders, expectedType);
         }
         if (auto* let = std::get_if<SurfaceLet>(&expression.node)) {
+            const char* claimSizeFlag2 =
+                std::getenv("MATH_CLAIM_SIZES");
+            bool dumpLetSize = claimSizeFlag2
+                && claimSizeFlag2[0] != '\0'
+                && claimSizeFlag2[0] != '0';
+            auto tLet0 = std::chrono::steady_clock::now();
             ExpressionPointer letType =
                 elaborateExpression(*let->type, localBinders);
+            auto tLetType = std::chrono::steady_clock::now();
             // Pass the declared type as the expected type for the value
             // so bidirectional elaborators (cases, anonymous tuples,
             // hammer, calc) can use it — without this, `let h : T := ?;`
             // can't trigger the hammer's reflexivity-match etc.
             ExpressionPointer letValue =
                 elaborateExpression(*let->value, localBinders, letType);
+            auto tLetValue = std::chrono::steady_clock::now();
             // Diff-inference for non-calc equality coercion: covers
             // `claim X : succ(a) = succ(b) by eq` (desugars to a
             // SurfaceLet) without an explicit congruenceOf wrapper.
             letValue = coerceToExpectedTypeViaDiff(
                 localBinders, letValue, letType);
+            auto tLetCoerce = std::chrono::steady_clock::now();
             checkRedundantCongruenceOfWrapper(
                 let->value, localBinders, letType,
                 "let value");
+            if (dumpLetSize) {
+                long long typeMs =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        tLetType - tLet0).count();
+                long long valueMs =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        tLetValue - tLetType).count();
+                long long coerceMs =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        tLetCoerce - tLetValue).count();
+                long long totalMs = typeMs + valueMs + coerceMs;
+                if (totalMs >= 100) {
+                    size_t typeSize = countExpressionNodes(letType);
+                    std::cerr << "[let-size] " << moduleName_
+                              << ":" << expression.line
+                              << " name=" << let->name
+                              << " typeSize=" << typeSize
+                              << " typeMs=" << typeMs
+                              << " valueMs=" << valueMs
+                              << " coerceMs=" << coerceMs << "\n";
+                }
+            }
             std::vector<LocalBinder> extended = localBinders;
             // Capture the value on the LocalBinder so downstream
             // openedContext builders can mark it as let-bound (enabling
@@ -4676,9 +4707,14 @@ private:
         bool propagateExpectedTypeToHint =
             std::holds_alternative<SurfaceLambda>(claim.byHint->node)
             || std::holds_alternative<SurfaceLet>(claim.byHint->node);
+        const char* claimSizeFlag = std::getenv("MATH_CLAIM_SIZES");
+        bool dumpClaimSize = claimSizeFlag && claimSizeFlag[0] != '\0'
+            && claimSizeFlag[0] != '0';
+        auto t0 = std::chrono::steady_clock::now();
         ExpressionPointer hintTerm = elaborateExpression(
             *claim.byHint, localBinders,
             propagateExpectedTypeToHint ? goalClosed : nullptr);
+        auto tElab = std::chrono::steady_clock::now();
         // `inferTypeInLocalContext` returns an OPENED type;
         // `autoFillHintForClaim` expects closed form throughout
         // (matchAgainstPattern / instantiateLemmaBinders are
@@ -4687,9 +4723,33 @@ private:
             inferTypeInLocalContext(localBinders, hintTerm);
         ExpressionPointer hintType = closeOverLocalBinders(
             hintTypeOpened, localBinders, localBinders.size());
+        auto tInfer = std::chrono::steady_clock::now();
 
         ExpressionPointer result = autoFillHintForClaim(
             hintTerm, hintType, goalClosed, localBinders, line);
+        auto tFill = std::chrono::steady_clock::now();
+        if (dumpClaimSize) {
+            size_t goalSize = countExpressionNodes(goalClosed);
+            size_t hintSize = countExpressionNodes(hintType);
+            long long elabMs =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    tElab - t0).count();
+            long long inferMs =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    tInfer - tElab).count();
+            long long fillMs =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    tFill - tInfer).count();
+            if (elabMs + inferMs + fillMs >= 50 || goalSize >= 100) {
+                std::cerr << "[claim-size] " << moduleName_
+                          << ":" << line
+                          << " goal=" << goalSize
+                          << " hint=" << hintSize
+                          << " elab=" << elabMs
+                          << " infer=" << inferMs
+                          << " fill=" << fillMs << " ms\n";
+            }
+        }
 
         // `--check-redundant-by`: speculatively run the bare-`claim`
         // auto-prover on the same goal. If it would also discharge
