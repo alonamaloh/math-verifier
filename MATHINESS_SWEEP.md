@@ -50,7 +50,32 @@ For each proof:
 - `prime_divides_product.math`
 - `padic_valuation.math` — **large (1503 lines)**; one site touched, the rest pending.
 
-### Integer/ — pending (about to start)
+### Integer/ — partially done
+
+**Covered (with refactors landed):**
+- `basics.math` — `?` on add_cancel_right.
+- `addition.math` — `add_after_first_respects` uses cases instead of
+  explicit Quotient.induct motive.
+- `ring.math` — major win: 34 → 21 declarations. Collapsed
+  triple-helper stacks (at_representatives + after_first +
+  after_first_second + main) into single cases-based proofs for:
+  add_commutative, add_associative, add_identity_left,
+  multiply_commutative, multiply_identity_left, distributivity_left,
+  multiply_associative.
+- `negation.math` — add_negate_left helper folded in.
+- `algebra.math` — multiply_zero_left and multiply_negate_right helpers
+  folded in.
+- `multiplication.math` — cases instead of explicit motive on
+  multiply_after_first_respects.
+
+**Pending:**
+- `absolute_value.math`, `absolute_value_natural.math`,
+  `absolute_value_multiplicative.math`, `cancellation.math`,
+  `embedding.math`, `instances.math`, `order.math`, `sign.math`.
+
+The triple-helper collapse pattern is the biggest single win. Any
+Integer-level proof that follows it (separate `_at_representatives` →
+`_after_first_second` → `_after_first` → main) is a candidate.
 
 ### Rational/ — pending
 
