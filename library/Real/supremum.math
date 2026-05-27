@@ -222,11 +222,7 @@ theorem Real.exists_rational_below_at_make
 -- Lift the at-make form via Quotient.induct.
 theorem Real.exists_rational_below (x : Real)
         : ∃ (q : Rational). (q : Real) ≤ x :=
-  Quotient.induct(
-      function (xArg : Real) =>
-          ∃ (q : Rational). (q : Real) ≤ xArg,
-      Real.exists_rational_below_at_make,
-      x)
+  Quotient.induct(Real.exists_rational_below_at_make, x)
 
 -- ----------------------------------------------------------------------
 -- Building block #2: every Real has a Rational upper bound. Symmetric
@@ -299,11 +295,7 @@ theorem Real.exists_rational_above_at_make
 -- Lift exists_rational_above_at_make via Quotient.induct.
 theorem Real.exists_rational_above (x : Real)
         : ∃ (q : Rational). x ≤ (q : Real) :=
-  Quotient.induct(
-      function (xArg : Real) =>
-          ∃ (q : Rational). xArg ≤ (q : Real),
-      Real.exists_rational_above_at_make,
-      x)
+  Quotient.induct(Real.exists_rational_above_at_make, x)
 
 -- ----------------------------------------------------------------------
 -- Building block #3: the bisection state and step function.
@@ -775,7 +767,7 @@ theorem Real.LessOrEqual_of_pointwise_at_make
   }
 
 -- Lift to arbitrary Real B via Quotient.induct: case on B = mk(b_rep),
--- pattern-match the rep, hand off to the at_make form.
+-- Take a representative B = [(b, bIsCauchy)]; the at-make form proves it.
 theorem Real.LessOrEqual_of_pointwise
         (s : Natural → Rational)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
@@ -783,27 +775,11 @@ theorem Real.LessOrEqual_of_pointwise
         (pointwiseLeq : (n : Natural) → (s(n) : Real) ≤ B)
         : (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real)
             ≤ B :=
-  Quotient.induct(
-      function (BArg : Real) =>
-          ((n : Natural) → (s(n) : Real) ≤ BArg)
-          → (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real)
-              ≤ BArg,
-      function (b_rep : CauchyRationalSequence) =>
-          (cases b_rep {
-             | CauchyRationalSequence.make(b, bIsCauchy) =>
-                 function (ptLeq
-                              : (n : Natural)
-                                → (s(n) : Real)
-                                    ≤ (Quotient.mk(
-                                          CauchyRationalSequence.make(b, bIsCauchy))
-                                        : Real)) =>
-                     Real.LessOrEqual_of_pointwise_at_make(
-                         s, sIsCauchy, b, bIsCauchy, ptLeq)
-           } : ((n : Natural)
-                  → (s(n) : Real) ≤ (Quotient.mk(b_rep) : Real))
-                 → (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real)
-                     ≤ (Quotient.mk(b_rep) : Real)),
-      B)(pointwiseLeq)
+  cases B refining pointwiseLeq {
+    | CauchyRationalSequence.make(b, bIsCauchy) =>
+        Real.LessOrEqual_of_pointwise_at_make(
+            s, sIsCauchy, b, bIsCauchy, pointwiseLeq)
+  }
 
 -- Dual: at-make form, lower bound by the limit. If every term of a
 -- Cauchy rational sequence is (as Real) ≥ some lower bound mk(make(b, _)),
@@ -888,34 +864,18 @@ theorem Real.LessOrEqual_of_pointwise_lower_at_make
         }
   }
 
--- Lift the dual via Quotient.induct on B.
+-- Take a representative B = [(b, bIsCauchy)]; the at-make form proves it.
 theorem Real.LessOrEqual_of_pointwise_lower
         (s : Natural → Rational)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
         (B : Real)
         (pointwiseGeq : (n : Natural) → B ≤ (s(n) : Real))
         : B ≤ (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real) :=
-  Quotient.induct(
-      function (BArg : Real) =>
-          ((n : Natural) → BArg ≤ (s(n) : Real))
-          → BArg
-              ≤ (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real),
-      function (b_rep : CauchyRationalSequence) =>
-          (cases b_rep {
-             | CauchyRationalSequence.make(b, bIsCauchy) =>
-                 function (ptGeq
-                              : (n : Natural)
-                                → (Quotient.mk(
-                                       CauchyRationalSequence.make(b, bIsCauchy))
-                                    : Real)
-                                    ≤ (s(n) : Real)) =>
-                     Real.LessOrEqual_of_pointwise_lower_at_make(
-                         s, sIsCauchy, b, bIsCauchy, ptGeq)
-           } : ((n : Natural)
-                  → (Quotient.mk(b_rep) : Real) ≤ (s(n) : Real))
-                 → (Quotient.mk(b_rep) : Real)
-                     ≤ (Quotient.mk(CauchyRationalSequence.make(s, sIsCauchy)) : Real)),
-      B)(pointwiseGeq)
+  cases B refining pointwiseGeq {
+    | CauchyRationalSequence.make(b, bIsCauchy) =>
+        Real.LessOrEqual_of_pointwise_lower_at_make(
+            s, sIsCauchy, b, bIsCauchy, pointwiseGeq)
+  }
 
 -- ----------------------------------------------------------------------
 -- Within-interval invariant: left(n) ≤ right(n) at every step. Each
@@ -2063,7 +2023,7 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
         }
   }
 
--- Lift via Quotient.induct on y.
+-- Take a representative y = [(rep, _)]; the at-rep lemma proves it.
 theorem Real.bisectionLimit_is_upper_bound
         (subset : Set(Real)) (initial : Real.BisectionInterval)
         (initialLeftLeqRight
@@ -2077,14 +2037,10 @@ theorem Real.bisectionLimit_is_upper_bound
               subset,
               Real.bisectionLimit(subset, initial, initialLeftLeqRight)) :=
   function (y : Real) (yInSubset : y ∈ subset) =>
-    Quotient.induct(
-        function (yArg : Real) =>
-            subset(yArg)
-            → yArg ≤ Real.bisectionLimit(
-                         subset, initial, initialLeftLeqRight),
-        Real.bisectionLimit_is_upper_bound_at_rep(
-            subset, initial, initialLeftLeqRight, initialRightAbove),
-        y)(yInSubset)
+    cases y refining yInSubset { | rep =>
+      Real.bisectionLimit_is_upper_bound_at_rep(
+          subset, initial, initialLeftLeqRight, initialRightAbove,
+          rep, yInSubset) }
 
 -- The limit is the LEAST upper bound: every other upper bound `B`
 -- satisfies `limit ≤ B`. Pointwise: `bisectionLeft(n) ≤ y_n ≤ otherBound`
