@@ -77,17 +77,19 @@ theorem Natural.padic_valuation_step_zero_when_not_divides
         : Natural.padic_valuation_step(successor(fuel), prime, target)
           = 0 :=
   unfold Natural.padic_valuation_step in
-    Equality.transport_proposition(
-        function (m : Natural) =>
-            (cases m {
-               | zero =>
-                   successor(Natural.padic_valuation_step(
-                                 fuel, prime, Natural.divide(prime, target)))
-               | successor(_) => zero
-             } : Natural) = 0,
-        successor(predM), Natural.modulo(prime, target),
-        Equality.symmetry(moduloIsSucc),
-        reflexivity(Natural, 0))
+    calc (cases Natural.modulo(prime, target) {
+            | zero =>
+                successor(Natural.padic_valuation_step(
+                              fuel, prime, Natural.divide(prime, target)))
+            | successor(_) => zero
+          } : Natural)
+       = (cases successor(predM) {
+            | zero =>
+                successor(Natural.padic_valuation_step(
+                              fuel, prime, Natural.divide(prime, target)))
+            | successor(_) => zero
+          } : Natural)                                                          by moduloIsSucc
+       = 0                                                                      by reflexivity(Natural, 0)
 
 -- When modulo(p, n) = 0, the step recurses.
 theorem Natural.padic_valuation_step_succ_when_divides
@@ -97,21 +99,22 @@ theorem Natural.padic_valuation_step_succ_when_divides
           = successor(Natural.padic_valuation_step(
                           fuel, prime, Natural.divide(prime, target))) :=
   unfold Natural.padic_valuation_step in
-    Equality.transport_proposition(
-        function (m : Natural) =>
-            (cases m {
-               | zero =>
-                   successor(Natural.padic_valuation_step(
-                                 fuel, prime, Natural.divide(prime, target)))
-               | successor(_) => zero
-             } : Natural)
-            = successor(Natural.padic_valuation_step(
-                            fuel, prime, Natural.divide(prime, target))),
-        0, Natural.modulo(prime, target),
-        Equality.symmetry(moduloZero),
-        reflexivity(Natural,
-            successor(Natural.padic_valuation_step(
-                fuel, prime, Natural.divide(prime, target)))))
+    calc (cases Natural.modulo(prime, target) {
+            | zero =>
+                successor(Natural.padic_valuation_step(
+                              fuel, prime, Natural.divide(prime, target)))
+            | successor(_) => zero
+          } : Natural)
+       = (cases 0 {
+            | zero =>
+                successor(Natural.padic_valuation_step(
+                              fuel, prime, Natural.divide(prime, target)))
+            | successor(_) => zero
+          } : Natural)                                                          by moduloZero
+       = successor(Natural.padic_valuation_step(
+                       fuel, prime, Natural.divide(prime, target)))             by reflexivity(Natural,
+                                                                                       successor(Natural.padic_valuation_step(
+                                                                                           fuel, prime, Natural.divide(prime, target))))
 
 -- ----------------------------------------------------------------------
 -- Helpers about Natural.divide when the modulo is zero.
@@ -666,6 +669,7 @@ theorem Natural.padic_valuation_power_divides
                               = Natural.power(0, prime)
                               = Natural.power(
                                     Natural.padic_valuation(prime, 0), prime);
+                     -- can't convert: motive uses bound var multiply (and `divides` is not a calc relation)
                      Equality.transport_proposition(
                          function (mValue : Natural) =>
                              Natural.divides(
@@ -761,6 +765,7 @@ theorem Natural.padic_valuation_power_divides
                          by rewrite(
                                 Equality.symmetry(valuationProduct),
                                 succPowerDivides);
+                       -- can't convert: motive uses bound var multiply (and `divides` is not a calc relation)
                        Equality.transport_proposition(
                            function (m' : Natural) =>
                                Natural.divides(

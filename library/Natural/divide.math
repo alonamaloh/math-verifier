@@ -462,33 +462,31 @@ theorem Natural.modulo_step_at_multiple
       -- Case fuel = 0: modulo_step(0, d, 0) = 0. ✓
       -- Case fuel = succ(f): monus(d, 0) = d. For d ≥ 1, d = succ(d').
       --   So monus(d, 0) = succ(d'), goes to "too big" branch, returns 0.
-      Equality.transport_proposition(
-          function (m : Natural) =>
-              Natural.modulo_step(fuel, d, m) = 0,
-          0, d * 0,
-          Equality.symmetry(Natural.multiply_zero(d)),
-          -- modulo_step(fuel, d, zero) = zero.
-          (cases fuel {
-             | zero =>
-                 -- modulo_step(0, d, 0) = 0 via the zero-fuel lemma.
-                 Natural.modulo_step_zero_fuel(d, 0)
-             | successor(f) =>
-                 -- Case on d (we have d ≥ 1).
-                 (cases d {
-                    | zero =>
-                        function (refinedDPositive : successor(0) ≤ 0) =>
-                          absurd(refinedDPositive)
-                    | successor(predD) =>
-                        function (refinedDPositive
-                                    : successor(0) ≤ successor(predD)) =>
-                          -- monus(succ(predD), zero) = succ(predD).
-                          Natural.modulo_step_succ_too_big(
-                              f, successor(predD), 0, predD,
-                              Natural.monus_succ_zero(predD))
-                  } : (refinedDPositive : successor(0) ≤ d)
-                      → Natural.modulo_step(successor(f), d, 0)
-                        = 0)(dPositive)
-           } : Natural.modulo_step(fuel, d, 0) = 0))
+      calc Natural.modulo_step(fuel, d, d * 0)
+         = Natural.modulo_step(fuel, d, 0)                                      by Natural.multiply_zero(d)
+         = 0                                                                    by
+              -- modulo_step(fuel, d, zero) = zero.
+              (cases fuel {
+                 | zero =>
+                     -- modulo_step(0, d, 0) = 0 via the zero-fuel lemma.
+                     Natural.modulo_step_zero_fuel(d, 0)
+                 | successor(f) =>
+                     -- Case on d (we have d ≥ 1).
+                     (cases d {
+                        | zero =>
+                            function (refinedDPositive : successor(0) ≤ 0) =>
+                              absurd(refinedDPositive)
+                        | successor(predD) =>
+                            function (refinedDPositive
+                                        : successor(0) ≤ successor(predD)) =>
+                              -- monus(succ(predD), zero) = succ(predD).
+                              Natural.modulo_step_succ_too_big(
+                                  f, successor(predD), 0, predD,
+                                  Natural.monus_succ_zero(predD))
+                      } : (refinedDPositive : successor(0) ≤ d)
+                          → Natural.modulo_step(successor(f), d, 0)
+                            = 0)(dPositive)
+               } : Natural.modulo_step(fuel, d, 0) = 0)
   | successor(q'), fuel, d, dPositive, succQLeSuccFuel =>
       -- d * succ(q') = d + d*q'.
       -- modulo_step(fuel, d, d + d*q').
@@ -537,6 +535,7 @@ theorem Natural.divides_implies_modulo_zero
         (dividesProof : Natural.divides(divisor, dividend))
         : Natural.modulo(divisor, dividend) = 0 := {
   obtain ⟨q, dividendEq⟩ from dividesProof;
+  -- can't convert: motive uses bound var multiply
   Equality.transport_proposition(
             function (m : Natural) =>
                 Natural.modulo_step(m, divisor, m) = 0,
