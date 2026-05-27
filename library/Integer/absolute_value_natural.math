@@ -40,16 +40,11 @@ theorem Integer.absolute_value_natural_respect
           → Integer.absolute_value_natural_at_representative(rep1)
             = Integer.absolute_value_natural_at_representative(rep1Prime)
   | IntegerRepresentative.make(a, b), rep1Prime, equivalenceHypothesis =>
-      (cases rep1Prime {
-         | IntegerRepresentative.make(c, d) =>
-             Natural.distance_respects_integer_equivalent(a, b, c, d)
-       } : (refinedEquivalence
-                : IntegerEquivalent(
-                      IntegerRepresentative.make(a, b), rep1Prime))
-           → Integer.absolute_value_natural_at_representative(
-                 IntegerRepresentative.make(a, b))
-             = Integer.absolute_value_natural_at_representative(
-                   rep1Prime))(equivalenceHypothesis)
+      cases rep1Prime refining equivalenceHypothesis {
+        | IntegerRepresentative.make(c, d) =>
+            Natural.distance_respects_integer_equivalent(a, b, c, d,
+                equivalenceHypothesis)
+      }
 
 -- Lifted Natural-valued absolute value.
 definition Integer.absolute_value_natural (x : Integer) : Natural :=
@@ -64,15 +59,5 @@ definition Integer.absolute_value_natural (x : Integer) : Natural :=
 theorem Integer.absolute_value_natural_is_image (x : Integer)
         : Integer.absolute_value(x)
           = (Integer.absolute_value_natural(x) : Integer) :=
-  Quotient.induct(
-      function (y : Integer) =>
-          Integer.absolute_value(y)
-            = (Integer.absolute_value_natural(y) : Integer),
-      function (rep : IntegerRepresentative) =>
-          (cases rep {
-             | IntegerRepresentative.make(a, b) =>
-                 reflexivity(Integer, (Natural.distance(a, b) : Integer))
-           } : Integer.absolute_value(Quotient.mk(rep))
-               = (Integer.absolute_value_natural(Quotient.mk(rep))
-                  : Integer)),
-      x)
+  cases x { | IntegerRepresentative.make(a, b) =>
+    reflexivity(Integer, (Natural.distance(a, b) : Integer)) }
