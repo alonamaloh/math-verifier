@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <sys/resource.h>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -148,6 +149,29 @@ public:
     // Run a strategy and track its timing + success rate. The
     // strategy must return ExpressionPointer (nullptr on miss). When
     // MATH_TIME_TACTICS isn't set, this is a no-op wrapper.
+    // Count expression-tree nodes (Constants, BVs, FVs, Applications,
+    // Pis, Lambdas, Lets, Sorts). Used by the diagnostic probes below
+    // — a structurally-large term suggests pathological substitution
+    // / unfolding behaviour worth investigating.
+    size_t countExpressionNodes(ExpressionPointer e) {
+        size_t total = 1;
+        if (auto* app = std::get_if<Application>(&e->node)) {
+            total += countExpressionNodes(app->function);
+            total += countExpressionNodes(app->argument);
+        } else if (auto* pi = std::get_if<Pi>(&e->node)) {
+            total += countExpressionNodes(pi->domain);
+            total += countExpressionNodes(pi->codomain);
+        } else if (auto* lambda = std::get_if<Lambda>(&e->node)) {
+            total += countExpressionNodes(lambda->domain);
+            total += countExpressionNodes(lambda->body);
+        } else if (auto* let = std::get_if<Let>(&e->node)) {
+            total += countExpressionNodes(let->type);
+            total += countExpressionNodes(let->value);
+            total += countExpressionNodes(let->body);
+        }
+        return total;
+    }
+
     template <typename F>
     ExpressionPointer runTactic(const std::string& name, F&& fn) {
         if (!tacticTimingEnabled_) return fn();
@@ -220,6 +244,21 @@ public:
         // elaboration get registered incrementally in
         // elaborateDefinition / elaboratePatternMatchDefinition.
         seedAlgebraicRegistryFromEnvironment();
+        // Opt-in: enable the kernel's structural-hash WHNF cache for
+        // the duration of this module. Big win on files where the
+        // elaborator hands the kernel many freshly-allocated but
+        // structurally-identical subexpressions (Real/supremum.math
+        // is the canonical example).
+        const char* cacheFlag = std::getenv("MATH_KERNEL_CACHE");
+        bool enableKernelCache = cacheFlag && cacheFlag[0] != '\0'
+            && cacheFlag[0] != '0';
+        bool previousKernelCache = kernelCacheEnabled;
+        if (enableKernelCache) kernelCacheEnabled = true;
+        const char* kpFlag = std::getenv("MATH_KERNEL_PROFILE");
+        bool enableKernelProfile = kpFlag && kpFlag[0] != '\0'
+            && kpFlag[0] != '0';
+        bool previousKernelProfile = kernelProfileEnabled;
+        if (enableKernelProfile) kernelProfileEnabled = true;
         const char* timeFlag = std::getenv("MATH_TIME_DECLARATIONS");
         bool timeDeclarations = timeFlag && timeFlag[0] != '\0'
             && timeFlag[0] != '0';
@@ -240,6 +279,23 @@ public:
                 }
             } else {
                 elaborateTopStatement(statement);
+            }
+        }
+        if (enableKernelCache) kernelCacheEnabled = previousKernelCache;
+        if (enableKernelProfile) kernelProfileEnabled = previousKernelProfile;
+        if (timeDeclarations || tacticTimingEnabled_) {
+            struct rusage ru;
+            if (getrusage(RUSAGE_SELF, &ru) == 0) {
+                // On macOS ru_maxrss is bytes; on Linux it's kilobytes.
+                // Normalize to MB; on macOS this is bytes/1048576, on
+                // Linux it's kbytes/1024 — same arithmetic.
+#if defined(__APPLE__)
+                long long mb = ru.ru_maxrss / (1024 * 1024);
+#else
+                long long mb = ru.ru_maxrss / 1024;
+#endif
+                std::cerr << "[memory] " << moduleName_
+                          << " peak RSS=" << mb << " MB\n";
             }
         }
     }
@@ -14866,11 +14922,28 @@ private:
         int occurrences = 0;
         int whnfFuel = 2048;
         ExpressionPointer motiveBody;
+        const char* sizeFlag = std::getenv("MATH_DECIDE_SIZES");
+        bool dumpSizes = sizeFlag && sizeFlag[0] != '\0'
+            && sizeFlag[0] != '0';
+        size_t expectedSize = 0, targetSize = 0;
+        if (dumpSizes) {
+            expectedSize = countExpressionNodes(expectedType);
+            targetSize = countExpressionNodes(targetReduced);
+        }
         {
             TimedScope _inner(*this, "decide:motiveAbstraction");
             motiveBody = abstractStructuralOccurrenceWithWHNF(
                 expectedType, targetReduced, targetHeadName,
                 /*currentDepth=*/0, occurrences, whnfFuel);
+        }
+        if (dumpSizes) {
+            size_t motiveSize = countExpressionNodes(motiveBody);
+            std::cerr << "[decide-size] line=" << line
+                      << " expected=" << expectedSize
+                      << " target=" << targetSize
+                      << " motiveBody=" << motiveSize
+                      << " occurrences=" << occurrences
+                      << " whnfFuelLeft=" << whnfFuel << "\n";
         }
         if (occurrences == 0) {
             // No occurrence of `Logic.classical_decidable(P)` in the
@@ -16949,31 +17022,59 @@ private:
             // `classical_decidable(P)` lives. Use the cheap structural
             // walker for the domain so any literal occurrence there
             // still gets abstracted.
+            int before = occurrenceCount;
             ExpressionPointer newDomain = abstractStructuralOccurrence(
                 pi->domain, target, currentDepth, occurrenceCount);
-            return makePi(pi->displayHint, newDomain,
+            ExpressionPointer newCodomain =
                 abstractStructuralOccurrenceWithWHNF(
                     pi->codomain, target, targetHeadName,
-                    currentDepth + 1, occurrenceCount, whnfFuel));
+                    currentDepth + 1, occurrenceCount, whnfFuel);
+            if (occurrenceCount == before
+                && newDomain.get() == pi->domain.get()
+                && newCodomain.get() == pi->codomain.get()
+                && working.get() == expression.get()) {
+                return expression;
+            }
+            return makePi(pi->displayHint,
+                std::move(newDomain), std::move(newCodomain));
         }
         if (auto* lambda = std::get_if<Lambda>(&working->node)) {
             // Same domain-skip as for Pi.
+            int before = occurrenceCount;
             ExpressionPointer newDomain = abstractStructuralOccurrence(
                 lambda->domain, target, currentDepth, occurrenceCount);
-            return makeLambda(lambda->displayHint, newDomain,
+            ExpressionPointer newBody =
                 abstractStructuralOccurrenceWithWHNF(
                     lambda->body, target, targetHeadName,
-                    currentDepth + 1, occurrenceCount, whnfFuel));
+                    currentDepth + 1, occurrenceCount, whnfFuel);
+            if (occurrenceCount == before
+                && newDomain.get() == lambda->domain.get()
+                && newBody.get() == lambda->body.get()
+                && working.get() == expression.get()) {
+                return expression;
+            }
+            return makeLambda(lambda->displayHint,
+                std::move(newDomain), std::move(newBody));
         }
         if (auto* application =
                 std::get_if<Application>(&working->node)) {
-            return makeApplication(
+            int before = occurrenceCount;
+            ExpressionPointer newFn =
                 abstractStructuralOccurrenceWithWHNF(
                     application->function, target, targetHeadName,
-                    currentDepth, occurrenceCount, whnfFuel),
+                    currentDepth, occurrenceCount, whnfFuel);
+            ExpressionPointer newArg =
                 abstractStructuralOccurrenceWithWHNF(
                     application->argument, target, targetHeadName,
-                    currentDepth, occurrenceCount, whnfFuel));
+                    currentDepth, occurrenceCount, whnfFuel);
+            if (occurrenceCount == before
+                && newFn.get() == application->function.get()
+                && newArg.get() == application->argument.get()
+                && working.get() == expression.get()) {
+                return expression;
+            }
+            return makeApplication(
+                std::move(newFn), std::move(newArg));
         }
         if (auto* letNode = std::get_if<Let>(&working->node)) {
             // ζ-substitute the let's value into the body before
@@ -17080,38 +17181,67 @@ private:
             return expression;
         }
         if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            int before = occurrenceCount;
+            auto newDomain = abstractStructuralOccurrence(
+                pi->domain, target, currentDepth, occurrenceCount);
+            auto newCodomain = abstractStructuralOccurrence(
+                pi->codomain, target, currentDepth + 1, occurrenceCount);
+            if (occurrenceCount == before
+                && newDomain.get() == pi->domain.get()
+                && newCodomain.get() == pi->codomain.get()) {
+                return expression;
+            }
             return makePi(pi->displayHint,
-                abstractStructuralOccurrence(pi->domain, target,
-                                              currentDepth, occurrenceCount),
-                abstractStructuralOccurrence(pi->codomain, target,
-                                              currentDepth + 1,
-                                              occurrenceCount));
+                std::move(newDomain), std::move(newCodomain));
         }
         if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            int before = occurrenceCount;
+            auto newDomain = abstractStructuralOccurrence(
+                lambda->domain, target, currentDepth, occurrenceCount);
+            auto newBody = abstractStructuralOccurrence(
+                lambda->body, target, currentDepth + 1, occurrenceCount);
+            if (occurrenceCount == before
+                && newDomain.get() == lambda->domain.get()
+                && newBody.get() == lambda->body.get()) {
+                return expression;
+            }
             return makeLambda(lambda->displayHint,
-                abstractStructuralOccurrence(lambda->domain, target,
-                                              currentDepth, occurrenceCount),
-                abstractStructuralOccurrence(lambda->body, target,
-                                              currentDepth + 1,
-                                              occurrenceCount));
+                std::move(newDomain), std::move(newBody));
         }
         if (auto* application =
                 std::get_if<Application>(&expression->node)) {
+            int before = occurrenceCount;
+            auto newFn = abstractStructuralOccurrence(
+                application->function, target,
+                currentDepth, occurrenceCount);
+            auto newArg = abstractStructuralOccurrence(
+                application->argument, target,
+                currentDepth, occurrenceCount);
+            if (occurrenceCount == before
+                && newFn.get() == application->function.get()
+                && newArg.get() == application->argument.get()) {
+                return expression;
+            }
             return makeApplication(
-                abstractStructuralOccurrence(application->function, target,
-                                              currentDepth, occurrenceCount),
-                abstractStructuralOccurrence(application->argument, target,
-                                              currentDepth, occurrenceCount));
+                std::move(newFn), std::move(newArg));
         }
         if (auto* let = std::get_if<Let>(&expression->node)) {
+            int before = occurrenceCount;
+            auto newType = abstractStructuralOccurrence(
+                let->type, target, currentDepth, occurrenceCount);
+            auto newValue = abstractStructuralOccurrence(
+                let->value, target, currentDepth, occurrenceCount);
+            auto newBody = abstractStructuralOccurrence(
+                let->body, target, currentDepth + 1, occurrenceCount);
+            if (occurrenceCount == before
+                && newType.get() == let->type.get()
+                && newValue.get() == let->value.get()
+                && newBody.get() == let->body.get()) {
+                return expression;
+            }
             return makeLet(let->displayHint,
-                abstractStructuralOccurrence(let->type, target,
-                                              currentDepth, occurrenceCount),
-                abstractStructuralOccurrence(let->value, target,
-                                              currentDepth, occurrenceCount),
-                abstractStructuralOccurrence(let->body, target,
-                                              currentDepth + 1,
-                                              occurrenceCount));
+                std::move(newType), std::move(newValue),
+                std::move(newBody));
         }
         // Sort, FreeVariable, Constant — no children, return as-is.
         return expression;
