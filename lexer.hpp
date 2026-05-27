@@ -84,6 +84,10 @@ enum class TokenKind {
     ForAll,          // "∀" (universal-quantifier prefix)
     Exists,          // "∃" (existential-quantifier prefix)
     Arrow,           // "→" or "->"
+    Question,        // "?" — placeholder for an argument the elaborator
+                     // should infer (by goal-unification + hypothesis
+                     // search). At a function call, `f(?, b, c)` asks
+                     // the elaborator to fill the first arg.
 
     EndOfFile,
 };

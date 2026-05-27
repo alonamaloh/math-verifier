@@ -3354,6 +3354,19 @@ private:
             return goalStack_[top];
         }
 
+        if (std::holds_alternative<SurfaceHole>(expression.node)) {
+            // `?` outside a function-call argument position. The hole
+            // can only be filled by goal-driven argument inference,
+            // which fires at the application level; if we got here,
+            // the user wrote `?` somewhere we don't (yet) try to
+            // resolve it.
+            throwElaborate(
+                "`?` used outside a function-call argument position — "
+                "no goal-driven inference applies here. Use `?` only "
+                "for positional arguments of a known function (e.g. "
+                "`Natural.successor_injective(?, ?, eq)`).");
+        }
+
         if (auto* unfold =
                 std::get_if<SurfaceUnfold>(&expression.node)) {
             // Flip each named definition's opacity from Opaque to
@@ -3453,6 +3466,102 @@ private:
                     application->arguments,
                     application->function,
                     expression.line);
+            // Hole detection: if any positional argument is `?`, the
+            // user has opted into goal-driven inference at those slots.
+            // Route to inferCallWithHoles with the function's
+            // (universe-instantiated) type. The function must be a
+            // known declaration with an identifier head — anonymous
+            // function expressions and operator-dispatched calls fall
+            // through to the regular path (which would error on `?`).
+            bool anyHole = false;
+            for (const auto& a : positionalArguments) {
+                if (a && std::holds_alternative<SurfaceHole>(a->node)) {
+                    anyHole = true; break;
+                }
+            }
+            if (anyHole && headIdentifier
+                && environment_.lookup(
+                       headIdentifier->qualifiedName) != nullptr) {
+                const std::string& name = headIdentifier->qualifiedName;
+                const Declaration* decl =
+                    environment_.lookup(name);
+                ExpressionPointer declType = declarationType(*decl);
+                // Universe-instantiate. Use user-provided
+                // `.{u, v, …}` arguments if present; otherwise infer
+                // universes from value args' types (concrete args
+                // only — holes contribute nothing). Skip leading
+                // implicit binders since the user supplies the
+                // remaining args directly.
+                int declaredImplicitCount =
+                    environment_.implicitArgumentCount(name);
+                int totalPiCount = countLeadingPis(declType);
+                const std::vector<std::string>& universeParams =
+                    declarationUniverseParameters(*decl);
+                std::vector<LevelPointer> universeArgs;
+                if (!headIdentifier->universeArgs.empty()) {
+                    for (const auto& l :
+                         headIdentifier->universeArgs) {
+                        universeArgs.push_back(elaborateLevel(*l));
+                    }
+                } else if (!universeParams.empty()) {
+                    std::vector<ExpressionPointer> probeArgs;
+                    for (const auto& sa : positionalArguments) {
+                        if (sa && std::holds_alternative<SurfaceHole>(
+                                      sa->node)) {
+                            probeArgs.push_back(nullptr);
+                        } else {
+                            try {
+                                probeArgs.push_back(
+                                    elaborateExpression(*sa,
+                                        localBinders));
+                            } catch (const ElaborateError&) {
+                                probeArgs.push_back(nullptr);
+                            }
+                        }
+                    }
+                    universeArgs = inferUniverseArguments(
+                        *decl, probeArgs, localBinders,
+                        declaredImplicitCount);
+                }
+                ExpressionPointer instantiatedType = declType;
+                if (!universeParams.empty()) {
+                    instantiatedType = substituteUniverseLevels(
+                        declType, universeParams, universeArgs);
+                }
+                // If the user supplied fewer args than the function
+                // has Pis after stripping implicit-leading args, the
+                // remaining leading-implicit args also need to be
+                // inferred — extend the positional list with a `?`
+                // prefix accordingly.
+                std::vector<SurfaceExpressionPointer> fullArgs;
+                int expectedArgCount =
+                    totalPiCount - declaredImplicitCount;
+                int implicitToFront = 0;
+                if (static_cast<int>(positionalArguments.size())
+                    == expectedArgCount
+                    && declaredImplicitCount > 0) {
+                    implicitToFront = declaredImplicitCount;
+                }
+                for (int i = 0; i < implicitToFront; ++i) {
+                    fullArgs.push_back(makeSurfaceHole(
+                        expression.line, expression.column));
+                }
+                for (const auto& a : positionalArguments) {
+                    fullArgs.push_back(a);
+                }
+                std::vector<ExpressionPointer> resolvedArgs =
+                    inferCallWithHoles(
+                        name, instantiatedType,
+                        fullArgs, localBinders,
+                        expectedType, expression.line);
+                ExpressionPointer call =
+                    makeConstant(name, universeArgs);
+                for (auto& v : resolvedArgs) {
+                    call = makeApplication(std::move(call),
+                                            std::move(v));
+                }
+                return call;
+            }
             if (headIdentifier && headIdentifier->universeArgs.empty()) {
                 const std::string& name = headIdentifier->qualifiedName;
                 size_t argumentCount = positionalArguments.size();
@@ -16062,6 +16171,183 @@ private:
         }
         result.trailingValues = std::move(elaboratedTrailingArguments);
         return result;
+    }
+
+    // Like `inferLeadingArguments` but the holes can be at ANY position,
+    // marked by `?` in the user's argument list. For each position:
+    //   - If it's `?` (SurfaceHole): open a metavariable; resolve it
+    //     later via backward inference (unify result type against goal)
+    //     plus forward inference (unify other args' inferred types
+    //     against their domains).
+    //   - If it's a real surface expression: elaborate it against the
+    //     Pi domain (with prior metas substituted), unify the inferred
+    //     type against the domain.
+    // After all args processed, do a final backward unification to fill
+    // any holes not yet resolved by the per-arg forward pass.
+    //
+    // Returns the resolved arg values by position. Errors if any hole
+    // remains unassigned (with a diagnostic message naming the position).
+    std::vector<ExpressionPointer> inferCallWithHoles(
+        const std::string& diagnosticName,
+        ExpressionPointer instantiatedFunctionType,
+        const std::vector<SurfaceExpressionPointer>& surfaceArgs,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line) {
+
+        // Step 1: walk the function's Pi chain. At each position, allocate
+        // a fresh Internal FreeVariable. Hole positions add their name to
+        // `metavariableNames` (to be resolved by unification); non-hole
+        // positions get a name that's later bound to the elaborated value.
+        std::vector<std::string> argFreshNames;
+        std::vector<bool> isHole;
+        std::set<std::string> metavariableNames;
+        std::vector<ExpressionPointer> piDomains;
+        std::vector<ExpressionPointer> piCodomainsBeforeOpen;
+        ExpressionPointer cursor = weakHeadNormalForm(
+            environment_, instantiatedFunctionType);
+        for (size_t i = 0; i < surfaceArgs.size(); ++i) {
+            auto* pi = std::get_if<Pi>(&cursor->node);
+            if (!pi) {
+                throw ElaborateError(
+                    "call to '" + diagnosticName
+                    + "': too many arguments at line "
+                    + std::to_string(line));
+            }
+            bool argIsHole = std::holds_alternative<SurfaceHole>(
+                surfaceArgs[i]->node);
+            std::string fresh = (argIsHole ? "_hole_" : "_arg_")
+                                + std::to_string(i) + "_" + diagnosticName;
+            argFreshNames.push_back(fresh);
+            isHole.push_back(argIsHole);
+            piDomains.push_back(pi->domain);
+            piCodomainsBeforeOpen.push_back(pi->codomain);
+            if (argIsHole) metavariableNames.insert(fresh);
+            cursor = weakHeadNormalForm(environment_,
+                openBinder(pi->codomain, fresh,
+                            FreeVariableOrigin::Internal));
+        }
+        // cursor is the result type with all positions opened as FVs.
+        ExpressionPointer resultTypePattern = cursor;
+
+        // Step 2: backward inference. Unify the result type pattern
+        // against the expected type to fix as many hole metavariables
+        // as possible up front.
+        std::map<std::string, ExpressionPointer> assignment;
+        if (expectedType) {
+            unifyConstructorParameters(resultTypePattern, expectedType,
+                                          metavariableNames, assignment);
+            // If anything's still unassigned, try with both sides WHNF'd.
+            bool anyUnassigned = false;
+            for (const auto& name : metavariableNames) {
+                if (!assignment.count(name)) {
+                    anyUnassigned = true; break;
+                }
+            }
+            if (anyUnassigned) {
+                ExpressionPointer resultPatternNormalised =
+                    weakHeadNormalForm(environment_, resultTypePattern);
+                ExpressionPointer expectedTypeNormalised =
+                    weakHeadNormalForm(environment_, expectedType);
+                unifyConstructorParameters(resultPatternNormalised,
+                                              expectedTypeNormalised,
+                                              metavariableNames, assignment);
+            }
+        }
+
+        // Step 3: forward inference. For each non-hole arg, elaborate it
+        // against the Pi domain (with prior metas substituted), unify the
+        // inferred type against the domain to fix more hole metas. Bind
+        // each non-hole arg's placeholder to its elaborated value so
+        // subsequent domains substitute correctly.
+        std::vector<ExpressionPointer> elaboratedArgs(surfaceArgs.size(),
+                                                       nullptr);
+        for (size_t i = 0; i < surfaceArgs.size(); ++i) {
+            ExpressionPointer expectedDomain =
+                substituteFreeVariables(piDomains[i], assignment);
+            if (isHole[i]) continue;
+            ExpressionPointer kernelArg = elaborateExpression(
+                *surfaceArgs[i], localBinders, expectedDomain);
+            ExpressionPointer inferredType =
+                weakHeadNormalForm(environment_,
+                    inferTypeInLocalContext(
+                        localBinders, kernelArg));
+            inferredType = closeOverLocalBinders(
+                inferredType, localBinders, localBinders.size());
+            std::vector<ExpressionPointer> binderStack;
+            unifyConstructorParameters(expectedDomain, inferredType,
+                                          metavariableNames, assignment,
+                                          0, &binderStack);
+            bool anyUnassigned = false;
+            for (const auto& name : metavariableNames) {
+                if (!assignment.count(name)) {
+                    anyUnassigned = true; break;
+                }
+            }
+            if (anyUnassigned) {
+                ExpressionPointer expectedDomainNormalised =
+                    weakHeadNormalForm(environment_, expectedDomain);
+                ExpressionPointer inferredRenormalised =
+                    weakHeadNormalForm(environment_, inferredType);
+                binderStack.clear();
+                unifyConstructorParameters(expectedDomainNormalised,
+                                              inferredRenormalised,
+                                              metavariableNames, assignment,
+                                              0, &binderStack);
+            }
+            elaboratedArgs[i] = kernelArg;
+            // Bind this arg's placeholder so later domain substitutions
+            // (and the final result pattern unification) see the actual
+            // value rather than the FV placeholder.
+            assignment[argFreshNames[i]] = kernelArg;
+        }
+
+        // Step 4: final backward unification — any holes still
+        // unassigned now potentially have more constraints to work with.
+        bool anyUnassigned = false;
+        for (const auto& name : metavariableNames) {
+            if (!assignment.count(name)) { anyUnassigned = true; break; }
+        }
+        if (anyUnassigned && expectedType) {
+            ExpressionPointer resultPatternResolved =
+                substituteFreeVariables(resultTypePattern, assignment);
+            ExpressionPointer expectedNormalised =
+                weakHeadNormalForm(environment_, expectedType);
+            unifyConstructorParameters(resultPatternResolved,
+                                          expectedNormalised,
+                                          metavariableNames, assignment);
+        }
+
+        // Step 5: resolve holes from the assignment. Build the final
+        // arg list by substituting metavariables.
+        std::vector<std::string> unresolved;
+        for (size_t i = 0; i < surfaceArgs.size(); ++i) {
+            if (isHole[i]) {
+                auto iterator = assignment.find(argFreshNames[i]);
+                if (iterator == assignment.end()) {
+                    unresolved.push_back(std::to_string(i));
+                } else {
+                    elaboratedArgs[i] = iterator->second;
+                }
+            }
+        }
+        if (!unresolved.empty()) {
+            std::string message =
+                "call to '" + diagnosticName
+                + "' at line " + std::to_string(line)
+                + ": could not infer hole(s) at position";
+            if (unresolved.size() > 1) message += "s";
+            for (const auto& p : unresolved) message += " " + p;
+            if (expectedType) {
+                message += "\n  expected return type: ";
+                message += prettyPrintInLocalScope(
+                    expectedType, localBinders);
+            }
+            message += "\n  Provide the missing argument(s) explicitly "
+                       "to disambiguate.";
+            throwElaborate(message);
+        }
+        return elaboratedArgs;
     }
 
     // Constructor-specific wrapper around `inferLeadingArguments`. Handles

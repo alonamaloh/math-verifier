@@ -197,6 +197,7 @@ private:
             case '<':  advanceOne(); return {TokenKind::Less,        "<", startLine, startColumn};
             case '>':  advanceOne(); return {TokenKind::Greater,     ">", startLine, startColumn};
             case '=':  advanceOne(); return {TokenKind::Equal,       "=", startLine, startColumn};
+            case '?':  advanceOne(); return {TokenKind::Question,    "?", startLine, startColumn};
         }
 
         throw LexError("Unexpected character '" + std::string(1, character)
@@ -434,6 +435,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::ForAll:               return "'∀'";
         case TokenKind::Exists:               return "'∃'";
         case TokenKind::Arrow:                return "'->' or '→'";
+        case TokenKind::Question:             return "'?'";
         case TokenKind::EndOfFile:            return "end of file";
     }
     return "(unknown token kind)";

@@ -1950,6 +1950,15 @@ private:
             }
             return makeSurfaceGoal(token.line, token.column);
         }
+        if (current.kind == TokenKind::Question) {
+            // `?` — placeholder for an argument the elaborator should
+            // infer (goal-unification + supplied-args-types + scope
+            // hypothesis search). Lets the user write
+            // `Natural.successor_injective(?, ?, eq)` for a lemma whose
+            // first two args are recoverable from the goal type.
+            Token token = consumeAny();
+            return makeSurfaceHole(token.line, token.column);
+        }
         if (current.kind == TokenKind::KeywordUnfold) {
             // `unfold X [, Y, ...] in <body>` — temporarily flips
             // X (and friends) from opaque to transparent while

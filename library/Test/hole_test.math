@@ -1,0 +1,28 @@
+-- Test `?` placeholder for goal-driven argument inference.
+-- The elaborator should fill `?` positions by unifying the lemma's
+-- conclusion against the expected (goal) type and the lemma's
+-- argument types against the supplied (non-?) args' inferred types.
+
+module Test.hole_test
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+
+-- (1) Successor injectivity: `(a b : Natural) → succ(a) = succ(b) → a = b`.
+-- Goal pins a, b; user supplies only the hypothesis.
+theorem successor_inj_hole (n : Natural) (h : 2 = successor(successor(n)))
+        : 1 = successor(n) :=
+  Natural.successor_injective(?, ?, h)
+
+-- (2) Trailing ? — placeholder where the user wants the elaborator to
+-- look in scope for a matching hypothesis. (Not implemented yet; we
+-- only do unification-based filling. So this would error.)
+-- theorem refl_hole : 0 = 0 := reflexivity(?)
+
+-- (3) Mixed: user supplies the first explicit arg, ? for the second
+-- and third. (For zero_not_successor: `(n : Natural) → zero ≠ successor(n)`)
+theorem zero_not_succ_hole : zero ≠ successor(zero) :=
+  Natural.zero_not_successor(?)

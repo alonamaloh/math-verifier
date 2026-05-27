@@ -348,6 +348,15 @@ struct SurfaceGiven {
 // (used in a position with no propagating expected type).
 struct SurfaceGoal {};
 
+// `?` — placeholder for an argument the elaborator should infer.
+// At a function call `f(?, b, c)`, asks the elaborator to fill in
+// the first argument by unification against the goal type, against
+// the supplied arguments' inferred types, and against in-scope
+// hypotheses by type-match. Lets the user write
+// `Natural.successor_injective(?, ?, eq)` and have the two
+// Natural arguments inferred from the goal.
+struct SurfaceHole {};
+
 // `unfold <name> in <body>` — temporarily flips `<name>`'s opacity
 // from Opaque to Transparent for the duration of elaborating
 // `<body>`. The kernel then δ-unfolds `<name>` freely, so reductions
@@ -442,7 +451,7 @@ struct SurfaceExpression {
         SurfaceRing, SurfaceField, SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
         SurfaceByStrongInduction, SurfaceGoal, SurfaceUnfold,
-        SurfaceDecide, SurfaceNote
+        SurfaceDecide, SurfaceNote, SurfaceHole
     > node;
     int line = 0;
     int column = 0;
@@ -616,6 +625,10 @@ inline SurfaceExpressionPointer makeSurfaceGiven(
 inline SurfaceExpressionPointer makeSurfaceGoal(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceGoal{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceHole(int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceHole{}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceUnfold(
     std::vector<std::string> names,
