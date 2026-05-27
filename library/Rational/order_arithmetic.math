@@ -121,86 +121,47 @@ theorem Integer.IsNonneg.add
             = (a + b : Integer))
 }
 
--- Rational IsNonneg.add via Quotient.induct_two.
+-- Rational IsNonneg.add: take representatives, the Integer-level
+-- IsNonneg.add closes the leaf.
 theorem Rational.IsNonneg.add (p q : Rational)
         (pIsNonneg : Rational.IsNonneg(p))
         (qIsNonneg : Rational.IsNonneg(q))
         : Rational.IsNonneg(p + q) :=
-  Quotient.induct_two(
-      function (pArg qArg : Rational) =>
-          Rational.IsNonneg(pArg) → Rational.IsNonneg(qArg)
-          → Rational.IsNonneg(pArg + qArg),
-      function (rep_p rep_q : RationalRepresentative) =>
-          (cases rep_p {
-             | RationalRepresentative.make(n1, d1) =>
-                 (cases rep_q {
-                    | RationalRepresentative.make(n2, d2) =>
-                        function (pNonneg : Integer.IsNonneg(n1))
-                                 (qNonneg : Integer.IsNonneg(n2)) =>
-                          Integer.IsNonneg.add(
-                              n1 * (successor(d2) : Integer),
-                              n2 * (successor(d1) : Integer),
-                              Integer.IsNonneg.multiply(
-                                  n1, (successor(d2) : Integer),
-                                  pNonneg,
-                                  Integer.from_natural_is_nonneg(
-                                      successor(d2))),
-                              Integer.IsNonneg.multiply(
-                                  n2, (successor(d1) : Integer),
-                                  qNonneg,
-                                  Integer.from_natural_is_nonneg(
-                                      successor(d1))))
-                  } : Rational.IsNonneg(Quotient.mk(RationalRepresentative.make(n1, d1)))
-                      → Rational.IsNonneg(Quotient.mk(rep_q))
-                      → Rational.IsNonneg(
-                            Quotient.mk(RationalRepresentative.make(n1, d1))
-                            + Quotient.mk(rep_q)))
-           } : Rational.IsNonneg(Quotient.mk(rep_p))
-               → Rational.IsNonneg(Quotient.mk(rep_q))
-               → Rational.IsNonneg(
-                     Quotient.mk(rep_p) + Quotient.mk(rep_q))),
-      p, q)(pIsNonneg)(qIsNonneg)
+  cases p refining pIsNonneg { | RationalRepresentative.make(n1, d1) =>
+    cases q refining qIsNonneg { | RationalRepresentative.make(n2, d2) =>
+      Integer.IsNonneg.add(?, ?,
+          Integer.IsNonneg.multiply(?, ?,
+              pIsNonneg,
+              Integer.from_natural_is_nonneg(successor(d2))),
+          Integer.IsNonneg.multiply(?, ?,
+              qIsNonneg,
+              Integer.from_natural_is_nonneg(successor(d1)))) } }
 
--- Rational analog: IsNonneg(q) ∧ IsNonneg(-q) → q = 0. Lift via
--- Quotient.induct from the Integer-level version.
+-- Rational analog: IsNonneg(q) ∧ IsNonneg(-q) → q = 0. Take a
+-- representative for q; at the rep level, n is both nonneg and
+-- (-n)-nonneg, so n = 0 (Integer antisymmetry), and mk(make(0, d)) =
+-- Rational.zero via Quotient.sound.
 theorem Rational.IsNonneg_and_negate_IsNonneg_implies_zero
         (q : Rational)
         (qIsNonneg : Rational.IsNonneg(q))
         (negQIsNonneg : Rational.IsNonneg(-q))
         : q = Rational.zero :=
-  Quotient.induct(
-      function (qArg : Rational) =>
-          Rational.IsNonneg(qArg) → Rational.IsNonneg(-qArg)
-          → qArg = Rational.zero,
-      function (rep : RationalRepresentative) =>
-          (cases rep {
-             | RationalRepresentative.make(n, d) =>
-                 function (nIsNonneg : Integer.IsNonneg(n))
-                          (negNIsNonneg : Integer.IsNonneg(-n)) =>
-                   -- n = 0; then mk(make(0, d)) = Rational.zero via
-                   -- Quotient.sound (0 · succ(0) = 0 · succ(d), both = 0).
-                   calc (Quotient.mk(RationalRepresentative.make(n, d))
-                            : Rational)
-                      = (Quotient.mk(RationalRepresentative.make(Integer.zero, d))
-                            : Rational)
-                      -- mk(make(Integer.zero, d)) = Rational.zero.
-                      = Rational.zero
-                            by Quotient.sound(
-                                   RationalRepresentative, RationalEquivalent,
-                                   RationalRepresentative.make(Integer.zero, d),
-                                   RationalRepresentative.make(Integer.zero, 0),
-                                   -- Integer.zero * succ(zero) = Integer.zero * succ(d).
-                                   -- Both sides reduce to Integer.zero (multiply_zero_left).
-                                   calc Integer.zero * (successor(0) : Integer)
-                                      = Integer.zero * (successor(d) : Integer))
-           } : Rational.IsNonneg(
-                   Quotient.mk(rep))
-               → Rational.IsNonneg(
-                     -Quotient.mk(RationalRepresentative,
-                                  RationalEquivalent, rep))
-               → Quotient.mk(RationalRepresentative,
-                             RationalEquivalent, rep) = Rational.zero),
-      q)(qIsNonneg)(negQIsNonneg)
+  cases q refining qIsNonneg, negQIsNonneg {
+    | RationalRepresentative.make(n, d) =>
+        -- n = 0; then mk(make(0, d)) = Rational.zero via
+        -- Quotient.sound (0 · succ(0) = 0 · succ(d), both = 0).
+        calc (Quotient.mk(RationalRepresentative.make(n, d))
+                 : Rational)
+           = (Quotient.mk(RationalRepresentative.make(Integer.zero, d))
+                 : Rational)
+           -- mk(make(Integer.zero, d)) = Rational.zero.
+           = Rational.zero
+                 by Quotient.sound(
+                        RationalRepresentative.make(Integer.zero, d),
+                        RationalRepresentative.make(Integer.zero, 0),
+                        calc Integer.zero * (successor(0) : Integer)
+                           = Integer.zero * (successor(d) : Integer))
+  }
 
 -- Antisymmetry: x ≤ y, y ≤ x → x = y. Use: y - x = -(x - y), then
 -- IsNonneg(y - x) ∧ IsNonneg(x - y) = IsNonneg(y - x) ∧ IsNonneg(-(y - x)),
