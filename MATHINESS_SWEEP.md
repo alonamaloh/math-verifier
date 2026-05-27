@@ -50,48 +50,58 @@ For each proof:
 - `prime_divides_product.math`
 - `padic_valuation.math` — **large (1503 lines)**; one site touched, the rest pending.
 
-### Integer/ — partially done
+### Integer/ — done
 
-**Covered (with refactors landed):**
-- `basics.math` — `?` on add_cancel_right.
-- `addition.math` — `add_after_first_respects` uses cases instead of
-  explicit Quotient.induct motive.
-- `ring.math` — major win: 34 → 21 declarations. Collapsed
-  triple-helper stacks (at_representatives + after_first +
-  after_first_second + main) into single cases-based proofs for:
-  add_commutative, add_associative, add_identity_left,
-  multiply_commutative, multiply_identity_left, distributivity_left,
-  multiply_associative.
-- `negation.math` — add_negate_left helper folded in.
-- `algebra.math` — multiply_zero_left and multiply_negate_right helpers
-  folded in.
-- `multiplication.math` — cases instead of explicit motive on
-  multiply_after_first_respects.
+All structural files (`basics`, `addition`, `multiplication`, `ring`,
+`negation`, `algebra`, `cancellation`, `order`, `sign`,
+`absolute_value`, `absolute_value_natural`, `embedding`, `instances`)
+have been swept. The triple-helper collapse pattern was the biggest
+win:
+- `ring.math`: 34 → 21 declarations.
+- All other files: smaller wins.
 
-**Pending:**
-- `absolute_value.math`, `absolute_value_natural.math`,
-  `absolute_value_multiplicative.math`, `cancellation.math`,
-  `embedding.math`, `instances.math`, `order.math`, `sign.math`.
+Files NOT yet looked at:
+- `absolute_value_multiplicative.math` (159 lines) — quick peek showed
+  no obvious verbose patterns; worth a careful read someday.
 
-The triple-helper collapse pattern is the biggest single win. Any
-Integer-level proof that follows it (separate `_at_representatives` →
-`_after_first_second` → `_after_first` → main) is a candidate.
+### Rational/ — substantially done
 
-### Rational/ — pending
+Refactored:
+- `basics.math` — `?` on multiply_cancel_right.
+- `addition.math`, `multiplication.math` — `cases` instead of
+  Quotient.induct motive on the after_first_respects helpers.
+- `ring.math` — collapsed double-obtain to single.
+- `algebra.math` — same.
+- `order_arithmetic.math` — two Quotient.induct stacks → cases-refining.
+- `positive.math` — IsNonneg.multiply → cases-refining.
 
-### Real/ — partially covered
+NOT yet refactored: `field.math`, `triangle.math`, `triangle_more.math`,
+`order_multiplication.math` (has Quotient.exact stacks),
+`absolute_value.math`, `reciprocal_function.math`, `reciprocal.math`,
+`order.math`, `negation.math`, `halve.math`, `linearity.math`,
+`embedding.math`, `instances.math`.
 
-Refactored during the earlier patterns-in-binders sweep:
-- `algebra.math`, `ring.math`, `absolute_value.math`, `order.math`, `supremum.math` (selected sites).
-- `linearity.math`, `multiplication.math`, `addition.math`, `field.math`, `apartness.math`, `convergence.math` — **not yet looked at with the `?` lens**.
+### Real/ — partially done
 
-### PAdic/ — partially covered
+Refactored in earlier patterns-in-binders sweep AND this sweep:
+- `ring.math` — drop motives on zero_add, add_negate_right, negate_negate.
+- `algebra.math` — collapse distributivity_left's nested induct + induct_two.
+- `absolute_value.math`, `order.math`, `supremum.math` — earlier work.
 
-Refactored during the earlier sweep:
-- `ring.math` (one site).
+NOT yet refactored: `linearity.math`, `multiplication.math`,
+`addition.math`, `field.math`, `apartness.math`, `convergence.math`,
+`negation.math`, `embedding.math`, `basics.math`, `cauchy_bounded.math`,
+`reciprocal.math`, `sequence.math`, `instances.math`.
 
-**Pending:**
-- `absolute_value.math`, `addition.math`, `negation.math`, `multiplication.math`, `algebra.math`, `instances.math`, `embedding.math`, `cauchy_bounded.math`, `basics.math`.
+### PAdic/ — partially done
+
+- `ring.math` — collapse add_associative, zero_add, add_negate_right.
+- `algebra.math` — collapse multiply_associative, one_multiply,
+  distributivity_left.
+
+NOT yet refactored: `absolute_value.math` (~7 induct sites),
+`addition.math`, `negation.math`, `multiplication.math`,
+`cauchy_bounded.math`, `embedding.math`, `instances.math`, `basics.math`.
 
 ### Other folders not yet swept
 
