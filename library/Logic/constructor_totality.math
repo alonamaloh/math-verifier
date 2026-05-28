@@ -46,12 +46,7 @@ theorem Natural.constructor_totality
   | zero =>
       Or.introduceLeft(reflexivity(0))
   | successor(predecessor) =>
-      Or.introduceRight(
-          Exists.introduce(
-              Natural,
-              function (p : Natural) => successor(predecessor) = successor(p),
-              predecessor,
-              reflexivity(successor(predecessor))))
+      Or.introduceRight(witness predecessor with reflexivity(successor(predecessor)))
 
 theorem LessOrEqual.constructor_totality
         (smaller larger : Natural)
@@ -64,15 +59,8 @@ theorem LessOrEqual.constructor_totality
       Or.introduceLeft(reflexivity(commonValue))
   | LessOrEqual.step(smallerD, largerPredecessor, subproof) =>
       Or.introduceRight(
-          Exists.introduce(
-              Natural,
-              function (predecessor : Natural) =>
-                  successor(largerPredecessor) = successor(predecessor)
-                  ∧ smallerD ≤ predecessor,
-              largerPredecessor,
-              And.introduction(
-                  reflexivity(successor(largerPredecessor)),
-                  subproof)))
+          witness largerPredecessor with
+              And.introduction(reflexivity(successor(largerPredecessor)), subproof))
 
 -- And's components live in Proposition, so we cannot wrap them in
 -- `Exists` (which quantifies over Type). And since `Equality` requires
@@ -132,21 +120,9 @@ theorem IntegerRepresentative.constructor_totality
           → ∃ (positivePart : Natural). ∃ (negativePart : Natural).
                 representative = IntegerRepresentative.make(positivePart, negativePart)
   | IntegerRepresentative.make(positivePart, negativePart) =>
-      Exists.introduce(
-          Natural,
-          function (a : Natural) =>
-              ∃ (b : Natural).
-                  IntegerRepresentative.make(positivePart, negativePart)
-                  = IntegerRepresentative.make(a, b),
-          positivePart,
-          Exists.introduce(
-              Natural,
-              function (b : Natural) =>
-                  IntegerRepresentative.make(positivePart, negativePart)
-                  = IntegerRepresentative.make(positivePart, b),
-              negativePart,
-              reflexivity(
-                  IntegerRepresentative.make(positivePart, negativePart))))
+      witness positivePart with
+          witness negativePart with
+              reflexivity(IntegerRepresentative.make(positivePart, negativePart))
 
 -- Every RationalRepresentative is a `RationalRepresentative.make` of
 -- its numerator (an Integer) and denominator-predecessor (a Natural).
@@ -157,18 +133,6 @@ theorem RationalRepresentative.constructor_totality
                   representative
                   = RationalRepresentative.make(numerator, denominatorPredecessor)
   | RationalRepresentative.make(numerator, denominatorPredecessor) =>
-      Exists.introduce(
-          Integer,
-          function (n : Integer) =>
-              ∃ (d : Natural).
-                  RationalRepresentative.make(numerator, denominatorPredecessor)
-                  = RationalRepresentative.make(n, d),
-          numerator,
-          Exists.introduce(
-              Natural,
-              function (d : Natural) =>
-                  RationalRepresentative.make(numerator, denominatorPredecessor)
-                  = RationalRepresentative.make(numerator, d),
-              denominatorPredecessor,
-              reflexivity(
-                  RationalRepresentative.make(numerator, denominatorPredecessor))))
+      witness numerator with
+          witness denominatorPredecessor with
+              reflexivity(RationalRepresentative.make(numerator, denominatorPredecessor))

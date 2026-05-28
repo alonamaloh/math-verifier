@@ -48,21 +48,20 @@ theorem Rational.sequence.absolute_value_is_cauchy
         (s : Rational.sequence.Sequence)
         (sIsCauchy : Rational.sequence.IsCauchy(s))
         : Rational.sequence.IsCauchy(
-              function (n : Natural) => Rational.absolute_value(s(n))) :=
+              function (n : Natural) => abs(s(n))) :=
   function (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) => {
     obtain ⟨N, sBound⟩ from sIsCauchy(epsilon, epsilonPositive);
     witness N with
         function (m : Natural) (N_leq_m : N ≤ m)
                  (n : Natural) (N_leq_n : N ≤ n) =>
-          Rational.LessThan.transitive_left(
-              Rational.absolute_value(
-                  Rational.absolute_value(s(m))
-                  - Rational.absolute_value(s(n))),
-              Rational.absolute_value(s(m) - s(n)),
-              epsilon,
-              Rational.absolute_value_reverse_triangle(s(m), s(n)),
-              sBound(m, N_leq_m, n, N_leq_n))
+          calc abs(
+                   abs(s(m))
+                   - abs(s(n)))
+             ≤ abs(s(m) - s(n))
+                  by Rational.absolute_value_reverse_triangle(s(m), s(n))
+             < epsilon
+                  by sBound(m, N_leq_m, n, N_leq_n)
   }
 
 -- ----------------------------------------------------------------------
@@ -72,7 +71,7 @@ definition CauchyRationalSequence.absolute_value
         : CauchyRationalSequence → CauchyRationalSequence
   | CauchyRationalSequence.make(s, sCauchy) =>
       CauchyRationalSequence.make(
-          function (n : Natural) => Rational.absolute_value(s(n)),
+          function (n : Natural) => abs(s(n)),
           Rational.sequence.absolute_value_is_cauchy(s, sCauchy))
 
 -- Bridge: sf(absolute_value(rep), m) = |sf(rep, m)|.
@@ -80,10 +79,10 @@ theorem CauchyRationalSequence.sequenceFunction_absolute_value
         : (rep : CauchyRationalSequence) → (m : Natural)
           → CauchyRationalSequence.sequenceFunction(
                 CauchyRationalSequence.absolute_value(rep), m)
-            = Rational.absolute_value(
+            = abs(
                   CauchyRationalSequence.sequenceFunction(rep, m))
   | CauchyRationalSequence.make(s, _), m =>
-      reflexivity(Rational, Rational.absolute_value(s(m)))
+      reflexivity(Rational, abs(s(m)))
 
 -- ----------------------------------------------------------------------
 -- Respect: equivalent sequences have equivalent absolute-value
@@ -114,38 +113,37 @@ theorem Real.absolute_value_respects
                 -- origAtN.
                 rewrite(
                     Equality.symmetry(
-                        calc Rational.absolute_value(
+                        calc abs(
                                  CauchyRationalSequence.sequenceFunction(
                                      CauchyRationalSequence.absolute_value(rep), m)
                                  - CauchyRationalSequence.sequenceFunction(
                                      CauchyRationalSequence.absolute_value(rep'), m))
-                           = Rational.absolute_value(
-                                 Rational.absolute_value(
+                           = abs(
+                                 abs(
                                      CauchyRationalSequence.sequenceFunction(rep, m))
                                  - CauchyRationalSequence.sequenceFunction(
                                      CauchyRationalSequence.absolute_value(rep'), m))
-                           = Rational.absolute_value(
-                                 Rational.absolute_value(
+                           = abs(
+                                 abs(
                                      CauchyRationalSequence.sequenceFunction(rep, m))
-                                 - Rational.absolute_value(
+                                 - abs(
                                      CauchyRationalSequence.sequenceFunction(rep', m)))),
-                    Rational.LessThan.transitive_left(
-                        Rational.absolute_value(
-                            Rational.absolute_value(
-                                CauchyRationalSequence.sequenceFunction(rep, m))
-                            - Rational.absolute_value(
-                                CauchyRationalSequence.sequenceFunction(rep', m))),
-                        Rational.absolute_value(
-                            CauchyRationalSequence.sequenceFunction(rep, m)
-                            - CauchyRationalSequence.sequenceFunction(rep', m)),
-                        epsilon,
-                        Rational.absolute_value_reverse_triangle(
-                            CauchyRationalSequence.sequenceFunction(rep, m),
-                            CauchyRationalSequence.sequenceFunction(rep', m)),
-                        origAtN(m, N_leq_m)))
+                    calc abs(
+                             abs(
+                                 CauchyRationalSequence.sequenceFunction(rep, m))
+                             - abs(
+                                 CauchyRationalSequence.sequenceFunction(rep', m)))
+                       ≤ abs(
+                             CauchyRationalSequence.sequenceFunction(rep, m)
+                             - CauchyRationalSequence.sequenceFunction(rep', m))
+                            by Rational.absolute_value_reverse_triangle(
+                                   CauchyRationalSequence.sequenceFunction(rep, m),
+                                   CauchyRationalSequence.sequenceFunction(rep', m))
+                       < epsilon
+                            by origAtN(m, N_leq_m))
         } : ∃ (N : Natural).
               (m : Natural) → N ≤ m →
-                Rational.absolute_value(
+                abs(
                     CauchyRationalSequence.sequenceFunction(
                         CauchyRationalSequence.absolute_value(rep), m)
                     - CauchyRationalSequence.sequenceFunction(
@@ -194,18 +192,18 @@ theorem Real.triangle_inequality_at_make
               --   -ε < (|sx(m)| + |sy(m)|) + -|sx(m) + sy(m)|
               -- Lower-bounded by 0 via Rational.triangle_inequality,
               -- and -ε < 0 by negate-of-positive.
-              Rational.LessThan.transitive_right(
-                  -epsilon, Rational.zero,
-                  (Rational.absolute_value(sx(m))
-                   + Rational.absolute_value(sy(m)))
-                  + -Rational.absolute_value(sx(m) + sy(m)),
-                  Rational.negate_LessThan_zero_of_positive(
-                      epsilon, epsilonPositive),
-                  Rational.LessOrEqual_zero_of_IsNonneg(
-                      (Rational.absolute_value(sx(m))
-                       + Rational.absolute_value(sy(m)))
-                      + -Rational.absolute_value(sx(m) + sy(m)),
-                      Rational.triangle_inequality(sx(m), sy(m))))
+              calc -epsilon
+                 < Rational.zero
+                      by Rational.negate_LessThan_zero_of_positive(
+                             epsilon, epsilonPositive)
+                 ≤ (abs(sx(m))
+                    + abs(sy(m)))
+                   + -abs(sx(m) + sy(m))
+                      by Rational.LessOrEqual_zero_of_IsNonneg(
+                             (abs(sx(m))
+                              + abs(sy(m)))
+                             + -abs(sx(m) + sy(m)),
+                             Rational.triangle_inequality(sx(m), sy(m)))
 
 -- Triangle on Real. Lift via Quotient.induct_two to the at-make form.
 theorem Real.triangle_inequality (x y : Real)
@@ -234,12 +232,12 @@ theorem Real.absolute_value_negate (x : Real)
                   calc CauchyRationalSequence.sequenceFunction(
                            CauchyRationalSequence.absolute_value(
                                CauchyRationalSequence.negate(rep_x)), n)
-                     = Rational.absolute_value(
+                     = abs(
                            CauchyRationalSequence.sequenceFunction(
                                CauchyRationalSequence.negate(rep_x), n))
-                     = Rational.absolute_value(
+                     = abs(
                            -CauchyRationalSequence.sequenceFunction(rep_x, n))
-                     = Rational.absolute_value(
+                     = abs(
                            CauchyRationalSequence.sequenceFunction(rep_x, n))
                      = CauchyRationalSequence.sequenceFunction(
                            CauchyRationalSequence.absolute_value(rep_x), n))),
