@@ -4826,6 +4826,11 @@ private:
         // abstracts over its expected type). Without the propagation
         // the inner form has nothing to abstract over and errors.
         //
+        // Also propagate for `ring` / `field` — both tactics reject
+        // outright when called without an expected type, so the
+        // anonymous-claim form `claim T by ring;` / `claim T by
+        // field(…);` requires it.
+        //
         // Other byHint shapes (applications, identifiers, etc.) keep
         // the no-expected-type path so `autoFillHintForClaim` can
         // peel a partial-application byHint's Pi chain and fill
@@ -4834,7 +4839,9 @@ private:
         // before autoFillHintForClaim gets to bridge the gap.
         bool propagateExpectedTypeToHint =
             std::holds_alternative<SurfaceLambda>(claim.byHint->node)
-            || std::holds_alternative<SurfaceLet>(claim.byHint->node);
+            || std::holds_alternative<SurfaceLet>(claim.byHint->node)
+            || std::holds_alternative<SurfaceRing>(claim.byHint->node)
+            || std::holds_alternative<SurfaceField>(claim.byHint->node);
         const char* claimSizeFlag = std::getenv("MATH_CLAIM_SIZES");
         bool dumpClaimSize = claimSizeFlag && claimSizeFlag[0] != '\0'
             && claimSizeFlag[0] != '0';
@@ -8864,6 +8871,43 @@ private:
                 return true;
             return decide->noBody
                 && surfaceMentionsName(*decide->noBody, name);
+        }
+        if (auto* fieldTactic =
+                std::get_if<SurfaceField>(&expression.node)) {
+            // `field(h1, h2, ...)` references each h_i positionally.
+            // Without this case the walker missed `smNonzero` /
+            // `snNonzero` inside `field(smNonzero, snNonzero)` and
+            // emitted spurious "unused name" warnings.
+            for (const auto& hypothesis : fieldTactic->nonzeroHypotheses) {
+                if (hypothesis
+                    && surfaceMentionsName(*hypothesis, name))
+                    return true;
+            }
+            return false;
+        }
+        if (auto* byInd =
+                std::get_if<SurfaceByInductionUsing>(&expression.node)) {
+            if (byInd->scrutinee
+                && surfaceMentionsName(*byInd->scrutinee, name))
+                return true;
+            if (byInd->inductionLemma
+                && surfaceMentionsName(*byInd->inductionLemma, name))
+                return true;
+            return byInd->body
+                && surfaceMentionsName(*byInd->body, name);
+        }
+        if (auto* byStrong =
+                std::get_if<SurfaceByStrongInduction>(&expression.node)) {
+            if (byStrong->scrutinee
+                && surfaceMentionsName(*byStrong->scrutinee, name))
+                return true;
+            return byStrong->body
+                && surfaceMentionsName(*byStrong->body, name);
+        }
+        if (auto* unfold =
+                std::get_if<SurfaceUnfold>(&expression.node)) {
+            return unfold->body
+                && surfaceMentionsName(*unfold->body, name);
         }
         // Leaf / specialised nodes (numeric literal, Type,
         // Proposition, hammer, sorry, ring, etc.) don't have
