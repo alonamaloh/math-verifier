@@ -274,15 +274,13 @@ theorem Real.exists_rational_above_at_make
                                      (1 : Rational),
                                      negatedDiff)
                           = (seq(N) + (1 : Rational)) - seq(m);
-                  -- -ε < 0 < (seq(N) + 1) - seq(m) by transitivity.
-                  Rational.LessThan.transitive_left(
-                      -epsilon, (0 : Rational),
-                      (seq(N) + (1 : Rational)) - seq(m),
-                      Rational.LessThan.weaken(
-                          -epsilon, (0 : Rational),
-                          Rational.negate_LessThan_zero_of_positive(
-                              epsilon, epsilonPositive)),
-                      diffPositive)
+                  -- Chain: -ε < 0 < (seq(N) + 1) - seq(m).
+                  calc -epsilon
+                     < (0 : Rational)
+                          by Rational.negate_LessThan_zero_of_positive(
+                                 epsilon, epsilonPositive)
+                     < (seq(N) + (1 : Rational)) - seq(m)
+                          by diffPositive
                 }
    }
 
@@ -1606,12 +1604,10 @@ theorem Real.exists_bisectionWidth_below
         : Real.bisectionWidth(initial, successor(K))
             * (successor(successor(K)) : Rational)
           < (successor(successor(K)) : Rational) * epsilon
-    by Rational.LessThan.transitive_left(
-           Real.bisectionWidth(initial, successor(K))
-               * (successor(successor(K)) : Rational),
-           (successor(K) : Rational) * epsilon,
-           (successor(successor(K)) : Rational) * epsilon,
-           chained, strictStep);
+    by calc Real.bisectionWidth(initial, successor(K))
+              * (successor(successor(K)) : Rational)
+          ≤ (successor(K) : Rational) * epsilon                  by chained
+          < (successor(successor(K)) : Rational) * epsilon       by strictStep;
   claim succSuccPositive
         : (0 : Rational) < (successor(successor(K)) : Rational)
     by Rational.successor_cast_positive(successor(K));
@@ -1771,16 +1767,13 @@ theorem Real.bisectionLeft_is_cauchy
     witness N with
         function (m : Natural) (NLeqM : N ≤ m)
                  (n : Natural) (NLeqN : N ≤ n) =>
-          Rational.LessThan.transitive_left(
-              abs(
-                  Real.bisectionLeft(subset, initial, m)
-                  - Real.bisectionLeft(subset, initial, n)),
-              Real.bisectionWidth(initial, N),
-              epsilon,
-              Real.bisectionLeft_diff_bound(
-                  subset, initial, initialLeftLeqRight,
-                  N, m, n, NLeqM, NLeqN),
-              widthBelowEpsilon)
+          calc abs(Real.bisectionLeft(subset, initial, m)
+                    - Real.bisectionLeft(subset, initial, n))
+             ≤ Real.bisectionWidth(initial, N)
+                  by Real.bisectionLeft_diff_bound(
+                         subset, initial, initialLeftLeqRight, N, m, n, NLeqM, NLeqN)
+             < epsilon
+                  by widthBelowEpsilon
   }
 
 -- ----------------------------------------------------------------------
