@@ -1086,14 +1086,13 @@ theorem Real.bisectionLeft_le_bisectionRight_predecessor
         (k n : Natural)
         : Real.bisectionLeft(subset, initial, k + n)
           ≤ Real.bisectionRight(subset, initial, n) :=
-  Rational.LessOrEqual.transitive(
-      Real.bisectionLeft(subset, initial, k + n),
-      Real.bisectionRight(subset, initial, k + n),
-      Real.bisectionRight(subset, initial, n),
-      Real.bisectionLeq_invariant(
-          subset, initial, initialLeftLeqRight, k + n),
-      Real.bisectionRight_le_predecessor(
-          subset, initial, initialLeftLeqRight, k, n))
+  calc Real.bisectionLeft(subset, initial, k + n)
+     ≤ Real.bisectionRight(subset, initial, k + n)
+          by Real.bisectionLeq_invariant(
+                 subset, initial, initialLeftLeqRight, k + n)
+     ≤ Real.bisectionRight(subset, initial, n)
+          by Real.bisectionRight_le_predecessor(
+                 subset, initial, initialLeftLeqRight, k, n)
 
 -- ----------------------------------------------------------------------
 -- Cauchy modulus for the bisection width.
@@ -1285,15 +1284,14 @@ theorem Real.bisectionWidth_times_succ_le_initial
                Rational.LessOrEqual_zero_of_IsNonneg(
                    Real.bisectionWidth(initial, predecessor),
                    widthNonneg));
-      Rational.LessOrEqual.transitive(
-          Rational.halve(Real.bisectionWidth(initial, predecessor))
-              * (successor(successor(predecessor)) : Rational),
-          Real.bisectionWidth(initial, predecessor)
-              * (successor(predecessor) : Rational),
-          Real.BisectionInterval.right(initial)
-              - Real.BisectionInterval.left(initial),
-          rewrite(Equality.symmetry(halveSwap), widthMultLeq),
-          IH)
+      calc Rational.halve(Real.bisectionWidth(initial, predecessor))
+              * (successor(successor(predecessor)) : Rational)
+         ≤ Real.bisectionWidth(initial, predecessor)
+              * (successor(predecessor) : Rational)
+              by rewrite(Equality.symmetry(halveSwap), widthMultLeq)
+         ≤ Real.BisectionInterval.right(initial)
+              - Real.BisectionInterval.left(initial)
+              by IH
   }
 
 -- ----------------------------------------------------------------------
@@ -1596,13 +1594,13 @@ theorem Real.exists_bisectionWidth_below
         : Real.bisectionWidth(initial, successor(K))
             * (successor(successor(K)) : Rational)
           ≤ (successor(K) : Rational) * epsilon
-    by Rational.LessOrEqual.transitive(
-           Real.bisectionWidth(initial, successor(K))
-               * (successor(successor(K)) : Rational),
-           Real.BisectionInterval.right(initial)
-               - Real.BisectionInterval.left(initial),
-           (successor(K) : Rational) * epsilon,
-           widthTimesSuccLeq, archBound);
+    by calc Real.bisectionWidth(initial, successor(K))
+              * (successor(successor(K)) : Rational)
+          ≤ Real.BisectionInterval.right(initial)
+              - Real.BisectionInterval.left(initial)
+               by widthTimesSuccLeq
+          ≤ (successor(K) : Rational) * epsilon
+               by archBound;
   claim strictStep
         : (successor(K) : Rational) * epsilon
           < (successor(successor(K)) : Rational) * epsilon
@@ -2064,12 +2062,10 @@ theorem Real.supremum_exists
   claim a0LeqB0AsReal
         : (Real.BisectionInterval.left(initial) : Real)
           ≤ (Real.BisectionInterval.right(initial) : Real)
-    by Real.LessOrEqual.transitive(
-           (a0 : Real), x0, (b0 : Real),
-           a0LeqX0,
-           Real.LessOrEqual.transitive(
-               x0, B0real, (b0 : Real),
-               B0IsUpper(x0, x0InS), B0LeqB0));
+    by calc (a0 : Real)
+          ≤ x0              by a0LeqX0
+          ≤ B0real          by B0IsUpper(x0, x0InS)
+          ≤ (b0 : Real)     by B0LeqB0;
   claim initialLeftLeqRight
         : Real.BisectionInterval.left(initial)
           ≤ Real.BisectionInterval.right(initial)
