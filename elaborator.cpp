@@ -19881,15 +19881,21 @@ private:
         ExpressionPointer predicate = outerApp->argument;
         // Build handler's expected type:
         //   Pi w : A. Pi _ : (predicate w). expectedType
-        // aType, predicate, expectedType are all in OPENED form
-        // (FreeVariable for outer local binders). Inside the outer
-        // Pi the codomain references the binder via BV(0); to
-        // construct `predicate w` we apply the (BV-free) predicate
-        // to BV(0). expectedType doesn't mention the new binders.
+        //
+        // `aType` and `predicate` come from inferTypeInLocalContext so
+        // they're in OPENED form (Internal FreeVariables for outer
+        // local binders). `expectedType` is in CLOSED form — its
+        // BoundVariables already index the call-site's locals. As we
+        // embed it inside two new Pi binders (w, _), every BV that
+        // referenced an outer local must shift by 2 so it still points
+        // through past the new binders.
+        ExpressionPointer expectedTypeLifted = liftBoundVariables(
+            expectedType, 2, 0);
         ExpressionPointer predicateAppliedToW = makeApplication(
             predicate, makeBoundVariable(0));
         ExpressionPointer innerPi = makePi("_",
-            std::move(predicateAppliedToW), expectedType);
+            std::move(predicateAppliedToW),
+            std::move(expectedTypeLifted));
         ExpressionPointer handlerExpected = makePi("w",
             aType, std::move(innerPi));
         ExpressionPointer handlerKernel = elaborateExpression(
