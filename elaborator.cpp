@@ -12970,10 +12970,49 @@ private:
         ExpressionPointer currentProof = buildReflexivity(
             universeLevel, carrierType, currentForm);
         ExpressionPointer startForm = currentForm;
+        // Both-negative fast path: (-Mi) * (-Mj) = Mi * Mj via
+        // `Ring.negate_multiply_negate` applied to <carrier>.is_ring.
+        // Falls through to the per-side multiply_negate_left/right +
+        // negate_negate chain when the abstract isn't in scope.
+        bool handledBothNegative = false;
+        {
+            const std::string carrierIsRing =
+                context.carrierName + ".is_ring";
+            if (leftMono.sign < 0 && rightMono.sign < 0
+                && environment_.lookup("Ring.negate_multiply_negate") != nullptr
+                && environment_.lookup(carrierIsRing) != nullptr) {
+                ExpressionPointer call = makeConstant(
+                    "Ring.negate_multiply_negate");
+                call = makeApplication(call, context.carrierType);
+                call = makeApplication(call,
+                                          makeConstant(context.addName));
+                call = makeApplication(call,
+                                          makeConstant(context.zeroName));
+                call = makeApplication(call,
+                                          makeConstant(context.negateName));
+                call = makeApplication(call,
+                                          makeConstant(context.multiplyName));
+                call = makeApplication(call,
+                                          makeConstant(context.oneName));
+                call = makeApplication(call,
+                                          makeConstant(carrierIsRing));
+                call = makeApplication(call, Mi);
+                call = makeApplication(call, Mj);
+                // call : (-Mi) * (-Mj) = Mi * Mj
+                ExpressionPointer newForm = buildRingOp(
+                    context.multiplyName, Mi, Mj);
+                currentProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    startForm, currentForm, newForm,
+                    currentProof, call);
+                currentForm = newForm;
+                handledBothNegative = true;
+            }
+        }
         // Step S1: if Li is -Mi, push the outer negate of Li outside the
         // product: Li * Rj = (-Mi) * Rj = -(Mi * Rj) via
         // multiply_negate_left.
-        if (leftMono.sign < 0) {
+        if (!handledBothNegative && leftMono.sign < 0) {
             ExpressionPointer call = buildRingMultiplyNegateProof(
                 /*onLeft=*/true, Mi, Rj, context, axiomNames);
             // call : (-Mi) * Rj = -(Mi * Rj)
@@ -12988,7 +13027,7 @@ private:
         }
         // Step S2: if Rj is -Mj, push the negate around the product
         // outside as well.
-        if (rightMono.sign < 0) {
+        if (!handledBothNegative && rightMono.sign < 0) {
             // Two cases: the current "product part" is either
             //   Mi * Rj    (if Li was positive)
             //   Mi * Rj inside a negate wrapper (if Li was negative).
