@@ -70,15 +70,14 @@ theorem Integer.to_rational.add_preserves (a b : Integer)
   -- proposition reduces to
   --   (a+b)·to_int(succ(0+0·succ(0))) = (a·1 + b·1)·to_int(succ(0)).
   -- We rebuild this via Quotient.sound and an Integer-level calc.
-  Equality.symmetry(
-      Quotient.sound(
-          RationalRepresentative, RationalEquivalent,
-          Rational.add_representatives(
-              RationalRepresentative.make(a, 0),
-              RationalRepresentative.make(b, 0)),
-          RationalRepresentative.make(a + b, 0),
-          calc (a * (successor(0) : Integer) + b * (successor(0) : Integer)) * (successor(0) : Integer)
-             = (a + b) * (successor(0) : Integer)))
+  Quotient.sound(
+      RationalRepresentative.make(a + b, 0),
+      Rational.add_representatives(
+          RationalRepresentative.make(a, 0),
+          RationalRepresentative.make(b, 0)),
+      calc (a + b) * (successor(0) : Integer)
+         = (a * (successor(0) : Integer) + b * (successor(0) : Integer))
+             * (successor(0) : Integer))
 
 -- Embedding preserves multiplication. At reps:
 --   LHS-rep: make(a · b, 0)
@@ -98,3 +97,21 @@ theorem Integer.to_rational.negate_preserves (a : Integer)
         : (-a : Rational) = -(a : Rational) :=
   reflexivity(Rational,
       (-a : Rational))
+
+-- ----------------------------------------------------------------------
+-- Scalar multiplication of a Rational by an Integer: `n · x` for
+-- `n : Integer, x : Rational`, defined as `(n : Rational) * x`.
+-- The Integer-scalar view of a ring; matches the universal-ring-of-Z
+-- intuition. Registered as `operator (*)` on the cross pairs so
+-- `(2 : Integer) * x` for `x : Rational` elaborates directly.
+
+definition Rational.from_integer_multiply
+        (n : Integer) (x : Rational) : Rational :=
+  (n : Rational) * x
+
+definition Rational.multiply_by_integer
+        (x : Rational) (n : Integer) : Rational :=
+  x * (n : Rational)
+
+operator (*) on (Integer, Rational) := Rational.from_integer_multiply
+operator (*) on (Rational, Integer) := Rational.multiply_by_integer

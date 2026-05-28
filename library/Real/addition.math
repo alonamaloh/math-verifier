@@ -194,19 +194,8 @@ theorem Real.add_respects
                   (Quotient.mk(CauchyRationalSequence.add(rep_xPrime, rep_y)) : Real),
               Real.add_after_first_respects(rep_xPrime),
               yReal) :=
-  Quotient.induct(
-      function (y : Real) =>
-          Quotient.lift(
-              function (rep_y : CauchyRationalSequence) =>
-                  (Quotient.mk(CauchyRationalSequence.add(rep_x, rep_y)) : Real),
-              Real.add_after_first_respects(rep_x),
-              y)
-          = Quotient.lift(
-              function (rep_y : CauchyRationalSequence) =>
-                  (Quotient.mk(CauchyRationalSequence.add(rep_xPrime, rep_y)) : Real),
-              Real.add_after_first_respects(rep_xPrime),
-              y),
-      function (rep_y : CauchyRationalSequence) =>
+  cases yReal {
+    | rep_y =>
         -- Mirror of add_after_first_respects with the SECOND component
         -- shared instead of the first; the same sequenceFunction_add
         -- bridge + ring cancel.
@@ -250,8 +239,8 @@ theorem Real.add_respects
                               CauchyRationalSequence.add(rep_x, rep_y), m)
                           - CauchyRationalSequence.sequenceFunction(
                               CauchyRationalSequence.add(rep_xPrime, rep_y), m))
-                        < epsilon)),
-      yReal)
+                        < epsilon))
+  }
 
 -- Inner "add-with-fixed-first": Real → Real, lifts y over the inner
 -- respect.
@@ -274,3 +263,75 @@ definition Real.add (x y : Real) : Real :=
       x)
 
 operator (+) on (Real, Real) := Real.add
+
+-- ----------------------------------------------------------------------
+-- Rational → Real embedding preservation lemmas (zero, one, add).
+-- Needed by the `ring` tactic to recognize multi-step-coerced integer
+-- literals as scalar coefficients at the Real carrier.
+
+-- Reflexivity: Real.zero is definitionally Rational.to_real(Rational.zero).
+theorem Rational.to_real.zero_preserves
+        : Rational.to_real(Rational.zero) = Real.zero :=
+  reflexivity(Real, Real.zero)
+
+-- Reflexivity: Real.one is definitionally Rational.to_real(Rational.one).
+theorem Rational.to_real.one_preserves
+        : Rational.to_real(Rational.one) = Real.one :=
+  reflexivity(Real, Real.one)
+
+-- Embedding preserves addition. Both sides represent the constant
+-- sequence λn. a + b; the LHS via Rational.to_cauchy_constant(a + b),
+-- the RHS via CauchyRationalSequence.add of two constant sequences.
+-- The Cauchy-witness proofs differ, so we use Quotient.sound with a
+-- pointwise-zero equivalence proof — pre-built as a named helper so
+-- the lambda body has an unambiguous expected type.
+theorem Rational.to_real.add_preserves_equiv (a b : Rational)
+        : CauchyEquivalent(
+              Rational.to_cauchy_constant(a + b),
+              CauchyRationalSequence.add(
+                  Rational.to_cauchy_constant(a),
+                  Rational.to_cauchy_constant(b))) :=
+  function (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) =>
+    witness 0 with
+        function (m : Natural) (_ : 0 ≤ m) =>
+          -- Both sequence projections reduce to `a + b`. The LHS via
+          -- δ-unfold of Rational.to_cauchy_constant plus ι/β on the
+          -- abstract projector. The RHS additionally walks through
+          -- sequenceFunction_add to push the projection inside `add`.
+          calc abs(
+                   CauchyRationalSequence.sequenceFunction(
+                       Rational.to_cauchy_constant(a + b), m)
+                   - CauchyRationalSequence.sequenceFunction(
+                         CauchyRationalSequence.add(
+                             Rational.to_cauchy_constant(a),
+                             Rational.to_cauchy_constant(b)),
+                         m))
+             = abs(
+                   (a + b)
+                   - CauchyRationalSequence.sequenceFunction(
+                         CauchyRationalSequence.add(
+                             Rational.to_cauchy_constant(a),
+                             Rational.to_cauchy_constant(b)),
+                         m))
+             = abs(
+                   (a + b)
+                   - (CauchyRationalSequence.sequenceFunction(
+                          Rational.to_cauchy_constant(a), m)
+                      + CauchyRationalSequence.sequenceFunction(
+                            Rational.to_cauchy_constant(b), m)))
+             = abs((a + b) - (a + b))
+             = Rational.zero
+             < epsilon       by epsilonPositive
+
+theorem Rational.to_real.add_preserves (a b : Rational)
+        : Rational.to_real(a + b)
+          = Rational.to_real(a) + Rational.to_real(b) :=
+  Quotient.sound(
+      CauchyRationalSequence,
+      CauchyEquivalent,
+      Rational.to_cauchy_constant(a + b),
+      CauchyRationalSequence.add(
+          Rational.to_cauchy_constant(a),
+          Rational.to_cauchy_constant(b)),
+      Rational.to_real.add_preserves_equiv(a, b))

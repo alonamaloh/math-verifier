@@ -434,27 +434,48 @@ Error diagnostic: if the assembled `Decidable_recursor` application doesn't type
 
 ## `ring` — try it first
 
-`ring` (currently v2: polynomial normalisation, distributivity,
-commutativity, associativity, ±1 coefficients) handles essentially
-every commutative-ring identity you'd write by hand in a calc block.
-The default for any equality between ring expressions on Natural,
-Integer, Rational, Real, or PAdic is `:= ring` (top-level) or
-`(ring : LHS = RHS)` (as a `rewrite` equation). Reach for explicit
-`add_commutative` / `add_associative` / `congruenceOf` ONLY after
-ring fails with a real limitation:
+`ring` (polynomial normalisation: distributivity, commutativity,
+associativity, like-term collection at arbitrary signed integer
+coefficients, total cancellation, unit-multiplication strip, subtract
+sugar, and Integer numeric literals) handles essentially every
+commutative-ring identity you'd write by hand in a calc block. The
+default for any equality between ring expressions on Natural, Integer,
+Rational, Real, or PAdic is `:= ring` (top-level) or `(ring : LHS =
+RHS)` (as a `rewrite` equation). Reach for explicit `add_commutative`
+/ `add_associative` / `congruenceOf` ONLY after ring fails with a
+real limitation:
 
-- **Coefficient > ±1.** `x + x = 2 * x` and `-(a/2) + -(a/2) = -a`
-  hit this — error: "monomial with coefficient ±k, v2 only handles
-  coefficients in {-1, +1}". Workaround: a manual calc using
-  `negate_add` / domain-specific halving lemmas (`halve_doubled`).
-- **Empty-polynomial cancellation.** `0 = x - x` fails with
-  "proveAddMerge total-cancellation case not implemented". Use
-  `Equality.symmetry(Rational.add_negate_right(x))` directly.
+- **Halving / division.** `Rational.halve(ε) + Rational.halve(ε) = ε`
+  is NOT a ring identity — it needs `Rational.halve_doubled` (which
+  internally is a non-ring fact: `halve(x) := x * (1/2)` and the `1/2`
+  identity isn't a polynomial relation). Same for any reciprocal
+  reasoning — use the `field(h1, h2, …)` tactic instead, which extends
+  ring with `t_i * reciprocal_function(t_i) = 1` side-relations from
+  the supplied nonzero-hypotheses.
 - **`ring` requires the carrier's `.add`, `.multiply`, and ring laws
   in scope.** For Real proofs, that typically means importing
   `Real.addition`, `Real.multiplication`, `Real.negation`, `Real.ring`,
   AND `Real.algebra` (which provides `multiply_associative` etc.).
   If `ring` says "carrier X is missing axiom Y", add the import.
+- **Scalar Integer multiplication at Rational/Real.** Use the
+  `*` operator on `(Integer, R)` (or `(R, Integer)`) — registered
+  via `R.from_integer_multiply(n, x) := (n : R) * x` for R in
+  {Rational, Real}. So `(2 : Integer) * x` for `x : Rational` is a
+  real operation, not an implicit conversion of `2`. Ring sees this
+  pattern as "coefficient n of atom x" and handles it identically to
+  the Integer-on-Integer case. Both `(n : Integer) * x` and
+  `x * (n : Integer)` work; ring recognizes the Integer literal
+  through the full coercion chain `Natural.to_integer(succ^k(zero))`
+  → wrapped by `Integer.to_rational` for Rational, then by
+  `Rational.to_real` for Real. The named constants `Integer.one` /
+  `Rational.one` etc. are also recognized as literal 1.
+
+- **Bare-literal Rational/Real (not multiplied).** Each numeric
+  literal still parses as a Natural — bare `1 + 1` for a Rational
+  target fails. For a Rational two, write `Rational.one + Rational.one`
+  or use the scalar pattern `(2 : Integer) * x`. We may revisit this
+  later (flip literal default → Integer) but for now Naturals
+  remain the literal default.
 
 When the goal is `(ring : Foo = Bar)` and you intend to `rewrite` with
 it, double-check the direction: `rewrite(eq, term)` looks for the LHS

@@ -9495,20 +9495,101 @@ private:
                 oneName, modulus);
             return (modulus - v) % modulus;
         }
-        // Carrier-embedded Natural literal: must mirror what ring V2
-        // recognises, else V2 would canonicalise it to a literal while
-        // the Z/p eval treats it as an atom — leading to a spurious
-        // disagreement. For the Integer carrier:
-        // `Natural.to_integer(successor^k(zero))` is integer literal k.
-        if (carrierName == "Integer") {
-            if (auto* app =
-                    std::get_if<Application>(&expression->node)) {
-                auto* head =
-                    std::get_if<Constant>(&app->function->node);
-                if (head && head->name == "Natural.to_integer") {
+        // Carrier-embedded Natural literal — must mirror ring V2's
+        // literal recognition (which itself depends on the carrier).
+        // For Integer: Natural.to_integer(succ^k(zero)) → k.
+        // For Rational: Integer.to_rational(Natural.to_integer(...)) → k.
+        // For Real: Rational.to_real(Integer.to_rational(...)) → k.
+        // At each level we also accept the outer carrier's named
+        // zero/one constants (which the elaborator may produce in
+        // place of the coercion application for literals 0 and 1).
+        {
+            // Pairs of (coercion fn name, outer carrier name) —
+            // OUTERMOST FIRST.
+            std::vector<std::pair<std::string, std::string>> outerChain;
+            if (carrierName == "Integer") {
+                outerChain = {{"Natural.to_integer", "Integer"}};
+            } else if (carrierName == "Rational") {
+                outerChain = {{"Integer.to_rational", "Rational"},
+                              {"Natural.to_integer", "Integer"}};
+            } else if (carrierName == "Real") {
+                outerChain = {{"Rational.to_real", "Real"},
+                              {"Integer.to_rational", "Rational"},
+                              {"Natural.to_integer", "Integer"}};
+            }
+            if (!outerChain.empty()) {
+                ExpressionPointer cursor = expression;
+                bool matched = true;
+                for (const auto& [coercion, outerCarrier] : outerChain) {
+                    // Check current level's zero/one named constants.
+                    if (auto* nameHead =
+                            std::get_if<Constant>(&cursor->node)) {
+                        if (nameHead->name == outerCarrier + ".zero") {
+                            return 0;
+                        }
+                        if (nameHead->name == outerCarrier + ".one") {
+                            return 1 % modulus;
+                        }
+                    }
+                    auto* app =
+                        std::get_if<Application>(&cursor->node);
+                    if (!app) { matched = false; break; }
+                    auto* head =
+                        std::get_if<Constant>(&app->function->node);
+                    if (!head || head->name != coercion) {
+                        matched = false; break;
+                    }
+                    cursor = app->argument;
+                }
+                if (matched) {
                     int value = 0;
-                    if (tryParseNaturalLiteral(app->argument, value)) {
+                    if (tryParseNaturalLiteral(cursor, value)) {
                         return ((uint64_t)value) % modulus;
+                    }
+                }
+            }
+        }
+        // Scalar-multiply operator at non-Integer carriers — must
+        // mirror tryParseScalarMultiplyOperator. We evaluate the inner
+        // Integer scalar as if it were carrier-embedded (using its own
+        // multi-step coercion via the same Integer→Rational chain that
+        // wraps it inside the operator's δ-unfolded form).
+        if (carrierName == "Rational" || carrierName == "Real") {
+            std::string fromIntegerMultiplyName =
+                carrierName + ".from_integer_multiply";
+            std::string multiplyByIntegerName =
+                carrierName + ".multiply_by_integer";
+            if (auto* outerApp =
+                    std::get_if<Application>(&expression->node)) {
+                if (auto* innerApp =
+                        std::get_if<Application>(&outerApp->function->node)) {
+                    if (auto* head =
+                            std::get_if<Constant>(&innerApp->function->node)) {
+                        ExpressionPointer scalar, atom;
+                        bool match = false;
+                        if (head->name == fromIntegerMultiplyName) {
+                            scalar = innerApp->argument;
+                            atom = outerApp->argument;
+                            match = true;
+                        } else if (head->name == multiplyByIntegerName) {
+                            atom = innerApp->argument;
+                            scalar = outerApp->argument;
+                            match = true;
+                        }
+                        if (match) {
+                            // The Integer-typed scalar uses the
+                            // Integer-carrier chain: just Natural.to_integer.
+                            uint64_t s = evalRingMod(
+                                scalar, "Integer",
+                                "Integer.add", "Integer.multiply",
+                                "Integer.negate", "Integer.subtract",
+                                "Integer.zero", "Integer.one", modulus);
+                            uint64_t a = evalRingMod(
+                                atom, carrierName, addName,
+                                multiplyName, negateName, subtractName,
+                                zeroName, oneName, modulus);
+                            return (uint64_t)(((__uint128_t)s * a) % modulus);
+                        }
                     }
                 }
             }
@@ -9833,6 +9914,28 @@ private:
             {universeLevel, universeLevel});
         call = makeApplication(std::move(call), carrierType);
         call = makeApplication(std::move(call), carrierType);
+        call = makeApplication(std::move(call), std::move(lambda));
+        call = makeApplication(std::move(call), std::move(x));
+        call = makeApplication(std::move(call), std::move(y));
+        call = makeApplication(std::move(call), std::move(p));
+        return call;
+    }
+
+    // Cross-carrier variant: lambda goes from sourceCarrier to
+    // targetCarrier. Used when pushing a coercion through congruence.
+    ExpressionPointer buildEqualityCongruence(
+        LevelPointer sourceUniverseLevel,
+        ExpressionPointer sourceCarrierType,
+        LevelPointer targetUniverseLevel,
+        ExpressionPointer targetCarrierType,
+        ExpressionPointer lambda,
+        ExpressionPointer x, ExpressionPointer y,
+        ExpressionPointer p) {
+        ExpressionPointer call = makeConstant(
+            "Equality.congruence",
+            {sourceUniverseLevel, targetUniverseLevel});
+        call = makeApplication(std::move(call), sourceCarrierType);
+        call = makeApplication(std::move(call), targetCarrierType);
         call = makeApplication(std::move(call), std::move(lambda));
         call = makeApplication(std::move(call), std::move(x));
         call = makeApplication(std::move(call), std::move(y));
@@ -10203,6 +10306,29 @@ private:
     // we never silently regress.
     // =====================================================================
 
+    // One step in the embedding chain from the source of a numeric
+    // literal (Natural, the source of every literal) up through
+    // coercions to the goal carrier. Holds the coercion function name
+    // plus the three preservation lemma names (zero, one, add) needed
+    // to push the coercion through a sum-of-ones canonical form.
+    //
+    // "outer" refers to the target carrier of THIS step's coercion.
+    // E.g. for `Natural.to_integer`: outer = Integer. For
+    // `Integer.to_rational`: outer = Rational.
+    struct RingEmbeddingStep {
+        std::string coercionFunctionName;    // e.g. "Natural.to_integer"
+        std::string zeroPreservesName;       // e.g. "Natural.to_integer.zero_preserves"
+        std::string onePreservesName;        // e.g. "Natural.to_integer.one_preserves"
+        std::string addPreservesName;        // e.g. "Natural.to_integer.add_preserves"
+        // Target carrier names (the "outer" side of this coercion):
+        std::string outerCarrierName;        // e.g. "Integer"
+        ExpressionPointer outerCarrierType;
+        LevelPointer outerCarrierUniverseLevel;
+        std::string outerAddName;            // e.g. "Integer.add"
+        std::string outerZeroName;           // e.g. "Integer.zero"
+        std::string outerOneName;            // e.g. "Integer.one"
+    };
+
     struct RingV2Context {
         std::string carrierName;           // e.g. "Rational"
         ExpressionPointer carrierType;      // Constant("Rational")
@@ -10214,6 +10340,22 @@ private:
         std::string subtractName;           // "<carrier>.subtract"
         std::string zeroName;               // "<carrier>.zero"
         std::string oneName;                // "<carrier>.one"
+
+        // Scalar-multiply operator names. The Integer is on the left
+        // for `fromIntegerMultiplyName`, on the right for
+        // `multiplyByIntegerName`. Empty when the carrier is Integer
+        // itself (the scalar-by-integer case collapses into the
+        // regular multiply path).
+        std::string fromIntegerMultiplyName;
+        std::string multiplyByIntegerName;
+
+        // Embedding chain from the literal source (Natural) up to the
+        // carrier. INNERMOST FIRST: chain[0] is always
+        // "Natural.to_integer" (the literal-bearing step), chain[1]
+        // is the next coercion up (e.g. "Integer.to_rational"), and
+        // so on. Empty when carrier is Natural; length 1 for Integer;
+        // length 2 for Rational; length 3 for Real.
+        std::vector<RingEmbeddingStep> embeddingChain;
 
         // Atom table: hash → kernel expression. Filled lazily while
         // normalising. We trust 64-bit hashes — the canonicalisation is
@@ -10387,23 +10529,101 @@ private:
         return true;
     }
 
-    // Recognise `Natural.to_integer(successor^k(zero))` as the integer
-    // constant k for the Integer carrier. Sets `value` to k on match.
-    // Other carriers (Rational, Real) aren't currently recognised
-    // here -- their embeddings compose multiple steps, and lifting the
-    // proof through each step needs the carrier's own preservation
-    // lemmas (Integer.to_rational.{zero,one,add}_preserves exist;
-    // Rational.to_real.{...}_preserves don't yet).
+    // Recognise the carrier's idiom of a Natural literal: the
+    // chain of coercions wrapping `successor^k(zero)`. The chain is
+    // determined by `context.embeddingChain` (innermost first); we
+    // peel off coercions outermost-first to reach the Natural literal.
+    //
+    // For Integer carrier: chain = [Natural.to_integer], so we expect
+    //   Natural.to_integer(succ^k(zero)).
+    // For Rational: chain = [Natural.to_integer, Integer.to_rational],
+    //   so we expect Integer.to_rational(Natural.to_integer(succ^k(zero))).
+    // For Real: one more layer of Rational.to_real(...) on top.
+    //
+    // At each level, BEFORE peeling the coercion, we also accept the
+    // current outer carrier's named `zero` / `one` constants directly
+    // (since `(0 : T)` and `(1 : T)` may δ-reduce to `T.zero` / `T.one`
+    // during elaboration via the existing preservation lemmas, and the
+    // kernel produces a structurally-different term than the unfolded
+    // coercion application).
     bool tryParseCarrierEmbeddedNaturalLiteral(
         ExpressionPointer expression,
         const RingV2Context& context,
         int& value) {
-        if (context.carrierName != "Integer") return false;
-        auto* app = std::get_if<Application>(&expression->node);
-        if (!app) return false;
-        auto* head = std::get_if<Constant>(&app->function->node);
-        if (!head || head->name != "Natural.to_integer") return false;
-        return tryParseNaturalLiteral(app->argument, value);
+        if (context.embeddingChain.empty()) return false;
+        ExpressionPointer cursor = expression;
+        // Walk outermost-to-innermost. embeddingChain is INNERMOST
+        // FIRST, so we iterate it in reverse.
+        for (auto it = context.embeddingChain.rbegin();
+             it != context.embeddingChain.rend(); ++it) {
+            // At each level, BEFORE peeling, check if cursor is the
+            // current outer carrier's zero or one constant.
+            if (auto* nameHead = std::get_if<Constant>(&cursor->node)) {
+                if (nameHead->name == it->outerZeroName) {
+                    value = 0; return true;
+                }
+                if (nameHead->name == it->outerOneName) {
+                    value = 1; return true;
+                }
+            }
+            auto* app = std::get_if<Application>(&cursor->node);
+            if (!app) return false;
+            auto* head = std::get_if<Constant>(&app->function->node);
+            if (!head || head->name != it->coercionFunctionName) {
+                return false;
+            }
+            cursor = app->argument;
+        }
+        return tryParseNaturalLiteral(cursor, value);
+    }
+
+    // Populate context.embeddingChain and scalar-multiply operator
+    // names based on context.carrierName. Caller has already filled in
+    // the carrier names (add, multiply, etc).
+    void populateRingV2EmbeddingChain(RingV2Context& context) {
+        auto buildStep =
+            [&](const std::string& coercionName,
+                const std::string& outerCarrier) -> RingEmbeddingStep {
+            RingEmbeddingStep step;
+            step.coercionFunctionName = coercionName;
+            step.zeroPreservesName = coercionName + ".zero_preserves";
+            step.onePreservesName = coercionName + ".one_preserves";
+            step.addPreservesName = coercionName + ".add_preserves";
+            step.outerCarrierName = outerCarrier;
+            step.outerCarrierType = makeConstant(outerCarrier);
+            step.outerCarrierUniverseLevel = makeLevelConst(0);
+            step.outerAddName = outerCarrier + ".add";
+            step.outerZeroName = outerCarrier + ".zero";
+            step.outerOneName = outerCarrier + ".one";
+            return step;
+        };
+        // INNERMOST FIRST.
+        if (context.carrierName == "Integer") {
+            context.embeddingChain.push_back(
+                buildStep("Natural.to_integer", "Integer"));
+        } else if (context.carrierName == "Rational") {
+            context.embeddingChain.push_back(
+                buildStep("Natural.to_integer", "Integer"));
+            context.embeddingChain.push_back(
+                buildStep("Integer.to_rational", "Rational"));
+            context.fromIntegerMultiplyName =
+                "Rational.from_integer_multiply";
+            context.multiplyByIntegerName =
+                "Rational.multiply_by_integer";
+        } else if (context.carrierName == "Real") {
+            context.embeddingChain.push_back(
+                buildStep("Natural.to_integer", "Integer"));
+            context.embeddingChain.push_back(
+                buildStep("Integer.to_rational", "Rational"));
+            context.embeddingChain.push_back(
+                buildStep("Rational.to_real", "Real"));
+            context.fromIntegerMultiplyName =
+                "Real.from_integer_multiply";
+            context.multiplyByIntegerName =
+                "Real.multiply_by_integer";
+        }
+        // Carriers we don't know about (PAdic, Natural) get an empty
+        // chain — literal-recognition simply doesn't fire.
     }
 
     // Build the Natural-level kernel for `successor^k(zero)`.
@@ -10490,8 +10710,87 @@ private:
                 return polynomial;
             }
         }
+        // Scalar-multiply operator: `R.from_integer_multiply(n, x)` or
+        // `R.multiply_by_integer(x, n)`. Definitionally δ-reduces to
+        // `(n : R) * x` or `x * (n : R)` respectively. Multiplication is
+        // commutative for polynomials so we can normalize either order
+        // identically.
+        {
+            ExpressionPointer scalarInteger;
+            ExpressionPointer atomExpression;
+            bool scalarOnLeft = false;
+            if (tryParseScalarMultiplyOperator(
+                    expression, context, scalarInteger, atomExpression,
+                    scalarOnLeft)) {
+                (void)scalarOnLeft;
+                ExpressionPointer coercedScalar =
+                    buildCoercedScalarForCarrier(scalarInteger, context);
+                RingPolynomial scalarPoly =
+                    normaliseToRingPolynomial(coercedScalar, context);
+                RingPolynomial atomPoly =
+                    normaliseToRingPolynomial(atomExpression, context);
+                return ringPolynomialMultiply(scalarPoly, atomPoly);
+            }
+        }
         // Otherwise: an opaque atom.
         return ringPolynomialAtom(context, expression);
+    }
+
+    // Match `R.from_integer_multiply(n, x)` or
+    // `R.multiply_by_integer(x, n)` against `expression`. On success,
+    // sets `scalarOut` to the Integer-typed scalar argument,
+    // `atomOut` to the carrier-typed argument, and `scalarOnLeftOut`
+    // to true iff the operator put the scalar on the left (which
+    // δ-unfolds to `(n : R) * x` rather than `x * (n : R)`).
+    bool tryParseScalarMultiplyOperator(
+        ExpressionPointer expression,
+        const RingV2Context& context,
+        ExpressionPointer& scalarOut,
+        ExpressionPointer& atomOut,
+        bool& scalarOnLeftOut) {
+        if (context.fromIntegerMultiplyName.empty()) return false;
+        auto* outerApp = std::get_if<Application>(&expression->node);
+        if (!outerApp) return false;
+        auto* innerApp =
+            std::get_if<Application>(&outerApp->function->node);
+        if (!innerApp) return false;
+        auto* head = std::get_if<Constant>(&innerApp->function->node);
+        if (!head) return false;
+        if (head->name == context.fromIntegerMultiplyName) {
+            scalarOut = innerApp->argument;
+            atomOut = outerApp->argument;
+            scalarOnLeftOut = true;
+            return true;
+        }
+        if (head->name == context.multiplyByIntegerName) {
+            atomOut = innerApp->argument;
+            scalarOut = outerApp->argument;
+            scalarOnLeftOut = false;
+            return true;
+        }
+        return false;
+    }
+
+    // Wrap `scalarInteger` (a kernel expression of type Integer) with
+    // the carrier's "outer coercion chain past Integer" to produce its
+    // canonical form at the carrier. For Rational: returns
+    //   Integer.to_rational(scalarInteger).
+    // For Real: returns
+    //   Rational.to_real(Integer.to_rational(scalarInteger)).
+    // For Integer carrier (chain length 1): returns scalarInteger as-is.
+    ExpressionPointer buildCoercedScalarForCarrier(
+        ExpressionPointer scalarInteger,
+        const RingV2Context& context) {
+        ExpressionPointer cursor = scalarInteger;
+        // chain[0] is Natural→Integer; subsequent steps are Integer→
+        // higher carriers. Wrap with chain[1..n].
+        for (size_t i = 1; i < context.embeddingChain.size(); ++i) {
+            cursor = makeApplication(
+                makeConstant(
+                    context.embeddingChain[i].coercionFunctionName),
+                cursor);
+        }
+        return cursor;
     }
 
     // Build the kernel expression for `1 + 1 + ... + 1` with N copies
@@ -11087,6 +11386,43 @@ private:
                     literalValue, context);
             }
         }
+        // Scalar-multiply operator: `R.from_integer_multiply(n, x)` δ-
+        // reduces to `(n : R) * x`; `R.multiply_by_integer(x, n)` to
+        // `x * (n : R)`. Bridge via reflexivity to the unfolded form so
+        // the returned proof's STORED type names the original operator
+        // (callers' downstream unification doesn't have to chase the
+        // δ-reduction).
+        {
+            ExpressionPointer scalarInteger;
+            ExpressionPointer atomExpression;
+            bool scalarOnLeft = false;
+            if (tryParseScalarMultiplyOperator(
+                    expression, context, scalarInteger, atomExpression,
+                    scalarOnLeft)) {
+                ExpressionPointer coercedScalar =
+                    buildCoercedScalarForCarrier(scalarInteger, context);
+                ExpressionPointer unfolded = scalarOnLeft
+                    ? buildRingOp(context.multiplyName, coercedScalar,
+                                    atomExpression)
+                    : buildRingOp(context.multiplyName, atomExpression,
+                                    coercedScalar);
+                ExpressionPointer unfoldProof = proveEqualsCanonical(
+                    unfolded, context, axiomNames, polynomialOut);
+                ExpressionPointer canonicalKernel =
+                    buildCanonicalPolynomial(polynomialOut, context);
+                // expression ≡ unfolded definitionally; reflexivity at
+                // `expression` has stored type `expression = expression`,
+                // which the kernel accepts as `expression = unfolded` at
+                // any application boundary that has to unify the type.
+                ExpressionPointer reflBridge = buildReflexivity(
+                    context.carrierUniverseLevel,
+                    context.carrierType, expression);
+                return buildEqualityTransitivity(
+                    context.carrierUniverseLevel, context.carrierType,
+                    expression, unfolded, canonicalKernel,
+                    reflBridge, unfoldProof);
+            }
+        }
         // Otherwise: an opaque atom. Its canonical kernel is itself.
         polynomialOut = ringPolynomialAtom(context, expression);
         ExpressionPointer canonicalKernel =
@@ -11099,89 +11435,89 @@ private:
         return buildReflexivity(universeLevel, carrierType, expression);
     }
 
-    // Prove `Natural.to_integer(successor^k(zero))` equals the
-    // canonical kernel of the polynomial [{}: k] for the Integer
-    // carrier.
+    // Build the canonical kernel form of "k copies of `oneName` added,
+    // left-associated" — the standard polynomial canonical form for
+    // the constant polynomial `[{}: k]`. For k = 0 returns `zeroName`.
+    ExpressionPointer buildSumOfOnesKernel(
+        int k,
+        const std::string& addName,
+        const std::string& zeroName,
+        const std::string& oneName) {
+        if (k == 0) return makeConstant(zeroName);
+        ExpressionPointer accumulator = makeConstant(oneName);
+        for (int j = 1; j < k; ++j) {
+            accumulator = buildRingOp(
+                addName, std::move(accumulator),
+                makeConstant(oneName));
+        }
+        return accumulator;
+    }
+
+    // Step 0 of the chain (Natural→Integer flavor): prove
+    //   step.coercion(successor^k(zero)) = c_k
+    // where c_k = `step.outerOne + step.outerOne + ... + step.outerOne`
+    // (k copies, left-associated; or `step.outerZero` for k = 0).
     //
-    // For k = 0: Natural.to_integer.zero_preserves directly.
-    // For k = 1: Natural.to_integer.one_preserves directly.
-    // For k > 1: chain Natural.to_integer.add_preserves(succ^j(zero),
-    //   successor(zero)) with the recursive proof at j and a
-    //   congruence wrapper that rewrites the resulting
-    //   `to_integer(succ^j(zero)) + to_integer(succ(zero))` to
-    //   `c_j + Integer.one` where c_j is the canonical at j (a
-    //   left-associated sum of j Integer.ones).
-    //
-    // Currently Integer-only. Other carriers fall through to the
-    // atom case in proveEqualsCanonical_impl above.
-    ExpressionPointer proveIntegerLiteralEqualsCanonical(
-        int literalValue, const RingV2Context& context) {
-        LevelPointer universeLevel = context.carrierUniverseLevel;
-        ExpressionPointer carrierType = context.carrierType;
-        ExpressionPointer oneConst = makeConstant(context.oneName);
+    // This uses the Natural-source shape where the literal is
+    // successor^k(zero) and add_preserves' LHS exploits the kernel
+    // reduction succ^j(zero) + succ(zero) ≡ succ^{j+1}(zero).
+    ExpressionPointer proveNaturalLiteralPushThroughStep(
+        int literalValue,
+        const RingEmbeddingStep& step) {
+        LevelPointer universeLevel = step.outerCarrierUniverseLevel;
+        ExpressionPointer carrierType = step.outerCarrierType;
+        ExpressionPointer oneConst = makeConstant(step.outerOneName);
         if (literalValue == 0) {
-            return makeConstant("Natural.to_integer.zero_preserves");
+            return makeConstant(step.zeroPreservesName);
         }
         if (literalValue == 1) {
-            return makeConstant("Natural.to_integer.one_preserves");
+            return makeConstant(step.onePreservesName);
         }
         ExpressionPointer cJ = oneConst;
         ExpressionPointer currentProof = makeConstant(
-            "Natural.to_integer.one_preserves");
+            step.onePreservesName);
         for (int j = 1; j < literalValue; ++j) {
             ExpressionPointer naturalJ = buildNaturalLiteralKernel(j);
             ExpressionPointer naturalOne = buildNaturalLiteralKernel(1);
-            ExpressionPointer toIntegerJ = makeApplication(
-                makeConstant("Natural.to_integer"), naturalJ);
-            ExpressionPointer toIntegerOne = makeApplication(
-                makeConstant("Natural.to_integer"), naturalOne);
-            // add_preserves(succ^j(zero), succ(zero)) :
-            //   to_integer(succ^j(zero) + succ(zero))
-            //     = to_integer(succ^j(zero)) + to_integer(succ(zero))
-            // LHS defeq to_integer(succ^{j+1}(zero)) (kernel reduces
-            // succ^j(zero) + succ(zero) to succ^{j+1}(zero)).
+            ExpressionPointer toOuterJ = makeApplication(
+                makeConstant(step.coercionFunctionName), naturalJ);
+            ExpressionPointer toOuterOne = makeApplication(
+                makeConstant(step.coercionFunctionName), naturalOne);
             ExpressionPointer addPreserves = makeApplication(
                 makeApplication(
-                    makeConstant("Natural.to_integer.add_preserves"),
-                    naturalJ),
+                    makeConstant(step.addPreservesName), naturalJ),
                 naturalOne);
             ExpressionPointer formA = makeApplication(
-                makeConstant("Natural.to_integer"),
+                makeConstant(step.coercionFunctionName),
                 buildNaturalLiteralKernel(j + 1));
             ExpressionPointer formB = buildRingOp(
-                context.addName, toIntegerJ, toIntegerOne);
-            // Rewrite the right summand: to_integer(succ(zero)) -> Integer.one
-            // via one_preserves, congruence under λz. toIntegerJ + z.
-            ExpressionPointer toIntegerJLifted =
-                liftBoundVariables(toIntegerJ, 1, 0);
+                step.outerAddName, toOuterJ, toOuterOne);
+            ExpressionPointer toOuterJLifted =
+                liftBoundVariables(toOuterJ, 1, 0);
             ExpressionPointer lambdaRight = makeLambda(
                 "_lit_z", carrierType,
-                buildRingOp(context.addName, toIntegerJLifted,
+                buildRingOp(step.outerAddName, toOuterJLifted,
                               makeBoundVariable(0)));
             ExpressionPointer onePreserves = makeConstant(
-                "Natural.to_integer.one_preserves");
+                step.onePreservesName);
             ExpressionPointer congrRight =
                 buildEqualityCongruenceSameCarrier(
                     universeLevel, carrierType, lambdaRight,
-                    toIntegerOne, oneConst, onePreserves);
+                    toOuterOne, oneConst, onePreserves);
             ExpressionPointer formC = buildRingOp(
-                context.addName, toIntegerJ, oneConst);
-            // Rewrite the left summand: to_integer(succ^j(zero)) -> c_j
-            // via currentProof, congruence under λz. z + Integer.one.
+                step.outerAddName, toOuterJ, oneConst);
             ExpressionPointer oneLifted =
                 liftBoundVariables(oneConst, 1, 0);
             ExpressionPointer lambdaLeft = makeLambda(
                 "_lit_z", carrierType,
-                buildRingOp(context.addName,
+                buildRingOp(step.outerAddName,
                               makeBoundVariable(0), oneLifted));
             ExpressionPointer congrLeft =
                 buildEqualityCongruenceSameCarrier(
                     universeLevel, carrierType, lambdaLeft,
-                    toIntegerJ, cJ, currentProof);
+                    toOuterJ, cJ, currentProof);
             ExpressionPointer formD = buildRingOp(
-                context.addName, cJ, oneConst);
-            // Chain: formA = formB (addPreserves) = formC (congrRight)
-            //           = formD (congrLeft).
+                step.outerAddName, cJ, oneConst);
             ExpressionPointer stepAB = buildEqualityTransitivity(
                 universeLevel, carrierType,
                 formA, formB, formC,
@@ -11191,6 +11527,177 @@ private:
                 formA, formC, formD,
                 stepAB, congrLeft);
             cJ = formD;
+        }
+        return currentProof;
+    }
+
+    // Push a coercion through a "k copies of innerOne added" canonical:
+    //   step.coercion(innerOne + innerOne + ... + innerOne) = outerOne + ... + outerOne
+    // (or step.coercion(innerZero) = outerZero for k = 0).
+    // `innerAddName` is the add operator of the inner carrier;
+    // `innerOneName` is its one constant.
+    //
+    // The inductive step at j is analogous to proveNaturalLiteral... but
+    // operates on the literal `innerCanonical_j + innerOne` form,
+    // without any successor-side kernel reductions.
+    ExpressionPointer proveCoercionThroughSumOfOnes(
+        int literalValue,
+        const RingEmbeddingStep& step,
+        const std::string& innerAddName,
+        const std::string& innerZeroName,
+        const std::string& innerOneName) {
+        LevelPointer universeLevel = step.outerCarrierUniverseLevel;
+        ExpressionPointer carrierType = step.outerCarrierType;
+        ExpressionPointer outerOne = makeConstant(step.outerOneName);
+        (void)innerZeroName;  // only used implicitly in zero_preserves
+        if (literalValue == 0) {
+            return makeConstant(step.zeroPreservesName);
+        }
+        if (literalValue == 1) {
+            return makeConstant(step.onePreservesName);
+        }
+        ExpressionPointer innerOne = makeConstant(innerOneName);
+        ExpressionPointer innerCJ = innerOne;     // k=1 canonical at inner.
+        ExpressionPointer outerCJ = outerOne;     // k=1 canonical at outer.
+        ExpressionPointer currentProof = makeConstant(
+            step.onePreservesName);
+        for (int j = 1; j < literalValue; ++j) {
+            // formA = step.coercion(innerCJ + innerOne)
+            ExpressionPointer innerSum = buildRingOp(
+                innerAddName, innerCJ, innerOne);
+            ExpressionPointer formA = makeApplication(
+                makeConstant(step.coercionFunctionName), innerSum);
+            ExpressionPointer coercInnerCJ = makeApplication(
+                makeConstant(step.coercionFunctionName), innerCJ);
+            ExpressionPointer coercInnerOne = makeApplication(
+                makeConstant(step.coercionFunctionName), innerOne);
+            ExpressionPointer formB = buildRingOp(
+                step.outerAddName, coercInnerCJ, coercInnerOne);
+            ExpressionPointer addPreserves = makeApplication(
+                makeApplication(
+                    makeConstant(step.addPreservesName), innerCJ),
+                innerOne);
+            // Rewrite right summand via one_preserves under λz. coercInnerCJ + z.
+            ExpressionPointer coercInnerCJLifted =
+                liftBoundVariables(coercInnerCJ, 1, 0);
+            ExpressionPointer lambdaRight = makeLambda(
+                "_chain_z", carrierType,
+                buildRingOp(step.outerAddName, coercInnerCJLifted,
+                              makeBoundVariable(0)));
+            ExpressionPointer onePreserves = makeConstant(
+                step.onePreservesName);
+            ExpressionPointer congrRight =
+                buildEqualityCongruenceSameCarrier(
+                    universeLevel, carrierType, lambdaRight,
+                    coercInnerOne, outerOne, onePreserves);
+            ExpressionPointer formC = buildRingOp(
+                step.outerAddName, coercInnerCJ, outerOne);
+            // Rewrite left summand via currentProof under λz. z + outerOne.
+            ExpressionPointer outerOneLifted =
+                liftBoundVariables(outerOne, 1, 0);
+            ExpressionPointer lambdaLeft = makeLambda(
+                "_chain_z", carrierType,
+                buildRingOp(step.outerAddName,
+                              makeBoundVariable(0), outerOneLifted));
+            ExpressionPointer congrLeft =
+                buildEqualityCongruenceSameCarrier(
+                    universeLevel, carrierType, lambdaLeft,
+                    coercInnerCJ, outerCJ, currentProof);
+            ExpressionPointer formD = buildRingOp(
+                step.outerAddName, outerCJ, outerOne);
+            ExpressionPointer stepAB = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                formA, formB, formC,
+                addPreserves, congrRight);
+            currentProof = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                formA, formC, formD,
+                stepAB, congrLeft);
+            innerCJ = innerSum;
+            outerCJ = formD;
+        }
+        return currentProof;
+    }
+
+    // Prove `<chain>(successor^k(zero)) = canonical_k` where:
+    //   - chain[0] is Natural.to_integer (always present for non-empty
+    //     chains)
+    //   - subsequent steps push through Integer→Rational, Rational→Real
+    //   - canonical_k uses the OUTERMOST step's outer add/zero/one
+    //
+    // Used by the literal-detection branch of proveEqualsCanonical_impl
+    // when the goal's carrier is Integer, Rational, or Real.
+    ExpressionPointer proveIntegerLiteralEqualsCanonical(
+        int literalValue, const RingV2Context& context) {
+        const auto& chain = context.embeddingChain;
+        if (chain.empty()) {
+            throwElaborate(
+                "`ring` (v2): internal error — proveIntegerLiteralEqualsCanonical "
+                "called with empty embedding chain");
+        }
+        // Step 0: Natural→Integer (or whatever the innermost step is).
+        ExpressionPointer currentProof =
+            proveNaturalLiteralPushThroughStep(literalValue, chain[0]);
+        // currentExpression: chain[0].coercion(succ^k(zero))
+        // currentCanonical: k copies of chain[0].outerOne added.
+        ExpressionPointer currentExpression = makeApplication(
+            makeConstant(chain[0].coercionFunctionName),
+            buildNaturalLiteralKernel(literalValue));
+        ExpressionPointer currentCanonical = buildSumOfOnesKernel(
+            literalValue,
+            chain[0].outerAddName,
+            chain[0].outerZeroName,
+            chain[0].outerOneName);
+        // Iterate remaining steps: lift through each coercion.
+        for (size_t i = 1; i < chain.size(); ++i) {
+            const RingEmbeddingStep& step = chain[i];
+            const RingEmbeddingStep& innerStep = chain[i - 1];
+            // Step A: congruence under λz. step.coercion(z) lifts
+            //   currentProof : currentExpression = currentCanonical
+            // to
+            //   step.coercion(currentExpression) = step.coercion(currentCanonical)
+            ExpressionPointer innerCarrierType = innerStep.outerCarrierType;
+            LevelPointer innerCarrierLevel =
+                innerStep.outerCarrierUniverseLevel;
+            ExpressionPointer coercionLambdaBody = makeApplication(
+                makeConstant(step.coercionFunctionName),
+                makeBoundVariable(0));
+            ExpressionPointer coercionLambda = makeLambda(
+                "_chain_outer_z", innerCarrierType, coercionLambdaBody);
+            ExpressionPointer congruenceProof =
+                buildEqualityCongruence(
+                    innerCarrierLevel,
+                    innerCarrierType,
+                    step.outerCarrierUniverseLevel,
+                    step.outerCarrierType,
+                    coercionLambda,
+                    currentExpression, currentCanonical,
+                    currentProof);
+            // Step B: push the coercion through the inner sum of ones.
+            ExpressionPointer pushProof = proveCoercionThroughSumOfOnes(
+                literalValue, step,
+                innerStep.outerAddName,
+                innerStep.outerZeroName,
+                innerStep.outerOneName);
+            // Combine via transitivity.
+            ExpressionPointer newExpression = makeApplication(
+                makeConstant(step.coercionFunctionName),
+                currentExpression);
+            ExpressionPointer newCanonical = buildSumOfOnesKernel(
+                literalValue,
+                step.outerAddName,
+                step.outerZeroName,
+                step.outerOneName);
+            ExpressionPointer coercedInnerCanonical = makeApplication(
+                makeConstant(step.coercionFunctionName),
+                currentCanonical);
+            currentProof = buildEqualityTransitivity(
+                step.outerCarrierUniverseLevel,
+                step.outerCarrierType,
+                newExpression, coercedInnerCanonical, newCanonical,
+                congruenceProof, pushProof);
+            currentExpression = newExpression;
+            currentCanonical = newCanonical;
         }
         return currentProof;
     }
@@ -11589,6 +12096,56 @@ private:
     //   (c) Left multi, right single: distributivity_right.
     //   (d) Left multi, right multi: distributivity_right peels one row
     //       at a time, recursing.
+    // Build a proof of `zero * x = zero` (onLeft = true) or
+    // `x * zero = zero` (onLeft = false) for the current carrier.
+    //
+    // Strategy: prefer the abstract `Ring.{zero_multiply,multiply_zero}`
+    // lemma applied to `<carrier>.is_ring`. Falls back to the per-
+    // carrier name (which Integer uses, where the rep-level proof is
+    // trivial reflexivity through Quotient.lift).
+    ExpressionPointer buildRingAnnihilatorProof(
+        bool onLeft,
+        ExpressionPointer x,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        const std::string carrierIsRing =
+            context.carrierName + ".is_ring";
+        const std::string abstractLemma = onLeft
+            ? std::string{"Ring.zero_multiply"}
+            : std::string{"Ring.multiply_zero"};
+        // Abstract path: requires both Ring.{zero,multiply}_multiply
+        // and <carrier>.is_ring in scope.
+        if (environment_.lookup(abstractLemma) != nullptr
+            && environment_.lookup(carrierIsRing) != nullptr) {
+            ExpressionPointer call = makeConstant(abstractLemma);
+            call = makeApplication(call, context.carrierType);
+            call = makeApplication(call,
+                                      makeConstant(context.addName));
+            call = makeApplication(call,
+                                      makeConstant(context.zeroName));
+            call = makeApplication(call,
+                                      makeConstant(context.negateName));
+            call = makeApplication(call,
+                                      makeConstant(context.multiplyName));
+            call = makeApplication(call,
+                                      makeConstant(context.oneName));
+            call = makeApplication(call, makeConstant(carrierIsRing));
+            call = makeApplication(call, x);
+            return call;
+        }
+        // Fall back to the per-carrier name.
+        const std::string& fallback = onLeft
+            ? axiomNames.multiplyZeroLeft
+            : axiomNames.multiplyZeroRight;
+        demandAxiomName(fallback,
+                          onLeft ? "multiply_zero_left / zero_multiply"
+                                  : "multiply_zero_right / multiply_zero",
+                          context.carrierName);
+        ExpressionPointer call = makeApplication(
+            makeConstant(fallback), x);
+        return call;
+    }
+
     ExpressionPointer proveMultiplyMerge(
         const RingPolynomial& leftPoly,
         const RingPolynomial& rightPoly,
@@ -11606,23 +12163,24 @@ private:
             leftPoly, rightPoly);
         ExpressionPointer mergedCanonical =
             buildCanonicalPolynomial(mergedPoly, context);
-        // Edge: one side empty. Then leftPoly · rightPoly = empty, and
-        // we need multiply_zero_*.
+        // Edge: one side empty. Then leftPoly · rightPoly = empty,
+        // and we need the multiplicative-annihilation axiom on the
+        // appropriate side. We get this from the abstract
+        // `Ring.zero_multiply` / `Ring.multiply_zero` lemmas (proved
+        // once over IsRing in `Algebra/ring_lemmas.math`) applied to
+        // the carrier's `is_ring` instance.
+        //
+        // Falls back to the per-carrier name (`<C>.multiply_zero_left`
+        // / `<C>.zero_multiply`) when that's the only thing in scope —
+        // useful for Integer, which has rep-level reflexivity proofs
+        // shorter than the abstract derivation would compile to.
         if (leftPoly.empty()) {
-            demandAxiomName(axiomNames.multiplyZeroLeft,
-                              "multiply_zero_left", context.carrierName);
-            ExpressionPointer call = makeApplication(
-                makeConstant(axiomNames.multiplyZeroLeft),
-                rightCanonical);
-            return call;
+            return buildRingAnnihilatorProof(
+                /*onLeft=*/true, rightCanonical, context, axiomNames);
         }
         if (rightPoly.empty()) {
-            demandAxiomName(axiomNames.multiplyZeroRight,
-                              "multiply_zero_right", context.carrierName);
-            ExpressionPointer call = makeApplication(
-                makeConstant(axiomNames.multiplyZeroRight),
-                leftCanonical);
-            return call;
+            return buildRingAnnihilatorProof(
+                /*onLeft=*/false, leftCanonical, context, axiomNames);
         }
         // For now we handle ONLY the common case: no like-term
         // collisions in mergedPoly (i.e. mergedPoly's size equals
@@ -11750,32 +12308,38 @@ private:
                     stepProof = distRightCall;
                     newForm = rhsExpanded;
                 } else {
-                    // currentForm == lhsExpanded + tail.
-                    // Build the tail kernel.
-                    std::vector<ExpressionPointer> tailSummands;
+                    // currentForm has shape: lhsExpanded LEFT-ASSOCIATED
+                    // with previously-peeled summands on the right —
+                    //   ((((lhsExpanded + T_i) + T_{i+1}) + ...) + T_{p-1})
+                    // where T_k = L_k * R. The lambda for congruence
+                    // must wrap z with each T_k via repeated left-
+                    // associated adds (not as a single right-leaning
+                    // sum, which doesn't match the actual structure).
+                    ExpressionPointer lambdaBody = makeBoundVariable(0);
                     for (size_t k = i; k < leftSigned.size(); ++k) {
-                        tailSummands.push_back(buildRingOp(
-                            context.multiplyName,
-                            leftMonomialKernels[k], rightCanonical));
+                        ExpressionPointer tk = liftBoundVariables(
+                            buildRingOp(
+                                context.multiplyName,
+                                leftMonomialKernels[k], rightCanonical),
+                            1, 0);
+                        lambdaBody = buildRingOp(
+                            context.addName, lambdaBody, tk);
                     }
-                    ExpressionPointer tailKernel;
-                    if (tailSummands.size() == 1) {
-                        tailKernel = tailSummands[0];
-                    } else {
-                        tailKernel = leftAssoc(tailSummands);
-                    }
-                    // Apply congruence with λz. z + tail.
-                    ExpressionPointer tailLifted =
-                        liftBoundVariables(tailKernel, 1, 0);
-                    ExpressionPointer lambdaBody = buildRingOp(
-                        context.addName, makeBoundVariable(0), tailLifted);
                     ExpressionPointer lambda = makeLambda(
                         "_ring_distR_z", carrierType, lambdaBody);
                     stepProof = buildEqualityCongruenceSameCarrier(
                         universeLevel, carrierType, lambda,
                         lhsExpanded, rhsExpanded, distRightCall);
-                    newForm = buildRingOp(
-                        context.addName, rhsExpanded, tailKernel);
+                    // Build newForm = ((((rhsExpanded + T_i) + ...) + T_{p-1})).
+                    newForm = rhsExpanded;
+                    for (size_t k = i; k < leftSigned.size(); ++k) {
+                        newForm = buildRingOp(
+                            context.addName,
+                            newForm,
+                            buildRingOp(
+                                context.multiplyName,
+                                leftMonomialKernels[k], rightCanonical));
+                    }
                 }
                 // currentProof was: leftTimesRight = currentForm.
                 // stepProof: currentForm = newForm.
@@ -13053,6 +13617,7 @@ private:
         context.subtractName  = carrierName + ".subtract";
         context.zeroName      = carrierName + ".zero";
         context.oneName       = carrierName + ".one";
+        populateRingV2EmbeddingChain(context);
         // Sanity-check the carrier supports the v2 vocabulary. We only
         // require add + multiply at the moment — zero, one, and negate
         // are optional (a goal that doesn't mention them won't need
@@ -13995,6 +14560,7 @@ private:
         context.subtractName  = carrierName + ".subtract";
         context.zeroName      = carrierName + ".zero";
         context.oneName       = carrierName + ".one";
+        populateRingV2EmbeddingChain(context);
         if (environment_.lookup(context.addName) == nullptr
             || environment_.lookup(context.multiplyName) == nullptr) {
             throwElaborate(

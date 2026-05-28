@@ -1,0 +1,114 @@
+-- Stage 1+2 acceptance: ring sees `Integer.to_R(integer-literal)` as
+-- coefficient `k` at the Rational and Real carriers; scalar
+-- multiplication via `R.from_integer_multiply` is recognized.
+
+module Test.scalar_multiply_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.embedding
+import Integer.negation
+import Integer.ring
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.algebra
+import Rational.embedding
+import Rational.instances
+import Real.basics
+import Real.sequence
+import Real.embedding
+import Real.addition
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+
+-- ----------------------------------------------------------------------
+-- Stage 1: scalar operators elaborate.
+
+theorem integer_times_rational_elaborates
+        (n : Integer) (x : Rational) : Rational :=
+  n * x
+
+theorem rational_times_integer_elaborates
+        (x : Rational) (n : Integer) : Rational :=
+  x * n
+
+theorem integer_times_real_elaborates
+        (n : Integer) (x : Real) : Real :=
+  n * x
+
+theorem real_times_integer_elaborates
+        (x : Real) (n : Integer) : Real :=
+  x * n
+
+-- ----------------------------------------------------------------------
+-- Stage 2: ring sees Integer literals at the Rational/Real carrier.
+
+-- Integer literal at Rational carrier (Integer * Rational).
+theorem ring_int_lit_at_rational (x : Rational)
+        : (2 : Integer) * x = x + x := ring
+
+-- Integer literal at Real carrier.
+theorem ring_int_lit_at_real (x : Real)
+        : (2 : Integer) * x = x + x := ring
+
+-- Higher coefficient.
+theorem ring_three_lit_rational (x : Rational)
+        : x + x + x = (3 : Integer) * x := ring
+
+theorem ring_three_lit_real (x : Real)
+        : x + x + x = (3 : Integer) * x := ring
+
+-- Scalar on the right: Rational * Integer.
+theorem ring_rational_times_int (x : Rational)
+        : x * (2 : Integer) = x + x := ring
+
+theorem ring_real_times_int (x : Real)
+        : x * (2 : Integer) = x + x := ring
+
+-- One scalar.
+theorem ring_one_scalar (x : Rational)
+        : (1 : Integer) * x = x := ring
+
+-- Sum of two scalar-multiplies: smaller case.
+theorem ring_two_plus_two (x : Rational)
+        : (2 : Integer) * x + (2 : Integer) * x = x + x + x + x := ring
+
+-- Sum of two different scalar-multiplies.
+theorem ring_one_plus_two (x : Rational)
+        : (1 : Integer) * x + (2 : Integer) * x = x + x + x := ring
+
+-- Combined: (2:I)*x + (3:I)*x = x*5.
+theorem ring_two_plus_three (x : Rational)
+        : (2 : Integer) * x + (3 : Integer) * x = x + x + x + x + x := ring
+
+-- Combining scalars on both sides: (2 + 3) * x = 5 * x.
+-- This requires the phase-1a left-assoc fix in proveMultiplyMerge.
+theorem ring_combine_scalars_rational (x : Rational)
+        : (2 : Integer) * x + (3 : Integer) * x = (5 : Integer) * x := ring
+
+theorem ring_combine_scalars_real (x : Real)
+        : (2 : Integer) * x + (3 : Integer) * x = (5 : Integer) * x := ring
+
+-- Zero scalar (needs Rational/Real.zero_multiply).
+theorem ring_zero_scalar_rational (x : Rational)
+        : (0 : Integer) * x = Rational.zero := ring
+
+theorem ring_zero_scalar_real (x : Real)
+        : (0 : Integer) * x = Real.zero := ring
+
+-- x * 0 (multiply_zero on the right).
+theorem ring_rational_times_zero (x : Rational)
+        : x * Rational.zero = Rational.zero := ring
+
+theorem ring_real_times_zero (x : Real)
+        : x * Real.zero = Real.zero := ring
