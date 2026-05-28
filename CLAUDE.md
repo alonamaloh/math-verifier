@@ -456,7 +456,13 @@ real limitation:
   in scope.** For Real proofs, that typically means importing
   `Real.addition`, `Real.multiplication`, `Real.negation`, `Real.ring`,
   AND `Real.algebra` (which provides `multiply_associative` etc.).
-  If `ring` says "carrier X is missing axiom Y", add the import.
+  For goals that touch zero (`(0 : Integer) * x = 0`) or negation in a
+  product (`-a * b`), also import `<carrier>.instances` (for
+  `<carrier>.is_ring`) and `Algebra.ring_lemmas` — `ring` derives the
+  multiplicative annihilation and `multiply_negate_*` lemmas
+  abstractly from the IsRing instance rather than looking up per-
+  carrier wrappers (Rational/Real no longer have them). If `ring` says
+  "carrier X is missing axiom Y", add the import.
 - **Scalar Integer multiplication at Rational/Real.** Use the
   `*` operator on `(Integer, R)` (or `(R, Integer)`) — registered
   via `R.from_integer_multiply(n, x) := (n : R) * x` for R in
@@ -481,6 +487,59 @@ When the goal is `(ring : Foo = Bar)` and you intend to `rewrite` with
 it, double-check the direction: `rewrite(eq, term)` looks for the LHS
 of `eq` in `term`'s type. Putting it the wrong way round gives the
 "left endpoint does not appear (structurally) in term's type" error.
+
+## Ring lemmas: foundational vs. derived
+
+Two flavours of ring lemma; they live in different places and you
+write them differently.
+
+**Foundational axioms** — the things `IsRing` bundles: `add_associative`,
+`add_commutative`, `multiply_associative`, `multiply_commutative`,
+`zero_add` / `add_zero`, `one_multiply` / `multiply_one`,
+`add_negate_left` / `add_negate_right`, `distributivity_left` /
+`distributivity_right`. These have to be proved per-carrier (they're
+the inputs that `<carrier>.is_ring` packages up). Live in the
+carrier's `ring.math` / `algebra.math`. Foundational means: ring v2
+looks them up by `<carrier>.<axiom>` name when it needs them.
+
+**Derived lemmas** — provable from `IsRing` alone: `zero_multiply`,
+`multiply_zero`, `multiply_negate_left`, `multiply_negate_right`,
+`negate_multiply_negate`, and friends. These live ONCE in
+`Algebra/ring_lemmas.math` as `Ring.<lemma>` over a generic `IsRing(R,
+…)`. There's no need to restate them per-carrier. To use them at a
+specific carrier, either:
+
+- Cite the abstract form by hand:
+  `Ring.zero_multiply(Rational, Rational.add, Rational.zero,
+  Rational.negate, Rational.multiply, Rational.one, Rational.is_ring,
+  x)` — verbose but mechanical.
+- Just `:= ring` (or in a calc step, a step that needs the lemma).
+  Ring v2 finds `Ring.<lemma>` plus `<carrier>.is_ring` in scope and
+  emits the abstract application internally.
+
+**Don't add `Rational.zero_multiply` / `Real.zero_multiply` /
+`Real.multiply_negate_left` / etc. as one-line wrappers around the
+abstract form.** Those wrappers used to exist; they were removed once
+the abstract path landed because they cost more than they buy:
+they're an extra import target, an extra name to know, and they have
+to be kept in sync with the abstract.
+
+Integer is the exception — `Integer.multiply_zero_left` / `_right` /
+`multiply_negate_left` / `_right` are proved at the representative
+level via `reflexivity` through Quotient.lift, which is shorter than
+the abstract derivation would compile to. Ring v2's helpers
+(`buildRingAnnihilatorProof`, `buildRingMultiplyNegateProof`) prefer
+the abstract form when both it and `<carrier>.is_ring` are in scope,
+fall back to the per-carrier name otherwise.
+
+When adding a new ring carrier:
+
+1. Define the carrier and its operations.
+2. Prove the foundational axioms per-carrier.
+3. Bundle them into `<carrier>.is_ring : IsRing(...)` in
+   `<carrier>/instances.math`. Import `Algebra.ring_lemmas` there so
+   downstream uses of `ring` find the abstract lemmas.
+4. That's it — `ring` works. No per-carrier `zero_multiply` etc.
 
 ## `calc` with mixed relations
 
