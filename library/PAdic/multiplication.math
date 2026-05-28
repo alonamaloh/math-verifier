@@ -72,14 +72,10 @@ theorem Rational.sequence.product_is_padic_cauchy_bound
                        (n_arg : Natural) → N_t ≤ n_arg →
                          Rational.padic_absolute_value(p, primality, t(m_arg) - t(n_arg))
                            < delta_t)
-        (delta_s_props : And(Rational.zero < delta_s,
-                             Rational.LessOrEqual(
-                                 (successor(K_t) : Rational) * delta_s,
-                                 Rational.halve(Rational.halve(epsilon)))))
-        (delta_t_props : And(Rational.zero < delta_t,
-                             Rational.LessOrEqual(
-                                 (successor(K_s) : Rational) * delta_t,
-                                 Rational.halve(Rational.halve(epsilon)))))
+        (succ_K_t_delta_s_bound : (successor(K_t) : Rational) * delta_s
+                                    ≤ Rational.halve(Rational.halve(epsilon)))
+        (succ_K_s_delta_t_bound : (successor(K_s) : Rational) * delta_t
+                                    ≤ Rational.halve(Rational.halve(epsilon)))
         (epsilonPositive : Rational.zero < epsilon)
         : Rational.padic_absolute_value(p, primality, s(m) * t(m) - s(n) * t(n)) < epsilon := {
   -- m, n ≥ N_s_bound, N_t_bound, N_s, N_t. Each is one left-then-{left,right}
@@ -124,35 +120,11 @@ theorem Rational.sequence.product_is_padic_cauchy_bound
   claim t_diff_bound : Rational.padic_absolute_value(p, primality, t(m) - t(n)) < delta_t
     by tCauchyAt(m, m_ge_N_t, n, n_ge_N_t);
   claim s_diff_weak : Rational.padic_absolute_value(p, primality, s(m) - s(n)) ≤ delta_s
-    by And.left(
-           Rational.LessOrEqual(
-               Rational.padic_absolute_value(p, primality, s(m) - s(n)), delta_s),
-           Not(Rational.padic_absolute_value(p, primality, s(m) - s(n)) = delta_s),
-           s_diff_bound);
+    by Rational.LessThan.weaken(
+           Rational.padic_absolute_value(p, primality, s(m) - s(n)), delta_s, s_diff_bound);
   claim t_diff_weak : Rational.padic_absolute_value(p, primality, t(m) - t(n)) ≤ delta_t
-    by And.left(
-           Rational.LessOrEqual(
-               Rational.padic_absolute_value(p, primality, t(m) - t(n)), delta_t),
-           Not(Rational.padic_absolute_value(p, primality, t(m) - t(n)) = delta_t),
-           t_diff_bound);
-  claim succ_K_t_delta_s_bound
-      : (successor(K_t) : Rational) * delta_s
-          ≤ Rational.halve(Rational.halve(epsilon))
-    by And.right(
-           Rational.zero < delta_s,
-           Rational.LessOrEqual(
-               (successor(K_t) : Rational) * delta_s,
-               Rational.halve(Rational.halve(epsilon))),
-           delta_s_props);
-  claim succ_K_s_delta_t_bound
-      : (successor(K_s) : Rational) * delta_t
-          ≤ Rational.halve(Rational.halve(epsilon))
-    by And.right(
-           Rational.zero < delta_t,
-           Rational.LessOrEqual(
-               (successor(K_s) : Rational) * delta_t,
-               Rational.halve(Rational.halve(epsilon))),
-           delta_t_props);
+    by Rational.LessThan.weaken(
+           Rational.padic_absolute_value(p, primality, t(m) - t(n)), delta_t, t_diff_bound);
   claim sum_abs_bound
       : Rational.padic_absolute_value(p, primality,
             s(m) * (t(m) - t(n)) + t(n) * (s(m) - s(n)))
@@ -314,8 +286,8 @@ theorem Rational.sequence.product_is_padic_cauchy
               m_ge, n_ge,
               sBound, tBound,
               sCauchyAt, tCauchyAt,
-              ⟨delta_s_pos, delta_s_bound⟩,
-              ⟨delta_t_pos, delta_t_bound⟩,
+              delta_s_bound,
+              delta_t_bound,
               epsilonPositive)
   }
 
@@ -364,11 +336,8 @@ theorem PAdic.multiply_respect_bound_chain
         : Rational.padic_absolute_value(p, primality, s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
             < epsilon := {
   claim s_y_diff_weak : Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)) ≤ delta
-    by And.left(
-           Rational.LessOrEqual(
-               Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)), delta),
-           Not(Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)) = delta),
-           s_y_diff_bound);
+    by Rational.LessThan.weaken(
+           Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m)), delta, s_y_diff_bound);
   claim step1
       : Rational.padic_absolute_value(p, primality, s_x(m))
             * Rational.padic_absolute_value(p, primality, s_y(m) - s_yPrime(m))
@@ -506,14 +475,12 @@ theorem PAdic.multiply_respects_at_rep_y_inner
                  s_y, sCauchy_y, s_x, s_xPrime, sCauchy_x, sCauchy_xPrime,
                  refinedXEquiv, epsilon, epsilonPositive);
     witness N with
-        function (m : Natural) (N_leq_m : N ≤ m) =>
-          rewrite(
-              congruenceOf(
-                  function (r : Rational) =>
-                      Rational.padic_absolute_value(p, primality, r),
-                  calc s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)
-                     = s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)),
-              boundedY(m, N_leq_m))
+        function (m : Natural) (N_leq_m : N ≤ m) => {
+          claim rearrange : s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)
+                          = s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)
+            by ring;
+          rewrite(rearrange, boundedY(m, N_leq_m))
+        }
   }
 
 -- Helper for multiply_respects: shows the at-rep-y version of the
