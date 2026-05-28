@@ -12096,28 +12096,31 @@ private:
     //   (c) Left multi, right single: distributivity_right.
     //   (d) Left multi, right multi: distributivity_right peels one row
     //       at a time, recursing.
-    // Build a proof of `zero * x = zero` (onLeft = true) or
-    // `x * zero = zero` (onLeft = false) for the current carrier.
+    // Helper: apply a derived ring lemma (one that follows from
+    // IsRing's axioms — zero_multiply, multiply_zero,
+    // multiply_negate_left, multiply_negate_right, etc.) to the
+    // current carrier's `<C>.is_ring` instance.
     //
-    // Strategy: prefer the abstract `Ring.{zero_multiply,multiply_zero}`
-    // lemma applied to `<carrier>.is_ring`. Falls back to the per-
-    // carrier name (which Integer uses, where the rep-level proof is
-    // trivial reflexivity through Quotient.lift).
-    ExpressionPointer buildRingAnnihilatorProof(
-        bool onLeft,
-        ExpressionPointer x,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+    // Prefers the abstract `Ring.<lemma>` from `Algebra.ring_lemmas`
+    // applied with the carrier instance; falls back to the per-carrier
+    // name when the abstract isn't in scope (e.g., Integer's
+    // rep-level reflexivity proofs that are shorter than the abstract
+    // derivation would compile to).
+    //
+    // `args` are the lemma-specific term arguments after the IsRing
+    // instance (e.g., `x` for `zero_multiply(x)`, `a, b` for
+    // `multiply_negate_left(a, b)`).
+    ExpressionPointer buildAbstractRingLemmaApplication(
+        const std::string& abstractLemmaName,
+        const std::string& fallbackPerCarrierName,
+        const std::string& fallbackHumanName,
+        const std::vector<ExpressionPointer>& args,
+        const RingV2Context& context) {
         const std::string carrierIsRing =
             context.carrierName + ".is_ring";
-        const std::string abstractLemma = onLeft
-            ? std::string{"Ring.zero_multiply"}
-            : std::string{"Ring.multiply_zero"};
-        // Abstract path: requires both Ring.{zero,multiply}_multiply
-        // and <carrier>.is_ring in scope.
-        if (environment_.lookup(abstractLemma) != nullptr
+        if (environment_.lookup(abstractLemmaName) != nullptr
             && environment_.lookup(carrierIsRing) != nullptr) {
-            ExpressionPointer call = makeConstant(abstractLemma);
+            ExpressionPointer call = makeConstant(abstractLemmaName);
             call = makeApplication(call, context.carrierType);
             call = makeApplication(call,
                                       makeConstant(context.addName));
@@ -12130,20 +12133,52 @@ private:
             call = makeApplication(call,
                                       makeConstant(context.oneName));
             call = makeApplication(call, makeConstant(carrierIsRing));
-            call = makeApplication(call, x);
+            for (const auto& arg : args) {
+                call = makeApplication(call, arg);
+            }
             return call;
         }
-        // Fall back to the per-carrier name.
-        const std::string& fallback = onLeft
-            ? axiomNames.multiplyZeroLeft
-            : axiomNames.multiplyZeroRight;
-        demandAxiomName(fallback,
-                          onLeft ? "multiply_zero_left / zero_multiply"
-                                  : "multiply_zero_right / multiply_zero",
+        // Fall back.
+        demandAxiomName(fallbackPerCarrierName, fallbackHumanName,
                           context.carrierName);
-        ExpressionPointer call = makeApplication(
-            makeConstant(fallback), x);
+        ExpressionPointer call = makeConstant(fallbackPerCarrierName);
+        for (const auto& arg : args) {
+            call = makeApplication(call, arg);
+        }
         return call;
+    }
+
+    // Build a proof of `zero * x = zero` (onLeft = true) or
+    // `x * zero = zero` (onLeft = false) for the current carrier.
+    ExpressionPointer buildRingAnnihilatorProof(
+        bool onLeft,
+        ExpressionPointer x,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        return buildAbstractRingLemmaApplication(
+            onLeft ? "Ring.zero_multiply" : "Ring.multiply_zero",
+            onLeft ? axiomNames.multiplyZeroLeft
+                    : axiomNames.multiplyZeroRight,
+            onLeft ? "multiply_zero_left / zero_multiply"
+                    : "multiply_zero_right / multiply_zero",
+            {x}, context);
+    }
+
+    // Build a proof of `(-a) * b = -(a * b)` (onLeft = true) or
+    // `a * (-b) = -(a * b)` (onLeft = false).
+    ExpressionPointer buildRingMultiplyNegateProof(
+        bool onLeft,
+        ExpressionPointer a, ExpressionPointer b,
+        const RingV2Context& context,
+        const RingV2AxiomNames& axiomNames) {
+        return buildAbstractRingLemmaApplication(
+            onLeft ? "Ring.multiply_negate_left"
+                    : "Ring.multiply_negate_right",
+            onLeft ? axiomNames.multiplyNegateLeft
+                    : axiomNames.multiplyNegateRight,
+            onLeft ? "multiply_negate_left"
+                    : "multiply_negate_right",
+            {a, b}, context);
     }
 
     ExpressionPointer proveMultiplyMerge(
@@ -12939,11 +12974,8 @@ private:
         // product: Li * Rj = (-Mi) * Rj = -(Mi * Rj) via
         // multiply_negate_left.
         if (leftMono.sign < 0) {
-            demandAxiomName(axiomNames.multiplyNegateLeft,
-                              "multiply_negate_left", context.carrierName);
-            ExpressionPointer call = makeConstant(axiomNames.multiplyNegateLeft);
-            call = makeApplication(call, Mi);
-            call = makeApplication(call, Rj);
+            ExpressionPointer call = buildRingMultiplyNegateProof(
+                /*onLeft=*/true, Mi, Rj, context, axiomNames);
             // call : (-Mi) * Rj = -(Mi * Rj)
             ExpressionPointer newForm = buildRingNegate(
                 context.negateName,
@@ -12957,18 +12989,14 @@ private:
         // Step S2: if Rj is -Mj, push the negate around the product
         // outside as well.
         if (rightMono.sign < 0) {
-            demandAxiomName(axiomNames.multiplyNegateRight,
-                              "multiply_negate_right", context.carrierName);
             // Two cases: the current "product part" is either
             //   Mi * Rj    (if Li was positive)
             //   Mi * Rj inside a negate wrapper (if Li was negative).
             if (leftMono.sign > 0) {
                 // currentForm == Mi * Rj. Apply multiply_negate_right(Mi, Mj):
                 // Mi * (-Mj) = -(Mi * Mj).
-                ExpressionPointer call = makeConstant(
-                    axiomNames.multiplyNegateRight);
-                call = makeApplication(call, Mi);
-                call = makeApplication(call, Mj);
+                ExpressionPointer call = buildRingMultiplyNegateProof(
+                    /*onLeft=*/false, Mi, Mj, context, axiomNames);
                 ExpressionPointer newForm = buildRingNegate(
                     context.negateName,
                     buildRingOp(context.multiplyName, Mi, Mj));
@@ -12981,10 +13009,8 @@ private:
                 // currentForm == -(Mi * Rj) where Rj == -Mj.
                 // Use congruence λz. -z, with proof Mi * Rj = -(Mi * Mj)
                 // via multiply_negate_right.
-                ExpressionPointer call = makeConstant(
-                    axiomNames.multiplyNegateRight);
-                call = makeApplication(call, Mi);
-                call = makeApplication(call, Mj);
+                ExpressionPointer call = buildRingMultiplyNegateProof(
+                    /*onLeft=*/false, Mi, Mj, context, axiomNames);
                 ExpressionPointer innerOld = buildRingOp(
                     context.multiplyName, Mi, Rj);
                 ExpressionPointer innerNew = buildRingNegate(
