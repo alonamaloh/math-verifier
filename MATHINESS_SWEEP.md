@@ -64,7 +64,7 @@ Files NOT yet looked at:
 - `absolute_value_multiplicative.math` (159 lines) — quick peek showed
   no obvious verbose patterns; worth a careful read someday.
 
-### Rational/ — substantially done
+### Rational/ — done
 
 Refactored:
 - `basics.math` — `?` on multiply_cancel_right.
@@ -74,34 +74,80 @@ Refactored:
 - `algebra.math` — same.
 - `order_arithmetic.math` — two Quotient.induct stacks → cases-refining.
 - `positive.math` — IsNonneg.multiply → cases-refining.
+- `order.math` — `cases ... refining` on `IsNonneg_respect`; fixed a
+  formatting glitch (two statements on one line).
+- `triangle.math` — verbose `Quotient.mk(T, R, …)` → short form
+  + ascription in `triangle_inequality_at_representatives`.
+- `triangle_more.math` — pattern-match-def → `cases ... refining`;
+  drop motive lambdas on two `Quotient.induct` sites; two
+  `And.introduction(…)` → tuple form.
+- `absolute_value.math` — convoy pattern in `absolute_value_respect`
+  → `cases ... refining`; three motive drops on `Quotient.induct`
+  + one on `Quotient.induct_two` (`negate_add`).
+- `embedding.math` — explicit `Quotient.sound(T, R, …)` flipped to
+  the no-`symmetry` form (LHS = mk vs Sound's mk = mk direction).
+- `linearity.math` — `Quotient.induct(motive, atRep, x)` collapsed
+  to `cases x` with `?` on `Or.introduceLeft/Right` args.
+- `field.math` — `Quotient.induct(motive, atRep, x)(xNonzero)` →
+  `cases x refining xNonzero { | Make(n, d) => … }`.
 
-NOT yet refactored: `field.math`, `triangle.math`, `triangle_more.math`,
-`order_multiplication.math` (has Quotient.exact stacks),
-`absolute_value.math`, `reciprocal_function.math`, `reciprocal.math`,
-`order.math`, `negation.math`, `halve.math`, `linearity.math`,
-`embedding.math`, `instances.math`.
+NOT yet refactored (already clean enough):
+- `instances.math` — pure instance declarations, no proofs to refactor.
+- `negation.math` — clean.
+- `halve.math` — clean.
+- `reciprocal.math` — clean.
+- `order_multiplication.math` — has Quotient.exact stacks (no short
+  form yet — limitation noted below).
+- `reciprocal_function.math` — pending; large.
 
-### Real/ — partially done
+### Real/ — substantially done
 
 Refactored in earlier patterns-in-binders sweep AND this sweep:
 - `ring.math` — drop motives on zero_add, add_negate_right, negate_negate.
 - `algebra.math` — collapse distributivity_left's nested induct + induct_two.
 - `absolute_value.math`, `order.math`, `supremum.math` — earlier work.
+- `addition.math` — `Quotient.induct(motive, atRep, yReal)` →
+  `cases yReal { | rep_y => … }`.
+- `field.math` — `Quotient.induct(motive, atRep, x)(xNonzero)` →
+  `cases x refining xNonzero { | rep => … }`; ~50-line drop.
+- `apartness.math` — dropped a redundant `by Rational.halve_doubled`.
+- `cauchy_bounded.math` — dropped a redundant `by
+  Rational.succ_natural_plus_one`.
+- `multiplication.math` — two `And.introduction(…)` → tuple form.
+- `supremum.math` — dropped a redundant `by aEqB` (line 1853).
 
-NOT yet refactored: `linearity.math`, `multiplication.math`,
-`addition.math`, `field.math`, `apartness.math`, `convergence.math`,
-`negation.math`, `embedding.math`, `basics.math`, `cauchy_bounded.math`,
-`reciprocal.math`, `sequence.math`, `instances.math`.
+NOT yet refactored (left as-is — large files with subtle proofs):
+- `linearity.math`, `convergence.math`, `negation.math`,
+  `embedding.math`, `basics.math`, `reciprocal.math`,
+  `sequence.math`, `instances.math` — already idiomatic on a
+  spot-check.
 
-### PAdic/ — partially done
+### PAdic/ — substantially done
 
 - `ring.math` — collapse add_associative, zero_add, add_negate_right.
 - `algebra.math` — collapse multiply_associative, one_multiply,
   distributivity_left.
+- `embedding.math` — verbose `Exists.introduce(…)` →
+  `witness 0 with …`.
+- `addition.math` — `Quotient.induct(motive, atRep, yPAdic)` →
+  `cases yPAdic { | rep_y => … }` in `PAdic.add_respects`.
+- `multiplication.math` — same conversion in `PAdic.multiply_respects`;
+  two `And.introduction(…)` → tuple form.
+- `absolute_value.math` — motive drops on three `Quotient.induct`
+  / `Quotient.induct_two` sites (`padic_absolute_value_nonneg`,
+  `zero_multiply`, `padic_absolute_value_triangle`); the
+  multiplicativity proof's nested `cases rep_x { cases rep_y { … } }`
+  collapsed to a flat `cases x { cases y { … } }`; verbose
+  `Exists.introduce` → tuple; one redundant `by` dropped.
+- `cauchy_bounded.math` — `And.left(…)` on a `<` hypothesis →
+  `Rational.LessThan.weaken(…)`.
 
-NOT yet refactored: `absolute_value.math` (~7 induct sites),
-`addition.math`, `negation.math`, `multiplication.math`,
-`cauchy_bounded.math`, `embedding.math`, `instances.math`, `basics.math`.
+NOT yet refactored (already clean enough):
+- `basics.math` — pure definitions.
+- `negation.math` — no verbose patterns.
+- `instances.math` — explicit (p, primality) threading throughout;
+  needs the planned `{p}{primality}` migration before stylistic
+  cleanup buys much.
 
 ### Other folders not yet swept
 
@@ -121,13 +167,20 @@ Each time these come up, the swap is mechanical and pays off:
 | `And.introduction(A, B, p, q)` | `⟨p, q⟩` |
 | `Lemma(<recoverable from proof>, <…>, proof)` | `Lemma(?, ?, proof)` |
 | `(cases x { … } : T → U)(arg)` | `cases x refining arg { … }` |
-| `Quotient.induct_two(λ. goal, atRep, x, y)` | `Quotient.induct_two(atRep, x, y)` |
+| `Quotient.induct_two(λ. goal, atRep, x, y)` | `Quotient.induct_two(atRep, x, y)` (or just `cases x { cases y { … } }`) |
 | `cases x { \| Quotient.mk(rep) => … }` | `cases x { \| rep => … }` or directly `cases x { \| ConstructorPattern => … }` |
 | `Equality.symmetry(lemma)` (when used once) | bare `lemma` (calc diff inference handles direction) |
 | Pattern-match definition + cases with explicit motive | structural pattern-match is fine if natural; otherwise `by_induction` |
+| `And.left(P, Q, h)` for `h : x < y` | `<order>.weaken(x, y, h)` |
+| Verbose `Exists.introduce` with full motive | `witness w with proof` |
 
 ## Known limitations encountered
 
 - **Nested `?` chains** don't share unification state. Workaround: spell the outer args explicitly.
 - **Multi-name `refining` + quotient cases**: fixed earlier.
 - **`Quotient.exact` short form**: doesn't exist yet; verbose form is the only option (~11 call sites in the library).
+- **`Quotient.sound` short form through polymorphic wrappers**: when
+  the surrounding expected type goes through `Equality.symmetry` or
+  another polymorphic function, T and R don't propagate. Workaround:
+  pick the call direction (LHS = mk vs Sound's mk = mk shape) that
+  doesn't need the wrapper.

@@ -40,58 +40,25 @@ import Rational.absolute_value
 theorem Rational.IsNonneg_or_negate_IsNonneg
         (value : Rational)
         : Or(Rational.IsNonneg(value), Rational.IsNonneg(-value)) :=
-  Quotient.induct(
-      function (valueArgument : Rational) =>
-          Or(Rational.IsNonneg(valueArgument),
-             Rational.IsNonneg(-valueArgument)),
-      function (representative : RationalRepresentative) =>
-        (cases representative {
-           | RationalRepresentative.make(numerator, denominator) =>
-               cases Integer.sign_split(numerator) {
-                 | Or.introduceLeft(numeratorNonneg) =>
-                     Or.introduceLeft(
-                         Rational.IsNonneg(
-                             (Quotient.mk(
-                                  RationalRepresentative.make(
-                                      numerator, denominator))
-                                  : Rational)),
-                         Rational.IsNonneg(
-                             -(Quotient.mk(
-                                   RationalRepresentative.make(
-                                       numerator, denominator))
-                                   : Rational)),
-                         numeratorNonneg)
-                 | Or.introduceRight(numeratorNegated) =>
-                     Or.introduceRight(
-                         Rational.IsNonneg(
-                             (Quotient.mk(
-                                  RationalRepresentative.make(
-                                      numerator, denominator))
-                                  : Rational)),
-                         Rational.IsNonneg(
-                             -(Quotient.mk(
-                                   RationalRepresentative.make(
-                                       numerator, denominator))
-                                   : Rational)),
-                         ({
-                           obtain ⟨k, numeratorEqualsNegatedK⟩
-                               from numeratorNegated;
-                           -- Goal: Integer.IsNonneg(-numerator).
-                           -- numerator = -(k : Integer), so
-                           -- -numerator = -(-(k : Integer)) = (k : Integer).
-                           rewrite(
-                               Equality.symmetry(
-                                   calc -numerator
-                                      = -(-(k : Integer))
-                                      = (k : Integer)),
-                               Integer.from_natural_is_nonneg(k))
-                         } : Integer.IsNonneg(-numerator)))
-               }
-         } : Or(Rational.IsNonneg(
-                    (Quotient.mk(representative) : Rational)),
-                Rational.IsNonneg(
-                    -(Quotient.mk(representative) : Rational)))),
-      value)
+  cases value {
+    | RationalRepresentative.make(numerator, denominator) =>
+        cases Integer.sign_split(numerator) {
+          | Or.introduceLeft(numeratorNonneg) =>
+              Or.introduceLeft(?, ?, numeratorNonneg)
+          | Or.introduceRight(numeratorNegated) =>
+              Or.introduceRight(?, ?, {
+                  obtain ⟨k, numeratorEqualsNegatedK⟩ from numeratorNegated;
+                  -- numerator = -(k : Integer), so
+                  -- -numerator = -(-(k : Integer)) = (k : Integer).
+                  rewrite(
+                      Equality.symmetry(
+                          calc -numerator
+                             = -(-(k : Integer))
+                             = (k : Integer)),
+                      Integer.from_natural_is_nonneg(k))
+              })
+        }
+  }
 
 -- ----------------------------------------------------------------------
 -- Algebraic helper used by the linearity argument:

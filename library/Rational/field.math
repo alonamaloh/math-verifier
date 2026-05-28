@@ -200,30 +200,15 @@ theorem Rational.reciprocal_exists_at_representative
 
 -- ----------------------------------------------------------------------
 -- Top-level inverse existence: every non-zero Rational has a
--- multiplicative inverse. Quotient.induct over `x` to expose the
--- representative make(n, d); the body delegates to
--- `reciprocal_exists_at_representative`.
+-- multiplicative inverse. Take a representative make(n, d) and
+-- delegate to `reciprocal_exists_at_representative`.
 theorem Rational.reciprocal_exists_for_nonzero
         (x : Rational) (xNonzero : ¬(x = Rational.zero))
         : ∃ (y : Rational). x * y = Rational.one :=
-  Quotient.induct(
-      function (xArg : Rational) =>
-          ¬(xArg = Rational.zero)
-            → ∃ (y : Rational). xArg * y = Rational.one,
-      function (rep : RationalRepresentative) =>
-        (cases rep {
-           | RationalRepresentative.make(n, d) =>
-               function (nonzeroHyp
-                           : ¬((Quotient.mk(
-                                    RationalRepresentative.make(n, d))
-                                    : Rational)
-                                   = Rational.zero)) =>
-                 Rational.reciprocal_exists_at_representative(
-                     n, d, nonzeroHyp)
-         } : ¬((Quotient.mk(rep) : Rational) = Rational.zero)
-             → ∃ (y : Rational).
-                 (Quotient.mk(rep) : Rational) * y = Rational.one),
-      x)(xNonzero)
+  cases x refining xNonzero {
+    | RationalRepresentative.make(n, d) =>
+        Rational.reciprocal_exists_at_representative(n, d, xNonzero)
+  }
 
 -- ----------------------------------------------------------------------
 -- Rational is a Field.

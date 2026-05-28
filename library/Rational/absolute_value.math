@@ -61,28 +61,19 @@ theorem Rational.absolute_value_respect
         (equivalenceHypothesis : RationalEquivalent(rep1, rep2))
         : Rational.absolute_value_at_representative(rep1)
           = Rational.absolute_value_at_representative(rep2) :=
-  (cases rep1 {
+  cases rep1 refining equivalenceHypothesis {
     | RationalRepresentative.make(n1, d1) =>
-        (cases rep2 {
+        cases rep2 refining equivalenceHypothesis {
           | RationalRepresentative.make(n2, d2) =>
-              function (cross : n1 * (successor(d2) : Integer)
-                                = n2 * (successor(d1) : Integer)) =>
-                Quotient.sound(
-                    RationalRepresentative.make(
-                        Integer.absolute_value(n1), d1),
-                    RationalRepresentative.make(
-                        Integer.absolute_value(n2), d2),
-                    Rational.absolute_value_respect_at_representatives(
-                        n1, n2, d1, d2, cross))
-        } : (cross : RationalEquivalent(
-                         RationalRepresentative.make(n1, d1), rep2))
-              → Rational.absolute_value_at_representative(
-                    RationalRepresentative.make(n1, d1))
-                = Rational.absolute_value_at_representative(rep2))
-  } : (cross : RationalEquivalent(rep1, rep2))
-        → Rational.absolute_value_at_representative(rep1)
-          = Rational.absolute_value_at_representative(rep2))(
-      equivalenceHypothesis)
+              Quotient.sound(
+                  RationalRepresentative.make(
+                      Integer.absolute_value(n1), d1),
+                  RationalRepresentative.make(
+                      Integer.absolute_value(n2), d2),
+                  Rational.absolute_value_respect_at_representatives(
+                      n1, n2, d1, d2, equivalenceHypothesis))
+        }
+  }
 
 definition Rational.absolute_value (x : Rational) : Rational :=
   Quotient.lift(
@@ -115,11 +106,7 @@ theorem Rational.absolute_value_negate_at_representative
 -- |-x| = |x| on Rational.
 theorem Rational.absolute_value_negate (x : Rational)
         : Rational.absolute_value(-x) = Rational.absolute_value(x) :=
-  Quotient.induct(
-      function (y : Rational) =>
-          Rational.absolute_value(-y) = Rational.absolute_value(y),
-      Rational.absolute_value_negate_at_representative,
-      x)
+  cases x { | rep => Rational.absolute_value_negate_at_representative(rep) }
 
 -- -(-x) = x at the representative level.
 theorem Rational.negate_negate_at_representative
@@ -130,14 +117,13 @@ theorem Rational.negate_negate_at_representative
 
 -- -(-x) = x on Rational.
 theorem Rational.negate_negate (x : Rational) : -(-x) = x :=
-  Quotient.induct(
-      function (y : Rational) => -(-y) = y,
-      function (rep : RationalRepresentative) =>
-          congruenceOf(
-              function (r : RationalRepresentative) =>
-                  (Quotient.mk(r) : Rational),
-              Rational.negate_negate_at_representative(rep)),
-      x)
+  cases x {
+    | rep =>
+        congruenceOf(
+            function (r : RationalRepresentative) =>
+                (Quotient.mk(r) : Rational),
+            Rational.negate_negate_at_representative(rep))
+  }
 
 -- Numerator-level identity used by negate_add at representatives:
 -- -(n1 * succ(d2) + n2 * succ(d1)) = -n1 * succ(d2) + -n2 * succ(d1).
@@ -168,14 +154,12 @@ theorem Rational.negate_add_at_representatives
 
 -- -(p + q) = -p + -q on Rational. Lift through Quotient.induct_two.
 theorem Rational.negate_add (p q : Rational) : -(p + q) = -p + -q :=
-  Quotient.induct_two(
-      function (a b : Rational) => -(a + b) = -a + -b,
-      function (rep_p rep_q : RationalRepresentative) =>
-          congruenceOf(
-              function (r : RationalRepresentative) =>
-                  (Quotient.mk(r) : Rational),
-              Rational.negate_add_at_representatives(rep_p, rep_q)),
-      p, q)
+  cases p { | rep_p =>
+    cases q { | rep_q =>
+      congruenceOf(
+          function (r : RationalRepresentative) =>
+              (Quotient.mk(r) : Rational),
+          Rational.negate_add_at_representatives(rep_p, rep_q)) } }
 
 -- x - y = -(y - x) on Rational. Same chain as Integer.subtract_swap.
 theorem Rational.subtract_swap (x y : Rational) : x - y = -(y - x) :=

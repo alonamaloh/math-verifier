@@ -189,63 +189,57 @@ theorem Real.reciprocal_cauchy_sequence_multiplies
 theorem Real.reciprocal_exists_for_nonzero
         (x : Real) (xNonzero : ¬(x = Real.zero))
         : ∃ (y : Real). x * y = Real.one :=
-  Quotient.induct(
-      function (xArg : Real) =>
-          ¬(xArg = Real.zero)
-            → ∃ (y : Real). xArg * y = Real.one,
-      function (rep : CauchyRationalSequence) =>
-        function (mkRepNonzero
-                      : ¬((Quotient.mk(rep) : Real) = Real.zero)) =>
-          ({
-          -- Apartness: ¬(mk(rep) = mk(constant_zero)) → ¬CauchyEquivalent(rep, constant_zero).
-          claim notEquivalentToZero
-                : ¬CauchyEquivalent(
-                      rep,
-                      Rational.to_cauchy_constant(Rational.zero))
-            by function (equiv
-                             : CauchyEquivalent(
-                                   rep,
-                                   Rational.to_cauchy_constant(
-                                       Rational.zero))) =>
-                 mkRepNonzero(
-                     Quotient.sound(
-                         CauchyRationalSequence, CauchyEquivalent,
-                         rep,
-                         Rational.to_cauchy_constant(Rational.zero),
-                         equiv));
-          obtain ⟨lowerBound, apartnessTail⟩
-              from Real.cauchy_apartness_from_zero(
-                       rep, notEquivalentToZero);
-          obtain ⟨apartnessIndex, andBundle⟩ from apartnessTail;
-          let ⟨lowerBoundPositive, apartness⟩ := andBundle;
-          witness (Quotient.mk(
-                       Real.reciprocal_cauchy_sequence(
-                           CauchyRationalSequence.sequenceFunction(rep),
-                           CauchyRationalSequence.isCauchy(rep),
-                           lowerBound, lowerBoundPositive,
-                           apartnessIndex, apartness))
-                    : Real) with
-              Quotient.sound(
-                  CauchyRationalSequence, CauchyEquivalent,
-                  CauchyRationalSequence.multiply(
-                      rep,
-                      Real.reciprocal_cauchy_sequence(
-                          CauchyRationalSequence.sequenceFunction(rep),
-                          CauchyRationalSequence.isCauchy(rep),
-                          lowerBound, lowerBoundPositive,
-                          apartnessIndex, apartness)),
-                  Rational.to_cauchy_constant(Rational.one),
-                  Real.reciprocal_cauchy_sequence_multiplies(
-                      CauchyRationalSequence.sequenceFunction(rep),
-                      CauchyRationalSequence.isCauchy(rep),
-                      lowerBound, lowerBoundPositive,
-                      apartnessIndex, apartness,
-                      rep,
-                      reflexivity(
-                          Rational.sequence.Sequence,
-                          CauchyRationalSequence.sequenceFunction(rep))))
-        } : ∃ (y : Real). (Quotient.mk(rep) : Real) * y = Real.one),
-      x)(xNonzero)
+  cases x refining xNonzero {
+    | rep => {
+        -- Apartness: ¬(mk(rep) = mk(constant_zero)) → ¬CauchyEquivalent(rep, constant_zero).
+        claim notEquivalentToZero
+              : ¬CauchyEquivalent(
+                    rep,
+                    Rational.to_cauchy_constant(Rational.zero))
+          by function (equiv
+                           : CauchyEquivalent(
+                                 rep,
+                                 Rational.to_cauchy_constant(
+                                     Rational.zero))) =>
+               xNonzero(
+                   Quotient.sound(
+                       CauchyRationalSequence, CauchyEquivalent,
+                       rep,
+                       Rational.to_cauchy_constant(Rational.zero),
+                       equiv));
+        obtain ⟨lowerBound, apartnessTail⟩
+            from Real.cauchy_apartness_from_zero(
+                     rep, notEquivalentToZero);
+        obtain ⟨apartnessIndex, andBundle⟩ from apartnessTail;
+        let ⟨lowerBoundPositive, apartness⟩ := andBundle;
+        witness (Quotient.mk(
+                     Real.reciprocal_cauchy_sequence(
+                         CauchyRationalSequence.sequenceFunction(rep),
+                         CauchyRationalSequence.isCauchy(rep),
+                         lowerBound, lowerBoundPositive,
+                         apartnessIndex, apartness))
+                  : Real) with
+            Quotient.sound(
+                CauchyRationalSequence, CauchyEquivalent,
+                CauchyRationalSequence.multiply(
+                    rep,
+                    Real.reciprocal_cauchy_sequence(
+                        CauchyRationalSequence.sequenceFunction(rep),
+                        CauchyRationalSequence.isCauchy(rep),
+                        lowerBound, lowerBoundPositive,
+                        apartnessIndex, apartness)),
+                Rational.to_cauchy_constant(Rational.one),
+                Real.reciprocal_cauchy_sequence_multiplies(
+                    CauchyRationalSequence.sequenceFunction(rep),
+                    CauchyRationalSequence.isCauchy(rep),
+                    lowerBound, lowerBoundPositive,
+                    apartnessIndex, apartness,
+                    rep,
+                    reflexivity(
+                        Rational.sequence.Sequence,
+                        CauchyRationalSequence.sequenceFunction(rep))))
+      }
+  }
 
 -- ----------------------------------------------------------------------
 -- Real is a Field.
