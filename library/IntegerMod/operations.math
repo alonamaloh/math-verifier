@@ -1,0 +1,206 @@
+-- IntegerMod/operations.math
+--
+-- The ring operations on IntegerMod(modulus): addition, negation, and
+-- multiplication, plus the constants zero and one. Each operation
+-- descends from the corresponding Integer operation through the
+-- quotient. The well-definedness obligations (respect of congruence)
+-- are the three `CongruentModulo.*_respects` lemmas at the top, each
+-- of which is one Integer divisibility closure lemma plus a `ring`
+-- rearrangement of the relevant difference.
+--
+-- `modulus` is an implicit argument on the public operations,
+-- recovered from the type IntegerMod(modulus) of the operands — so
+-- call sites read as `IntegerMod.add(x, y)` and the operators below
+-- dispatch cleanly. The quotient plumbing uses the verbose
+-- Quotient.{mk,lift,sound} forms: the short forms can't recover the
+-- relation `Integer.CongruentModulo(modulus)` by unfolding IntegerMod
+-- (they over-unfold into the underlying `Integer.divides` existential).
+
+module IntegerMod.operations
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.instances
+import Integer.divisibility
+import Algebra.ring_lemmas
+import IntegerMod.basics
+
+-- ----------------------------------------------------------------------
+-- Respect of congruence by the Integer operations.
+
+-- (a + b) − (a' + b') = (a − a') + (b − b'); closed under addition.
+theorem Integer.CongruentModulo.add_respects (modulus : Natural)
+        (a a' b b' : Integer)
+        (congruentA : Integer.CongruentModulo(modulus, a, a'))
+        (congruentB : Integer.CongruentModulo(modulus, b, b'))
+        : Integer.CongruentModulo(modulus, a + b, a' + b') :=
+  rewrite((ring : (a - a') + (b - b') = (a + b) - (a' + b')),
+          Integer.divides_add((modulus : Integer), a - a', b - b',
+              congruentA, congruentB))
+
+-- (−a) − (−a') = −(a − a'); closed under negation.
+theorem Integer.CongruentModulo.negate_respects (modulus : Natural)
+        (a a' : Integer)
+        (congruentA : Integer.CongruentModulo(modulus, a, a'))
+        : Integer.CongruentModulo(modulus, -a, -a') :=
+  rewrite((ring : -(a - a') = (-a) - (-a')),
+          Integer.divides_negate((modulus : Integer), a - a', congruentA))
+
+-- a·b − a'·b' = (a − a')·b + (b − b')·a'; closed under addition of the
+-- two multiplied-through differences.
+theorem Integer.CongruentModulo.multiply_respects (modulus : Natural)
+        (a a' b b' : Integer)
+        (congruentA : Integer.CongruentModulo(modulus, a, a'))
+        (congruentB : Integer.CongruentModulo(modulus, b, b'))
+        : Integer.CongruentModulo(modulus, a * b, a' * b') :=
+  rewrite((ring : (a - a') * b + (b - b') * a' = a * b - a' * b'),
+          Integer.divides_add((modulus : Integer),
+              (a - a') * b, (b - b') * a',
+              Integer.divides_multiply_right((modulus : Integer), a - a', b,
+                  congruentA),
+              Integer.divides_multiply_right((modulus : Integer), b - b', a',
+                  congruentB)))
+
+-- ----------------------------------------------------------------------
+-- The class of an Integer representative.
+
+definition IntegerMod.make (modulus : Natural) (a : Integer)
+        : IntegerMod(modulus) :=
+  Quotient.mk(Integer, Integer.CongruentModulo(modulus), a)
+
+-- ----------------------------------------------------------------------
+-- Addition. Lift Integer.add over both arguments. The first lift
+-- (varying the second operand, first fixed) is `add_representative`;
+-- the outer lift varies the first operand, discharged by
+-- `add_representative_respects`.
+
+definition IntegerMod.add_representative (modulus : Natural)
+        (a : Integer) (y : IntegerMod(modulus)) : IntegerMod(modulus) :=
+  Quotient.lift(
+      Integer, Integer.CongruentModulo(modulus), IntegerMod(modulus),
+      function (b : Integer) => IntegerMod.make(modulus, a + b),
+      function (b b' : Integer)
+               (congruentB : Integer.CongruentModulo(modulus, b, b')) =>
+          Quotient.sound(
+              Integer, Integer.CongruentModulo(modulus),
+              a + b, a + b',
+              Integer.CongruentModulo.add_respects(modulus, a, a, b, b',
+                  Integer.CongruentModulo.reflexive(modulus, a), congruentB)),
+      y)
+
+theorem IntegerMod.add_representative_respects (modulus : Natural)
+        (a a' : Integer)
+        (congruentA : Integer.CongruentModulo(modulus, a, a'))
+        (y : IntegerMod(modulus))
+        : IntegerMod.add_representative(modulus, a, y)
+          = IntegerMod.add_representative(modulus, a', y) :=
+  cases y { | b =>
+    Quotient.sound(
+        Integer, Integer.CongruentModulo(modulus),
+        a + b, a' + b,
+        Integer.CongruentModulo.add_respects(modulus, a, a', b, b,
+            congruentA, Integer.CongruentModulo.reflexive(modulus, b))) }
+
+definition IntegerMod.add {modulus : Natural}
+        (x y : IntegerMod(modulus)) : IntegerMod(modulus) :=
+  Quotient.lift(
+      Integer, Integer.CongruentModulo(modulus), IntegerMod(modulus),
+      function (a : Integer) => IntegerMod.add_representative(modulus, a, y),
+      function (a a' : Integer)
+               (congruentA : Integer.CongruentModulo(modulus, a, a')) =>
+          IntegerMod.add_representative_respects(modulus, a, a', congruentA, y),
+      x)
+
+-- ----------------------------------------------------------------------
+-- Negation. A single lift. `modulus` is explicit: as the operand of a
+-- binary `+` (in the inverse laws) `IntegerMod.negate(x)` is type-
+-- inferred bottom-up with no guiding expected type, and an unfilled
+-- implicit there is mis-bound to the modulus slot.
+
+definition IntegerMod.negate (modulus : Natural)
+        (x : IntegerMod(modulus)) : IntegerMod(modulus) :=
+  Quotient.lift(
+      Integer, Integer.CongruentModulo(modulus), IntegerMod(modulus),
+      function (a : Integer) => IntegerMod.make(modulus, -a),
+      function (a a' : Integer)
+               (congruentA : Integer.CongruentModulo(modulus, a, a')) =>
+          Quotient.sound(
+              Integer, Integer.CongruentModulo(modulus),
+              -a, -a',
+              Integer.CongruentModulo.negate_respects(modulus, a, a',
+                  congruentA)),
+      x)
+
+-- ----------------------------------------------------------------------
+-- Multiplication. Same two-lift shape as addition.
+
+definition IntegerMod.multiply_representative (modulus : Natural)
+        (a : Integer) (y : IntegerMod(modulus)) : IntegerMod(modulus) :=
+  Quotient.lift(
+      Integer, Integer.CongruentModulo(modulus), IntegerMod(modulus),
+      function (b : Integer) => IntegerMod.make(modulus, a * b),
+      function (b b' : Integer)
+               (congruentB : Integer.CongruentModulo(modulus, b, b')) =>
+          Quotient.sound(
+              Integer, Integer.CongruentModulo(modulus),
+              a * b, a * b',
+              Integer.CongruentModulo.multiply_respects(modulus, a, a, b, b',
+                  Integer.CongruentModulo.reflexive(modulus, a), congruentB)),
+      y)
+
+theorem IntegerMod.multiply_representative_respects (modulus : Natural)
+        (a a' : Integer)
+        (congruentA : Integer.CongruentModulo(modulus, a, a'))
+        (y : IntegerMod(modulus))
+        : IntegerMod.multiply_representative(modulus, a, y)
+          = IntegerMod.multiply_representative(modulus, a', y) :=
+  cases y { | b =>
+    Quotient.sound(
+        Integer, Integer.CongruentModulo(modulus),
+        a * b, a' * b,
+        Integer.CongruentModulo.multiply_respects(modulus, a, a', b, b,
+            congruentA, Integer.CongruentModulo.reflexive(modulus, b))) }
+
+definition IntegerMod.multiply {modulus : Natural}
+        (x y : IntegerMod(modulus)) : IntegerMod(modulus) :=
+  Quotient.lift(
+      Integer, Integer.CongruentModulo(modulus), IntegerMod(modulus),
+      function (a : Integer) => IntegerMod.multiply_representative(modulus, a, y),
+      function (a a' : Integer)
+               (congruentA : Integer.CongruentModulo(modulus, a, a')) =>
+          IntegerMod.multiply_representative_respects(modulus, a, a', congruentA, y),
+      x)
+
+-- ----------------------------------------------------------------------
+-- Constants.
+
+-- `modulus` is explicit on the constants: as bare arguments they
+-- have no operand to drive implicit inference, and an unfilled
+-- implicit here is mis-bound to the modulus slot by the elaborator.
+definition IntegerMod.zero (modulus : Natural) : IntegerMod(modulus) :=
+  IntegerMod.make(modulus, Integer.zero)
+
+definition IntegerMod.one (modulus : Natural) : IntegerMod(modulus) :=
+  IntegerMod.make(modulus, Integer.one)
+
+-- Subtraction: x − y = x + (−y).
+definition IntegerMod.subtract {modulus : Natural}
+        (x y : IntegerMod(modulus)) : IntegerMod(modulus) :=
+  IntegerMod.add(x, IntegerMod.negate(modulus, y))
+
+-- ----------------------------------------------------------------------
+-- Operator overloads. The head of IntegerMod(modulus) is IntegerMod;
+-- with `modulus` implicit each operation is the (x, y) shape the
+-- dispatcher expects.
+
+operator (+) on (IntegerMod, IntegerMod) := IntegerMod.add
+operator (*) on (IntegerMod, IntegerMod) := IntegerMod.multiply
+operator (-) on (IntegerMod, IntegerMod) := IntegerMod.subtract

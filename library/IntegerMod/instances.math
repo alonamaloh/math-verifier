@@ -1,0 +1,91 @@
+-- IntegerMod/instances.math
+--
+-- Witnesses that IntegerMod(modulus) is a commutative ring under
+-- (+, 0, −, ·, 1), for every modulus. Each instance is a tuple of the
+-- already-proved laws from IntegerMod/ring.math — no new mathematical
+-- content, just packaging. When `modulus` is prime this ring is in
+-- fact a field (see IntegerMod/field.math).
+--
+-- The additive / multiplicative operations are passed as the lambdas
+-- `λ a b. a + b` and `λ a b. a * b`: `IntegerMod.add` / `.multiply`
+-- carry an implicit `modulus`, and a bare implicit-leading function
+-- handed to a higher-order parameter (IsMonoid's `operation`, etc.)
+-- does not get its implicit inserted — so we wrap with the operators,
+-- which do dispatch correctly. The law statements use the same
+-- operators, so the field types match up to β-reduction. Negation is
+-- the explicit-modulus partial application `IntegerMod.negate(modulus)`.
+
+module IntegerMod.instances
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import IntegerMod.basics
+import IntegerMod.operations
+import IntegerMod.ring
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+
+-- Additive monoid.
+theorem IntegerMod.add_is_monoid (modulus : Natural)
+        : IsMonoid(IntegerMod(modulus),
+                   function (a b : IntegerMod(modulus)) => a + b,
+                   IntegerMod.zero(modulus)) :=
+    ⟨IntegerMod.add_associative(modulus),
+     IntegerMod.add_identity_left(modulus),
+     IntegerMod.add_identity_right(modulus)⟩
+
+-- Additive commutative monoid.
+theorem IntegerMod.add_is_commutative_monoid (modulus : Natural)
+        : IsCommutativeMonoid(IntegerMod(modulus),
+                              function (a b : IntegerMod(modulus)) => a + b,
+                              IntegerMod.zero(modulus)) :=
+    ⟨IntegerMod.add_is_monoid(modulus), IntegerMod.add_commutative(modulus)⟩
+
+-- Additive group.
+theorem IntegerMod.add_is_group (modulus : Natural)
+        : IsGroup(IntegerMod(modulus),
+                  function (a b : IntegerMod(modulus)) => a + b,
+                  IntegerMod.zero(modulus), IntegerMod.negate(modulus)) :=
+    ⟨IntegerMod.add_is_monoid(modulus),
+     IntegerMod.add_negate_left(modulus),
+     IntegerMod.add_negate_right(modulus)⟩
+
+-- Additive abelian group.
+theorem IntegerMod.add_is_abelian_group (modulus : Natural)
+        : IsAbelianGroup(IntegerMod(modulus),
+                         function (a b : IntegerMod(modulus)) => a + b,
+                         IntegerMod.zero(modulus), IntegerMod.negate(modulus)) :=
+    ⟨IntegerMod.add_is_group(modulus), IntegerMod.add_commutative(modulus)⟩
+
+-- Multiplicative monoid.
+theorem IntegerMod.multiply_is_monoid (modulus : Natural)
+        : IsMonoid(IntegerMod(modulus),
+                   function (a b : IntegerMod(modulus)) => a * b,
+                   IntegerMod.one(modulus)) :=
+    ⟨IntegerMod.multiply_associative(modulus),
+     IntegerMod.multiply_identity_left(modulus),
+     IntegerMod.multiply_identity_right(modulus)⟩
+
+-- Ring.
+theorem IntegerMod.is_ring (modulus : Natural)
+        : IsRing(IntegerMod(modulus),
+                 function (a b : IntegerMod(modulus)) => a + b,
+                 IntegerMod.zero(modulus), IntegerMod.negate(modulus),
+                 function (a b : IntegerMod(modulus)) => a * b,
+                 IntegerMod.one(modulus)) :=
+    ⟨IntegerMod.add_is_abelian_group(modulus),
+     IntegerMod.multiply_is_monoid(modulus),
+     IntegerMod.distributivity_left(modulus),
+     IntegerMod.distributivity_right(modulus)⟩
+
+-- Commutative ring.
+theorem IntegerMod.is_commutative_ring (modulus : Natural)
+        : IsCommutativeRing(IntegerMod(modulus),
+                            function (a b : IntegerMod(modulus)) => a + b,
+                            IntegerMod.zero(modulus), IntegerMod.negate(modulus),
+                            function (a b : IntegerMod(modulus)) => a * b,
+                            IntegerMod.one(modulus)) :=
+    ⟨IntegerMod.is_ring(modulus), IntegerMod.multiply_commutative(modulus)⟩

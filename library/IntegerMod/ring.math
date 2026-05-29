@@ -1,0 +1,190 @@
+-- IntegerMod/ring.math
+--
+-- The commutative-ring laws for IntegerMod(modulus). Every law lifts
+-- the corresponding Integer law through the quotient: on
+-- representatives `a, b, …`, both sides reduce (by the Quotient.lift
+-- compute rule) to `IntegerMod.make(modulus, <Integer expression>)`,
+-- so the law is exactly `congruenceOf(make, <Integer law>)`.
+--
+-- The binary / ternary laws use the short `Quotient.induct_two` /
+-- `Quotient.induct_three` forms (their motive inference handles the
+-- parameterized quotient IntegerMod). The unary laws use the verbose
+-- single `Quotient.induct` with an explicit motive — the short single
+-- induct's motive inference does not yet cope with the `modulus`
+-- parameter. The constants are spelled `IntegerMod.zero(modulus)` /
+-- `IntegerMod.one(modulus)` and negation as `IntegerMod.negate(x)`,
+-- since the implicit-modulus and unary-minus surface paths mis-bind a
+-- bare constant / operand to the modulus slot.
+
+module IntegerMod.ring
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import IntegerMod.basics
+import IntegerMod.operations
+
+-- ----------------------------------------------------------------------
+-- Additive abelian group.
+
+theorem IntegerMod.add_associative (modulus : Natural)
+        (x y z : IntegerMod(modulus))
+        : (x + y) + z = x + (y + z) :=
+  Quotient.induct_three(
+      function (a b c : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.add_associative(a, b, c)),
+      x, y, z)
+
+theorem IntegerMod.add_identity_left (modulus : Natural)
+        (x : IntegerMod(modulus))
+        : IntegerMod.zero(modulus) + x = x :=
+  Quotient.induct(
+      Integer, Integer.CongruentModulo(modulus),
+      function (xArg : IntegerMod(modulus)) =>
+          IntegerMod.zero(modulus) + xArg = xArg,
+      function (a : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.add_identity_left(a)),
+      x)
+
+theorem IntegerMod.add_identity_right (modulus : Natural)
+        (x : IntegerMod(modulus))
+        : x + IntegerMod.zero(modulus) = x :=
+  Quotient.induct(
+      Integer, Integer.CongruentModulo(modulus),
+      function (xArg : IntegerMod(modulus)) =>
+          xArg + IntegerMod.zero(modulus) = xArg,
+      function (a : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.add_identity_right(a)),
+      x)
+
+theorem IntegerMod.add_commutative (modulus : Natural)
+        (x y : IntegerMod(modulus))
+        : x + y = y + x :=
+  Quotient.induct_two(
+      function (a b : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.add_commutative(a, b)),
+      x, y)
+
+theorem IntegerMod.add_negate_left (modulus : Natural)
+        (x : IntegerMod(modulus))
+        : IntegerMod.negate(modulus, x) + x = IntegerMod.zero(modulus) :=
+  Quotient.induct(
+      Integer, Integer.CongruentModulo(modulus),
+      function (xArg : IntegerMod(modulus)) =>
+          IntegerMod.negate(modulus, xArg) + xArg = IntegerMod.zero(modulus),
+      function (a : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.add_negate_left(a)),
+      x)
+
+theorem IntegerMod.add_negate_right (modulus : Natural)
+        (x : IntegerMod(modulus))
+        : x + IntegerMod.negate(modulus, x) = IntegerMod.zero(modulus) :=
+  Quotient.induct(
+      Integer, Integer.CongruentModulo(modulus),
+      function (xArg : IntegerMod(modulus)) =>
+          xArg + IntegerMod.negate(modulus, xArg) = IntegerMod.zero(modulus),
+      function (a : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.add_negate_right(a)),
+      x)
+
+-- ----------------------------------------------------------------------
+-- Multiplicative monoid.
+
+theorem IntegerMod.multiply_associative (modulus : Natural)
+        (x y z : IntegerMod(modulus))
+        : (x * y) * z = x * (y * z) :=
+  Quotient.induct_three(
+      function (a b c : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.multiply_associative(a, b, c)),
+      x, y, z)
+
+theorem IntegerMod.multiply_identity_left (modulus : Natural)
+        (x : IntegerMod(modulus))
+        : IntegerMod.one(modulus) * x = x :=
+  Quotient.induct(
+      Integer, Integer.CongruentModulo(modulus),
+      function (xArg : IntegerMod(modulus)) =>
+          IntegerMod.one(modulus) * xArg = xArg,
+      function (a : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.multiply_identity_left(a)),
+      x)
+
+theorem IntegerMod.multiply_identity_right (modulus : Natural)
+        (x : IntegerMod(modulus))
+        : x * IntegerMod.one(modulus) = x :=
+  Quotient.induct(
+      Integer, Integer.CongruentModulo(modulus),
+      function (xArg : IntegerMod(modulus)) =>
+          xArg * IntegerMod.one(modulus) = xArg,
+      function (a : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.multiply_identity_right(a)),
+      x)
+
+theorem IntegerMod.multiply_commutative (modulus : Natural)
+        (x y : IntegerMod(modulus))
+        : x * y = y * x :=
+  Quotient.induct_two(
+      function (a b : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.multiply_commutative(a, b)),
+      x, y)
+
+-- ----------------------------------------------------------------------
+-- Distributivity.
+
+theorem IntegerMod.distributivity_left (modulus : Natural)
+        (x y z : IntegerMod(modulus))
+        : x * (y + z) = x * y + x * z :=
+  Quotient.induct_three(
+      function (a b c : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.distributivity_left(a, b, c)),
+      x, y, z)
+
+theorem IntegerMod.distributivity_right (modulus : Natural)
+        (x y z : IntegerMod(modulus))
+        : (x + y) * z = x * z + y * z :=
+  Quotient.induct_three(
+      function (a b c : Integer) =>
+          congruenceOf(
+              function (representativeValue : Integer) =>
+                  IntegerMod.make(modulus, representativeValue),
+              Integer.distributivity_right(a, b, c)),
+      x, y, z)
