@@ -5145,19 +5145,97 @@ void loadCacheRecursive(Environment& environment,
     alreadyLoaded.insert(cachePath);
 }
 
+// Convert a dotted module name ("Foo.Bar") to a relative slash path
+// ("Foo/Bar") plus the requested extension.
+std::string modulePathWithExtension(const std::string& moduleName,
+                                    const std::string& extension) {
+    std::string result = moduleName;
+    for (char& c : result) if (c == '.') c = '/';
+    result += extension;
+    return result;
+}
+
+// Given a source file path and its declared module name, peel the
+// module-name suffix off the source path to recover the "source root"
+// (e.g. sourcePath "library/Logic/basics.math" + moduleName
+// "Logic.basics" yields "library/"). Returns "" if the suffix isn't
+// present — in which case the convention-based dep resolution can't
+// fire and `--deps` is the only path.
+std::string deriveSourceRoot(const std::string& sourcePath,
+                             const std::string& moduleName) {
+    std::string suffix = modulePathWithExtension(moduleName, ".math");
+    if (sourcePath.size() >= suffix.size()
+        && sourcePath.compare(sourcePath.size() - suffix.size(),
+                               suffix.size(), suffix) == 0) {
+        return sourcePath.substr(0, sourcePath.size() - suffix.size());
+    }
+    return "";
+}
+
 // Verify a single source file with cache support. Optional output
-// cache path (empty means "don't write"). Returns 0 on success.
+// cache path (empty means "don't write"). When `cacheRoot` is
+// non-empty, the file's `import` declarations are resolved to
+// `<cacheRoot>/<sourceRoot><module-as-path>.mathv` and used as
+// dependency caches — `dependencyCachePaths` need not list them
+// explicitly. Returns 0 on success.
 int verifyWithCache(const std::string& sourcePath,
                     const std::vector<std::string>& dependencyCachePaths,
                     const std::string& outputCachePath,
+                    const std::string& cacheRoot = "",
                     bool reportRedundantBy = false,
                     bool reportRedundantCalcSteps = false,
                     bool reportRedundantByNonEq = false) {
     Environment environment;
     std::set<std::string> alreadyLoaded;
 
+    // Read and parse the source first so we know its module name and
+    // imports — both needed to resolve dependency cache paths when
+    // `--cache-root` is in use.
+    auto sourceOpt = readWholeFile(sourcePath);
+    if (!sourceOpt) {
+        std::cerr << "cannot open source: " << sourcePath << "\n";
+        return 1;
+    }
+    const std::string& source = *sourceOpt;
+    uint64_t sourceHash = fnv1aHash(source);
+
+    SurfaceModule parsedModule;
+    try {
+        auto tokens = lex(source);
+        parsedModule = parseModule(tokens);
+    } catch (const LexError& error) {
+        std::cerr << "lex error in " << sourcePath << ": "
+                  << error.what() << "\n";
+        return 1;
+    } catch (const ParseError& error) {
+        std::cerr << sourcePath << ":1:1: parse error: "
+                  << error.what() << "\n";
+        return 1;
+    }
+    const std::string moduleName = parsedModule.moduleName;
+    const std::vector<std::string> importedModuleNames =
+        importedModulesOf(parsedModule);
+
+    // Resolve dependency cache paths. The explicit `--deps` list (if
+    // any) is honored; when `--cache-root` is given, each import is
+    // additionally mapped to its conventional cache path. Duplicates
+    // are dropped by loadCacheRecursive's `alreadyLoaded` set, so the
+    // two sources can overlap freely.
+    std::vector<std::string> resolvedDependencyCachePaths(
+        dependencyCachePaths);
+    if (!cacheRoot.empty()) {
+        const std::string sourceRoot =
+            deriveSourceRoot(sourcePath, moduleName);
+        for (const auto& importedName : importedModuleNames) {
+            resolvedDependencyCachePaths.push_back(
+                cacheRoot + "/" + sourceRoot
+                + modulePathWithExtension(importedName, ".mathv"));
+        }
+    }
+
     // Load dependency caches (with transitive expansion).
-    for (const auto& dependency : dependencyCachePaths) {
+    auto loadT0 = std::chrono::steady_clock::now();
+    for (const auto& dependency : resolvedDependencyCachePaths) {
         try {
             loadCacheRecursive(environment, dependency, alreadyLoaded);
         } catch (const SerializationError& error) {
@@ -5166,14 +5244,14 @@ int verifyWithCache(const std::string& sourcePath,
             return 1;
         }
     }
-
-    auto sourceOpt = readWholeFile(sourcePath);
-    if (!sourceOpt) {
-        std::cerr << "cannot open source: " << sourcePath << "\n";
-        return 1;
+    auto loadT1 = std::chrono::steady_clock::now();
+    if (std::getenv("MATH_REPORT_ADDDECL")) {
+        long long loadMs =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                loadT1 - loadT0).count();
+        std::cerr << "[load] " << moduleName << " dep_load="
+                  << loadMs << "ms deps=" << alreadyLoaded.size() << "\n";
     }
-    const std::string& source = *sourceOpt;
-    uint64_t sourceHash = fnv1aHash(source);
 
     // Snapshot the environment's declaration / implicit-count names so
     // we can identify which entries this file added.
@@ -5204,22 +5282,10 @@ int verifyWithCache(const std::string& sourcePath,
     }
 
     std::vector<std::string> importedModules;
-    std::string moduleName;
     try {
-        auto tokens = lex(source);
-        auto module = parseModule(tokens);
-        moduleName = module.moduleName;
-        elaborateModule(module, environment, importedModules,
+        elaborateModule(parsedModule, environment, importedModules,
                          reportRedundantBy, reportRedundantCalcSteps,
                          reportRedundantByNonEq);
-    } catch (const LexError& error) {
-        std::cerr << "lex error in " << sourcePath << ": "
-                  << error.what() << "\n";
-        return 1;
-    } catch (const ParseError& error) {
-        std::cerr << sourcePath << ":1:1: parse error: "
-                  << error.what() << "\n";
-        return 1;
     } catch (const ElaborateError& error) {
         std::cerr << sourcePath << ":"
                   << (error.line > 0 ? error.line : 1) << ":"
@@ -5253,7 +5319,7 @@ int verifyWithCache(const std::string& sourcePath,
     // For each direct import, find the corresponding top-level dep
     // cache (by module name) and record (cachePath, sourceHash).
     std::map<std::string, std::pair<std::string, uint64_t>> moduleToDepInfo;
-    for (const auto& dependencyPath : dependencyCachePaths) {
+    for (const auto& dependencyPath : resolvedDependencyCachePaths) {
         try {
             CacheContents depContents = readCacheFile(dependencyPath);
             moduleToDepInfo[depContents.moduleName] =
@@ -5336,6 +5402,14 @@ int verifyWithCache(const std::string& sourcePath,
     std::cout << "verified " << sourcePath << " (module " << moduleName
               << ", " << cache.declarations.size()
               << " new declarations)\n";
+    if (std::getenv("MATH_REPORT_ADDDECL")) {
+        std::cerr << "[adddecl] " << moduleName
+                  << " adddecl_total=" << (kernelAddDeclMicros / 1000)
+                  << "ms count=" << kernelAddDeclCount
+                  << " avg=" << (kernelAddDeclCount
+                                  ? kernelAddDeclMicros / kernelAddDeclCount
+                                  : 0) << "us\n";
+    }
     return 0;
 }
 
@@ -5546,16 +5620,18 @@ int main(int argc, char* argv[]) {
         }
         std::string sourcePath;
         std::string outputCachePath;
+        std::string cacheRoot;
         std::vector<std::string> dependencyCachePaths;
         bool reportRedundantBy = false;
         bool reportRedundantByNonEq = false;
         bool reportRedundantCalcSteps = false;
-        enum class State { None, Source, Output, Deps } state = State::None;
+        enum class State { None, Source, Output, Deps, CacheRoot } state = State::None;
         for (int i = 2; i < argc; ++i) {
             std::string argument = argv[i];
             if (argument == "--source")      { state = State::Source; continue; }
             if (argument == "--output")      { state = State::Output; continue; }
             if (argument == "--deps")        { state = State::Deps;   continue; }
+            if (argument == "--cache-root")  { state = State::CacheRoot; continue; }
             if (argument == "--check-redundant-by") {
                 reportRedundantBy = true;
                 state = State::None;
@@ -5575,6 +5651,7 @@ int main(int argc, char* argv[]) {
                 case State::Source: sourcePath = argument; state = State::None; break;
                 case State::Output: outputCachePath = argument; state = State::None; break;
                 case State::Deps:   dependencyCachePaths.push_back(argument); break;
+                case State::CacheRoot: cacheRoot = argument; state = State::None; break;
                 case State::None:
                     std::cerr << "verify: unexpected argument " << argument << "\n";
                     return 1;
@@ -5585,7 +5662,8 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         return verifyWithCache(sourcePath, dependencyCachePaths,
-                               outputCachePath, reportRedundantBy,
+                               outputCachePath, cacheRoot,
+                               reportRedundantBy,
                                reportRedundantCalcSteps,
                                reportRedundantByNonEq);
     }
@@ -5611,9 +5689,13 @@ int main(int argc, char* argv[]) {
                   << "                      verify one or more .math files\n"
                   << "                      (legacy form, no caching)\n"
                   << "  kernel verify --source FILE.math --output FILE.mathv\n"
+                  << "                  [--cache-root DIR]\n"
                   << "                  [--deps DEP.mathv DEP.mathv ...]\n"
                   << "                      verify one file, writing a binary\n"
                   << "                      cache. Deps must already be cached.\n"
+                  << "                      With --cache-root, the file's imports\n"
+                  << "                      are resolved against that root and need\n"
+                  << "                      not be listed via --deps.\n"
                   << "  kernel deps [--cache-root DIR] FILE.math [FILE.math ...]\n"
                   << "                      emit Makefile dependency lines\n"
                   << "                      (target .mathv -> imported .mathv).\n";
