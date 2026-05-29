@@ -1860,6 +1860,9 @@ ExpressionPointer inferTypeWork(const Environment& environment,
 }
 } // namespace
 
+uint64_t kernelAddDeclMicros = 0;
+uint64_t kernelAddDeclCount = 0;
+
 void addAxiom(Environment& environment,
               std::string name,
               std::vector<std::string> universeParameters,
@@ -1872,8 +1875,13 @@ void addAxiom(Environment& environment,
         throw TypeError("addAxiom: name already declared: " + name);
     }
     KernelInstrumentationScope instrumentationScope("axiom " + name);
+    auto t0 = std::chrono::steady_clock::now();
     auto kindOfType = weakHeadNormalForm(
         environment, inferType(environment, {}, declaredType));
+    auto t1 = std::chrono::steady_clock::now();
+    kernelAddDeclMicros +=
+        std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+    ++kernelAddDeclCount;
     if (!std::holds_alternative<Sort>(kindOfType->node)) {
         throw TypeError("addAxiom: declared type is not a type for " + name);
     }
@@ -1896,6 +1904,7 @@ void addDefinition(Environment& environment,
         throw TypeError("addDefinition: name already declared: " + name);
     }
     KernelInstrumentationScope instrumentationScope("definition " + name);
+    auto t0 = std::chrono::steady_clock::now();
     auto kindOfType = weakHeadNormalForm(
         environment, inferType(environment, {}, declaredType));
     if (!std::holds_alternative<Sort>(kindOfType->node)) {
@@ -1910,6 +1919,10 @@ void addDefinition(Environment& environment,
         error.actualType = inferredBodyType;
         throw error;
     }
+    auto t1 = std::chrono::steady_clock::now();
+    kernelAddDeclMicros +=
+        std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+    ++kernelAddDeclCount;
     environment.declarations.emplace(
         std::move(name),
         Definition{std::move(universeParameters),

@@ -161,6 +161,53 @@ public:
     //      histogram; top library lemmas.
     void emitAutoProverProfile() {
         if (autoProveRows_.empty()) return;
+        // Headline: time spent on losing tactic attempts vs the
+        // winning one. Answers "how much would an oracle save?" —
+        // the losing figure is the theoretical upper bound on the
+        // savings from a (context, goal) → winning-tactic cache.
+        //
+        // NOTE: under profiling we keep running every tactic even
+        // after one wins (to capture independent hit rates), but
+        // normal operation short-circuits at the first success. So
+        // "losing" here means failed attempts that ran BEFORE the
+        // winner — those are the real waste. Attempts AFTER the
+        // winner are profiling-only artefacts and excluded.
+        long long losingUs = 0;
+        long long winningUs = 0;
+        long long claimsWithWinner = 0;
+        long long claimsWithoutWinner = 0;
+        for (const AutoProveRow& row : autoProveRows_) {
+            bool hasWinner = !row.winningTactic.empty();
+            if (hasWinner) ++claimsWithWinner;
+            else ++claimsWithoutWinner;
+            if (!hasWinner) {
+                // Every attempt was a real loser (claim unresolved).
+                for (const AutoProveAttempt& attempt : row.attempts) {
+                    losingUs += attempt.micros;
+                }
+                continue;
+            }
+            for (const AutoProveAttempt& attempt : row.attempts) {
+                if (attempt.tacticName == row.winningTactic
+                    && attempt.succeeded) {
+                    winningUs += attempt.micros;
+                    break;  // stop at the winner — rest are artefacts
+                }
+                losingUs += attempt.micros;
+            }
+        }
+        long long totalUs = losingUs + winningUs;
+        double losingPct = totalUs > 0
+            ? 100.0 * losingUs / totalUs : 0.0;
+        std::cerr << "[autoprove-summary] " << moduleName_
+                  << " claims=" << (claimsWithWinner + claimsWithoutWinner)
+                  << " (closed=" << claimsWithWinner
+                  << ", unresolved=" << claimsWithoutWinner << ")"
+                  << " losing=" << (losingUs / 1000) << "ms"
+                  << " winning=" << (winningUs / 1000) << "ms"
+                  << " total=" << (totalUs / 1000) << "ms"
+                  << " losing_share=" << (int)losingPct << "%"
+                  << " (oracle could skip the losing share)\n";
         std::cerr << "[autoprove] " << moduleName_
                   << " — per-claim rows (TSV: "
                   << "file:line\tgoal_head\tgoal_size\twinner\t"

@@ -362,6 +362,13 @@ extern std::size_t kernelDumpWidth;
 // positions, this turns O(N^k) work into O(N).
 extern bool kernelCacheEnabled;
 
+// Diagnostic counters for the per-decl typecheck cost. Updated from
+// addAxiom / addDefinition's inferType pair. Read by main.cpp's
+// verifyWithCache to report what fraction of file time is spent in
+// the kernel's final typecheck (the part the trust cache would skip).
+extern uint64_t kernelAddDeclMicros;
+extern uint64_t kernelAddDeclCount;
+
 // Drop every cached WHNF / isDefEq result. Must be called whenever the
 // environment mutates in a way that could change reduction (e.g. an
 // opacity flip via `unfold`, or the matching restore): a cached TRUE
