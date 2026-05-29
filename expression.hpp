@@ -50,19 +50,29 @@ public:
     }
     IntrusiveExpressionPointer&
     operator=(const IntrusiveExpressionPointer& other) noexcept {
-        // Bump source's refcount before dropping ours — handles
-        // self-assignment correctly.
-        if (other.ptr_) intrusiveAddRef(other.ptr_);
+        // Cache `other.ptr_` up front. `other` itself may live inside an
+        // Expression that `*this` transitively owns (e.g. peel loops of
+        // the form `cursor = application->function`, where `application`
+        // points into `cursor`'s storage). Dropping our refcount can
+        // then free the storage backing `other`, so any later read of
+        // `other.ptr_` would be UB. Handles self-assignment correctly
+        // because the AddRef bumps before the SubRef drops.
+        Expression* source = other.ptr_;
+        if (source) intrusiveAddRef(source);
         if (ptr_) intrusiveSubRef(ptr_);
-        ptr_ = other.ptr_;
+        ptr_ = source;
         return *this;
     }
     IntrusiveExpressionPointer&
     operator=(IntrusiveExpressionPointer&& other) noexcept {
         if (this != &other) {
-            if (ptr_) intrusiveSubRef(ptr_);
-            ptr_ = other.ptr_;
+            // Same self-ownership hazard as the copy assignment: read
+            // and clear `other` BEFORE the SubRef of our old pointer,
+            // since that SubRef can free storage that `other` lives in.
+            Expression* source = other.ptr_;
             other.ptr_ = nullptr;
+            if (ptr_) intrusiveSubRef(ptr_);
+            ptr_ = source;
         }
         return *this;
     }
@@ -95,23 +105,15 @@ private:
     Expression* ptr_;
 };
 
-// Tried IntrusiveExpressionPointer as a 16-byte-header replacement for
-// shared_ptr. Compiles and runs on simple files, but fails on
-// `Natural.order.math:LessOrEqual.transitive` (pattern-match form) —
-// the recursor's case construction emits a Lambda where inferType
-// expects a Pi. The bug doesn't reproduce on shared_ptr and isn't a
-// refcount-underflow trap (instrumented `intrusiveSubRef` never fires).
-// Suspected cause: some elaborator code path implicitly relies on
-// shared_ptr's separate-allocation layout (the control-block-separate
-// header) that doesn't hold for the intrusive layout where Expression
-// addresses are recycled more aggressively by the allocator. Left the
-// class defined for future investigation; production stays on
-// shared_ptr where the build is provably correct.
-using ExpressionPointer = std::shared_ptr<Expression>;
-[[maybe_unused]] static void touchIntrusiveSymbols() {
-    IntrusiveExpressionPointer p;
-    (void)p;
-}
+// IntrusiveExpressionPointer replaces std::shared_ptr<Expression>:
+// 8-byte pointer (vs 16), no separate control-block allocation, no
+// atomic refcount ops. See operator= bodies for the self-ownership
+// hazard the assignment paths have to guard against — that hazard
+// was the historical blocker; peel loops of the form
+// `cursor = application->function` (where `application` points into
+// `cursor`'s storage) trip it whenever dropping `cursor`'s last ref
+// frees the storage backing the rhs.
+using ExpressionPointer = IntrusiveExpressionPointer;
 
 // Distinguishes free variables introduced by the user (via makeFreeVariable
 // and ContextEntry) from those introduced by the kernel internally — for
