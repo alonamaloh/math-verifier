@@ -2,8 +2,20 @@ CXX = clang++
 CXXFLAGS = -std=c++20 -Wall -Wextra -Werror -O3 -g
 OBJS = level.o kernel.o printer.o lexer.o parser.o elaborator.o hash.o serialize.o main.o
 
+# mimalloc — small-object allocator that's faster than the system
+# malloc on node-heavy workloads (substitute/makeApplication create
+# small Expression nodes constantly). Linked as a force_load on the
+# static library so malloc/free are overridden at link time without
+# needing DYLD_INSERT_LIBRARIES at runtime.
+MIMALLOC_PREFIX := $(shell brew --prefix mimalloc 2>/dev/null)
+ifeq ($(MIMALLOC_PREFIX),)
+LDFLAGS_MIMALLOC :=
+else
+LDFLAGS_MIMALLOC := -Wl,-force_load,$(MIMALLOC_PREFIX)/lib/libmimalloc.a
+endif
+
 kernel: $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS_MIMALLOC)
 
 level.o: level.cpp level.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -68,26 +80,29 @@ library: $(LIBRARY_MATHV_FILES)
 
 tests: library $(TEST_MATHV_FILES)
 
-# Verification flags. The redundant-`by` check runs by default: it warns
-# about `by <proof>` calls that the auto-prover would close on its own,
-# which keeps the library tidy as it grows. The overhead is in the noise
-# (~1s on a full -B rebuild). Doesn't affect cache contents; warnings
-# just go to stderr. Set `CHECK_REDUNDANT_BY=0` on the make command line
-# to silence.
-VERIFY_FLAGS := --check-redundant-by
-ifeq ($(CHECK_REDUNDANT_BY),0)
+# Verification flags. The redundant-`by` check is OFF by default: it
+# re-runs the auto-prover speculatively on every `by` annotation, which
+# on math-heavy files (e.g. PAdic/absolute_value.math) adds a 10-15x
+# overhead — incompatible with real-time edit feedback. Opt in with
+# `CHECK_REDUNDANT_BY=1` for tidy-up sweeps. Doesn't affect cache
+# contents; warnings just go to stderr.
 VERIFY_FLAGS :=
+ifeq ($(CHECK_REDUNDANT_BY),1)
+VERIFY_FLAGS := --check-redundant-by
 endif
 
 # Recipe for a .mathv. The pattern rule provides the .math prerequisite;
-# explicit .mathv prerequisites come from the included dependency file
-# (built from `kernel deps`). The kernel binary is an order-only prereq —
-# we want it present, but bumping it shouldn't invalidate every cache
-# (the cache file format is versioned; format bumps will fail to load
-# old caches and force a rebuild explicitly).
+# the .mathv prerequisites — listed by the included dependency file —
+# drive `make`'s staleness tracking but are NOT passed to `kernel
+# verify` on the command line: the kernel resolves the source file's
+# `import` declarations against `--cache-root` directly. The kernel
+# binary is an order-only prereq — we want it present, but bumping it
+# shouldn't invalidate every cache (the cache file format is versioned;
+# format bumps will fail to load old caches and force a rebuild
+# explicitly).
 $(BUILD_DIR)/%.mathv: %.math | kernel
 	@mkdir -p $(dir $@)
-	./kernel verify --source $< --output $@ --deps $(filter %.mathv,$^) $(VERIFY_FLAGS)
+	./kernel verify --source $< --output $@ --cache-root $(BUILD_DIR) $(VERIFY_FLAGS)
 
 -include $(BUILD_DIR)/library-depends.mk
 

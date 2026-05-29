@@ -116,9 +116,15 @@ public:
         const char* tacticFlag = std::getenv("MATH_TIME_TACTICS");
         tacticTimingEnabled_ = tacticFlag && tacticFlag[0] != '\0'
             && tacticFlag[0] != '0';
+        const char* autoProveProfileFlag =
+            std::getenv("MATH_PROFILE_AUTOPROVER");
+        autoProveProfileEnabled_ = autoProveProfileFlag
+            && autoProveProfileFlag[0] != '\0'
+            && autoProveProfileFlag[0] != '0';
     }
 
     ~Elaborator() {
+        if (autoProveProfileEnabled_) emitAutoProverProfile();
         if (!tacticTimingEnabled_ || tacticStats_.empty()) return;
         // Dump in descending order of total time.
         std::vector<std::pair<std::string, TacticStats>> rows(
@@ -143,6 +149,134 @@ public:
                       << " total=" << (r.second.totalMicros / 1000) << " ms"
                       << " (" << (int)pct << "%)"
                       << " avg=" << (int)avgUs << " us\n";
+        }
+    }
+
+    // Dump the AutoProveRows collected under MATH_PROFILE_AUTOPROVER.
+    // Emits two blocks on stderr:
+    //   1. Per-row TSV — one line per outermost autoProveClaim call,
+    //      columns documented at the top.
+    //   2. Aggregates — per-tactic hit-rate vs. order; per-source
+    //      distribution for contextFactMatch wins; local-binder-depth
+    //      histogram; top library lemmas.
+    void emitAutoProverProfile() {
+        if (autoProveRows_.empty()) return;
+        std::cerr << "[autoprove] " << moduleName_
+                  << " — per-claim rows (TSV: "
+                  << "file:line\tgoal_head\tgoal_size\twinner\t"
+                  << "tactic\tok\tus\twin_source\tcand)\n";
+        for (const AutoProveRow& row : autoProveRows_) {
+            for (const AutoProveAttempt& attempt : row.attempts) {
+                std::cerr << "[autoprove-row]\t"
+                          << row.moduleName << ":" << row.line << "\t"
+                          << row.goalHead << "\t"
+                          << row.goalSize << "\t"
+                          << row.winningTactic << "\t"
+                          << attempt.tacticName << "\t"
+                          << (attempt.succeeded ? "1" : "0") << "\t"
+                          << attempt.micros << "\t"
+                          << attempt.winner << "\t"
+                          << attempt.candidatesTried
+                          << "\n";
+            }
+        }
+        // Aggregate: per-tactic independent hit-rates and timings.
+        // These are decoupled from ordering — each tactic was tried
+        // on every outermost claim site regardless of earlier wins.
+        struct TacticAgg {
+            long long inv = 0;
+            long long ok = 0;
+            long long totalUs = 0;
+            long long winTotalUs = 0;
+            long long winCount = 0;  // chosen as overall winner
+        };
+        std::unordered_map<std::string, TacticAgg> perTactic;
+        std::unordered_map<std::string, long long> winnerSourceCounts;
+        std::unordered_map<std::string, long long> winnerLibraryCounts;
+        // Local-binder-depth histogram: distance from end (the most
+        // recent binder is depth 0). For "library X" winners we
+        // bucket under "library" overall and break out top names.
+        std::unordered_map<int, long long> localDepthHistogram;
+        for (const AutoProveRow& row : autoProveRows_) {
+            for (const AutoProveAttempt& attempt : row.attempts) {
+                auto& agg = perTactic[attempt.tacticName];
+                ++agg.inv;
+                agg.totalUs += attempt.micros;
+                if (attempt.succeeded) ++agg.ok;
+                if (attempt.tacticName == row.winningTactic) {
+                    agg.winTotalUs += attempt.micros;
+                    ++agg.winCount;
+                    if (attempt.tacticName == "contextFactMatch"
+                        && !attempt.winner.empty()) {
+                        // attempt.winner is e.g.
+                        //  "local binder kEqualsPredecessor"
+                        //  "library Natural.le_through_max_left"
+                        if (attempt.winner.rfind("local binder ", 0) == 0) {
+                            ++winnerSourceCounts["local"];
+                            // Depth from end isn't recorded yet — for now
+                            // bucket as "local"; depth tracking is a
+                            // straightforward follow-on (collectContextFacts
+                            // walks N-1..0; we'd record the index).
+                        } else if (attempt.winner.rfind("library ", 0) == 0) {
+                            ++winnerSourceCounts["library"];
+                            std::string lemmaName =
+                                attempt.winner.substr(strlen("library "));
+                            ++winnerLibraryCounts[lemmaName];
+                        } else {
+                            ++winnerSourceCounts["other"];
+                        }
+                    }
+                }
+            }
+        }
+        (void)localDepthHistogram;
+        std::vector<std::pair<std::string, TacticAgg>> tacticRows(
+            perTactic.begin(), perTactic.end());
+        std::sort(tacticRows.begin(), tacticRows.end(),
+            [](const auto& a, const auto& b) {
+                return a.second.totalUs > b.second.totalUs;
+            });
+        std::cerr << "[autoprove] aggregate — per-tactic"
+                  << " (tactic / inv / ok / hit_rate / "
+                  << "avg_us / total_ms / wins / win_avg_us)\n";
+        for (const auto& r : tacticRows) {
+            double rate = r.second.inv > 0
+                ? 100.0 * r.second.ok / r.second.inv : 0.0;
+            double avgUs = r.second.inv > 0
+                ? (double)r.second.totalUs / r.second.inv : 0.0;
+            double winAvgUs = r.second.winCount > 0
+                ? (double)r.second.winTotalUs / r.second.winCount : 0.0;
+            std::cerr << "  " << r.first
+                      << ": inv=" << r.second.inv
+                      << " ok=" << r.second.ok
+                      << " rate=" << (int)rate << "%"
+                      << " avg=" << (int)avgUs << " us"
+                      << " total=" << (r.second.totalUs / 1000) << " ms"
+                      << " wins=" << r.second.winCount
+                      << " win_avg=" << (int)winAvgUs << " us\n";
+        }
+        // Source-category breakdown for contextFactMatch.
+        if (!winnerSourceCounts.empty()) {
+            std::cerr << "[autoprove] aggregate — contextFactMatch"
+                      << " winner source (local vs library)\n";
+            for (const auto& kv : winnerSourceCounts) {
+                std::cerr << "  " << kv.first << ": " << kv.second << "\n";
+            }
+        }
+        if (!winnerLibraryCounts.empty()) {
+            std::vector<std::pair<std::string, long long>> libRows(
+                winnerLibraryCounts.begin(), winnerLibraryCounts.end());
+            std::sort(libRows.begin(), libRows.end(),
+                [](const auto& a, const auto& b) {
+                    return a.second > b.second;
+                });
+            std::cerr << "[autoprove] aggregate — top library "
+                      << "lemmas chosen by contextFactMatch\n";
+            int count = 0;
+            for (const auto& r : libRows) {
+                std::cerr << "  " << r.second << "\t" << r.first << "\n";
+                if (++count >= 20) break;
+            }
         }
     }
 
@@ -5434,16 +5568,30 @@ private:
             [](const ContextFact& a, const ContextFact& b) {
                 return a.cost < b.cost;
             });
+        // Reset profiling fields each call — only meaningful when
+        // autoProveProfileEnabled_, but the writes are cheap.
+        lastContextFactWinner_.clear();
+        lastContextFactCandidateCount_ = 0;
+        int triedCount = 0;
         for (const ContextFact& fact : facts) {
+            ++triedCount;
             try {
-                return autoFillHintForClaim(
+                ExpressionPointer result = autoFillHintForClaim(
                     fact.proofTerm, fact.type, goalClosed,
                     localBinders, line);
+                if (autoProveProfileEnabled_) {
+                    lastContextFactWinner_ = fact.source;
+                    lastContextFactCandidateCount_ = triedCount;
+                }
+                return result;
             } catch (const ElaborateError&) {
                 continue;
             } catch (const TypeError&) {
                 continue;
             }
+        }
+        if (autoProveProfileEnabled_) {
+            lastContextFactCandidateCount_ = triedCount;
         }
         return nullptr;
     }
@@ -5991,9 +6139,27 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line,
         int transportBudget = 1) {
-        // (2) Equality battery — reflexivity, single-position diff
-        // with congruence wrapping, AC rearrangement via ring. No-op
-        // when the goal isn't an Equality.
+        // Tactic order is chosen to minimise total time, not to match
+        // the docstring narrative above. The cheap shape-gated tactics
+        // (equalityBattery, transitivityBridge, conjunctionIntro,
+        // contradiction) run first because each does an O(1) head
+        // check and bails on the wrong goal shape. After those, we
+        // try contextFactMatch — empirically the highest-hit-rate
+        // tactic (~10% per call on math-heavy files), so promoting
+        // it past the per-call-expensive disjunctionIntro and
+        // contextEqualityBridge skips those when a hypothesis or
+        // library lemma already closes the goal.
+        ++autoProveDepth_;
+        struct DepthDecrement {
+            int& d;
+            ~DepthDecrement() { --d; }
+        } decrementer{autoProveDepth_};
+
+        if (autoProveProfileEnabled_ && autoProveDepth_ == 1) {
+            return autoProveClaimProfiling(
+                goalClosed, localBinders, line, transportBudget);
+        }
+
         {
             ExpressionPointer attempt = runTactic("equalityBattery",
                 [&] { return tryAutoProveEqualityGoal(
@@ -6001,11 +6167,6 @@ private:
             if (attempt) return attempt;
         }
 
-        // (3) Transitivity bridge — for relational goals `H(a, c)`,
-        // search hypothesis pairs (h1 : H(a, b), h2 : H(b, c)) and
-        // apply `<H>.transitive`. No-op when goal isn't a 2-arg
-        // application of a constant head or when the transitive
-        // lemma isn't in scope.
         {
             ExpressionPointer attempt = runTactic("transitivityBridge",
                 [&] { return tryTransitivityBridge(
@@ -6013,8 +6174,6 @@ private:
             if (attempt) return attempt;
         }
 
-        // (4) Conjunction introduction — when the goal is `And(A, B)`,
-        // recursively prove each conjunct via the full auto-prover.
         {
             ExpressionPointer attempt = runTactic("conjunctionIntro",
                 [&] { return tryConjunctionIntro(
@@ -6022,7 +6181,28 @@ private:
             if (attempt) return attempt;
         }
 
-        // (5) Disjunction introduction — when the goal is `Or(A, B)`,
+        {
+            ExpressionPointer attempt = runTactic("contradiction",
+                [&] { return tryContradiction(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
+        // Context fact match — unified local-hypothesis + library
+        // scan. Iterates all in-scope facts (local binders and
+        // applicable library declarations) by cost, trying
+        // autoFillHintForClaim on each. Expensive per call (~4 ms
+        // average on math-heavy goals) but high hit rate, so it
+        // pays for itself by short-circuiting the equally expensive
+        // disjunctionIntro / contextEqualityBridge below.
+        {
+            ExpressionPointer attempt = runTactic("contextFactMatch",
+                [&] { return tryContextFactMatch(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
+        }
+
+        // Disjunction introduction — when the goal is `Or(A, B)`,
         // try proving A; if that fails, try B. Left-biased.
         {
             ExpressionPointer attempt = runTactic("disjunctionIntro",
@@ -6031,39 +6211,24 @@ private:
             if (attempt) return attempt;
         }
 
-        // (6) Contradiction — if in-scope hypotheses contain False
-        // or a `(h, ¬h)` pair, close the goal via
-        // `False.eliminate_proposition`.
-        {
-            ExpressionPointer attempt = runTactic("contradiction",
-                [&] { return tryContradiction(
-                    goalClosed, localBinders, line); });
-            if (attempt) return attempt;
-        }
-
-        // (1) Context fact match — unified local-hypothesis +
-        // library scan. Iterates all in-scope facts (local binders
-        // and applicable library declarations) by cost, trying
-        // autoFillHintForClaim on each.
-        {
-            ExpressionPointer attempt = runTactic("contextFactMatch",
-                [&] { return tryContextFactMatch(
-                    goalClosed, localBinders, line); });
-            if (attempt) return attempt;
-        }
-
-        // (7) Unified equality bridge: rewrite the goal via any
-        // equality fact in context (local hypothesis OR library
-        // lemma matched at a subexpression), then recurse. See
-        // TODO.md "Hammer unification" — this strategy is the
-        // pattern other context-iterating strategies should
-        // eventually follow.
-        {
+        // contextEqualityBridge: opt-out via MATH_DISABLE_CTX_EQ_BRIDGE=1.
+        // The profiler showed it wins only 16 of 217 outermost claim
+        // sites across the library while costing ~20 s total. Disabled
+        // by default to measure the saving; opt back in when you want
+        // it. Sites that need it surface as "no in-scope hypothesis
+        // matches structurally…" claim errors.
+        static const bool ctxEqBridgeDisabled = [] {
+            const char* f = std::getenv("MATH_DISABLE_CTX_EQ_BRIDGE");
+            return f && f[0] != '\0' && f[0] != '0';
+        }();
+        if (!ctxEqBridgeDisabled) {
             ExpressionPointer attempt = runTactic("contextEqualityBridge",
                 [&] { return tryContextEqualityBridge(
                     goalClosed, localBinders,
                     line, transportBudget); });
             if (attempt) return attempt;
+        } else {
+            (void)transportBudget;
         }
 
         throwElaborate(
@@ -6077,6 +6242,138 @@ private:
             "with this conclusion shape applies, and no context "
             "equality lets us rewrite to a provable form — add "
             "`by <lemma>` to specify");
+    }
+
+    // Profiling variant: runs every tactic, records per-attempt
+    // outcome (succeeded?, time, winner descriptor where meaningful),
+    // emits one AutoProveRow at the end. Returns the first successful
+    // proof so verification still behaves identically; subsequent
+    // tactics still execute so we capture independent hit-rates and
+    // can compare alternative orderings offline.
+    ExpressionPointer autoProveClaimProfiling(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line,
+        int transportBudget) {
+        AutoProveRow row;
+        row.moduleName = moduleName_;
+        row.line = line;
+        row.goalSize = countExpressionNodes(goalClosed);
+        row.goalHead = goalHeadName(goalClosed);
+        ExpressionPointer firstSuccess = nullptr;
+
+        auto runProfiled = [&](const char* tacticName,
+                               auto&& fn) {
+            AutoProveAttempt attempt;
+            attempt.tacticName = tacticName;
+            attempt.succeeded = false;
+            attempt.micros = 0;
+            // Reset contextFactMatch's per-call profiling fields so
+            // we don't carry winners over from earlier tactics.
+            lastContextFactWinner_.clear();
+            lastContextFactCandidateCount_ = 0;
+            auto t0 = std::chrono::steady_clock::now();
+            ExpressionPointer result = nullptr;
+            try {
+                result = fn();
+            } catch (const ElaborateError&) {
+                result = nullptr;
+            } catch (const TypeError&) {
+                result = nullptr;
+            }
+            auto t1 = std::chrono::steady_clock::now();
+            attempt.micros =
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    t1 - t0).count();
+            attempt.succeeded = (result != nullptr);
+            if (std::string(tacticName) == "contextFactMatch") {
+                attempt.winner = lastContextFactWinner_;
+                attempt.candidatesTried =
+                    lastContextFactCandidateCount_;
+            }
+            // First success becomes the returned proof — but we keep
+            // running later tactics for the comparison data.
+            if (result && !firstSuccess) {
+                firstSuccess = result;
+                if (row.winningTactic.empty()) {
+                    row.winningTactic = tacticName;
+                }
+            }
+            row.attempts.push_back(std::move(attempt));
+            // Also feed the global tactic-timing aggregate so the
+            // existing [tactic] summary still reports invocations and
+            // successes consistently across profiling and non-profiling
+            // runs. Otherwise the headline numbers would diverge.
+            auto& bucket = tacticStats_[tacticName];
+            ++bucket.invocations;
+            if (result) ++bucket.successes;
+            bucket.totalMicros += attempt.micros;
+        };
+
+        runProfiled("equalityBattery", [&] {
+            return tryAutoProveEqualityGoal(
+                goalClosed, localBinders, line);
+        });
+        runProfiled("transitivityBridge", [&] {
+            return tryTransitivityBridge(
+                goalClosed, localBinders, line);
+        });
+        runProfiled("conjunctionIntro", [&] {
+            return tryConjunctionIntro(
+                goalClosed, localBinders, line);
+        });
+        runProfiled("contradiction", [&] {
+            return tryContradiction(
+                goalClosed, localBinders, line);
+        });
+        runProfiled("contextFactMatch", [&] {
+            return tryContextFactMatch(
+                goalClosed, localBinders, line);
+        });
+        runProfiled("disjunctionIntro", [&] {
+            return tryDisjunctionIntro(
+                goalClosed, localBinders, line);
+        });
+        runProfiled("contextEqualityBridge", [&] {
+            return tryContextEqualityBridge(
+                goalClosed, localBinders, line, transportBudget);
+        });
+
+        autoProveRows_.push_back(std::move(row));
+
+        if (firstSuccess) return firstSuccess;
+        throwElaborate(
+            "claim `"
+            + prettyPrintInLocalScope(goalClosed, localBinders)
+            + "`: no in-scope hypothesis matches structurally, no "
+            "equality battery (reflexivity / diff / ring) closes the "
+            "goal, no transitivity chain reaches the goal, no "
+            "conjunction split decomposes it, no in-scope "
+            "contradiction lets us close it, no library theorem "
+            "with this conclusion shape applies, and no context "
+            "equality lets us rewrite to a provable form — add "
+            "`by <lemma>` to specify");
+    }
+
+    // Print just the spine head of a goal expression — typically a
+    // Constant name like "Equality" / "LessOrEqual" / "Natural.is_prime".
+    // Falls back to "<sort>" / "<pi>" / "<lambda>" / "<bv>" / "<fv>"
+    // for non-constant heads. Used by the auto-prover profiler.
+    std::string goalHeadName(ExpressionPointer expression) {
+        ExpressionPointer head = expression;
+        while (auto* app = std::get_if<Application>(&head->node)) {
+            head = app->function;
+        }
+        if (auto* c = std::get_if<Constant>(&head->node)) {
+            return c->name;
+        }
+        if (std::holds_alternative<Sort>(head->node)) return "<sort>";
+        if (std::holds_alternative<Pi>(head->node)) return "<pi>";
+        if (std::holds_alternative<Lambda>(head->node)) return "<lambda>";
+        if (std::holds_alternative<Let>(head->node)) return "<let>";
+        if (std::holds_alternative<BoundVariable>(head->node)) return "<bv>";
+        if (std::holds_alternative<FreeVariable>(head->node)) return "<fv>";
+        return "<?>";
     }
 
     // Elaborates `claim [P] by cases { in (A): body  in (B): body }`.
@@ -7569,6 +7866,65 @@ private:
         ExpressionPointer term,
         ExpressionPointer expectedTypeClosed) {
         TimedScope _scope(*this, "coerceToExpectedTypeViaDiff");
+        // Cheap structural prefilter. The full coerce path runs an
+        // inferType + isSubtype upfront — ~1 ms per call on math-heavy
+        // files — before attempting four sub-strategies:
+        //   (a) tryDiffWrapForEqualityGoal    — expected WHNF head must be Equality
+        //   (b) tryDiffBridgeViaContextEquality — needs a local Equality hypothesis
+        //   (c) tryDoubleNegationElimination — term type must be Not(Not P)
+        //   (d) tryBarePropositionAsProof    — term is structurally equal to expected
+        //                                       (and has type Sort 0, but the
+        //                                       structural-equality check filters out
+        //                                       essentially all other shapes already)
+        // For (a)/(b)/(d), all preconditions are cheap to test structurally
+        // (head check on expected type, scan of binder type heads, pointer/
+        // hash-compare on term vs expected). Strategy (c) is the lone holdout
+        // — it requires inferType to confirm `Not(Not P)`, but the pattern
+        // (suppose ¬P; … claim False; eliminate to P) is rare enough that we
+        // skip it here. If a user hits that path they'll see a genuine type
+        // error and can write `Logic.double_negation_eliminate(P, h)` directly.
+        auto headIsEqualityConstant =
+            [](ExpressionPointer e) {
+                ExpressionPointer head = e;
+                while (auto* app = std::get_if<Application>(&head->node)) {
+                    head = app->function;
+                }
+                auto* constant = std::get_if<Constant>(&head->node);
+                return constant && constant->name == "Equality";
+            };
+        bool expectedCouldFire = headIsEqualityConstant(expectedTypeClosed);
+        bool contextCouldFire = false;
+        if (!expectedCouldFire) {
+            for (const auto& binder : localBinders) {
+                if (headIsEqualityConstant(binder.type)) {
+                    contextCouldFire = true;
+                    break;
+                }
+            }
+        }
+        // Strategy (d) cheap precondition: term structurally equals
+        // expected type. We have to compare in a matching representation
+        // — most callers pass `term` in closed-over-binders form (BV
+        // indices) but `expectedTypeClosed` in already-opened form (FVs),
+        // depending on where the expected type came from. openOver on
+        // an already-opened type is a no-op, so the comparison is
+        // representation-agnostic. structurallyEqual short-circuits on
+        // hash mismatch, so this is O(1) on the common case where term
+        // and expected obviously differ.
+        bool barePropositionCouldFire = false;
+        if (!expectedCouldFire && !contextCouldFire) {
+            ExpressionPointer termOpened = openOverLocalBinders(
+                term, localBinders, localBinders.size());
+            ExpressionPointer expectedOpenedForCompare = openOverLocalBinders(
+                expectedTypeClosed, localBinders, localBinders.size());
+            barePropositionCouldFire =
+                structurallyEqual(termOpened, expectedOpenedForCompare);
+        }
+        if (!expectedCouldFire
+            && !contextCouldFire
+            && !barePropositionCouldFire) {
+            return term;
+        }
         ExpressionPointer termTypeOpened;
         try {
             termTypeOpened = inferTypeInLocalContext(
@@ -21392,6 +21748,44 @@ private:
     };
     std::unordered_map<std::string, TacticStats> tacticStats_;
     bool tacticTimingEnabled_ = false;
+
+    // Auto-prover profiling — when MATH_PROFILE_AUTOPROVER=1, each
+    // outermost call to autoProveClaim runs ALL tactics (not just
+    // until the first success) and emits one row per claim site
+    // describing which tactic won, where the winning fact came from
+    // (local binder index, library name), how many candidates were
+    // tried, and how long each tactic took. Recursive sub-calls
+    // aggregate but do not emit rows.
+    bool autoProveProfileEnabled_ = false;
+    int autoProveDepth_ = 0;
+    // Set by tryContextFactMatch (only when profiling is on) to the
+    // `source` string of whichever fact closed the goal. Read by
+    // autoProveClaim's profiling path immediately after the tactic
+    // returns, then cleared.
+    std::string lastContextFactWinner_;
+    int lastContextFactCandidateCount_ = 0;
+    struct AutoProveAttempt {
+        std::string tacticName;
+        bool succeeded;
+        long long micros;
+        // Tactic-specific winner descriptor — for contextFactMatch
+        // this is the ContextFact's `source` string (e.g.
+        // "local binder kEqualsPredecessor", "library Natural.le_through_max_left").
+        // Empty for tactics that don't have a meaningful winner.
+        std::string winner;
+        // For contextFactMatch: number of candidates the matcher
+        // tried before finding (or failing to find) a winner.
+        int candidatesTried = 0;
+    };
+    struct AutoProveRow {
+        std::string moduleName;
+        int line;
+        std::string goalHead;
+        size_t goalSize;
+        std::string winningTactic;  // first tactic to succeed, or empty
+        std::vector<AutoProveAttempt> attempts;
+    };
+    std::vector<AutoProveRow> autoProveRows_;
 
     // Per-decide-invocation memoization for the motive walker
     // (abstractStructuralOccurrenceWithWHNF). The walker visits the

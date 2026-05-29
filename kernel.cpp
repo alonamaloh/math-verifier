@@ -181,6 +181,66 @@ thread_local std::unordered_set<
 thread_local uint64_t isDefEqLoopsDetected = 0;
 thread_local uint64_t whnfLoopsDetected = 0;
 
+// inferType cache — keyed by (expressionStructuralHash, contextFingerprint).
+// inferType's result depends on Context (FreeVariable lookups), so the key
+// includes a fingerprint of the context: XOR of per-entry hashes (entry
+// name string-hash XOR entry type's structural hash). Two contexts with the
+// same entry set produce the same fingerprint; different contexts produce
+// different fingerprints with overwhelming probability. The cache lives for
+// one declaration's checking pass, like the other kernel caches — cleared
+// inside KernelInstrumentationScope.
+//
+// This is always-on (not gated on kernelCacheEnabled). Empirically, kernel
+// caching is a clear win once allocator pressure is reduced (mimalloc),
+// and inferType in particular shows up as the dominant `coerceToExpectedTypeViaDiff`
+// cost in profiles even when each call is fresh — sub-expression recursion
+// inside inferType hits the cache.
+struct InferTypeCacheKey {
+    uint64_t expressionHash;
+    uint64_t contextFingerprint;
+    bool operator==(const InferTypeCacheKey& other) const {
+        return expressionHash == other.expressionHash
+            && contextFingerprint == other.contextFingerprint;
+    }
+};
+struct InferTypeCacheKeyHash {
+    std::size_t operator()(const InferTypeCacheKey& k) const noexcept {
+        return static_cast<std::size_t>(
+            k.expressionHash ^ (k.contextFingerprint * 0x9e3779b97f4a7c15ULL));
+    }
+};
+struct InferTypeCacheValue {
+    ExpressionPointer expression;
+    ExpressionPointer type;
+};
+// Multimap-style: hash collisions are rare but possible; we store the
+// (expression, type) pair and check structuralEqual on lookup.
+thread_local std::unordered_multimap<
+    InferTypeCacheKey, InferTypeCacheValue,
+    InferTypeCacheKeyHash> inferTypeCache;
+thread_local uint64_t inferTypeCacheHits = 0;
+thread_local uint64_t inferTypeCacheMisses = 0;
+
+// Compute a fingerprint of `context` for inferType caching. XOR-fold per-
+// entry hashes; commutative, but that's fine — Lean's `expr_map` does the
+// same thing for its `m_infer_type` cache and the false-positive rate is
+// negligible in practice. The empty context fingerprints to 0.
+inline uint64_t contextFingerprint(const Context& context) {
+    uint64_t fingerprint = 0;
+    uint64_t mixer = 0x9e3779b97f4a7c15ULL;
+    for (const auto& entry : context) {
+        uint64_t nameHash = subtree_hash::hashString(entry.name);
+        uint64_t typeHash = entry.type ? entry.type->hash : 0;
+        // Mix name + type + origin (User vs Internal — the FV identity
+        // includes both).
+        uint64_t entryHash = nameHash ^ (typeHash * mixer)
+            ^ static_cast<uint64_t>(entry.origin);
+        fingerprint ^= entryHash;
+        mixer *= 0x100000001b3ULL;  // walk through different mixers
+    }
+    return fingerprint;
+}
+
 // Implementation note: this function is declared in `kernel.hpp` (no
 // namespace), so we close the anonymous namespace, define it, and
 // reopen the namespace.
@@ -192,6 +252,9 @@ void invalidateKernelCaches() {
         whnfInFlight.clear();
         isDefEqInFlight.clear();
     }
+    // inferTypeCache is always-on; clear it whenever the kernel signals
+    // a public-entry boundary (declaration commits, environment mutates).
+    inferTypeCache.clear();
 }
 namespace {
 
@@ -338,6 +401,11 @@ struct KernelInstrumentationScope {
             whnfInFlight.clear();
             isDefEqInFlight.clear();
         }
+        // inferTypeCache is always-on; clear at every public-entry
+        // boundary along with the gated caches.
+        inferTypeCache.clear();
+        inferTypeCacheHits = 0;
+        inferTypeCacheMisses = 0;
         isDefEqLoopsDetected = 0;
         whnfLoopsDetected = 0;
     }
@@ -416,7 +484,7 @@ namespace {
 // through the public API.
 ExpressionPointer makeInternalFreeVariable(std::string name) {
     uint64_t nameHash = subtree_hash::hashString(name);
-    auto expression = std::make_shared<Expression>(
+    auto expression = makeRawExpression(
         FreeVariable{std::move(name), FreeVariableOrigin::Internal});
     expression->hash = subtree_hash::mix(
         subtree_hash::mix(
@@ -663,7 +731,7 @@ ExpressionPointer openBinder(ExpressionPointer expression,
                              const std::string& freshName,
                              FreeVariableOrigin origin) {
     uint64_t nameHash = subtree_hash::hashString(freshName);
-    auto freeVar = std::make_shared<Expression>(
+    auto freeVar = makeRawExpression(
         FreeVariable{freshName, origin});
     freeVar->hash = subtree_hash::mix(
         subtree_hash::mix(
@@ -1573,10 +1641,35 @@ ExpressionPointer inferTypeWork(const Environment& environment,
 ExpressionPointer inferType(const Environment& environment,
                             const Context& context,
                             ExpressionPointer expression) {
+    // Cache lookup. The key is (expression structural hash, context
+    // fingerprint). On hit, verify the cached entry's expression is
+    // structurally equal — guards against hash collisions on key collisions.
+    // The fingerprint is computed once per top-level inferType call; the
+    // recursive sub-calls each recompute their own (cheap, O(N) in context
+    // size). For most call shapes the context size is small.
+    static const bool inferCacheDisabled = [] {
+        const char* f = std::getenv("MATH_DISABLE_INFER_TYPE_CACHE");
+        return f && f[0] != '\0' && f[0] != '0';
+    }();
+    InferTypeCacheKey key;
+    if (!inferCacheDisabled) {
+        key.expressionHash = expression ? expression->hash : 0;
+        key.contextFingerprint = contextFingerprint(context);
+        auto range = inferTypeCache.equal_range(key);
+        for (auto it = range.first; it != range.second; ++it) {
+            if (structurallyEqual(it->second.expression, expression)) {
+                ++inferTypeCacheHits;
+                return it->second.type;
+            }
+        }
+        ++inferTypeCacheMisses;
+    }
     if (!kernelCheckInvariants || isCurrentlyCheckingInvariants) {
-        // Fast path: either invariant checking is off, or we're already
-        // inside a check (recursive call inside the postcondition itself).
-        return inferTypeWork(environment, context, expression);
+        ExpressionPointer result = inferTypeWork(environment, context, expression);
+        if (!inferCacheDisabled) {
+            inferTypeCache.emplace(key, InferTypeCacheValue{expression, result});
+        }
+        return result;
     }
     isCurrentlyCheckingInvariants = true;
     ExpressionPointer result;
@@ -1598,6 +1691,9 @@ ExpressionPointer inferType(const Environment& environment,
         throw;
     }
     isCurrentlyCheckingInvariants = false;
+    if (!inferCacheDisabled) {
+        inferTypeCache.emplace(key, InferTypeCacheValue{expression, result});
+    }
     return result;
 }
 

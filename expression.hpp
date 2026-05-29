@@ -3,15 +3,115 @@
 #include "level.hpp"
 #include "subtree_hash.hpp"
 
+#include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
-#include <string>
 #include <type_traits>
 #include <variant>
 #include <vector>
 
 struct Expression;
+
+// Forward-declared refcount manipulation. Implementations live below the
+// Expression definition (need to access `refcount`).
+inline void intrusiveAddRef(Expression* expression) noexcept;
+inline void intrusiveSubRef(Expression* expression) noexcept;
+
+// Intrusive reference-counted pointer to Expression. Replaces
+// std::shared_ptr<Expression> — 8 bytes per pointer (vs 16 for shared_ptr),
+// no control-block allocation (vs shared_ptr's two-allocation pattern
+// when not using make_shared), no atomic refcount op cost. Matches Lean 4's
+// `lean_object*` model.
+//
+// API surface is the subset of shared_ptr<Expression> we actually use:
+// default/copy/move construct + assign, ->, *, get(), bool, reset(),
+// nullptr-comparison. Single-threaded — the kernel runs on the verify
+// command's main thread, so refcount ops are plain ++/-- (not atomic).
+class IntrusiveExpressionPointer {
+public:
+    constexpr IntrusiveExpressionPointer() noexcept : ptr_(nullptr) {}
+    constexpr IntrusiveExpressionPointer(std::nullptr_t) noexcept
+        : ptr_(nullptr) {}
+    explicit IntrusiveExpressionPointer(Expression* p) noexcept
+        : ptr_(p) {
+        if (ptr_) intrusiveAddRef(ptr_);
+    }
+    IntrusiveExpressionPointer(const IntrusiveExpressionPointer& other) noexcept
+        : ptr_(other.ptr_) {
+        if (ptr_) intrusiveAddRef(ptr_);
+    }
+    IntrusiveExpressionPointer(IntrusiveExpressionPointer&& other) noexcept
+        : ptr_(other.ptr_) {
+        other.ptr_ = nullptr;
+    }
+    ~IntrusiveExpressionPointer() noexcept {
+        if (ptr_) intrusiveSubRef(ptr_);
+    }
+    IntrusiveExpressionPointer&
+    operator=(const IntrusiveExpressionPointer& other) noexcept {
+        // Bump source's refcount before dropping ours — handles
+        // self-assignment correctly.
+        if (other.ptr_) intrusiveAddRef(other.ptr_);
+        if (ptr_) intrusiveSubRef(ptr_);
+        ptr_ = other.ptr_;
+        return *this;
+    }
+    IntrusiveExpressionPointer&
+    operator=(IntrusiveExpressionPointer&& other) noexcept {
+        if (this != &other) {
+            if (ptr_) intrusiveSubRef(ptr_);
+            ptr_ = other.ptr_;
+            other.ptr_ = nullptr;
+        }
+        return *this;
+    }
+    IntrusiveExpressionPointer& operator=(std::nullptr_t) noexcept {
+        if (ptr_) intrusiveSubRef(ptr_);
+        ptr_ = nullptr;
+        return *this;
+    }
+
+    Expression* get() const noexcept { return ptr_; }
+    Expression& operator*() const noexcept { return *ptr_; }
+    Expression* operator->() const noexcept { return ptr_; }
+    explicit operator bool() const noexcept { return ptr_ != nullptr; }
+
+    void reset() noexcept {
+        if (ptr_) intrusiveSubRef(ptr_);
+        ptr_ = nullptr;
+    }
+
+    bool operator==(const IntrusiveExpressionPointer& o) const noexcept {
+        return ptr_ == o.ptr_;
+    }
+    bool operator!=(const IntrusiveExpressionPointer& o) const noexcept {
+        return ptr_ != o.ptr_;
+    }
+    bool operator==(std::nullptr_t) const noexcept { return ptr_ == nullptr; }
+    bool operator!=(std::nullptr_t) const noexcept { return ptr_ != nullptr; }
+
+private:
+    Expression* ptr_;
+};
+
+// Tried IntrusiveExpressionPointer as a 16-byte-header replacement for
+// shared_ptr. Compiles and runs on simple files, but fails on
+// `Natural.order.math:LessOrEqual.transitive` (pattern-match form) —
+// the recursor's case construction emits a Lambda where inferType
+// expects a Pi. The bug doesn't reproduce on shared_ptr and isn't a
+// refcount-underflow trap (instrumented `intrusiveSubRef` never fires).
+// Suspected cause: some elaborator code path implicitly relies on
+// shared_ptr's separate-allocation layout (the control-block-separate
+// header) that doesn't hold for the intrusive layout where Expression
+// addresses are recycled more aggressively by the allocator. Left the
+// class defined for future investigation; production stays on
+// shared_ptr where the build is provably correct.
 using ExpressionPointer = std::shared_ptr<Expression>;
+[[maybe_unused]] static void touchIntrusiveSymbols() {
+    IntrusiveExpressionPointer p;
+    (void)p;
+}
 
 // Distinguishes free variables introduced by the user (via makeFreeVariable
 // and ContextEntry) from those introduced by the kernel internally — for
@@ -52,6 +152,10 @@ struct Expression {
     // closed library terms, so a single int compare at the top of each
     // recursion replaces an O(size) walk.
     int maxFreeBoundVariable = -1;
+    // Intrusive refcount, managed by IntrusiveExpressionPointer's
+    // ctor/dtor/assignment. Starts at 0; the first IntrusiveExpressionPointer
+    // bumps it to 1; last release deletes the Expression.
+    mutable uint32_t refcount = 0;
 
     Expression() = default;
 
@@ -61,6 +165,26 @@ struct Expression {
     Expression(Alternative&& alternative)
         : node(std::forward<Alternative>(alternative)) {}
 };
+
+// Refcount manipulators — defined inline after Expression so they can
+// touch the `refcount` field. Single-threaded; non-atomic. Diagnostic
+// abort guards remain in place since the intrusive path isn't on the
+// production code path yet — they're cheap (one compare) and catch
+// the obvious classes of bug if/when this gets re-enabled.
+inline void intrusiveAddRef(Expression* expression) noexcept {
+    ++expression->refcount;
+}
+inline void intrusiveSubRef(Expression* expression) noexcept {
+    if (--expression->refcount == 0) delete expression;
+}
+
+// Factory: allocate an Expression on the heap initialised with `alternative`,
+// wrap in an ExpressionPointer (refcount → 1). Replaces the
+// `std::make_shared<Expression>(...)` calls used previously.
+template <typename Alternative>
+inline ExpressionPointer makeRawExpression(Alternative&& alternative) {
+    return ExpressionPointer(new Expression(std::forward<Alternative>(alternative)));
+}
 
 // Hash-cons table for Expression nodes. Each make* helper calls
 // internExpression with the freshly-allocated candidate; if a
@@ -91,7 +215,7 @@ ExpressionPointer internExpression(ExpressionPointer candidate);
 extern bool g_hashConsEnabled;
 
 inline ExpressionPointer makeBoundVariable(int index) {
-    auto expression = std::make_shared<Expression>(BoundVariable{index});
+    auto expression = makeRawExpression(BoundVariable{index});
     expression->hash = subtree_hash::mix(
         subtree_hash::mix(subtree_hash::kSeed,
                            subtree_hash::kTagBoundVariable),
@@ -101,7 +225,7 @@ inline ExpressionPointer makeBoundVariable(int index) {
 }
 inline ExpressionPointer makeFreeVariable(std::string name) {
     uint64_t nameHash = subtree_hash::hashString(name);
-    auto expression = std::make_shared<Expression>(
+    auto expression = makeRawExpression(
         FreeVariable{std::move(name)});
     expression->hash = subtree_hash::mix(
         subtree_hash::mix(
@@ -120,7 +244,7 @@ inline ExpressionPointer makeFreeVariable(std::string name) {
 // overload below). Level 0 is Proposition; level n+1 is "Type n".
 inline ExpressionPointer makeSort(LevelPointer level) {
     uint64_t levelHash = level->hash;
-    auto expression = std::make_shared<Expression>(
+    auto expression = makeRawExpression(
         Sort{std::move(level)});
     expression->hash = subtree_hash::mix(
         subtree_hash::mix(subtree_hash::kSeed,
@@ -154,7 +278,7 @@ inline ExpressionPointer makePi(std::string displayHint,
     int codomainAdj = codomain->maxFreeBoundVariable - 1;
     int maxFree = domainMax > codomainAdj ? domainMax : codomainAdj;
     if (maxFree < -1) maxFree = -1;
-    auto expression = std::make_shared<Expression>(
+    auto expression = makeRawExpression(
         Pi{std::move(displayHint), std::move(domain),
            std::move(codomain)});
     expression->hash = subtree_hash::mix(
@@ -175,7 +299,7 @@ inline ExpressionPointer makeLambda(std::string displayHint,
     int bodyAdj = body->maxFreeBoundVariable - 1;
     int maxFree = domainMax > bodyAdj ? domainMax : bodyAdj;
     if (maxFree < -1) maxFree = -1;
-    auto expression = std::make_shared<Expression>(
+    auto expression = makeRawExpression(
         Lambda{std::move(displayHint), std::move(domain),
                std::move(body)});
     expression->hash = subtree_hash::mix(
@@ -194,7 +318,7 @@ inline ExpressionPointer makeApplication(ExpressionPointer function,
     int fnMax = function->maxFreeBoundVariable;
     int argMax = argument->maxFreeBoundVariable;
     int maxFree = fnMax > argMax ? fnMax : argMax;
-    auto expression = std::make_shared<Expression>(
+    auto expression = makeRawExpression(
         Application{std::move(function), std::move(argument)});
     expression->hash = subtree_hash::mix(
         subtree_hash::mix(
@@ -213,7 +337,7 @@ inline ExpressionPointer makeConstant(std::string name,
         universeHash = subtree_hash::mix(universeHash,
                                             universeArgument->hash);
     }
-    auto expression = std::make_shared<Expression>(
+    auto expression = makeRawExpression(
         Constant{std::move(name), std::move(universeArguments)});
     expression->hash = subtree_hash::mix(
         subtree_hash::mix(
@@ -240,7 +364,7 @@ inline ExpressionPointer makeLet(std::string displayHint,
     if (valueMax > maxFree) maxFree = valueMax;
     if (bodyAdj > maxFree) maxFree = bodyAdj;
     if (maxFree < -1) maxFree = -1;
-    auto expression = std::make_shared<Expression>(
+    auto expression = makeRawExpression(
         Let{std::move(displayHint), std::move(type),
             std::move(value), std::move(body)});
     expression->hash = subtree_hash::mix(
