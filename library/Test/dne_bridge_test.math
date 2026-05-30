@@ -1,7 +1,12 @@
--- Tests for the classical LEM bridge: when a term has type
--- Not(Not(P)) and the expected type is P, the elaborator silently
--- wraps with Logic.double_negation_eliminate. This is what makes the
--- textbook reductio-ad-absurdum pattern work without explicit DNE.
+-- Tests for classical double-negation elimination (`¬¬P → P`).
+--
+-- NOTE: the elaborator once auto-inserted `Logic.double_negation_eliminate`
+-- when a term had type `Not(Not(P))` and the expected type was `P`. That
+-- implicit bridge was dropped (the prefilter in
+-- `coerceToExpectedTypeViaDiff` deliberately skips the double-negation
+-- strategy on the hot coercion path), so the elimination is now written
+-- explicitly. These tests pin the explicit form, which is what proofs
+-- should use today.
 
 module Test.dne_bridge_test
 
@@ -10,20 +15,17 @@ import Logic.basics
 import Logic.exists
 import Logic.excluded_middle
 
--- (1) Direct: the body is literally a term of type Not(Not(P)) but
--- the theorem signature stipulates P. coerceToExpectedTypeViaDiff
--- inserts the DNE wrapper.
+-- (1) Direct: a term of type `Not(Not(P))` eliminated to `P`.
 theorem dne_bridge_direct (P : Proposition) (notNotP : Not(Not(P))) : P :=
-  notNotP
+  Logic.double_negation_eliminate(P, notNotP)
 
--- (2) RAA via suppose-then-False. The block's type is Not(P) →
--- False, i.e. Not(Not(P)). The theorem expects P. Bridge fires at
--- the theorem-body boundary. The `claim False` inside closes via
--- the unified fact match: `notNotP : Not(Not(P))` applied to the
--- in-scope `notP : Not(P)` produces False; autoFillHintForClaim
--- discovers the application without an explicit `by`.
+-- (2) Reductio: build the `Not(Not(P))` proof as a block
+-- (`suppose ¬P; derive False`) and eliminate it explicitly. The inner
+-- `claim False` closes by the unified fact match — `notNotP` applied to
+-- the in-scope `notP` produces False without an explicit `by`.
 theorem dne_bridge_via_block
-        (P : Proposition) (notNotP : Not(Not(P))) : P := {
-  suppose Not(P) as notP;
-  claim False
-}
+        (P : Proposition) (notNotP : Not(Not(P))) : P :=
+  Logic.double_negation_eliminate(P, {
+    suppose Not(P) as notP;
+    claim False
+  })
