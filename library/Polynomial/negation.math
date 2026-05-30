@@ -1,0 +1,97 @@
+-- Polynomial/negation.math
+--
+-- The zero polynomial and negation, over a bundled ring `r : Ring`.
+-- Negation maps each coefficient through `Ring.negate(r)`; its bridge
+-- lemma `nth_negate` says the i-th coefficient of −p is the negation of
+-- the i-th coefficient of p (the empty-list base case is where
+-- `Ring.negate_zero` is needed). Negation respects the equivalence, so
+-- it lifts to `Polynomial.negate`.
+
+module Polynomial.negation
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring_bundle
+import Polynomial.basics
+import Polynomial.addition
+
+-- The zero polynomial: the empty coefficient list. Its coefficient at
+-- every index is `Ring.zero(r)` definitionally.
+definition Polynomial.zero (r : Ring) : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
+  Polynomial.make(Ring.carrier(r), Ring.zero(r),
+      Polynomial.Coefficients.nil(Ring.carrier(r)))
+
+-- The one polynomial: the single coefficient `Ring.one(r)`.
+definition Polynomial.one (r : Ring) : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
+  Polynomial.make(Ring.carrier(r), Ring.zero(r),
+      Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
+          Polynomial.Coefficients.nil(Ring.carrier(r))))
+
+-- Coefficient-wise negation.
+definition Polynomial.Coefficients.negate (r : Ring)
+        : Polynomial.Coefficients(Ring.carrier(r))
+          → Polynomial.Coefficients(Ring.carrier(r))
+  | Polynomial.Coefficients.nil =>
+      Polynomial.Coefficients.nil(Ring.carrier(r))
+  | Polynomial.Coefficients.cons(a, rest) =>
+      Polynomial.Coefficients.cons(Ring.carrier(r),
+          Ring.negate(r, a),
+          Polynomial.Coefficients.negate(r, rest))
+
+-- Bridge: the i-th coefficient of −p is the negation of the i-th
+-- coefficient of p. The nil case needs `Ring.negate_zero`.
+theorem Polynomial.nth_negate (r : Ring)
+        : (p : Polynomial.Coefficients(Ring.carrier(r)))
+          → (index : Natural)
+          → Polynomial.coefficient(r, Polynomial.Coefficients.negate(r, p), index)
+            = Ring.negate(r, Polynomial.coefficient(r, p, index))
+  | Polynomial.Coefficients.nil, index =>
+      Equality.symmetry(?, ?, Ring.negate_zero(r))
+  | Polynomial.Coefficients.cons(a, rest), index =>
+      cases index {
+        | zero => reflexivity(Ring.carrier(r), Ring.negate(r, a))
+        | successor(predecessor) =>
+            Polynomial.nth_negate(r, rest, predecessor)
+      }
+
+-- Negation respects the equivalence (pointwise via the bridge).
+theorem Polynomial.Coefficients.negate_respects (r : Ring)
+        (p pPrime : Polynomial.Coefficients(Ring.carrier(r)))
+        (equal
+            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime))
+        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
+              Polynomial.Coefficients.negate(r, p),
+              Polynomial.Coefficients.negate(r, pPrime)) :=
+  function (index : Natural) =>
+      calc Polynomial.coefficient(r, Polynomial.Coefficients.negate(r, p), index)
+         = Ring.negate(r, Polynomial.coefficient(r, p, index))
+               by Polynomial.nth_negate(r, p, index)
+         = Ring.negate(r, Polynomial.coefficient(r, pPrime, index))
+               by equal(index)
+         = Polynomial.coefficient(r, Polynomial.Coefficients.negate(r, pPrime), index)
+               by Equality.symmetry(?, ?, Polynomial.nth_negate(r, pPrime, index))
+
+-- Lift to the quotient. A single lift (negation is unary).
+definition Polynomial.negate (r : Ring)
+        (polynomial : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
+  Quotient.lift(
+      Polynomial.Coefficients(Ring.carrier(r)),
+      Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r)),
+      Polynomial(Ring.carrier(r), Ring.zero(r)),
+      function (p : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.make(Ring.carrier(r), Ring.zero(r),
+              Polynomial.Coefficients.negate(r, p)),
+      function (p pPrime : Polynomial.Coefficients(Ring.carrier(r)))
+               (equal
+                   : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime)) =>
+          Quotient.sound(
+              Polynomial.Coefficients(Ring.carrier(r)),
+              Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r)),
+              Polynomial.Coefficients.negate(r, p),
+              Polynomial.Coefficients.negate(r, pPrime),
+              Polynomial.Coefficients.negate_respects(r, p, pPrime, equal)),
+      polynomial)

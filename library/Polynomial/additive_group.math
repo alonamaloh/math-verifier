@@ -1,0 +1,227 @@
+-- Polynomial/additive_group.math
+--
+-- The additive abelian-group laws for Polynomial over a bundled ring,
+-- and the IsAbelianGroup instance. Each law reduces to a per-index
+-- statement about coefficients: lift to representatives, then prove the
+-- two coefficient lists agree at every index (`make_equal_…`), where
+-- the `nth_add` / `nth_negate` bridges turn the goal into the
+-- corresponding `Ring` law applied coefficient-wise.
+--
+-- `add_identity_left` is the one structural shortcut: `nil + p` reduces
+-- to `p` definitionally, so it closes by reflexivity.
+
+module Polynomial.additive_group
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring_bundle
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+
+-- Two classes are equal when their representatives agree at every index.
+theorem Polynomial.make_equal_of_coefficients_equal (r : Ring)
+        (p q : Polynomial.Coefficients(Ring.carrier(r)))
+        (equal
+            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, q))
+        : Polynomial.make(Ring.carrier(r), Ring.zero(r), p)
+          = Polynomial.make(Ring.carrier(r), Ring.zero(r), q) :=
+  Quotient.sound(
+      Polynomial.Coefficients(Ring.carrier(r)),
+      Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r)),
+      p, q, equal)
+
+-- ----------------------------------------------------------------------
+-- Associativity.
+
+theorem Polynomial.add_associative (r : Ring)
+        (x y z : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.add(r, Polynomial.add(r, x, y), z)
+          = Polynomial.add(r, x, Polynomial.add(r, y, z)) :=
+  Quotient.induct_three(
+      function (p q s : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.make_equal_of_coefficients_equal(r,
+              Polynomial.Coefficients.add(r, Polynomial.Coefficients.add(r, p, q), s),
+              Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.add(r, q, s)),
+              function (index : Natural) => {
+                  -- The reverse fold of `q + s`, bound first: an inline
+                  -- `congruenceOf(_, symmetry(...))` doesn't elaborate, but
+                  -- `congruenceOf` over a named equation does.
+                  claim foldedTail
+                      : Ring.add(r,
+                            Polynomial.coefficient(r, q, index),
+                            Polynomial.coefficient(r, s, index))
+                        = Polynomial.coefficient(r, Polynomial.Coefficients.add(r, q, s), index)
+                      by Equality.symmetry(
+                             Polynomial.coefficient(r, Polynomial.Coefficients.add(r, q, s), index),
+                             Ring.add(r,
+                                 Polynomial.coefficient(r, q, index),
+                                 Polynomial.coefficient(r, s, index)),
+                             Polynomial.nth_add(r, q, s, index));
+                  calc Polynomial.coefficient(r,
+                           Polynomial.Coefficients.add(r,
+                               Polynomial.Coefficients.add(r, p, q), s), index)
+                     = Ring.add(r,
+                           Polynomial.coefficient(r, Polynomial.Coefficients.add(r, p, q), index),
+                           Polynomial.coefficient(r, s, index))
+                           by Polynomial.nth_add(r, Polynomial.Coefficients.add(r, p, q), s, index)
+                     = Ring.add(r,
+                           Ring.add(r,
+                               Polynomial.coefficient(r, p, index),
+                               Polynomial.coefficient(r, q, index)),
+                           Polynomial.coefficient(r, s, index))
+                           by Polynomial.nth_add(r, p, q, index)
+                     = Ring.add(r,
+                           Polynomial.coefficient(r, p, index),
+                           Ring.add(r,
+                               Polynomial.coefficient(r, q, index),
+                               Polynomial.coefficient(r, s, index)))
+                           by Ring.add_associative(r,
+                                  Polynomial.coefficient(r, p, index),
+                                  Polynomial.coefficient(r, q, index),
+                                  Polynomial.coefficient(r, s, index))
+                     = Ring.add(r,
+                           Polynomial.coefficient(r, p, index),
+                           Polynomial.coefficient(r, Polynomial.Coefficients.add(r, q, s), index))
+                           by congruenceOf(
+                                  function (tailValue : Ring.carrier(r)) =>
+                                      Ring.add(r, Polynomial.coefficient(r, p, index), tailValue),
+                                  foldedTail)
+                     = Polynomial.coefficient(r,
+                           Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.add(r, q, s)), index)
+                           by Equality.symmetry(?, ?,
+                                  Polynomial.nth_add(r, p, Polynomial.Coefficients.add(r, q, s), index))
+              }),
+      x, y, z)
+
+-- ----------------------------------------------------------------------
+-- Commutativity.
+
+theorem Polynomial.add_commutative (r : Ring)
+        (x y : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.add(r, x, y) = Polynomial.add(r, y, x) :=
+  Quotient.induct_two(
+      function (p q : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.make_equal_of_coefficients_equal(r,
+              Polynomial.Coefficients.add(r, p, q),
+              Polynomial.Coefficients.add(r, q, p),
+              function (index : Natural) =>
+                  calc Polynomial.coefficient(r, Polynomial.Coefficients.add(r, p, q), index)
+                     = Ring.add(r,
+                           Polynomial.coefficient(r, p, index),
+                           Polynomial.coefficient(r, q, index))
+                           by Polynomial.nth_add(r, p, q, index)
+                     = Ring.add(r,
+                           Polynomial.coefficient(r, q, index),
+                           Polynomial.coefficient(r, p, index))
+                           by Ring.add_commutative(r,
+                                  Polynomial.coefficient(r, p, index),
+                                  Polynomial.coefficient(r, q, index))
+                     = Polynomial.coefficient(r, Polynomial.Coefficients.add(r, q, p), index)
+                           by Equality.symmetry(?, ?, Polynomial.nth_add(r, q, p, index))),
+      x, y)
+
+-- ----------------------------------------------------------------------
+-- Identity. Left is structural (nil + p ≡ p); right needs add_zero
+-- coefficient-wise.
+
+theorem Polynomial.add_identity_left (r : Ring)
+        (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.add(r, Polynomial.zero(r), x) = x :=
+  cases x { | p =>
+    reflexivity(Polynomial(Ring.carrier(r), Ring.zero(r)),
+        Polynomial.make(Ring.carrier(r), Ring.zero(r), p)) }
+
+theorem Polynomial.add_identity_right (r : Ring)
+        (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.add(r, x, Polynomial.zero(r)) = x :=
+  cases x { | p =>
+    Polynomial.make_equal_of_coefficients_equal(r,
+        Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.nil(Ring.carrier(r))),
+        p,
+        function (index : Natural) =>
+            calc Polynomial.coefficient(r,
+                     Polynomial.Coefficients.add(r, p,
+                         Polynomial.Coefficients.nil(Ring.carrier(r))), index)
+               = Ring.add(r,
+                     Polynomial.coefficient(r, p, index),
+                     Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), index))
+                     by Polynomial.nth_add(r, p,
+                            Polynomial.Coefficients.nil(Ring.carrier(r)), index)
+               = Polynomial.coefficient(r, p, index)
+                     by Ring.add_zero(r, Polynomial.coefficient(r, p, index))) }
+
+-- ----------------------------------------------------------------------
+-- Inverses.
+
+theorem Polynomial.add_negate_left (r : Ring)
+        (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.add(r, Polynomial.negate(r, x), x) = Polynomial.zero(r) :=
+  cases x { | p =>
+    Polynomial.make_equal_of_coefficients_equal(r,
+        Polynomial.Coefficients.add(r, Polynomial.Coefficients.negate(r, p), p),
+        Polynomial.Coefficients.nil(Ring.carrier(r)),
+        function (index : Natural) =>
+            calc Polynomial.coefficient(r,
+                     Polynomial.Coefficients.add(r,
+                         Polynomial.Coefficients.negate(r, p), p), index)
+               = Ring.add(r,
+                     Polynomial.coefficient(r, Polynomial.Coefficients.negate(r, p), index),
+                     Polynomial.coefficient(r, p, index))
+                     by Polynomial.nth_add(r, Polynomial.Coefficients.negate(r, p), p, index)
+               = Ring.add(r,
+                     Ring.negate(r, Polynomial.coefficient(r, p, index)),
+                     Polynomial.coefficient(r, p, index))
+                     by Polynomial.nth_negate(r, p, index)
+               = Ring.zero(r)
+                     by Ring.add_negate_left(r, Polynomial.coefficient(r, p, index))) }
+
+theorem Polynomial.add_negate_right (r : Ring)
+        (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.add(r, x, Polynomial.negate(r, x)) = Polynomial.zero(r) :=
+  cases x { | p =>
+    Polynomial.make_equal_of_coefficients_equal(r,
+        Polynomial.Coefficients.add(r, p, Polynomial.Coefficients.negate(r, p)),
+        Polynomial.Coefficients.nil(Ring.carrier(r)),
+        function (index : Natural) =>
+            calc Polynomial.coefficient(r,
+                     Polynomial.Coefficients.add(r, p,
+                         Polynomial.Coefficients.negate(r, p)), index)
+               = Ring.add(r,
+                     Polynomial.coefficient(r, p, index),
+                     Polynomial.coefficient(r, Polynomial.Coefficients.negate(r, p), index))
+                     by Polynomial.nth_add(r, p, Polynomial.Coefficients.negate(r, p), index)
+               = Ring.add(r,
+                     Polynomial.coefficient(r, p, index),
+                     Ring.negate(r, Polynomial.coefficient(r, p, index)))
+                     by Polynomial.nth_negate(r, p, index)
+               = Ring.zero(r)
+                     by Ring.add_negate_right(r, Polynomial.coefficient(r, p, index))) }
+
+-- ----------------------------------------------------------------------
+-- Instances. `r` is explicit on every polynomial operation, so they
+-- compose directly as IsMonoid / IsGroup data — no lambda wrappers.
+
+theorem Polynomial.add_is_monoid (r : Ring)
+        : IsMonoid(Polynomial(Ring.carrier(r), Ring.zero(r)),
+                   Polynomial.add(r), Polynomial.zero(r)) :=
+    ⟨Polynomial.add_associative(r),
+     Polynomial.add_identity_left(r),
+     Polynomial.add_identity_right(r)⟩
+
+theorem Polynomial.add_is_group (r : Ring)
+        : IsGroup(Polynomial(Ring.carrier(r), Ring.zero(r)),
+                  Polynomial.add(r), Polynomial.zero(r), Polynomial.negate(r)) :=
+    ⟨Polynomial.add_is_monoid(r),
+     Polynomial.add_negate_left(r),
+     Polynomial.add_negate_right(r)⟩
+
+theorem Polynomial.add_is_abelian_group (r : Ring)
+        : IsAbelianGroup(Polynomial(Ring.carrier(r), Ring.zero(r)),
+                         Polynomial.add(r), Polynomial.zero(r), Polynomial.negate(r)) :=
+    ⟨Polynomial.add_is_group(r), Polynomial.add_commutative(r)⟩

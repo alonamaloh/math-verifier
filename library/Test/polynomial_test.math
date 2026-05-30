@@ -1,24 +1,43 @@
--- Smoke test: Polynomial instantiates at a concrete ring (Integer).
+-- Smoke test: Polynomial over a concrete bundled ring (the integers).
 module Test.polynomial_test
 
 import Natural.basics
 import Integer.basics
 import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.instances
+import Algebra.group
+import Algebra.ring_bundle
 import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+
+-- The integers as a bundled ring.
+definition integerRing : Ring :=
+  Ring.make(Integer, Integer.add, Integer.zero, Integer.negate,
+      Integer.multiply, Integer.one, Integer.is_ring)
+
+-- Its carrier projects back to Integer (definitionally).
+theorem integerRing_carrier : Ring.carrier(integerRing) = Integer :=
+  reflexivity(Type(0), Integer)
 
 -- Polynomials over the integers form a type.
 definition test_integer_polynomial : Type(0) :=
-  Polynomial(Integer, Integer.zero)
+  Polynomial(Ring.carrier(integerRing), Ring.zero(integerRing))
 
--- The constant polynomial a0 = 1 (the list [1]).
-definition test_constant_one : Polynomial(Integer, Integer.zero) :=
-  Polynomial.make(Integer, Integer.zero,
-      Polynomial.Coefficients.cons(Integer, Integer.one,
-          Polynomial.Coefficients.nil(Integer)))
+-- The constant polynomial 1.
+definition test_constant_one
+        : Polynomial(Ring.carrier(integerRing), Ring.zero(integerRing)) :=
+  Polynomial.one(integerRing)
 
--- The linear polynomial 0 + 1·x (the list [0, 1]).
-definition test_linear : Polynomial(Integer, Integer.zero) :=
-  Polynomial.make(Integer, Integer.zero,
-      Polynomial.Coefficients.cons(Integer, Integer.zero,
-          Polynomial.Coefficients.cons(Integer, Integer.one,
-              Polynomial.Coefficients.nil(Integer))))
+-- Polynomials over the integers form an additive abelian group.
+theorem test_polynomial_abelian_group
+        : IsAbelianGroup(
+              Polynomial(Ring.carrier(integerRing), Ring.zero(integerRing)),
+              Polynomial.add(integerRing),
+              Polynomial.zero(integerRing),
+              Polynomial.negate(integerRing)) :=
+  Polynomial.add_is_abelian_group(integerRing)
