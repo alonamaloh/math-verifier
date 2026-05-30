@@ -1,0 +1,179 @@
+-- Algebra/ring_bundle.math
+--
+-- A *bundled* ring: a single value `r : Ring` carrying its carrier
+-- type, the five operations, and the `IsRing` proof together. This is
+-- the consumer-facing layer over the unbundled `IsRing` predicate —
+-- it lets a generic construction (e.g. Polynomial) thread one `r`
+-- instead of `(carrier, add, zero, negate, multiply, one, ringProof)`
+-- at every call.
+--
+-- `Ring` is a single-constructor inductive (a dependent record); the
+-- projections below recover each field, and the kernel reduces them on
+-- a concrete `Ring.make(...)`. The flattened law projections
+-- (`Ring.add_associative`, `Ring.zero_add`, …) pull the individual
+-- equations out of the nested-∧ `IsRing` once, so consumers never walk
+-- the hierarchy by hand.
+--
+-- NOTE: the field projections are written with `cases r { … }` rather
+-- than the pattern-match-definition form `| Ring.make(…) => …`. The
+-- latter's codegen does not yet handle a dependent motive (the return
+-- type of `add` mentions `Ring.carrier(r)`); `cases` builds the motive
+-- correctly.
+
+module Algebra.ring_bundle
+
+import Logic.basics
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+
+-- A ring bundled with its carrier, operations, and laws. Lives in
+-- Type(1) because it carries a Type(0) carrier.
+inductive Ring : Type(1) where
+  | Ring.make
+      : (carrier : Type(0))
+        → (add : carrier → carrier → carrier)
+        → (zero : carrier)
+        → (negate : carrier → carrier)
+        → (multiply : carrier → carrier → carrier)
+        → (one : carrier)
+        → IsRing(carrier, add, zero, negate, multiply, one)
+        → Ring
+
+-- ----------------------------------------------------------------------
+-- Field projections.
+
+definition Ring.carrier : Ring → Type(0)
+  | Ring.make(carrier, add, zero, negate, multiply, one, isRing) => carrier
+
+definition Ring.add (r : Ring)
+        : Ring.carrier(r) → Ring.carrier(r) → Ring.carrier(r) :=
+  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
+    add }
+
+definition Ring.zero (r : Ring) : Ring.carrier(r) :=
+  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
+    zero }
+
+definition Ring.negate (r : Ring)
+        : Ring.carrier(r) → Ring.carrier(r) :=
+  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
+    negate }
+
+definition Ring.multiply (r : Ring)
+        : Ring.carrier(r) → Ring.carrier(r) → Ring.carrier(r) :=
+  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
+    multiply }
+
+definition Ring.one (r : Ring) : Ring.carrier(r) :=
+  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
+    one }
+
+definition Ring.is_ring (r : Ring)
+        : IsRing(Ring.carrier(r), Ring.add(r), Ring.zero(r),
+                 Ring.negate(r), Ring.multiply(r), Ring.one(r)) :=
+  cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
+    isRing }
+
+-- ----------------------------------------------------------------------
+-- Flattened law projections. Each destructures `Ring.is_ring(r)` to
+-- the depth needed and returns the equation. IsRing unfolds to
+--   IsAbelianGroup ∧ IsMonoid(·) ∧ distribLeft ∧ distribRight,
+-- IsAbelianGroup to IsGroup ∧ commutative, IsGroup to
+--   IsMonoid(+) ∧ negateLeft ∧ negateRight, and each IsMonoid to
+--   associative ∧ identityLeft ∧ identityRight.
+
+theorem Ring.add_associative (r : Ring)
+        : (x y z : Ring.carrier(r))
+          → Ring.add(r, Ring.add(r, x, y), z)
+            = Ring.add(r, x, Ring.add(r, y, z)) := {
+  let ⟨additiveAbelianGroup, _, _, _⟩ := Ring.is_ring(r);
+  let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+  let ⟨additiveMonoid, _, _⟩ := additiveGroup;
+  let ⟨associative, _, _⟩ := additiveMonoid;
+  associative
+}
+
+theorem Ring.zero_add (r : Ring)
+        : (x : Ring.carrier(r)) → Ring.add(r, Ring.zero(r), x) = x := {
+  let ⟨additiveAbelianGroup, _, _, _⟩ := Ring.is_ring(r);
+  let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+  let ⟨additiveMonoid, _, _⟩ := additiveGroup;
+  let ⟨_, identityLeft, _⟩ := additiveMonoid;
+  identityLeft
+}
+
+theorem Ring.add_zero (r : Ring)
+        : (x : Ring.carrier(r)) → Ring.add(r, x, Ring.zero(r)) = x := {
+  let ⟨additiveAbelianGroup, _, _, _⟩ := Ring.is_ring(r);
+  let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+  let ⟨additiveMonoid, _, _⟩ := additiveGroup;
+  let ⟨_, _, identityRight⟩ := additiveMonoid;
+  identityRight
+}
+
+theorem Ring.add_negate_left (r : Ring)
+        : (x : Ring.carrier(r))
+          → Ring.add(r, Ring.negate(r, x), x) = Ring.zero(r) := {
+  let ⟨additiveAbelianGroup, _, _, _⟩ := Ring.is_ring(r);
+  let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+  let ⟨_, negateLeft, _⟩ := additiveGroup;
+  negateLeft
+}
+
+theorem Ring.add_negate_right (r : Ring)
+        : (x : Ring.carrier(r))
+          → Ring.add(r, x, Ring.negate(r, x)) = Ring.zero(r) := {
+  let ⟨additiveAbelianGroup, _, _, _⟩ := Ring.is_ring(r);
+  let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
+  let ⟨_, _, negateRight⟩ := additiveGroup;
+  negateRight
+}
+
+theorem Ring.add_commutative (r : Ring)
+        : (x y : Ring.carrier(r))
+          → Ring.add(r, x, y) = Ring.add(r, y, x) := {
+  let ⟨additiveAbelianGroup, _, _, _⟩ := Ring.is_ring(r);
+  let ⟨_, commutative⟩ := additiveAbelianGroup;
+  commutative
+}
+
+theorem Ring.multiply_associative (r : Ring)
+        : (x y z : Ring.carrier(r))
+          → Ring.multiply(r, Ring.multiply(r, x, y), z)
+            = Ring.multiply(r, x, Ring.multiply(r, y, z)) := {
+  let ⟨_, multiplicativeMonoid, _, _⟩ := Ring.is_ring(r);
+  let ⟨associative, _, _⟩ := multiplicativeMonoid;
+  associative
+}
+
+theorem Ring.one_multiply (r : Ring)
+        : (x : Ring.carrier(r)) → Ring.multiply(r, Ring.one(r), x) = x := {
+  let ⟨_, multiplicativeMonoid, _, _⟩ := Ring.is_ring(r);
+  let ⟨_, identityLeft, _⟩ := multiplicativeMonoid;
+  identityLeft
+}
+
+theorem Ring.multiply_one (r : Ring)
+        : (x : Ring.carrier(r)) → Ring.multiply(r, x, Ring.one(r)) = x := {
+  let ⟨_, multiplicativeMonoid, _, _⟩ := Ring.is_ring(r);
+  let ⟨_, _, identityRight⟩ := multiplicativeMonoid;
+  identityRight
+}
+
+theorem Ring.distributivity_left (r : Ring)
+        : (x y z : Ring.carrier(r))
+          → Ring.multiply(r, x, Ring.add(r, y, z))
+            = Ring.add(r, Ring.multiply(r, x, y), Ring.multiply(r, x, z)) := {
+  let ⟨_, _, distributivityLeft, _⟩ := Ring.is_ring(r);
+  distributivityLeft
+}
+
+theorem Ring.distributivity_right (r : Ring)
+        : (x y z : Ring.carrier(r))
+          → Ring.multiply(r, Ring.add(r, x, y), z)
+            = Ring.add(r, Ring.multiply(r, x, z), Ring.multiply(r, y, z)) := {
+  let ⟨_, _, _, distributivityRight⟩ := Ring.is_ring(r);
+  distributivityRight
+}
