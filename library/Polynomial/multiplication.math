@@ -20,9 +20,11 @@ import Logic.quotient
 import Equality.basics
 import Natural.basics
 import Natural.peano
+import Natural.monus
 import Algebra.ring_bundle
 import Polynomial.basics
 import Polynomial.addition
+import Polynomial.summation
 
 -- ----------------------------------------------------------------------
 -- Scaling: multiply every coefficient by `a` on the left.
@@ -90,3 +92,228 @@ definition Polynomial.Coefficients.multiply (r : Ring)
           Polynomial.Coefficients.scale(r, a, q),
           Polynomial.Coefficients.shift(r,
               Polynomial.Coefficients.multiply(r, restA, q)))
+
+-- ----------------------------------------------------------------------
+-- The convolution bridge: the k-th coefficient of a product is
+-- Σ_{i=0}^{k} p_i · q_{k-i}. Induction on the first list; `Natural.monus`
+-- is unfolded so the index arithmetic (k+1−(j+1) = k−j) computes, and
+-- the recursive call is bound before the `unfold` block (where the
+-- self-name is not in scope).
+theorem Polynomial.nth_multiply (r : Ring)
+        : (p q : Polynomial.Coefficients(Ring.carrier(r))) → (k : Natural)
+          → Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, p, q), k)
+            = Polynomial.Sum(r,
+                  function (i : Natural) =>
+                      Ring.multiply(r,
+                          Polynomial.coefficient(r, p, i),
+                          Polynomial.coefficient(r, q, Natural.monus(k, i))),
+                  k)
+  | Polynomial.Coefficients.nil, q, k =>
+      calc Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.nil(Ring.carrier(r)), q), k)
+         = Ring.zero(r)
+             by reflexivity(Ring.carrier(r), Ring.zero(r))
+         = Polynomial.Sum(r, function (i : Natural) => Ring.zero(r), k)
+             by Equality.symmetry(?, ?, Polynomial.Sum.zero(r, k))
+         = Polynomial.Sum(r,
+               function (i : Natural) =>
+                   Ring.multiply(r,
+                       Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), i),
+                       Polynomial.coefficient(r, q, Natural.monus(k, i))),
+               k)
+             by Equality.symmetry(?, ?,
+                    Polynomial.Sum.extensional(r,
+                        function (i : Natural) =>
+                            Ring.multiply(r,
+                                Polynomial.coefficient(r, Polynomial.Coefficients.nil(Ring.carrier(r)), i),
+                                Polynomial.coefficient(r, q, Natural.monus(k, i))),
+                        function (i : Natural) => Ring.zero(r),
+                        function (i : Natural) =>
+                            Ring.zero_multiply_left(r,
+                                Polynomial.coefficient(r, q, Natural.monus(k, i))),
+                        k))
+  | Polynomial.Coefficients.cons(a, restA), q, k =>
+      cases k {
+        | zero =>
+            unfold Natural.monus in
+              calc Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), q), 0)
+                 = Ring.add(r,
+                       Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, q), 0),
+                       Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), 0))
+                     by Polynomial.nth_add(r, Polynomial.Coefficients.scale(r, a, q), Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), 0)
+                 = Ring.add(r,
+                       Ring.multiply(r, a, Polynomial.coefficient(r, q, 0)),
+                       Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), 0))
+                     by Polynomial.nth_scale(r, a, q, 0)
+                 = Ring.add(r,
+                       Ring.multiply(r, a, Polynomial.coefficient(r, q, 0)),
+                       Ring.zero(r))
+                     by Polynomial.nth_shift_zero(r, Polynomial.Coefficients.multiply(r, restA, q))
+                 = Ring.multiply(r, a, Polynomial.coefficient(r, q, 0))
+                     by Ring.add_zero(r, Ring.multiply(r, a, Polynomial.coefficient(r, q, 0)))
+                 = Polynomial.Sum(r,
+                       function (i : Natural) =>
+                           Ring.multiply(r,
+                               Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
+                               Polynomial.coefficient(r, q, Natural.monus(0, i))),
+                       0)
+                     by reflexivity(Ring.carrier(r), Ring.multiply(r, a, Polynomial.coefficient(r, q, 0)))
+        | successor(predecessor) => {
+            claim recursiveResult
+                : Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, restA, q), predecessor)
+                  = Polynomial.Sum(r,
+                        function (j : Natural) =>
+                            Ring.multiply(r,
+                                Polynomial.coefficient(r, restA, j),
+                                Polynomial.coefficient(r, q, Natural.monus(predecessor, j))),
+                        predecessor)
+                by Polynomial.nth_multiply(r, restA, q, predecessor);
+            unfold Natural.monus in
+              calc Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), q), successor(predecessor))
+                 = Ring.add(r,
+                       Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, q), successor(predecessor)),
+                       Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), successor(predecessor)))
+                     by Polynomial.nth_add(r, Polynomial.Coefficients.scale(r, a, q), Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), successor(predecessor))
+                 = Ring.add(r,
+                       Ring.multiply(r, a, Polynomial.coefficient(r, q, successor(predecessor))),
+                       Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, restA, q)), successor(predecessor)))
+                     by Polynomial.nth_scale(r, a, q, successor(predecessor))
+                 = Ring.add(r,
+                       Ring.multiply(r, a, Polynomial.coefficient(r, q, successor(predecessor))),
+                       Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, restA, q), predecessor))
+                     by Polynomial.nth_shift_successor(r, Polynomial.Coefficients.multiply(r, restA, q), predecessor)
+                 = Ring.add(r,
+                       Ring.multiply(r, a, Polynomial.coefficient(r, q, successor(predecessor))),
+                       Polynomial.Sum(r,
+                           function (j : Natural) =>
+                               Ring.multiply(r,
+                                   Polynomial.coefficient(r, restA, j),
+                                   Polynomial.coefficient(r, q, Natural.monus(predecessor, j))),
+                           predecessor))
+                     by recursiveResult
+                 = Polynomial.Sum(r,
+                       function (i : Natural) =>
+                           Ring.multiply(r,
+                               Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
+                               Polynomial.coefficient(r, q, Natural.monus(successor(predecessor), i))),
+                       successor(predecessor))
+                     by Equality.symmetry(?, ?,
+                            Polynomial.Sum.shift(r,
+                                function (i : Natural) =>
+                                    Ring.multiply(r,
+                                        Polynomial.coefficient(r, Polynomial.Coefficients.cons(Ring.carrier(r), a, restA), i),
+                                        Polynomial.coefficient(r, q, Natural.monus(successor(predecessor), i))),
+                                predecessor))
+          }
+      }
+
+-- ----------------------------------------------------------------------
+-- Multiplication respects the equivalence in both arguments at once:
+-- the bridge expresses each coefficient purely through the coefficient
+-- functions, so equal-as-functions inputs give equal sums.
+theorem Polynomial.Coefficients.multiply_respects (r : Ring)
+        (p pPrime q qPrime : Polynomial.Coefficients(Ring.carrier(r)))
+        (firstEqual
+            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime))
+        (secondEqual
+            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), q, qPrime))
+        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
+              Polynomial.Coefficients.multiply(r, p, q),
+              Polynomial.Coefficients.multiply(r, pPrime, qPrime)) :=
+  function (k : Natural) =>
+      calc Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, p, q), k)
+         = Polynomial.Sum(r,
+               function (i : Natural) =>
+                   Ring.multiply(r,
+                       Polynomial.coefficient(r, p, i),
+                       Polynomial.coefficient(r, q, Natural.monus(k, i))),
+               k)
+               by Polynomial.nth_multiply(r, p, q, k)
+         = Polynomial.Sum(r,
+               function (i : Natural) =>
+                   Ring.multiply(r,
+                       Polynomial.coefficient(r, pPrime, i),
+                       Polynomial.coefficient(r, qPrime, Natural.monus(k, i))),
+               k)
+               by Polynomial.Sum.extensional(r,
+                      function (i : Natural) =>
+                          Ring.multiply(r,
+                              Polynomial.coefficient(r, p, i),
+                              Polynomial.coefficient(r, q, Natural.monus(k, i))),
+                      function (i : Natural) =>
+                          Ring.multiply(r,
+                              Polynomial.coefficient(r, pPrime, i),
+                              Polynomial.coefficient(r, qPrime, Natural.monus(k, i))),
+                      function (i : Natural) =>
+                          calc Ring.multiply(r,
+                                   Polynomial.coefficient(r, p, i),
+                                   Polynomial.coefficient(r, q, Natural.monus(k, i)))
+                             = Ring.multiply(r,
+                                   Polynomial.coefficient(r, pPrime, i),
+                                   Polynomial.coefficient(r, q, Natural.monus(k, i)))
+                                   by firstEqual(i)
+                             = Ring.multiply(r,
+                                   Polynomial.coefficient(r, pPrime, i),
+                                   Polynomial.coefficient(r, qPrime, Natural.monus(k, i)))
+                                   by secondEqual(Natural.monus(k, i)),
+                      k)
+         = Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, pPrime, qPrime), k)
+               by Equality.symmetry(?, ?, Polynomial.nth_multiply(r, pPrime, qPrime, k))
+
+-- ----------------------------------------------------------------------
+-- Lift to the quotient (two lifts, as for addition).
+
+definition Polynomial.multiply_after_first (r : Ring)
+        (p : Polynomial.Coefficients(Ring.carrier(r)))
+        (secondPolynomial : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
+  Quotient.lift(
+      Polynomial.Coefficients(Ring.carrier(r)),
+      Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r)),
+      Polynomial(Ring.carrier(r), Ring.zero(r)),
+      function (q : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.make(Ring.carrier(r), Ring.zero(r),
+              Polynomial.Coefficients.multiply(r, p, q)),
+      function (q qPrime : Polynomial.Coefficients(Ring.carrier(r)))
+               (secondEqual
+                   : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), q, qPrime)) =>
+          Quotient.sound(
+              Polynomial.Coefficients(Ring.carrier(r)),
+              Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r)),
+              Polynomial.Coefficients.multiply(r, p, q),
+              Polynomial.Coefficients.multiply(r, p, qPrime),
+              Polynomial.Coefficients.multiply_respects(r, p, p, q, qPrime,
+                  Polynomial.ExtensionallyEqual.reflexive(Ring.carrier(r), Ring.zero(r), p),
+                  secondEqual)),
+      secondPolynomial)
+
+theorem Polynomial.multiply_after_first_respects (r : Ring)
+        (p pPrime : Polynomial.Coefficients(Ring.carrier(r)))
+        (firstEqual
+            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime))
+        (secondPolynomial : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.multiply_after_first(r, p, secondPolynomial)
+          = Polynomial.multiply_after_first(r, pPrime, secondPolynomial) :=
+  cases secondPolynomial { | q =>
+    Quotient.sound(
+        Polynomial.Coefficients(Ring.carrier(r)),
+        Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r)),
+        Polynomial.Coefficients.multiply(r, p, q),
+        Polynomial.Coefficients.multiply(r, pPrime, q),
+        Polynomial.Coefficients.multiply_respects(r, p, pPrime, q, q,
+            firstEqual,
+            Polynomial.ExtensionallyEqual.reflexive(Ring.carrier(r), Ring.zero(r), q))) }
+
+definition Polynomial.multiply (r : Ring)
+        (firstPolynomial secondPolynomial : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
+  Quotient.lift(
+      Polynomial.Coefficients(Ring.carrier(r)),
+      Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r)),
+      Polynomial(Ring.carrier(r), Ring.zero(r)),
+      function (p : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.multiply_after_first(r, p, secondPolynomial),
+      function (p pPrime : Polynomial.Coefficients(Ring.carrier(r)))
+               (firstEqual
+                   : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime)) =>
+          Polynomial.multiply_after_first_respects(r, p, pPrime, firstEqual, secondPolynomial),
+      firstPolynomial)

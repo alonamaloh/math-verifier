@@ -40,6 +40,26 @@ theorem Polynomial.Sum.zero (r : Ring) (n : Natural)
            = Ring.zero(r)   by Ring.zero_add(r, Ring.zero(r))
   }
 
+-- Pointwise-equal functions have equal sums.
+theorem Polynomial.Sum.extensional (r : Ring)
+        (f g : Natural → Ring.carrier(r))
+        (pointwise : (i : Natural) → f(i) = g(i))
+        (n : Natural)
+        : Polynomial.Sum(r, f, n) = Polynomial.Sum(r, g, n) :=
+  by_induction on n with IH {
+    case zero: pointwise(0)
+    case successor(k):
+        calc Polynomial.Sum(r, f, successor(k))
+           = Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k)))
+                 by reflexivity(Ring.carrier(r),
+                        Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k))))
+           = Ring.add(r, Polynomial.Sum(r, g, k), f(successor(k)))   by IH
+           = Ring.add(r, Polynomial.Sum(r, g, k), g(successor(k)))   by pointwise(successor(k))
+           = Polynomial.Sum(r, g, successor(k))
+                 by reflexivity(Ring.carrier(r),
+                        Ring.add(r, Polynomial.Sum(r, g, k), g(successor(k))))
+  }
+
 -- Peel the first term: Σ_{i=0}^{n+1} f(i) = f(0) + Σ_{j=0}^{n} f(j+1).
 -- The workhorse for the convolution recursion (it exposes the i=0
 -- term and reindexes the rest to start from the tail of the list).
