@@ -737,10 +737,7 @@ theorem Real.LessOrEqual_of_pointwise_at_make
                          b(m) - s(N_s),
                          -Rational.halve(epsilon),
                          s(N_s) - s(m),
-                         Rational.LessThan.weaken(
-                             -Rational.halve(epsilon),
-                             s(N_s) - s(m),
-                             sFlippedBound))
+                         Rational.LessThan.weaken(sFlippedBound))
              = b(m) - s(m)
         }
   }
@@ -828,10 +825,7 @@ theorem Real.LessOrEqual_of_pointwise_lower_at_make
                          s(m) - s(N_s),
                          -Rational.halve(epsilon),
                          s(N_s) - b(m),
-                         Rational.LessThan.weaken(
-                             -Rational.halve(epsilon),
-                             s(N_s) - b(m),
-                             sBBound))
+                         Rational.LessThan.weaken(sBBound))
              = s(m) - b(m)
         }
   }
@@ -1164,12 +1158,7 @@ theorem Rational.halve_two_plus_le_one_plus (n : Natural)
     by rewrite(
            (ring : (1 : Rational) + ((1 : Rational) + (n : Rational))
                    = (1 : Rational) + (1 : Rational) + (n : Rational)),
-           Rational.LessOrEqual.sum(
-               (1 : Rational),
-               (1 : Rational) + (n : Rational),
-               (1 : Rational) + (n : Rational),
-               (1 : Rational) + (n : Rational),
-               oneLeqOnePlusN,
+           Rational.LessOrEqual.sum(oneLeqOnePlusN,
                Rational.LessOrEqual.reflexive(
                    (1 : Rational) + (n : Rational))));
   -- halve preserves the inner bound; halve_of_doubled folds the RHS.
@@ -1362,14 +1351,14 @@ theorem Rational.reciprocal_function_positive_of_positive
         : (0 : Rational) < Rational.reciprocal_function(x) := {
   claim xNonzero : ¬(x = (0 : Rational))
     by function (xEqZero : x = (0 : Rational)) =>
-         Rational.LessThan.distinct((0 : Rational), x, xPositive,
+         Rational.LessThan.distinct(xPositive)(
              Equality.symmetry(xEqZero));
   claim xRecipEqOne
         : x * Rational.reciprocal_function(x) = (1 : Rational)
     by Rational.reciprocal_function_multiplies(x, xNonzero);
   claim xNonneg : Rational.IsNonneg(x)
     by Rational.IsNonneg_of_LessOrEqual_zero(x,
-           Rational.LessThan.weaken((0 : Rational), x, xPositive));
+           Rational.LessThan.weaken(xPositive));
   cases Rational.LessOrEqual.linear(
             Rational.reciprocal_function(x), (0 : Rational)) {
     | Or.introduceLeft(recipLeqZero) => {
@@ -1408,13 +1397,11 @@ theorem Rational.reciprocal_function_positive_of_positive
         claim zeroEqOne : (0 : Rational) = (1 : Rational)
           by Rational.LessOrEqual.antisymmetric(
                  (0 : Rational), (1 : Rational),
-                 Rational.LessThan.weaken((0 : Rational), (1 : Rational),
-                     Rational.zero_less_one),
+                 Rational.LessThan.weaken(Rational.zero_less_one),
                  oneLeqZero);
         False.eliminate_proposition(
             (0 : Rational) < Rational.reciprocal_function(x),
-            Rational.LessThan.distinct(
-                (0 : Rational), (1 : Rational), Rational.zero_less_one,
+            Rational.LessThan.distinct(Rational.zero_less_one)(
                 zeroEqOne))
       }
     | Or.introduceRight(zeroLeqRecip) =>
@@ -1428,9 +1415,7 @@ theorem Rational.reciprocal_function_positive_of_positive
                       = (1 : Rational);
               False.eliminate_proposition(
                   (0 : Rational) < Rational.reciprocal_function(x),
-                  Rational.LessThan.distinct(
-                      (0 : Rational), (1 : Rational),
-                      Rational.zero_less_one,
+                  Rational.LessThan.distinct(Rational.zero_less_one)(
                       zeroEqOne))
             }
           | no zeroNotEqRecip =>
@@ -1457,9 +1442,7 @@ theorem Rational.archimedean_for_positives
         : Rational.IsNonneg(Rational.reciprocal_function(epsilon))
     by Rational.IsNonneg_of_LessOrEqual_zero(
            Rational.reciprocal_function(epsilon),
-           Rational.LessThan.weaken((0 : Rational),
-               Rational.reciprocal_function(epsilon),
-               recipPositive));
+           Rational.LessThan.weaken(recipPositive));
   claim Rational.IsNonneg(c * Rational.reciprocal_function(epsilon))
     by Rational.IsNonneg.multiply(
            c, Rational.reciprocal_function(epsilon),
@@ -1477,7 +1460,7 @@ theorem Rational.archimedean_for_positives
           ≤ (successor(K) : Rational) by absBound;
   claim epsilonNonneg
         : Rational.LessOrEqual((0 : Rational), epsilon)
-    by Rational.LessThan.weaken((0 : Rational), epsilon, epsilonPositive);
+    by Rational.LessThan.weaken(epsilonPositive);
   claim multipliedBound
         : (c * Rational.reciprocal_function(epsilon)) * epsilon
           ≤ (successor(K) : Rational) * epsilon
@@ -1515,27 +1498,25 @@ theorem Rational.LessThan.multiply_cancel_right_positive
               claim productsEqual : a * c = b * c by aEqB;
               False.eliminate_proposition(
                   a < b,
-                  Rational.LessThan.distinct(
-                      a * c, b * c, productLessThan, productsEqual))
+                  Rational.LessThan.distinct(productLessThan)(productsEqual))
             }
           | no aNotEqB =>
               And.introduction(aLeqB, aNotEqB)
         }
     | Or.introduceRight(bLeqA) => {
         claim cNonneg : Rational.LessOrEqual((0 : Rational), c)
-          by Rational.LessThan.weaken((0 : Rational), c, cPositive);
+          by Rational.LessThan.weaken(cPositive);
         claim reversedProduct : b * c ≤ a * c
           by Rational.LessOrEqual.multiply_by_nonneg_right(
                  b, a, c, bLeqA, cNonneg);
         claim productsEqual : a * c = b * c
           by Rational.LessOrEqual.antisymmetric(
                  a * c, b * c,
-                 Rational.LessThan.weaken(a * c, b * c, productLessThan),
+                 Rational.LessThan.weaken(productLessThan),
                  reversedProduct);
         False.eliminate_proposition(
             a < b,
-            Rational.LessThan.distinct(
-                a * c, b * c, productLessThan, productsEqual))
+            Rational.LessThan.distinct(productLessThan)(productsEqual))
       }
   }
 }
@@ -1692,12 +1673,7 @@ theorem Real.bisectionLeft_diff_bound
           - Real.bisectionLeft(subset, initial, n)
           ≤ Real.bisectionRight(subset, initial, N)
             - Real.bisectionLeft(subset, initial, N)
-    by Rational.LessOrEqual.sum(
-           Real.bisectionLeft(subset, initial, m),
-           Real.bisectionRight(subset, initial, N),
-           -Real.bisectionLeft(subset, initial, n),
-           -Real.bisectionLeft(subset, initial, N),
-           leftMLeqRight,
+    by Rational.LessOrEqual.sum(leftMLeqRight,
            Rational.LessOrEqual.negate(
                Real.bisectionLeft(subset, initial, N),
                Real.bisectionLeft(subset, initial, n),
@@ -1708,12 +1684,7 @@ theorem Real.bisectionLeft_diff_bound
           - Real.bisectionLeft(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N)
             - Real.bisectionLeft(subset, initial, N)
-    by Rational.LessOrEqual.sum(
-           Real.bisectionLeft(subset, initial, n),
-           Real.bisectionRight(subset, initial, N),
-           -Real.bisectionLeft(subset, initial, m),
-           -Real.bisectionLeft(subset, initial, N),
-           leftNLeqRight,
+    by Rational.LessOrEqual.sum(leftNLeqRight,
            Rational.LessOrEqual.negate(
                Real.bisectionLeft(subset, initial, N),
                Real.bisectionLeft(subset, initial, m),
@@ -1822,8 +1793,7 @@ theorem Rational.LessOrEqual_of_real_LessOrEqual
                      bMinusASelf);
             False.eliminate_proposition(
                 a ≤ b,
-                Rational.LessThan.distinct(
-                    b - a, b - a, bMinusALessSelf,
+                Rational.LessThan.distinct(bMinusALessSelf)(
                     reflexivity(Rational, b - a)))
           }
       }
@@ -1945,10 +1915,7 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
                          Real.bisectionRight(subset, initial, K) - yseq(j),
                          -Rational.halve(epsilon),
                          -Real.bisectionWidth(initial, K),
-                         Rational.LessThan.weaken(
-                             -Rational.halve(epsilon),
-                             -Real.bisectionWidth(initial, K),
-                             negWidthGtNegHalvedEpsilon))
+                         Rational.LessThan.weaken(negWidthGtNegHalvedEpsilon))
              = Real.bisectionLeft(subset, initial, K) - yseq(j)
              ≤ Real.bisectionLeft(subset, initial, j) - yseq(j)
                   by Rational.add_preserves_LessOrEqual(

@@ -4,6 +4,7 @@
 module Test.implicit_args_test
 
 import Logic.basics
+import Logic.exists
 import Equality.basics
 import Natural.basics
 
@@ -52,3 +53,31 @@ definition apply_unary (m : Natural)
 theorem tagged_identity_bare_higher_order (m : Natural) (x : Tagged(m))
         : Tagged(m) :=
   apply_unary(m, tagged_identity, x)
+
+-- ----------------------------------------------------------------------
+-- Forward leading-implicit inference for a Definition-headed domain with
+-- NO expected type: a lemma whose implicit shape args appear only inside
+-- the proof arguments' types, called nested under a polymorphic head, so
+-- {a, b, c, d} are recovered by forward unification from the proof args
+-- alone. (`Related` is a Definition standing in for `≤`.) This covers the
+-- forward path generally; the specific "structural attempt before WHNF"
+-- ordering in inferLeadingArguments is exercised by the Rational order
+-- lemmas (LessOrEqual.sum, LessThan.weaken/distinct, now stated with
+-- implicit shape args) and their use sites in Real/supremum.math, where a
+-- relation that unfolds to `∃ k. (b - a) = (k : R)` needs the FOLDED `≤`
+-- head matched before WHNF strips it.
+
+definition Related (a b : Natural) : Type(0) := ∃ (anyNatural : Natural). a = b
+
+theorem related_combine {a b c d : Natural}
+        (first : Related(a, b)) (second : Related(c, d))
+        : Related(a, b) :=
+  first
+
+theorem related_combine_no_expected
+        (p q : Natural) (h1 : Related(p, q)) (h2 : Related(q, p))
+        : Related(p, q) :=
+  -- identity_implicit elaborates its argument with no concrete expected
+  -- type, so {a, b, c, d} of related_combine can only be recovered by
+  -- forward unification against h1 : Related(p, q) and h2 : Related(q, p).
+  identity_implicit(related_combine(h1, h2))

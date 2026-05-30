@@ -312,6 +312,36 @@ Rule of thumb: prefer `1 + n` when the `+1` is doing arithmetic work
 the reader cares about (`1 ≤ 1 + k`, `1 + k = succ(k)` reductions).
 Keep `successor(n)` when it's a structural placeholder.
 
+## Bind a repeated cast with `let`, don't re-ascribe it
+
+A coercion is shown at one syntactic site by design (see the
+coercion-registry principle). In a calc that lives entirely in one
+carrier, that principle backfires: the same ascription
+`(successor(d) : Integer)` gets re-typed at every term — eight times
+in a Rational cross-multiplication is common. The fix is NOT to hide
+the cast (a carrier-scoped region would move it off-screen and weaken
+"coercions visible at one site"); it is to **name it once** with a
+`let` and reuse the name:
+
+```math
+-- Noisy: the cast is re-ascribed on every line.
+calc (successor(d_x) : Integer) * n_y + (successor(d_y) : Integer) * n_x
+   = …(successor(d_x) : Integer)…(successor(d_y) : Integer)…
+
+-- Clean: bind each positive denominator once, reuse the name.
+let dx : Integer := (successor(d_x) : Integer);
+let dy : Integer := (successor(d_y) : Integer);
+calc dx * n_y + dy * n_x
+   = …dx…dy…
+```
+
+The kernel ζ-unfolds the `let` whenever def-eq is needed (see the
+`let` and ζ section), so the auto-prover and `rewrite` still see
+through `dx` to `(successor(d_x) : Integer)`. The cast appears
+exactly once — at the binding — which is *more* faithful to "one
+visible site" than the inline form, not less. Reach for this
+whenever a single coercion appears 3+ times in one proof.
+
 ## Prefer `cases` / `by_induction` over pattern-match definitions
 
 The pattern-match definition form (`theorem foo | zero => … |

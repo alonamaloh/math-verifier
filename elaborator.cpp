@@ -17195,13 +17195,21 @@ private:
             ExpressionPointer kernelTrailingArgument = elaborateExpression(
                 *trailingArgumentsSurface[j], localBinders,
                 expectedDomain);
+            // Infer the trailing arg's type WITHOUT normalising first, so a
+            // Definition head (e.g. `Rational.LessOrEqual` for an `a ≤ b`
+            // domain) is preserved and matches the Pi domain's head
+            // structurally. WHNF only as a fallback below — this mirrors
+            // the backward path above. WHNF-ing up front unfolds `a ≤ b`
+            // to its `IsNonneg(…)`/`Exists(…)` body, whose head no longer
+            // matches the `≤`-shaped domain, leaving the leading
+            // metavariables for `a`/`b` unassigned and the whole inference
+            // failing for nested calls with no propagated expected type
+            // (e.g. `Rational.LessOrEqual.sum(p1, p2)` as a `rewrite` term).
             ExpressionPointer inferredArgumentType =
-                weakHeadNormalForm(environment_,
+                closeOverLocalBinders(
                     inferTypeInLocalContext(
-                        localBinders, kernelTrailingArgument));
-            inferredArgumentType = closeOverLocalBinders(
-                inferredArgumentType, localBinders,
-                localBinders.size());
+                        localBinders, kernelTrailingArgument),
+                    localBinders, localBinders.size());
             // Structural attempt first; WHNF both sides as fallback
             // for Definition-headed mismatches. We pass a binder-type
             // stack so the unifier can apply Miller-pattern HO
