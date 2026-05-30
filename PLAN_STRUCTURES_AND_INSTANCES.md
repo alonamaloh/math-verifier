@@ -361,3 +361,59 @@ build green.
 
 (Both Stage 0 items are surface/elaboration only — no kernel change — and
 each has a concrete green/red test in the shipped `IntegerMod` tree.)
+
+---
+
+## Update (2026-05-29) — a bundled `Ring` was built and validated
+
+The `Polynomial(R)` construction (generic polynomials over an arbitrary
+ring) needed *some* way to thread a ring's data, and the planned Stage 3
+instance inference wasn't available — so a **bundled `Ring` was built
+directly** (`library/Algebra/ring_bundle.math`) and used as the
+parameterization for the whole polynomial development
+(`library/Polynomial/*`). This is exactly Stage 2, which the plan above
+recommended *against* as a primary representation. Real evidence now
+exists; the recommendation should be **revisited, not assumed**:
+
+- **A `structure` keyword was NOT needed.** `Ring` is a single-constructor
+  inductive (`Ring.make : (carrier : Type(0)) → (add : …) → … → IsRing(…) →
+  Ring`), built with the machinery that already exists. Field projections
+  are `definition Ring.add (r) … := cases r { | Ring.make(…) => add }`.
+  This validates the plan's "single-constructor inductive *is* the record
+  type" claim — Stage 1's keyword is sugar over what works today.
+
+- **Flattened law projections are the real ergonomic win, and they're
+  cheap to hand-write.** `Ring.add_associative`, `Ring.zero_add`,
+  `Ring.distributivity_left`, … (all 11 IsRing laws, plus derived
+  `Ring.negate_zero` / `Ring.zero_multiply_left` / `Ring.multiply_zero_right`
+  / `Ring.add_four_swap`) are each a few-line `let ⟨…⟩ := Ring.is_ring(r)`
+  destructure. No new elaborator feature; `Ring.<law>(r, …)` reads clean.
+  This is the "flattened re-projections" Stage 1 flagged as the actual
+  payoff — confirmed, and obtainable without the `structure` keyword.
+
+- **Bundling did NOT make statements unbearably noisy.** The feared
+  `R.carrier` / `R.add` accessors (`Ring.carrier(r)`, `Ring.add(r, …)`)
+  appear throughout, but the proofs still read as math because every law
+  threads a single explicit `r : Ring`. Verbosity is real but mechanical.
+
+- **Explicit `r : Ring` sidestepped the Stage 0 implicit-insertion bug.**
+  Because operations take `r` *explicitly*, instances compose them
+  directly (`IsMonoid(…, Polynomial.add(r), Polynomial.zero(r))`) with **no
+  lambda wrappers** — the workaround the IntegerMod build needed (see Stage
+  0). A bundled-but-explicit representation is a pragmatic way to get
+  genericity *now* without first landing Stage 0 + Stage 3.
+
+- **Codegen caveat (Stage 1 relevance).** Dependent field projections —
+  where the result type mentions an earlier field, e.g. `Ring.add(r) :
+  Ring.carrier(r) → Ring.carrier(r) → Ring.carrier(r)` — must be written
+  with `cases r { … }`, NOT the pattern-match-definition form
+  `| Ring.make(…) => …`. The latter's codegen does not build the dependent
+  motive. A `structure` keyword (Stage 1) would need to emit the `cases`
+  form for projections, not the pattern-match form.
+
+**Net:** Stage 2 bundling is more viable than the plan assumed — it carried
+an entire generic ring construction. The open question is no longer "does
+bundling work" (it does) but "do we *also* want Stage 3 inference to hide
+the `r` threading." A bundled core + Stage 3 inference (rather than Stage 3
+*instead of* bundling) now looks attractive. Decision still belongs to a
+human; this is evidence, not a verdict.

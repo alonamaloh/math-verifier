@@ -230,3 +230,66 @@ Both green, and for Stages 1/2/5 the emitted kernel term for at least one
 touched theorem is unchanged. If a stage can't keep both green, stop and
 leave the stage half-done in a branch rather than weakening the kernel or the
 coercion principle to force it through.
+
+---
+
+## Findings (2026-05-29) from the IntegerMod / Polynomial build
+
+Two new quotient constructions landed this session — `IntegerMod(n) :=
+Quotient(Integer, CongruentModulo n)` and `Polynomial(R) :=
+Quotient(Coefficients(R), ExtensionallyEqual)` — both **parameterized
+quotients** (the relation depends on a parameter). They exercised the
+quotient surface hard and bear on the stages above:
+
+- **Short `Quotient.{mk,lift,sound}` inference breaks for parameterized
+  quotient *aliases* (relevant to Stage 1).** For `IntegerMod(m)`, the
+  short `Quotient.mk(rep)` cannot recover the relation `R`: it unfolds the
+  alias past `CongruentModulo(m)` into the relation's body (an `Exists`)
+  and tries to use that as `R`. The whole IntegerMod/Polynomial code had to
+  use the **verbose** `Quotient.mk(T, R, rep)` / `lift(T,R,U,…)` /
+  `sound(T,R,…)` forms. This *raises* the value of Stage 1's
+  `construction` form for parameterized quotients — and that form should
+  emit the verbose internal term, not rely on short-form inference.
+
+- **Single `Quotient.induct` / `cases` motive inference breaks for
+  parameterized quotients (directly hits Stage 2 `by_representatives`).**
+  `Quotient.induct_two` / `induct_three` infer their motive fine for
+  `IntegerMod(m)` / `Polynomial(R)`, but the **single** `Quotient.induct(atRep, q)`
+  and bare `cases q { | rep => … }` do NOT when `q`'s type is a
+  parameterized alias — they error with a Pi-domain mismatch. Workaround:
+  the verbose `Quotient.induct(T, R, motive, atRep, q)` with an explicit
+  motive (used for every unary law in `IntegerMod/ring.math` and
+  `Polynomial/*`). Stage 2's `by_representatives` desugaring must therefore
+  emit an explicit motive for the single-scrutinee case, or the underlying
+  inference must be fixed first. (Non-parameterized quotients —
+  Rational/Real/PAdic — are unaffected; single induct/cases works there.)
+
+- **Stage 3 `by computation` is lower-value than written.** A whole-step
+  definitional equality is already closed by plain `reflexivity` (the
+  kernel checks `rhs` def-eq `lhs`) and by the calc auto-prover's def-eq
+  branch with no `by` at all. The genuine `by bridge` pain — abstract reps
+  where `seqFn(add(rep1,rep2),m)` is *stuck* because the reps aren't
+  constructors — is better addressed by the patterns already in use:
+  (a) the **at-make** pattern (pattern-match reps to constructor form so
+  β/ι fires, then `reflexivity`), and (b) **`unfold Foo in <calc>`** for
+  opaque recursive helpers. The polynomial multiplication bridge leaned on
+  `unfold Natural.monus in <calc>` exactly this way to make index
+  arithmetic (`monus(k+1,j+1) ≡ monus(k,j)`) compute. So `by computation`
+  would be sugar over `reflexivity`/`unfold`, not a new capability —
+  deprioritize unless a concrete site wants the explicit spelling.
+
+- **Calc ergonomics worth a future sugar (new, not in the stages above).**
+  Two friction points recurred across all the lifted-law proofs:
+  1. `congruenceOf(f, Equality.symmetry(…))` with an *inline* symmetry does
+     NOT elaborate as a calc `by` step (the step's diff-inference interferes);
+     it works in a plain term position. Workaround: bind the symmetry to a
+     `claim` first, then `congruenceOf(f, thatClaim)`.
+  2. A reverse-direction congruence fold inside a calc is fragile; the
+     reliable idiom is to prove the all-forward "expanded ⇒ folded"
+     direction and wrap the whole calc in a single `Equality.symmetry`.
+  A calc that handled reverse congruence steps (or a `by reverse <lemma>`)
+  would remove a lot of boilerplate in quotient-law proofs.
+
+These don't change the stage *priorities* much (Stage 1 construction +
+Stage 5 implicit shape args remain the cheap wins), but Stage 2 now has a
+concrete blocker to design around, and Stage 3 should be reweighted down.
