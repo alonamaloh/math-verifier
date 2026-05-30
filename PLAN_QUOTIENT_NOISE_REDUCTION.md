@@ -1,5 +1,33 @@
 # PLAN: Reduce surface noise in quotient-based constructions
 
+> **STATUS (2026-05-30): Stages 1, 2, 4, 5 LANDED; Stage 3 dropped.**
+> - **Stage 1 (`construction`)** — landed as a *transparent definition*
+>   (not a strict macro), so `Rational.fraction(n,d)` reads like math in
+>   source AND printed goals while staying def-equal to the underlying
+>   `Quotient.mk`. `Rational.zero`/`one` adopt it. Soft encapsulation
+>   convention documented (prefer `fraction`/`by_representatives` over the
+>   raw constructor; not enforced). See CLAUDE.md.
+> - **Stage 2 (`by_representatives`)** — landed. Parse-time sugar for
+>   nested quotient-`cases`; tuple pattern `⟨a,b⟩` resolves the carrier
+>   constructor from the type (constructor name hidden). Adopted in
+>   `Rational/triangle.math`. Emitted term unchanged modulo source
+>   position metadata.
+> - **Stage 4 (cast tax)** — shipped the `let`-rule convention only (no
+>   `over` region); documented in CLAUDE.md.
+> - **Stage 5 (implicit shape args)** — landed on `Rational.LessOrEqual.sum`
+>   / `LessThan.weaken` / `LessThan.distinct` (~55 call sites updated);
+>   `cauchy_bounded` shrank. Required an elaborator fix to the forward
+>   leading-implicit unifier (structural match before WHNF for
+>   Definition-headed domains).
+> - **Stage 3 (`by computation`)** — DROPPED as planned: it is sugar over
+>   `reflexivity`/`unfold`, not a new capability.
+>
+> Also landed: `Polynomial/*` converted to short `Quotient.{mk,lift,sound}`
+> forms (confirms the Stage-0b parameterized-quotient fix generalizes).
+> The rest of this file is the original brief, kept for context.
+
+
+
 Working brief for an assistant session (Claude Code). The goal is to make
 proofs over quotient types (`Rational`, `Real`, `PAdic`) read like math
 instead of like CIC plumbing, **without enlarging the trusted base**.

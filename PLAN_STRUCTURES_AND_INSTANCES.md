@@ -1,5 +1,37 @@
 # PLAN: Structure types + canonical instances (the abstraction-scaling prerequisite)
 
+> **STATUS (2026-05-30): Stage 3 (concrete-carrier) LANDED; Stages 1, 2
+> not built.**
+> - **Stage 3 (canonical instance inference)** — landed for concrete
+>   carriers. `instance <name>` registers a structure-predicate theorem as
+>   the canonical instance for its `(structure, carrier)` pair
+>   (reject-on-ambiguity, mirroring the coercion registry). A generic
+>   lemma with implicit structure/operation/instance args has them filled
+>   at a concrete call site from the registry, keyed by the carrier head;
+>   the sibling operation/identity/inverse implicits are read off the
+>   instance's type. Acceptance: `Test/instance_inference_test.math`
+>   (`instance Integer.add_is_group` + `integer_cancel` with zero ceremony
+>   args). See CLAUDE.md "Canonical instances".
+>   **Follow-on (not built):** *local-instance search* — resolving a
+>   structure-typed implicit from an in-scope hypothesis — is what would
+>   let the existing GENERIC consumers (e.g. `Ring.zero_multiply` calling
+>   `Group.cancel_left` over an abstract carrier) also drop their ceremony
+>   args. v1 also restricts to non-parameterized (concrete-carrier)
+>   instances. Prereqs F1 / Stage 0 (leading-implicit insertion) were
+>   already landed.
+> - **Stage 1 (`structure` keyword)** — NOT built. Per the 2026-05-29
+>   evidence, single-constructor inductives already serve as record types
+>   (`Algebra/ring_bundle.math`), and "reads like math" ranks instance
+>   inference (Stage 3, touches every use) above the keyword (touches only
+>   declarations). Stage 3 did not need it.
+> - **Stage 2 (bundling)** — NOT built as a primary representation
+>   (`ring_bundle.math` already provides a bundled `Ring` ad hoc); the
+>   principle favours unbundled core + Stage 3 inference.
+>
+> The rest of this file is the original brief, kept for context.
+
+
+
 Working brief for an assistant session (Claude Code). Goal: make the
 abstract-algebra layer ergonomic enough to *read like math*, and lay the one
 piece of groundwork that makes a future category-theory layer feasible at
