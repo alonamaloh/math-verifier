@@ -1,0 +1,90 @@
+-- Polynomial/basics.math
+--
+-- Polynomials over an arbitrary type R with a distinguished zero,
+-- represented as finite coefficient lists (low degree first) modulo
+-- "agrees as a coefficient function". A raw list
+-- `cons(a0, cons(a1, … nil))` stands for a0 + a1·x + …; two lists are
+-- identified exactly when they have the same coefficient at every
+-- index (reading past the end as the zero coefficient), so trailing
+-- zeros are quotiented away — `[a0]` and `[a0, 0]` are the same
+-- polynomial. This makes `Polynomial(R, zero)` a genuine quotient type
+-- on which equality is the kernel's `=`, the same pattern used for
+-- Integer / Rational / Real / IntegerMod.
+--
+-- Only R's zero is needed to form the type and its equivalence; the
+-- ring operations (add, multiply, …) enter later, where the
+-- polynomial arithmetic is defined.
+
+module Polynomial.basics
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+
+-- Finite coefficient list, low degree first.
+inductive Polynomial.Coefficients (R : Type(0)) : Type(0) where
+  | Polynomial.Coefficients.nil  : Polynomial.Coefficients(R)
+  | Polynomial.Coefficients.cons
+      : R → Polynomial.Coefficients(R) → Polynomial.Coefficients(R)
+
+-- The coefficient at a given index, reading past the end of the list
+-- as the zero coefficient. Recurses on the list; the index is split
+-- inside the cons case.
+definition Polynomial.nth (R : Type(0)) (zeroCoefficient : R)
+        : Polynomial.Coefficients(R) → Natural → R
+  | Polynomial.Coefficients.nil,           index => zeroCoefficient
+  | Polynomial.Coefficients.cons(c, rest), index =>
+      cases index {
+        | zero                   => c
+        | successor(predecessor) =>
+            Polynomial.nth(R, zeroCoefficient, rest, predecessor)
+      }
+
+-- Two coefficient lists represent the same polynomial when they agree
+-- at every index (trailing zeros become invisible).
+definition Polynomial.ExtensionallyEqual (R : Type(0)) (zeroCoefficient : R)
+        (p q : Polynomial.Coefficients(R)) : Proposition :=
+  (index : Natural) →
+      Polynomial.nth(R, zeroCoefficient, p, index)
+      = Polynomial.nth(R, zeroCoefficient, q, index)
+
+-- The relation is an equivalence: each property is pointwise in the
+-- index, inherited from equality on R.
+theorem Polynomial.ExtensionallyEqual.reflexive (R : Type(0))
+        (zeroCoefficient : R) (p : Polynomial.Coefficients(R))
+        : Polynomial.ExtensionallyEqual(R, zeroCoefficient, p, p) :=
+  function (index : Natural) =>
+      reflexivity(R, Polynomial.nth(R, zeroCoefficient, p, index))
+
+theorem Polynomial.ExtensionallyEqual.symmetric (R : Type(0))
+        (zeroCoefficient : R) (p q : Polynomial.Coefficients(R))
+        (extensionallyEqual
+            : Polynomial.ExtensionallyEqual(R, zeroCoefficient, p, q))
+        : Polynomial.ExtensionallyEqual(R, zeroCoefficient, q, p) :=
+  function (index : Natural) =>
+      Equality.symmetry(?, ?, extensionallyEqual(index))
+
+theorem Polynomial.ExtensionallyEqual.transitive (R : Type(0))
+        (zeroCoefficient : R) (p q r : Polynomial.Coefficients(R))
+        (firstEqual
+            : Polynomial.ExtensionallyEqual(R, zeroCoefficient, p, q))
+        (secondEqual
+            : Polynomial.ExtensionallyEqual(R, zeroCoefficient, q, r))
+        : Polynomial.ExtensionallyEqual(R, zeroCoefficient, p, r) :=
+  function (index : Natural) =>
+      Equality.transitivity(?, ?, ?, firstEqual(index), secondEqual(index))
+
+-- Polynomials over R: coefficient lists modulo the equivalence.
+definition Polynomial (R : Type(0)) (zeroCoefficient : R) : Type(0) :=
+  Quotient(Polynomial.Coefficients(R),
+           Polynomial.ExtensionallyEqual(R, zeroCoefficient))
+
+-- The class of a coefficient list.
+definition Polynomial.make (R : Type(0)) (zeroCoefficient : R)
+        (coefficients : Polynomial.Coefficients(R))
+        : Polynomial(R, zeroCoefficient) :=
+  Quotient.mk(Polynomial.Coefficients(R),
+              Polynomial.ExtensionallyEqual(R, zeroCoefficient),
+              coefficients)
