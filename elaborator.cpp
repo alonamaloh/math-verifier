@@ -863,20 +863,22 @@ private:
             throwElaborate("instance '" + declaration.name
                            + "': could not determine its type");
         }
-        // v1: the type must be DIRECTLY a structure application — not a
-        // Pi. A parameterized instance (e.g. IntegerMod's, whose type is
-        // `Π modulus. IsGroup(IntegerMod(modulus), …)`) would need the
-        // parameter threaded at the resolution site; out of scope here.
-        if (std::get_if<Pi>(&type->node)) {
-            throwElaborate(
-                "instance '" + declaration.name + "': parameterized "
-                "instances (a Pi type) are not supported yet — register a "
-                "concrete-carrier instance such as `Integer.add_is_group`");
+        // Strip any leading value-parameter Pis (e.g. `(modulus : Natural)`
+        // for `IntegerMod`'s instances). What remains is the structure
+        // application `Struct(Carrier(params…), ops…)`, whose argument
+        // sub-terms reference the stripped parameters as (now dangling)
+        // BoundVariables — fine for head extraction, and the resolution
+        // site re-instantiates the parameters from the call's carrier.
+        ExpressionPointer structureBody = type;
+        int parameterCount = 0;
+        while (auto* pi = std::get_if<Pi>(&structureBody->node)) {
+            structureBody = pi->codomain;
+            ++parameterCount;
         }
-        std::string structureName = headConstantName(type);
+        std::string structureName = headConstantName(structureBody);
         // Collect the structure application's arguments (reverse order).
         std::vector<ExpressionPointer> reversedArguments;
-        ExpressionPointer cursor = type;
+        ExpressionPointer cursor = structureBody;
         while (auto* application =
                    std::get_if<Application>(&cursor->node)) {
             reversedArguments.push_back(application->argument);
@@ -910,6 +912,7 @@ private:
         CanonicalInstanceEntry entry;
         entry.termName = declaration.name;
         entry.type = type;
+        entry.parameterCount = parameterCount;
         entry.universeParameters = declarationUniverseParameters(*decl);
         canonicalInstanceRegistry_[key] = std::move(entry);
     }
@@ -17390,19 +17393,55 @@ private:
                     auto entry = canonicalInstanceRegistry_.find(
                         std::make_pair(structureName, carrierName));
                     if (entry == canonicalInstanceRegistry_.end()) continue;
-                    // v1: only universe-monomorphic instances (the
-                    // concrete-carrier ones we register) — emit the bare
-                    // constant. Universe-polymorphic instances would need
-                    // universe-argument inference, deferred.
+                    // Universe-polymorphic instances would need universe-
+                    // argument inference, deferred.
                     if (!entry->second.universeParameters.empty()) continue;
+                    // The carrier's own arguments instantiate the
+                    // instance's leading value parameters. For a concrete
+                    // carrier (`Integer`) there are none; for a
+                    // parameterized one (`IntegerMod(m)`) the args are
+                    // `[m]`, which thread through `IntegerMod.add_is_group(m)`.
+                    std::vector<ExpressionPointer> carrierArguments;
+                    {
+                        ExpressionPointer carrierSpine = carrierArgument;
+                        while (auto* application = std::get_if<Application>(
+                                   &carrierSpine->node)) {
+                            carrierArguments.push_back(application->argument);
+                            carrierSpine = application->function;
+                        }
+                        std::reverse(carrierArguments.begin(),
+                                     carrierArguments.end());
+                    }
+                    if (static_cast<int>(carrierArguments.size())
+                        != entry->second.parameterCount) {
+                        continue;
+                    }
+                    // Instantiate the instance type's leading Pis with the
+                    // carrier arguments, yielding the concrete structure
+                    // application for this carrier.
+                    ExpressionPointer instantiatedType = entry->second.type;
+                    bool instantiated = true;
+                    for (const auto& carrierArg : carrierArguments) {
+                        auto* pi = std::get_if<Pi>(&instantiatedType->node);
+                        if (!pi) { instantiated = false; break; }
+                        instantiatedType =
+                            substitute(pi->codomain, 0, carrierArg);
+                    }
+                    if (!instantiated) continue;
                     // Fill the sibling structure-argument metavariables by
-                    // unifying the domain against the instance's type, then
-                    // assign the instance term itself.
+                    // unifying the domain against the instantiated type,
+                    // then assign the instance term applied to the carrier
+                    // arguments.
                     unifyConstructorParameters(
-                        domain, entry->second.type,
+                        domain, instantiatedType,
                         metavariableNames, assignment);
-                    assignment[metaName] =
+                    ExpressionPointer instanceTerm =
                         makeConstant(entry->second.termName);
+                    for (const auto& carrierArg : carrierArguments) {
+                        instanceTerm = makeApplication(
+                            std::move(instanceTerm), carrierArg);
+                    }
+                    assignment[metaName] = std::move(instanceTerm);
                     madeProgress = true;
                 }
             }
@@ -22159,7 +22198,8 @@ private:
     // at registration (see elaborateInstanceDeclaration).
     struct CanonicalInstanceEntry {
         std::string termName;
-        ExpressionPointer type;
+        ExpressionPointer type;        // full type, incl. any leading Pis
+        int parameterCount = 0;        // leading value Pis (carrier params)
         std::vector<std::string> universeParameters;
     };
     std::map<std::pair<std::string, std::string>, CanonicalInstanceEntry>

@@ -325,11 +325,13 @@ Resolution rule (mirrors the coercion registry): **at most one instance
 per `(structure, carrier)`**. Registering a second is rejected with a
 diagnostic — never guessed, never backtracked.
 
-Scope / limits (v1):
-- **Concrete carriers only.** The instance type must be a structure
-  application on a concrete carrier (`IsGroup(Integer, …)`), not a Pi —
-  parameterized instances (e.g. `IntegerMod(m)`'s) are not yet
-  registerable.
+Parameterized carriers work too. An instance whose type is Pi-quantified
+(`IntegerMod.add_is_group (modulus) : IsGroup(IntegerMod(modulus), …)`)
+registers under the carrier head (`IntegerMod`); at a call site over
+`IntegerMod(m)` the leading parameter is instantiated from the carrier's
+own argument `m`, threading `IntegerMod.add_is_group(m)` automatically.
+
+Scope / limits:
 - **Generic consumers still pass instances explicitly.** A generic lemma
   that consumes another generic lemma over the *same abstract* carrier
   (e.g. `Ring.zero_multiply` calling `Group.cancel_left` with the
