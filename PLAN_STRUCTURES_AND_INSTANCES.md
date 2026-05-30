@@ -266,6 +266,42 @@ reject-on-ambiguity principle to force it through.
 
 ## Stage 0 — solidify leading-implicit insertion (PREREQUISITE for Stage 3)
 
+**STATUS (2026-05-29): LANDED for repros #1 and #3; #2 (bare nullary
+constant as an operator operand) deliberately out of scope.** Two
+elaborator touchpoints, surface/elaboration only, no kernel change:
+
+- **Direct calls / bottom-up operands (repros #2-as-a-call, #3).** The
+  leading-implicit inference block in `elaborateExpression`'s
+  `SurfaceApplication` path now engages even with a *null* expectedType
+  when the head declaration carries `{…}` implicit binders —
+  `inferLeadingArguments`'s forward unification recovers the implicit
+  prefix from the explicit args' types (e.g. `IntegerMod.negate(x)`
+  bottom-up under `+`). Failure falls through to positional application,
+  so explicitly-passed implicits (`PAdicEquivalent(p, primality)`) still
+  work.
+- **Bare higher-order argument (repro #1).** The `SurfaceIdentifier`
+  path now inserts a bare constant's leading implicits and solves them by
+  backward unification against the expected type — so `IntegerMod.add`
+  handed to `IsMonoid`'s `operation` slot elaborates without a lambda
+  wrapper.
+
+Result: `IntegerMod`'s `add`/`multiply`/`negate` are all implicit and
+`instances.math` / `field.math` / `integer_mod_test.math` pass the bare
+names directly (lambda wrappers gone). Regression coverage:
+`library/Test/implicit_args_test.math` (`tagged_identity_no_expected`,
+`tagged_identity_bare_higher_order`).
+
+**Residual (repro #2 proper — left for a follow-up).** `zero`/`one`
+remain explicit-`modulus`. As nullary values written bare as the LEFT
+operand of an operator (`IntegerMod.zero + x`), they are elaborated
+bottom-up with *no* expected type and *no* argument to carry the
+modulus, so the bare constant's type stays `Π{m}. IntegerMod(m)` and
+operator dispatch can't see the `IntegerMod` head. Fixing this needs
+operand-ordering work (defer the left operand's implicit resolution
+until the operator/right operand pins `m`), which is a deeper change
+than the two touchpoints above. Documented in
+`IntegerMod/operations.math`.
+
 **Evidence-driven. Stage 3 (instance inference) marks operation/instance
 arguments implicit and fills them from a value's type — but the elaborator
 does not reliably *insert* a leading implicit today, so instance inference

@@ -3622,6 +3622,67 @@ private:
                     std::move(call), std::move(leftEndpoint));
                 return call;
             }
+            // Bare implicit-leading constant used where an expected type
+            // is available — e.g. `IntegerMod.add` passed to `IsMonoid`'s
+            // `operation` parameter (expected `C(m) → C(m) → C(m)`), or
+            // `IntegerMod.zero` where `C(m)` is expected. The bare
+            // constant's type is `Π{m}. …`, which does not match the
+            // expected type because the leading implicit stays open.
+            // Insert the implicit prefix as metavariables and solve them
+            // by backward unification against the expected type, returning
+            // the constant partially applied to the inferred implicits.
+            //
+            // Safe for the "bare lemma citation as a proof" case: if the
+            // implicits cannot be recovered from the expected type the
+            // inference throws and we fall through to the bare constant;
+            // and if the open-implicit polymorphic form is what's wanted,
+            // the expected type is itself a `Π{m}. …` whose head won't
+            // unify with the opened result, so it falls through too.
+            if (expectedType && identifier->universeArgs.empty()) {
+                bool shadowedByLocal = false;
+                for (const auto& binder : localBinders) {
+                    if (binder.name == identifier->qualifiedName) {
+                        shadowedByLocal = true;
+                        break;
+                    }
+                }
+                const Declaration* decl =
+                    environment_.lookup(identifier->qualifiedName);
+                if (!shadowedByLocal && decl
+                    && currentDeclarationName_ != identifier->qualifiedName
+                    && universeParameterCount(*decl) == 0
+                    && environment_.implicitArgumentCount(
+                           identifier->qualifiedName) > 0) {
+                    int implicitCount =
+                        environment_.implicitArgumentCount(
+                            identifier->qualifiedName);
+                    ExpressionPointer declType = declarationType(*decl);
+                    if (declType) {
+                        try {
+                            CallInferenceResult inferred =
+                                inferLeadingArguments(
+                                    identifier->qualifiedName, declType,
+                                    implicitCount, {}, localBinders,
+                                    expectedType,
+                                    "_identifierLeadingArgument_",
+                                    expression.line);
+                            ExpressionPointer head = makeConstant(
+                                identifier->qualifiedName);
+                            for (auto& leadingValue :
+                                 inferred.leadingValues) {
+                                head = makeApplication(
+                                    std::move(head),
+                                    std::move(leadingValue));
+                            }
+                            return head;
+                        } catch (const ElaborateError&) {
+                            // Could not infer the implicits from the
+                            // expected type — fall through to the bare
+                            // constant, preserving prior behavior.
+                        }
+                    }
+                }
+            }
             return elaborateIdentifier(*identifier, localBinders,
                                         expression.line, expression.column);
         }
@@ -3969,10 +4030,18 @@ private:
                 // If inference cannot resolve every leading metavariable
                 // we fall through to the partial-application path so the
                 // user can still partially apply explicitly.
+                // Engages with a non-null expectedType (backward +
+                // forward inference) OR, when the declaration carries
+                // leading `{x : T}` implicit binders, even WITHOUT an
+                // expectedType — `inferLeadingArguments` resolves the
+                // implicit prefix from the explicit args' types by
+                // forward unification alone (e.g. `IntegerMod.add(x, y)`
+                // recovering `{modulus}` from `x : IntegerMod(modulus)`).
                 if (!isCurrentDeclaration
                     && environmentDeclaration
-                    && expectedType
-                    && argumentCount > 0) {
+                    && argumentCount > 0
+                    && (expectedType
+                        || environment_.implicitArgumentCount(name) > 0)) {
                     ExpressionPointer declarationKernelType;
                     const std::vector<std::string>* declarationUniverseParams
                         = nullptr;
@@ -4103,15 +4172,27 @@ private:
                                 }
                                 return head;
                             };
-                            if (explicitImplicitMode) {
+                            // Hard-error on inference failure only when
+                            // the user committed to inference by both
+                            // using explicit `{x : T}` binders AND giving
+                            // an expectedType. When there is no
+                            // expectedType (the relaxed entry above), a
+                            // failure may simply mean the user passed the
+                            // implicit arguments explicitly and
+                            // positionally (e.g.
+                            // `PAdicEquivalent(p, primality)` partially
+                            // applying the convention-implicit prefix) —
+                            // fall through to the generic application
+                            // path, which binds args to Pis left-to-right
+                            // including the implicit prefix.
+                            if (explicitImplicitMode && expectedType) {
                                 return runInference();
                             }
                             try {
                                 return runInference();
                             } catch (const ElaborateError&) {
-                                // Inference failed in arity-based
-                                // mode — fall through to partial
-                                // application.
+                                // Inference failed — fall through to
+                                // partial / positional application.
                             }
                         }
                     }

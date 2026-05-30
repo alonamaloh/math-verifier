@@ -21,3 +21,34 @@ theorem refl_implicit {T : Type(0)} (x : T) : x = x :=
 
 theorem refl_implicit_test (n : Natural) : n = n :=
   refl_implicit(n)
+
+-- ----------------------------------------------------------------------
+-- Leading-implicit insertion: a function `f {m} (x : C(m))` must get
+-- `{m}` inserted and inferred even when no expected type guides the
+-- call. `Tagged` is a parameterized type standing in for IntegerMod(m)
+-- and friends.
+
+inductive Tagged (m : Natural) : Type(0) where
+  | Tagged.make : Tagged(m)
+
+definition tagged_identity {m : Natural} (x : Tagged(m)) : Tagged(m) :=
+  x
+
+-- Direct call with the implicit recovered from the argument's type,
+-- under a polymorphic head that supplies NO concrete expected type to
+-- the inner call (forward inference, not backward).
+theorem tagged_identity_no_expected (m : Natural) (x : Tagged(m))
+        : Tagged(m) :=
+  identity_implicit(tagged_identity(x))
+
+-- Bare implicit-leading function handed to a higher-order parameter:
+-- `tagged_identity` is passed where `Tagged(m) → Tagged(m)` is expected,
+-- so the leading `{m}` is inserted by backward unification against that
+-- expected function type.
+definition apply_unary (m : Natural)
+        (f : Tagged(m) → Tagged(m)) (x : Tagged(m)) : Tagged(m) :=
+  f(x)
+
+theorem tagged_identity_bare_higher_order (m : Natural) (x : Tagged(m))
+        : Tagged(m) :=
+  apply_unary(m, tagged_identity, x)
