@@ -17371,16 +17371,17 @@ private:
                                  FreeVariableOrigin::Internal);
         }
 
-        // Canonical-instance resolution (Stage 3). For any still-unassigned
-        // leading implicit whose domain is a registered structure
-        // predicate applied to a now-resolved CONCRETE carrier (e.g.
-        // `groupProof : IsGroup(Integer, …)` once `carrier := Integer` was
-        // recovered from an explicit arg), fill it from the canonical-
-        // instance registry and unify the instance's type against the
-        // domain — that fills the sibling operation/identity/inverse
-        // implicits with the instance's concrete operations. Gated on the
-        // registry being non-empty, so non-structure calls are unaffected.
-        if (!canonicalInstanceRegistry_.empty()) {
+        // Instance resolution (Stage 3 + local-instance follow-on). For
+        // any still-unassigned leading implicit whose domain is a
+        // PREDICATE application (a structure class like IsGroup/IsRing —
+        // head Definition returning Proposition), resolve it either from
+        // the canonical-instance registry (concrete or parameterized
+        // carrier) OR from a UNIQUE in-scope hypothesis (abstract carrier);
+        // either way the sibling operation/identity/… implicits are filled
+        // by unifying the chosen instance's type against the domain. The
+        // predicate gate keeps ordinary implicits (`{T : Type(0)}`,
+        // `{x : Tagged(m)}`) untouched.
+        {
             bool madeProgress = true;
             while (madeProgress) {
                 madeProgress = false;
@@ -17391,6 +17392,7 @@ private:
                         leadingDomains[i], assignment);
                     std::string structureName = headConstantName(domain);
                     if (structureName == "<unknown>") continue;
+                    if (!structureHeadIsClass(structureName)) continue;
                     // First argument of the structure application is the
                     // carrier; collect the spine and read it off.
                     ExpressionPointer spine = domain;
@@ -17403,60 +17405,118 @@ private:
                     if (!carrierArgument) continue;
                     std::string carrierName =
                         headConstantName(carrierArgument);
-                    if (carrierName == "<unknown>") continue;
-                    auto entry = canonicalInstanceRegistry_.find(
-                        std::make_pair(structureName, carrierName));
-                    if (entry == canonicalInstanceRegistry_.end()) continue;
-                    // Universe-polymorphic instances would need universe-
-                    // argument inference, deferred.
-                    if (!entry->second.universeParameters.empty()) continue;
-                    // The carrier's own arguments instantiate the
-                    // instance's leading value parameters. For a concrete
-                    // carrier (`Integer`) there are none; for a
-                    // parameterized one (`IntegerMod(m)`) the args are
-                    // `[m]`, which thread through `IntegerMod.add_is_group(m)`.
-                    std::vector<ExpressionPointer> carrierArguments;
-                    {
-                        ExpressionPointer carrierSpine = carrierArgument;
-                        while (auto* application = std::get_if<Application>(
-                                   &carrierSpine->node)) {
-                            carrierArguments.push_back(application->argument);
-                            carrierSpine = application->function;
+
+                    // --- Registry path: concrete / parameterized carrier.
+                    auto entry = (carrierName == "<unknown>")
+                        ? canonicalInstanceRegistry_.end()
+                        : canonicalInstanceRegistry_.find(
+                              std::make_pair(structureName, carrierName));
+                    if (entry != canonicalInstanceRegistry_.end()
+                        && entry->second.universeParameters.empty()) {
+                        // The carrier's own arguments instantiate the
+                        // instance's leading value parameters (none for a
+                        // concrete carrier like Integer; `[m]` for the
+                        // parameterized `IntegerMod(m)`).
+                        std::vector<ExpressionPointer> carrierArguments;
+                        {
+                            ExpressionPointer carrierSpine = carrierArgument;
+                            while (auto* application =
+                                       std::get_if<Application>(
+                                           &carrierSpine->node)) {
+                                carrierArguments.push_back(
+                                    application->argument);
+                                carrierSpine = application->function;
+                            }
+                            std::reverse(carrierArguments.begin(),
+                                         carrierArguments.end());
                         }
-                        std::reverse(carrierArguments.begin(),
-                                     carrierArguments.end());
+                        if (static_cast<int>(carrierArguments.size())
+                            == entry->second.parameterCount) {
+                            ExpressionPointer instantiatedType =
+                                entry->second.type;
+                            bool instantiated = true;
+                            for (const auto& carrierArg : carrierArguments) {
+                                auto* pi = std::get_if<Pi>(
+                                    &instantiatedType->node);
+                                if (!pi) { instantiated = false; break; }
+                                instantiatedType =
+                                    substitute(pi->codomain, 0, carrierArg);
+                            }
+                            if (instantiated) {
+                                unifyConstructorParameters(
+                                    domain, instantiatedType,
+                                    metavariableNames, assignment);
+                                ExpressionPointer instanceTerm =
+                                    makeConstant(entry->second.termName);
+                                for (const auto& carrierArg
+                                         : carrierArguments) {
+                                    instanceTerm = makeApplication(
+                                        std::move(instanceTerm), carrierArg);
+                                }
+                                assignment[metaName] =
+                                    std::move(instanceTerm);
+                                madeProgress = true;
+                                continue;
+                            }
+                        }
                     }
-                    if (static_cast<int>(carrierArguments.size())
-                        != entry->second.parameterCount) {
-                        continue;
+
+                    // --- Local-hypothesis path: abstract carrier. Find a
+                    // UNIQUE in-scope binder whose type is the same
+                    // structure on a matching carrier; use it as the
+                    // instance and read its operations off to fill the
+                    // sibling implicits. Work in opened form (FreeVariables
+                    // for the local binders), then close the solved values
+                    // back; reject on a non-unique match.
+                    ExpressionPointer domainOpened = openOverLocalBinders(
+                        domain, localBinders, localBinders.size());
+                    Context hypothesisContext =
+                        buildContextFromLocalBinders(localBinders);
+                    int matchCount = 0;
+                    int matchBinder = -1;
+                    std::map<std::string, ExpressionPointer> matchTrial;
+                    for (int j =
+                             static_cast<int>(localBinders.size()) - 1;
+                         j >= 0; --j) {
+                        ExpressionPointer candidateType =
+                            openOverLocalBinders(
+                                localBinders[j].type, localBinders,
+                                static_cast<size_t>(j));
+                        if (headConstantName(candidateType)
+                            != structureName) {
+                            continue;
+                        }
+                        std::map<std::string, ExpressionPointer> trial;
+                        std::vector<ExpressionPointer> binderStack;
+                        unifyConstructorParameters(
+                            domainOpened, candidateType, metavariableNames,
+                            trial, 0, &binderStack);
+                        ExpressionPointer resolved =
+                            substituteFreeVariables(domainOpened, trial);
+                        if (!isDefinitionallyEqual(
+                                environment_, hypothesisContext,
+                                resolved, candidateType)) {
+                            continue;
+                        }
+                        ++matchCount;
+                        matchBinder = j;
+                        matchTrial = trial;
+                        if (matchCount > 1) break;
                     }
-                    // Instantiate the instance type's leading Pis with the
-                    // carrier arguments, yielding the concrete structure
-                    // application for this carrier.
-                    ExpressionPointer instantiatedType = entry->second.type;
-                    bool instantiated = true;
-                    for (const auto& carrierArg : carrierArguments) {
-                        auto* pi = std::get_if<Pi>(&instantiatedType->node);
-                        if (!pi) { instantiated = false; break; }
-                        instantiatedType =
-                            substitute(pi->codomain, 0, carrierArg);
+                    if (matchCount == 1) {
+                        for (const auto& solvedValue : matchTrial) {
+                            if (!assignment.count(solvedValue.first)) {
+                                assignment[solvedValue.first] =
+                                    closeOverLocalBinders(
+                                        solvedValue.second, localBinders,
+                                        localBinders.size());
+                            }
+                        }
+                        assignment[metaName] = makeBoundVariable(
+                            static_cast<int>(localBinders.size()) - 1
+                            - matchBinder);
+                        madeProgress = true;
                     }
-                    if (!instantiated) continue;
-                    // Fill the sibling structure-argument metavariables by
-                    // unifying the domain against the instantiated type,
-                    // then assign the instance term applied to the carrier
-                    // arguments.
-                    unifyConstructorParameters(
-                        domain, instantiatedType,
-                        metavariableNames, assignment);
-                    ExpressionPointer instanceTerm =
-                        makeConstant(entry->second.termName);
-                    for (const auto& carrierArg : carrierArguments) {
-                        instanceTerm = makeApplication(
-                            std::move(instanceTerm), carrierArg);
-                    }
-                    assignment[metaName] = std::move(instanceTerm);
-                    madeProgress = true;
                 }
             }
         }
@@ -20320,6 +20380,34 @@ private:
     // Extract a Constant head name from a type expression. Tries the
     // raw form first (so user-declared type aliases like `Rational`
     // don't get unfolded), falls back to WHNF.
+    // True if `name` is a STRUCTURE CLASS — a Definition whose first
+    // parameter is a carrier TYPE (its domain is a Sort) and whose final
+    // codomain is `Proposition` (Sort 0). This is what `IsGroup` / `IsRing`
+    // / `IsField` look like. Used to gate instance resolution so it fires
+    // ONLY on genuine instance-style arguments: it excludes data implicits
+    // (`{T : Type(0)}`, `{x : Tagged(m)}`, whose head isn't even a
+    // Proposition) AND ordinary value predicates like `Natural.is_prime`
+    // or `Natural.divides`, whose first parameter is a value, not a
+    // carrier type — those are threaded explicitly and must NOT be grabbed
+    // from an in-scope hypothesis.
+    bool structureHeadIsClass(const std::string& name) {
+        const Declaration* decl = environment_.lookup(name);
+        if (!decl) return false;
+        ExpressionPointer type = declarationType(*decl);
+        if (!type) return false;
+        auto* firstPi = std::get_if<Pi>(&type->node);
+        if (!firstPi) return false;
+        if (!std::get_if<Sort>(&firstPi->domain->node)) return false;
+        ExpressionPointer cursor = type;
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            cursor = pi->codomain;
+        }
+        auto* sort = std::get_if<Sort>(&cursor->node);
+        if (!sort) return false;
+        auto* level = std::get_if<LevelConst>(&sort->level->node);
+        return level != nullptr && level->value == 0;
+    }
+
     std::string headConstantName(ExpressionPointer typeExpression) {
         ExpressionPointer cursor = typeExpression;
         while (auto* application =

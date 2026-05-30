@@ -45,8 +45,7 @@ theorem cancel_left_inferred
         (a b c : carrier)
         (equation : operation(a, b) = operation(a, c))
         : b = c :=
-  Group.cancel_left(carrier, operation, identity, inverse, groupProof,
-                    a, b, c, equation)
+  Group.cancel_left(a, b, c, equation)
 
 -- Concrete use over Integer with NO ceremony arguments:
 --   carrier   = Integer       (from a : Integer)
@@ -76,4 +75,21 @@ instance PAdic.add_is_group
 theorem padic_cancel (p : Natural) (primality : Natural.is_prime(p))
         (a b c : PAdic(p, primality))
         (equation : PAdic.add(a, b) = PAdic.add(a, c)) : b = c :=
+  cancel_left_inferred(a, b, c, equation)
+
+-- LOCAL-INSTANCE SEARCH: an ABSTRACT carrier, no registry entry. The
+-- `groupProof` implicit of cancel_left_inferred is resolved from the
+-- in-scope `groupProof` HYPOTHESIS (matched by structure + carrier), and
+-- identity / inverse are read off its type. This is the generic-consumer
+-- shape (e.g. a ring lemma calling a group lemma over its abstract
+-- carrier) that the registry alone cannot serve.
+theorem generic_cancel
+        {carrier : Type(0)}
+        {operation : carrier → carrier → carrier}
+        {identity : carrier}
+        {inverse : carrier → carrier}
+        (groupProof : IsGroup(carrier, operation, identity, inverse))
+        (a b c : carrier)
+        (equation : operation(a, b) = operation(a, c))
+        : b = c :=
   cancel_left_inferred(a, b, c, equation)

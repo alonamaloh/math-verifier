@@ -331,14 +331,22 @@ registers under the carrier head (`IntegerMod`); at a call site over
 `IntegerMod(m)` the leading parameter is instantiated from the carrier's
 own argument `m`, threading `IntegerMod.add_is_group(m)` automatically.
 
-Scope / limits:
-- **Generic consumers still pass instances explicitly.** A generic lemma
-  that consumes another generic lemma over the *same abstract* carrier
-  (e.g. `Ring.zero_multiply` calling `Group.cancel_left` with the
-  ring's derived `addGroupProof`) has no concrete carrier to key on, so
-  it still passes the instance by hand. Resolving a structure-typed
-  implicit from an in-scope hypothesis (local-instance search) is the
-  natural follow-on that would let those drop the ceremony too.
+Abstract carriers work via **local-instance search**: when the carrier is
+not a concrete head but the call site has a UNIQUE in-scope hypothesis of
+the right structure, that hypothesis is used as the instance (and its
+operations read off to fill the siblings). This is what lets a generic
+lemma consume another over its own abstract carrier with no ceremony —
+e.g. `Ring.zero_multiply` calls `Group.cancel_left(0·x, 0·x, 0, eq)` and
+the `IsGroup` instance is resolved from the ring's derived
+`addGroupProof` already in scope. A non-unique match is rejected (not
+guessed), same stance as the registry.
+
+What instance resolution will NOT touch (by design):
+- **Ordinary value predicates** like `Natural.is_prime(p)` or
+  `Natural.divides(a, b)`. The gate fires only on a *structure class* —
+  a Proposition-valued head whose FIRST parameter is a carrier *type*
+  (`IsGroup(carrier, …)`), not a value (`is_prime` takes a `Natural`).
+  Side-condition proofs like `primality` stay explicit.
 - For carriers the `ring` / `field` tactics already cover, prefer those —
   instance inference is for hand-cited structure lemmas they can't
   discharge (cancellation, inverse-uniqueness, …).
