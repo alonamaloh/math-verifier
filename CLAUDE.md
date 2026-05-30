@@ -122,6 +122,35 @@ Quotient.induct_two(at_make_lemma, x, y)
 Quotient.induct_three(at_make_lemma, x, y, z)
 ```
 
+### `construction` — name the quotient introduction form
+
+`construction Name(args) : T := <intro body>` declares a **canonical
+introduction form** for a quotient. It is an ordinary *transparent*
+definition (the kernel δ-reduces `Name(args)` to the body), so it is
+def-equal to the underlying `Quotient.mk(...)` and needs no special
+support in `cases` / `lift` / `reflexivity`. The win is readability:
+proofs and printed goals say `Rational.fraction(n, d)` instead of
+`Quotient.mk(RationalRepresentative.make(n, d))`.
+
+```math
+construction Rational.fraction (n : Integer) (d : Natural) : Rational :=
+  Quotient.mk(RationalRepresentative.make(n, d))
+
+-- Downstream, prefer the named form:
+definition Rational.zero : Rational := Rational.fraction(Integer.zero, 0)
+```
+
+It parses exactly like a `definition` (same binder / `: T` / `:= body`
+syntax), so the return type is written explicitly — that expected type
+is also what lets the short `Quotient.mk(rep)` body infer its relation.
+
+**Soft convention (preferred, not enforced):** once a quotient has a
+`construction` intro and a `by_representatives` eliminator, prefer them
+over naming the raw representative constructor
+(`RationalRepresentative.make`) outside the quotient's defining module.
+The raw constructor remains available as an escape hatch; this is a
+readability convention, not an elaborator-enforced restriction.
+
 ## Patterns in binders — `take`, `suppose`, `cases` on quotients
 
 The unifying principle: a binder accepts a pattern, and the elaborator

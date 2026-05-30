@@ -826,6 +826,13 @@ struct SurfaceDefinitionDeclaration {
     // opacity). Forwarded to the kernel via `addDefinition`'s
     // Opacity parameter.
     bool opaque = false;
+    // `construction Name(args) : T := body` — a transparent definition
+    // additionally registered as a *canonical constructor* (a named
+    // quotient-introduction form). Elaborates identically to a
+    // definition; the flag drives registration in the elaborator's
+    // canonical-constructor registry, which `by_representatives` and the
+    // printer use to fold representative terms back to `Name(args)`.
+    bool isConstruction = false;
 };
 
 struct SurfaceImportDeclaration  { std::string moduleName; };

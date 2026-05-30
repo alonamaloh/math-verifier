@@ -370,11 +370,21 @@ private:
             case TokenKind::KeywordOverload:   return parseOverloadDeclaration();
             case TokenKind::KeywordCoercion:   return parseCoercionDeclaration();
             case TokenKind::KeywordConvention: return parseConventionDeclaration();
+            case TokenKind::KeywordConstruction: {
+                // `construction Name(args) : T := body` — parses exactly
+                // like a (non-theorem) definition; the elaborator treats
+                // it as a transparent definition and registers Name as a
+                // canonical constructor.
+                SurfaceDefinitionDeclaration decl =
+                    parseDefinitionDeclaration(false);
+                decl.isConstruction = true;
+                return decl;
+            }
             default:
                 throwHere("expected top-level statement keyword "
                           "(import / using / inductive / axiom / "
                           "definition / theorem / operator / overload / "
-                          "convention / opaque)");
+                          "convention / construction / opaque)");
         }
     }
 

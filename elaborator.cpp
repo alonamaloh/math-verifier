@@ -1610,6 +1610,13 @@ private:
         if (declaration.isTheorem) {
             registerAlgebraicShape(declaration.name, typeForDetection);
         }
+        if (declaration.isConstruction) {
+            // Record as a canonical constructor. The definition itself is
+            // an ordinary transparent definition (already added above); the
+            // registry lets `by_representatives` and the printer fold a
+            // representative term `mk(make(args…))` back to `Name(args…)`.
+            canonicalConstructions_.insert(declaration.name);
+        }
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
@@ -21991,6 +21998,12 @@ private:
         std::vector<SurfaceConventionProposition> propositions;
     };
     std::unordered_map<std::string, ConventionEntry> conventionRegistry_;
+    // Names declared via `construction` — canonical quotient-introduction
+    // forms. They are ordinary transparent definitions; this set records
+    // which definitions are the preferred named introduction so that
+    // `by_representatives` (and, later, the printer) can fold a
+    // representative term back to the named form.
+    std::set<std::string> canonicalConstructions_;
     // Memoized result of "does definition X's body transitively
     // reference constant Y as a head?" — used by the `decide`
     // elaborator's WHNF walker to skip Applications whose head
