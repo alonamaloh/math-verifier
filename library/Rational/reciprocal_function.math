@@ -62,18 +62,14 @@ definition Rational.reciprocal_at_natural_pair
         | zero =>
             Rational.zero
         | successor(predecessorB) =>
-            Quotient.mk(
-                RationalRepresentative.make(
-                    -(successor(denominatorPredecessor) : Integer),
-                    predecessorB))
+            Rational.fraction(-(successor(denominatorPredecessor) : Integer),
+                    predecessorB)
       }
   | successor(predecessorA), b, denominatorPredecessor =>
       cases b {
         | zero =>
-            Quotient.mk(
-                RationalRepresentative.make(
-                    (successor(denominatorPredecessor) : Integer),
-                    predecessorA))
+            Rational.fraction((successor(denominatorPredecessor) : Integer),
+                    predecessorA)
         | successor(predecessorB) =>
             Rational.reciprocal_at_natural_pair(
                 predecessorA, predecessorB, denominatorPredecessor)
@@ -100,22 +96,16 @@ theorem Rational.reciprocal_at_natural_pair_positive_shift
                 anchorValue + successor(shiftPredecessor),
                 anchorValue,
                 denominatorPredecessor)
-            = (Quotient.mk(
-                   RationalRepresentative.make(
-                       (successor(denominatorPredecessor) : Integer),
-                       shiftPredecessor))
-               : Rational)
+            = Rational.fraction((successor(denominatorPredecessor) : Integer),
+                       shiftPredecessor)
   | zero, shiftPredecessor, denominatorPredecessor =>
       -- a = 0, so a + succ(shiftPred) = succ(shiftPred). The
       -- pattern reduces to (succ(shiftPred), 0, d), which returns
       -- mk(make(succ d : I, shiftPred)) by the first nonzero case.
       reflexivity(
           Rational,
-          (Quotient.mk(
-               RationalRepresentative.make(
-                   (successor(denominatorPredecessor) : Integer),
+          Rational.fraction((successor(denominatorPredecessor) : Integer),
                    shiftPredecessor))
-           : Rational))
   | successor(predecessor), shiftPredecessor, denominatorPredecessor =>
       -- (succ(predecessor) + succ(shiftPred), succ(predecessor), d)
       -- reduces by the recursive case to
@@ -129,19 +119,13 @@ theorem Rational.reciprocal_at_natural_pair_negative_shift
                 anchorValue,
                 anchorValue + successor(shiftPredecessor),
                 denominatorPredecessor)
-            = (Quotient.mk(
-                   RationalRepresentative.make(
-                       -(successor(denominatorPredecessor) : Integer),
-                       shiftPredecessor))
-               : Rational)
+            = Rational.fraction(-(successor(denominatorPredecessor) : Integer),
+                       shiftPredecessor)
   | zero, shiftPredecessor, denominatorPredecessor =>
       reflexivity(
           Rational,
-          (Quotient.mk(
-               RationalRepresentative.make(
-                   -(successor(denominatorPredecessor) : Integer),
+          Rational.fraction(-(successor(denominatorPredecessor) : Integer),
                    shiftPredecessor))
-           : Rational))
   | successor(predecessor), shiftPredecessor, denominatorPredecessor =>
       Rational.reciprocal_at_natural_pair_negative_shift(
           predecessor, shiftPredecessor, denominatorPredecessor)
@@ -206,11 +190,8 @@ theorem Rational.reciprocal_at_natural_pair_respect
                   = Rational.reciprocal_at_natural_pair(
                         firstA, firstA + successor(gapPredecessor),
                         denominatorPredecessor)
-                  = (Quotient.mk(
-                         RationalRepresentative.make(
-                             -(successor(denominatorPredecessor) : Integer),
-                             gapPredecessor))
-                     : Rational)
+                  = Rational.fraction(-(successor(denominatorPredecessor) : Integer),
+                             gapPredecessor)
                   = Rational.reciprocal_at_natural_pair(
                         secondA, secondA + successor(gapPredecessor),
                         denominatorPredecessor)
@@ -265,11 +246,8 @@ theorem Rational.reciprocal_at_natural_pair_respect
                   = Rational.reciprocal_at_natural_pair(
                         firstB + successor(gapPredecessor), firstB,
                         denominatorPredecessor)
-                  = (Quotient.mk(
-                         RationalRepresentative.make(
-                             (successor(denominatorPredecessor) : Integer),
-                             gapPredecessor))
-                     : Rational)
+                  = Rational.fraction((successor(denominatorPredecessor) : Integer),
+                             gapPredecessor)
                   = Rational.reciprocal_at_natural_pair(
                         secondB + successor(gapPredecessor), secondB,
                         denominatorPredecessor)
@@ -336,13 +314,9 @@ definition Rational.reciprocal_at_integer
 theorem Rational.reciprocal_at_integer_multiplies
         (n : Integer) (denominatorPredecessor : Natural)
         (mkNonzero
-            : ¬((Quotient.mk(
-                     RationalRepresentative.make(n, denominatorPredecessor))
-                     : Rational)
+            : ¬(Rational.fraction(n, denominatorPredecessor)
                     = Rational.zero))
-        : (Quotient.mk(
-               RationalRepresentative.make(n, denominatorPredecessor))
-               : Rational)
+        : Rational.fraction(n, denominatorPredecessor)
             * Rational.reciprocal_at_integer(n, denominatorPredecessor)
           = Rational.one := {
     claim Integer.IsNonneg(n) ∨ (∃ (k : Natural). n = -(k : Integer))
@@ -357,14 +331,9 @@ theorem Rational.reciprocal_at_integer_multiplies
                  claim n = (0 : Integer)
                    by rewrite(aEq, nIsImage);
                  absurd(mkNonzero(
-                            calc (Quotient.mk(
-                                     RationalRepresentative.make(
-                                         n, denominatorPredecessor))
-                                     : Rational)
-                               = Quotient.mk(
-                                     RationalRepresentative.make(
-                                         Integer.zero,
-                                         denominatorPredecessor))
+                            calc Rational.fraction(n, denominatorPredecessor)
+                               = Rational.fraction(Integer.zero,
+                                         denominatorPredecessor)
                                = Rational.zero))
                }
              | successor(predecessor) => {
@@ -373,27 +342,18 @@ theorem Rational.reciprocal_at_integer_multiplies
                  let refinedHypothesis
                        : n = (successor(predecessor) : Integer) :=
                      rewrite(aEq, nIsImage);
-                 calc (Quotient.mk(
-                           RationalRepresentative.make(
-                               n, denominatorPredecessor))
-                           : Rational)
+                 calc Rational.fraction(n, denominatorPredecessor)
                           * Rational.reciprocal_at_integer(
                                 n, denominatorPredecessor)
-                    = (Quotient.mk(
-                           RationalRepresentative.make(
-                               (successor(predecessor) : Integer),
-                               denominatorPredecessor))
-                           : Rational)
+                    = Rational.fraction((successor(predecessor) : Integer),
+                               denominatorPredecessor)
                           * Rational.reciprocal_at_integer(
                                 (successor(predecessor) : Integer),
                                 denominatorPredecessor)
                            by congruenceOf(
                                   function (m : Integer) =>
-                                      (Quotient.mk(
-                                           RationalRepresentative.make(
-                                               m,
-                                               denominatorPredecessor))
-                                           : Rational)
+                                      Rational.fraction(m,
+                                               denominatorPredecessor)
                                       * Rational.reciprocal_at_integer(
                                             m,
                                             denominatorPredecessor),
@@ -415,14 +375,9 @@ theorem Rational.reciprocal_at_integer_multiplies
                  claim n = -(0 : Integer)
                    by rewrite(aEq, nIsNegatedImage);
                  absurd(mkNonzero(
-                            calc (Quotient.mk(
-                                     RationalRepresentative.make(
-                                         n, denominatorPredecessor))
-                                     : Rational)
-                               = Quotient.mk(
-                                     RationalRepresentative.make(
-                                         Integer.zero,
-                                         denominatorPredecessor))
+                            calc Rational.fraction(n, denominatorPredecessor)
+                               = Rational.fraction(Integer.zero,
+                                         denominatorPredecessor)
                                = Rational.zero))
                }
              | successor(predecessor) => {
@@ -431,27 +386,18 @@ theorem Rational.reciprocal_at_integer_multiplies
                  let refinedHypothesis
                        : n = -(successor(predecessor) : Integer) :=
                      rewrite(aEq, nIsNegatedImage);
-                 calc (Quotient.mk(
-                           RationalRepresentative.make(
-                               n, denominatorPredecessor))
-                           : Rational)
+                 calc Rational.fraction(n, denominatorPredecessor)
                           * Rational.reciprocal_at_integer(
                                 n, denominatorPredecessor)
-                    = (Quotient.mk(
-                           RationalRepresentative.make(
-                               -(successor(predecessor) : Integer),
-                               denominatorPredecessor))
-                           : Rational)
+                    = Rational.fraction(-(successor(predecessor) : Integer),
+                               denominatorPredecessor)
                           * Rational.reciprocal_at_integer(
                                 -(successor(predecessor) : Integer),
                                 denominatorPredecessor)
                            by congruenceOf(
                                   function (m : Integer) =>
-                                      (Quotient.mk(
-                                           RationalRepresentative.make(
-                                               m,
-                                               denominatorPredecessor))
-                                           : Rational)
+                                      Rational.fraction(m,
+                                               denominatorPredecessor)
                                       * Rational.reciprocal_at_integer(
                                             m,
                                             denominatorPredecessor),
@@ -510,9 +456,7 @@ theorem Rational.reciprocal_at_integer_multiplies
 theorem Rational.mk_zero_implies_integer_zero
         (n : Integer) (denominatorPredecessor : Natural)
         (mkIsZero
-            : (Quotient.mk(
-                   RationalRepresentative.make(n, denominatorPredecessor))
-                   : Rational)
+            : Rational.fraction(n, denominatorPredecessor)
                 = Rational.zero)
         : n = Integer.zero := {
     claim n * (successor(0) : Integer)
@@ -558,17 +502,15 @@ theorem Rational.reciprocal_function_at_rational_rep_respect
   | RationalRepresentative.make(n1, d1),
     RationalRepresentative.make(n2, d2),
     equivalenceHypothesis =>
-      decide (Quotient.mk(RationalRepresentative.make(n1, d1)) : Rational)
+      decide Rational.fraction(n1, d1)
                  = Rational.zero {
         | yes mkFirstIsZero => {
             -- Zero branch: both reciprocals reduce to Rational.zero.
             claim n1 = Integer.zero
               by Rational.mk_zero_implies_integer_zero(
                      n1, d1, mkFirstIsZero);
-            calc (Quotient.mk(RationalRepresentative.make(n2, d2))
-                     : Rational)
-               = (Quotient.mk(RationalRepresentative.make(n1, d1))
-                     : Rational)
+            calc Rational.fraction(n2, d2)
+               = Rational.fraction(n1, d1)
                      by Equality.symmetry(
                             Quotient.sound(
                                 RationalRepresentative, RationalEquivalent,
@@ -583,14 +525,10 @@ theorem Rational.reciprocal_function_at_rational_rep_respect
           }
         | no mkFirstIsNonzero => {
             -- Non-zero branch: uniqueness of inverse via multiplication.
-            claim ¬((Quotient.mk(
-                         RationalRepresentative.make(n2, d2))
-                         : Rational)
+            claim ¬(Rational.fraction(n2, d2)
                         = Rational.zero);
-            claim (Quotient.mk(RationalRepresentative.make(n1, d1))
-                       : Rational)
-                  = (Quotient.mk(RationalRepresentative.make(n2, d2))
-                         : Rational)
+            claim Rational.fraction(n1, d1)
+                  = Rational.fraction(n2, d2)
               by Quotient.sound(
                      RationalRepresentative, RationalEquivalent,
                      RationalRepresentative.make(n1, d1),
@@ -606,17 +544,14 @@ theorem Rational.reciprocal_function_at_rational_rep_respect
             --   = reciprocal(n2, d2)
             calc Rational.reciprocal_at_integer(n1, d1)
                = Rational.one * Rational.reciprocal_at_integer(n1, d1)
-               = ((Quotient.mk(RationalRepresentative.make(n2, d2))
-                       : Rational)
+               = (Rational.fraction(n2, d2)
                        * Rational.reciprocal_at_integer(n2, d2))
                    * Rational.reciprocal_at_integer(n1, d1)
-               = ((Quotient.mk(RationalRepresentative.make(n1, d1))
-                       : Rational)
+               = (Rational.fraction(n1, d1)
                        * Rational.reciprocal_at_integer(n2, d2))
                    * Rational.reciprocal_at_integer(n1, d1)
                = Rational.reciprocal_at_integer(n2, d2)
-                   * ((Quotient.mk(RationalRepresentative.make(n1, d1))
-                          : Rational)
+                   * (Rational.fraction(n1, d1)
                        * Rational.reciprocal_at_integer(n1, d1))
                = Rational.reciprocal_at_integer(n2, d2) * Rational.one
                = Rational.reciprocal_at_integer(n2, d2)
@@ -652,9 +587,7 @@ theorem Rational.reciprocal_function_multiplies
         (cases rep {
            | RationalRepresentative.make(n, d) =>
                function (mkNonzero
-                             : ¬((Quotient.mk(
-                                      RationalRepresentative.make(n, d))
-                                      : Rational)
+                             : ¬(Rational.fraction(n, d)
                                      = Rational.zero)) =>
                  Rational.reciprocal_at_integer_multiplies(n, d, mkNonzero)
          } : ¬((Quotient.mk(rep) : Rational) = Rational.zero)

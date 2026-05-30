@@ -49,10 +49,10 @@ import Rational.reciprocal
 -- and the numerator equality reduces to Integer.multiply_negate_left.
 theorem Rational.multiply_negate_left_at_representatives
         (n_x n_y : Integer) (d_x d_y : Natural)
-        : (Quotient.mk(RationalRepresentative.make(-n_x, d_x)) : Rational)
-              * Quotient.mk(RationalRepresentative.make(n_y, d_y))
-          = -(Quotient.mk(RationalRepresentative.make(n_x, d_x))
-              * Quotient.mk(RationalRepresentative.make(n_y, d_y))) :=
+        : Rational.fraction(-n_x, d_x)
+              * Rational.fraction(n_y, d_y)
+          = -(Rational.fraction(n_x, d_x)
+              * Rational.fraction(n_y, d_y)) :=
   Integer.multiply_negate_left(n_x, n_y)
 
 theorem Rational.multiply_negate_left (x y : Rational)
@@ -67,9 +67,9 @@ theorem Rational.multiply_negate_left (x y : Rational)
                     | RationalRepresentative.make(n_y, d_y) =>
                         Rational.multiply_negate_left_at_representatives(
                             n_x, n_y, d_x, d_y)
-                  } : (-(Quotient.mk(RationalRepresentative.make(n_x, d_x)) : Rational))
+                  } : (-Rational.fraction(n_x, d_x))
                       * Quotient.mk(rep_y)
-                      = -(Quotient.mk(RationalRepresentative.make(n_x, d_x))
+                      = -(Rational.fraction(n_x, d_x)
                           * Quotient.mk(rep_y)))
            } : (-(Quotient.mk(rep_x) : Rational)) * Quotient.mk(rep_y)
                = -(Quotient.mk(rep_x) * Quotient.mk(rep_y))),
@@ -264,10 +264,8 @@ theorem Integer.scaled_succ_minus_natural_simplifies
 theorem Rational.succ_natural_minus_natural_form_at_rep
         (K d : Natural)
         : (successor(K) : Rational)
-              - Quotient.mk(RationalRepresentative.make((K : Integer), d))
-          = (Quotient.mk(RationalRepresentative.make(
-                            (successor(K * d + d) : Integer), d))
-                : Rational) :=
+              - Rational.fraction((K : Integer), d)
+          = Rational.fraction((successor(K * d + d) : Integer), d) :=
   -- LHS reduces (through Rational.add + Rational.negate β) to
   -- mk(make((succ K : I)·succ(d) + (-(K : I))·succ(0), d + 0·succ(d))).
   -- We Quotient.sound to mk(make((succ(K·d + d) : I), d)) by
@@ -306,7 +304,7 @@ theorem Rational.succ_natural_minus_natural_form_at_rep
 theorem Rational.absolute_value_natural_form_le_succ
         (K d : Natural)
         : Rational.LessOrEqual(
-              Quotient.mk(RationalRepresentative.make((K : Integer), d)),
+              Rational.fraction((K : Integer), d),
               (successor(K) : Rational)) :=
   -- Rational.LessOrEqual unfolds to Rational.IsNonneg of the diff.
   -- Transport the diff to the explicit mk(make((succ(K·d+d) : I), d))
@@ -322,14 +320,12 @@ theorem Rational.absolute_value_natural_form_le_succ
 theorem Rational.absolute_value_le_succ_natural_at_representative
         (n : Integer) (d : Natural)
         : Rational.LessOrEqual(
-              abs((Quotient.mk(RationalRepresentative.make(n, d)) : Rational)),
+              abs(Rational.fraction(n, d)),
               (successor(Integer.absolute_value_natural(n)) : Rational)) :=
   -- |q| at rep = mk(make(Integer.absolute_value(n), d)) which equals
   -- mk(make((K : I), d)) via the abs_value_natural_is_image bridge.
-  calc abs((Quotient.mk(RationalRepresentative.make(n, d)) : Rational))
-     = (Quotient.mk(RationalRepresentative.make(
-                        (Integer.absolute_value_natural(n) : Integer), d))
-           : Rational)
+  calc abs(Rational.fraction(n, d))
+     = Rational.fraction((Integer.absolute_value_natural(n) : Integer), d)
          by Integer.absolute_value_natural_is_image(n)
      ≤ (successor(Integer.absolute_value_natural(n)) : Rational)
          by Rational.absolute_value_natural_form_le_succ(
@@ -435,10 +431,8 @@ theorem Rational.reciprocal_of_succ_positive (K : Natural)
 theorem Rational.multiply_positive_at_representatives
         (k_x k_y d_x d_y : Natural)
         : Rational.zero
-            < Quotient.mk(RationalRepresentative.make(
-                              (successor(k_x) : Integer), d_x))
-                * Quotient.mk(RationalRepresentative.make(
-                                  (successor(k_y) : Integer), d_y)) := {
+            < Rational.fraction((successor(k_x) : Integer), d_x)
+                * Rational.fraction((successor(k_y) : Integer), d_y) := {
   -- The product at rep: mk(make((succ(k_x) : I) · (succ(k_y) : I), d_y + d_x · succ(d_y))).
   -- (succ(k_x) : I) · (succ(k_y) : I) = (succ(k_x) · succ(k_y) : I) = (succ(some) : I).
   -- IsNonneg follows from from_natural_is_nonneg.
@@ -446,10 +440,8 @@ theorem Rational.multiply_positive_at_representatives
   -- equation; reduces to (succ(k_x) · succ(k_y)) = 0 (Natural), false.
   claim productIsNonneg
       : Rational.IsNonneg(
-            Quotient.mk(RationalRepresentative.make(
-                            (successor(k_x) : Integer), d_x))
-              * Quotient.mk(RationalRepresentative.make(
-                                (successor(k_y) : Integer), d_y)))
+            Rational.fraction((successor(k_x) : Integer), d_x)
+              * Rational.fraction((successor(k_y) : Integer), d_y))
     by -- The numerator (succ(k_x) : I) · (succ(k_y) : I) =
        -- (succ(k_x) · succ(k_y) : I), IsNonneg.
        rewrite(
@@ -459,16 +451,12 @@ theorem Rational.multiply_positive_at_representatives
                successor(k_x) * successor(k_y)));
   claim productNonzero
       : Not(Rational.zero
-            = Quotient.mk(RationalRepresentative.make(
-                              (successor(k_x) : Integer), d_x))
-                * Quotient.mk(RationalRepresentative.make(
-                                  (successor(k_y) : Integer), d_y)))
+            = Rational.fraction((successor(k_x) : Integer), d_x)
+                * Rational.fraction((successor(k_y) : Integer), d_y))
     by function (zeroEqProduct
                     : Rational.zero
-                      = Quotient.mk(RationalRepresentative.make(
-                                        (successor(k_x) : Integer), d_x))
-                          * Quotient.mk(RationalRepresentative.make(
-                                            (successor(k_y) : Integer), d_y))) =>
+                      = Rational.fraction((successor(k_x) : Integer), d_x)
+                          * Rational.fraction((successor(k_y) : Integer), d_y)) =>
          -- Product at rep: make(succ(k_x)·succ(k_y) : I, d_y + d_x·succ(d_y)).
          -- Quotient.exact gives: 0 · succ(d_y + d_x·succ(d_y))
          --   = (succ(k_x)·succ(k_y) : I) · succ(zero).
@@ -514,10 +502,8 @@ theorem Rational.multiply_positive_at_representatives
                                 = Integer.zero));
   And.introduction(
       Rational.LessOrEqual_zero_of_IsNonneg(
-          Quotient.mk(RationalRepresentative.make(
-                          (successor(k_x) : Integer), d_x))
-              * Quotient.mk(RationalRepresentative.make(
-                                (successor(k_y) : Integer), d_y)),
+          Rational.fraction((successor(k_x) : Integer), d_x)
+              * Rational.fraction((successor(k_y) : Integer), d_y),
           productIsNonneg),
       productNonzero)
 }
@@ -535,7 +521,7 @@ theorem Rational.multiply_positive_positive
         Rational.strict_positive_witness_at_representative(
             n_x, d_x,
             Rational.IsNonneg_of_LessOrEqual_zero(
-                Quotient.mk(RationalRepresentative.make(n_x, d_x)),
+                Rational.fraction(n_x, d_x),
                 Rational.LessThan.weaken(xPos)),
             function (zeroEqNx : n_x = Integer.zero) =>
               Rational.LessThan.distinct(xPos)(
@@ -563,7 +549,7 @@ theorem Rational.multiply_positive_positive
         Rational.strict_positive_witness_at_representative(
             n_y, d_y,
             Rational.IsNonneg_of_LessOrEqual_zero(
-                Quotient.mk(RationalRepresentative.make(n_y, d_y)),
+                Rational.fraction(n_y, d_y),
                 Rational.LessThan.weaken(yPos)),
             function (zeroEqNy : n_y = Integer.zero) =>
               Rational.LessThan.distinct(yPos)(
@@ -589,17 +575,14 @@ theorem Rational.multiply_positive_positive
                                           * (successor(0) : Integer))));
       -- Transport to the (succ k_x, succ k_y) form.
       calc Rational.zero
-         < Quotient.mk(RationalRepresentative.make(
-                           (successor(k_x) : Integer), d_x))
-               * Quotient.mk(RationalRepresentative.make(
-                                 (successor(k_y) : Integer), d_y))
+         < Rational.fraction((successor(k_x) : Integer), d_x)
+               * Rational.fraction((successor(k_y) : Integer), d_y)
              by Rational.multiply_positive_at_representatives(
                     k_x, k_y, d_x, d_y)
-         = Quotient.mk(RationalRepresentative.make(n_x, d_x))
-               * Quotient.mk(RationalRepresentative.make(
-                                 (successor(k_y) : Integer), d_y))
-         = Quotient.mk(RationalRepresentative.make(n_x, d_x))
-               * Quotient.mk(RationalRepresentative.make(n_y, d_y))
+         = Rational.fraction(n_x, d_x)
+               * Rational.fraction((successor(k_y) : Integer), d_y)
+         = Rational.fraction(n_x, d_x)
+               * Rational.fraction(n_y, d_y)
     } } }
 
 -- The ε construction: given ε > 0 and Natural K, produce a positive
