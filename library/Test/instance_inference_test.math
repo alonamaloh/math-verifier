@@ -1,0 +1,51 @@
+-- Stage 3 canonical instance inference. `instance <name>` registers a
+-- theorem proving a structure predicate as the canonical instance for its
+-- (structure, carrier) pair. A generic lemma whose structure / operation /
+-- instance arguments are IMPLICIT then has them filled from the registry,
+-- keyed by the carrier head — so a concrete call site writes none of the
+-- ceremony arguments.
+
+module Test.instance_inference_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.addition
+import Integer.negation
+import Integer.ring
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Integer.instances
+
+-- Register Integer's additive group as the canonical (IsGroup, Integer)
+-- instance.
+instance Integer.add_is_group
+
+-- A generic left-cancellation lemma with the structure / operation /
+-- instance arguments IMPLICIT. The carrier and operation are recoverable
+-- from the explicit arguments' types; the identity, inverse, and the
+-- `IsGroup` instance proof are NOT — those are what instance inference
+-- supplies from the registry.
+theorem cancel_left_inferred
+        {carrier : Type(0)}
+        {operation : carrier → carrier → carrier}
+        {identity : carrier}
+        {inverse : carrier → carrier}
+        {groupProof : IsGroup(carrier, operation, identity, inverse)}
+        (a b c : carrier)
+        (equation : operation(a, b) = operation(a, c))
+        : b = c :=
+  Group.cancel_left(carrier, operation, identity, inverse, groupProof,
+                    a, b, c, equation)
+
+-- Concrete use over Integer with NO ceremony arguments:
+--   carrier   = Integer       (from a : Integer)
+--   operation = Integer.add    (from the equation's `+`)
+--   identity  = Integer.zero   ┐ read off the registered
+--   inverse   = Integer.negate ┘ `Integer.add_is_group` instance's type
+--   groupProof = Integer.add_is_group  (from the registry)
+theorem integer_cancel (a b c : Integer)
+        (equation : a + b = a + c) : b = c :=
+  cancel_left_inferred(a, b, c, equation)

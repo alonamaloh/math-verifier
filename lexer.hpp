@@ -55,6 +55,7 @@ enum class TokenKind {
     KeywordField,           // `field` — field decision tactic (ring + reciprocal_function)
     KeywordConvention,      // `convention p : T with H` — name-bound implicit binder
     KeywordConstruction,    // `construction Name(args) : T := mk(...)` — canonical quotient intro (transparent definition)
+    KeywordInstance,        // `instance Name` — register a canonical structure instance (e.g. Integer ⇒ IsGroup)
     KeywordGiven,           // `given (P)` — look up the in-scope hypothesis of type P
     KeywordAs,              // `in (P) as h:` — name the arm's disjunct hypothesis
     KeywordRefining,        // `cases X refining h, …` — refine listed binders' types per case

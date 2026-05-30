@@ -901,13 +901,25 @@ struct SurfaceCoercionDeclaration {
     std::string functionName;
 };
 
+// `instance <name>` — registers `name` (a theorem proving a structure
+// predicate, e.g. `Integer.add_is_group : IsGroup(Integer, …)`) as the
+// CANONICAL instance for its (structure, carrier) pair. Generic lemmas
+// whose structure/operation/instance arguments are implicit then have
+// those arguments filled from this registry, keyed by the carrier head.
+// Mirrors the coercion registry's reject-on-ambiguity stance: a second
+// instance for the same (structure, carrier) is rejected, never guessed.
+struct SurfaceInstanceDeclaration {
+    std::string name;
+};
+
 using SurfaceTopStatement = std::variant<
     SurfaceImportDeclaration, SurfaceUsingDeclaration,
     SurfaceInductiveDeclaration, SurfaceAxiomDeclaration,
     SurfaceDefinitionDeclaration,
     SurfaceOperatorDeclaration, SurfaceOverloadDeclaration,
     SurfaceCoercionDeclaration,
-    SurfaceConventionDeclaration
+    SurfaceConventionDeclaration,
+    SurfaceInstanceDeclaration
 >;
 
 struct SurfaceModule {

@@ -370,6 +370,7 @@ private:
             case TokenKind::KeywordOverload:   return parseOverloadDeclaration();
             case TokenKind::KeywordCoercion:   return parseCoercionDeclaration();
             case TokenKind::KeywordConvention: return parseConventionDeclaration();
+            case TokenKind::KeywordInstance:   return parseInstanceDeclaration();
             case TokenKind::KeywordConstruction: {
                 // `construction Name(args) : T := body` — parses exactly
                 // like a (non-theorem) definition; the elaborator treats
@@ -523,6 +524,17 @@ private:
             throwHere("expected 'operators', 'literals', or '{' after '.'"
                       " in using directive");
         }
+        return declaration;
+    }
+
+    // `instance <qualifiedName>` — register a canonical structure
+    // instance. `<qualifiedName>` names an existing theorem whose type is
+    // (possibly under parameters) a structure predicate applied to a
+    // concrete carrier, e.g. `Integer.add_is_group`.
+    SurfaceInstanceDeclaration parseInstanceDeclaration() {
+        consumeAny();  // 'instance'
+        SurfaceInstanceDeclaration declaration;
+        declaration.name = consumeQualifiedNameString();
         return declaration;
     }
 

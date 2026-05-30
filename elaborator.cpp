@@ -806,6 +806,11 @@ private:
             elaborateConventionDeclaration(*convention);
             return;
         }
+        if (auto* instance =
+                std::get_if<SurfaceInstanceDeclaration>(&statement)) {
+            elaborateInstanceDeclaration(*instance);
+            return;
+        }
         throw ElaborateError("unhandled top-level statement variant");
     }
 
@@ -837,6 +842,76 @@ private:
             }
             conventionRegistry_[name] = entry;
         }
+    }
+
+    // `instance <name>` — register `name` as the canonical instance for
+    // its (structure, carrier) pair. v1 supports concrete-carrier,
+    // non-parameterized instances (e.g. `Integer.add_is_group :
+    // IsGroup(Integer, …)`). Reject-on-ambiguity: a second instance for
+    // the same (structure, carrier) is refused, mirroring the coercion
+    // registry — never guess, never backtrack.
+    void elaborateInstanceDeclaration(
+        const SurfaceInstanceDeclaration& declaration) {
+        Frame frame(*this, "instance '" + declaration.name + "'");
+        const Declaration* decl = environment_.lookup(declaration.name);
+        if (!decl) {
+            throwElaborate("instance: unknown name '"
+                           + declaration.name + "'");
+        }
+        ExpressionPointer type = declarationType(*decl);
+        if (!type) {
+            throwElaborate("instance '" + declaration.name
+                           + "': could not determine its type");
+        }
+        // v1: the type must be DIRECTLY a structure application — not a
+        // Pi. A parameterized instance (e.g. IntegerMod's, whose type is
+        // `Π modulus. IsGroup(IntegerMod(modulus), …)`) would need the
+        // parameter threaded at the resolution site; out of scope here.
+        if (std::get_if<Pi>(&type->node)) {
+            throwElaborate(
+                "instance '" + declaration.name + "': parameterized "
+                "instances (a Pi type) are not supported yet — register a "
+                "concrete-carrier instance such as `Integer.add_is_group`");
+        }
+        std::string structureName = headConstantName(type);
+        // Collect the structure application's arguments (reverse order).
+        std::vector<ExpressionPointer> reversedArguments;
+        ExpressionPointer cursor = type;
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            reversedArguments.push_back(application->argument);
+            cursor = application->function;
+        }
+        if (structureName == "<unknown>" || reversedArguments.empty()) {
+            throwElaborate(
+                "instance '" + declaration.name + "': its type is not a "
+                "structure predicate applied to a carrier (expected e.g. "
+                "`IsGroup(Carrier, …)`)");
+        }
+        // The carrier is the FIRST argument (last collected).
+        ExpressionPointer carrierArgument = reversedArguments.back();
+        std::string carrierName = headConstantName(carrierArgument);
+        if (carrierName == "<unknown>") {
+            throwElaborate(
+                "instance '" + declaration.name + "': could not determine "
+                "the carrier head of its structure type");
+        }
+        auto key = std::make_pair(structureName, carrierName);
+        auto existing = canonicalInstanceRegistry_.find(key);
+        if (existing != canonicalInstanceRegistry_.end()
+            && existing->second.termName != declaration.name) {
+            throwElaborate(
+                "instance ambiguity: (" + structureName + ", "
+                + carrierName + ") already has canonical instance '"
+                + existing->second.termName + "'; refusing to also "
+                "register '" + declaration.name + "' (reject-on-"
+                "ambiguity, like the coercion registry)");
+        }
+        CanonicalInstanceEntry entry;
+        entry.termName = declaration.name;
+        entry.type = type;
+        entry.universeParameters = declarationUniverseParameters(*decl);
+        canonicalInstanceRegistry_[key] = std::move(entry);
     }
 
     // Validate and register an `operator (sym) on (T1, T2) := F`
@@ -17130,6 +17205,10 @@ private:
         // serving as a metavariable.
         std::vector<std::string> leadingFreshNames;
         std::set<std::string> metavariableNames;
+        // The i-th leading binder's domain, expressed with the earlier
+        // leading metavariables (fresh FreeVariables) substituted in.
+        // Used by the canonical-instance resolution pass below.
+        std::vector<ExpressionPointer> leadingDomains;
         ExpressionPointer cursor = instantiatedDeclarationType;
         for (int i = 0; i < numLeadingToInfer; ++i) {
             auto* pi = std::get_if<Pi>(&cursor->node);
@@ -17144,6 +17223,7 @@ private:
                 + diagnosticName;
             leadingFreshNames.push_back(fresh);
             metavariableNames.insert(fresh);
+            leadingDomains.push_back(pi->domain);
             cursor = openBinder(pi->codomain, fresh,
                                  FreeVariableOrigin::Internal);
         }
@@ -17272,6 +17352,60 @@ private:
             assignment[trailingArgumentFresh] = kernelTrailingArgument;
             cursor = openBinder(pi->codomain, trailingArgumentFresh,
                                  FreeVariableOrigin::Internal);
+        }
+
+        // Canonical-instance resolution (Stage 3). For any still-unassigned
+        // leading implicit whose domain is a registered structure
+        // predicate applied to a now-resolved CONCRETE carrier (e.g.
+        // `groupProof : IsGroup(Integer, …)` once `carrier := Integer` was
+        // recovered from an explicit arg), fill it from the canonical-
+        // instance registry and unify the instance's type against the
+        // domain — that fills the sibling operation/identity/inverse
+        // implicits with the instance's concrete operations. Gated on the
+        // registry being non-empty, so non-structure calls are unaffected.
+        if (!canonicalInstanceRegistry_.empty()) {
+            bool madeProgress = true;
+            while (madeProgress) {
+                madeProgress = false;
+                for (int i = 0; i < numLeadingToInfer; ++i) {
+                    const std::string& metaName = leadingFreshNames[i];
+                    if (assignment.count(metaName)) continue;
+                    ExpressionPointer domain = substituteFreeVariables(
+                        leadingDomains[i], assignment);
+                    std::string structureName = headConstantName(domain);
+                    if (structureName == "<unknown>") continue;
+                    // First argument of the structure application is the
+                    // carrier; collect the spine and read it off.
+                    ExpressionPointer spine = domain;
+                    ExpressionPointer carrierArgument;
+                    while (auto* application =
+                               std::get_if<Application>(&spine->node)) {
+                        carrierArgument = application->argument;
+                        spine = application->function;
+                    }
+                    if (!carrierArgument) continue;
+                    std::string carrierName =
+                        headConstantName(carrierArgument);
+                    if (carrierName == "<unknown>") continue;
+                    auto entry = canonicalInstanceRegistry_.find(
+                        std::make_pair(structureName, carrierName));
+                    if (entry == canonicalInstanceRegistry_.end()) continue;
+                    // v1: only universe-monomorphic instances (the
+                    // concrete-carrier ones we register) — emit the bare
+                    // constant. Universe-polymorphic instances would need
+                    // universe-argument inference, deferred.
+                    if (!entry->second.universeParameters.empty()) continue;
+                    // Fill the sibling structure-argument metavariables by
+                    // unifying the domain against the instance's type, then
+                    // assign the instance term itself.
+                    unifyConstructorParameters(
+                        domain, entry->second.type,
+                        metavariableNames, assignment);
+                    assignment[metaName] =
+                        makeConstant(entry->second.termName);
+                    madeProgress = true;
+                }
+            }
         }
 
         // If any leading value still remains unassigned after forward
@@ -22016,6 +22150,20 @@ private:
     // `by_representatives` (and, later, the printer) can fold a
     // representative term back to the named form.
     std::set<std::string> canonicalConstructions_;
+    // Canonical-instance registry (Stage 3 instance inference). Keyed by
+    // (structureHeadName, carrierHeadName) — e.g. ("IsGroup", "Integer").
+    // Maps to the instance theorem's name and its (structure-application)
+    // type, so a structure-typed implicit argument with a resolved
+    // concrete carrier can be filled, and the sibling operation/identity/
+    // inverse implicits read off the instance's type. Reject-on-ambiguity
+    // at registration (see elaborateInstanceDeclaration).
+    struct CanonicalInstanceEntry {
+        std::string termName;
+        ExpressionPointer type;
+        std::vector<std::string> universeParameters;
+    };
+    std::map<std::pair<std::string, std::string>, CanonicalInstanceEntry>
+        canonicalInstanceRegistry_;
     // Memoized result of "does definition X's body transitively
     // reference constant Y as a head?" — used by the `decide`
     // elaborator's WHNF walker to skip Applications whose head

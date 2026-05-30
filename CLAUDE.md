@@ -291,6 +291,56 @@ consider making them implicit: `{p : Natural} {primality :
 Natural.is_prime(p)}`. Existing PAdic code uses explicit form for
 historical reasons; migration is a planned cleanup.
 
+## Canonical instances — `instance` and instance inference
+
+`instance <name>` registers a theorem that proves a structure predicate
+(`IsMonoid` / `IsGroup` / `IsRing` / …) as the **canonical instance** for
+its `(structure, carrier)` pair. A generic lemma whose structure,
+operation, and instance arguments are *implicit* then has them filled
+from the registry at concrete call sites — keyed by the carrier head.
+
+```math
+instance Integer.add_is_group   -- registers (IsGroup, Integer)
+
+theorem cancel_left_inferred
+        {carrier : Type(0)}
+        {operation : carrier → carrier → carrier}
+        {identity : carrier}
+        {inverse : carrier → carrier}
+        {groupProof : IsGroup(carrier, operation, identity, inverse)}
+        (a b c : carrier)
+        (equation : operation(a, b) = operation(a, c))
+        : b = c := …
+
+-- Concrete call: carrier (from `a`) and operation (from the `+` in the
+-- equation) come from the explicit args; identity / inverse / groupProof
+-- are read off the registered `Integer.add_is_group` instance. No
+-- ceremony arguments.
+theorem integer_cancel (a b c : Integer) (equation : a + b = a + c)
+        : b = c :=
+  cancel_left_inferred(a, b, c, equation)
+```
+
+Resolution rule (mirrors the coercion registry): **at most one instance
+per `(structure, carrier)`**. Registering a second is rejected with a
+diagnostic — never guessed, never backtracked.
+
+Scope / limits (v1):
+- **Concrete carriers only.** The instance type must be a structure
+  application on a concrete carrier (`IsGroup(Integer, …)`), not a Pi —
+  parameterized instances (e.g. `IntegerMod(m)`'s) are not yet
+  registerable.
+- **Generic consumers still pass instances explicitly.** A generic lemma
+  that consumes another generic lemma over the *same abstract* carrier
+  (e.g. `Ring.zero_multiply` calling `Group.cancel_left` with the
+  ring's derived `addGroupProof`) has no concrete carrier to key on, so
+  it still passes the instance by hand. Resolving a structure-typed
+  implicit from an in-scope hypothesis (local-instance search) is the
+  natural follow-on that would let those drop the ceremony too.
+- For carriers the `ring` / `field` tactics already cover, prefer those —
+  instance inference is for hand-cited structure lemmas they can't
+  discharge (cancellation, inverse-uniqueness, …).
+
 ## Naming
 
 - **No abbreviations in identifiers.** `representative`, not `rep` (in
