@@ -1,0 +1,92 @@
+-- Polynomial/multiplication.math
+--
+-- Multiplication of polynomials over a bundled ring. Built from two
+-- helpers on coefficient lists:
+--   * `scale(a, q)` multiplies every coefficient of q by a (on the
+--     left) — the i-th coefficient is `a · q_i`;
+--   * `shift(q)` multiplies by x (prepends a zero coefficient).
+-- Then `(a + x·restA) · q = a·q + x·(restA·q)`, the standard recursion:
+--   multiply(cons(a, restA), q) = scale(a, q) + shift(multiply(restA, q)).
+--
+-- This file sets up the operations and their coefficient (`nth`)
+-- bridges. The convolution bridge for the full product, the respect
+-- proof, the lift to `Polynomial.multiply`, and the ring laws build on
+-- these.
+
+module Polynomial.multiplication
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring_bundle
+import Polynomial.basics
+import Polynomial.addition
+
+-- ----------------------------------------------------------------------
+-- Scaling: multiply every coefficient by `a` on the left.
+
+definition Polynomial.Coefficients.scale (r : Ring) (a : Ring.carrier(r))
+        : Polynomial.Coefficients(Ring.carrier(r))
+          → Polynomial.Coefficients(Ring.carrier(r))
+  | Polynomial.Coefficients.nil =>
+      Polynomial.Coefficients.nil(Ring.carrier(r))
+  | Polynomial.Coefficients.cons(c, rest) =>
+      Polynomial.Coefficients.cons(Ring.carrier(r),
+          Ring.multiply(r, a, c),
+          Polynomial.Coefficients.scale(r, a, rest))
+
+-- Bridge: the i-th coefficient of `scale(a, p)` is `a · p_i`. The nil
+-- case needs `Ring.multiply_zero_right` (a · 0 = 0).
+theorem Polynomial.nth_scale (r : Ring) (a : Ring.carrier(r))
+        : (p : Polynomial.Coefficients(Ring.carrier(r)))
+          → (index : Natural)
+          → Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, a, p), index)
+            = Ring.multiply(r, a, Polynomial.coefficient(r, p, index))
+  | Polynomial.Coefficients.nil, index =>
+      Equality.symmetry(?, ?, Ring.multiply_zero_right(r, a))
+  | Polynomial.Coefficients.cons(c, rest), index =>
+      cases index {
+        | zero => reflexivity(Ring.carrier(r), Ring.multiply(r, a, c))
+        | successor(predecessor) =>
+            Polynomial.nth_scale(r, a, rest, predecessor)
+      }
+
+-- ----------------------------------------------------------------------
+-- Shifting: multiply by x (prepend a zero coefficient).
+
+definition Polynomial.Coefficients.shift (r : Ring)
+        (p : Polynomial.Coefficients(Ring.carrier(r)))
+        : Polynomial.Coefficients(Ring.carrier(r)) :=
+  Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r), p)
+
+-- Bridges: the 0-th coefficient of a shift is zero; the (j+1)-th is
+-- the j-th of the original. Both hold definitionally.
+theorem Polynomial.nth_shift_zero (r : Ring)
+        (p : Polynomial.Coefficients(Ring.carrier(r)))
+        : Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), 0)
+          = Ring.zero(r) :=
+  reflexivity(Ring.carrier(r), Ring.zero(r))
+
+theorem Polynomial.nth_shift_successor (r : Ring)
+        (p : Polynomial.Coefficients(Ring.carrier(r))) (j : Natural)
+        : Polynomial.coefficient(r, Polynomial.Coefficients.shift(r, p), successor(j))
+          = Polynomial.coefficient(r, p, j) :=
+  reflexivity(Ring.carrier(r), Polynomial.coefficient(r, p, j))
+
+-- ----------------------------------------------------------------------
+-- Multiplication of coefficient lists: the standard recursion
+-- (a + x·restA) · q = a·q + x·(restA·q).
+
+definition Polynomial.Coefficients.multiply (r : Ring)
+        : Polynomial.Coefficients(Ring.carrier(r))
+          → Polynomial.Coefficients(Ring.carrier(r))
+          → Polynomial.Coefficients(Ring.carrier(r))
+  | Polynomial.Coefficients.nil, q =>
+      Polynomial.Coefficients.nil(Ring.carrier(r))
+  | Polynomial.Coefficients.cons(a, restA), q =>
+      Polynomial.Coefficients.add(r,
+          Polynomial.Coefficients.scale(r, a, q),
+          Polynomial.Coefficients.shift(r,
+              Polynomial.Coefficients.multiply(r, restA, q)))
