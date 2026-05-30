@@ -368,35 +368,44 @@ and confirm `instances.math` no longer needs lambda wrappers.
 
 ## Stage 0b — single `Quotient.induct` motive inference for parameterized quotients
 
-**Also a Stage-2-of-the-quotient-plan blocker (`by_representatives`).** The
-short forms `Quotient.induct_two` / `induct_three` infer their motive fine
-for a parameterized quotient, but the **single** `Quotient.induct(atRep, q)`
-(and bare `cases q`) does NOT when `q : C(param)` for a parameterized alias
-`C`:
-```
--- with x : IntegerMod(modulus):
-Quotient.induct(function (a : Integer) => …, x)
---> expected type: Natural   actual type: Π(modulus:Natural). IntegerMod modulus
-```
-The verbose `Quotient.induct(Integer, Integer.CongruentModulo(modulus),
-motive, atRep, x)` works (this is what `IntegerMod/ring.math` and `field.math`
-use for every unary law). Two sub-issues, likely the same root cause —
-the short-form T/R/motive recovery WHNF-unfolds `C(param)` too far:
-  - it can't recover `R` from `IntegerMod(m)` (over-unfolds past
-    `Integer.CongruentModulo` into the underlying `Integer.divides`
-    *existential*, then tries to use `Exists` as the relation); the
-    construction in `IntegerMod/operations.math` uses verbose
-    `Quotient.{mk,lift,sound}` throughout for this reason;
-  - the motive abstraction over a single scrutinee of parameterized-quotient
-    type yields the mis-typed application above.
+**STATUS (2026-05-29): the induct/cases half is DONE; one residual on
+`Quotient.sound`/`lift` remains.** Re-tested empirically: the single
+`Quotient.induct(atRep, x)` and bare `cases x { | a => … }` now infer
+their motive correctly for the parameterized alias `IntegerMod(modulus)`
+— the Pi-domain mismatch the plan recorded no longer reproduces (verified
+on the elaborator both before and after the Stage 0 implicit-insertion
+work, so an intervening fix already closed it). All six unary laws in
+`IntegerMod/ring.math` were rewritten from the verbose explicit-motive
+`Quotient.induct(Integer, Integer.CongruentModulo(modulus), motive,
+atRep, x)` to the short `Quotient.induct(atRep, x)`; build stays green.
+Short `Quotient.mk(rep)` also recovers `R` from the expected
+`IntegerMod(modulus)` correctly.
 
-**Acceptance:** `Quotient.induct(atRep, x)` and `cases x { | a => … }` elaborate
-for `x : IntegerMod(m)` with the motive inferred from the goal; rewrite the
-unary laws in `IntegerMod/ring.math` back to the short form and keep the
-build green.
+**Short `Quotient.{mk,sound,lift}` for parameterized aliases — now also
+DONE.** Two elaborator fixes (surface/elaboration only, no kernel change):
+  - `desugarQuotientSound`'s expected-type branch used
+    `closeOverLocalBinders` on `decomp.relation`/`carrierType`, but those
+    are sub-expressions of the (already closed) `expectedType` — exactly
+    as `desugarQuotientMk` uses them directly. Re-closing shifted the
+    `modulus` BoundVariable (`closeAtDepth` bumps any index `>= depth`),
+    leaking `kernel: internal: bare BoundVariable reached inferType`. For
+    non-parameterized relations (bare `Constant`s, no BoundVariables) the
+    extra close was a silent no-op, which is why only parameterized
+    aliases tripped it. Fix: use `decomp.*` directly.
+  - `desugarQuotientSound`'s proof-type fallback (hit when no expected
+    type is propagated — e.g. a short `Quotient.sound` inside a short
+    `Quotient.lift` respect handler) WHNF-ed the proof's type *first*,
+    over-unfolding a Definition-headed relation
+    (`Integer.CongruentModulo(modulus)` → `Integer.divides` → `Exists`)
+    and recovering the wrong head. Fix: extract `R` structurally from the
+    proof type as written (where `R` already appears applied to its two
+    args) and only WHNF as a secondary attempt.
 
-(Both Stage 0 items are surface/elaboration only — no kernel change — and
-each has a concrete green/red test in the shipped `IntegerMod` tree.)
+  `IntegerMod/operations.math` now uses the short
+  `Quotient.{mk,lift,sound}` forms throughout. Regression coverage:
+  `short_mk` / `short_sound` in `library/Test/integer_mod_test.math`,
+  plus the whole `operations.math` construction (the short lift +
+  inner-sound-without-expected-type path). **Stage 0b is fully closed.**
 
 ---
 

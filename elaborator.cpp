@@ -20241,12 +20241,19 @@ private:
                                 &eqMid->function->node)) {
                         QuotientDecomposition decomp;
                         if (tryDecomposeQuotient(eqInner->argument, decomp)) {
-                            carrierType = closeOverLocalBinders(
-                                decomp.carrierType, localBinders,
-                                localBinders.size());
-                            relation = closeOverLocalBinders(
-                                decomp.relation, localBinders,
-                                localBinders.size());
+                            // `decomp.*` are sub-expressions of
+                            // `expectedType`, which is already in
+                            // closed-over-localBinders form — use them
+                            // directly (as `desugarQuotientMk` does).
+                            // Re-closing here would shift any
+                            // BoundVariable the relation carries (e.g. the
+                            // `modulus` of a parameterized quotient
+                            // `IntegerMod(modulus)`), leaking a dangling
+                            // index. Non-parameterized relations are bare
+                            // constants, so the old extra close was a
+                            // silent no-op for them.
+                            carrierType = decomp.carrierType;
+                            relation = decomp.relation;
                             universeLevel = decomp.universeLevel;
                         }
                     }
@@ -20269,18 +20276,35 @@ private:
             universeLevel = typeUniverseOf(localBinders, xKernel);
         }
         if (!relation) {
-            // Fallback: pull `R` from proof's type as `R(x, y)`.
-            ExpressionPointer proofTypeOpened = weakHeadNormalForm(
-                environment_,
-                inferTypeInLocalContext(localBinders, proofKernel));
-            if (auto* outer = std::get_if<Application>(
-                    &proofTypeOpened->node)) {
-                if (auto* inner = std::get_if<Application>(
-                        &outer->function->node)) {
-                    relation = closeOverLocalBinders(
-                        inner->function, localBinders,
-                        localBinders.size());
+            // Fallback: pull `R` from proof's type as `R(x, y)`. Try the
+            // proof's type AS WRITTEN first — `R` already appears applied
+            // to its two arguments, so `inner->function` is exactly the
+            // relation. Only WHNF as a secondary attempt. WHNF-ing first
+            // would over-unfold a Definition-headed relation (e.g.
+            // `Integer.CongruentModulo(modulus)` → `Integer.divides` →
+            // the underlying `Exists`), recovering the wrong head — which
+            // is what breaks short `Quotient.sound` inside a short
+            // `Quotient.lift` respect handler, where no expected type is
+            // propagated to pin `R`.
+            ExpressionPointer proofTypeOpened =
+                inferTypeInLocalContext(localBinders, proofKernel);
+            auto extractRelation =
+                [&](ExpressionPointer proofType) -> ExpressionPointer {
+                if (auto* outer = std::get_if<Application>(
+                        &proofType->node)) {
+                    if (auto* inner = std::get_if<Application>(
+                            &outer->function->node)) {
+                        return closeOverLocalBinders(
+                            inner->function, localBinders,
+                            localBinders.size());
+                    }
                 }
+                return nullptr;
+            };
+            relation = extractRelation(proofTypeOpened);
+            if (!relation) {
+                relation = extractRelation(weakHeadNormalForm(
+                    environment_, proofTypeOpened));
             }
         }
         if (!relation) {

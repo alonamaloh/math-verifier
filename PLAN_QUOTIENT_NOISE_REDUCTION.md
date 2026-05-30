@@ -251,18 +251,20 @@ quotient surface hard and bear on the stages above:
   `construction` form for parameterized quotients — and that form should
   emit the verbose internal term, not rely on short-form inference.
 
-- **Single `Quotient.induct` / `cases` motive inference breaks for
-  parameterized quotients (directly hits Stage 2 `by_representatives`).**
-  `Quotient.induct_two` / `induct_three` infer their motive fine for
-  `IntegerMod(m)` / `Polynomial(R)`, but the **single** `Quotient.induct(atRep, q)`
-  and bare `cases q { | rep => … }` do NOT when `q`'s type is a
-  parameterized alias — they error with a Pi-domain mismatch. Workaround:
-  the verbose `Quotient.induct(T, R, motive, atRep, q)` with an explicit
-  motive (used for every unary law in `IntegerMod/ring.math` and
-  `Polynomial/*`). Stage 2's `by_representatives` desugaring must therefore
-  emit an explicit motive for the single-scrutinee case, or the underlying
-  inference must be fixed first. (Non-parameterized quotients —
-  Rational/Real/PAdic — are unaffected; single induct/cases works there.)
+- **Single `Quotient.induct` / `cases` motive inference for
+  parameterized quotients — RESOLVED (2026-05-29).** This was reported as
+  a Pi-domain mismatch and a Stage 2 `by_representatives` blocker, but it
+  no longer reproduces: `Quotient.induct(atRep, q)` and bare
+  `cases q { | rep => … }` now infer the motive for `q : IntegerMod(m)`,
+  and all six unary laws in `IntegerMod/ring.math` were rewritten from the
+  verbose explicit-motive form to the short form (build green). So Stage 2
+  does **not** need a special explicit-motive path for the single
+  scrutinee. The short `Quotient.sound` / `lift` over-unfolding gap for
+  parameterized aliases is **also fixed** (see
+  `PLAN_STRUCTURES_AND_INSTANCES.md` Stage 0b) — `IntegerMod/operations.math`
+  now uses the short `Quotient.{mk,lift,sound}` forms throughout, so the
+  whole parameterized-quotient surface (intro, elim, construction) reads
+  the same as the non-parameterized one.
 
 - **Stage 3 `by computation` is lower-value than written.** A whole-step
   definitional equality is already closed by plain `reflexivity` (the

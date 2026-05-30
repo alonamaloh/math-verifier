@@ -11,10 +11,11 @@
 -- `modulus` is an implicit argument on the public operations,
 -- recovered from the type IntegerMod(modulus) of the operands — so
 -- call sites read as `IntegerMod.add(x, y)` and the operators below
--- dispatch cleanly. The quotient plumbing uses the verbose
--- Quotient.{mk,lift,sound} forms: the short forms can't recover the
--- relation `Integer.CongruentModulo(modulus)` by unfolding IntegerMod
--- (they over-unfold into the underlying `Integer.divides` existential).
+-- dispatch cleanly. The quotient plumbing uses the short
+-- Quotient.{mk,lift,sound} forms: their type/relation inference handles
+-- the parameterized alias IntegerMod(modulus) (recovering
+-- `Integer.CongruentModulo(modulus)` as the relation from the surrounding
+-- expected type).
 
 module IntegerMod.operations
 
@@ -74,7 +75,7 @@ theorem Integer.CongruentModulo.multiply_respects (modulus : Natural)
 
 definition IntegerMod.make (modulus : Natural) (a : Integer)
         : IntegerMod(modulus) :=
-  Quotient.mk(Integer, Integer.CongruentModulo(modulus), a)
+  Quotient.mk(a)
 
 -- ----------------------------------------------------------------------
 -- Addition. Lift Integer.add over both arguments. The first lift
@@ -85,12 +86,10 @@ definition IntegerMod.make (modulus : Natural) (a : Integer)
 definition IntegerMod.add_representative (modulus : Natural)
         (a : Integer) (y : IntegerMod(modulus)) : IntegerMod(modulus) :=
   Quotient.lift(
-      Integer, Integer.CongruentModulo(modulus), IntegerMod(modulus),
       function (b : Integer) => IntegerMod.make(modulus, a + b),
       function (b b' : Integer)
                (congruentB : Integer.CongruentModulo(modulus, b, b')) =>
           Quotient.sound(
-              Integer, Integer.CongruentModulo(modulus),
               a + b, a + b',
               Integer.CongruentModulo.add_respects(modulus, a, a, b, b',
                   Integer.CongruentModulo.reflexive(modulus, a), congruentB)),
@@ -104,7 +103,6 @@ theorem IntegerMod.add_representative_respects (modulus : Natural)
           = IntegerMod.add_representative(modulus, a', y) :=
   cases y { | b =>
     Quotient.sound(
-        Integer, Integer.CongruentModulo(modulus),
         a + b, a' + b,
         Integer.CongruentModulo.add_respects(modulus, a, a', b, b,
             congruentA, Integer.CongruentModulo.reflexive(modulus, b))) }
@@ -112,7 +110,6 @@ theorem IntegerMod.add_representative_respects (modulus : Natural)
 definition IntegerMod.add {modulus : Natural}
         (x y : IntegerMod(modulus)) : IntegerMod(modulus) :=
   Quotient.lift(
-      Integer, Integer.CongruentModulo(modulus), IntegerMod(modulus),
       function (a : Integer) => IntegerMod.add_representative(modulus, a, y),
       function (a a' : Integer)
                (congruentA : Integer.CongruentModulo(modulus, a, a')) =>
@@ -129,12 +126,10 @@ definition IntegerMod.add {modulus : Natural}
 definition IntegerMod.negate {modulus : Natural}
         (x : IntegerMod(modulus)) : IntegerMod(modulus) :=
   Quotient.lift(
-      Integer, Integer.CongruentModulo(modulus), IntegerMod(modulus),
       function (a : Integer) => IntegerMod.make(modulus, -a),
       function (a a' : Integer)
                (congruentA : Integer.CongruentModulo(modulus, a, a')) =>
           Quotient.sound(
-              Integer, Integer.CongruentModulo(modulus),
               -a, -a',
               Integer.CongruentModulo.negate_respects(modulus, a, a',
                   congruentA)),
@@ -146,12 +141,10 @@ definition IntegerMod.negate {modulus : Natural}
 definition IntegerMod.multiply_representative (modulus : Natural)
         (a : Integer) (y : IntegerMod(modulus)) : IntegerMod(modulus) :=
   Quotient.lift(
-      Integer, Integer.CongruentModulo(modulus), IntegerMod(modulus),
       function (b : Integer) => IntegerMod.make(modulus, a * b),
       function (b b' : Integer)
                (congruentB : Integer.CongruentModulo(modulus, b, b')) =>
           Quotient.sound(
-              Integer, Integer.CongruentModulo(modulus),
               a * b, a * b',
               Integer.CongruentModulo.multiply_respects(modulus, a, a, b, b',
                   Integer.CongruentModulo.reflexive(modulus, a), congruentB)),
@@ -165,7 +158,6 @@ theorem IntegerMod.multiply_representative_respects (modulus : Natural)
           = IntegerMod.multiply_representative(modulus, a', y) :=
   cases y { | b =>
     Quotient.sound(
-        Integer, Integer.CongruentModulo(modulus),
         a * b, a' * b,
         Integer.CongruentModulo.multiply_respects(modulus, a, a', b, b,
             congruentA, Integer.CongruentModulo.reflexive(modulus, b))) }
@@ -173,7 +165,6 @@ theorem IntegerMod.multiply_representative_respects (modulus : Natural)
 definition IntegerMod.multiply {modulus : Natural}
         (x y : IntegerMod(modulus)) : IntegerMod(modulus) :=
   Quotient.lift(
-      Integer, Integer.CongruentModulo(modulus), IntegerMod(modulus),
       function (a : Integer) => IntegerMod.multiply_representative(modulus, a, y),
       function (a a' : Integer)
                (congruentA : Integer.CongruentModulo(modulus, a, a')) =>
