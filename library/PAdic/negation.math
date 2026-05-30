@@ -169,54 +169,24 @@ theorem PAdic.negate_respects
               from equivalenceHypothesis(epsilon, epsilonPositive);
           witness N with
               function (m : Natural) (N_leq_m : N ≤ m) => {
-                claim absChain
-                      : Rational.padic_absolute_value(
-                            p, primality,
-                            PAdicCauchySequence.sequenceFunction(
-                                p, primality,
-                                PAdicCauchySequence.negate(
-                                    p, primality, rep1), m)
-                            - PAdicCauchySequence.sequenceFunction(
-                                  p, primality,
-                                  PAdicCauchySequence.negate(
-                                      p, primality, rep1Prime), m))
-                        = Rational.padic_absolute_value(
-                              p, primality,
-                              PAdicCauchySequence.sequenceFunction(
-                                  p, primality, rep1, m)
-                              - PAdicCauchySequence.sequenceFunction(
-                                    p, primality, rep1Prime, m))
-                  by calc Rational.padic_absolute_value(
-                              p, primality,
-                              PAdicCauchySequence.sequenceFunction(
-                                  p, primality,
-                                  PAdicCauchySequence.negate(
-                                      p, primality, rep1), m)
-                              - PAdicCauchySequence.sequenceFunction(
-                                    p, primality,
-                                    PAdicCauchySequence.negate(
-                                        p, primality, rep1Prime), m))
-                        = Rational.padic_absolute_value(
-                              p, primality,
-                              -PAdicCauchySequence.sequenceFunction(
-                                    p, primality, rep1, m)
-                              - PAdicCauchySequence.sequenceFunction(
-                                    p, primality,
-                                    PAdicCauchySequence.negate(
-                                        p, primality, rep1Prime), m))
-                        = Rational.padic_absolute_value(
-                              p, primality,
-                              -PAdicCauchySequence.sequenceFunction(
-                                    p, primality, rep1, m)
-                              - -PAdicCauchySequence.sequenceFunction(
-                                    p, primality, rep1Prime, m))
-                        = Rational.padic_absolute_value(
-                              p, primality,
-                              PAdicCauchySequence.sequenceFunction(
-                                  p, primality, rep1, m)
-                              - PAdicCauchySequence.sequenceFunction(
-                                    p, primality, rep1Prime, m));
-                rewrite(Equality.symmetry(absChain), origAtN(m, N_leq_m))
+                let sx : Rational :=
+                    PAdicCauchySequence.sequenceFunction(p, primality, rep1, m);
+                let sxPrime : Rational :=
+                    PAdicCauchySequence.sequenceFunction(p, primality, rep1Prime, m);
+                -- Bridge each sf(negate(rep), m) to -sx one operand at a
+                -- time (sequenceFunction_negate, auto), then ring rewrites
+                -- `-sx - -sxPrime` to `sx - sxPrime`, the bound origAtN gives.
+                calc Rational.padic_absolute_value(p, primality,
+                         PAdicCauchySequence.sequenceFunction(p, primality, PAdicCauchySequence.negate(p, primality, rep1), m)
+                         - PAdicCauchySequence.sequenceFunction(p, primality, PAdicCauchySequence.negate(p, primality, rep1Prime), m))
+                   = Rational.padic_absolute_value(p, primality,
+                         -sx - PAdicCauchySequence.sequenceFunction(p, primality, PAdicCauchySequence.negate(p, primality, rep1Prime), m))
+                   = Rational.padic_absolute_value(p, primality,
+                         -sx - -sxPrime)
+                   = Rational.padic_absolute_value(p, primality,
+                         sx - sxPrime)
+                   < epsilon
+                       by origAtN(m, N_leq_m)
               }
         } : ∃ (N : Natural).
               (m : Natural) → N ≤ m →
