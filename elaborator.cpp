@@ -20617,8 +20617,20 @@ private:
             *xSurface, localBinders);
         ExpressionPointer yKernel = elaborateExpression(
             *ySurface, localBinders);
+        // When the relation is already pinned (from the expected type),
+        // elaborate the proof against `R(x, y)` so a user-written lambda
+        // respect proof (e.g. `function (epsilon) => …` for a sequence-
+        // equivalence relation) receives the relation's codomain as its
+        // body's expected type — no `({ … } : …)` ascription needed. When
+        // R is not yet known (the no-expected-type case, where R is
+        // recovered FROM the proof's type below), pass no expected type.
+        ExpressionPointer proofExpectedType =
+            relation
+                ? makeApplication(
+                      makeApplication(relation, xKernel), yKernel)
+                : nullptr;
         ExpressionPointer proofKernel = elaborateExpression(
-            *proofSurface, localBinders);
+            *proofSurface, localBinders, proofExpectedType);
 
         if (!carrierType) {
             ExpressionPointer xTypeOpened =

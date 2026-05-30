@@ -1,0 +1,29 @@
+-- Regression: short `Quotient.sound(x, y, proof)` propagates the
+-- relation's type `R(x, y)` into the `proof` argument. When `R` is a
+-- function-valued relation (as for the Cauchy / p-adic sequence
+-- equivalences) and `proof` is a user-written `function (…) => <block>`,
+-- the block now receives the relation's codomain as its expected type —
+-- so an `obtain` / `witness` block needs NO `({ … } : …)` ascription.
+
+module Test.quotient_sound_lambda_test
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+
+inductive Seq : Type(0) where
+  | Seq.make : (Natural → Natural) → Seq
+
+-- A function-valued equivalence relation, the shape that forced the
+-- ascription before the fix.
+definition SeqEquiv (a b : Seq) : Proposition :=
+  (e : Natural) → ∃ (n : Natural). n = n
+
+theorem sound_lambda_no_ascription (a b : Seq)
+        (h : (e : Natural) → ∃ (n : Natural). n = n)
+        : (Quotient.mk(a) : Quotient(Seq, SeqEquiv)) = Quotient.mk(b) :=
+  Quotient.sound(a, b,
+      function (e : Natural) =>
+        { obtain ⟨n, equation⟩ from h(e); witness n with equation })
