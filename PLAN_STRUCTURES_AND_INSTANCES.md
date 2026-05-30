@@ -201,6 +201,26 @@ instance Integer.is_commutative_ring   -- registers Integer ⇒ IsCommutativeRin
 - Effort: medium–large. Risk: medium (unifier extension + universe-arg
   inference). **Highest leverage item in this plan.**
 
+  **NOTE (2026-05-29): the stated acceptance site is stale — pick a new
+  one before building.** A survey of the library found **no** verbose
+  hand-citations of generic `Ring.*` / `Group.*` lemmas: the `ring` /
+  `field` tactics already fill the carrier/op/instance arguments
+  internally, and the per-carrier wrappers were removed in favour of
+  `:= ring`. So leak #1's threading pain is currently *hidden by the
+  tactics*, and there is no existing `Rational/ring.math` call site for
+  instance inference to simplify. H1 is still worthwhile as a
+  *future-facing* feature (a later abstract-algebra / category-theory
+  layer, or enabling hand-cited group/field lemmas that `ring` can't
+  discharge — e.g. cancellation, inverse-uniqueness), but its immediate
+  payoff is muted. Whoever picks this up should (a) choose a concrete
+  target where the threading is actually written by hand — most likely
+  the bundled `Ring` / `Polynomial` development in
+  `Algebra/ring_bundle.math` + `Polynomial/*`, which threads `r : Ring`
+  explicitly — and (b) write a fresh acceptance test, since the planned
+  one no longer exists. F1 (leading-implicit insertion) — H1's
+  prerequisite — is now landed, so the ground is ready when a target is
+  chosen.
+
 ---
 
 ## Category theory: what this plan unlocks, and what it does NOT
