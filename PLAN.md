@@ -39,7 +39,7 @@ column as items land.
 
 ## Items deliberately deferred
 
-- **Inductive parameters and indices.** `List A`, `Vec A n` aren't expressible yet. Substantial work (~500 LOC), affects the recursor builder, no urgent soundness implication at the current expressiveness level.
+- **Inductive parameters: NOW SUPPORTED (verified 2026-05-29).** Type-parameterized inductives like `MyList (A : Type(0))` work end to end — declaration, recursor, structural-recursion pattern-match definitions (`append`), and `by_induction` proofs (with qualified `case MyList.cons(a, rest):` labels) all verify. So `List(A)`, `Polynomial(R)`, etc. are expressible today; this item is closed. (Indices proper — `Vec A n` where the index varies per constructor — were not re-tested and may still be open; parameters that stay fixed across constructors are fine.)
 - **Direct recursion in `addDefinition`.** Currently we don't allow it; recursion happens through recursors. Would need a termination check (structural recursion / sized types / `Acc`).
 - **Mutual induction.** Multiple inductives defined together. Real but niche.
 - **Performance.** No hash-consing, no reduction caching. Fine for our scale.
