@@ -1,0 +1,322 @@
+-- Polynomial/multiply_laws.math
+--
+-- The multiplicative ring laws for polynomials over a bundled ring:
+-- the two distributivity laws, the multiplicative identities, and
+-- associativity. Each is proved first at the coefficient-list level as
+-- an `ExtensionallyEqual` (a per-index identity established through the
+-- convolution bridge `nth_multiply` and the `Sum` algebra), then lifted
+-- to `Polynomial.*` by `Quotient.induct` + `make_equal_of_coefficients_equal`.
+
+module Polynomial.multiply_laws
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.monus
+import Algebra.ring_bundle
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+import Polynomial.summation
+import Polynomial.multiplication
+
+-- ----------------------------------------------------------------------
+-- Left distributivity: p · (q + s) = p·q + p·s, at the coefficient
+-- level. Proved in the "expanded ⇒ folded" direction (all forward
+-- congruences) and reflected with a final symmetry.
+
+theorem Polynomial.Coefficients.multiply_distributivity_left (r : Ring)
+        (p q s : Polynomial.Coefficients(Ring.carrier(r)))
+        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
+              Polynomial.Coefficients.multiply(r, p, Polynomial.Coefficients.add(r, q, s)),
+              Polynomial.Coefficients.add(r,
+                  Polynomial.Coefficients.multiply(r, p, q),
+                  Polynomial.Coefficients.multiply(r, p, s))) :=
+  function (k : Natural) =>
+      Equality.symmetry(?, ?,
+          calc Polynomial.coefficient(r,
+                   Polynomial.Coefficients.add(r,
+                       Polynomial.Coefficients.multiply(r, p, q),
+                       Polynomial.Coefficients.multiply(r, p, s)), k)
+             = Ring.add(r,
+                   Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, p, q), k),
+                   Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, p, s), k))
+                   by Polynomial.nth_add(r,
+                          Polynomial.Coefficients.multiply(r, p, q),
+                          Polynomial.Coefficients.multiply(r, p, s), k)
+             = Ring.add(r,
+                   Polynomial.Sum(r,
+                       function (i : Natural) =>
+                           Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                               Polynomial.coefficient(r, q, Natural.monus(k, i))), k),
+                   Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, p, s), k))
+                   by Polynomial.nth_multiply(r, p, q, k)
+             = Ring.add(r,
+                   Polynomial.Sum(r,
+                       function (i : Natural) =>
+                           Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                               Polynomial.coefficient(r, q, Natural.monus(k, i))), k),
+                   Polynomial.Sum(r,
+                       function (i : Natural) =>
+                           Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                               Polynomial.coefficient(r, s, Natural.monus(k, i))), k))
+                   by Polynomial.nth_multiply(r, p, s, k)
+             = Polynomial.Sum(r,
+                   function (i : Natural) =>
+                       Ring.add(r,
+                           Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                               Polynomial.coefficient(r, q, Natural.monus(k, i))),
+                           Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                               Polynomial.coefficient(r, s, Natural.monus(k, i)))), k)
+                   by Equality.symmetry(?, ?,
+                          Polynomial.Sum.add(r,
+                              function (i : Natural) =>
+                                  Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                                      Polynomial.coefficient(r, q, Natural.monus(k, i))),
+                              function (i : Natural) =>
+                                  Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                                      Polynomial.coefficient(r, s, Natural.monus(k, i))),
+                              k))
+             = Polynomial.Sum(r,
+                   function (i : Natural) =>
+                       Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                           Ring.add(r,
+                               Polynomial.coefficient(r, q, Natural.monus(k, i)),
+                               Polynomial.coefficient(r, s, Natural.monus(k, i)))), k)
+                   by Polynomial.Sum.extensional(r,
+                          function (i : Natural) =>
+                              Ring.add(r,
+                                  Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                                      Polynomial.coefficient(r, q, Natural.monus(k, i))),
+                                  Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                                      Polynomial.coefficient(r, s, Natural.monus(k, i)))),
+                          function (i : Natural) =>
+                              Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                                  Ring.add(r,
+                                      Polynomial.coefficient(r, q, Natural.monus(k, i)),
+                                      Polynomial.coefficient(r, s, Natural.monus(k, i)))),
+                          function (i : Natural) =>
+                              Equality.symmetry(?, ?,
+                                  Ring.distributivity_left(r, Polynomial.coefficient(r, p, i),
+                                      Polynomial.coefficient(r, q, Natural.monus(k, i)),
+                                      Polynomial.coefficient(r, s, Natural.monus(k, i)))),
+                          k)
+             = Polynomial.Sum(r,
+                   function (i : Natural) =>
+                       Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                           Polynomial.coefficient(r, Polynomial.Coefficients.add(r, q, s), Natural.monus(k, i))), k)
+                   by Polynomial.Sum.extensional(r,
+                          function (i : Natural) =>
+                              Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                                  Ring.add(r,
+                                      Polynomial.coefficient(r, q, Natural.monus(k, i)),
+                                      Polynomial.coefficient(r, s, Natural.monus(k, i)))),
+                          function (i : Natural) =>
+                              Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                                  Polynomial.coefficient(r, Polynomial.Coefficients.add(r, q, s), Natural.monus(k, i))),
+                          function (i : Natural) =>
+                              congruenceOf(
+                                  function (w : Ring.carrier(r)) =>
+                                      Ring.multiply(r, Polynomial.coefficient(r, p, i), w),
+                                  Equality.symmetry(?, ?,
+                                      Polynomial.nth_add(r, q, s, Natural.monus(k, i)))),
+                          k)
+             = Polynomial.coefficient(r,
+                   Polynomial.Coefficients.multiply(r, p, Polynomial.Coefficients.add(r, q, s)), k)
+                   by Equality.symmetry(?, ?,
+                          Polynomial.nth_multiply(r, p, Polynomial.Coefficients.add(r, q, s), k)))
+
+theorem Polynomial.multiply_distributivity_left (r : Ring)
+        (x y z : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.multiply(r, x, Polynomial.add(r, y, z))
+          = Polynomial.add(r, Polynomial.multiply(r, x, y), Polynomial.multiply(r, x, z)) :=
+  Quotient.induct_three(
+      function (p q s : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.make_equal_of_coefficients_equal(r,
+              Polynomial.Coefficients.multiply(r, p, Polynomial.Coefficients.add(r, q, s)),
+              Polynomial.Coefficients.add(r,
+                  Polynomial.Coefficients.multiply(r, p, q),
+                  Polynomial.Coefficients.multiply(r, p, s)),
+              Polynomial.Coefficients.multiply_distributivity_left(r, p, q, s)),
+      x, y, z)
+
+-- ----------------------------------------------------------------------
+-- Right distributivity: (p + q) · s = p·s + q·s.
+
+theorem Polynomial.Coefficients.multiply_distributivity_right (r : Ring)
+        (p q s : Polynomial.Coefficients(Ring.carrier(r)))
+        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
+              Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.add(r, p, q), s),
+              Polynomial.Coefficients.add(r,
+                  Polynomial.Coefficients.multiply(r, p, s),
+                  Polynomial.Coefficients.multiply(r, q, s))) :=
+  function (k : Natural) =>
+      Equality.symmetry(?, ?,
+          calc Polynomial.coefficient(r,
+                   Polynomial.Coefficients.add(r,
+                       Polynomial.Coefficients.multiply(r, p, s),
+                       Polynomial.Coefficients.multiply(r, q, s)), k)
+             = Ring.add(r,
+                   Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, p, s), k),
+                   Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, q, s), k))
+                   by Polynomial.nth_add(r,
+                          Polynomial.Coefficients.multiply(r, p, s),
+                          Polynomial.Coefficients.multiply(r, q, s), k)
+             = Ring.add(r,
+                   Polynomial.Sum(r,
+                       function (i : Natural) =>
+                           Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                               Polynomial.coefficient(r, s, Natural.monus(k, i))), k),
+                   Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, q, s), k))
+                   by Polynomial.nth_multiply(r, p, s, k)
+             = Ring.add(r,
+                   Polynomial.Sum(r,
+                       function (i : Natural) =>
+                           Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                               Polynomial.coefficient(r, s, Natural.monus(k, i))), k),
+                   Polynomial.Sum(r,
+                       function (i : Natural) =>
+                           Ring.multiply(r, Polynomial.coefficient(r, q, i),
+                               Polynomial.coefficient(r, s, Natural.monus(k, i))), k))
+                   by Polynomial.nth_multiply(r, q, s, k)
+             = Polynomial.Sum(r,
+                   function (i : Natural) =>
+                       Ring.add(r,
+                           Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                               Polynomial.coefficient(r, s, Natural.monus(k, i))),
+                           Ring.multiply(r, Polynomial.coefficient(r, q, i),
+                               Polynomial.coefficient(r, s, Natural.monus(k, i)))), k)
+                   by Equality.symmetry(?, ?,
+                          Polynomial.Sum.add(r,
+                              function (i : Natural) =>
+                                  Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                                      Polynomial.coefficient(r, s, Natural.monus(k, i))),
+                              function (i : Natural) =>
+                                  Ring.multiply(r, Polynomial.coefficient(r, q, i),
+                                      Polynomial.coefficient(r, s, Natural.monus(k, i))),
+                              k))
+             = Polynomial.Sum(r,
+                   function (i : Natural) =>
+                       Ring.multiply(r,
+                           Ring.add(r, Polynomial.coefficient(r, p, i), Polynomial.coefficient(r, q, i)),
+                           Polynomial.coefficient(r, s, Natural.monus(k, i))), k)
+                   by Polynomial.Sum.extensional(r,
+                          function (i : Natural) =>
+                              Ring.add(r,
+                                  Ring.multiply(r, Polynomial.coefficient(r, p, i),
+                                      Polynomial.coefficient(r, s, Natural.monus(k, i))),
+                                  Ring.multiply(r, Polynomial.coefficient(r, q, i),
+                                      Polynomial.coefficient(r, s, Natural.monus(k, i)))),
+                          function (i : Natural) =>
+                              Ring.multiply(r,
+                                  Ring.add(r, Polynomial.coefficient(r, p, i), Polynomial.coefficient(r, q, i)),
+                                  Polynomial.coefficient(r, s, Natural.monus(k, i))),
+                          function (i : Natural) =>
+                              Equality.symmetry(?, ?,
+                                  Ring.distributivity_right(r, Polynomial.coefficient(r, p, i),
+                                      Polynomial.coefficient(r, q, i),
+                                      Polynomial.coefficient(r, s, Natural.monus(k, i)))),
+                          k)
+             = Polynomial.Sum(r,
+                   function (i : Natural) =>
+                       Ring.multiply(r,
+                           Polynomial.coefficient(r, Polynomial.Coefficients.add(r, p, q), i),
+                           Polynomial.coefficient(r, s, Natural.monus(k, i))), k)
+                   by Polynomial.Sum.extensional(r,
+                          function (i : Natural) =>
+                              Ring.multiply(r,
+                                  Ring.add(r, Polynomial.coefficient(r, p, i), Polynomial.coefficient(r, q, i)),
+                                  Polynomial.coefficient(r, s, Natural.monus(k, i))),
+                          function (i : Natural) =>
+                              Ring.multiply(r,
+                                  Polynomial.coefficient(r, Polynomial.Coefficients.add(r, p, q), i),
+                                  Polynomial.coefficient(r, s, Natural.monus(k, i))),
+                          function (i : Natural) =>
+                              congruenceOf(
+                                  function (w : Ring.carrier(r)) =>
+                                      Ring.multiply(r, w, Polynomial.coefficient(r, s, Natural.monus(k, i))),
+                                  Equality.symmetry(?, ?, Polynomial.nth_add(r, p, q, i))),
+                          k)
+             = Polynomial.coefficient(r,
+                   Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.add(r, p, q), s), k)
+                   by Equality.symmetry(?, ?,
+                          Polynomial.nth_multiply(r, Polynomial.Coefficients.add(r, p, q), s, k)))
+
+theorem Polynomial.multiply_distributivity_right (r : Ring)
+        (x y z : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.multiply(r, Polynomial.add(r, x, y), z)
+          = Polynomial.add(r, Polynomial.multiply(r, x, z), Polynomial.multiply(r, y, z)) :=
+  Quotient.induct_three(
+      function (p q s : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.make_equal_of_coefficients_equal(r,
+              Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.add(r, p, q), s),
+              Polynomial.Coefficients.add(r,
+                  Polynomial.Coefficients.multiply(r, p, s),
+                  Polynomial.Coefficients.multiply(r, q, s)),
+              Polynomial.Coefficients.multiply_distributivity_right(r, p, q, s)),
+      x, y, z)
+
+-- ----------------------------------------------------------------------
+-- Multiplicative identities. The coefficient list of 1 is [one]; the
+-- left identity is structural (1·p = scale(one, p) + shift(nil·p), and
+-- scale(one,·) is the identity coefficient-wise while the shift adds
+-- only zeros).
+
+theorem Polynomial.Coefficients.nth_cons_zero_nil (r : Ring) (k : Natural)
+        : Polynomial.coefficient(r,
+              Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r),
+                  Polynomial.Coefficients.nil(Ring.carrier(r))), k)
+          = Ring.zero(r) :=
+  cases k {
+    | zero => reflexivity(Ring.carrier(r), Ring.zero(r))
+    | successor(j) => reflexivity(Ring.carrier(r), Ring.zero(r))
+  }
+
+theorem Polynomial.Coefficients.multiply_one_left (r : Ring)
+        (p : Polynomial.Coefficients(Ring.carrier(r)))
+        : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
+              Polynomial.Coefficients.multiply(r,
+                  Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
+                      Polynomial.Coefficients.nil(Ring.carrier(r))),
+                  p),
+              p) :=
+  function (k : Natural) =>
+      calc Polynomial.coefficient(r,
+               Polynomial.Coefficients.multiply(r,
+                   Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
+                       Polynomial.Coefficients.nil(Ring.carrier(r))), p), k)
+         = Ring.add(r,
+               Polynomial.coefficient(r, Polynomial.Coefficients.scale(r, Ring.one(r), p), k),
+               Polynomial.coefficient(r,
+                   Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.nil(Ring.carrier(r)), p)), k))
+               by Polynomial.nth_add(r, Polynomial.Coefficients.scale(r, Ring.one(r), p),
+                      Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.nil(Ring.carrier(r)), p)), k)
+         = Ring.add(r,
+               Ring.multiply(r, Ring.one(r), Polynomial.coefficient(r, p, k)),
+               Polynomial.coefficient(r,
+                   Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.nil(Ring.carrier(r)), p)), k))
+               by Polynomial.nth_scale(r, Ring.one(r), p, k)
+         = Ring.add(r,
+               Polynomial.coefficient(r, p, k),
+               Polynomial.coefficient(r,
+                   Polynomial.Coefficients.shift(r, Polynomial.Coefficients.multiply(r, Polynomial.Coefficients.nil(Ring.carrier(r)), p)), k))
+               by Ring.one_multiply(r, Polynomial.coefficient(r, p, k))
+         = Ring.add(r, Polynomial.coefficient(r, p, k), Ring.zero(r))
+               by Polynomial.Coefficients.nth_cons_zero_nil(r, k)
+         = Polynomial.coefficient(r, p, k)
+               by Ring.add_zero(r, Polynomial.coefficient(r, p, k))
+
+theorem Polynomial.multiply_one_left (r : Ring)
+        (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.multiply(r, Polynomial.one(r), x) = x :=
+  cases x { | p =>
+    Polynomial.make_equal_of_coefficients_equal(r,
+        Polynomial.Coefficients.multiply(r,
+            Polynomial.Coefficients.cons(Ring.carrier(r), Ring.one(r),
+                Polynomial.Coefficients.nil(Ring.carrier(r))),
+            p),
+        p,
+        Polynomial.Coefficients.multiply_one_left(r, p)) }

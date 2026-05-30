@@ -151,6 +151,29 @@ theorem Ring.negate_zero (r : Ring)
       Ring.negate(r), additiveGroup)
 }
 
+-- Derived abelian rearrangement: (a+b)+(c+d) = (a+c)+(b+d). The
+-- four-term interchange, used by the Sum.add lemma.
+theorem Ring.add_four_swap (r : Ring) (a b c d : Ring.carrier(r))
+        : Ring.add(r, Ring.add(r, a, b), Ring.add(r, c, d))
+          = Ring.add(r, Ring.add(r, a, c), Ring.add(r, b, d)) := {
+  claim inner
+      : Ring.add(r, b, Ring.add(r, c, d)) = Ring.add(r, c, Ring.add(r, b, d))
+      by calc Ring.add(r, b, Ring.add(r, c, d))
+            = Ring.add(r, Ring.add(r, b, c), d)
+                  by Equality.symmetry(?, ?, Ring.add_associative(r, b, c, d))
+            = Ring.add(r, Ring.add(r, c, b), d)
+                  by Ring.add_commutative(r, b, c)
+            = Ring.add(r, c, Ring.add(r, b, d))
+                  by Ring.add_associative(r, c, b, d);
+  calc Ring.add(r, Ring.add(r, a, b), Ring.add(r, c, d))
+     = Ring.add(r, a, Ring.add(r, b, Ring.add(r, c, d)))
+           by Ring.add_associative(r, a, b, Ring.add(r, c, d))
+     = Ring.add(r, a, Ring.add(r, c, Ring.add(r, b, d)))
+           by congruenceOf(function (t : Ring.carrier(r)) => Ring.add(r, a, t), inner)
+     = Ring.add(r, Ring.add(r, a, c), Ring.add(r, b, d))
+           by Equality.symmetry(?, ?, Ring.add_associative(r, a, c, Ring.add(r, b, d)))
+}
+
 -- Derived annihilation: zero times anything (and anything times zero)
 -- is zero. From the generic ring lemmas applied to the bundle's fields.
 -- (Named with `_left`/`_right` to avoid colliding with the abstract
