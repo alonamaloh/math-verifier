@@ -17294,9 +17294,23 @@ private:
             }
             ExpressionPointer expectedDomain =
                 substituteFreeVariables(pi->domain, assignment);
+            // If the expected domain still mentions an unresolved leading
+            // metavariable, do NOT hand it to the trailing-arg
+            // elaboration: a nested call to the same (or a related)
+            // implicit-leading function would backward-bind its own
+            // implicits to OUR metavariables, leaving them unresolved —
+            // they then leak into the emitted term as unbound
+            // FreeVariables (e.g. `PAdic.add(PAdic.add(x, y), z)`).
+            // Elaborate the argument bottom-up to a concrete type instead;
+            // the unification below still uses `expectedDomain` to solve
+            // the metavariables from that concrete type.
+            ExpressionPointer expectedForArgument =
+                containsNamedFreeVariable(expectedDomain, metavariableNames)
+                    ? nullptr
+                    : expectedDomain;
             ExpressionPointer kernelTrailingArgument = elaborateExpression(
                 *trailingArgumentsSurface[j], localBinders,
-                expectedDomain);
+                expectedForArgument);
             // Infer the trailing arg's type WITHOUT normalising first, so a
             // Definition head (e.g. `Rational.LessOrEqual` for an `a ≤ b`
             // domain) is preserved and matches the Pi domain's head
@@ -17464,6 +17478,20 @@ private:
                                           metavariableNames, assignment);
         }
 
+        // A leading value derived by backward unification against an
+        // expectedType that was OPENED over the local binders (e.g. the
+        // generic-application path passes `pi->domain` from
+        // inferTypeInLocalContext, which is opened) is a pure local-binder
+        // FreeVariable term — it must be CLOSED back to BoundVariable form
+        // before it is emitted, or the kernel sees an unbound internal
+        // variable (`weak(Rational.LessThan.weaken(h))`). Forward-derived
+        // values are already closed and contain no such FreeVariable, so
+        // they are left untouched (closing them would over-shift their
+        // BoundVariables). The two never mix in one value.
+        std::set<std::string> localBinderOpeningNames;
+        for (size_t b = 0; b < localBinders.size(); ++b) {
+            localBinderOpeningNames.insert(openingNameFor(localBinders, b));
+        }
         CallInferenceResult result;
         std::vector<std::string> unassigned;
         std::vector<std::pair<std::string, ExpressionPointer>> assigned;
@@ -17472,8 +17500,14 @@ private:
             if (iterator == assignment.end()) {
                 unassigned.push_back(name);
             } else {
-                assigned.push_back({name, iterator->second});
-                result.leadingValues.push_back(iterator->second);
+                ExpressionPointer value = iterator->second;
+                if (containsNamedFreeVariable(value,
+                                              localBinderOpeningNames)) {
+                    value = closeOverLocalBinders(
+                        value, localBinders, localBinders.size());
+                }
+                assigned.push_back({name, value});
+                result.leadingValues.push_back(value);
             }
         }
         if (!unassigned.empty()) {
@@ -21496,6 +21530,31 @@ private:
     // that mention any such placeholder aren't substituted away later
     // and would leak into the assembled kernel term, so the unifier
     // rejects them.
+    // True if `expression` contains a FreeVariable whose name is in
+    // `names` (used to detect unresolved leading-inference metavariables).
+    bool containsNamedFreeVariable(
+        ExpressionPointer expression,
+        const std::set<std::string>& names) {
+        if (auto* freeVariable =
+                std::get_if<FreeVariable>(&expression->node)) {
+            return names.count(freeVariable->name) > 0;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return containsNamedFreeVariable(pi->domain, names)
+                || containsNamedFreeVariable(pi->codomain, names);
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return containsNamedFreeVariable(lambda->domain, names)
+                || containsNamedFreeVariable(lambda->body, names);
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return containsNamedFreeVariable(application->function, names)
+                || containsNamedFreeVariable(application->argument, names);
+        }
+        return false;
+    }
+
     bool containsValueArgumentFreeVar(ExpressionPointer expression) {
         if (auto* freeVariable =
                 std::get_if<FreeVariable>(&expression->node)) {

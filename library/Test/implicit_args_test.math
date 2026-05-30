@@ -55,6 +55,30 @@ theorem tagged_identity_bare_higher_order (m : Natural) (x : Tagged(m))
   apply_unary(m, tagged_identity, x)
 
 -- ----------------------------------------------------------------------
+-- Two leading-implicit emission regressions.
+
+definition tagged_binary {m : Natural} (x y : Tagged(m)) : Tagged(m) := x
+
+-- (1) NESTED same-function call in a position with no concrete expected
+-- type: the outer call must not hand its OWN unresolved metavariables to
+-- the inner call as an expected type (the inner would bind to them,
+-- leaving them unresolved and emitted unbound). Mirrors
+-- `PAdic.add(PAdic.add(x, y), z)`.
+theorem tagged_binary_nested (m : Natural) (x y z : Tagged(m))
+        : tagged_binary(tagged_binary(x, y), z)
+          = tagged_binary(tagged_binary(x, y), z) :=
+  reflexivity(Tagged(m), tagged_binary(tagged_binary(x, y), z))
+
+-- (2) Implicit-leading call elaborated against a LOCAL Pi-binder's domain
+-- (which arrives opened, as a FreeVariable): the inferred `{m}` must be
+-- closed back to a BoundVariable before emission. Mirrors
+-- `weak(Rational.LessThan.weaken(h))` in Rational.LessThan.lift.
+theorem tagged_identity_under_local_pi
+        (m : Natural) (w : Tagged(m) → Tagged(m)) (x : Tagged(m))
+        : Tagged(m) :=
+  w(tagged_identity(x))
+
+-- ----------------------------------------------------------------------
 -- Forward leading-implicit inference for a Definition-headed domain with
 -- NO expected type: a lemma whose implicit shape args appear only inside
 -- the proof arguments' types, called nested under a polymorphic head, so
