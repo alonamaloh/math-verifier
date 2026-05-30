@@ -72,6 +72,17 @@ struct CachedCoercionRegistration {
     std::vector<std::string> chain;
 };
 
+// Canonical-instance-registry entry added by this file. The derived key
+// fields (structure / carrier head names) and the carrier-parameter count
+// are stored; the instance's type is re-fetched from the loaded
+// declaration `termName` at replay time.
+struct CachedInstanceRegistration {
+    std::string structureName;
+    std::string carrierName;
+    std::string termName;
+    int parameterCount;
+};
+
 // The full contents of a .mathv file, prior to (de)serialization.
 struct CacheContents {
     std::string sourcePath;
@@ -89,6 +100,8 @@ struct CacheContents {
     // Coercion-registry entries added by this file (direct and the
     // transitive-closure entries that the direct one introduced).
     std::vector<CachedCoercionRegistration> coercionRegistrations;
+    // Canonical-instance-registry entries added by this file.
+    std::vector<CachedInstanceRegistration> instanceRegistrations;
 };
 
 // Write `contents` to `path`. Throws SerializationError on I/O failure.

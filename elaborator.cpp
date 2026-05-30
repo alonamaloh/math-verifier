@@ -898,9 +898,9 @@ private:
                 "instance '" + declaration.name + "': could not determine "
                 "the carrier head of its structure type");
         }
-        auto key = std::make_pair(structureName, carrierName);
-        auto existing = canonicalInstanceRegistry_.find(key);
-        if (existing != canonicalInstanceRegistry_.end()
+        auto key = std::make_tuple(structureName, carrierName);
+        auto existing = environment_.canonicalInstanceRegistry.find(key);
+        if (existing != environment_.canonicalInstanceRegistry.end()
             && existing->second.termName != declaration.name) {
             throwElaborate(
                 "instance ambiguity: (" + structureName + ", "
@@ -909,12 +909,12 @@ private:
                 "register '" + declaration.name + "' (reject-on-"
                 "ambiguity, like the coercion registry)");
         }
-        CanonicalInstanceEntry entry;
+        Environment::CanonicalInstance entry;
         entry.termName = declaration.name;
         entry.type = type;
         entry.parameterCount = parameterCount;
         entry.universeParameters = declarationUniverseParameters(*decl);
-        canonicalInstanceRegistry_[key] = std::move(entry);
+        environment_.canonicalInstanceRegistry[key] = std::move(entry);
     }
 
     // Validate and register an `operator (sym) on (T1, T2) := F`
@@ -17406,52 +17406,82 @@ private:
                     std::string carrierName =
                         headConstantName(carrierArgument);
 
-                    // --- Registry path: concrete / parameterized carrier.
+                    // --- Registry path. Open the instance's leading
+                    // parameter Pis as fresh metavariables and unify the
+                    // resulting structure application against the domain.
+                    // This solves the parameters from WHEREVER they appear
+                    // — in the carrier (`IsGroup(IntegerMod(m), …)`) or in
+                    // the relation (`IsEquivalenceRelation(Integer,
+                    // CongruentModulo(m))`) — and fills the domain's own
+                    // sibling metavariables. The instance is then emitted
+                    // applied to the solved parameters.
                     auto entry = (carrierName == "<unknown>")
-                        ? canonicalInstanceRegistry_.end()
-                        : canonicalInstanceRegistry_.find(
-                              std::make_pair(structureName, carrierName));
-                    if (entry != canonicalInstanceRegistry_.end()
+                        ? environment_.canonicalInstanceRegistry.end()
+                        : environment_.canonicalInstanceRegistry.find(
+                              std::make_tuple(structureName, carrierName));
+                    if (entry != environment_.canonicalInstanceRegistry.end()
                         && entry->second.universeParameters.empty()) {
-                        // The carrier's own arguments instantiate the
-                        // instance's leading value parameters (none for a
-                        // concrete carrier like Integer; `[m]` for the
-                        // parameterized `IntegerMod(m)`).
-                        std::vector<ExpressionPointer> carrierArguments;
-                        {
-                            ExpressionPointer carrierSpine = carrierArgument;
-                            while (auto* application =
-                                       std::get_if<Application>(
-                                           &carrierSpine->node)) {
-                                carrierArguments.push_back(
-                                    application->argument);
-                                carrierSpine = application->function;
-                            }
-                            std::reverse(carrierArguments.begin(),
-                                         carrierArguments.end());
+                        std::set<std::string> parameterMetavariables =
+                            metavariableNames;
+                        std::vector<std::string> parameterMetaNames;
+                        ExpressionPointer openedInstanceType =
+                            entry->second.type;
+                        bool opened = true;
+                        for (int k = 0; k < entry->second.parameterCount;
+                             ++k) {
+                            auto* pi = std::get_if<Pi>(
+                                &openedInstanceType->node);
+                            if (!pi) { opened = false; break; }
+                            std::string fresh = "_instanceParameter_"
+                                + std::to_string(k) + "_"
+                                + entry->second.termName;
+                            parameterMetavariables.insert(fresh);
+                            parameterMetaNames.push_back(fresh);
+                            openedInstanceType = openBinder(
+                                pi->codomain, fresh,
+                                FreeVariableOrigin::Internal);
                         }
-                        if (static_cast<int>(carrierArguments.size())
-                            == entry->second.parameterCount) {
-                            ExpressionPointer instantiatedType =
-                                entry->second.type;
-                            bool instantiated = true;
-                            for (const auto& carrierArg : carrierArguments) {
-                                auto* pi = std::get_if<Pi>(
-                                    &instantiatedType->node);
-                                if (!pi) { instantiated = false; break; }
-                                instantiatedType =
-                                    substitute(pi->codomain, 0, carrierArg);
+                        if (opened) {
+                            std::map<std::string, ExpressionPointer>
+                                instanceAssignment = assignment;
+                            // unifyConstructorParameters solves the
+                            // metavariables in its FIRST argument. Run both
+                            // directions: domain-first solves the domain's
+                            // sibling metavariables (operation/identity/…)
+                            // from the instance; instance-first solves the
+                            // instance's parameters from the domain.
+                            unifyConstructorParameters(
+                                domain, openedInstanceType,
+                                parameterMetavariables, instanceAssignment);
+                            unifyConstructorParameters(
+                                openedInstanceType, domain,
+                                parameterMetavariables, instanceAssignment);
+                            bool allSolved = true;
+                            for (const auto& p : parameterMetaNames) {
+                                if (!instanceAssignment.count(p)) {
+                                    allSolved = false; break;
+                                }
                             }
-                            if (instantiated) {
-                                unifyConstructorParameters(
-                                    domain, instantiatedType,
-                                    metavariableNames, assignment);
+                            if (allSolved) {
+                                // Merge the sibling domain-metavariable
+                                // solutions (substituting the parameters)
+                                // into the real assignment.
+                                for (const auto& nm : leadingFreshNames) {
+                                    if (assignment.count(nm)) continue;
+                                    auto it = instanceAssignment.find(nm);
+                                    if (it != instanceAssignment.end()) {
+                                        assignment[nm] =
+                                            substituteFreeVariables(
+                                                it->second,
+                                                instanceAssignment);
+                                    }
+                                }
                                 ExpressionPointer instanceTerm =
                                     makeConstant(entry->second.termName);
-                                for (const auto& carrierArg
-                                         : carrierArguments) {
+                                for (const auto& p : parameterMetaNames) {
                                     instanceTerm = makeApplication(
-                                        std::move(instanceTerm), carrierArg);
+                                        std::move(instanceTerm),
+                                        instanceAssignment[p]);
                                 }
                                 assignment[metaName] =
                                     std::move(instanceTerm);
@@ -22336,21 +22366,11 @@ private:
     // `by_representatives` (and, later, the printer) can fold a
     // representative term back to the named form.
     std::set<std::string> canonicalConstructions_;
-    // Canonical-instance registry (Stage 3 instance inference). Keyed by
-    // (structureHeadName, carrierHeadName) — e.g. ("IsGroup", "Integer").
-    // Maps to the instance theorem's name and its (structure-application)
-    // type, so a structure-typed implicit argument with a resolved
-    // concrete carrier can be filled, and the sibling operation/identity/
-    // inverse implicits read off the instance's type. Reject-on-ambiguity
-    // at registration (see elaborateInstanceDeclaration).
-    struct CanonicalInstanceEntry {
-        std::string termName;
-        ExpressionPointer type;        // full type, incl. any leading Pis
-        int parameterCount = 0;        // leading value Pis (carrier params)
-        std::vector<std::string> universeParameters;
-    };
-    std::map<std::pair<std::string, std::string>, CanonicalInstanceEntry>
-        canonicalInstanceRegistry_;
+    // The canonical-instance registry itself lives on `environment_`
+    // (kernel.hpp `Environment::canonicalInstanceRegistry`) so it persists
+    // across module imports, like the coercion/operator/overload
+    // registries. See elaborateInstanceDeclaration (registration, with
+    // reject-on-ambiguity) and the resolution pass in inferLeadingArguments.
     // Memoized result of "does definition X's body transitively
     // reference constant Y as a head?" — used by the `decide`
     // elaborator's WHNF walker to skip Applications whose head

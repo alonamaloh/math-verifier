@@ -5142,6 +5142,25 @@ void loadCacheRecursive(Environment& environment,
                                      entry.targetTypeName);
         environment.coercionRegistry[key] = entry.chain;
     }
+    for (const auto& entry : contents.instanceRegistrations) {
+        const Declaration* declaration = environment.lookup(entry.termName);
+        if (!declaration) continue;
+        Environment::CanonicalInstance instance;
+        instance.termName = entry.termName;
+        instance.parameterCount = entry.parameterCount;
+        if (auto* axiom = std::get_if<Axiom>(declaration)) {
+            instance.type = axiom->type;
+            instance.universeParameters = axiom->universeParameters;
+        } else if (auto* definition =
+                       std::get_if<Definition>(declaration)) {
+            instance.type = definition->type;
+            instance.universeParameters = definition->universeParameters;
+        } else {
+            continue;
+        }
+        environment.canonicalInstanceRegistry[std::make_tuple(
+            entry.structureName, entry.carrierName)] = std::move(instance);
+    }
     alreadyLoaded.insert(cachePath);
 }
 
@@ -5280,6 +5299,10 @@ int verifyWithCache(const std::string& sourcePath,
     for (const auto& [key, _] : environment.coercionRegistry) {
         coercionsBefore.insert(key);
     }
+    std::set<std::tuple<std::string, std::string>> instancesBefore;
+    for (const auto& [key, _] : environment.canonicalInstanceRegistry) {
+        instancesBefore.insert(key);
+    }
 
     std::vector<std::string> importedModules;
     try {
@@ -5377,6 +5400,16 @@ int verifyWithCache(const std::string& sourcePath,
             entry.targetTypeName = std::get<1>(key);
             entry.chain = chain;
             cache.coercionRegistrations.push_back(std::move(entry));
+        }
+    }
+    for (const auto& [key, instance] : environment.canonicalInstanceRegistry) {
+        if (!instancesBefore.count(key)) {
+            CachedInstanceRegistration entry;
+            entry.structureName = std::get<0>(key);
+            entry.carrierName = std::get<1>(key);
+            entry.termName = instance.termName;
+            entry.parameterCount = instance.parameterCount;
+            cache.instanceRegistrations.push_back(std::move(entry));
         }
     }
 

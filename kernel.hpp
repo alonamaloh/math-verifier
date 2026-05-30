@@ -125,6 +125,23 @@ struct Environment {
     std::map<std::tuple<std::string, std::string>,
               std::vector<std::string>> coercionRegistry;
 
+    // Canonical-instance registry (instance inference). Key: (structure
+    // class head name, carrier head name) — e.g. ("IsGroup", "Integer").
+    // Value: the instance theorem's name, its (structure-application)
+    // type, the count of leading carrier-parameter Pis (0 for a concrete
+    // carrier, 1 for `IntegerMod(m)`, …), and its universe parameters.
+    // The elaborator fills an implicit structure-typed argument by
+    // looking up the carrier head here. Surface-elaborator concern; the
+    // kernel never reads it. Persisted across modules like the others.
+    struct CanonicalInstance {
+        std::string termName;
+        ExpressionPointer type;
+        int parameterCount = 0;
+        std::vector<std::string> universeParameters;
+    };
+    std::map<std::tuple<std::string, std::string>, CanonicalInstance>
+        canonicalInstanceRegistry;
+
     const Declaration* lookup(const std::string& name) const {
         auto iterator = declarations.find(name);
         return iterator == declarations.end() ? nullptr : &iterator->second;

@@ -39,6 +39,45 @@ theorem Quotient.compute.{u, v}
   reflexivity(U, f(x))
 
 -- ----------------------------------------------------------------------
+-- IsEquivalenceRelation: the bundle of reflexivity, symmetry, and
+-- transitivity for a relation R on T. This is a STRUCTURE CLASS (its
+-- first parameter is the carrier type), so the canonical-instance
+-- machinery resolves it: register one `instance <X>.equivalence` per
+-- quotient construction and the three proofs are threaded automatically
+-- — notably into `Quotient.exact` below, which then needs only the two
+-- representatives and the `mk`-equality.
+
+definition IsEquivalenceRelation.{u}
+        (T : Type(u)) (R : T → T → Proposition) : Proposition :=
+  ((x : T) → R(x, x))
+  ∧ ((x y : T) → R(x, y) → R(y, x))
+  ∧ ((x y z : T) → R(x, y) → R(y, z) → R(x, z))
+
+theorem IsEquivalenceRelation.reflexive.{u}
+        {T : Type(u)} {R : T → T → Proposition}
+        (equivalence : IsEquivalenceRelation(T, R))
+        : (x : T) → R(x, x) := {
+  let ⟨reflexivityProof, _, _⟩ := equivalence;
+  reflexivityProof
+}
+
+theorem IsEquivalenceRelation.symmetric.{u}
+        {T : Type(u)} {R : T → T → Proposition}
+        (equivalence : IsEquivalenceRelation(T, R))
+        : (x y : T) → R(x, y) → R(y, x) := {
+  let ⟨_, symmetryProof, _⟩ := equivalence;
+  symmetryProof
+}
+
+theorem IsEquivalenceRelation.transitive.{u}
+        {T : Type(u)} {R : T → T → Proposition}
+        (equivalence : IsEquivalenceRelation(T, R))
+        : (x y z : T) → R(x, y) → R(y, z) → R(x, z) := {
+  let ⟨_, _, transitivityProof⟩ := equivalence;
+  transitivityProof
+}
+
+-- ----------------------------------------------------------------------
 -- Quotient.induct_two: induction on two quotients simultaneously.
 --
 -- Saves the nested-induct boilerplate that every binary-on-quotients
@@ -147,21 +186,22 @@ definition Quotient.induct_three.{u, v, w}
 --   3. Transport along the input equality `mk(x) = mk(y)` to obtain
 --      `isRelatedToX(mk(y))`, which reduces to `R(x, y)`.
 --
--- Reflexivity / symmetry / transitivity of R are passed in explicitly;
--- typically R is the equivalence relation of a quotient construction
--- and these are already proved.
+-- Reflexivity / symmetry / transitivity of R come bundled in an
+-- `IsEquivalenceRelation(T, R)` — an implicit argument, so it is filled
+-- by instance inference from the quotient's registered `equivalence`
+-- instance (or a local hypothesis). T and R are implicit too, recovered
+-- from the `mk`-equality, so the call is just `Quotient.exact(x, y, h)`.
 theorem Quotient.exact.{u}
-        (T : Type(u))
-        (R : T → T → Proposition)
-        (reflexivityOfR : (x : T) → R(x, x))
-        (symmetryOfR : (x y : T) → R(x, y) → R(y, x))
-        (transitivityOfR : (x y z : T) → R(x, y) → R(y, z) → R(x, z))
+        {T : Type(u)}
+        {R : T → T → Proposition}
+        {equivalence : IsEquivalenceRelation(T, R)}
         (x y : T)
         (mkEqualityHypothesis
             : Equality(Quotient(T, R),
                             Quotient.mk(T, R, x),
                             Quotient.mk(T, R, y)))
         : R(x, y) := {
+    let ⟨reflexivityOfR, symmetryOfR, transitivityOfR⟩ := equivalence;
     -- Step 1: build the lifted "related to x by R" predicate. Its
     -- respect-of-R obligation reduces, via propext, to the
     -- equivalence of `R(x, y1)` and `R(x, y2)` whenever `R(y1, y2)`.

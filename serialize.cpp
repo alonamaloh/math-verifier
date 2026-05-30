@@ -422,6 +422,14 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
             writer.writeString(funcName);
         }
     }
+    writer.writeU32(
+        static_cast<uint32_t>(contents.instanceRegistrations.size()));
+    for (const auto& entry : contents.instanceRegistrations) {
+        writer.writeString(entry.structureName);
+        writer.writeString(entry.carrierName);
+        writer.writeString(entry.termName);
+        writer.writeU32(static_cast<uint32_t>(entry.parameterCount));
+    }
     if (!output) {
         throw SerializationError("write failed (final flush): " + path);
     }
@@ -502,6 +510,16 @@ CacheContents readCacheFile(const std::string& path) {
             entry.chain.push_back(reader.readString());
         }
         contents.coercionRegistrations.push_back(std::move(entry));
+    }
+    uint32_t instanceCount = reader.readU32();
+    contents.instanceRegistrations.reserve(instanceCount);
+    for (uint32_t i = 0; i < instanceCount; ++i) {
+        CachedInstanceRegistration entry;
+        entry.structureName = reader.readString();
+        entry.carrierName = reader.readString();
+        entry.termName = reader.readString();
+        entry.parameterCount = static_cast<int>(reader.readU32());
+        contents.instanceRegistrations.push_back(std::move(entry));
     }
     return contents;
 }

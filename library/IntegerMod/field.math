@@ -60,12 +60,13 @@ theorem Natural.not_two_less_or_equal_one (twoLessOrEqualOne : 2 ≤ 1)
 theorem IntegerMod.congruent_of_make_equal (modulus : Natural) (x y : Integer)
         (makeEquality : IntegerMod.make(modulus, x) = IntegerMod.make(modulus, y))
         : Integer.CongruentModulo(modulus, x, y) :=
-  Quotient.exact(
-      Integer, Integer.CongruentModulo(modulus),
-      Integer.CongruentModulo.reflexive(modulus),
-      Integer.CongruentModulo.symmetric(modulus),
-      Integer.CongruentModulo.transitive(modulus),
-      x, y, makeEquality)
+  -- T and R can't be inferred here: `makeEquality`'s type mentions the
+  -- `IntegerMod(modulus)` / `IntegerMod.make` aliases, and unification
+  -- doesn't unfold them inside the equality to expose Quotient(T, R).
+  -- Pass T, R, and the bundled equivalence explicitly (still one
+  -- `IntegerMod.equivalence(modulus)` rather than three separate proofs).
+  Quotient.exact(Integer, Integer.CongruentModulo(modulus),
+                 IntegerMod.equivalence(modulus), x, y, makeEquality)
 
 -- From a divisibility witness `p | (a·w − 1)` the class of w inverts
 -- the class of a: `[a] · [w] = [1]`.
