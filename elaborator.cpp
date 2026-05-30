@@ -15740,12 +15740,24 @@ private:
                     + std::to_string(clause.line) + "_"
                     + std::to_string(clause.column);
                 innerDestructurePattern = clause.pattern;
+            } else if (std::get_if<SurfacePatternTuple>(
+                           &clause.pattern->node)) {
+                // `cases x { | ⟨a, b⟩ => body }` — destructure the
+                // representative via the carrier's sole constructor
+                // (resolved by the inner cases from the carrier type, so
+                // the constructor name need not be written). This is the
+                // form `by_representatives x as ⟨a, b⟩` desugars to.
+                representativeName = "_quotientRep_"
+                    + std::to_string(clause.line) + "_"
+                    + std::to_string(clause.column);
+                innerDestructurePattern = clause.pattern;
             } else {
                 throwElaborate(
                     "quotient-cases pattern must be a bare name "
                     "(binding the representative), a constructor "
-                    "pattern over the carrier type (destructures the "
-                    "representative), or `Quotient.mk(<inner>)`");
+                    "pattern or tuple `⟨…⟩` over the carrier type "
+                    "(destructures the representative), or "
+                    "`Quotient.mk(<inner>)`");
             }
         }
 

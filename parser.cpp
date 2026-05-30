@@ -1913,6 +1913,9 @@ private:
         if (current.kind == TokenKind::KeywordByStrongInduction) {
             return parseByStrongInduction();
         }
+        if (current.kind == TokenKind::KeywordByRepresentatives) {
+            return parseByRepresentatives();
+        }
         if (current.kind == TokenKind::LeftBrace) {
             // `{ let pat := v; ...; final_expr }` as an expression.
             // Same shape as the theorem-body block form; useful inside
@@ -2084,6 +2087,60 @@ private:
             std::move(equalityHypothesisName),
             std::move(refiningNames),
             casesToken.line, casesToken.column);
+    }
+
+    // `by_representatives x as <pat>, y as <pat>, … => body` —
+    // "WLOG pick representatives" elimination over one or more quotient
+    // values that are already in scope (typically the theorem's binders).
+    // Pure parse-time sugar: desugars to nested quotient-`cases`, one per
+    // scrutinee, innermost-last. The pattern after `as` is any pattern the
+    // quotient-cases path accepts — a bare name (bind the representative),
+    // a tuple `⟨a, b⟩` (destructure via the carrier's sole constructor,
+    // hiding the constructor name), or an explicit `Carrier.make(a, b)`.
+    SurfaceExpressionPointer parseByRepresentatives() {
+        consumeAny();  // 'by_representatives'
+        struct Scrutinee {
+            SurfaceExpressionPointer expression;
+            SurfacePatternPointer pattern;
+            int line;
+            int column;
+        };
+        std::vector<Scrutinee> scrutinees;
+        while (true) {
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected a quotient-value variable name in "
+                          "`by_representatives`");
+            }
+            Token nameToken = consumeAny();
+            SurfaceExpressionPointer scrutineeExpression =
+                makeSurfaceIdentifier(nameToken.lexeme, {},
+                                      nameToken.line, nameToken.column);
+            expect(TokenKind::KeywordAs,
+                   "after the scrutinee name in `by_representatives`");
+            SurfacePatternPointer pattern = parsePattern();
+            scrutinees.push_back({std::move(scrutineeExpression),
+                                  std::move(pattern),
+                                  nameToken.line, nameToken.column});
+            if (peek().kind == TokenKind::Comma) {
+                consumeAny();
+                continue;
+            }
+            break;
+        }
+        expect(TokenKind::FatArrow,
+               "before the `by_representatives` body");
+        SurfaceExpressionPointer body = parseExpression();
+        // Fold right: the body is the innermost arm; each scrutinee wraps
+        // it in `cases <scrutinee> { | <pattern> => <inner> }`.
+        SurfaceExpressionPointer result = std::move(body);
+        for (auto it = scrutinees.rbegin(); it != scrutinees.rend(); ++it) {
+            std::vector<SurfaceCasesClause> clauses;
+            clauses.push_back(SurfaceCasesClause{
+                it->pattern, std::move(result), it->line, it->column});
+            result = makeSurfaceCases(it->expression, std::move(clauses),
+                                       it->line, it->column);
+        }
+        return result;
     }
 
     // `decide P { | yes m => arm_yes  | no n => arm_no }` —

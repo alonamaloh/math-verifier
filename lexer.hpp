@@ -35,6 +35,7 @@ enum class TokenKind {
     KeywordSuffices,
     KeywordByInduction,     // `by_induction` — case-split with IH
     KeywordByStrongInduction, // `by_strong_induction` — single-step strong induction
+    KeywordByRepresentatives, // `by_representatives x as ⟨a,b⟩, … => body` — nested quotient-cases
     KeywordInduction,       // `induction` — after `claim P by`, opens claim-by-induction
     KeywordGoal,            // `goal` — refers to the elaborator's current expected type
     KeywordDone,            // `done` — bare-`claim` synonym; closes the surrounding goal via auto-prover

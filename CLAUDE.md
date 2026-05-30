@@ -157,11 +157,29 @@ The unifying principle: a binder accepts a pattern, and the elaborator
 picks the eliminator from the type. This is the standard idiom for
 "WLOG pick a representative" / "let n = k + 1" intros.
 
+### `by_representatives` — the multi-scrutinee elimination idiom
+
+`by_representatives x as <pat>, y as <pat>, … => body` is the preferred
+"WLOG pick representatives" form. It desugars to nested quotient-`cases`
+(one per scrutinee), so it is exactly the nested `cases` below but reads
+as one line. The pattern after `as` is a tuple `⟨a, b⟩` (the carrier's
+sole constructor is resolved from the type — `RationalRepresentative.make`
+need not be named), an explicit constructor pattern, or a bare name.
+
+```math
+theorem Rational.triangle_inequality (x y : Rational)
+        : abs(x + y) ≤ abs(x) + abs(y) :=
+  by_representatives x as ⟨n1, d1⟩, y as ⟨n2, d2⟩ =>
+    Rational.triangle_inequality_at_representatives(n1, n2, d1, d2)
+```
+
 ### `cases` on a quotient — direct destructure
 
 The pattern can be a bare name (bind the rep), a constructor pattern
-over the carrier type (destructure the rep), or the explicit
-`Quotient.mk(<inner>)` wrap (legacy).
+over the carrier type (destructure the rep), a tuple `⟨a, b⟩` (same, with
+the constructor name resolved from the type), or the explicit
+`Quotient.mk(<inner>)` wrap (legacy). Prefer `by_representatives` (above)
+when destructuring one or more scrutinees with no extra `cases` plumbing.
 
 ```math
 -- Bare name: bind rep_x to the representative.
@@ -171,7 +189,10 @@ cases x { | rep_x => …use rep_x… }
 cases x { | IntegerRepresentative.make(a, b) =>
     …use a and b… }
 
--- Two-binder cases nest naturally:
+-- Tuple pattern: destructure without naming the constructor.
+cases x { | ⟨a, b⟩ => …use a and b… }
+
+-- Two-binder cases nest naturally (or use `by_representatives`):
 cases x { | IntegerRepresentative.make(a, b) =>
   cases y { | IntegerRepresentative.make(c, d) =>
     …use a, b, c, d… } }

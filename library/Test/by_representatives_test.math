@@ -1,0 +1,42 @@
+-- `by_representatives x as <pat>, y as <pat>, … => body` — "WLOG pick
+-- representatives" sugar for nested quotient-`cases`. The pattern after
+-- `as` may be a tuple `⟨a, b⟩` (constructor name hidden, resolved from
+-- the carrier type), an explicit constructor pattern, or a bare name.
+
+module Test.by_representatives_test
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Rational.basics
+import Rational.addition
+import Rational.order
+import Rational.absolute_value
+import Rational.triangle
+
+-- Single scrutinee, tuple pattern. The destructured representative is
+-- introduced as `Rational.fraction(n, d)` (def-equal to the underlying
+-- mk), so reflexivity closes the goal.
+theorem single_representative (x : Rational) : x = x :=
+  by_representatives x as ⟨n, d⟩ =>
+    reflexivity(Rational, Rational.fraction(n, d))
+
+-- Two scrutinees, tuple patterns, dispatching to an at-representatives
+-- lemma (the canonical triangle-inequality shape).
+theorem two_representatives (x y : Rational)
+        : abs(x + y) ≤ abs(x) + abs(y) :=
+  by_representatives x as ⟨n1, d1⟩, y as ⟨n2, d2⟩ =>
+    Rational.triangle_inequality_at_representatives(n1, n2, d1, d2)
+
+-- Explicit constructor pattern still works (equivalent to the tuple).
+theorem explicit_constructor_pattern (x : Rational) : x = x :=
+  by_representatives x as RationalRepresentative.make(n, d) =>
+    reflexivity(Rational, Rational.fraction(n, d))
+
+-- Bare name binds the whole representative (no destructure). The
+-- ascription supplies the expected type the short `Quotient.mk` needs.
+theorem bare_representative (x : Rational) : x = x :=
+  by_representatives x as rep =>
+    reflexivity(Rational, (Quotient.mk(rep) : Rational))
