@@ -241,15 +241,22 @@ Quotient(Coefficients(R), ExtensionallyEqual)` — both **parameterized
 quotients** (the relation depends on a parameter). They exercised the
 quotient surface hard and bear on the stages above:
 
-- **Short `Quotient.{mk,lift,sound}` inference breaks for parameterized
-  quotient *aliases* (relevant to Stage 1).** For `IntegerMod(m)`, the
-  short `Quotient.mk(rep)` cannot recover the relation `R`: it unfolds the
-  alias past `CongruentModulo(m)` into the relation's body (an `Exists`)
-  and tries to use that as `R`. The whole IntegerMod/Polynomial code had to
-  use the **verbose** `Quotient.mk(T, R, rep)` / `lift(T,R,U,…)` /
-  `sound(T,R,…)` forms. This *raises* the value of Stage 1's
-  `construction` form for parameterized quotients — and that form should
-  emit the verbose internal term, not rely on short-form inference.
+- **Short `Quotient.{mk,lift,sound}` inference for parameterized quotient
+  *aliases* — FIXED (2026-05-29).** This was reported as broken: for
+  `IntegerMod(m)` the short forms over-unfolded the alias past
+  `CongruentModulo(m)` into the relation's body (an `Exists`) when
+  recovering `R`, forcing the verbose `Quotient.{mk,lift,sound}(T, R, …)`
+  forms. Two elaborator fixes in `desugarQuotientSound` closed it (a
+  spurious re-close that shifted the parameter's BoundVariable, and a
+  WHNF-first proof-type fallback that over-unfolded the relation head —
+  see `PLAN_STRUCTURES_AND_INSTANCES.md` Stage 0b for the details).
+  `IntegerMod/operations.math` now uses the short forms throughout. The
+  `Polynomial(R)` construction was NOT re-tested against the short forms
+  this session — it still uses the verbose forms, and converting it is a
+  cheap follow-up that would confirm the fix generalizes past the
+  `IntegerMod` relation shape. Stage 1's `construction` form is still
+  worthwhile, but it no longer has to *work around* short-form inference
+  for parameterized quotients.
 
 - **Single `Quotient.induct` / `cases` motive inference for
   parameterized quotients — RESOLVED (2026-05-29).** This was reported as
@@ -293,5 +300,10 @@ quotient surface hard and bear on the stages above:
   would remove a lot of boilerplate in quotient-law proofs.
 
 These don't change the stage *priorities* much (Stage 1 construction +
-Stage 5 implicit shape args remain the cheap wins), but Stage 2 now has a
-concrete blocker to design around, and Stage 3 should be reweighted down.
+Stage 5 implicit shape args remain the cheap wins). Stage 2's former
+blocker (single-induct/`cases` motive inference for parameterized
+quotients) is now **resolved**, so `by_representatives` can desugar
+straight to the short `Quotient.induct`/`induct_two`/`induct_three` for
+parameterized and non-parameterized quotients alike. Stage 3
+(`by computation`) should be reweighted down (sugar over
+`reflexivity`/`unfold`, per the bullet above).
