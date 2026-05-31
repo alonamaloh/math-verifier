@@ -5505,8 +5505,7 @@ std::map<std::string, std::string> loadAllCaches(
 // Render one hit line + its location/needs line.
 void printSearchHit(const LemmaSearchHit& hit,
                     const std::map<std::string, std::string>& nameToSource) {
-    std::cout << "  " << hit.name << " : "
-              << prettyPrint(hit.declaredType) << "\n";
+    std::cout << "  " << hit.name << " : " << hit.signature << "\n";
     std::string location;
     auto sourceIterator = nameToSource.find(hit.name);
     if (sourceIterator != nameToSource.end()) {
@@ -5540,10 +5539,11 @@ void printSearchHit(const LemmaSearchHit& hit,
 // conclusion-unifies-with-goal mode (print wrapper around computeGoalHits).
 int searchByGoal(const Environment& environment,
                  const std::map<std::string, std::string>& nameToSource,
+                 const std::set<std::string>& excludedNames,
                  ExpressionPointer goalType, size_t cap) {
     std::string goalHead;
     std::vector<LemmaSearchHit> hits =
-        computeGoalHits(environment, goalType, goalHead);
+        computeGoalHits(environment, goalType, goalHead, excludedNames);
     if (goalHead.empty()) {
         std::cerr << "search: goal conclusion has no Constant head "
                      "(nothing to index on)\n";
@@ -5567,9 +5567,10 @@ int searchByGoal(const Environment& environment,
 // mentions-these-symbols mode (Coq `Search`).
 int searchByMentions(const Environment& environment,
                      const std::map<std::string, std::string>& nameToSource,
+                     const std::set<std::string>& excludedNames,
                      const std::vector<std::string>& wanted, size_t cap) {
     std::vector<LemmaSearchHit> hits =
-        computeMentionHits(environment, wanted);
+        computeMentionHits(environment, wanted, excludedNames);
     if (hits.empty()) {
         std::cout << "no lemmas mention all of the given symbols.\n";
         return 0;
@@ -5624,6 +5625,15 @@ int runSearch(int argc, char* argv[]) {
                   << " (build the library first: make -j 16 library)\n";
         return 1;
     }
+    // Drop `library/Test/` fixtures from CLI results — they are feature
+    // scaffolding, not reusable library content, and otherwise flood
+    // common goal shapes (e.g. an `=` goal).
+    std::set<std::string> excludedNames;
+    for (const auto& [name, sourcePath] : nameToSource) {
+        if (sourcePath.find("/Test/") != std::string::npos) {
+            excludedNames.insert(name);
+        }
+    }
     if (!mentionsText.empty()) {
         std::vector<std::string> wanted;
         size_t start = 0;
@@ -5641,7 +5651,8 @@ int runSearch(int argc, char* argv[]) {
             if (comma == std::string::npos) break;
             start = comma + 1;
         }
-        return searchByMentions(environment, nameToSource, wanted, cap);
+        return searchByMentions(environment, nameToSource, excludedNames,
+                                wanted, cap);
     }
     // --goal: parse + elaborate the goal type against the full library.
     ExpressionPointer goalType;
@@ -5664,7 +5675,8 @@ int runSearch(int argc, char* argv[]) {
                   << "\n";
         return 1;
     }
-    return searchByGoal(environment, nameToSource, goalType, cap);
+    return searchByGoal(environment, nameToSource, excludedNames,
+                        goalType, cap);
 }
 
 // Unit tests for the E1 lemma-search engine. Builds a tiny in-memory
@@ -5705,6 +5717,15 @@ axiom le_trans : (a b c : Nat) → LE(a, b) → LE(b, c) → LE(a, c)
         for (const auto& hit : hits)
             if (hit.name == "le_refl") reflMatched = true;
         EXPECT_FALSE(reflMatched);
+        // Signature renders in surface form — binder group + arrows, no
+        // raw `Π` chain (fix (1)).
+        EXPECT_TRUE(!hits.empty()
+                    && hits[0].signature.find("Π") == std::string::npos);
+        EXPECT_TRUE(!hits.empty()
+                    && hits[0].signature.find("(a b c : Nat)")
+                       != std::string::npos);
+        EXPECT_TRUE(!hits.empty()
+                    && hits[0].signature.find("→") != std::string::npos);
     }
 
     // A bare `LE(a, a)`-shaped goal matches le_refl (zero needs, top of

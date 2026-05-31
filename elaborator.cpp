@@ -688,7 +688,7 @@ private:
             size_t shown = std::min(limit, hits.size());
             for (size_t i = 0; i < shown; ++i) {
                 out += "\n    " + hits[i].name + " : "
-                     + prettyPrint(hits[i].declaredType);
+                     + hits[i].signature;
                 if (!hits[i].needs.empty()) {
                     out += "   [needs: ";
                     for (size_t j = 0; j < hits[i].needs.size(); ++j) {

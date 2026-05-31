@@ -18,6 +18,11 @@
 struct LemmaSearchHit {
     std::string name;
     ExpressionPointer declaredType;
+    // The statement rendered in surface form — `(a b : T) → P → Q`
+    // rather than the raw `Π(a : T). Π(b : T). …` chain. Precomputed by
+    // computeGoalHits / computeMentionHits (which hold the environment
+    // needed to classify each binder as a parameter vs. a hypothesis).
+    std::string signature;
     // Unbound PROPOSITION premises — the hypotheses a caller would still
     // have to discharge after applying this lemma (the `[needs: …]`).
     std::vector<ExpressionPointer> needs;
@@ -39,14 +44,17 @@ void collectConstantNames(ExpressionPointer expression,
 // conclusion-unifies-with-goal mode (apply?-style). Ranks library lemmas
 // whose conclusion first-order-matches `goalType`'s conclusion. Sets
 // `goalHead` to the goal conclusion's head Constant name (empty when the
-// goal has no Constant head, in which case the result is empty). Pure —
-// no I/O.
-std::vector<LemmaSearchHit> computeGoalHits(const Environment& environment,
-                                            ExpressionPointer goalType,
-                                            std::string& goalHead);
+// goal has no Constant head, in which case the result is empty).
+// Declarations named in `excludedNames` are skipped (used to drop
+// `library/Test/` fixtures from CLI results). Pure — no I/O.
+std::vector<LemmaSearchHit> computeGoalHits(
+    const Environment& environment, ExpressionPointer goalType,
+    std::string& goalHead,
+    const std::set<std::string>& excludedNames = {});
 
 // mentions-these-symbols mode (Coq `Search`). Lemmas whose statement
 // mentions every name in `wanted`, ranked by specificity (fewer total
-// constants first).
+// constants first). `excludedNames` as above.
 std::vector<LemmaSearchHit> computeMentionHits(
-    const Environment& environment, const std::vector<std::string>& wanted);
+    const Environment& environment, const std::vector<std::string>& wanted,
+    const std::set<std::string>& excludedNames = {});

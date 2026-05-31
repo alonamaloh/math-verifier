@@ -40,9 +40,13 @@ classifyBinaryOperator(const std::string& name) {
         return BinaryOperatorInfo{"-", kPrecedenceAdditive};
     if (endsWith(".multiply"))
         return BinaryOperatorInfo{"*", kPrecedenceMultiplicative};
-    if (endsWith(".LessOrEqual"))
+    // The order relations on Natural are bare top-level inductives
+    // (`LessOrEqual` / `LessThan`, no `Carrier.` prefix); every other
+    // carrier namespaces them (`Rational.LessOrEqual`, …). Match both the
+    // suffixed and the bare names so all of them render infix.
+    if (endsWith(".LessOrEqual") || name == "LessOrEqual")
         return BinaryOperatorInfo{"≤", kPrecedenceRelation};
-    if (endsWith(".LessThan"))
+    if (endsWith(".LessThan") || name == "LessThan")
         return BinaryOperatorInfo{"<", kPrecedenceRelation};
     return std::nullopt;
 }

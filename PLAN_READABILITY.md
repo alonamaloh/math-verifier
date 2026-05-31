@@ -158,10 +158,23 @@ which otherwise *guesses* lemma names.
 
 ### STATUS (live)
 
-- **E1 (lemma search) — CLI surface AND error-message surface DONE.**
-  The engine is factored into `lemma_search.{hpp,cpp}` (a shared TU
-  compiled into both the CLI and the elaborator) so one implementation
-  drives both deliveries.
+- **E1 (lemma search) — CLI + error-message surfaces DONE, output
+  polished.** The engine is factored into `lemma_search.{hpp,cpp}` (a
+  shared TU compiled into both the CLI and the elaborator) so one
+  implementation drives both deliveries.
+  - **Output quality pass (post-review).** A first cut printed raw CIC
+    (`Π(a : Natural). … LessOrEqual (a + b) (c + b)` with `@`-marked
+    holes and test-fixture pollution). Fixed to the textbook form:
+    `Natural.le_add_preserves_left : (a c b : Natural) → a ≤ c → a + b ≤
+    c + b   [needs: a ≤ c]`. Four changes: (1) a surface-arrow signature
+    formatter (`formatLemmaSignature` — collapses same-type binder
+    groups, renders premises as the `→` chain) replaces the `Π`-soup;
+    (2) the printer now infixes the bare top-level `LessOrEqual` /
+    `LessThan` (Natural's order relations have no `Carrier.` prefix, so
+    the suffix heuristic missed them); (3) `[needs: …]` premises are
+    demoted from Internal- to User-origin free variables so they read in
+    the lemma's own names without the `@` leak marker; (4) `library/Test/`
+    fixtures are excluded from CLI results (they flooded e.g. `=` goals).
   - **Surface #1 (error messages) — DONE.** When `autoProveClaim` fails
     (a `done`/`okay`/bare-`claim`, or a non-equality calc step), the
     elaborator appends "search by conclusion shape — candidates" with the
