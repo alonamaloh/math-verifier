@@ -1,0 +1,143 @@
+-- Polynomial/degree.math
+--
+-- Degree, modelled as a PREDICATE rather than a function. Over the
+-- trailing-zero quotient (`[a0]` = `[a0, 0]`) a degree *function* would
+-- need to locate the highest nonzero coefficient, which is not
+-- computable without decidable equality on the base ring. Instead we
+-- track "the polynomial's coefficients vanish at and above index n":
+--
+--   Polynomial.DegreeLessThan(r, p, n) := (i ≥ n) → coefficientOf(p, i) = 0
+--
+-- This is well-defined on the quotient (it speaks only of `nth`, the
+-- quotient invariant) and is all the division/Euclid/Bezout development
+-- needs to state and run its inductions. The companion `coefficientOf`
+-- lifts `Polynomial.coefficient` (= nth) to the quotient, and the
+-- `coefficientOf_*` lemmas push it through the ring operations.
+
+module Polynomial.degree
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.instances
+
+-- ----------------------------------------------------------------------
+-- The coefficient of a quotient polynomial at an index. Lifts
+-- `Polynomial.coefficient` (= nth); well-defined because extensionally
+-- equal representatives agree at every index.
+
+definition Polynomial.coefficientOf (r : Ring)
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (index : Natural)
+        : Ring.carrier(r) :=
+  Quotient.lift(
+      function (coeffs : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.coefficient(r, coeffs, index),
+      function (coeffs coeffsPrime : Polynomial.Coefficients(Ring.carrier(r)))
+               (extensionallyEqual
+                   : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
+                         coeffs, coeffsPrime)) =>
+          extensionallyEqual(index),
+      p)
+
+-- ----------------------------------------------------------------------
+-- Coefficients of the ring operations, at the quotient level. Each lifts
+-- the corresponding Coefficients-level `nth_*` lemma.
+
+theorem Polynomial.coefficientOf_zero (r : Ring) (index : Natural)
+        : Polynomial.coefficientOf(r, Polynomial.zero(r), index) = Ring.zero(r) :=
+  reflexivity(Ring.carrier(r), Ring.zero(r))
+
+theorem Polynomial.coefficientOf_one_zero (r : Ring)
+        : Polynomial.coefficientOf(r, Polynomial.one(r), 0) = Ring.one(r) :=
+  reflexivity(Ring.carrier(r), Ring.one(r))
+
+theorem Polynomial.coefficientOf_one_successor (r : Ring) (j : Natural)
+        : Polynomial.coefficientOf(r, Polynomial.one(r), successor(j)) = Ring.zero(r) :=
+  reflexivity(Ring.carrier(r), Ring.zero(r))
+
+theorem Polynomial.coefficientOf_add (r : Ring)
+        (p q : Polynomial(Ring.carrier(r), Ring.zero(r))) (index : Natural)
+        : Polynomial.coefficientOf(r, Polynomial.add(r, p, q), index)
+          = Ring.add(r, Polynomial.coefficientOf(r, p, index),
+                     Polynomial.coefficientOf(r, q, index)) :=
+  Quotient.induct_two(
+      function (a b : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.nth_add(r, a, b, index),
+      p, q)
+
+theorem Polynomial.coefficientOf_negate (r : Ring)
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (index : Natural)
+        : Polynomial.coefficientOf(r, Polynomial.negate(r, p), index)
+          = Ring.negate(r, Polynomial.coefficientOf(r, p, index)) :=
+  Quotient.induct(
+      function (a : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.nth_negate(r, a, index),
+      p)
+
+-- ----------------------------------------------------------------------
+-- DegreeLessThan: coefficients vanish at and above index n.
+
+definition Polynomial.DegreeLessThan (r : Ring)
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (n : Natural)
+        : Proposition :=
+  (i : Natural) → n ≤ i → Polynomial.coefficientOf(r, p, i) = Ring.zero(r)
+
+-- Weakening the bound: degree < n implies degree < m whenever n ≤ m.
+theorem Polynomial.DegreeLessThan.weaken (r : Ring)
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (n m : Natural)
+        (nLessOrEqualM : n ≤ m)
+        (degreeLessThanN : Polynomial.DegreeLessThan(r, p, n))
+        : Polynomial.DegreeLessThan(r, p, m) :=
+  function (i : Natural) (mLessOrEqualI : m ≤ i) =>
+      degreeLessThanN(i, LessOrEqual.transitive(n, m, i, mLessOrEqualI, nLessOrEqualM))
+
+-- The zero polynomial has degree < 0 (no nonzero coefficients at all).
+theorem Polynomial.DegreeLessThan.zero (r : Ring)
+        : Polynomial.DegreeLessThan(r, Polynomial.zero(r), 0) :=
+  function (i : Natural) (zeroLessOrEqualI : 0 ≤ i) =>
+      Polynomial.coefficientOf_zero(r, i)
+
+-- Sum of two polynomials of degree < n has degree < n.
+theorem Polynomial.DegreeLessThan.add (r : Ring)
+        (p q : Polynomial(Ring.carrier(r), Ring.zero(r))) (n : Natural)
+        (degreeP : Polynomial.DegreeLessThan(r, p, n))
+        (degreeQ : Polynomial.DegreeLessThan(r, q, n))
+        : Polynomial.DegreeLessThan(r, Polynomial.add(r, p, q), n) :=
+  function (i : Natural) (nLessOrEqualI : n ≤ i) =>
+      calc Polynomial.coefficientOf(r, Polynomial.add(r, p, q), i)
+         = Ring.add(r, Polynomial.coefficientOf(r, p, i),
+                    Polynomial.coefficientOf(r, q, i))
+               by Polynomial.coefficientOf_add(r, p, q, i)
+         = Ring.add(r, Ring.zero(r), Polynomial.coefficientOf(r, q, i))
+               by degreeP(i, nLessOrEqualI)
+         = Ring.add(r, Ring.zero(r), Ring.zero(r))
+               by degreeQ(i, nLessOrEqualI)
+         = Ring.zero(r)
+               by Ring.zero_add(r, Ring.zero(r))
+
+-- Negation preserves degree < n.
+theorem Polynomial.DegreeLessThan.negate (r : Ring)
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (n : Natural)
+        (degreeP : Polynomial.DegreeLessThan(r, p, n))
+        : Polynomial.DegreeLessThan(r, Polynomial.negate(r, p), n) :=
+  function (i : Natural) (nLessOrEqualI : n ≤ i) =>
+      calc Polynomial.coefficientOf(r, Polynomial.negate(r, p), i)
+         = Ring.negate(r, Polynomial.coefficientOf(r, p, i))
+               by Polynomial.coefficientOf_negate(r, p, i)
+         = Ring.negate(r, Ring.zero(r))
+               by degreeP(i, nLessOrEqualI)
+         = Ring.zero(r)
+               by Ring.negate_zero(r)
