@@ -156,6 +156,45 @@ which otherwise *guesses* lemma names.
 --------------------------------------------------------------------------
 ## 2. THE IMPROVEMENT PROGRAM
 
+### STATUS (live)
+
+- **A1 — DONE.** Operators `+`/`-`/`*` on `RingModulo` (via re-indexing the
+  quotient over a new `CommutativeRing` bundle, which lets `multiply` drop
+  its explicit commutativity arg), on the abstract `Ring.carrier`, and on
+  `CommutativeRing.carrier`. The implicit-recovery-through-projection works,
+  incl. through definition-alias carriers (`FiniteField(p,f)`,
+  `ComplexNumber`) via a single-δ-step head unfold in the elaborator.
+- **A2 — DONE, for `CommutativeRing.carrier(c)`.** `ring` drives a goal over
+  an abstract bundled commutative ring (operation "scheme" = namespace +
+  structure prefix; matchers/builders thread the prefix; open-over-binders
+  so the index is a free var; close before return). The `ring` law
+  dependency is now documented at `RingLawNames`, and the dev-history
+  `v1`/`v2` names are retired.
+- **B2 — DONE.** `change T;` (active `note goal`) — replace the goal by a
+  defeq spelling.
+- **Findings that revise this plan:**
+  1. **A2 does NOT retroactively simplify `ring_difference.math` /
+     `RingModulo` respect-lemmas.** Those are stated over a *plain*
+     `(s : Ring)` and are deliberately commutativity-free
+     (`difference_multiply_split`), so `ring` (a commutative-ring tactic)
+     cannot reprove them without strengthening their hypotheses. A2 is
+     forward-looking. **Retire** the §4 acceptance item
+     "`difference_multiply_split` reproved as `:= ring`."
+  2. **`ring`'s `proveMultiplyMerge` cross-pair-cancellation case is
+     unimplemented** ("not yet supported") and is *carrier-independent* —
+     it blocks `(a+b)*(a+b)`-style expansion for every carrier, including
+     the ℂ `i²=−1` / `modulus.math` steps in the §5 acceptance snapshot.
+     That snapshot is unreachable until this is fixed (separate from A2).
+  3. **B1 needs a *bounded* "structure-projection normalisation," not WHNF.**
+     The failing endpoint is `Ring.multiply(Polynomial.ring(r), x, y)` vs the
+     term's `Polynomial.multiply(r, x, y)`. Full `weakHeadNormalForm` of the
+     endpoint over-reduces *past* `Polynomial.multiply` into its convolution
+     body, so it still doesn't match. The right primitive resolves a
+     structure projection on a (δ-unfolded) constructor —
+     `Ring.<field>(Ring.make(…), args)` ↦ `<field>(args)` — and STOPS, not a
+     general WHNF. Reusing `decide`'s `abstractStructuralOccurrenceWithWHNF`
+     does not help: it only bridges *same-head* applications. B1 remains TODO.
+
 Four tracks. A and B together are aimed squarely at the user's goal:
 "liberate the user from having to know anything about defeq-vs-structural
 and motive-plumbing." A is the readability headline; B dissolves (F1); C
