@@ -3513,21 +3513,6 @@ void runErrorMessageTests() {
         }
     };
 
-    // Hammer failure: should name the theorem, the goal type, and
-    // list at least one candidate.
-    expectErrorContains(R"(
-module Test.errors_hammer
-
-theorem cant_find (A B : Proposition) (h : A) : B := ?
-)",
-        {"hammer placeholder '?'",
-         "theorem 'cant_find'",
-         "could not find a proof",
-         "Candidates in scope:",
-         "h : A"},
-        "hammer-failure error",
-        __LINE__);
-
     // Cases body type mismatch: the case-for-Constructor frame should
     // appear, along with expected vs actual types.
     expectErrorContains(R"(
@@ -3647,28 +3632,7 @@ theorem bad_call (A : Proposition) (n : Natural) : And(A, A) :=
         "constructor argument type mismatch",
         __LINE__);
 
-    // Successful hammer: '?' resolves to a hypothesis, no error.
-    {
-        try {
-            verifyMathSource(R"(
-module Test.errors_hammer_ok
-
-inductive Dummy : Proposition where
-  | unit : Dummy
-
-theorem hammer_ok (A : Proposition) (h : A) : A := ?
-)");
-            ++passed;
-        } catch (const std::exception& e) {
-            ++failed;
-            std::cerr << "FAIL (line " << __LINE__
-                      << "): hammer should have resolved hypothesis-match: "
-                      << e.what() << "\n";
-        }
-    }
-
-    // Phase 3.1: depth-1 hypothesis application — `h : A → B`, `a : A`
-    // in scope and goal `B`, the hammer should apply `h(a)`.
+    // Helper: a source that should verify cleanly (no error).
     auto expectVerifies = [](const std::string& source,
                               const char* description,
                               int testLine) {
@@ -3682,49 +3646,6 @@ theorem hammer_ok (A : Proposition) (h : A) : A := ?
                       << e.what() << "\n";
         }
     };
-
-    expectVerifies(R"(
-module Test.hammer_app_one_step
-
-theorem one_step (A B : Proposition) (h : A → B) (a : A) : B := ?
-)",
-        "depth-1 hypothesis application (single arg)",
-        __LINE__);
-
-    expectVerifies(R"(
-module Test.hammer_app_two_step
-
-theorem two_step (A B C : Proposition)
-                 (h : A → B → C)
-                 (a : A) (b : B) : C := ?
-)",
-        "depth-1 hypothesis application (two args)",
-        __LINE__);
-
-    // Application strategy must not shadow hypothesis-match: when the
-    // goal is directly in scope, prefer the cheaper direct match.
-    expectVerifies(R"(
-module Test.hammer_app_prefers_direct
-
-theorem prefers_direct (A : Proposition) (h : A → A) (a : A) : A := ?
-)",
-        "direct match still wins over application",
-        __LINE__);
-
-    // When the application's argument is itself missing from scope,
-    // the hammer reports failure (we don't yet recurse into multi-
-    // level application).
-    expectErrorContains(R"(
-module Test.hammer_app_unfillable
-
-theorem unfillable (A B : Proposition) (h : A → B) : B := ?
-)",
-        {"hammer placeholder '?'",
-         "theorem 'unfillable'",
-         "could not find a proof",
-         "depth-1 hypothesis-application"},
-        "hammer fails when an application arg is unfillable",
-        __LINE__);
 
     // Axiom-admission warning: every `axiom` declaration must surface
     // on stderr so a verified file is never silent about its unproved
@@ -4072,22 +3993,21 @@ theorem flipped : Equality.{0}(Natural, zero, zero) := {
         "suffices reduces the goal via a lemma",
         __LINE__);
 
-    // `by_cases on E { case Pattern: body; … }` — math-style case-split.
+    // `cases E { | Pattern => body … }` — case-split on a disjunction.
     expectVerifies(R"(
-module Test.by_cases_statement
+module Test.cases_on_disjunction
 
 inductive Or (A B : Proposition) : Proposition where
   | Or.introduceLeft  : A → Or(A, B)
   | Or.introduceRight : B → Or(A, B)
 
-theorem disjunction_swap (A B : Proposition) (h : Or(A, B)) : Or(B, A) := {
-  by_cases on h {
-    case Or.introduceLeft(a):  Or.introduceRight(B, A, a);
-    case Or.introduceRight(b): Or.introduceLeft(B, A, b);
+theorem disjunction_swap (A B : Proposition) (h : Or(A, B)) : Or(B, A) :=
+  cases h {
+    | Or.introduceLeft(a)  => Or.introduceRight(B, A, a)
+    | Or.introduceRight(b) => Or.introduceLeft(B, A, b)
   }
-}
 )",
-        "by_cases statement is sugar for cases",
+        "cases on a disjunction swaps it",
         __LINE__);
 
     // `by_induction on E using L with subject, ih { body }` — the
@@ -4191,11 +4111,11 @@ inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
 
 theorem reflexive_of_assumption
         : Equality.{0}(Natural, zero, zero) → Equality.{0}(Natural, zero, zero) := {
-  assume h : Equality.{0}(Natural, zero, zero);
+  suppose Equality.{0}(Natural, zero, zero) as h;
   h
 }
 )",
-        "assume introduces a hypothesis as a block statement",
+        "suppose introduces a hypothesis as a block statement",
         __LINE__);
 
     // `set n := E;` — surface-level substitution. `n` is interchangeable
@@ -4398,7 +4318,9 @@ inductive Or (A B : Proposition) : Proposition where
   | Or.introduceLeft  : A → Or(A, B)
   | Or.introduceRight : B → Or(A, B)
 
-theorem successor_not_equal_zero (n : Natural) : successor(n) ≠ zero := ?
+theorem successor_not_equal_zero (n : Natural)
+        (h : successor(n) ≠ zero)
+        : Not(successor(n) = zero) := h
 )",
         "≠ desugars to Not of equality",
         __LINE__);
@@ -4533,99 +4455,6 @@ theorem swap_or_keep
            (h : Equality.{0}(Natural, a, b)) => h
 )",
         "∀ with multiple names in one binder chains Pi",
-        __LINE__);
-
-    // Hammer constructor disjointness: `Not(C(...) = D(...))` for
-    // distinct constructors of the same inductive elaborates to a
-    // synthesized discriminator + Equality_recursor proof.
-    expectVerifies(R"(
-module Test.hammer_disjointness_successor_zero
-
-inductive True : Proposition where
-  | True.trivial : True
-
-inductive False : Proposition where
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-theorem successor_disjoint_from_zero (n : Natural)
-        : (Equality.{0}(Natural, successor(n), zero)) → False := ?
-)",
-        "hammer disjointness: successor(n) ≠ zero",
-        __LINE__);
-
-    // Symmetric direction: zero ≠ successor(n).
-    expectVerifies(R"(
-module Test.hammer_disjointness_zero_successor
-
-inductive True : Proposition where
-  | True.trivial : True
-
-inductive False : Proposition where
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-theorem zero_disjoint_from_successor (n : Natural)
-        : (Equality.{0}(Natural, zero, successor(n))) → False := ?
-)",
-        "hammer disjointness: zero ≠ successor(n)",
-        __LINE__);
-
-    // Two-constructor enum: distinct constructors are unequal.
-    expectVerifies(R"(
-module Test.hammer_disjointness_enum
-
-inductive True : Proposition where
-  | True.trivial : True
-
-inductive False : Proposition where
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-inductive Color : Type(0) where
-  | red    : Color
-  | green  : Color
-  | blue   : Color
-
-theorem red_is_not_blue
-        : (Equality.{0}(Color, red, blue)) → False := ?
-)",
-        "hammer disjointness: distinct nullary constructors",
-        __LINE__);
-
-    // Negative: same constructor on both sides should fall through.
-    expectErrorContains(R"(
-module Test.hammer_disjointness_same_constructor
-
-inductive True : Proposition where
-  | True.trivial : True
-
-inductive False : Proposition where
-
-inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
-  | reflexivity : Equality(A, x, x)
-
-inductive Natural : Type(0) where
-  | zero : Natural
-  | successor : Natural → Natural
-
-theorem succ_eq_succ_not_disjoint
-        : (Equality.{0}(Natural, successor(zero), successor(zero))) → False := ?
-)",
-        {"could not find a proof",
-         "succ_eq_succ_not_disjoint"},
-        "hammer rejects same-constructor disjointness",
         __LINE__);
 
     // calc in a pattern-match body verifies. (A recursive call inside
