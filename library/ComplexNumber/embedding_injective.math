@@ -1,0 +1,183 @@
+-- ComplexNumber/embedding_injective.math
+--
+-- The embedding ℝ ↪ ℂ is injective, so ℝ genuinely sits inside ℂ.
+-- If from_real(a) = from_real(b) then x²+1 divides the constant
+-- polynomial a−b; but x²+1 has degree 2 and a nonzero multiple of it
+-- has degree ≥ 2, so the constant must be 0, i.e. a = b.
+
+module ComplexNumber.embedding_injective
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring_divisibility
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.instances
+import Polynomial.degree
+import Polynomial.multiply_coefficient
+import Polynomial.monomial
+import Polynomial.division
+import Polynomial.degree_function
+import Polynomial.bezout
+import Polynomial.degree_product
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+import ComplexNumber.basics
+import ComplexNumber.modulus
+import ComplexNumber.embedding
+
+-- A polynomial divisible by the modulus but of degree < 2 is zero.
+theorem Complex.divides_modulus_low_degree_zero
+        (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
+        (modulusDivides : Ring.divides(Real.polynomial_ring, Complex.modulus, p))
+        (pLow : Polynomial.DegreeLessThan(Real.ring, p, 2))
+        : p = Polynomial.zero(Real.ring) :=
+  decide p = Polynomial.zero(Real.ring) {
+    | yes pZero => pZero
+    | no pNonzero => {
+        obtain ⟨degreeP, pBound, pLeadingNonzero⟩
+            from Polynomial.exists_degree_of_nonzero(Real.ring, p, pNonzero);
+        obtain ⟨quotient, pEqualsModulusQuotient⟩ from modulusDivides;
+        claim pEqualsPolyMultiply
+            : p = Polynomial.multiply(Real.ring, Complex.modulus, quotient)
+            by pEqualsModulusQuotient;
+        claim quotientNonzero : ¬(quotient = Polynomial.zero(Real.ring))
+            by function (quotientZero : quotient = Polynomial.zero(Real.ring)) =>
+                 pNonzero(
+                     calc p
+                        = Polynomial.multiply(Real.ring, Complex.modulus, quotient)
+                              by pEqualsModulusQuotient
+                        = Polynomial.multiply(Real.ring, Complex.modulus,
+                              Polynomial.zero(Real.ring))
+                              by quotientZero
+                        = Polynomial.zero(Real.ring)
+                              by Ring.multiply_zero_right(Real.polynomial_ring, Complex.modulus));
+        obtain ⟨degreeQuotient, quotientBound, quotientLeadingNonzero⟩
+            from Polynomial.exists_degree_of_nonzero(Real.ring, quotient, quotientNonzero);
+        claim degreePEquation : degreeP = 2 + degreeQuotient
+            by Polynomial.HasDegree_unique(Real.ring, p, degreeP, 2 + degreeQuotient,
+                   And.introduction(pBound, pLeadingNonzero),
+                   rewrite(Equality.symmetry(pEqualsPolyMultiply),
+                       Polynomial.HasDegree_product(Real.ring, Real.multiply_commutative,
+                           Real.reciprocal_exists_for_nonzero, Complex.modulus, quotient,
+                           2, degreeQuotient, Complex.modulus_HasDegree_two,
+                           And.introduction(quotientBound, quotientLeadingNonzero))));
+        absurd(pLeadingNonzero(
+            pLow(degreeP,
+                rewrite(Equality.symmetry(degreePEquation),
+                    Natural.less_or_equal_add_right(2, degreeQuotient)))))
+      }
+  }
+
+-- The embedding ℝ ↪ ℂ is injective.
+theorem ComplexNumber.from_real_injective (a b : Real)
+        (equalImages : ComplexNumber.from_real(a) = ComplexNumber.from_real(b))
+        : a = b := {
+  -- Equal classes: the modulus divides monomial(a,0) − monomial(b,0).
+  claim modulusDividesDifference
+      : Ring.divides(Real.polynomial_ring, Complex.modulus,
+            Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+                Polynomial.negate(Real.ring, Polynomial.monomial(Real.ring, b, 0))))
+      by Quotient.exact(
+             Ring.carrier(Real.polynomial_ring),
+             Ring.CongruentModulo(Real.polynomial_ring, Complex.modulus),
+             RingModulo.equivalence(Real.polynomial_ring, Complex.modulus),
+             Polynomial.monomial(Real.ring, a, 0), Polynomial.monomial(Real.ring, b, 0),
+             equalImages);
+  -- That difference has degree < 2.
+  claim differenceLow
+      : Polynomial.DegreeLessThan(Real.ring,
+            Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+                Polynomial.negate(Real.ring, Polynomial.monomial(Real.ring, b, 0))), 2)
+      by Polynomial.DegreeLessThan.add(Real.ring,
+             Polynomial.monomial(Real.ring, a, 0),
+             Polynomial.negate(Real.ring, Polynomial.monomial(Real.ring, b, 0)), 2,
+             function (i : Natural) (twoLessOrEqualI : 2 ≤ i) =>
+                 Polynomial.coefficientOf_monomial_off(Real.ring, a, 0, i,
+                     function (iZero : i = 0) =>
+                         Natural.not_less_or_equal_successor_zero(1,
+                             rewrite(iZero, twoLessOrEqualI))),
+             Polynomial.DegreeLessThan.negate(Real.ring,
+                 Polynomial.monomial(Real.ring, b, 0), 2,
+                 function (i : Natural) (twoLessOrEqualI : 2 ≤ i) =>
+                     Polynomial.coefficientOf_monomial_off(Real.ring, b, 0, i,
+                         function (iZero : i = 0) =>
+                             Natural.not_less_or_equal_successor_zero(1,
+                                 rewrite(iZero, twoLessOrEqualI)))));
+  -- Hence the difference is zero.
+  claim differenceZero
+      : Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+            Polynomial.negate(Real.ring, Polynomial.monomial(Real.ring, b, 0)))
+        = Polynomial.zero(Real.ring)
+      by Complex.divides_modulus_low_degree_zero(
+             Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+                 Polynomial.negate(Real.ring, Polynomial.monomial(Real.ring, b, 0))),
+             modulusDividesDifference, differenceLow);
+  -- Read off the constant coefficient: a − b = 0.
+  claim aMinusBZero : Real.add(a, Real.negate(b)) = Real.zero
+      by calc Real.add(a, Real.negate(b))
+            = Real.add(
+                  Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a, 0), 0),
+                  Real.negate(b))
+                  by Equality.symmetry(
+                         Polynomial.coefficientOf_monomial_at(Real.ring, a, 0))
+            = Real.add(
+                  Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a, 0), 0),
+                  Real.negate(
+                      Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), 0)))
+                  by congruenceOf(function (t : Real) => Real.add(
+                         Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a, 0), 0),
+                         Real.negate(t)),
+                         Equality.symmetry(Polynomial.coefficientOf_monomial_at(Real.ring, b, 0)))
+            = Real.add(
+                  Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a, 0), 0),
+                  Polynomial.coefficientOf(Real.ring,
+                      Polynomial.negate(Real.ring, Polynomial.monomial(Real.ring, b, 0)), 0))
+                  by Equality.symmetry(
+                         Polynomial.coefficientOf_negate(Real.ring,
+                             Polynomial.monomial(Real.ring, b, 0), 0))
+            = Polynomial.coefficientOf(Real.ring,
+                  Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+                      Polynomial.negate(Real.ring, Polynomial.monomial(Real.ring, b, 0))), 0)
+                  by Equality.symmetry(
+                         Polynomial.coefficientOf_add(Real.ring,
+                             Polynomial.monomial(Real.ring, a, 0),
+                             Polynomial.negate(Real.ring, Polynomial.monomial(Real.ring, b, 0)), 0))
+            = Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), 0)
+                  by congruenceOf(
+                         function (q : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                             Polynomial.coefficientOf(Real.ring, q, 0),
+                         differenceZero)
+            = Real.zero
+                  by Polynomial.coefficientOf_zero(Real.ring, 0);
+  -- a − b = 0 = b − b, cancel.
+  Group.cancel_right(Real, Real.add, Real.zero, Real.negate, Real.add_is_group,
+      Real.negate(b), a, b,
+      calc Real.add(a, Real.negate(b))
+         = Real.zero
+               by aMinusBZero
+         = Real.add(b, Real.negate(b))
+               by Equality.symmetry(Ring.add_negate_right(Real.ring, b)))
+}
