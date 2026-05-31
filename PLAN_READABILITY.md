@@ -178,15 +178,24 @@ which otherwise *guesses* lemma names.
   - **Surface #1 (error messages) — DONE.** When `autoProveClaim` fails
     (a `done`/`okay`/bare-`claim`, or a non-equality calc step), the
     elaborator appends "search by conclusion shape — candidates" with the
-    top 5 in-scope lemmas whose conclusion matches the goal, each with
-    its signature and `[needs: …]`. Best-effort (try/catch; empty result
-    → no text), so it never masks the base error. Crucially it respects
-    import scope automatically — the elaborator's environment only holds
-    loaded modules, so it never suggests a lemma you'd have to import.
-    This is the highest-value surface for LLM fluency: the real lemma
-    name arrives exactly where a wrong guess would otherwise be made.
-    Regression test in `runLemmaSearchTests` (asserts the failing-`done`
-    error names the matching lemma).
+    top 5 lemmas whose conclusion matches the goal, each with its
+    signature and `[needs: …]`. Best-effort (try/catch; empty result →
+    no text), so it never masks the base error. This is the
+    highest-value surface for LLM fluency: the real lemma name arrives
+    exactly where a wrong guess would otherwise be made. Regression test
+    in `runLemmaSearchTests`.
+    - **Unimported lemmas tagged with `(needs import X)`.** The search
+      runs over the WHOLE library (a `LibrarySearchIndex` lazily built by
+      the verify-with-cache driver — only on a failure, so the happy path
+      pays nothing; confirmed full-build time unchanged at ~4.9s). A hit
+      already in `environment_` prints untagged; one that is not in scope
+      gets a `(needs import <module>)` line. So the suggestions are no
+      longer bounded by what you imported — `a + b ≤ c + b` now surfaces
+      `Natural.le_add_preserves_left … (needs import
+      Polynomial.division_support)` as the top hit. Injected via a
+      `std::function<const LibrarySearchIndex*()>` provider through
+      `elaborateModule` (nullptr on the test / legacy path → in-scope
+      search only).
   `kernel search` subcommand (main.cpp):
   - `--goal "(a c b : Natural) → a + b ≤ c + b"` — conclusion-unifies
     mode (apply?-style). Free variables are written as leading binders;

@@ -2,9 +2,11 @@
 
 #include "expression.hpp"
 #include "kernel.hpp"
+#include "lemma_search.hpp"
 #include "level.hpp"
 #include "surface.hpp"
 
+#include <functional>
 #include <stdexcept>
 #include <string>
 
@@ -37,9 +39,17 @@ ExpressionPointer elaborateExpression(const SurfaceExpression& expression,
 // `using` directives are currently a no-op (notation resolution is
 // deferred for v0; modules must use explicit function calls and the
 // fully-qualified `Equality(A, x, y)` form rather than `a = b`).
+// `librarySearchProvider`, when set, returns (lazily, the first time it is
+// called) a snapshot of the whole built library — used only to enrich a
+// failing-proof error with candidate lemmas that aren't imported yet. It
+// is consulted at most once and only on a failure path, so a build that
+// succeeds never calls it. Pass nullptr (the default) to disable; then
+// suggestions come from the in-scope environment alone.
 void elaborateModule(const SurfaceModule& module,
                      Environment& environment,
                      std::vector<std::string>& importedModules,
                      bool reportRedundantBy = false,
                      bool reportRedundantCalcSteps = false,
-                     bool reportRedundantByNonEq = false);
+                     bool reportRedundantByNonEq = false,
+                     std::function<const LibrarySearchIndex*()>
+                         librarySearchProvider = nullptr);

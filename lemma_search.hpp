@@ -11,9 +11,20 @@
 #include "expression.hpp"
 #include "kernel.hpp"
 
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
+
+// A snapshot of the WHOLE built library, used by the elaborator's
+// failing-proof suggestions to surface lemmas that aren't imported yet
+// (tagged with the import to add). Built lazily by the verify driver —
+// only when a proof actually fails — so the happy path pays nothing.
+struct LibrarySearchIndex {
+    Environment environment;                          // all declarations
+    std::map<std::string, std::string> nameToModule;  // decl name → module
+    std::set<std::string> excludedNames;              // Test/* fixtures
+};
 
 struct LemmaSearchHit {
     std::string name;

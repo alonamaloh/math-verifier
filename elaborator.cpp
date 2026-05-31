@@ -399,6 +399,13 @@ public:
     // `--check-redundant-by` CLI flag.
     void setReportRedundantBy(bool flag) { reportRedundantBy_ = flag; }
 
+    // Injects the lazy whole-library snapshot used to enrich failing-proof
+    // errors with unimported-lemma suggestions. See elaborateModule.
+    void setLibrarySearchProvider(
+        std::function<const LibrarySearchIndex*()> provider) {
+        librarySearchProvider_ = std::move(provider);
+    }
+
     // When true, the redundant-by check also fires on non-equality
     // calc steps (≤/</≥/>). Off by default because for large files
     // it can be expensive (the per-step lemma-index lookup iterates
@@ -678,9 +685,22 @@ private:
                                         localBinders[i - 1].name,
                                         FreeVariableOrigin::User);
             }
+            // Search the WHOLE library when a snapshot is available (the
+            // verify-with-cache path), so a lemma that isn't imported yet
+            // still surfaces — tagged with the import to add. Without the
+            // snapshot (tests / legacy verify), search the in-scope
+            // environment alone. A hit is "in scope" iff it is already a
+            // declaration in environment_; otherwise we cite its module.
+            const LibrarySearchIndex* index =
+                librarySearchProvider_ ? librarySearchProvider_() : nullptr;
+            static const std::set<std::string> noExclusions;
+            const Environment& searchEnvironment =
+                index ? index->environment : environment_;
+            const std::set<std::string>& excluded =
+                index ? index->excludedNames : noExclusions;
             std::string head;
-            std::vector<LemmaSearchHit> hits =
-                computeGoalHits(environment_, goalOpened, head);
+            std::vector<LemmaSearchHit> hits = computeGoalHits(
+                searchEnvironment, goalOpened, head, excluded);
             if (hits.empty()) return "";
             std::string out =
                 "\n  search by conclusion shape — candidates "
@@ -696,6 +716,15 @@ private:
                         out += prettyPrint(hits[i].needs[j]);
                     }
                     out += "]";
+                }
+                // Tag lemmas that are not yet in scope with the import.
+                if (index && !environment_.lookup(hits[i].name)) {
+                    auto moduleIterator =
+                        index->nameToModule.find(hits[i].name);
+                    if (moduleIterator != index->nameToModule.end()) {
+                        out += "\n        (needs import "
+                             + moduleIterator->second + ")";
+                    }
                 }
             }
             return out;
@@ -23166,6 +23195,9 @@ private:
     Environment& environment_;
     std::vector<std::string>& importedModules_;
     std::string moduleName_;
+    // See elaborateModule's docstring. Consulted only by searchSuggestions
+    // on a failed proof, to surface unimported library lemmas.
+    std::function<const LibrarySearchIndex*()> librarySearchProvider_;
     // Tactic stats — tracks per-strategy invocations, successes, and
     // cumulative time. Enabled by MATH_TIME_TACTICS=1 env var. Dumped
     // by ~Elaborator if any tactic was instrumented.
@@ -23352,10 +23384,13 @@ void elaborateModule(const SurfaceModule& module,
                      std::vector<std::string>& importedModules,
                      bool reportRedundantBy,
                      bool reportRedundantCalcSteps,
-                     bool reportRedundantByNonEq) {
+                     bool reportRedundantByNonEq,
+                     std::function<const LibrarySearchIndex*()>
+                         librarySearchProvider) {
     Elaborator elaborator(environment, importedModules);
     elaborator.setReportRedundantBy(reportRedundantBy);
     elaborator.setReportRedundantCalcSteps(reportRedundantCalcSteps);
     elaborator.setReportRedundantByNonEq(reportRedundantByNonEq);
+    elaborator.setLibrarySearchProvider(std::move(librarySearchProvider));
     elaborator.runModule(module);
 }

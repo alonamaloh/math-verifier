@@ -12,6 +12,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <memory>
 #include <iostream>
 #include <map>
 #include <random>
@@ -5027,6 +5029,8 @@ std::string deriveSourceRoot(const std::string& sourcePath,
 // `<cacheRoot>/<sourceRoot><module-as-path>.mathv` and used as
 // dependency caches — `dependencyCachePaths` need not list them
 // explicitly. Returns 0 on success.
+LibrarySearchIndex buildLibraryIndex(const std::string& cacheRoot);
+
 int verifyWithCache(const std::string& sourcePath,
                     const std::vector<std::string>& dependencyCachePaths,
                     const std::string& outputCachePath,
@@ -5134,11 +5138,30 @@ int verifyWithCache(const std::string& sourcePath,
         instancesBefore.insert(key);
     }
 
+    // A lazy whole-library snapshot for failing-proof suggestions: built
+    // (once) only if a proof actually fails, so successful builds — the
+    // common case — never pay for it. Only available when a cache root is
+    // known (the imports are resolved against it).
+    std::function<const LibrarySearchIndex*()> librarySearchProvider;
+    if (!cacheRoot.empty()) {
+        auto indexCache =
+            std::make_shared<std::unique_ptr<LibrarySearchIndex>>();
+        std::string root = cacheRoot;
+        librarySearchProvider =
+            [indexCache, root]() -> const LibrarySearchIndex* {
+                if (!*indexCache) {
+                    *indexCache = std::make_unique<LibrarySearchIndex>(
+                        buildLibraryIndex(root));
+                }
+                return indexCache->get();
+            };
+    }
+
     std::vector<std::string> importedModules;
     try {
         elaborateModule(parsedModule, environment, importedModules,
                          reportRedundantBy, reportRedundantCalcSteps,
-                         reportRedundantByNonEq);
+                         reportRedundantByNonEq, librarySearchProvider);
     } catch (const ElaborateError& error) {
         std::cerr << sourcePath << ":"
                   << (error.line > 0 ? error.line : 1) << ":"
@@ -5500,6 +5523,41 @@ std::map<std::string, std::string> loadAllCaches(
         }
     }
     return nameToSource;
+}
+
+// Load the whole built library into a LibrarySearchIndex — every
+// declaration, a name→module map, and the set of `library/Test/` fixture
+// names to exclude from suggestions. Used by the elaborator's failing-proof
+// surface to suggest (and cite the import for) lemmas not yet in scope.
+LibrarySearchIndex buildLibraryIndex(const std::string& cacheRoot) {
+    LibrarySearchIndex index;
+    std::set<std::string> alreadyLoaded;
+    std::vector<std::string> cacheFiles;
+    std::error_code errorCode;
+    for (auto& entry : std::filesystem::recursive_directory_iterator(
+             cacheRoot, errorCode)) {
+        if (entry.is_regular_file()
+            && entry.path().extension() == ".mathv") {
+            cacheFiles.push_back(entry.path().string());
+        }
+    }
+    std::sort(cacheFiles.begin(), cacheFiles.end());
+    for (const auto& cacheFile : cacheFiles) {
+        try {
+            loadCacheRecursive(index.environment, cacheFile, alreadyLoaded);
+            CacheContents contents = readCacheFile(cacheFile);
+            bool isTest =
+                contents.sourcePath.find("/Test/") != std::string::npos;
+            for (const auto& [name, declaration] : contents.declarations) {
+                (void)declaration;
+                index.nameToModule[name] = contents.moduleName;
+                if (isTest) index.excludedNames.insert(name);
+            }
+        } catch (const SerializationError&) {
+            // Skip stale / unreadable caches; the rest is still useful.
+        }
+    }
+    return index;
 }
 
 // Render one hit line + its location/needs line.
