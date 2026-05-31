@@ -181,6 +181,21 @@ which otherwise *guesses* lemma names.
   yes/no, so no custom reducer was needed).
 - **B2 — DONE.** `change T;` (active `note goal`) — replace the goal by a
   defeq spelling.
+- **#21 (ring cross-pair cancellation) — DONE.** `proveMultiplyMerge`
+  routes the p·q expanded products through the shared
+  `proveSignedMonomialSumEqualsCanonical` (extracted from the additive
+  merge), so `(a+b)(a−b)=a²−b²` and same-sign coef>1 collisions close.
+- **C1 — DONE.** `cases`/`by_induction` auto-generalize: a try-then-revert
+  wrapper (`elaborateCasesExpression`) reverts scrutinee-dependent in-scope
+  hypotheses into the motive (via the existing `refining` telescope) when
+  the plain elaboration fails. Zero-regression (existing proofs take the
+  no-revert path). Covers plain `cases` and constructor `by_induction`;
+  `Natural/cancellation.math` dropped an explicit `refining`. NOT yet
+  wired for the lemma-based path (`by_strong_induction` /
+  `by_induction … using`, `elaborateByInductionUsing`) — small surface (6
+  uses), a follow-up. C2's cases-side is subsumed by this; C3 (β/WHNF of
+  the expected type before an anonymous tuple reads its motive) was
+  already present (`elaborateAnonymousTuple` WHNFs).
 - **Findings that revise this plan:**
   1. **A2 does NOT retroactively simplify `ring_difference.math` /
      `RingModulo` respect-lemmas.** Those are stated over a *plain*
