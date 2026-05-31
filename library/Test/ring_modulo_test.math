@@ -1,0 +1,42 @@
+-- Smoke test: the generic RingModulo construction over a concrete
+-- bundled ring. RingModulo(integerRing, m) is Z modulo the ideal (m) —
+-- the same object IntegerMod(n) builds by hand — recovered here as an
+-- instance of the generic "ring modulo a principal ideal" construction.
+module Test.ring_modulo_test
+
+import Natural.basics
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.instances
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+
+-- The integers as a bundled ring.
+definition integerRing : Ring :=
+  Ring.make(Integer, Integer.add, Integer.zero, Integer.negate,
+      Integer.multiply, Integer.one, Integer.is_ring)
+
+-- Z/(m) is a type for every integer m.
+definition test_quotient_type (m : Integer) : Type(0) :=
+  RingModulo(integerRing, m)
+
+-- Z/(m) is a commutative ring. The base commutativity is exactly
+-- Integer.multiply_commutative, read as a Ring.MultiplyCommutative.
+theorem test_quotient_is_commutative_ring (m : Integer)
+        : IsCommutativeRing(
+              RingModulo(integerRing, m),
+              RingModulo.add(integerRing, m),
+              RingModulo.zero(integerRing, m),
+              RingModulo.negate(integerRing, m),
+              RingModulo.multiply(integerRing, Integer.multiply_commutative, m),
+              RingModulo.one(integerRing, m)) :=
+  RingModulo.is_commutative_ring(integerRing, Integer.multiply_commutative, m)

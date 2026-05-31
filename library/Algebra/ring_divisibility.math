@@ -1,0 +1,122 @@
+-- Algebra/ring_divisibility.math
+--
+-- Divisibility in an arbitrary bundled ring `s`:
+--   Ring.divides(s, divisor, dividend)
+-- holds when there is a quotient `q` with
+--   dividend = multiply(s, divisor, q).
+--
+-- This generalises Integer/divisibility.math from the concrete ring of
+-- integers to any `s : Ring`. The closure lemmas (zero, reflexive,
+-- addition, negation, right multiplication) are proved from the
+-- bundle's flattened law projections plus the abstract ring lemmas in
+-- Algebra/ring_lemmas. They are exactly the facts a quotient-by-a-
+-- principal-ideal construction (PolynomialMod, IntegerMod) needs to
+-- show that the "divisor divides the difference" relation is an
+-- equivalence and is respected by the ring operations.
+--
+-- Everything here is one-sided (a *right* divisor: dividend = divisor·q)
+-- and needs no commutativity; the few places that genuinely need a
+-- left multiple (the multiply-respects obligation of a quotient) apply
+-- commutativity at that call site.
+
+module Algebra.ring_divisibility
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+
+-- `divisor` divides `dividend` when some quotient witnesses the product.
+definition Ring.divides (s : Ring) (divisor dividend : Ring.carrier(s))
+        : Proposition :=
+  ∃ (quotient : Ring.carrier(s)).
+      dividend = Ring.multiply(s, divisor, quotient)
+
+-- Every element divides itself: quotient is `one`, and `d · 1 = d`.
+theorem Ring.divides_reflexive (s : Ring) (d : Ring.carrier(s))
+        : Ring.divides(s, d, d) :=
+  ⟨Ring.one(s), Equality.symmetry(Ring.multiply_one(s, d))⟩
+
+-- Every element divides zero: quotient is `zero`, and `d · 0 = 0`.
+theorem Ring.divides_zero (s : Ring) (d : Ring.carrier(s))
+        : Ring.divides(s, d, Ring.zero(s)) :=
+  ⟨Ring.zero(s), Equality.symmetry(Ring.multiply_zero_right(s, d))⟩
+
+-- Closed under addition: `d | x` and `d | y` give `d | (x + y)`, with
+-- the quotients added and distributivity recombining the product.
+theorem Ring.divides_add (s : Ring) (d x y : Ring.carrier(s))
+        (dDividesX : Ring.divides(s, d, x))
+        (dDividesY : Ring.divides(s, d, y))
+        : Ring.divides(s, d, Ring.add(s, x, y)) := {
+  obtain ⟨quotientX, xEquation⟩ from dDividesX;
+  obtain ⟨quotientY, yEquation⟩ from dDividesY;
+  ⟨Ring.add(s, quotientX, quotientY),
+   calc Ring.add(s, x, y)
+      = Ring.add(s, Ring.multiply(s, d, quotientX), y)
+            by xEquation
+      = Ring.add(s, Ring.multiply(s, d, quotientX),
+                 Ring.multiply(s, d, quotientY))
+            by yEquation
+      = Ring.multiply(s, d, Ring.add(s, quotientX, quotientY))
+            by Equality.symmetry(
+                   Ring.distributivity_left(s, d, quotientX, quotientY))⟩
+}
+
+-- Closed under negation: `d | x` gives `d | (−x)`, negating the quotient.
+theorem Ring.divides_negate (s : Ring) (d x : Ring.carrier(s))
+        (dDividesX : Ring.divides(s, d, x))
+        : Ring.divides(s, d, Ring.negate(s, x)) := {
+  obtain ⟨quotientX, xEquation⟩ from dDividesX;
+  ⟨Ring.negate(s, quotientX),
+   calc Ring.negate(s, x)
+      = Ring.negate(s, Ring.multiply(s, d, quotientX))
+            by xEquation
+      = Ring.multiply(s, d, Ring.negate(s, quotientX))
+            by Equality.symmetry(
+                   Ring.multiply_negate_right(
+                       Ring.carrier(s), Ring.add(s), Ring.zero(s),
+                       Ring.negate(s), Ring.multiply(s), Ring.one(s),
+                       Ring.is_ring(s), d, quotientX))⟩
+}
+
+-- `d | x` gives `d | (x · c)` for any `c`: the quotient is `qx · c`
+-- and associativity regroups `(d · qx) · c = d · (qx · c)`.
+theorem Ring.divides_multiply_right (s : Ring) (d x c : Ring.carrier(s))
+        (dDividesX : Ring.divides(s, d, x))
+        : Ring.divides(s, d, Ring.multiply(s, x, c)) := {
+  obtain ⟨quotientX, xEquation⟩ from dDividesX;
+  ⟨Ring.multiply(s, quotientX, c),
+   calc Ring.multiply(s, x, c)
+      = Ring.multiply(s, Ring.multiply(s, d, quotientX), c)
+            by xEquation
+      = Ring.multiply(s, d, Ring.multiply(s, quotientX, c))
+            by Ring.multiply_associative(s, d, quotientX, c)⟩
+}
+
+-- `d | x` gives `d | (c · x)` for any `c`, when multiplication
+-- commutes. The only closure lemma that needs commutativity: a *left*
+-- multiple `c · x = c · (d · q)` is regrouped to `d · (c · q)` only
+-- after commuting `c · d = d · c`.
+theorem Ring.divides_multiply_left (s : Ring)
+        (commutativity
+            : (x y : Ring.carrier(s))
+              → Ring.multiply(s, x, y) = Ring.multiply(s, y, x))
+        (d x c : Ring.carrier(s))
+        (dDividesX : Ring.divides(s, d, x))
+        : Ring.divides(s, d, Ring.multiply(s, c, x)) := {
+  obtain ⟨quotientX, xEquation⟩ from dDividesX;
+  ⟨Ring.multiply(s, c, quotientX),
+   calc Ring.multiply(s, c, x)
+      = Ring.multiply(s, c, Ring.multiply(s, d, quotientX))
+            by xEquation
+      = Ring.multiply(s, Ring.multiply(s, c, d), quotientX)
+            by Equality.symmetry(Ring.multiply_associative(s, c, d, quotientX))
+      = Ring.multiply(s, Ring.multiply(s, d, c), quotientX)
+            by commutativity(c, d)
+      = Ring.multiply(s, d, Ring.multiply(s, c, quotientX))
+            by Ring.multiply_associative(s, d, c, quotientX)⟩
+}

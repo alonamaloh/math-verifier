@@ -1,0 +1,71 @@
+-- RingModulo/instances.math
+--
+-- Witnesses that RingModulo(s, m) is a ring under (+, 0, −, ·, 1) for
+-- any bundled ring `s` whose multiplication commutes, and a commutative
+-- ring as well. Each instance packages the laws proved in
+-- RingModulo/ring.math. Mirrors IntegerMod/instances.math; the
+-- commutativity proof of the base ring is threaded through every
+-- multiplicative structure (it is what `RingModulo.multiply` needs).
+
+module RingModulo.instances
+
+import Logic.basics
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+
+-- Additive monoid.
+theorem RingModulo.add_is_monoid (s : Ring) (m : Ring.carrier(s))
+        : IsMonoid(RingModulo(s, m), RingModulo.add(s, m), RingModulo.zero(s, m)) :=
+    ⟨RingModulo.add_associative(s, m),
+     RingModulo.add_identity_left(s, m),
+     RingModulo.add_identity_right(s, m)⟩
+
+-- Additive group.
+theorem RingModulo.add_is_group (s : Ring) (m : Ring.carrier(s))
+        : IsGroup(RingModulo(s, m), RingModulo.add(s, m), RingModulo.zero(s, m),
+                  RingModulo.negate(s, m)) :=
+    ⟨RingModulo.add_is_monoid(s, m),
+     RingModulo.add_negate_left(s, m),
+     RingModulo.add_negate_right(s, m)⟩
+
+-- Additive abelian group.
+theorem RingModulo.add_is_abelian_group (s : Ring) (m : Ring.carrier(s))
+        : IsAbelianGroup(RingModulo(s, m), RingModulo.add(s, m),
+                         RingModulo.zero(s, m), RingModulo.negate(s, m)) :=
+    ⟨RingModulo.add_is_group(s, m), RingModulo.add_commutative(s, m)⟩
+
+-- Multiplicative monoid.
+theorem RingModulo.multiply_is_monoid (s : Ring)
+        (commutativity : Ring.MultiplyCommutative(s)) (m : Ring.carrier(s))
+        : IsMonoid(RingModulo(s, m), RingModulo.multiply(s, commutativity, m),
+                   RingModulo.one(s, m)) :=
+    ⟨RingModulo.multiply_associative(s, commutativity, m),
+     RingModulo.multiply_identity_left(s, commutativity, m),
+     RingModulo.multiply_identity_right(s, commutativity, m)⟩
+
+-- Ring.
+theorem RingModulo.is_ring (s : Ring)
+        (commutativity : Ring.MultiplyCommutative(s)) (m : Ring.carrier(s))
+        : IsRing(RingModulo(s, m), RingModulo.add(s, m), RingModulo.zero(s, m),
+                 RingModulo.negate(s, m),
+                 RingModulo.multiply(s, commutativity, m), RingModulo.one(s, m)) :=
+    ⟨RingModulo.add_is_abelian_group(s, m),
+     RingModulo.multiply_is_monoid(s, commutativity, m),
+     RingModulo.distributivity_left(s, commutativity, m),
+     RingModulo.distributivity_right(s, commutativity, m)⟩
+
+-- Commutative ring.
+theorem RingModulo.is_commutative_ring (s : Ring)
+        (commutativity : Ring.MultiplyCommutative(s)) (m : Ring.carrier(s))
+        : IsCommutativeRing(RingModulo(s, m), RingModulo.add(s, m),
+                            RingModulo.zero(s, m), RingModulo.negate(s, m),
+                            RingModulo.multiply(s, commutativity, m),
+                            RingModulo.one(s, m)) :=
+    ⟨RingModulo.is_ring(s, commutativity, m),
+     RingModulo.multiply_commutative(s, commutativity, m)⟩
