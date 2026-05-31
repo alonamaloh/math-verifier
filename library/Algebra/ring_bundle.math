@@ -49,7 +49,14 @@ inductive Ring : Type(1) where
 definition Ring.carrier : Ring → Type(0)
   | Ring.make(carrier, add, zero, negate, multiply, one, isRing) => carrier
 
-definition Ring.add (r : Ring)
+-- The operation projections take their ring implicitly, so they read as
+-- operators: `x + y` / `x * y` / `x - y` over an abstract `Ring.carrier`
+-- recover `{r}` from the operand type. Full-application call sites
+-- (`Ring.add(r, x, y)`) still work by passing `r` positionally; only
+-- partial/slot uses must be written bare (`Ring.add`), recovering `r`
+-- from the expected operation type. The constants `zero`/`one` keep an
+-- explicit ring (no operands to recover from).
+definition Ring.add {r : Ring}
         : Ring.carrier(r) → Ring.carrier(r) → Ring.carrier(r) :=
   cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
     add }
@@ -58,12 +65,12 @@ definition Ring.zero (r : Ring) : Ring.carrier(r) :=
   cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
     zero }
 
-definition Ring.negate (r : Ring)
+definition Ring.negate {r : Ring}
         : Ring.carrier(r) → Ring.carrier(r) :=
   cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
     negate }
 
-definition Ring.multiply (r : Ring)
+definition Ring.multiply {r : Ring}
         : Ring.carrier(r) → Ring.carrier(r) → Ring.carrier(r) :=
   cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
     multiply }
@@ -72,9 +79,20 @@ definition Ring.one (r : Ring) : Ring.carrier(r) :=
   cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
     one }
 
+-- x − y := x + (−y) on the bundle's carrier.
+definition Ring.subtract {r : Ring} (x y : Ring.carrier(r)) : Ring.carrier(r) :=
+  Ring.add(x, Ring.negate(y))
+
+-- Operator overloads dispatch on the carrier-projection head, distinct
+-- from any concrete carrier's head, so they never clash with the
+-- per-carrier operators (Integer, Rational, …).
+operator (+) on (Ring.carrier, Ring.carrier) := Ring.add
+operator (-) on (Ring.carrier, Ring.carrier) := Ring.subtract
+operator (*) on (Ring.carrier, Ring.carrier) := Ring.multiply
+
 definition Ring.is_ring (r : Ring)
-        : IsRing(Ring.carrier(r), Ring.add(r), Ring.zero(r),
-                 Ring.negate(r), Ring.multiply(r), Ring.one(r)) :=
+        : IsRing(Ring.carrier(r), Ring.add, Ring.zero(r),
+                 Ring.negate, Ring.multiply, Ring.one(r)) :=
   cases r { | Ring.make(carrier, add, zero, negate, multiply, one, isRing) =>
     isRing }
 
@@ -147,8 +165,8 @@ theorem Ring.negate_zero (r : Ring)
         : Ring.negate(r, Ring.zero(r)) = Ring.zero(r) := {
   let ⟨additiveAbelianGroup, _, _, _⟩ := Ring.is_ring(r);
   let ⟨additiveGroup, _⟩ := additiveAbelianGroup;
-  Group.inverse_identity(Ring.carrier(r), Ring.add(r), Ring.zero(r),
-      Ring.negate(r), additiveGroup)
+  Group.inverse_identity(Ring.carrier(r), Ring.add, Ring.zero(r),
+      Ring.negate, additiveGroup)
 }
 
 -- Derived abelian rearrangement: (a+b)+(c+d) = (a+c)+(b+d). The
@@ -180,13 +198,13 @@ theorem Ring.add_four_swap (r : Ring) (a b c d : Ring.carrier(r))
 -- `Ring.zero_multiply` / `Ring.multiply_zero` over `IsRing`.)
 theorem Ring.zero_multiply_left (r : Ring) (x : Ring.carrier(r))
         : Ring.multiply(r, Ring.zero(r), x) = Ring.zero(r) :=
-  Ring.zero_multiply(Ring.carrier(r), Ring.add(r), Ring.zero(r),
-      Ring.negate(r), Ring.multiply(r), Ring.one(r), Ring.is_ring(r), x)
+  Ring.zero_multiply(Ring.carrier(r), Ring.add, Ring.zero(r),
+      Ring.negate, Ring.multiply, Ring.one(r), Ring.is_ring(r), x)
 
 theorem Ring.multiply_zero_right (r : Ring) (x : Ring.carrier(r))
         : Ring.multiply(r, x, Ring.zero(r)) = Ring.zero(r) :=
-  Ring.multiply_zero(Ring.carrier(r), Ring.add(r), Ring.zero(r),
-      Ring.negate(r), Ring.multiply(r), Ring.one(r), Ring.is_ring(r), x)
+  Ring.multiply_zero(Ring.carrier(r), Ring.add, Ring.zero(r),
+      Ring.negate, Ring.multiply, Ring.one(r), Ring.is_ring(r), x)
 
 theorem Ring.multiply_associative (r : Ring)
         : (x y z : Ring.carrier(r))
