@@ -1,0 +1,129 @@
+-- Polynomial/monomial.math
+--
+-- Monomials c·x^j and the one fact division needs about them: the
+-- coefficient of (c·x^j)·p. By convolution the k-th coefficient is a
+-- sum that is supported at the single index i = j (the only place the
+-- monomial is nonzero), so it collapses (Sum.single_point) to
+--   coefficientOf((c·x^j)·p, k) = c · coefficientOf(p, k − j)   (j ≤ k).
+-- This is exactly the "leading-term killer" the division step subtracts.
+
+module Polynomial.monomial
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.monus
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import Polynomial.summation
+import Polynomial.degree
+import Polynomial.multiply_coefficient
+import Polynomial.division_support
+
+-- The coefficient list of c·x^j: j zeros followed by c.
+definition Polynomial.Coefficients.monomial (r : Ring) (c : Ring.carrier(r))
+        : Natural → Polynomial.Coefficients(Ring.carrier(r))
+  | zero =>
+      Polynomial.Coefficients.cons(Ring.carrier(r), c,
+          Polynomial.Coefficients.nil(Ring.carrier(r)))
+  | successor(k) =>
+      Polynomial.Coefficients.cons(Ring.carrier(r), Ring.zero(r),
+          Polynomial.Coefficients.monomial(r, c, k))
+
+-- Coefficient of the monomial list at its own degree is c.
+theorem Polynomial.coefficient_monomial_at (r : Ring) (c : Ring.carrier(r))
+        (j : Natural)
+        : Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, j), j) = c :=
+  by_induction on j with IH {
+    case zero: reflexivity(Ring.carrier(r), c)
+    case successor(k): IH
+  }
+
+-- Coefficient of the monomial list off its degree is zero.
+theorem Polynomial.coefficient_monomial_off (r : Ring) (c : Ring.carrier(r))
+        (j : Natural)
+        : (i : Natural) → ¬(i = j)
+          → Polynomial.coefficient(r, Polynomial.Coefficients.monomial(r, c, j), i)
+            = Ring.zero(r) :=
+  by_induction on j with IH {
+    case zero:
+      function (i : Natural) (notEqual : ¬(i = 0)) =>
+          cases i refining notEqual {
+            | zero => absurd(notEqual(reflexivity(Natural, 0)))
+            | successor(iPredecessor) => reflexivity(Ring.carrier(r), Ring.zero(r))
+          }
+    case successor(k):
+      function (i : Natural) (notEqual : ¬(i = successor(k))) =>
+          cases i refining notEqual {
+            | zero => reflexivity(Ring.carrier(r), Ring.zero(r))
+            | successor(iPredecessor) =>
+                IH(iPredecessor,
+                   function (predecessorEqual : iPredecessor = k) =>
+                       notEqual(congruenceOf(
+                           function (t : Natural) => successor(t), predecessorEqual)))
+          }
+  }
+
+-- The monomial c·x^j, as a polynomial.
+definition Polynomial.monomial (r : Ring) (c : Ring.carrier(r)) (j : Natural)
+        : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
+  Polynomial.make(Ring.carrier(r), Ring.zero(r),
+      Polynomial.Coefficients.monomial(r, c, j))
+
+-- Its coefficients, at the quotient level (definitional through the lift).
+theorem Polynomial.coefficientOf_monomial_at (r : Ring) (c : Ring.carrier(r))
+        (j : Natural)
+        : Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), j) = c :=
+  Polynomial.coefficient_monomial_at(r, c, j)
+
+theorem Polynomial.coefficientOf_monomial_off (r : Ring) (c : Ring.carrier(r))
+        (j i : Natural) (notEqual : ¬(i = j))
+        : Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), i) = Ring.zero(r) :=
+  Polynomial.coefficient_monomial_off(r, c, j, i, notEqual)
+
+-- The coefficient of (c·x^j)·p: the convolution collapses to a single
+-- term because the monomial vanishes off index j.
+theorem Polynomial.coefficientOf_monomial_multiply (r : Ring) (c : Ring.carrier(r))
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (j k : Natural)
+        (jLessOrEqualK : j ≤ k)
+        : Polynomial.coefficientOf(r,
+              Polynomial.multiply(r, Polynomial.monomial(r, c, j), p), k)
+          = Ring.multiply(r, c, Polynomial.coefficientOf(r, p, Natural.monus(k, j))) :=
+  calc Polynomial.coefficientOf(r,
+           Polynomial.multiply(r, Polynomial.monomial(r, c, j), p), k)
+     = Polynomial.Sum(r,
+           function (i : Natural) =>
+               Ring.multiply(r,
+                   Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), i),
+                   Polynomial.coefficientOf(r, p, Natural.monus(k, i))),
+           k)
+           by Polynomial.coefficientOf_multiply(r, Polynomial.monomial(r, c, j), p, k)
+     = Ring.multiply(r,
+           Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), j),
+           Polynomial.coefficientOf(r, p, Natural.monus(k, j)))
+           by Polynomial.Sum.single_point(r,
+                  function (i : Natural) =>
+                      Ring.multiply(r,
+                          Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), i),
+                          Polynomial.coefficientOf(r, p, Natural.monus(k, i))),
+                  j, k, jLessOrEqualK,
+                  function (i : Natural) (notEqual : ¬(i = j)) =>
+                      calc Ring.multiply(r,
+                               Polynomial.coefficientOf(r, Polynomial.monomial(r, c, j), i),
+                               Polynomial.coefficientOf(r, p, Natural.monus(k, i)))
+                         = Ring.multiply(r, Ring.zero(r),
+                               Polynomial.coefficientOf(r, p, Natural.monus(k, i)))
+                               by Polynomial.coefficientOf_monomial_off(r, c, j, i, notEqual)
+                         = Ring.zero(r)
+                               by Ring.zero_multiply_left(r,
+                                      Polynomial.coefficientOf(r, p, Natural.monus(k, i))))
+     = Ring.multiply(r, c, Polynomial.coefficientOf(r, p, Natural.monus(k, j)))
+           by Polynomial.coefficientOf_monomial_at(r, c, j)

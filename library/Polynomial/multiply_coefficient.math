@@ -1,0 +1,33 @@
+-- Polynomial/multiply_coefficient.math
+--
+-- The convolution formula for coefficients of a product, lifted to the
+-- quotient: the k-th coefficient of p·q is Σ_{i=0}^{k} p_i · q_{k−i}.
+-- Lifts Polynomial.nth_multiply through Quotient.induct_two.
+
+module Polynomial.multiply_coefficient
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.monus
+import Algebra.ring
+import Algebra.ring_bundle
+import Polynomial.basics
+import Polynomial.multiplication
+import Polynomial.summation
+import Polynomial.degree
+
+theorem Polynomial.coefficientOf_multiply (r : Ring)
+        (p q : Polynomial(Ring.carrier(r), Ring.zero(r))) (k : Natural)
+        : Polynomial.coefficientOf(r, Polynomial.multiply(r, p, q), k)
+          = Polynomial.Sum(r,
+                function (i : Natural) =>
+                    Ring.multiply(r,
+                        Polynomial.coefficientOf(r, p, i),
+                        Polynomial.coefficientOf(r, q, Natural.monus(k, i))),
+                k) :=
+  Quotient.induct_two(
+      function (a b : Polynomial.Coefficients(Ring.carrier(r))) =>
+          Polynomial.nth_multiply(r, a, b, k),
+      p, q)
