@@ -19381,6 +19381,136 @@ private:
         return expression;
     }
 
+    // Like `abstractStructuralOccurrence`, but also abstracts a subterm
+    // that is only DEFINITIONALLY (not structurally) equal to `target`.
+    // The last-resort matcher for `rewrite`: it locates an endpoint that
+    // the structural combos miss because it is present only up to
+    // definitional equality — e.g. a structure projection on a concrete
+    // bundle, `Ring.multiply(Polynomial.ring(r), x, y)`, against the
+    // term's spelling `Polynomial.multiply(r, x, y)`. To stay cheap it
+    // calls the kernel's `isDefinitionallyEqual` only at Application
+    // subterms whose spine arity equals the target's, and at most
+    // `defeqBudget` times overall; a structural match is always taken
+    // first (free), and a defeq match abstracts the subterm whole.
+    ExpressionPointer abstractDefeqOccurrence(
+        ExpressionPointer expression,
+        ExpressionPointer target,
+        int targetArity,
+        int currentDepth,
+        int& occurrenceCount,
+        int& defeqBudget) {
+        ExpressionPointer shiftedTarget =
+            currentDepth == 0 ? target : shift(target, currentDepth);
+        if (structurallyEqual(expression, shiftedTarget)) {
+            occurrenceCount++;
+            return makeBoundVariable(currentDepth);
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            // Definitional-equality attempt at a same-arity application.
+            if (defeqBudget > 0) {
+                int arity = 0;
+                ExpressionPointer head = expression;
+                while (auto* app =
+                           std::get_if<Application>(&head->node)) {
+                    ++arity;
+                    head = app->function;
+                }
+                if (arity == targetArity) {
+                    --defeqBudget;
+                    Context emptyContext;
+                    bool equal = false;
+                    try {
+                        equal = isDefinitionallyEqual(
+                            environment_, emptyContext,
+                            expression, shiftedTarget);
+                    } catch (const TypeError&) {
+                        equal = false;
+                    }
+                    if (equal) {
+                        occurrenceCount++;
+                        return makeBoundVariable(currentDepth);
+                    }
+                }
+            }
+            int before = occurrenceCount;
+            auto newFn = abstractDefeqOccurrence(
+                application->function, target, targetArity,
+                currentDepth, occurrenceCount, defeqBudget);
+            auto newArg = abstractDefeqOccurrence(
+                application->argument, target, targetArity,
+                currentDepth, occurrenceCount, defeqBudget);
+            if (occurrenceCount == before
+                && newFn.get() == application->function.get()
+                && newArg.get() == application->argument.get()) {
+                return expression;
+            }
+            return makeApplication(std::move(newFn), std::move(newArg));
+        }
+        if (auto* boundVariable =
+                std::get_if<BoundVariable>(&expression->node)) {
+            int index = boundVariable->deBruijnIndex;
+            if (index >= currentDepth) {
+                return makeBoundVariable(index + 1);
+            }
+            return expression;
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            int before = occurrenceCount;
+            auto newDomain = abstractDefeqOccurrence(
+                pi->domain, target, targetArity, currentDepth,
+                occurrenceCount, defeqBudget);
+            auto newCodomain = abstractDefeqOccurrence(
+                pi->codomain, target, targetArity, currentDepth + 1,
+                occurrenceCount, defeqBudget);
+            if (occurrenceCount == before
+                && newDomain.get() == pi->domain.get()
+                && newCodomain.get() == pi->codomain.get()) {
+                return expression;
+            }
+            return makePi(pi->displayHint,
+                std::move(newDomain), std::move(newCodomain));
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            int before = occurrenceCount;
+            auto newDomain = abstractDefeqOccurrence(
+                lambda->domain, target, targetArity, currentDepth,
+                occurrenceCount, defeqBudget);
+            auto newBody = abstractDefeqOccurrence(
+                lambda->body, target, targetArity, currentDepth + 1,
+                occurrenceCount, defeqBudget);
+            if (occurrenceCount == before
+                && newDomain.get() == lambda->domain.get()
+                && newBody.get() == lambda->body.get()) {
+                return expression;
+            }
+            return makeLambda(lambda->displayHint,
+                std::move(newDomain), std::move(newBody));
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            int before = occurrenceCount;
+            auto newType = abstractDefeqOccurrence(
+                let->type, target, targetArity, currentDepth,
+                occurrenceCount, defeqBudget);
+            auto newValue = abstractDefeqOccurrence(
+                let->value, target, targetArity, currentDepth,
+                occurrenceCount, defeqBudget);
+            auto newBody = abstractDefeqOccurrence(
+                let->body, target, targetArity, currentDepth + 1,
+                occurrenceCount, defeqBudget);
+            if (occurrenceCount == before
+                && newType.get() == let->type.get()
+                && newValue.get() == let->value.get()
+                && newBody.get() == let->body.get()) {
+                return expression;
+            }
+            return makeLet(let->displayHint,
+                std::move(newType), std::move(newValue),
+                std::move(newBody));
+        }
+        return expression;
+    }
+
     // `rewrite(lemma)` where `lemma : Equality.{u}(T', x, y)` and the
     // current goal is `Equality.{v}(T, A, B)`: builds the proof
     //   `Equality.congruence.{u, v}(T', T, λ z ⇒ A[z/x], x, y, lemma)`
@@ -19563,6 +19693,35 @@ private:
                 termTypeDeepBeta, localBinders, localBinders.size());
             runAttempt(4, termTypeDeepBetaClosed, leftEndpoint);
             runAttempt(5, termTypeDeepBetaClosed, leftEndpointWhnf);
+        }
+
+        // Last resort: a definitional-equality-aware occurrence search.
+        // The six structural combos compare each subterm STRUCTURALLY, so
+        // they miss an endpoint present only up to definitional equality —
+        // the canonical case being a structure projection on a concrete
+        // bundle, `Ring.multiply(Polynomial.ring(r), x, y)`, against the
+        // term's `Polynomial.multiply(r, x, y)`. This walker calls the
+        // kernel's `isDefinitionallyEqual` (bounded; only at same-arity
+        // applications) to dissolve that mismatch — the precise fix for
+        // the bridging-`claim` tax (F1). Still requires EXACTLY ONE
+        // occurrence, so an ambiguous match is rejected, not guessed.
+        if (!found) {
+            int defeqOccurrences = 0;
+            int defeqBudget = 256;
+            int targetArity = 0;
+            ExpressionPointer head = leftEndpoint;
+            while (auto* app = std::get_if<Application>(&head->node)) {
+                ++targetArity;
+                head = app->function;
+            }
+            ExpressionPointer body = abstractDefeqOccurrence(
+                termTypeUnreducedClosed, leftEndpoint, targetArity,
+                /*currentDepth=*/0, defeqOccurrences, defeqBudget);
+            if (defeqOccurrences == 1) {
+                occurrenceCount = 1;
+                abstractedBody = std::move(body);
+                found = true;
+            }
         }
 
         // If no combo found exactly one occurrence, build a diagnostic
