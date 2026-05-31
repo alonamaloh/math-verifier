@@ -1,0 +1,96 @@
+-- Polynomial/degree_function.math
+--
+-- Every nonzero polynomial has a degree: an index d with all higher
+-- coefficients zero and a nonzero coefficient at d. Euclid needs this
+-- to locate a remainder's (invertible) leading coefficient.
+--
+-- Rather than define a degree FUNCTION (which, being classical, would
+-- be stuck on the decidability axiom and so uncomputable), we prove the
+-- existence directly: scanning a degree bound downward, a classical
+-- case-split on each "coefficient = 0?" either finds the top nonzero
+-- index or proves the polynomial identically zero. The classical
+-- reasoning is confined to that case-split (`decide`), which only ever
+-- splits the goal — never needs to reduce a stuck function.
+
+module Polynomial.degree_function
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Algebra.ring
+import Algebra.ring_bundle
+import Polynomial.basics
+import Polynomial.additive_group
+import Polynomial.degree
+import Polynomial.division_support
+import Polynomial.division
+
+-- A polynomial all of whose coefficients vanish is the zero polynomial.
+theorem Polynomial.zero_of_coefficients_zero (r : Ring)
+        (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        (allZero : (i : Natural) → Polynomial.coefficientOf(r, y, i) = Ring.zero(r))
+        : y = Polynomial.zero(r) :=
+  cases y refining allZero { | coefficients =>
+    Polynomial.make_equal_of_coefficients_equal(r, coefficients,
+        Polynomial.Coefficients.nil(Ring.carrier(r)),
+        function (i : Natural) => allZero(i)) }
+
+-- Scanning the bound `n` downward: either some index below n carries a
+-- nonzero coefficient (and we return the topmost such, with everything
+-- above it zero), or every coefficient is zero.
+theorem Polynomial.exists_degree_within (r : Ring)
+        (y : Polynomial(Ring.carrier(r), Ring.zero(r))) (n : Natural)
+        : Polynomial.DegreeLessThan(r, y, n)
+          → (∃ (d : Natural).
+                 Polynomial.DegreeLessThan(r, y, successor(d))
+                 ∧ ¬(Polynomial.coefficientOf(r, y, d) = Ring.zero(r)))
+            ∨ ((i : Natural) → Polynomial.coefficientOf(r, y, i) = Ring.zero(r)) :=
+  by_induction on n with IH {
+    case zero:
+      function (boundN : Polynomial.DegreeLessThan(r, y, 0)) =>
+          Or.introduceRight(function (i : Natural) => boundN(i, Natural.zero_least(i)))
+    case successor(m):
+      function (boundN : Polynomial.DegreeLessThan(r, y, successor(m))) =>
+          decide Polynomial.coefficientOf(r, y, m) = Ring.zero(r) {
+            | yes coefficientZero => {
+                claim boundM : Polynomial.DegreeLessThan(r, y, m)
+                    by function (i : Natural) (mLessOrEqualI : m ≤ i) =>
+                        decide i = m {
+                          | yes indexIsM =>
+                              Equality.transitivity(
+                                  congruenceOf(
+                                      function (t : Natural) =>
+                                          Polynomial.coefficientOf(r, y, t),
+                                      indexIsM),
+                                  coefficientZero)
+                          | no indexNotM =>
+                              boundN(i, Natural.less_or_equal_not_equal_successor(m, i,
+                                  mLessOrEqualI, indexNotM))
+                        };
+                IH(boundM)
+              }
+            | no coefficientNonzero =>
+                Or.introduceLeft(⟨m, And.introduction(boundN, coefficientNonzero)⟩)
+          }
+  }
+
+-- Every nonzero polynomial has a degree.
+theorem Polynomial.exists_degree_of_nonzero (r : Ring)
+        (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        (notZero : ¬(y = Polynomial.zero(r)))
+        : ∃ (d : Natural).
+            Polynomial.DegreeLessThan(r, y, successor(d))
+            ∧ ¬(Polynomial.coefficientOf(r, y, d) = Ring.zero(r)) := {
+  obtain ⟨bound, boundProof⟩ from Polynomial.exists_degree_bound(r, y);
+  cases Polynomial.exists_degree_within(r, y, bound, boundProof) {
+    | Or.introduceLeft(existsDegree) => existsDegree
+    | Or.introduceRight(allZero) =>
+        absurd(notZero(Polynomial.zero_of_coefficients_zero(r, y, allZero)))
+  }
+}
