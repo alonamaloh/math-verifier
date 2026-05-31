@@ -1,6 +1,6 @@
 CXX = clang++
 CXXFLAGS = -std=c++20 -Wall -Wextra -Werror -O3 -g
-OBJS = level.o kernel.o printer.o lexer.o parser.o elaborator.o hash.o serialize.o main.o
+OBJS = level.o kernel.o printer.o lexer.o parser.o elaborator.o hash.o serialize.o lemma_search.o main.o
 
 # mimalloc — small-object allocator that's faster than the system
 # malloc on node-heavy workloads (substitute/makeApplication create
@@ -32,7 +32,7 @@ lexer.o: lexer.cpp lexer.hpp
 parser.o: parser.cpp parser.hpp surface.hpp lexer.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-elaborator.o: elaborator.cpp elaborator.hpp surface.hpp kernel.hpp expression.hpp level.hpp
+elaborator.o: elaborator.cpp elaborator.hpp surface.hpp kernel.hpp expression.hpp level.hpp lemma_search.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 hash.o: hash.cpp hash.hpp
@@ -41,7 +41,10 @@ hash.o: hash.cpp hash.hpp
 serialize.o: serialize.cpp serialize.hpp expression.hpp kernel.hpp level.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-main.o: main.cpp expression.hpp kernel.hpp printer.hpp level.hpp lexer.hpp surface.hpp parser.hpp elaborator.hpp hash.hpp serialize.hpp
+lemma_search.o: lemma_search.cpp lemma_search.hpp expression.hpp kernel.hpp level.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+main.o: main.cpp expression.hpp kernel.hpp printer.hpp level.hpp lexer.hpp surface.hpp parser.hpp elaborator.hpp hash.hpp serialize.hpp lemma_search.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:

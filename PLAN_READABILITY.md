@@ -158,7 +158,22 @@ which otherwise *guesses* lemma names.
 
 ### STATUS (live)
 
-- **E1 (lemma search) — CLI surface DONE; error-message surface TODO.**
+- **E1 (lemma search) — CLI surface AND error-message surface DONE.**
+  The engine is factored into `lemma_search.{hpp,cpp}` (a shared TU
+  compiled into both the CLI and the elaborator) so one implementation
+  drives both deliveries.
+  - **Surface #1 (error messages) — DONE.** When `autoProveClaim` fails
+    (a `done`/`okay`/bare-`claim`, or a non-equality calc step), the
+    elaborator appends "search by conclusion shape — candidates" with the
+    top 5 in-scope lemmas whose conclusion matches the goal, each with
+    its signature and `[needs: …]`. Best-effort (try/catch; empty result
+    → no text), so it never masks the base error. Crucially it respects
+    import scope automatically — the elaborator's environment only holds
+    loaded modules, so it never suggests a lemma you'd have to import.
+    This is the highest-value surface for LLM fluency: the real lemma
+    name arrives exactly where a wrong guess would otherwise be made.
+    Regression test in `runLemmaSearchTests` (asserts the failing-`done`
+    error names the matching lemma).
   `kernel search` subcommand (main.cpp):
   - `--goal "(a c b : Natural) → a + b ≤ c + b"` — conclusion-unifies
     mode (apply?-style). Free variables are written as leading binders;

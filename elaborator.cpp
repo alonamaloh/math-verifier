@@ -1,5 +1,6 @@
 #include "elaborator.hpp"
 
+#include "lemma_search.hpp"
 #include "printer.hpp"
 
 #include <chrono>
@@ -656,6 +657,51 @@ private:
         const std::vector<LocalBinder>& localBinders) const {
         return prettyPrintInLocalScope(expression, localBinders,
                                          localBinders.size());
+    }
+
+    // E1 surface #1: turn a failed auto-prove into a list of candidate
+    // lemmas whose CONCLUSION matches the goal's shape (the same engine
+    // behind `kernel search --goal`). Appended to the claim/`done`
+    // failure message so the author — especially an LLM that would
+    // otherwise guess a plausible-but-wrong name — sees the real lemma,
+    // its signature, and the hypotheses still to discharge, exactly
+    // where they are already looking. Best-effort: any exception (or an
+    // empty result) yields no text, preserving the base error.
+    std::string searchSuggestions(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        size_t limit = 5) const {
+        try {
+            ExpressionPointer goalOpened = goalClosed;
+            for (size_t i = localBinders.size(); i > 0; --i) {
+                goalOpened = openBinder(goalOpened,
+                                        localBinders[i - 1].name,
+                                        FreeVariableOrigin::User);
+            }
+            std::string head;
+            std::vector<LemmaSearchHit> hits =
+                computeGoalHits(environment_, goalOpened, head);
+            if (hits.empty()) return "";
+            std::string out =
+                "\n  search by conclusion shape — candidates "
+                "(cite one as `by <lemma>(…)`):";
+            size_t shown = std::min(limit, hits.size());
+            for (size_t i = 0; i < shown; ++i) {
+                out += "\n    " + hits[i].name + " : "
+                     + prettyPrint(hits[i].declaredType);
+                if (!hits[i].needs.empty()) {
+                    out += "   [needs: ";
+                    for (size_t j = 0; j < hits[i].needs.size(); ++j) {
+                        if (j) out += ", ";
+                        out += prettyPrint(hits[i].needs[j]);
+                    }
+                    out += "]";
+                }
+            }
+            return out;
+        } catch (...) {
+            return "";
+        }
     }
 
     // Const version of openOverLocalBinders (the existing one in this
@@ -6564,7 +6610,8 @@ private:
             "contradiction lets us close it, no library theorem "
             "with this conclusion shape applies, and no context "
             "equality lets us rewrite to a provable form — add "
-            "`by <lemma>` to specify");
+            "`by <lemma>` to specify"
+            + searchSuggestions(goalClosed, localBinders));
     }
 
     // Profiling variant: runs every tactic, records per-attempt
@@ -6675,7 +6722,8 @@ private:
             "contradiction lets us close it, no library theorem "
             "with this conclusion shape applies, and no context "
             "equality lets us rewrite to a provable form — add "
-            "`by <lemma>` to specify");
+            "`by <lemma>` to specify"
+            + searchSuggestions(goalClosed, localBinders));
     }
 
     // Print just the spine head of a goal expression — typically a

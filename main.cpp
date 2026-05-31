@@ -2,6 +2,7 @@
 #include "expression.hpp"
 #include "hash.hpp"
 #include "kernel.hpp"
+#include "lemma_search.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
 #include "printer.hpp"
@@ -5426,226 +5427,10 @@ int verifyFiles(const std::vector<std::string>& filenames) {
     return 0;
 }
 
-// ======================================================================
-// E1 — lemma search by goal shape (PLAN_READABILITY Track E1).
-//
-// Given a goal type, return the library lemmas whose CONCLUSION
-// first-order-matches the goal's conclusion (apply?-style), each with
-// the hypotheses you would still have to discharge. Also a Coq-`Search`
-// mode: lemmas whose statement mentions a given set of symbols.
-//
-// The engine works on already-elaborated kernel types — no surface
-// reasoning. A lemma's leading Pi binders are its universally-quantified
-// variables AND its hypotheses; we open them as metavariables (Internal-
-// origin free variables) and match the conclusion against the goal,
-// binding the metavars. Binders left unbound after the match are the
-// "leftover" obligations reported as `[needs: …]`.
-// ======================================================================
-
-// The declared type of a top-level declaration that can serve as a lemma
-// (axiom or definition/theorem). Inductives/constructors/recursors are
-// not lemmas; return nullptr for them.
-ExpressionPointer searchableDeclarationType(const Declaration& declaration) {
-    if (auto* axiom = std::get_if<Axiom>(&declaration)) return axiom->type;
-    if (auto* definition = std::get_if<Definition>(&declaration))
-        return definition->type;
-    return nullptr;
-}
-
-// Head Constant name of a proposition after WHNF (peel the App spine).
-// Empty string when the head is not a Constant (a Pi, a free variable…).
-std::string searchHeadName(const Environment& environment,
-                           ExpressionPointer expression) {
-    expression = weakHeadNormalForm(environment, expression);
-    while (auto* application =
-               std::get_if<Application>(&expression->node)) {
-        expression = application->function;
-    }
-    if (auto* constant = std::get_if<Constant>(&expression->node)) {
-        return constant->name;
-    }
-    return "";
-}
-
-struct PeeledType {
-    // (opened binder name, binder domain in opened form) for each leading
-    // Pi, outermost first.
-    std::vector<std::pair<std::string, ExpressionPointer>> binders;
-    ExpressionPointer conclusion;
-};
-
-// Peel every leading Pi, opening each binder as a fresh free variable of
-// `origin`. Binder names come from the Pi display hints, deduped so the
-// opened term is unambiguous. The stored domains reference earlier
-// binders by their opened names.
-PeeledType peelLeadingPis(ExpressionPointer type,
-                          FreeVariableOrigin origin) {
-    PeeledType result;
-    std::set<std::string> used;
-    while (auto* pi = std::get_if<Pi>(&type->node)) {
-        std::string base = pi->displayHint.empty() ? "x" : pi->displayHint;
-        std::string name = base;
-        int suffix = 1;
-        while (used.count(name)) {
-            name = base + "_" + std::to_string(++suffix);
-        }
-        used.insert(name);
-        result.binders.push_back({name, pi->domain});
-        type = openBinder(pi->codomain, name, origin);
-    }
-    result.conclusion = type;
-    return result;
-}
-
-// Collect every Constant name occurring in `expression`.
-void collectConstantNames(ExpressionPointer expression,
-                          std::set<std::string>& names) {
-    if (auto* constant = std::get_if<Constant>(&expression->node)) {
-        names.insert(constant->name);
-    } else if (auto* application =
-                   std::get_if<Application>(&expression->node)) {
-        collectConstantNames(application->function, names);
-        collectConstantNames(application->argument, names);
-    } else if (auto* pi = std::get_if<Pi>(&expression->node)) {
-        collectConstantNames(pi->domain, names);
-        collectConstantNames(pi->codomain, names);
-    } else if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-        collectConstantNames(lambda->domain, names);
-        collectConstantNames(lambda->body, names);
-    } else if (auto* let = std::get_if<Let>(&expression->node)) {
-        collectConstantNames(let->type, names);
-        collectConstantNames(let->value, names);
-        collectConstantNames(let->body, names);
-    }
-}
-
-// First-order match: does `pattern` match `target`, treating the
-// Internal-origin free variables named in `metavars` as holes that bind
-// to whatever they align with? On success `bindings` records each hole's
-// value (consistent repeats checked up to defeq). Rigid mismatches fall
-// back to a kernel defeq check so `successor(k)` matches `1 + k`.
-bool searchMatch(const Environment& environment,
-                 ExpressionPointer pattern,
-                 ExpressionPointer target,
-                 const std::set<std::string>& metavars,
-                 std::map<std::string, ExpressionPointer>& bindings,
-                 int& freshCounter) {
-    if (auto* fv = std::get_if<FreeVariable>(&pattern->node)) {
-        if (fv->origin == FreeVariableOrigin::Internal
-            && metavars.count(fv->name)) {
-            auto existing = bindings.find(fv->name);
-            if (existing != bindings.end()) {
-                return isDefinitionallyEqual(
-                    environment, {}, existing->second, target);
-            }
-            bindings[fv->name] = target;
-            return true;
-        }
-    }
-    // Same-shape structural recursion.
-    if (pattern->node.index() == target->node.index()) {
-        if (auto* pc = std::get_if<Constant>(&pattern->node)) {
-            auto* tc = std::get_if<Constant>(&target->node);
-            if (pc->name == tc->name) return true;
-            // fall through to defeq
-        } else if (auto* pa =
-                       std::get_if<Application>(&pattern->node)) {
-            auto* ta = std::get_if<Application>(&target->node);
-            if (searchMatch(environment, pa->function, ta->function,
-                            metavars, bindings, freshCounter)
-                && searchMatch(environment, pa->argument, ta->argument,
-                               metavars, bindings, freshCounter)) {
-                return true;
-            }
-            // fall through to defeq
-        } else if (auto* pp = std::get_if<Pi>(&pattern->node)) {
-            auto* tp = std::get_if<Pi>(&target->node);
-            std::string fresh = "__cmp_" + std::to_string(freshCounter++);
-            if (searchMatch(environment, pp->domain, tp->domain,
-                            metavars, bindings, freshCounter)
-                && searchMatch(environment,
-                               openBinder(pp->codomain, fresh,
-                                          FreeVariableOrigin::Internal),
-                               openBinder(tp->codomain, fresh,
-                                          FreeVariableOrigin::Internal),
-                               metavars, bindings, freshCounter)) {
-                return true;
-            }
-        } else if (auto* pl = std::get_if<Lambda>(&pattern->node)) {
-            auto* tl = std::get_if<Lambda>(&target->node);
-            std::string fresh = "__cmp_" + std::to_string(freshCounter++);
-            if (searchMatch(environment, pl->domain, tl->domain,
-                            metavars, bindings, freshCounter)
-                && searchMatch(environment,
-                               openBinder(pl->body, fresh,
-                                          FreeVariableOrigin::Internal),
-                               openBinder(tl->body, fresh,
-                                          FreeVariableOrigin::Internal),
-                               metavars, bindings, freshCounter)) {
-                return true;
-            }
-        } else if (auto* pb =
-                       std::get_if<BoundVariable>(&pattern->node)) {
-            auto* tb = std::get_if<BoundVariable>(&target->node);
-            if (pb->deBruijnIndex == tb->deBruijnIndex) return true;
-        } else if (auto* pf =
-                       std::get_if<FreeVariable>(&pattern->node)) {
-            auto* tf = std::get_if<FreeVariable>(&target->node);
-            if (pf->name == tf->name && pf->origin == tf->origin) {
-                return true;
-            }
-        }
-    }
-    // Rigid/shape mismatch: let the kernel decide up to reduction. Cheap
-    // here because the head filter has already pruned to a handful of
-    // candidates, and the conclusion subterms are small.
-    return isDefinitionallyEqual(environment, {}, pattern, target);
-}
-
-struct SearchHit {
-    std::string name;
-    ExpressionPointer declaredType;
-    std::vector<ExpressionPointer> needs;  // unbound PROPOSITION premises
-    int unboundParameters = 0;             // unbound DATA parameters
-    int specificity = 0;                   // matched Constant nodes
-};
-
-// Is `domain`, in the lemma's binder context, a Proposition (Sort 0)?
-// Such a leftover binder is a hypothesis the caller must still prove; a
-// non-Proposition leftover (e.g. `x : Natural`) is merely an
-// underdetermined parameter. Conservative: returns false if the type
-// cannot be inferred (treat as a parameter, not a need).
-bool searchDomainIsProposition(
-    const Environment& environment, const Context& context,
-    ExpressionPointer domain) {
-    try {
-        ExpressionPointer sort = weakHeadNormalForm(
-            environment, inferType(environment, context, domain));
-        if (auto* sortNode = std::get_if<Sort>(&sort->node)) {
-            if (auto* level =
-                    std::get_if<LevelConst>(&sortNode->level->node)) {
-                return level->value == 0;
-            }
-        }
-    } catch (const TypeError&) {
-    }
-    return false;
-}
-
-int countConstantNodes(ExpressionPointer expression) {
-    std::set<std::string> names;  // dummy; count with multiplicity instead
-    if (std::get_if<Constant>(&expression->node)) return 1;
-    if (auto* a = std::get_if<Application>(&expression->node)) {
-        return countConstantNodes(a->function)
-             + countConstantNodes(a->argument);
-    }
-    if (auto* p = std::get_if<Pi>(&expression->node)) {
-        return countConstantNodes(p->domain)
-             + countConstantNodes(p->codomain);
-    }
-    (void)names;
-    return 0;
-}
+// The lemma-search ENGINE (computeGoalHits / computeMentionHits and
+// helpers) lives in lemma_search.cpp, shared with the elaborator's
+// failing-proof error messages. The CLI-specific cache loading,
+// source-line lookup, and printing stay here.
 
 // Find the source line of a declaration by scanning its source file for
 // the declaration header. Returns 0 if not found / file unreadable.
@@ -5718,7 +5503,7 @@ std::map<std::string, std::string> loadAllCaches(
 }
 
 // Render one hit line + its location/needs line.
-void printSearchHit(const SearchHit& hit,
+void printSearchHit(const LemmaSearchHit& hit,
                     const std::map<std::string, std::string>& nameToSource) {
     std::cout << "  " << hit.name << " : "
               << prettyPrint(hit.declaredType) << "\n";
@@ -5752,78 +5537,12 @@ void printSearchHit(const SearchHit& hit,
     }
 }
 
-// Core of the conclusion-unifies-with-goal mode: rank the library
-// lemmas whose conclusion first-order-matches `goalType`'s conclusion.
-// `goalHead` is set to the goal's conclusion head (empty if none, in
-// which case the result is empty). Pure — no I/O — so it is unit
-// testable against a small in-memory environment.
-std::vector<SearchHit> computeGoalHits(const Environment& environment,
-                                       ExpressionPointer goalType,
-                                       std::string& goalHead) {
-    PeeledType goal = peelLeadingPis(goalType, FreeVariableOrigin::User);
-    goalHead = searchHeadName(environment, goal.conclusion);
-    std::vector<SearchHit> hits;
-    if (goalHead.empty()) return hits;
-    for (const auto& [name, declaration] : environment.declarations) {
-        ExpressionPointer type = searchableDeclarationType(declaration);
-        if (!type) continue;
-        PeeledType lemma = peelLeadingPis(type, FreeVariableOrigin::Internal);
-        if (searchHeadName(environment, lemma.conclusion) != goalHead) {
-            continue;
-        }
-        std::set<std::string> metavars;
-        for (const auto& [binderName, binderType] : lemma.binders) {
-            (void)binderType;
-            metavars.insert(binderName);
-        }
-        std::map<std::string, ExpressionPointer> bindings;
-        int freshCounter = 0;
-        if (!searchMatch(environment, lemma.conclusion, goal.conclusion,
-                         metavars, bindings, freshCounter)) {
-            continue;
-        }
-        // Context for classifying leftover binders: every lemma binder,
-        // with its (opened) domain type and Internal origin.
-        Context lemmaContext;
-        for (const auto& [binderName, binderType] : lemma.binders) {
-            lemmaContext.push_back(
-                {binderName, binderType, FreeVariableOrigin::Internal,
-                 nullptr});
-        }
-        SearchHit hit;
-        hit.name = name;
-        hit.declaredType = type;
-        for (const auto& [binderName, binderType] : lemma.binders) {
-            if (bindings.count(binderName)) continue;
-            if (searchDomainIsProposition(
-                    environment, lemmaContext, binderType)) {
-                hit.needs.push_back(binderType);
-            } else {
-                ++hit.unboundParameters;
-            }
-        }
-        hit.specificity = countConstantNodes(lemma.conclusion);
-        hits.push_back(std::move(hit));
-    }
-    std::sort(hits.begin(), hits.end(),
-              [](const SearchHit& a, const SearchHit& b) {
-                  if (a.needs.size() != b.needs.size())
-                      return a.needs.size() < b.needs.size();
-                  if (a.unboundParameters != b.unboundParameters)
-                      return a.unboundParameters < b.unboundParameters;
-                  if (a.specificity != b.specificity)
-                      return a.specificity > b.specificity;
-                  return a.name < b.name;
-              });
-    return hits;
-}
-
 // conclusion-unifies-with-goal mode (print wrapper around computeGoalHits).
 int searchByGoal(const Environment& environment,
                  const std::map<std::string, std::string>& nameToSource,
                  ExpressionPointer goalType, size_t cap) {
     std::string goalHead;
-    std::vector<SearchHit> hits =
+    std::vector<LemmaSearchHit> hits =
         computeGoalHits(environment, goalType, goalHead);
     if (goalHead.empty()) {
         std::cerr << "search: goal conclusion has no Constant head "
@@ -5849,25 +5568,8 @@ int searchByGoal(const Environment& environment,
 int searchByMentions(const Environment& environment,
                      const std::map<std::string, std::string>& nameToSource,
                      const std::vector<std::string>& wanted, size_t cap) {
-    struct MentionHit { std::string name; ExpressionPointer type; int size; };
-    std::vector<MentionHit> hits;
-    for (const auto& [name, declaration] : environment.declarations) {
-        ExpressionPointer type = searchableDeclarationType(declaration);
-        if (!type) continue;
-        std::set<std::string> constants;
-        collectConstantNames(type, constants);
-        bool all = true;
-        for (const auto& symbol : wanted) {
-            if (!constants.count(symbol)) { all = false; break; }
-        }
-        if (!all) continue;
-        hits.push_back({name, type, static_cast<int>(constants.size())});
-    }
-    std::sort(hits.begin(), hits.end(),
-              [](const MentionHit& a, const MentionHit& b) {
-                  if (a.size != b.size) return a.size < b.size;
-                  return a.name < b.name;
-              });
+    std::vector<LemmaSearchHit> hits =
+        computeMentionHits(environment, wanted);
     if (hits.empty()) {
         std::cout << "no lemmas mention all of the given symbols.\n";
         return 0;
@@ -5877,10 +5579,7 @@ int searchByMentions(const Environment& environment,
               << (hits.size() == 1 ? "lemma" : "lemmas")
               << " (showing " << shown << "):\n";
     for (size_t i = 0; i < shown; ++i) {
-        SearchHit hit;
-        hit.name = hits[i].name;
-        hit.declaredType = hits[i].type;
-        printSearchHit(hit, nameToSource);
+        printSearchHit(hits[i], nameToSource);
     }
     return 0;
 }
@@ -5997,7 +5696,7 @@ axiom le_trans : (a b c : Nat) → LE(a, b) → LE(b, c) → LE(a, c)
         std::string head;
         ExpressionPointer goal =
             elaborateGoal("(a b c : Nat) → LE(plus(a, b), plus(c, b))");
-        std::vector<SearchHit> hits =
+        std::vector<LemmaSearchHit> hits =
             computeGoalHits(environment, goal, head);
         EXPECT_TRUE(head == "LE");
         EXPECT_TRUE(!hits.empty() && hits[0].name == "le_add_right");
@@ -6013,7 +5712,7 @@ axiom le_trans : (a b c : Nat) → LE(a, b) → LE(b, c) → LE(a, c)
     {
         std::string head;
         ExpressionPointer goal = elaborateGoal("(x : Nat) → LE(x, x)");
-        std::vector<SearchHit> hits =
+        std::vector<LemmaSearchHit> hits =
             computeGoalHits(environment, goal, head);
         EXPECT_TRUE(!hits.empty() && hits[0].name == "le_refl");
         EXPECT_TRUE(!hits.empty() && hits[0].needs.empty());
@@ -6029,6 +5728,33 @@ axiom le_trans : (a b c : Nat) → LE(a, b) → LE(b, c) → LE(a, c)
         if (type) collectConstantNames(type, constants);
         EXPECT_TRUE(constants.count("plus") == 1);
         EXPECT_TRUE(constants.count("LE") == 1);
+    }
+
+    // Error-message surface (#1): a failing `done` whose goal matches a
+    // library lemma's conclusion gets that lemma appended to the claim
+    // error. Here `le_add_right` needs `LE(a, c)`, which is NOT in scope,
+    // so the auto-prover genuinely fails — and the search suggestion
+    // names the lemma the author should cite.
+    {
+        bool threw = false;
+        std::string message;
+        try {
+            verifyMathSource(R"(
+module Test.search_suggest
+axiom Nat : Type(0)
+axiom LE : Nat → Nat → Proposition
+axiom plus : Nat → Nat → Nat
+axiom le_add_right : (a b c : Nat) → LE(a, c) → LE(plus(a, b), plus(c, b))
+theorem target (a c b : Nat) : LE(plus(a, b), plus(c, b)) := { done }
+)");
+        } catch (const ElaborateError& error) {
+            threw = true;
+            message = error.what();
+        }
+        EXPECT_TRUE(threw);
+        EXPECT_TRUE(message.find("search by conclusion shape")
+                    != std::string::npos);
+        EXPECT_TRUE(message.find("le_add_right") != std::string::npos);
     }
 }
 
