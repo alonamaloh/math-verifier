@@ -158,6 +158,30 @@ which otherwise *guesses* lemma names.
 
 ### STATUS (live)
 
+- **E1 (lemma search) — CLI surface DONE; error-message surface TODO.**
+  `kernel search` subcommand (main.cpp):
+  - `--goal "(a c b : Natural) → a + b ≤ c + b"` — conclusion-unifies
+    mode (apply?-style). Free variables are written as leading binders;
+    the engine peels every lemma's leading Pis as metavariables,
+    head-filters by conclusion head, first-order-matches the conclusion
+    (with a kernel-defeq fallback so `successor(k)` matches `1+k`), and
+    ranks by (proposition obligations, then unbound data parameters,
+    then matched-constant specificity). Each hit prints its full
+    signature, `file:line`, and `[needs: <unproved hypotheses>; N free
+    parameters]`. Acceptance test 1 passes: `le_add_preserves_left` is
+    the top hit; acceptance test 2: `Integer.IsNonneg.multiply` is the
+    top hit for `Integer.IsNonneg(x * y)`.
+  - `--mentions a,b,c` — Coq-`Search` mode (lemmas whose statement
+    mentions all named constants), ranked by specificity.
+  - Loads all `.mathv` under `--cache-root` (default `build`); builds a
+    name→source map for the `file:line` column (grepped lazily per
+    shown hit). Unit tests in `runLemmaSearchTests` (in-memory env, no
+    build cache needed). The engine is factored as `computeGoalHits`
+    (pure) + a print wrapper, so the **next step — surface #1, pushing
+    the top 3–5 hits into a failing `by`/`done`/`rewrite` error
+    message** — can reuse `computeGoalHits` from the elaborator. That is
+    the highest-value surface for LLM fluency and is the remaining E1
+    work.
 - **A1 — DONE.** Operators `+`/`-`/`*` on `RingModulo` (via re-indexing the
   quotient over a new `CommutativeRing` bundle, which lets `multiply` drop
   its explicit commutativity arg), on the abstract `Ring.carrier`, and on
