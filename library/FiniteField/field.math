@@ -1,0 +1,56 @@
+-- FiniteField/field.math
+--
+-- F_{p^k} is a field: for p prime and f an irreducible polynomial over
+-- F_p, the quotient F_p[x]/(f) = FiniteField(p, f) is a field. This is
+-- the general F[x]/(f)-is-a-field theorem (Polynomial/quotient_field)
+-- instantiated at the field F_p = IntegerMod(p):
+--   * commutativity of F_p          — IntegerMod.multiply_commutative
+--   * every nonzero element invertible — IntegerMod.nonzero_invertible
+--     (this is where primality of p enters).
+--
+-- Taking f irreducible of degree k makes the quotient an extension of
+-- degree k, i.e. the field F_{p^k} of p^k elements. (Producing such an
+-- f for arbitrary k — the existence of irreducible polynomials of every
+-- degree over F_p — is a separate result not formalized here; this
+-- theorem delivers the field structure for any given irreducible f.)
+
+module FiniteField.field
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.prime
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.field
+import IntegerMod.basics
+import IntegerMod.operations
+import IntegerMod.ring
+import IntegerMod.instances
+import IntegerMod.field
+import Polynomial.basics
+import Polynomial.instances
+import Polynomial.irreducible
+import Polynomial.quotient_field
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+import FiniteField.basics
+
+theorem FiniteField.is_field (p : Natural) (primality : Natural.is_prime(p))
+        (f : Ring.carrier(IntegerMod.polynomial_ring(p)))
+        (fIrreducible : Polynomial.IsIrreducible(IntegerMod.ring(p), f))
+        : IsField(
+              FiniteField(p, f),
+              RingModulo.add(IntegerMod.polynomial_ring(p), f),
+              RingModulo.zero(IntegerMod.polynomial_ring(p), f),
+              RingModulo.negate(IntegerMod.polynomial_ring(p), f),
+              RingModulo.multiply(IntegerMod.polynomial_ring(p),
+                  IntegerMod.polynomial_ring_commutative(p), f),
+              RingModulo.one(IntegerMod.polynomial_ring(p), f)) :=
+  Polynomial.quotient_is_field(IntegerMod.ring(p),
+      IntegerMod.multiply_commutative(p),
+      IntegerMod.nonzero_invertible(p, primality),
+      f, fIrreducible)
