@@ -179,3 +179,20 @@ definition RingModulo.zero (s : Ring) (m : Ring.carrier(s)) : RingModulo(s, m) :
 
 definition RingModulo.one (s : Ring) (m : Ring.carrier(s)) : RingModulo(s, m) :=
   RingModulo.make(s, m, Ring.one(s))
+
+-- The class of the modulus is zero: m ≡ 0 (mod m), since m divides
+-- m − 0 = m. (The defining relation of the quotient, packaged.)
+theorem RingModulo.modulus_is_zero (s : Ring) (m : Ring.carrier(s))
+        : RingModulo.make(s, m, m) = RingModulo.zero(s, m) :=
+  Quotient.sound(
+      Ring.carrier(s), Ring.CongruentModulo(s, m),
+      m, Ring.zero(s),
+      (⟨Ring.one(s),
+        calc Ring.add(s, m, Ring.negate(s, Ring.zero(s)))
+           = Ring.add(s, m, Ring.zero(s))
+                 by Ring.negate_zero(s)
+           = m
+                 by Ring.add_zero(s, m)
+           = Ring.multiply(s, m, Ring.one(s))
+                 by Equality.symmetry(Ring.multiply_one(s, m))⟩
+       : Ring.divides(s, m, Ring.add(s, m, Ring.negate(s, Ring.zero(s))))))

@@ -1,0 +1,75 @@
+-- ComplexNumber/basics.math
+--
+-- The complex numbers as ℝ[x]/(x²+1):
+--   ComplexNumber := RingModulo(Real.ring, x²+1).
+-- This is a commutative ring for free (RingModulo over the commutative
+-- ring ℝ). It is in fact a FIELD — because x²+1 is irreducible over ℝ —
+-- proved in ComplexNumber/field.math. The imaginary unit i is the class
+-- of x, and i² = −1 (ComplexNumber/embedding.math).
+
+module ComplexNumber.basics
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.instances
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+
+-- ℝ as a bundled ring.
+definition Real.ring : Ring :=
+  Ring.make(Real, Real.add, Real.zero, Real.negate, Real.multiply, Real.one,
+      Real.is_ring)
+
+-- The polynomial x (the monomial 1·x¹) over ℝ.
+definition Complex.x : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)) :=
+  Polynomial.monomial(Real.ring, Real.one, 1)
+
+-- The modulus x²+1, written so that x·x + 1 is its literal form (this is
+-- what makes i²+1 = 0 hold definitionally up to the quotient relation).
+definition Complex.modulus : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)) :=
+  Polynomial.add(Real.ring, Polynomial.multiply(Real.ring, Complex.x, Complex.x),
+      Polynomial.one(Real.ring))
+
+-- ℝ[x], the polynomials over ℝ, as a bundled ring — the base ring of
+-- the quotient — and its commutativity proof.
+definition Real.polynomial_ring : Ring :=
+  Polynomial.ring(Real.ring)
+
+definition Real.polynomial_ring_commutative
+        : Ring.MultiplyCommutative(Real.polynomial_ring) :=
+  Polynomial.multiply_commutative(Real.ring, Real.multiply_commutative)
+
+-- The complex numbers: ℝ[x] modulo (x²+1).
+definition ComplexNumber : Type(0) :=
+  RingModulo(Real.polynomial_ring, Complex.modulus)
+
+-- ℂ is a commutative ring (inherited from ℝ[x] being commutative).
+theorem ComplexNumber.is_commutative_ring
+        : IsCommutativeRing(
+              ComplexNumber,
+              RingModulo.add(Real.polynomial_ring, Complex.modulus),
+              RingModulo.zero(Real.polynomial_ring, Complex.modulus),
+              RingModulo.negate(Real.polynomial_ring, Complex.modulus),
+              RingModulo.multiply(Real.polynomial_ring,
+                  Real.polynomial_ring_commutative, Complex.modulus),
+              RingModulo.one(Real.polynomial_ring, Complex.modulus)) :=
+  RingModulo.is_commutative_ring(Real.polynomial_ring,
+      Real.polynomial_ring_commutative, Complex.modulus)

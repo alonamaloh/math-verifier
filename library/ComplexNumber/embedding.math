@@ -1,0 +1,308 @@
+-- ComplexNumber/embedding.math
+--
+-- The imaginary unit i (the class of x), its defining relation i² = −1,
+-- and the embedding ℝ ↪ ℂ sending a real number to the class of the
+-- constant polynomial. The embedding preserves 0, 1, +, ·; injectivity
+-- (a genuine embedding) is in ComplexNumber/field.math, where the degree
+-- machinery is available.
+
+module ComplexNumber.embedding
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.monus
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.group
+import Algebra.group_lemmas
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.instances
+import Polynomial.degree
+import Polynomial.multiply_coefficient
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+import ComplexNumber.basics
+
+-- ----------------------------------------------------------------------
+-- The imaginary unit and i² = −1.
+
+definition ComplexNumber.i : ComplexNumber :=
+  RingModulo.make(Real.polynomial_ring, Complex.modulus, Complex.x)
+
+-- i² + 1 = 0: the left side is the class of x²+1 = the modulus, which is
+-- zero in the quotient. (Holds by the modulus's definition reducing
+-- through the lifts; the proof is just `modulus_is_zero`.)
+theorem ComplexNumber.i_squared_plus_one
+        : RingModulo.add(Real.polynomial_ring, Complex.modulus,
+              RingModulo.multiply(Real.polynomial_ring,
+                  Real.polynomial_ring_commutative, Complex.modulus,
+                  ComplexNumber.i, ComplexNumber.i),
+              RingModulo.one(Real.polynomial_ring, Complex.modulus))
+          = RingModulo.zero(Real.polynomial_ring, Complex.modulus) :=
+  RingModulo.modulus_is_zero(Real.polynomial_ring, Complex.modulus)
+
+-- i² = −1.
+theorem ComplexNumber.i_squared
+        : RingModulo.multiply(Real.polynomial_ring,
+              Real.polynomial_ring_commutative, Complex.modulus,
+              ComplexNumber.i, ComplexNumber.i)
+          = RingModulo.negate(Real.polynomial_ring, Complex.modulus,
+              RingModulo.one(Real.polynomial_ring, Complex.modulus)) :=
+  Group.left_inverse_unique(
+      ComplexNumber,
+      RingModulo.add(Real.polynomial_ring, Complex.modulus),
+      RingModulo.zero(Real.polynomial_ring, Complex.modulus),
+      RingModulo.negate(Real.polynomial_ring, Complex.modulus),
+      RingModulo.add_is_group(Real.polynomial_ring, Complex.modulus),
+      RingModulo.one(Real.polynomial_ring, Complex.modulus),
+      RingModulo.multiply(Real.polynomial_ring,
+          Real.polynomial_ring_commutative, Complex.modulus,
+          ComplexNumber.i, ComplexNumber.i),
+      ComplexNumber.i_squared_plus_one)
+
+-- ----------------------------------------------------------------------
+-- Constant-polynomial lemmas (the algebra behind the embedding).
+
+-- The constant polynomials add coefficientwise.
+theorem Complex.constant_add (a b : Real)
+        : Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+              Polynomial.monomial(Real.ring, b, 0))
+          = Polynomial.monomial(Real.ring, Real.add(a, b), 0) :=
+  Polynomial.equal_of_coefficientOf_equal(Real.ring,
+      Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+          Polynomial.monomial(Real.ring, b, 0)),
+      Polynomial.monomial(Real.ring, Real.add(a, b), 0),
+      function (i : Natural) =>
+        decide i = 0 {
+          | yes indexZero =>
+              calc Polynomial.coefficientOf(Real.ring,
+                       Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+                           Polynomial.monomial(Real.ring, b, 0)), i)
+                 = Polynomial.coefficientOf(Real.ring,
+                       Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+                           Polynomial.monomial(Real.ring, b, 0)), 0)
+                       by congruenceOf(
+                              function (t : Natural) =>
+                                  Polynomial.coefficientOf(Real.ring,
+                                      Polynomial.add(Real.ring,
+                                          Polynomial.monomial(Real.ring, a, 0),
+                                          Polynomial.monomial(Real.ring, b, 0)), t),
+                              indexZero)
+                 = Real.add(
+                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a, 0), 0),
+                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), 0))
+                       by Polynomial.coefficientOf_add(Real.ring,
+                              Polynomial.monomial(Real.ring, a, 0),
+                              Polynomial.monomial(Real.ring, b, 0), 0)
+                 = Real.add(a,
+                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), 0))
+                       by Polynomial.coefficientOf_monomial_at(Real.ring, a, 0)
+                 = Real.add(a, b)
+                       by Polynomial.coefficientOf_monomial_at(Real.ring, b, 0)
+                 = Polynomial.coefficientOf(Real.ring,
+                       Polynomial.monomial(Real.ring, Real.add(a, b), 0), 0)
+                       by Equality.symmetry(
+                              Polynomial.coefficientOf_monomial_at(Real.ring, Real.add(a, b), 0))
+                 = Polynomial.coefficientOf(Real.ring,
+                       Polynomial.monomial(Real.ring, Real.add(a, b), 0), i)
+                       by congruenceOf(
+                              function (t : Natural) =>
+                                  Polynomial.coefficientOf(Real.ring,
+                                      Polynomial.monomial(Real.ring, Real.add(a, b), 0), t),
+                              Equality.symmetry(indexZero))
+          | no indexNotZero =>
+              calc Polynomial.coefficientOf(Real.ring,
+                       Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+                           Polynomial.monomial(Real.ring, b, 0)), i)
+                 = Real.add(
+                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a, 0), i),
+                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), i))
+                       by Polynomial.coefficientOf_add(Real.ring,
+                              Polynomial.monomial(Real.ring, a, 0),
+                              Polynomial.monomial(Real.ring, b, 0), i)
+                 = Real.add(Real.zero,
+                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), i))
+                       by Polynomial.coefficientOf_monomial_off(Real.ring, a, 0, i, indexNotZero)
+                 = Real.add(Real.zero, Real.zero)
+                       by Polynomial.coefficientOf_monomial_off(Real.ring, b, 0, i, indexNotZero)
+                 = Real.zero
+                       by Ring.zero_add(Real.ring, Real.zero)
+                 = Polynomial.coefficientOf(Real.ring,
+                       Polynomial.monomial(Real.ring, Real.add(a, b), 0), i)
+                       by Equality.symmetry(
+                              Polynomial.coefficientOf_monomial_off(Real.ring, Real.add(a, b), 0, i,
+                                  indexNotZero))
+        })
+
+-- The constant polynomials multiply coefficientwise.
+theorem Complex.constant_multiply (a b : Real)
+        : Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+              Polynomial.monomial(Real.ring, b, 0))
+          = Polynomial.monomial(Real.ring, Real.multiply(a, b), 0) :=
+  Polynomial.equal_of_coefficientOf_equal(Real.ring,
+      Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+          Polynomial.monomial(Real.ring, b, 0)),
+      Polynomial.monomial(Real.ring, Real.multiply(a, b), 0),
+      function (i : Natural) =>
+        decide i = 0 {
+          | yes indexZero =>
+              calc Polynomial.coefficientOf(Real.ring,
+                       Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+                           Polynomial.monomial(Real.ring, b, 0)), i)
+                 = Polynomial.coefficientOf(Real.ring,
+                       Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+                           Polynomial.monomial(Real.ring, b, 0)), 0)
+                       by congruenceOf(
+                              function (t : Natural) =>
+                                  Polynomial.coefficientOf(Real.ring,
+                                      Polynomial.multiply(Real.ring,
+                                          Polynomial.monomial(Real.ring, a, 0),
+                                          Polynomial.monomial(Real.ring, b, 0)), t),
+                              indexZero)
+                 = Real.multiply(a,
+                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0),
+                           Natural.monus(0, 0)))
+                       by Polynomial.coefficientOf_monomial_multiply(Real.ring, a,
+                              Polynomial.monomial(Real.ring, b, 0), 0, 0, Natural.zero_least(0))
+                 = Real.multiply(a,
+                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), 0))
+                       by congruenceOf(
+                              function (t : Natural) =>
+                                  Real.multiply(a,
+                                      Polynomial.coefficientOf(Real.ring,
+                                          Polynomial.monomial(Real.ring, b, 0), t)),
+                              Natural.monus_zero(0))
+                 = Real.multiply(a, b)
+                       by Polynomial.coefficientOf_monomial_at(Real.ring, b, 0)
+                 = Polynomial.coefficientOf(Real.ring,
+                       Polynomial.monomial(Real.ring, Real.multiply(a, b), 0), 0)
+                       by Equality.symmetry(
+                              Polynomial.coefficientOf_monomial_at(Real.ring, Real.multiply(a, b), 0))
+                 = Polynomial.coefficientOf(Real.ring,
+                       Polynomial.monomial(Real.ring, Real.multiply(a, b), 0), i)
+                       by congruenceOf(
+                              function (t : Natural) =>
+                                  Polynomial.coefficientOf(Real.ring,
+                                      Polynomial.monomial(Real.ring, Real.multiply(a, b), 0), t),
+                              Equality.symmetry(indexZero))
+          | no indexNotZero =>
+              calc Polynomial.coefficientOf(Real.ring,
+                       Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+                           Polynomial.monomial(Real.ring, b, 0)), i)
+                 = Real.multiply(a,
+                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0),
+                           Natural.monus(i, 0)))
+                       by Polynomial.coefficientOf_monomial_multiply(Real.ring, a,
+                              Polynomial.monomial(Real.ring, b, 0), 0, i, Natural.zero_least(i))
+                 = Real.multiply(a,
+                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), i))
+                       by congruenceOf(
+                              function (t : Natural) =>
+                                  Real.multiply(a,
+                                      Polynomial.coefficientOf(Real.ring,
+                                          Polynomial.monomial(Real.ring, b, 0), t)),
+                              Natural.monus_zero(i))
+                 = Real.multiply(a, Real.zero)
+                       by Polynomial.coefficientOf_monomial_off(Real.ring, b, 0, i, indexNotZero)
+                 = Real.zero
+                       by Ring.multiply_zero_right(Real.ring, a)
+                 = Polynomial.coefficientOf(Real.ring,
+                       Polynomial.monomial(Real.ring, Real.multiply(a, b), 0), i)
+                       by Equality.symmetry(
+                              Polynomial.coefficientOf_monomial_off(Real.ring, Real.multiply(a, b),
+                                  0, i, indexNotZero))
+        })
+
+-- The constant polynomial 0 is the zero polynomial.
+theorem Complex.constant_zero
+        : Polynomial.monomial(Real.ring, Real.zero, 0) = Polynomial.zero(Real.ring) :=
+  Polynomial.equal_of_coefficientOf_equal(Real.ring,
+      Polynomial.monomial(Real.ring, Real.zero, 0), Polynomial.zero(Real.ring),
+      function (i : Natural) =>
+        decide i = 0 {
+          | yes indexZero =>
+              calc Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, Real.zero, 0), i)
+                 = Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, Real.zero, 0), 0)
+                       by congruenceOf(
+                              function (t : Natural) =>
+                                  Polynomial.coefficientOf(Real.ring,
+                                      Polynomial.monomial(Real.ring, Real.zero, 0), t),
+                              indexZero)
+                 = Real.zero
+                       by Polynomial.coefficientOf_monomial_at(Real.ring, Real.zero, 0)
+                 = Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), 0)
+                       by Equality.symmetry(Polynomial.coefficientOf_zero(Real.ring, 0))
+                 = Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), i)
+                       by congruenceOf(
+                              function (t : Natural) =>
+                                  Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), t),
+                              Equality.symmetry(indexZero))
+          | no indexNotZero =>
+              calc Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, Real.zero, 0), i)
+                 = Real.zero
+                       by Polynomial.coefficientOf_monomial_off(Real.ring, Real.zero, 0, i, indexNotZero)
+                 = Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), i)
+                       by Equality.symmetry(Polynomial.coefficientOf_zero(Real.ring, i))
+        })
+
+-- ----------------------------------------------------------------------
+-- The embedding ℝ ↪ ℂ.
+
+definition ComplexNumber.from_real (a : Real) : ComplexNumber :=
+  RingModulo.make(Real.polynomial_ring, Complex.modulus,
+      Polynomial.monomial(Real.ring, a, 0))
+
+-- 1 ↦ 1 (the constant polynomial 1 is literally Polynomial.one).
+theorem ComplexNumber.from_real_one
+        : ComplexNumber.from_real(Real.one)
+          = RingModulo.one(Real.polynomial_ring, Complex.modulus) :=
+  reflexivity(ComplexNumber, RingModulo.one(Real.polynomial_ring, Complex.modulus))
+
+-- 0 ↦ 0.
+theorem ComplexNumber.from_real_zero
+        : ComplexNumber.from_real(Real.zero)
+          = RingModulo.zero(Real.polynomial_ring, Complex.modulus) :=
+  congruenceOf(
+      function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+          RingModulo.make(Real.polynomial_ring, Complex.modulus, p),
+      Complex.constant_zero)
+
+-- Preserves addition.
+theorem ComplexNumber.from_real_add (a b : Real)
+        : ComplexNumber.from_real(Real.add(a, b))
+          = RingModulo.add(Real.polynomial_ring, Complex.modulus,
+              ComplexNumber.from_real(a), ComplexNumber.from_real(b)) :=
+  Equality.symmetry(
+      congruenceOf(
+          function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+              RingModulo.make(Real.polynomial_ring, Complex.modulus, p),
+          Complex.constant_add(a, b)))
+
+-- Preserves multiplication.
+theorem ComplexNumber.from_real_multiply (a b : Real)
+        : ComplexNumber.from_real(Real.multiply(a, b))
+          = RingModulo.multiply(Real.polynomial_ring,
+              Real.polynomial_ring_commutative, Complex.modulus,
+              ComplexNumber.from_real(a), ComplexNumber.from_real(b)) :=
+  Equality.symmetry(
+      congruenceOf(
+          function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+              RingModulo.make(Real.polynomial_ring, Complex.modulus, p),
+          Complex.constant_multiply(a, b)))
