@@ -19840,11 +19840,15 @@ private:
             if (sawZeroOnly) {
                 headline =
                     "rewrite(eq, term): the equality's left endpoint "
-                    "does not appear (structurally) in term's type "
-                    "(`"
+                    "does not appear in term's type — neither "
+                    "structurally nor up to definitional equality "
+                    "(both were tried) — in (`"
                     + prettyPrintInLocalScope(termTypeOpened,
                                                 localBinders)
-                    + "`).";
+                    + "`). Check the equation's direction (rewrite uses "
+                      "its LEFT endpoint; wrap in Equality.symmetry to "
+                      "flip), or restate the goal with `change <type>;` "
+                      "to the spelling that exposes the endpoint.";
             } else {
                 headline =
                     "rewrite(eq, term): the equality's left endpoint "
