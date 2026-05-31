@@ -50,6 +50,26 @@ clean:
 .PHONY: clean
 
 # ----------------------------------------------------------------------
+# compile_commands.json — feeds clangd (the editor / IDE language
+# server) the real compile flags so it stops emitting phantom
+# "can't find <header>" / c++20-syntax diagnostics. We strip -Werror
+# from CXXFLAGS so clangd reports rather than hard-errors. Regenerate
+# after adding/removing a .cpp.
+CDB_FLAGS := $(filter-out -Werror,$(CXXFLAGS))
+
+compile_commands.json:
+	@printf '[\n' > $@
+	@first=1; for f in $(OBJS:.o=.cpp); do \
+		if [ $$first -eq 0 ]; then printf ',\n' >> $@; fi; first=0; \
+		printf '  { "directory": "%s", "file": "%s", "command": "%s -c %s -o %s" }' \
+			"$(CURDIR)" "$$f" "$(CXX) $(CDB_FLAGS)" "$$f" "$${f%.cpp}.o" >> $@; \
+	done
+	@printf '\n]\n' >> $@
+	@echo "wrote $@"
+
+.PHONY: compile_commands.json
+
+# ----------------------------------------------------------------------
 # Library verification.
 #
 # Each .math file under library/ becomes a .mathv cache under
