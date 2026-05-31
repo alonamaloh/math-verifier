@@ -1,0 +1,42 @@
+-- PoC: can the elaborator recover an implicit structure argument from a
+-- projection-typed operand? IntegerMod already recovers {modulus} from
+-- IntegerMod(m) (a direct constructor argument). The open question for
+-- Track A1 is the *projection* case: recover {r : Ring} from an operand
+-- of type Ring.carrier(r). Two probes: direct call, then operator dispatch.
+module Test.operator_parametrized_poc
+
+import Logic.basics
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import RingModulo.basics
+import RingModulo.operations
+
+-- (1) Direct call: is {r} solved from x : Ring.carrier(r)?
+definition Test.bundleAdd {r : Ring} (x y : Ring.carrier(r)) : Ring.carrier(r) :=
+  Ring.add(r, x, y)
+
+theorem Test.recover_direct (s : Ring) (x y : Ring.carrier(s))
+        : Test.bundleAdd(x, y) = Ring.add(s, x, y) :=
+  reflexivity(Ring.carrier(s), Ring.add(s, x, y))
+
+-- (2) Operator dispatch: does `x + y` find the dispatch fn (head
+-- `Ring.carrier`) and recover {r}?
+operator (+) on (Ring.carrier, Ring.carrier) := Test.bundleAdd
+
+theorem Test.recover_operator (s : Ring) (x y : Ring.carrier(s))
+        : x + y = Ring.add(s, x, y) :=
+  reflexivity(Ring.carrier(s), Ring.add(s, x, y))
+
+-- (3) Two implicits, the second dependent: recover {s : Ring} AND
+-- {m : Ring.carrier(s)} from x : RingModulo(s, m).
+definition Test.rmAdd {s : Ring} {m : Ring.carrier(s)}
+        (x y : RingModulo(s, m)) : RingModulo(s, m) :=
+  RingModulo.add(s, m, x, y)
+
+theorem Test.recover_two (s : Ring) (m : Ring.carrier(s))
+        (x y : RingModulo(s, m))
+        : Test.rmAdd(x, y) = RingModulo.add(s, m, x, y) :=
+  reflexivity(RingModulo(s, m), RingModulo.add(s, m, x, y))

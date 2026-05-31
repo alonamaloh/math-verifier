@@ -21771,6 +21771,52 @@ private:
         return false;
     }
 
+    // One δ-step on a (possibly applied) Constant-headed expression:
+    // unfold the head definition and β-reduce the spine arguments into
+    // it, WITHOUT recursing further — the result's head may itself be a
+    // definition (e.g. `FiniteField(p,f)` → `RingModulo(…)`, whose head
+    // `RingModulo` is in turn a definition for `Quotient(…)`). Stopping
+    // after a single unfold is exactly what lets a head-directed matcher
+    // stop at the FIRST head that aligns with its pattern, rather than
+    // collapsing all the way to `Quotient`. Returns null when the head
+    // isn't a transparent definition (axiom / opaque / inductive / not a
+    // Constant), i.e. when no δ-step is available.
+    ExpressionPointer unfoldHeadConstantOneStep(ExpressionPointer expr) {
+        std::vector<ExpressionPointer> args;
+        ExpressionPointer head = expr;
+        while (auto* app = std::get_if<Application>(&head->node)) {
+            args.push_back(app->argument);
+            head = app->function;
+        }
+        std::reverse(args.begin(), args.end());
+        auto* constant = std::get_if<Constant>(&head->node);
+        if (!constant) return nullptr;
+        const Declaration* declaration =
+            environment_.lookup(constant->name);
+        if (!declaration) return nullptr;
+        auto* definition = std::get_if<Definition>(declaration);
+        if (!definition) return nullptr;
+        if (definition->opacity == Opacity::Opaque) return nullptr;
+        if (definition->universeParameters.size()
+                != constant->universeArguments.size()) {
+            return nullptr;
+        }
+        ExpressionPointer body = definition->body;
+        if (!body) return nullptr;
+        if (!definition->universeParameters.empty()) {
+            body = substituteUniverseLevels(
+                body, definition->universeParameters,
+                constant->universeArguments);
+        }
+        // β-apply the spine arguments into the unfolded body.
+        for (const auto& argument : args) {
+            auto* lambda = std::get_if<Lambda>(&body->node);
+            if (!lambda) return nullptr;
+            body = substitute(lambda->body, 0, argument);
+        }
+        return body;
+    }
+
     void unifyConstructorParameters(
         ExpressionPointer pattern,
         ExpressionPointer target,
@@ -21933,22 +21979,52 @@ private:
                     return;
                 }
             }
+            // Walk the target's function chain to its head (a no-op when
+            // the target is a bare Constant, as for a nullary alias like
+            // `ComplexNumber`).
+            ExpressionPointer targetHead = target;
+            while (auto* nestedApp =
+                       std::get_if<Application>(&targetHead->node)) {
+                targetHead = nestedApp->function;
+            }
+            if (!headsMatch(patternHead, targetHead)) {
+                // The target may be a definition/alias whose head differs
+                // from the pattern's only until unfolded — e.g. pattern
+                // `RingModulo(?s, ?m)` against target `FiniteField(p, f)`
+                // (which δ-reduces to `RingModulo(...)`) or the nullary
+                // alias `ComplexNumber` (a bare Constant that δ-reduces to
+                // `RingModulo(...)`). Unfold the target one δ-step at a time
+                // and retry as soon as a head aligns with the pattern's. A
+                // SINGLE-step unfold (not full WHNF) is essential:
+                // `RingModulo` is itself a definition for `Quotient(…)`, so
+                // WHNF would blow past the `RingModulo` head we want to match
+                // all the way to `Quotient`. The loop is bounded by the
+                // chain of transparent definitions, so it terminates.
+                ExpressionPointer current = target;
+                for (int unfoldStep = 0; unfoldStep < 64; ++unfoldStep) {
+                    ExpressionPointer next =
+                        unfoldHeadConstantOneStep(current);
+                    if (!next) break;
+                    current = next;
+                    ExpressionPointer currentHead = current;
+                    while (auto* nestedApp = std::get_if<Application>(
+                               &currentHead->node)) {
+                        currentHead = nestedApp->function;
+                    }
+                    if (headsMatch(patternHead, currentHead)) {
+                        unifyConstructorParameters(
+                            pattern, current, metavariableNames,
+                            assignment, binderDepth, binderTypeStack);
+                        break;
+                    }
+                }
+                return;
+            }
+            // Heads match: require the target to be an application of the
+            // same arity and recurse pointwise. (A bare-Constant target
+            // with a matching head has no arguments to recurse into.)
             if (auto* targetApplication =
                     std::get_if<Application>(&target->node)) {
-                // Require the heads (after walking the function chain)
-                // to be structurally equivalent. Without this check,
-                // pointwise recursion of two same-arity but
-                // semantically-different applications (e.g.
-                // `Natural.divides(_, _)` vs `Exists(Natural, _)`)
-                // would assign metavariables to wrong-typed targets.
-                ExpressionPointer targetHead = targetApplication->function;
-                while (auto* nestedApp =
-                           std::get_if<Application>(&targetHead->node)) {
-                    targetHead = nestedApp->function;
-                }
-                if (!headsMatch(patternHead, targetHead)) {
-                    return;
-                }
                 unifyConstructorParameters(
                     patternApplication->function,
                     targetApplication->function,
