@@ -17070,11 +17070,89 @@ private:
         return recursorCall;
     }
 
+    // Names of in-scope binders introduced AFTER the `cases`/induction
+    // scrutinee whose TYPE depends on it — the hypotheses that an
+    // induction must generalize (revert) into the motive, or they keep
+    // their stale type referring to the original scrutinee. Returns them
+    // in array (outermost-first) order, a valid revert telescope. Empty
+    // if the scrutinee isn't a local-binder variable.
+    std::vector<std::string> scrutineeDependentBinders(
+        const SurfaceCases& cases,
+        const std::vector<LocalBinder>& localBinders) {
+        ExpressionPointer scrutineeKernel;
+        try {
+            scrutineeKernel =
+                elaborateExpression(*cases.scrutinee, localBinders);
+        } catch (const ElaborateError&) {
+            return {};
+        } catch (const TypeError&) {
+            return {};
+        }
+        auto* boundVariable =
+            std::get_if<BoundVariable>(&scrutineeKernel->node);
+        if (!boundVariable) return {};
+        int total = static_cast<int>(localBinders.size());
+        int scrutineePosition = total - 1 - boundVariable->deBruijnIndex;
+        if (scrutineePosition < 0 || scrutineePosition >= total) return {};
+        std::vector<std::string> names;
+        for (int i = scrutineePosition + 1; i < total; ++i) {
+            // The scrutinee's de Bruijn index within binder i's type
+            // scope (binders 0..i-1 are in scope there).
+            int scrutineeIndexInTypeScope = (i - 1) - scrutineePosition;
+            if (referencesBoundVariable(
+                    localBinders[i].type, scrutineeIndexInTypeScope)) {
+                names.push_back(localBinders[i].name);
+            }
+        }
+        return names;
+    }
+
+    // `cases`/`by_induction` entry. The plain form (no explicit
+    // `refining`/`with`) gets an automatic generalize-fallback: if it
+    // fails to elaborate AND the scrutinee has in-scope dependent
+    // hypotheses, retry reverting them into the motive (via the same
+    // `refining` telescope), so an induction over `n` with a hypothesis
+    // mentioning `n` no longer needs a hand-written `refining` list.
+    // Existing proofs (which elaborate without reverting) take the first
+    // path unchanged, so this never regresses them.
+    ExpressionPointer elaborateCasesExpression(
+        const SurfaceCases& cases,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        bool plain = cases.refiningNames.empty()
+            && cases.equalityHypothesisName.empty();
+        if (plain && expectedType) {
+            std::vector<std::string> autoRefine =
+                scrutineeDependentBinders(cases, localBinders);
+            if (!autoRefine.empty()) {
+                try {
+                    return elaborateCasesExpressionInner(
+                        cases, localBinders, expectedType, line, column);
+                } catch (const ElaborateError& plainError) {
+                    SurfaceCases reverted = cases;
+                    reverted.refiningNames = std::move(autoRefine);
+                    try {
+                        return elaborateCasesExpressionInner(
+                            reverted, localBinders, expectedType,
+                            line, column);
+                    } catch (const ElaborateError&) {
+                        // The auto-revert didn't help; surface the
+                        // original (more relevant) failure.
+                        throw plainError;
+                    }
+                }
+            }
+        }
+        return elaborateCasesExpressionInner(
+            cases, localBinders, expectedType, line, column);
+    }
+
     // `cases scrutinee { | pattern => body | ... }`. Phase 1 covers
     // non-indexed inductives only. Re-uses the existing
     // `buildCaseLambda` helper by synthesizing a minimal pattern-match
     // declaration whose cases mirror the user's clauses.
-    ExpressionPointer elaborateCasesExpression(
+    ExpressionPointer elaborateCasesExpressionInner(
         const SurfaceCases& cases,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,

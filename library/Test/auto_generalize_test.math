@@ -1,0 +1,21 @@
+-- C1: `cases`/`by_induction` auto-generalize. When the scrutinee has an
+-- in-scope hypothesis depending on it, the plain form (no `refining`)
+-- reverts it into the motive automatically, so the body sees the
+-- hypothesis refined per case. Equivalent to writing `refining h`.
+module Test.auto_generalize_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+
+-- `equation : n = 0` depends on the scrutinee `n`. In the successor case
+-- it is refined to `successor(k) = 0`, which is exactly the goal there —
+-- so the body uses the refined hypothesis directly. Without auto-
+-- generalize (or an explicit `refining equation`) this fails, because
+-- the un-reverted `equation : n = 0` does not match `successor(k) = 0`.
+theorem Test.uses_refined_hypothesis (n : Natural) (equation : n = 0)
+        : n = 0 :=
+  cases n {
+    | zero          => reflexivity(Natural, 0)
+    | successor(k)  => equation
+  }
