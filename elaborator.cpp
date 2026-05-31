@@ -10108,7 +10108,7 @@ private:
                 oneName, modulus);
             return (modulus - v) % modulus;
         }
-        // Carrier-embedded Natural literal — must mirror ring V2's
+        // Carrier-embedded Natural literal — must mirror the ring normaliser's
         // literal recognition (which itself depends on the carrier).
         // For Integer: Natural.to_integer(succ^k(zero)) → k.
         // For Rational: Integer.to_rational(Natural.to_integer(...)) → k.
@@ -10325,7 +10325,7 @@ private:
             // sum-of-monomials canonical form (handles distributivity,
             // 0/1 identity, negation, and like-term cancellation
             // within ±1 coefficient).
-            return elaborateRingV2(
+            return elaborateRingByNormalisation(
                 /*localBinders*/{},
                 goal.leftEndpoint, goal.rightEndpoint,
                 goal.carrierType, goal.carrierUniverseLevel,
@@ -10896,7 +10896,7 @@ private:
     }
 
     // =====================================================================
-    // Ring v2 — polynomial canonicalisation
+    // Ring normaliser — polynomial canonicalisation
     //
     // Decision procedure that extends v1 with distributivity, identity
     // (0 and 1), and negation. Both sides of `e1 = e2` are normalised
@@ -10942,7 +10942,7 @@ private:
         std::string outerOneName;            // e.g. "Integer.one"
     };
 
-    struct RingV2Context {
+    struct RingNormalisationContext {
         std::string carrierName;           // e.g. "Rational"
         ExpressionPointer carrierType;      // Constant("Rational")
         LevelPointer carrierUniverseLevel;  // for Equality.* applications
@@ -11061,7 +11061,7 @@ private:
     // with one factor and coefficient 1). Side effect: register the atom
     // in `context.atoms` keyed by its hash.
     RingPolynomial ringPolynomialAtom(
-        RingV2Context& context, ExpressionPointer atom) {
+        RingNormalisationContext& context, ExpressionPointer atom) {
         uint64_t atomHash = atom->hash;
         auto insertion = context.atoms.emplace(atomHash, atom);
         (void)insertion;  // first writer wins; subsequent hits reuse
@@ -11161,7 +11161,7 @@ private:
     // coercion application).
     bool tryParseCarrierEmbeddedNaturalLiteral(
         ExpressionPointer expression,
-        const RingV2Context& context,
+        const RingNormalisationContext& context,
         int& value) {
         if (context.embeddingChain.empty()) return false;
         ExpressionPointer cursor = expression;
@@ -11193,7 +11193,7 @@ private:
     // Populate context.embeddingChain and scalar-multiply operator
     // names based on context.carrierName. Caller has already filled in
     // the carrier names (add, multiply, etc).
-    void populateRingV2EmbeddingChain(RingV2Context& context) {
+    void populateRingEmbeddingChain(RingNormalisationContext& context) {
         auto buildStep =
             [&](const std::string& coercionName,
                 const std::string& outerCarrier) -> RingEmbeddingStep {
@@ -11254,7 +11254,7 @@ private:
     // multiply / negate are unfolded; zero and one are bottomed out;
     // everything else is an atom.
     RingPolynomial normaliseToRingPolynomial(
-        ExpressionPointer expression, RingV2Context& context) {
+        ExpressionPointer expression, RingNormalisationContext& context) {
         // zero — empty polynomial.
         if (matchRingZero(expression, context.zeroName)) {
             return RingPolynomial{};
@@ -11357,7 +11357,7 @@ private:
     // δ-unfolds to `(n : R) * x` rather than `x * (n : R)`).
     bool tryParseScalarMultiplyOperator(
         ExpressionPointer expression,
-        const RingV2Context& context,
+        const RingNormalisationContext& context,
         ExpressionPointer& scalarOut,
         ExpressionPointer& atomOut,
         bool& scalarOnLeftOut) {
@@ -11393,7 +11393,7 @@ private:
     // For Integer carrier (chain length 1): returns scalarInteger as-is.
     ExpressionPointer buildCoercedScalarForCarrier(
         ExpressionPointer scalarInteger,
-        const RingV2Context& context) {
+        const RingNormalisationContext& context) {
         ExpressionPointer cursor = scalarInteger;
         // chain[0] is Natural→Integer; subsequent steps are Integer→
         // higher carriers. Wrap with chain[1..n].
@@ -11409,7 +11409,7 @@ private:
     // Build the kernel expression for `1 + 1 + ... + 1` with N copies
     // of `<context.oneName>`, left-associated.  N must be >= 1.
     ExpressionPointer buildRingCoefficientExpression(
-        int count, const RingV2Context& context) {
+        int count, const RingNormalisationContext& context) {
         ExpressionPointer one = makeConstant(context.oneName);
         if (count == 1) return one;
         ExpressionPointer accumulator = one;
@@ -11433,7 +11433,7 @@ private:
     ExpressionPointer buildCanonicalMonomial(
         const RingMonomialSignature& factors,
         int coefficient,
-        const RingV2Context& context) {
+        const RingNormalisationContext& context) {
         const int magnitude = coefficient > 0 ? coefficient : -coefficient;
         ExpressionPointer factorProduct;
         if (!factors.empty()) {
@@ -11443,7 +11443,7 @@ private:
                 auto found = context.atoms.find(factorHash);
                 if (found == context.atoms.end()) {
                     throwElaborate(
-                        "ring v2: internal error — atom hash missing "
+                        "ring (normalisation): internal error — atom hash missing "
                         "from atom table");
                 }
                 atomTerms.push_back(found->second);
@@ -11483,7 +11483,7 @@ private:
     // coefficient ±1.
     ExpressionPointer buildCanonicalPolynomial(
         const RingPolynomial& polynomial,
-        const RingV2Context& context) {
+        const RingNormalisationContext& context) {
         if (polynomial.empty()) {
             return makeConstant(context.zeroName);
         }
@@ -11522,7 +11522,7 @@ private:
     }
 
     // =====================================================================
-    // Ring v2 — proof emitter helpers.
+    // Ring normaliser — proof-emitter helpers.
     //
     // The decision step already canonicalises both endpoints to the same
     // polynomial. The emitter produces a proof of
@@ -11538,13 +11538,47 @@ private:
     // the proof emitter.
     // =====================================================================
 
-    // Carrier-specific axiom names. Library carriers split into two
-    // naming conventions: Rational/Real/PAdic use `zero_add` /
-    // `add_zero` / `one_multiply` / `multiply_one`; Integer uses
-    // `add_identity_left` / `add_identity_right` /
-    // `multiply_identity_left` / `multiply_identity_right`. We probe
-    // both, prefer whichever is in scope.
-    struct RingV2AxiomNames {
+    // ------------------------------------------------------------------
+    // The ring laws `ring` depends on.
+    //
+    // `ring` proves a commutative-ring identity by normalising both
+    // sides to a canonical sum-of-monomials and emitting a kernel proof
+    // that chains the library's ring laws. Every law it can cite is named
+    // below; if a goal needs a law the carrier doesn't provide, `ring`
+    // fails with "carrier X is missing axiom Y". The laws come in two
+    // flavours (see CLAUDE.md "Ring lemmas: foundational vs. derived"):
+    //
+    //   FOUNDATIONAL — the IsRing axioms, proved per carrier and looked
+    //   up by name `<carrier>.<law>`:
+    //     add_associative, add_commutative,
+    //     multiply_associative, multiply_commutative,
+    //     distributivity_left, distributivity_right,
+    //     zero_add / add_identity_left   (0 + a = a),
+    //     add_zero / add_identity_right  (a + 0 = a),
+    //     one_multiply / multiply_identity_left   (1 · a = a),
+    //     multiply_one / multiply_identity_right   (a · 1 = a),
+    //     add_negate_left  (-a + a = 0), add_negate_right (a + -a = 0),
+    //     negate_negate (-(-a) = a), negate_add (-(a+b) = -a + -b).
+    //   (Library carriers split on the identity-law spelling:
+    //   Rational/Real/PAdic use `zero_add`/`add_zero`/…; Integer uses
+    //   `add_identity_left`/…. `pickAxiomName` probes both.)
+    //
+    //   DERIVED — consequences of IsRing, NOT restated per carrier.
+    //   `ring` cites the abstract forms over a generic `IsRing` from
+    //   `Algebra/ring_lemmas.math`, applied to the carrier's `is_ring`
+    //   instance (see `buildAbstractRingLemmaApplication`):
+    //     Ring.zero_multiply (0·a = 0), Ring.multiply_zero (a·0 = 0),
+    //     Ring.multiply_negate_left (-a·b = -(a·b)),
+    //     Ring.multiply_negate_right (a·-b = -(a·b)).
+    //   A per-carrier `<carrier>.<law>` wrapper, if present, is used
+    //   instead (Integer ships rep-level reflexivity proofs that are
+    //   cheaper than the abstract derivation).
+    //
+    // Operation terms (`<carrier>.add`, `.multiply`, `.negate`,
+    // `.subtract`, `.zero`, `.one`) are recognised and built by the
+    // matchers/builders below.
+    // ------------------------------------------------------------------
+    struct RingLawNames {
         std::string addZeroRight;          // a + 0 = a
         std::string zeroAddLeft;           // 0 + a = a
         std::string multiplyOneRight;      // a * 1 = a
@@ -11576,9 +11610,9 @@ private:
         return std::string{};
     }
 
-    RingV2AxiomNames resolveRingV2AxiomNames(
+    RingLawNames resolveRingLawNames(
         const std::string& carrierName) {
-        RingV2AxiomNames names;
+        RingLawNames names;
         names.zeroAddLeft = pickAxiomName(
             carrierName + ".zero_add",
             carrierName + ".add_identity_left");
@@ -11630,7 +11664,7 @@ private:
         if (axiomName.empty()
             || environment_.lookup(axiomName) == nullptr) {
             throwElaborate(
-                "`ring` (v2): carrier `" + carrierName
+                "`ring`: carrier `" + carrierName
                 + "` is missing axiom `" + description
                 + "` — required for this goal");
         }
@@ -11647,7 +11681,7 @@ private:
     ExpressionPointer buildSignedMonomialKernel(
         const RingMonomialSignature& signature,
         int sign,
-        const RingV2Context& context) {
+        const RingNormalisationContext& context) {
         return buildCanonicalMonomial(signature, sign, context);
     }
 
@@ -11702,8 +11736,8 @@ private:
     // `expression = leftAssoc(flatten(expression))`.
     ExpressionPointer reassociateSumLeftProof(
         ExpressionPointer expression,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         RingAxiomNames addAxioms{
             context.addName,
             axiomNames.addAssociative,
@@ -11719,8 +11753,8 @@ private:
     ExpressionPointer sortSumLeftAssocProof(
         const std::vector<ExpressionPointer>& originalFactors,
         const std::vector<ExpressionPointer>& sortedFactors,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         RingAxiomNames addAxioms{
             context.addName,
             axiomNames.addAssociative,
@@ -11739,8 +11773,8 @@ private:
     ExpressionPointer sortMultiplyLeftAssocProof(
         const std::vector<ExpressionPointer>& originalFactors,
         const std::vector<ExpressionPointer>& sortedFactors,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         RingAxiomNames multiplyAxioms{
             context.multiplyName,
             axiomNames.multiplyAssociative,
@@ -11757,8 +11791,8 @@ private:
     // operator.
     ExpressionPointer reassociateMultiplyLeftProof(
         ExpressionPointer expression,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         RingAxiomNames multiplyAxioms{
             context.multiplyName,
             axiomNames.multiplyAssociative,
@@ -11781,8 +11815,8 @@ private:
     // ----------------------------------------------------------------
     ExpressionPointer proveEqualsCanonical_impl(
         ExpressionPointer expression,
-        RingV2Context& context,
-        const RingV2AxiomNames& axiomNames,
+        RingNormalisationContext& context,
+        const RingLawNames& axiomNames,
         RingPolynomial& polynomialOut) {
         ExpressionPointer carrierType = context.carrierType;
         LevelPointer universeLevel = context.carrierUniverseLevel;
@@ -12042,7 +12076,7 @@ private:
             buildCanonicalPolynomial(polynomialOut, context);
         if (!structurallyEqual(expression, canonicalKernel)) {
             throwElaborate(
-                "`ring` (v2): atom's canonical kernel mismatched the "
+                "`ring`: atom's canonical kernel mismatched the "
                 "atom itself (internal error)");
         }
         return buildReflexivity(universeLevel, carrierType, expression);
@@ -12241,11 +12275,11 @@ private:
     // Used by the literal-detection branch of proveEqualsCanonical_impl
     // when the goal's carrier is Integer, Rational, or Real.
     ExpressionPointer proveIntegerLiteralEqualsCanonical(
-        int literalValue, const RingV2Context& context) {
+        int literalValue, const RingNormalisationContext& context) {
         const auto& chain = context.embeddingChain;
         if (chain.empty()) {
             throwElaborate(
-                "`ring` (v2): internal error — proveIntegerLiteralEqualsCanonical "
+                "`ring`: internal error — proveIntegerLiteralEqualsCanonical "
                 "called with empty embedding chain");
         }
         // Step 0: Natural→Integer (or whatever the innermost step is).
@@ -12317,8 +12351,8 @@ private:
 
     ExpressionPointer proveEqualsCanonical(
         ExpressionPointer expression,
-        RingV2Context& context,
-        const RingV2AxiomNames& axiomNames,
+        RingNormalisationContext& context,
+        const RingLawNames& axiomNames,
         RingPolynomial& polynomialOut) {
         return proveEqualsCanonical_impl(
             expression, context, axiomNames, polynomialOut);
@@ -12339,8 +12373,8 @@ private:
     ExpressionPointer proveAddMerge(
         const RingPolynomial& leftPoly,
         const RingPolynomial& rightPoly,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         ExpressionPointer carrierType = context.carrierType;
         LevelPointer universeLevel = context.carrierUniverseLevel;
         ExpressionPointer leftCanonical =
@@ -12483,7 +12517,7 @@ private:
             polynomialToSignedMonomials(mergedPoly);
         if (sortedSignedMonomials.size() != mergedMonomials.size()) {
             throwElaborate(
-                "`ring` (v2): proveAddMerge: survivor count mismatched "
+                "`ring`: proveAddMerge: survivor count mismatched "
                 "merged polynomial size (internal error)");
         }
         for (size_t i = 0; i < mergedMonomials.size(); ++i) {
@@ -12492,7 +12526,7 @@ private:
                 || sortedSignedMonomials[i].sign
                     != mergedMonomials[i].sign) {
                 throwElaborate(
-                    "`ring` (v2): proveAddMerge: survivors don't match "
+                    "`ring`: proveAddMerge: survivors don't match "
                     "merged polynomial entry-by-entry (internal error)");
             }
         }
@@ -12537,7 +12571,7 @@ private:
             // Check that and return chainSoFar.
             if (!structurallyEqual(leftAssocSorted, mergedCanonical)) {
                 throwElaborate(
-                    "`ring` (v2): proveAddMerge expected leftAssocSorted "
+                    "`ring`: proveAddMerge expected leftAssocSorted "
                     "to match canonical(mergedPoly) (no cancellations) "
                     "but they differ (internal error)");
             }
@@ -12571,7 +12605,7 @@ private:
             // Pop the last two from remainingKernels: they are (M, -M).
             if (remainingKernels.size() < 2) {
                 throwElaborate(
-                    "`ring` (v2): cancellation underrun (internal error)");
+                    "`ring`: cancellation underrun (internal error)");
             }
             ExpressionPointer negM = remainingKernels.back();
             remainingKernels.pop_back();
@@ -12663,7 +12697,7 @@ private:
         // with mergedCanonical should hold.
         if (!structurallyEqual(currentForm, mergedCanonical)) {
             throwElaborate(
-                "`ring` (v2): proveAddMerge ended with shape mismatched "
+                "`ring`: proveAddMerge ended with shape mismatched "
                 "with canonical(mergedPoly) (internal error)");
         }
         return chainProof;
@@ -12685,7 +12719,7 @@ private:
     //   4. Sort the summands by canonical order (per std::map merge).
     //   5. Cancel any (M, -M) pairs that arise.
     //
-    // To stay implementable in v2 v1, the merge currently restricts to
+    // To stay implementable, the merge currently restricts to
     // the case where the EXPANSION DOES NOT PRODUCE CANCELLATION: i.e.
     // each pair of input monomials L_i × R_j yields a distinct merged
     // signature. (Cancellations would arise only when distinct L*R pairs
@@ -12702,7 +12736,7 @@ private:
     //       (L_i + rest) * R = L_i*R + rest*R     (rest is left side of L)
     //     then recurse. Symmetric for the inner with distributivity_left.
     //
-    // For implementation simplicity in v2 v1, we handle:
+    // We handle:
     //   (a) Both single-summand: just product-of-monomials path.
     //   (b) Left single, right multi: distributivity_left, then per-
     //       summand monomial canonicalisation.
@@ -12728,7 +12762,7 @@ private:
         const std::string& fallbackPerCarrierName,
         const std::string& fallbackHumanName,
         const std::vector<ExpressionPointer>& args,
-        const RingV2Context& context) {
+        const RingNormalisationContext& context) {
         const std::string carrierIsRing =
             context.carrierName + ".is_ring";
         if (environment_.lookup(abstractLemmaName) != nullptr
@@ -12766,8 +12800,8 @@ private:
     ExpressionPointer buildRingAnnihilatorProof(
         bool onLeft,
         ExpressionPointer x,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         return buildAbstractRingLemmaApplication(
             onLeft ? "Ring.zero_multiply" : "Ring.multiply_zero",
             onLeft ? axiomNames.multiplyZeroLeft
@@ -12782,8 +12816,8 @@ private:
     ExpressionPointer buildRingMultiplyNegateProof(
         bool onLeft,
         ExpressionPointer a, ExpressionPointer b,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         return buildAbstractRingLemmaApplication(
             onLeft ? "Ring.multiply_negate_left"
                     : "Ring.multiply_negate_right",
@@ -12797,8 +12831,8 @@ private:
     ExpressionPointer proveMultiplyMerge(
         const RingPolynomial& leftPoly,
         const RingPolynomial& rightPoly,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         ExpressionPointer carrierType = context.carrierType;
         LevelPointer universeLevel = context.carrierUniverseLevel;
         ExpressionPointer leftCanonical =
@@ -12839,7 +12873,7 @@ private:
         // no-collision condition.
         if (mergedPoly.size() != leftPoly.size() * rightPoly.size()) {
             throwElaborate(
-                "`ring` (v2): proveMultiplyMerge with cross-pair "
+                "`ring`: proveMultiplyMerge with cross-pair "
                 "cancellations not yet supported");
         }
         // Build the "naively expanded" sum:
@@ -13303,7 +13337,7 @@ private:
                     lambdaInner, xExpr);
                 if (!structurallyEqual(currentForm, expectedCurrent)) {
                     throwElaborate(
-                        "`ring` (v2) phase1b: motive's xExpr-form does "
+                        "`ring` phase1b: motive's xExpr-form does "
                         "not match currentForm (internal error)");
                 }
                 currentProof = buildEqualityTransitivity(
@@ -13424,7 +13458,7 @@ private:
         // Final check.
         if (!structurallyEqual(currentForm, mergedCanonical)) {
             throwElaborate(
-                "`ring` (v2): proveMultiplyMerge final form does not "
+                "`ring`: proveMultiplyMerge final form does not "
                 "match canonical(mergedPoly) (internal error)");
         }
         return currentProof;
@@ -13490,12 +13524,12 @@ private:
         ExpressionPointer currentForm,
         size_t position, size_t totalCount,
         ExpressionPointer replacement,
-        const RingV2Context& context) {
+        const RingNormalisationContext& context) {
         std::vector<ExpressionPointer> summands;
         flattenRingProduct(currentForm, context.addName, summands);
         if (summands.size() != totalCount) {
             throwElaborate(
-                "`ring` (v2): rewriteFlatSummandAtPosition: flatten "
+                "`ring`: rewriteFlatSummandAtPosition: flatten "
                 "count " + std::to_string(summands.size())
                 + " != expected " + std::to_string(totalCount));
         }
@@ -13509,12 +13543,12 @@ private:
         ExpressionPointer oldSummand,
         ExpressionPointer newSummand,
         ExpressionPointer summandProof,
-        const RingV2Context& context) {
+        const RingNormalisationContext& context) {
         std::vector<ExpressionPointer> summands;
         flattenRingProduct(currentForm, context.addName, summands);
         if (summands.size() != totalCount) {
             throwElaborate(
-                "`ring` (v2): rewriteFlatSummandAtPositionProof: flatten "
+                "`ring`: rewriteFlatSummandAtPositionProof: flatten "
                 "count " + std::to_string(summands.size())
                 + " != expected " + std::to_string(totalCount));
         }
@@ -13564,8 +13598,8 @@ private:
         const SignedMonomial& leftMono, const SignedMonomial& rightMono,
         const RingMonomialSignature& /*mergedSig*/, int mergedSign,
         ExpressionPointer targetMonomial,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         ExpressionPointer carrierType = context.carrierType;
         LevelPointer universeLevel = context.carrierUniverseLevel;
         // The "positive" base monomial kernels (no negate wrapper):
@@ -13719,7 +13753,7 @@ private:
                 std::get_if<Application>(&currentForm->node);
             if (!outerApp) {
                 throwElaborate(
-                    "`ring` (v2): proveSignedProductEqualsMonomial: "
+                    "`ring`: proveSignedProductEqualsMonomial: "
                     "negative branch has malformed shape");
             }
             innerProductForm = outerApp->argument;
@@ -13783,7 +13817,7 @@ private:
                 currentForm = newForm;
                 if (!structurallyEqual(currentForm, targetMonomial)) {
                     throwElaborate(
-                        "`ring` (v2): unit-strip produced form does not "
+                        "`ring`: unit-strip produced form does not "
                         "match canonical target (internal error)");
                 }
                 return currentProof;
@@ -13794,7 +13828,7 @@ private:
         if (!flattenRingProduct(innerProductForm, context.multiplyName,
                                    innerFactors)) {
             throwElaborate(
-                "`ring` (v2): inner product not pure-multiply (internal)");
+                "`ring`: inner product not pure-multiply (internal)");
         }
         // The target product is built by buildCanonicalMonomial from
         // mergedSig and +1 sign. Use it to get the factor order we want.
@@ -13808,7 +13842,7 @@ private:
                 std::get_if<Application>(&targetMonomial->node);
             if (!outerApp) {
                 throwElaborate(
-                    "`ring` (v2): target signed monomial malformed");
+                    "`ring`: target signed monomial malformed");
             }
             targetInner = outerApp->argument;
         }
@@ -13816,11 +13850,11 @@ private:
         if (!flattenRingProduct(targetInner, context.multiplyName,
                                    targetFactors)) {
             throwElaborate(
-                "`ring` (v2): target inner product not pure-multiply");
+                "`ring`: target inner product not pure-multiply");
         }
         if (innerFactors.size() != targetFactors.size()) {
             throwElaborate(
-                "`ring` (v2): factor count mismatch in monomial merge "
+                "`ring`: factor count mismatch in monomial merge "
                 "(internal error)");
         }
         // Reassociate innerProductForm to left-associated.
@@ -13869,7 +13903,7 @@ private:
         currentForm = outerNewForm;
         if (!structurallyEqual(currentForm, targetMonomial)) {
             throwElaborate(
-                "`ring` (v2): signed-product merge ended with mismatch "
+                "`ring`: signed-product merge ended with mismatch "
                 "(internal error)");
         }
         return currentProof;
@@ -13896,8 +13930,8 @@ private:
     // (No primitive `negate_zero` axiom is required.)
     ExpressionPointer proveNegateMerge(
         const RingPolynomial& innerPoly,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         ExpressionPointer carrierType = context.carrierType;
         LevelPointer universeLevel = context.carrierUniverseLevel;
         if (innerPoly.empty()) {
@@ -14094,7 +14128,7 @@ private:
         // monomials, in the same signature order.
         if (!structurallyEqual(currentForm, negatedCanonical)) {
             throwElaborate(
-                "`ring` (v2): proveNegateMerge final form mismatched "
+                "`ring`: proveNegateMerge final form mismatched "
                 "negated canonical (internal error)");
         }
         return currentProof;
@@ -14277,7 +14311,7 @@ private:
     // v2 of the ring tactic. Called as a fallback when v1 (pure-AC)
     // can't close the goal. Returns the proof on success; throws
     // otherwise. `expectedType` is the equality goal.
-    ExpressionPointer elaborateRingV2(
+    ExpressionPointer elaborateRingByNormalisation(
         const std::vector<LocalBinder>& /*localBinders*/,
         ExpressionPointer leftEndpoint,
         ExpressionPointer rightEndpoint,
@@ -14285,7 +14319,7 @@ private:
         LevelPointer carrierUniverseLevel,
         const std::string& carrierName,
         int line) {
-        RingV2Context context;
+        RingNormalisationContext context;
         context.carrierName = carrierName;
         context.carrierType = carrierType;
         context.carrierUniverseLevel = carrierUniverseLevel;
@@ -14295,7 +14329,7 @@ private:
         context.subtractName  = carrierName + ".subtract";
         context.zeroName      = carrierName + ".zero";
         context.oneName       = carrierName + ".one";
-        populateRingV2EmbeddingChain(context);
+        populateRingEmbeddingChain(context);
         // Sanity-check the carrier supports the v2 vocabulary. We only
         // require add + multiply at the moment — zero, one, and negate
         // are optional (a goal that doesn't mention them won't need
@@ -14303,7 +14337,7 @@ private:
         if (environment_.lookup(context.addName) == nullptr
             || environment_.lookup(context.multiplyName) == nullptr) {
             throwElaborate(
-                "`ring` (v2): carrier `" + carrierName
+                "`ring`: carrier `" + carrierName
                 + "` does not have both `.add` and `.multiply` in scope");
         }
         RingPolynomial leftPolynomial =
@@ -14325,8 +14359,8 @@ private:
         // needed for this particular goal are allowed to remain
         // unresolved; the merge helpers `demandAxiomName` only what
         // they actually use.
-        RingV2AxiomNames axiomNames =
-            resolveRingV2AxiomNames(carrierName);
+        RingLawNames axiomNames =
+            resolveRingLawNames(carrierName);
         // We always need add/multiply assoc and commute (used by
         // every non-trivial merge step).
         demandAxiomName(axiomNames.addAssociative,
@@ -14361,11 +14395,11 @@ private:
     }
 
     // =====================================================================
-    // `field(h1, h2, ...)` — extends ring v2 with the side relation
+    // `field(h1, h2, ...)` — extends the ring normaliser with the side relation
     // `t_i * reciprocal_function(t_i) = 1` for each user-supplied
     // hypothesis `h_i : ¬(t_i = Rational.zero)`.
     //
-    // Strategy: normalise both sides via ring v2 treating
+    // Strategy: normalise both sides via the ring normaliser treating
     // `reciprocal_function(t_i)` and `t_i` as opaque atoms. In each
     // monomial of the canonical polynomial, count matched (t_i, r_i)
     // pairs and contract them (each contraction drops one t_i and one
@@ -14382,7 +14416,7 @@ private:
     //       = RHS
     //
     // Each per-monomial contraction proof rearranges the monomial's
-    // factor list via ring v1 AC machinery, then applies
+    // factor list via the single-operator AC sorter, then applies
     // `reciprocal_function_multiplies` plus `multiply_one` to remove
     // each (t_i, r_i) pair from the tail.
     // =====================================================================
@@ -14485,7 +14519,7 @@ private:
     //   2. Build the "rearranged" factor list = survivingFactors ++
     //      [t_1, r_1, t_1, r_1, ...] (one (t, r) pair per cancellation).
     //   3. Prove `factorList-product = rearranged-product` via
-    //      `proveProductEqualsSorted` (ring v1 AC, ANY permutation).
+    //      `proveProductEqualsSorted` (single-operator AC sorter, ANY permutation).
     //   4. Cancel pairs from the tail: each step uses
     //        ((prefix * t) * r) = prefix * (t * r)     (multiply_associative)
     //        prefix * (t * r) = prefix * 1             (congr + multiplies_proof)
@@ -14497,8 +14531,8 @@ private:
         const std::vector<ExpressionPointer>& factorList,
         const std::vector<FieldReciprocalPair>& pairs,
         const std::vector<int>& pairsRemoved,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         const std::string& multiplyName = context.multiplyName;
         ExpressionPointer carrierType = context.carrierType;
         LevelPointer universeLevel = context.carrierUniverseLevel;
@@ -14823,8 +14857,8 @@ private:
         const RingMonomialSignature& contractedSignature,
         const std::vector<int>& pairsRemoved,
         const std::vector<FieldReciprocalPair>& pairs,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         ExpressionPointer carrierType = context.carrierType;
         LevelPointer universeLevel = context.carrierUniverseLevel;
         // No pair removals: nothing to do.
@@ -14975,8 +15009,8 @@ private:
         const RingPolynomial& contractedPoly,
         const std::vector<FieldMonomialContraction>& contractionRecords,
         const std::vector<FieldReciprocalPair>& pairs,
-        const RingV2Context& context,
-        const RingV2AxiomNames& axiomNames) {
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
         ExpressionPointer carrierType = context.carrierType;
         LevelPointer universeLevel = context.carrierUniverseLevel;
         // No-collision assumption: contractedPoly has the same number
@@ -15042,7 +15076,7 @@ private:
         //   left_assoc(contractedMonomialKernels_in_canonical_order).
         // These may differ in summand order.
         //
-        // To bridge: apply ring v1 AC on the additive operator to sort
+        // To bridge: apply the single-operator AC sorter on the additive operator to sort
         // the summands.
         //
         // Step 1: per-position rewrites → contracted-monomials-in-original-order.
@@ -15141,7 +15175,7 @@ private:
         if (structurallyEqual(afterPerPos, canonicalContracted)) {
             return chainProof;
         }
-        // Need to reorder via ring v1 AC on add.
+        // Need to reorder via the single-operator AC sorter on add.
         std::vector<ExpressionPointer> contractedMonomialKernelsCanonical;
         for (const auto& entry : contractedPoly) {
             contractedMonomialKernelsCanonical.push_back(
@@ -15227,8 +15261,8 @@ private:
         EqualityComponents goal =
             extractEqualityComponents(expectedTypeOpened, "field", line);
         std::string carrierName = headConstantName(goal.carrierType);
-        // Set up the ring v2 context.
-        RingV2Context context;
+        // Set up the ring normaliser context.
+        RingNormalisationContext context;
         context.carrierName = carrierName;
         context.carrierType = goal.carrierType;
         context.carrierUniverseLevel = goal.carrierUniverseLevel;
@@ -15238,7 +15272,7 @@ private:
         context.subtractName  = carrierName + ".subtract";
         context.zeroName      = carrierName + ".zero";
         context.oneName       = carrierName + ".one";
-        populateRingV2EmbeddingChain(context);
+        populateRingEmbeddingChain(context);
         if (environment_.lookup(context.addName) == nullptr
             || environment_.lookup(context.multiplyName) == nullptr) {
             throwElaborate(
@@ -15415,7 +15449,7 @@ private:
                 throwElaborate(
                     "`field`: the canonical form has a monomial with "
                     "coefficient " + std::to_string(entry.second)
-                    + " — the underlying ring v2 only handles "
+                    + " — the underlying ring normaliser only handles "
                     "coefficients in {-1, +1}");
             }
         }
@@ -15424,7 +15458,7 @@ private:
                 throwElaborate(
                     "`field`: the LHS polynomial has a monomial with "
                     "coefficient " + std::to_string(entry.second)
-                    + " — the underlying ring v2 only handles "
+                    + " — the underlying ring normaliser only handles "
                     "coefficients in {-1, +1}");
             }
         }
@@ -15433,13 +15467,13 @@ private:
                 throwElaborate(
                     "`field`: the RHS polynomial has a monomial with "
                     "coefficient " + std::to_string(entry.second)
-                    + " — the underlying ring v2 only handles "
+                    + " — the underlying ring normaliser only handles "
                     "coefficients in {-1, +1}");
             }
         }
         // Resolve axiom names.
-        RingV2AxiomNames axiomNames =
-            resolveRingV2AxiomNames(carrierName);
+        RingLawNames axiomNames =
+            resolveRingLawNames(carrierName);
         demandAxiomName(axiomNames.addAssociative,
                           "add_associative", carrierName);
         demandAxiomName(axiomNames.addCommutative,
