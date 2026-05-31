@@ -12824,6 +12824,246 @@ private:
         return chainProof;
     }
 
+    // Prove `leftAssoc(combinedKernels) = canonical(mergedPoly)` for a
+    // flat list of signed monomials, SORTING into canonical order and
+    // CANCELLING opposite-sign like-term pairs (and keeping same-sign
+    // duplicates, which match a coefficient>1 canonical entry). Shared
+    // by the additive merge and the multiplicative merge's final phase
+    // (so a product expansion `(a+b)(a-b)` whose cross terms cancel is
+    // handled the same way a sum's like terms are). `combinedMonomials`
+    // and `combinedKernels` are parallel; `mergedCanonical` is
+    // `canonical(mergedPoly)`.
+    ExpressionPointer proveSignedMonomialSumEqualsCanonical(
+        const std::vector<SignedMonomial>& combinedMonomials,
+        const std::vector<ExpressionPointer>& combinedKernels,
+        const RingPolynomial& mergedPoly,
+        ExpressionPointer mergedCanonical,
+        const RingNormalisationContext& context,
+        const RingLawNames& axiomNames) {
+        ExpressionPointer carrierType = context.carrierType;
+        LevelPointer universeLevel = context.carrierUniverseLevel;
+        ExpressionPointer leftAssocCombined = assembleLeftAssociatedSum(
+            context.addName, combinedKernels);
+        std::vector<SignedMonomial> sortedSignedMonomials;
+        // Group by signature.
+        std::map<RingMonomialSignature, std::vector<int>> bySig;
+        for (const auto& m : combinedMonomials) {
+            bySig[m.signature].push_back(m.sign);
+        }
+        // Survivors first, in canonical signature order. Cancel pairs
+        // collected to the side.
+        //
+        // Each group's `signs` vector consists of ±1 entries (one per
+        // unit monomial). Count positives vs negatives: min(p, n)
+        // pairs cancel, leaving |p - n| copies of sign(p - n) as
+        // survivors. The merged polynomial's coefficient for this
+        // signature is exactly (p - n), so the survivor count agrees
+        // with mergedPoly[sig].
+        std::vector<std::pair<RingMonomialSignature, int>> cancelPairs;
+        for (const auto& [sig, signs] : bySig) {
+            int positives = 0;
+            int negatives = 0;
+            for (int s : signs) {
+                if (s > 0) ++positives;
+                else if (s < 0) ++negatives;
+            }
+            int net = positives - negatives;
+            int cancellations = std::min(positives, negatives);
+            int survivorSign = (net > 0) ? +1 : -1;
+            int survivorCount = (net > 0) ? net : -net;
+            for (int i = 0; i < survivorCount; ++i) {
+                sortedSignedMonomials.push_back({sig, survivorSign});
+            }
+            for (int i = 0; i < cancellations; ++i) {
+                cancelPairs.push_back({sig, +1});
+            }
+        }
+        // Verify: surviving monomials, in std::map signature order,
+        // EXACTLY match canonicalMergedPoly's order.
+        std::vector<SignedMonomial> mergedMonomials =
+            polynomialToSignedMonomials(mergedPoly);
+        if (sortedSignedMonomials.size() != mergedMonomials.size()) {
+            throwElaborate(
+                "`ring`: proveAddMerge: survivor count mismatched "
+                "merged polynomial size (internal error)");
+        }
+        for (size_t i = 0; i < mergedMonomials.size(); ++i) {
+            if (sortedSignedMonomials[i].signature
+                    != mergedMonomials[i].signature
+                || sortedSignedMonomials[i].sign
+                    != mergedMonomials[i].sign) {
+                throwElaborate(
+                    "`ring`: proveAddMerge: survivors don't match "
+                    "merged polynomial entry-by-entry (internal error)");
+            }
+        }
+        // Append cancellation pairs.
+        for (const auto& [sig, _] : cancelPairs) {
+            sortedSignedMonomials.push_back({sig, +1});
+            sortedSignedMonomials.push_back({sig, -1});
+        }
+        // Convert sortedSignedMonomials to kernels and sort the
+        // *combinedKernels* into that order via insertion-sort proof.
+        std::vector<ExpressionPointer> sortedKernels;
+        sortedKernels.reserve(sortedSignedMonomials.size());
+        for (const auto& m : sortedSignedMonomials) {
+            sortedKernels.push_back(buildSignedMonomialKernel(
+                m.signature, m.sign, context));
+        }
+        // The sortSumLeftAssocProof expects a vector that's a
+        // permutation of combinedKernels (treated as the "factor
+        // multiset"). proveProductEqualsSorted does insertion-sort
+        // using compareExpressionStructure for direction. But we
+        // want a SPECIFIC target permutation, not the
+        // structurally-sorted one. proveProductEqualsSorted accepts
+        // arbitrary sorted targets — let me check.
+        //
+        // Looking at proveProductEqualsSorted: it walks i = 0..n-1,
+        // for each i finds the first j with current[j] = sorted[i],
+        // and swaps it down to position i via adjacent swaps. So
+        // ANY permutation of the original factor multiset works as
+        // the "sorted" target.
+        ExpressionPointer sortProof = sortSumLeftAssocProof(
+            combinedKernels, sortedKernels, context, axiomNames);
+        ExpressionPointer leftAssocSorted = assembleLeftAssociatedProduct(
+            context.addName, sortedKernels);
+        // Chain so far: leftAssocCombined = leftAssocCombined (via
+        // reassocProof) = leftAssocSorted (via sortProof).
+        // (helper) chainProof starts at the post-sort form; the caller
+        // owns the base-to-leftAssocCombined step.
+        ExpressionPointer chainSoFar = sortProof;
+        if (cancelPairs.empty()) {
+            // Surviving monomials only: leftAssocSorted == mergedCanonical.
+            // Check that and return chainSoFar.
+            if (!structurallyEqual(leftAssocSorted, mergedCanonical)) {
+                throwElaborate(
+                    "`ring`: proveAddMerge expected leftAssocSorted "
+                    "to match canonical(mergedPoly) (no cancellations) "
+                    "but they differ (internal error)");
+            }
+            return chainSoFar;
+        }
+        // Cancellations needed. Walk sortedKernels from right to left,
+        // collapsing each (M, -M) tail-pair via:
+        //   1. associativity: (((prefix + M) + -M) + tail) — no, after
+        //      sort we already placed pairs at the very tail. The
+        //      current form is `((prefix) + M_p) + (-M_p)` (for the
+        //      rightmost pair). We use:
+        //      add_associative(prefix, M, -M) :
+        //        prefix + M + -M = prefix + (M + -M)
+        //      add_negate_right(M) : M + -M = 0
+        //      congruence with λz. prefix + z to get
+        //        prefix + (M + -M) = prefix + 0
+        //      add_zero_right(prefix) (i.e. add_zero) : prefix + 0 = prefix
+        //   2. Then iterate: drop the next pair from the tail.
+        demandAxiomName(axiomNames.addNegateRight, "add_negate_right",
+                          context.carrierName);
+        demandAxiomName(axiomNames.addZeroRight, "add_zero/add_identity_right",
+                          context.carrierName);
+        // current: ExpressionPointer for the current form. Starts as
+        // leftAssocSorted. Each cancellation step removes the last two
+        // summands (the (M, -M) pair).
+        ExpressionPointer currentForm = leftAssocSorted;
+        ExpressionPointer chainProof = chainSoFar;
+        std::vector<ExpressionPointer> remainingKernels = sortedKernels;
+        for (size_t pairIndex = 0; pairIndex < cancelPairs.size();
+             ++pairIndex) {
+            // Pop the last two from remainingKernels: they are (M, -M).
+            if (remainingKernels.size() < 2) {
+                throwElaborate(
+                    "`ring`: cancellation underrun (internal error)");
+            }
+            ExpressionPointer negM = remainingKernels.back();
+            remainingKernels.pop_back();
+            ExpressionPointer M = remainingKernels.back();
+            remainingKernels.pop_back();
+            // Total-cancellation tail: the final pair has no prefix
+            // before it. currentForm is just `M + (-M)`; reduce
+            // directly to `0` via add_negate_right(M), no
+            // associativity / add_zero needed.
+            if (remainingKernels.empty()) {
+                ExpressionPointer addNegProof = ringConst(axiomNames.addNegateRight);
+                addNegProof = makeApplication(addNegProof, M);
+                ExpressionPointer zeroConst = ringConst(context.zeroName);
+                chainProof = buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    leftAssocCombined, currentForm, zeroConst,
+                    chainProof, addNegProof);
+                currentForm = zeroConst;
+                continue;
+            }
+            ExpressionPointer prefix;
+            bool prefixSingle = (remainingKernels.size() == 1);
+            if (prefixSingle) {
+                prefix = remainingKernels[0];
+            } else {
+                prefix = assembleLeftAssociatedProduct(
+                    context.addName, remainingKernels);
+            }
+            // currentForm has shape:
+            //   ((prefix) + M) + (-M)
+            // Step A: associativity. (prefix + M) + (-M) = prefix + (M + (-M)).
+            ExpressionPointer assocProof = ringConst(axiomNames.addAssociative);
+            assocProof = makeApplication(assocProof, prefix);
+            assocProof = makeApplication(assocProof, M);
+            assocProof = makeApplication(assocProof, negM);
+            ExpressionPointer formA = buildRingOp(
+                context.addName, prefix,
+                buildRingOp(context.addName, M, negM));
+            // Step B: congruence with λz. prefix + z, where the inner
+            // step is `add_negate_right(M) : M + (-M) = 0`.
+            ExpressionPointer addNegProof = ringConst(axiomNames.addNegateRight);
+            addNegProof = makeApplication(addNegProof, M);
+            ExpressionPointer prefixLifted =
+                liftBoundVariables(prefix, 1, 0);
+            ExpressionPointer lambdaBodyB = buildRingOp(
+                context.addName, prefixLifted, makeBoundVariable(0));
+            ExpressionPointer lambdaB = makeLambda(
+                "_ring_cancel_z", carrierType, lambdaBodyB);
+            ExpressionPointer zeroConst = ringConst(context.zeroName);
+            ExpressionPointer congrB =
+                buildEqualityCongruenceSameCarrier(
+                    universeLevel, carrierType, lambdaB,
+                    buildRingOp(context.addName, M, negM),
+                    zeroConst,
+                    addNegProof);
+            ExpressionPointer formB = buildRingOp(
+                context.addName, prefix, zeroConst);
+            // Step C: add_zero_right(prefix) : prefix + 0 = prefix.
+            ExpressionPointer addZeroProof = ringConst(axiomNames.addZeroRight);
+            addZeroProof = makeApplication(addZeroProof, prefix);
+            // Compose: currentForm → formA via assocProof,
+            //          formA → formB via congrB,
+            //          formB → prefix via addZeroProof.
+            ExpressionPointer stepAB = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                currentForm, formA, formB,
+                assocProof, congrB);
+            ExpressionPointer stepABC = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                currentForm, formB, prefix,
+                stepAB, addZeroProof);
+            // Now chain with chainProof.
+            chainProof = buildEqualityTransitivity(
+                universeLevel, carrierType,
+                leftAssocCombined, currentForm, prefix,
+                chainProof, stepABC);
+            currentForm = prefix;
+        }
+        // After all cancellations, currentForm should be the merged
+        // canonical form. For partial cancellation: sortedKernels of
+        // just the survivors, left-associated. For total cancellation
+        // (all summands cancel): the zero constant, set by the
+        // final-pair branch above. Either way, structural equality
+        // with mergedCanonical should hold.
+        if (!structurallyEqual(currentForm, mergedCanonical)) {
+            throwElaborate(
+                "`ring`: proveAddMerge ended with shape mismatched "
+                "with canonical(mergedPoly) (internal error)");
+        }
+        return chainProof;
+    }
+
     // ----------------------------------------------------------------
     // proveMultiplyMerge: prove
     //   canonical(leftPoly) * canonical(rightPoly) = canonical(leftPoly * rightPoly)
@@ -12890,11 +13130,18 @@ private:
     void appendIsRingInstanceArgs(
         ExpressionPointer& call,
         const RingNormalisationContext& context) {
+        // Every operation/constant carries the structure prefix (`c` for
+        // a bundled commutative ring). These are RAW kernel terms — the
+        // elaborator's implicit-argument insertion does NOT run here — so
+        // even the binary ops must be applied to the prefix explicitly
+        // (`CommutativeRing.add(c)`), not left bare. For a concrete
+        // carrier the prefix is empty, so `ringConst` is just the bare
+        // constant, exactly as before.
         call = makeApplication(call, context.carrierType);
-        call = makeApplication(call, makeConstant(context.addName));
+        call = makeApplication(call, ringConst(context.addName));
         call = makeApplication(call, ringConst(context.zeroName));
-        call = makeApplication(call, makeConstant(context.negateName));
-        call = makeApplication(call, makeConstant(context.multiplyName));
+        call = makeApplication(call, ringConst(context.negateName));
+        call = makeApplication(call, ringConst(context.multiplyName));
         call = makeApplication(call, ringConst(context.oneName));
         call = makeApplication(call, ringConst(context.isRingName));
     }
@@ -12993,18 +13240,11 @@ private:
             return buildRingAnnihilatorProof(
                 /*onLeft=*/false, leftCanonical, context, axiomNames);
         }
-        // For now we handle ONLY the common case: no like-term
-        // collisions in mergedPoly (i.e. mergedPoly's size equals
-        // leftPoly.size() * rightPoly.size()). With coefficient ±1
-        // throughout, like-term collisions would necessarily mean
-        // signature collisions across pairs, which trigger the
-        // cancellation path. Test cases (1)-(4) all satisfy the
-        // no-collision condition.
-        if (mergedPoly.size() != leftPoly.size() * rightPoly.size()) {
-            throwElaborate(
-                "`ring`: proveMultiplyMerge with cross-pair "
-                "cancellations not yet supported");
-        }
+        // Like-term collisions across the p*q products (cross-pair
+        // cancellation, e.g. (a+b)(a−b): the +ab and −ba collapse) are
+        // handled in the final phase below by the shared signed-monomial-
+        // sum merge, exactly as the additive path cancels like terms — so
+        // no special-case bail here.
         // Build the "naively expanded" sum:
         //   sum_{i,j} (L_i * R_j)
         // in the order (i, j) = (0, 0..q-1), (1, 0..q-1), ..., (p-1, ...).
@@ -13558,36 +13798,39 @@ private:
                 currentForm = newCurrent;
             }
         }
-        // currentForm is now a flat sum of canonical monomials in
-        // row-major (L_i*R_j) order. Need to sort to canonical
-        // std::map order.
-        std::vector<ExpressionPointer> flatSummands;
-        // Re-derive flatSummands from currentForm by flattening.
-        flattenRingProduct(currentForm, context.addName, flatSummands);
-        // Target order = canonical monomials in mergedPoly order.
-        std::vector<SignedMonomial> mergedMonomials =
-            polynomialToSignedMonomials(mergedPoly);
-        std::vector<ExpressionPointer> sortedKernels;
-        for (const auto& m : mergedMonomials) {
-            sortedKernels.push_back(buildSignedMonomialKernel(
-                m.signature, m.sign, context));
+        // currentForm is now a flat sum of the p*q canonical monomials
+        // L_i*R_j in row-major order. Merge them into the canonical
+        // merged form — sorting AND cancelling opposite-sign like terms
+        // (cross-pair cancellation, and combining same-sign duplicates) —
+        // via the shared signed-monomial-sum merge the additive path
+        // uses.
+        std::vector<SignedMonomial> productMonomials;
+        std::vector<ExpressionPointer> productKernels;
+        for (size_t i = 0; i < leftSigned.size(); ++i) {
+            for (size_t j = 0; j < rightSigned.size(); ++j) {
+                RingMonomialSignature sig;
+                std::merge(
+                    leftSigned[i].signature.begin(),
+                    leftSigned[i].signature.end(),
+                    rightSigned[j].signature.begin(),
+                    rightSigned[j].signature.end(),
+                    std::back_inserter(sig));
+                int sign = leftSigned[i].sign * rightSigned[j].sign;
+                productMonomials.push_back({sig, sign});
+                productKernels.push_back(
+                    buildSignedMonomialKernel(sig, sign, context));
+            }
         }
-        // Apply sum-AC sort (sortSumLeftAssocProof handles ANY target permutation).
-        ExpressionPointer sortProof = sortSumLeftAssocProof(
-            flatSummands, sortedKernels, context, axiomNames);
-        ExpressionPointer sortedKernel = assembleLeftAssociatedProduct(
-            context.addName, sortedKernels);
+        // mergeProof : leftAssoc(productKernels) = mergedCanonical, and
+        // currentForm is structurally that left-associated sum.
+        ExpressionPointer mergeProof =
+            proveSignedMonomialSumEqualsCanonical(
+                productMonomials, productKernels, mergedPoly,
+                mergedCanonical, context, axiomNames);
         currentProof = buildEqualityTransitivity(
             universeLevel, carrierType,
-            leftTimesRight, currentForm, sortedKernel,
-            currentProof, sortProof);
-        currentForm = sortedKernel;
-        // Final check.
-        if (!structurallyEqual(currentForm, mergedCanonical)) {
-            throwElaborate(
-                "`ring`: proveMultiplyMerge final form does not "
-                "match canonical(mergedPoly) (internal error)");
-        }
+            leftTimesRight, currentForm, mergedCanonical,
+            currentProof, mergeProof);
         return currentProof;
     }
 
