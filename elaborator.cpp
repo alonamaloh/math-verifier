@@ -5138,9 +5138,18 @@ private:
         // remaining-arguments type, with motive already substituted.
         ExpressionPointer lemmaAppliedToMotive =
             makeApplication(lemmaKernel, motive);
-        ExpressionPointer remainingType = weakHeadNormalForm(
-            environment_,
-            inferTypeInLocalContext(localBinders, lemmaAppliedToMotive));
+        // inferTypeInLocalContext returns the type in OPENED form (outer
+        // binders are Internal FreeVariables). Close it back over
+        // localBinders before extracting sub-terms: those sub-terms
+        // (`ihTypeAfterSubject`) get embedded as lambda domains in the
+        // returned closed-form term, so a free `r` left over from the
+        // opened motive would dangle as "unbound internal variable r".
+        // (Only bites when the motive references an outer binder — hence
+        // the existing motive-free tests never exercised this path.)
+        ExpressionPointer remainingType = closeOverLocalBinders(
+            inferTypeInLocalContext(localBinders, lemmaAppliedToMotive),
+            localBinders, localBinders.size());
+        remainingType = weakHeadNormalForm(environment_, remainingType);
         // remainingType should be:
         //   (step : (subject : T) → IH(subject) → motive(subject))
         //   → (target : T) → motive(target)

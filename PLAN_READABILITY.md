@@ -198,6 +198,40 @@ which otherwise *guesses* lemma names.
   `ElaborateError`). C2's cases-side is subsumed by this; C3 (β/WHNF of
   the expected type before an anonymous tuple reads its motive) was
   already present (`elaborateAnonymousTuple` WHNFs).
+- **Track D re-audit (2026-05-31).** Re-tested the F4/Track-D failure
+  modes against the current elaborator before writing the error
+  messages, since A/B/C may have dissolved them:
+  - *Partial-application-as-value* (`CongruentModulo.symmetric(s, m)` in
+    a tuple slot): **RESOLVED** — now verifies (the defeq check
+    eta-expands the partial application). The D bullet is moot; no error
+    message needed.
+  - *Inline `Equality.symmetry(…)` as a calc `by`* (B4): **RESOLVED** —
+    both the bare `by Equality.symmetry(eq)` (diff-inference wraps the
+    congruence at the symmetric orientation) and
+    `by congruenceOf(f, Equality.symmetry(eq))` verify. B4 and its D
+    error-message bullet are moot.
+  - *`by_strong_induction` mis-scopes a large motive* (D3 / F4 bullet 2):
+    **WAS STILL LIVE → FIXED this session.** Root cause was NOT a motive
+    over-abstraction but a representation bug in
+    `elaborateByInductionUsingInner`: `inferTypeInLocalContext` returns
+    the post-motive remaining type in OPENED form (outer binders as
+    Internal free variables), and a sub-term of it (`ihTypeAfterSubject`)
+    was embedded as the IH lambda's domain in the returned *closed*-form
+    term — leaving any outer binder the motive mentions (e.g. `r`)
+    dangling as "unbound internal variable r". Fixed by
+    `closeOverLocalBinders` on the inferred type before extraction. Only
+    bit when the motive references an outer binder, so the existing
+    motive-free `by_strong_induction` tests never caught it. Regression
+    tests (6)/(7) added to `Test/by_strong_induction_test.math`. The D
+    error-message bullet for this is now moot — the construct works
+    directly. **Opportunity:** `Polynomial/bezout.math` can drop its
+    explicit `Natural.strong_induction(motive, step, n)` back to
+    `by_strong_induction on bound …` (the original cure is no longer
+    needed); deferred as a separate proving-ground change.
+  - *Anonymous-tuple / `obtain` needs expected type* (remaining F4
+    items): not individually re-verified; C3 already records the
+    `elaborateAnonymousTuple` WHNF path as present. Low value; left as
+    error-message polish if it resurfaces.
 - **Findings that revise this plan:**
   1. **A2 does NOT retroactively simplify `ring_difference.math` /
      `RingModulo` respect-lemmas.** Those are stated over a *plain*

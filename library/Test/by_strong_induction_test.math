@@ -42,3 +42,31 @@ theorem strong_induction_auto_generalize (n : Natural) (equation : n = 0)
   by_strong_induction on n with subject, inductionHypothesis {
     equation
   }
+
+-- (6) Outer-parameter motive: the goal `r + n = n + r` mentions an
+-- outer binder `r`, so the built motive `λsubject. r + subject = …`
+-- references `r`. Regression for the "unbound internal variable r"
+-- bug: the lemma-based path inferred the remaining type in OPENED form
+-- (outer binders as free variables) and then embedded a sub-term of it
+-- as the IH lambda's domain in the returned closed-form term, leaving
+-- `r` dangling. Fixed by closing the inferred type back over the local
+-- binders before extraction. (The motive-free cases above never
+-- exercised this because their motives reference no outer binder.)
+theorem strong_induction_outer_parameter_motive
+        (r : Natural) (n : Natural)
+        : r + n = n + r :=
+  by_strong_induction on n with subject, inductionHypothesis {
+    Natural.add_commutative(r, subject)
+  }
+
+-- (7) Same, with the goal additionally Pi-quantified under the subject
+-- AND mentioning the outer parameter — the shape that bit
+-- `Polynomial.gcd_bezout` (which had to drop to an explicit
+-- `Natural.strong_induction` with a hand-spelled motive).
+theorem strong_induction_outer_parameter_pi_motive
+        (r : Natural) (n : Natural)
+        : (y : Natural) → y ≤ n → r + y = y + r :=
+  by_strong_induction on n with subject, inductionHypothesis {
+    function (y : Natural) (yBound : y ≤ subject) =>
+      Natural.add_commutative(r, y)
+  }
