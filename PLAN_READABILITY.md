@@ -170,6 +170,15 @@ which otherwise *guesses* lemma names.
   so the index is a free var; close before return). The `ring` law
   dependency is now documented at `RingLawNames`, and the dev-history
   `v1`/`v2` names are retired.
+- **B1 — DONE.** `rewrite` locates its endpoint up to definitional
+  equality via a bounded `isDefinitionallyEqual`-at-same-arity fallback
+  (`abstractDefeqOccurrence`) after the structural combos. Dissolves the
+  bridging-`claim` tax (F1); two real bridges deleted as the regression
+  proof (`embedding_injective` `pEqualsPolyMultiply`, `bezout`
+  `xAsRingAdd`). NB finding #3 below is RESOLVED: the bounded-defeq walker
+  beat a hand-written structure-projection normaliser (full WHNF
+  over-reduces past the projected field; the kernel's defeq gives a sound
+  yes/no, so no custom reducer was needed).
 - **B2 — DONE.** `change T;` (active `note goal`) — replace the goal by a
   defeq spelling.
 - **Findings that revise this plan:**
