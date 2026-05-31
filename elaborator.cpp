@@ -16465,15 +16465,23 @@ private:
         Frame frame(*this,
             "note at line " + std::to_string(line),
             localBinders, expectedType, line, /*column=*/0);
+        // `change T;` replaces the goal by `T` for the body (after the
+        // defeq check below); `note goal : T;` leaves it unchanged. This
+        // holds the replacement goal in the `change` case.
+        ExpressionPointer changedGoal;
         if (note.goalType) {
             if (!expectedType) {
                 throwElaborate(
-                    "`note goal : T` needs an expected type from "
-                    "context (none available at line "
+                    (note.changesGoal
+                         ? "`change T` needs an expected type from "
+                           "context (none available at line "
+                         : "`note goal : T` needs an expected type from "
+                           "context (none available at line ")
                     + std::to_string(line) + ")");
             }
             ExpressionPointer declaredKernel = elaborateExpression(
                 *note.goalType, localBinders);
+            if (note.changesGoal) changedGoal = declaredKernel;
             Context openedContext =
                 buildContextFromLocalBinders(localBinders);
             ExpressionPointer declaredOpen = openOverLocalBinders(
@@ -16484,9 +16492,14 @@ private:
                     environment_, openedContext,
                     declaredOpen, expectedOpen)) {
                 throwElaborate(
-                    std::string("`note goal :` mismatch at line ")
-                    + std::to_string(line) + ":\n"
-                    + "  noted form:    "
+                    std::string(note.changesGoal
+                        ? "`change` mismatch at line "
+                        : "`note goal :` mismatch at line ")
+                    + std::to_string(line)
+                    + " (the given type is not definitionally equal to "
+                      "the goal):\n"
+                    + (note.changesGoal ? "  change to:     "
+                                        : "  noted form:    ")
                     + prettyPrintInLocalScope(declaredKernel, localBinders)
                     + "\n  actual goal:   "
                     + prettyPrintInLocalScope(expectedType, localBinders));
@@ -16517,7 +16530,9 @@ private:
                 "internal: SurfaceNote with neither goalType nor "
                 "proposition set");
         }
-        return elaborateExpression(*note.body, localBinders, expectedType);
+        return elaborateExpression(
+            *note.body, localBinders,
+            note.changesGoal ? changedGoal : expectedType);
     }
 
     // `decide P { | yes m => arm_yes | no n => arm_no }` — classical

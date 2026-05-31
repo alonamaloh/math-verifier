@@ -219,9 +219,14 @@ struct SurfaceSorry { };
 // is the remainder of the block — elaborated at the unchanged
 // expected type once the check passes.
 struct SurfaceNote {
-    SurfaceExpressionPointer goalType;       // `note goal : T;`
+    SurfaceExpressionPointer goalType;       // `note goal : T;` / `change T;`
     SurfaceExpressionPointer proposition;    // `note P;`
     SurfaceExpressionPointer body;
+    // `change T;` sets this: after checking T is definitionally equal to
+    // the current goal, the body is elaborated AT T (the goal is actually
+    // replaced), whereas `note goal : T;` only checks and continues at the
+    // unchanged goal. Requires `goalType` set.
+    bool changesGoal = false;
 };
 
 // `decide P { | yes m => arm_yes  | no n => arm_no }` —
@@ -565,10 +570,11 @@ inline SurfaceExpressionPointer makeSurfaceNote(
     SurfaceExpressionPointer goalType,
     SurfaceExpressionPointer proposition,
     SurfaceExpressionPointer body,
-    int line, int column) {
+    int line, int column,
+    bool changesGoal = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceNote{std::move(goalType), std::move(proposition),
-                     std::move(body)},
+                     std::move(body), changesGoal},
         line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceDecide(

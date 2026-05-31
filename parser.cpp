@@ -697,7 +697,7 @@ private:
         // `SurfaceChoose` (the elaborator handles the scope lookup).
         struct BlockWrapper {
             enum Kind { TypedLet, PatternLet, Suppose, Choose, Set,
-                        NoteGoal, NoteAssertion };
+                        NoteGoal, NoteAssertion, ChangeGoal };
             Kind kind = TypedLet;
             SurfacePatternPointer pattern;     // PatternLet, Suppose
                                                // (when set on Suppose,
@@ -729,6 +729,7 @@ private:
                || peek().kind == TokenKind::KeywordSet
                || peek().kind == TokenKind::KeywordTake
                || peek().kind == TokenKind::KeywordNote
+               || peek().kind == TokenKind::KeywordChange
                || peek().kind == TokenKind::KeywordCalc) {
             // `calc` at statement position has two shapes:
             //   - `calc … as NAME;`  (named binding for downstream use)
@@ -908,6 +909,8 @@ private:
                 statementToken.kind == TokenKind::KeywordTake;
             bool isNote =
                 statementToken.kind == TokenKind::KeywordNote;
+            bool isChange =
+                statementToken.kind == TokenKind::KeywordChange;
             BlockWrapper wrapper;
             wrapper.line = statementToken.line;
             wrapper.column = statementToken.column;
@@ -968,6 +971,12 @@ private:
                     wrapper.kind = BlockWrapper::NoteAssertion;
                     wrapper.value = parseExpression();
                 }
+            } else if (isChange) {
+                // `change <type>;` — replace the current goal by the
+                // definitionally-equal <type>, then continue the block AT
+                // that type. The active counterpart of `note goal : T`.
+                wrapper.kind = BlockWrapper::ChangeGoal;
+                wrapper.type = parseExpression();
             } else if (isSuppose) {
                 // `suppose <type> as <name>;` introduces a hypothesis.
                 // With a complex `as <pattern>` (constructor or tuple
@@ -1264,6 +1273,14 @@ private:
                         std::move(iterator->value),
                         std::move(result),
                         iterator->line, iterator->column);
+                    break;
+                case BlockWrapper::ChangeGoal:
+                    result = makeSurfaceNote(
+                        std::move(iterator->type),
+                        /*proposition=*/nullptr,
+                        std::move(result),
+                        iterator->line, iterator->column,
+                        /*changesGoal=*/true);
                     break;
                 case BlockWrapper::Choose: {
                     result = makeSurfaceChoose(

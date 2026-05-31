@@ -62,6 +62,7 @@ enum class TokenKind {
     KeywordDecide,          // `decide P { yes m => …; no n => … }` — classical case-split with auto-transport
     KeywordTake,            // `take h : T;` — introduce a Pi-binder (math-style "take an arbitrary h : T")
     KeywordNote,            // `note goal : T;` / `note P;` — elaboration-time assertion / goal restatement
+    KeywordChange,          // `change T;` — replace the goal by a definitionally-equal T
 
     // Punctuation
     LeftParen, RightParen,

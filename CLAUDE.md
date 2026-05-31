@@ -990,6 +990,13 @@ returns its final non-`;`-terminated expression.
   that …" / "observe that …" — a parenthetical aside in math prose.
   Useful when the reader benefits from seeing the intermediate
   fact even though the surrounding proof would close without it.
+- `change <type>;` — the *active* counterpart of `note goal`: assert
+  `<type>` is definitionally equal to the current goal AND replace the
+  goal by `<type>` for the rest of the block (the body is elaborated at
+  `<type>`). The one-line escape hatch for a residual defeq-spelling
+  mismatch — write the spelling your next step needs, instead of the
+  ad-hoc `claim X : <type> by <oldGoalProof>` bridge. (`note goal : T`
+  only *checks*; `change T` checks and *switches*.)
 - `unfold <Foo> in <body>` — temporarily mark `Foo` transparent
   inside `<body>` (for opaque definitions; see the opaque section).
 
