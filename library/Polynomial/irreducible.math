@@ -1,0 +1,149 @@
+-- Polynomial/irreducible.math
+--
+-- Units and irreducibility for polynomials over a field, and the
+-- consequence that drives the field structure of F[x]/(f):
+--   f irreducible and f ∤ g  ⟹  ∃ a b. a·f + b·g = 1.
+--
+-- Proof: the Euclidean gcd m of f and g satisfies m = a·f + b·g, m | f,
+-- m | g. Since f is irreducible and m | f (so f = m·q), either m or q
+-- is a unit. If q is a unit then m = f·q⁻¹ and m | g gives f | g — a
+-- contradiction. So m is a unit, and scaling the Bézout identity by m⁻¹
+-- yields a·f + b·g = 1.
+
+module Polynomial.irreducible
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Natural.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_divisibility
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.commutative
+import Polynomial.instances
+import Polynomial.degree
+import Polynomial.division
+import Polynomial.bezout
+
+-- p is a unit when it divides 1 (i.e. has a multiplicative inverse).
+definition Polynomial.IsUnit (r : Ring)
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) : Proposition :=
+  Ring.divides(Polynomial.ring(r), p, Polynomial.one(r))
+
+-- f is irreducible when it is not a unit and its only factorizations are
+-- trivial (one factor is a unit).
+definition Polynomial.IsIrreducible (r : Ring)
+        (f : Polynomial(Ring.carrier(r), Ring.zero(r))) : Proposition :=
+  ¬(Polynomial.IsUnit(r, f))
+  ∧ ((a b : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        → f = Polynomial.multiply(r, a, b)
+        → Polynomial.IsUnit(r, a) ∨ Polynomial.IsUnit(r, b))
+
+-- a·b·c = a·c·b (reorder the last two factors).
+theorem Polynomial.multiply_right_swap (r : Ring)
+        (commutativity
+            : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+        (a b c : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.multiply(r, Polynomial.multiply(r, a, b), c)
+          = Polynomial.multiply(r, Polynomial.multiply(r, a, c), b) :=
+  calc Polynomial.multiply(r, Polynomial.multiply(r, a, b), c)
+     = Polynomial.multiply(r, a, Polynomial.multiply(r, b, c))
+           by Polynomial.multiply_associative(r, a, b, c)
+     = Polynomial.multiply(r, a, Polynomial.multiply(r, c, b))
+           by Polynomial.multiply_commutative(r, commutativity, b, c)
+     = Polynomial.multiply(r, Polynomial.multiply(r, a, c), b)
+           by Equality.symmetry(Polynomial.multiply_associative(r, a, c, b))
+
+-- f irreducible and f ∤ g give a Bézout identity equal to 1.
+theorem Polynomial.bezout_one_of_irreducible (r : Ring)
+        (commutativity
+            : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+        (inverseExistence
+            : (x : Ring.carrier(r)) → ¬(x = Ring.zero(r))
+                → ∃ (inverse : Ring.carrier(r)). Ring.multiply(r, x, inverse) = Ring.one(r))
+        (f : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        (fIrreducible : Polynomial.IsIrreducible(r, f))
+        (g : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        (notDivides : ¬(Ring.divides(Polynomial.ring(r), f, g)))
+        : ∃ (a b : Polynomial(Ring.carrier(r), Ring.zero(r))).
+            Polynomial.add(r, Polynomial.multiply(r, a, f), Polynomial.multiply(r, b, g))
+            = Polynomial.one(r) := {
+  let ⟨fNotUnit, factorClause⟩ := fIrreducible;
+  obtain ⟨bound, gBound⟩ from Polynomial.exists_degree_bound(r, g);
+  obtain ⟨m, coefficientF, coefficientG, combinationEquation, mDividesF, mDividesG⟩
+      from Polynomial.gcd_bezout(r, commutativity, inverseExistence, bound, g, gBound, f);
+  -- combinationEquation : m = coefficientF·f + coefficientG·g; mDividesF/G.
+  obtain ⟨quotientFM, fEqualsMquotient⟩ from mDividesF;
+  -- fEqualsMquotient : f = m·quotientFM.
+  cases factorClause(m, quotientFM, fEqualsMquotient) {
+    | Or.introduceLeft(mIsUnit) => {
+        obtain ⟨mInverse, oneEqualsMmInverse⟩ from mIsUnit;
+        -- oneEqualsMmInverse : 1 = m·mInverse.
+        ⟨Polynomial.multiply(r, coefficientF, mInverse),
+         Polynomial.multiply(r, coefficientG, mInverse),
+         Equality.symmetry(
+             calc Polynomial.one(r)
+                = Polynomial.multiply(r, m, mInverse)
+                      by oneEqualsMmInverse
+                = Polynomial.multiply(r,
+                      Polynomial.add(r, Polynomial.multiply(r, coefficientF, f),
+                          Polynomial.multiply(r, coefficientG, g)),
+                      mInverse)
+                      by combinationEquation
+                = Polynomial.add(r,
+                      Polynomial.multiply(r, Polynomial.multiply(r, coefficientF, f), mInverse),
+                      Polynomial.multiply(r, Polynomial.multiply(r, coefficientG, g), mInverse))
+                      by Polynomial.multiply_distributivity_right(r,
+                             Polynomial.multiply(r, coefficientF, f),
+                             Polynomial.multiply(r, coefficientG, g), mInverse)
+                = Polynomial.add(r,
+                      Polynomial.multiply(r, Polynomial.multiply(r, coefficientF, mInverse), f),
+                      Polynomial.multiply(r, Polynomial.multiply(r, coefficientG, g), mInverse))
+                      by Polynomial.multiply_right_swap(r, commutativity, coefficientF, f, mInverse)
+                = Polynomial.add(r,
+                      Polynomial.multiply(r, Polynomial.multiply(r, coefficientF, mInverse), f),
+                      Polynomial.multiply(r, Polynomial.multiply(r, coefficientG, mInverse), g))
+                      by Polynomial.multiply_right_swap(r, commutativity, coefficientG, g, mInverse))⟩
+      }
+    | Or.introduceRight(quotientIsUnit) => {
+        obtain ⟨quotientInverse, oneEqualsQuotientInverse⟩ from quotientIsUnit;
+        -- oneEqualsQuotientInverse : 1 = quotientFM·quotientInverse.
+        claim mEqualsFquotientInverse
+            : m = Polynomial.multiply(r, f, quotientInverse)
+            by calc m
+                  = Polynomial.multiply(r, m, Polynomial.one(r))
+                        by Equality.symmetry(Polynomial.multiply_one_right(r, m))
+                  = Polynomial.multiply(r, m,
+                        Polynomial.multiply(r, quotientFM, quotientInverse))
+                        by oneEqualsQuotientInverse
+                  = Polynomial.multiply(r, Polynomial.multiply(r, m, quotientFM),
+                        quotientInverse)
+                        by Equality.symmetry(Polynomial.multiply_associative(r, m,
+                               quotientFM, quotientInverse))
+                  = Polynomial.multiply(r, f, quotientInverse)
+                        by congruenceOf(
+                               function (t : Polynomial(Ring.carrier(r), Ring.zero(r))) =>
+                                   Polynomial.multiply(r, t, quotientInverse),
+                               Equality.symmetry(fEqualsMquotient));
+        obtain ⟨cofactorG, gEqualsMcofactor⟩ from mDividesG;
+        -- gEqualsMcofactor : g = m·cofactorG.
+        absurd(notDivides(
+            ⟨Polynomial.multiply(r, quotientInverse, cofactorG),
+             calc g
+                = Polynomial.multiply(r, m, cofactorG)
+                      by gEqualsMcofactor
+                = Polynomial.multiply(r, Polynomial.multiply(r, f, quotientInverse), cofactorG)
+                      by mEqualsFquotientInverse
+                = Polynomial.multiply(r, f,
+                      Polynomial.multiply(r, quotientInverse, cofactorG))
+                      by Polynomial.multiply_associative(r, f, quotientInverse, cofactorG)⟩))
+      }
+  }
+}
