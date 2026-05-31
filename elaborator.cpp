@@ -4995,7 +4995,108 @@ private:
     // the remainder of the lemma's type), then decompose the
     // already-substituted type to extract the subject and ih binder
     // types. Then build the step lambda and finish the application.
+    // Try-then-revert auto-generalize for the lemma-based induction path
+    // (`by_strong_induction`, `by_induction … using`), mirroring the
+    // `cases`/`by_induction` wrapper: on failure with scrutinee-dependent
+    // in-scope hypotheses, retry with them reverted into the goal (and
+    // re-introduced in the step body). Zero-regression — proofs that
+    // elaborate without reverting take the first path.
     ExpressionPointer elaborateByInductionUsing(
+        const SurfaceByInductionUsing& form,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        if (expectedType) {
+            std::vector<std::string> deps =
+                scrutineeDependentBinders(form.scrutinee, localBinders);
+            if (!deps.empty()) {
+                // Try the plain induction. Unlike the `cases` path, the
+                // lemma path builds the final application without
+                // typechecking it, so a stale-hypothesis mismatch only
+                // surfaces at the kernel boundary (a TypeError) — we must
+                // validate the result here to know whether to fall back.
+                try {
+                    ExpressionPointer plain =
+                        elaborateByInductionUsingInner(
+                            form, localBinders, expectedType, line, column);
+                    inferTypeInLocalContext(localBinders, plain);
+                    return plain;
+                } catch (const ElaborateError&) {
+                } catch (const TypeError&) {
+                }
+                return elaborateByInductionUsingReverted(
+                    form, deps, localBinders, expectedType, line, column);
+            }
+        }
+        return elaborateByInductionUsingInner(
+            form, localBinders, expectedType, line, column);
+    }
+
+    // Revert `deps` (scrutinee-dependent in-scope binders, outermost-
+    // first) into the goal, wrap the body in matching lambdas, run the
+    // ordinary lemma-based induction at the reverted goal, then apply the
+    // actual hypotheses — the same generalize/reintroduce telescope
+    // `elaborateCasesWithRefining` uses, for the lemma path.
+    ExpressionPointer elaborateByInductionUsingReverted(
+        const SurfaceByInductionUsing& form,
+        const std::vector<std::string>& deps,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        int total = static_cast<int>(localBinders.size());
+        int depCount = static_cast<int>(deps.size());
+        // Resolve each dep to its outer BoundVariable index and its type
+        // lifted to the outer (depth = total) scope.
+        std::vector<int> depBoundVariableIndices;
+        std::vector<ExpressionPointer> depTypesAtOuterDepth;
+        for (const auto& name : deps) {
+            int positionInArray = -1;
+            for (int i = total - 1; i >= 0; --i) {
+                if (localBinders[i].name == name) { positionInArray = i; break; }
+            }
+            if (positionInArray < 0) {
+                throwElaborate("by_induction auto-generalize: no binder '"
+                    + name + "' in scope");
+            }
+            depBoundVariableIndices.push_back(total - 1 - positionInArray);
+            depTypesAtOuterDepth.push_back(liftBoundVariables(
+                localBinders[positionInArray].type,
+                total - positionInArray, 0));
+        }
+        // Build the reverted goal: Π(d_1)…Π(d_k). Goal, abstracting each
+        // dep (innermost-first) so earlier deps' references resolve to
+        // the new Π binders.
+        ExpressionPointer revertedGoal = expectedType;
+        for (int i = depCount - 1; i >= 0; --i) {
+            revertedGoal = abstractOverBoundVariable(
+                revertedGoal, depBoundVariableIndices[i]);
+            revertedGoal = makePi(deps[i],
+                depTypesAtOuterDepth[i], std::move(revertedGoal));
+        }
+        // Wrap the body in `function (d_1) … (d_k) => body`.
+        SurfaceExpressionPointer wrappedBody = form.body;
+        for (int i = depCount - 1; i >= 0; --i) {
+            SurfaceBinder binder;
+            binder.names = {deps[i]};
+            binder.type = nullptr;
+            binder.isImplicit = false;
+            wrappedBody = makeSurfaceLambda(
+                std::move(binder), wrappedBody, line, column);
+        }
+        SurfaceByInductionUsing wrappedForm{
+            form.scrutinee, form.inductionLemma,
+            form.subjectName, form.ihName, wrappedBody};
+        ExpressionPointer result = elaborateByInductionUsingInner(
+            wrappedForm, localBinders, revertedGoal, line, column);
+        // Apply the actual hypotheses to unwind the Π chain back to Goal.
+        for (int i = 0; i < depCount; ++i) {
+            result = makeApplication(std::move(result),
+                makeBoundVariable(depBoundVariableIndices[i]));
+        }
+        return result;
+    }
+
+    ExpressionPointer elaborateByInductionUsingInner(
         const SurfaceByInductionUsing& form,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
@@ -17077,12 +17178,12 @@ private:
     // in array (outermost-first) order, a valid revert telescope. Empty
     // if the scrutinee isn't a local-binder variable.
     std::vector<std::string> scrutineeDependentBinders(
-        const SurfaceCases& cases,
+        const SurfaceExpressionPointer& scrutinee,
         const std::vector<LocalBinder>& localBinders) {
         ExpressionPointer scrutineeKernel;
         try {
             scrutineeKernel =
-                elaborateExpression(*cases.scrutinee, localBinders);
+                elaborateExpression(*scrutinee, localBinders);
         } catch (const ElaborateError&) {
             return {};
         } catch (const TypeError&) {
@@ -17124,7 +17225,7 @@ private:
             && cases.equalityHypothesisName.empty();
         if (plain && expectedType) {
             std::vector<std::string> autoRefine =
-                scrutineeDependentBinders(cases, localBinders);
+                scrutineeDependentBinders(cases.scrutinee, localBinders);
             if (!autoRefine.empty()) {
                 try {
                     return elaborateCasesExpressionInner(
