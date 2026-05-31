@@ -1,0 +1,293 @@
+-- Polynomial/bezout.math
+--
+-- The Euclidean algorithm for polynomials over a field, producing a
+-- gcd together with its Bézout combination:
+--   ∀ x y. ∃ m a b. m = a·x + b·y ∧ m | x ∧ m | y.
+-- Run as strong induction on a degree bound for the second argument y:
+-- if y = 0 the gcd is x; otherwise divide x by y (its leading
+-- coefficient is invertible because the ring is a field), giving
+-- x = q·y + rem with deg rem < deg y, recurse on (y, rem), and
+-- back-substitute the Bézout coefficients.
+--
+-- The field structure enters only as the inverse-existence hypothesis
+-- (every nonzero element is invertible) plus commutativity.
+
+module Polynomial.bezout
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.subtraction
+import Natural.decide
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_divisibility
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.commutative
+import Polynomial.instances
+import Polynomial.degree
+import Polynomial.division
+import Polynomial.degree_function
+
+-- ----------------------------------------------------------------------
+-- Polynomial-level wrappers for the abstract ring negate-multiply laws.
+
+theorem Polynomial.multiply_negate_left (r : Ring)
+        (a b : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.multiply(r, Polynomial.negate(r, a), b)
+          = Polynomial.negate(r, Polynomial.multiply(r, a, b)) :=
+  Ring.multiply_negate_left(
+      Ring.carrier(Polynomial.ring(r)), Ring.add(Polynomial.ring(r)),
+      Ring.zero(Polynomial.ring(r)), Ring.negate(Polynomial.ring(r)),
+      Ring.multiply(Polynomial.ring(r)), Ring.one(Polynomial.ring(r)),
+      Ring.is_ring(Polynomial.ring(r)), a, b)
+
+theorem Polynomial.multiply_negate_right (r : Ring)
+        (a b : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.multiply(r, a, Polynomial.negate(r, b))
+          = Polynomial.negate(r, Polynomial.multiply(r, a, b)) :=
+  Ring.multiply_negate_right(
+      Ring.carrier(Polynomial.ring(r)), Ring.add(Polynomial.ring(r)),
+      Ring.zero(Polynomial.ring(r)), Ring.negate(Polynomial.ring(r)),
+      Ring.multiply(Polynomial.ring(r)), Ring.one(Polynomial.ring(r)),
+      Ring.is_ring(Polynomial.ring(r)), a, b)
+
+-- add(a, add(b, c)) = add(b, add(a, c)).
+theorem Polynomial.add_swap_first (r : Ring)
+        (a b c : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        : Polynomial.add(r, a, Polynomial.add(r, b, c))
+          = Polynomial.add(r, b, Polynomial.add(r, a, c)) :=
+  calc Polynomial.add(r, a, Polynomial.add(r, b, c))
+     = Polynomial.add(r, Polynomial.add(r, a, b), c)
+           by Equality.symmetry(Polynomial.add_associative(r, a, b, c))
+     = Polynomial.add(r, Polynomial.add(r, b, a), c)
+           by Polynomial.add_commutative(r, a, b)
+     = Polynomial.add(r, b, Polynomial.add(r, a, c))
+           by Polynomial.add_associative(r, b, a, c)
+
+-- ----------------------------------------------------------------------
+-- ¬(bound ≤ dy) is what guarantees the recursion shrinks; package the
+-- Natural step ¬(bound ≤ dy) ⟹ successor(dy) ≤ bound.
+
+theorem Natural.not_le_implies_successor_le (bound dy : Natural)
+        (notLessOrEqual : ¬(bound ≤ dy))
+        : successor(dy) ≤ bound :=
+  cases Natural.totality_of_less_or_equal(successor(dy), bound) {
+    | Or.introduceLeft(successorLessOrEqual) => successorLessOrEqual
+    | Or.introduceRight(boundLessOrEqualSuccessor) =>
+        decide bound = successor(dy) {
+          | yes boundIsSuccessor =>
+              Equality.transport_proposition(Natural,
+                  function (t : Natural) => successor(dy) ≤ t,
+                  successor(dy), bound, Equality.symmetry(boundIsSuccessor),
+                  LessOrEqual.reflexivity(successor(dy)))
+          | no boundNotSuccessor =>
+              absurd(notLessOrEqual(
+                  Natural.less_or_equal_successor_not_equal(bound, dy,
+                      boundLessOrEqualSuccessor, boundNotSuccessor)))
+        }
+  }
+
+-- ----------------------------------------------------------------------
+-- The Euclidean algorithm with Bézout coefficients.
+
+theorem Polynomial.gcd_bezout (r : Ring)
+        (commutativity
+            : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+        (inverseExistence
+            : (x : Ring.carrier(r)) → ¬(x = Ring.zero(r))
+                → ∃ (inverse : Ring.carrier(r)). Ring.multiply(r, x, inverse) = Ring.one(r))
+        (bound : Natural)
+        : (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
+          → Polynomial.DegreeLessThan(r, y, bound)
+          → (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
+          → ∃ (m a b : Polynomial(Ring.carrier(r), Ring.zero(r))).
+              m = Polynomial.add(r, Polynomial.multiply(r, a, x), Polynomial.multiply(r, b, y))
+              ∧ Ring.divides(Polynomial.ring(r), m, x)
+              ∧ Ring.divides(Polynomial.ring(r), m, y) :=
+  Natural.strong_induction(
+    function (degreeBoundVariable : Natural) =>
+        (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        → Polynomial.DegreeLessThan(r, y, degreeBoundVariable)
+        → (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
+        → ∃ (m a b : Polynomial(Ring.carrier(r), Ring.zero(r))).
+            m = Polynomial.add(r, Polynomial.multiply(r, a, x), Polynomial.multiply(r, b, y))
+            ∧ Ring.divides(Polynomial.ring(r), m, x)
+            ∧ Ring.divides(Polynomial.ring(r), m, y),
+    function (subject : Natural)
+             (IH : (k : Natural) → successor(k) ≤ subject
+                   → (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
+                     → Polynomial.DegreeLessThan(r, y, k)
+                     → (x : Polynomial(Ring.carrier(r), Ring.zero(r)))
+                     → ∃ (m a b : Polynomial(Ring.carrier(r), Ring.zero(r))).
+                         m = Polynomial.add(r, Polynomial.multiply(r, a, x),
+                                 Polynomial.multiply(r, b, y))
+                         ∧ Ring.divides(Polynomial.ring(r), m, x)
+                         ∧ Ring.divides(Polynomial.ring(r), m, y)) =>
+        function (y : Polynomial(Ring.carrier(r), Ring.zero(r)))
+                 (yBound : Polynomial.DegreeLessThan(r, y, subject))
+                 (x : Polynomial(Ring.carrier(r), Ring.zero(r))) =>
+        decide y = Polynomial.zero(r) {
+          | yes yIsZero => {
+              claim yIsRingZero : Ring.zero(Polynomial.ring(r)) = y
+                  by Equality.symmetry(yIsZero);
+              -- gcd = x: x = 1·x + 0·y, x | x, x | 0 = y.
+              ⟨x, Polynomial.one(r), Polynomial.zero(r),
+               calc x
+                  = Polynomial.multiply(r, Polynomial.one(r), x)
+                        by Equality.symmetry(Polynomial.multiply_one_left(r, x))
+                  = Polynomial.add(r, Polynomial.multiply(r, Polynomial.one(r), x),
+                        Polynomial.zero(r))
+                        by Equality.symmetry(Polynomial.add_identity_right(r,
+                               Polynomial.multiply(r, Polynomial.one(r), x)))
+                  = Polynomial.add(r, Polynomial.multiply(r, Polynomial.one(r), x),
+                        Polynomial.multiply(r, Polynomial.zero(r), y))
+                        by Equality.symmetry(
+                               Ring.zero_multiply_left(Polynomial.ring(r), y)),
+               Ring.divides_reflexive(Polynomial.ring(r), x),
+               rewrite(yIsRingZero, Ring.divides_zero(Polynomial.ring(r), x))⟩
+            }
+          | no yNotZero => {
+              obtain ⟨degreeY, yDegreeBound, leadingNonzero⟩
+                  from Polynomial.exists_degree_of_nonzero(r, y, yNotZero);
+              claim successorDegreeLessOrEqualBound : successor(degreeY) ≤ subject
+                  by Natural.not_le_implies_successor_le(subject, degreeY,
+                         function (boundLessOrEqual : subject ≤ degreeY) =>
+                             leadingNonzero(yBound(degreeY, boundLessOrEqual)));
+              obtain ⟨quotient, remainder, divisionEquation, remainderBound⟩
+                  from Polynomial.division_with_remainder(r, commutativity, y, degreeY,
+                           yDegreeBound,
+                           inverseExistence(Polynomial.coefficientOf(r, y, degreeY),
+                               leadingNonzero),
+                           x);
+              -- divisionEquation : x = quotient·y + remainder.
+              obtain ⟨m, aRest, bRest, restEquation, mDividesY, mDividesRemainder⟩
+                  from IH(degreeY, successorDegreeLessOrEqualBound, remainder, remainderBound, y);
+              -- restEquation : m = aRest·y + bRest·remainder.
+              claim remainderEquation
+                  : remainder = Polynomial.add(r, x,
+                        Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))
+                  by Equality.symmetry(
+                      calc Polynomial.add(r, x,
+                               Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))
+                         = Polynomial.add(r,
+                               Polynomial.add(r, Polynomial.multiply(r, quotient, y), remainder),
+                               Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))
+                               by divisionEquation
+                         = Polynomial.add(r,
+                               Polynomial.add(r, remainder, Polynomial.multiply(r, quotient, y)),
+                               Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))
+                               by Polynomial.add_commutative(r,
+                                      Polynomial.multiply(r, quotient, y), remainder)
+                         = Polynomial.add(r, remainder,
+                               Polynomial.add(r, Polynomial.multiply(r, quotient, y),
+                                   Polynomial.negate(r, Polynomial.multiply(r, quotient, y))))
+                               by Polynomial.add_associative(r, remainder,
+                                      Polynomial.multiply(r, quotient, y),
+                                      Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))
+                         = Polynomial.add(r, remainder, Polynomial.zero(r))
+                               by Polynomial.add_negate_right(r,
+                                      Polynomial.multiply(r, quotient, y))
+                         = remainder
+                               by Polynomial.add_identity_right(r, remainder));
+
+              claim mDividesQuotientY
+                  : Ring.divides(Polynomial.ring(r), m,
+                        Polynomial.multiply(r, quotient, y))
+                  by Ring.divides_multiply_left(Polynomial.ring(r),
+                         Polynomial.multiply_commutative(r, commutativity),
+                         m, y, quotient, mDividesY);
+              claim xAsRingAdd
+                  : x = Ring.add(Polynomial.ring(r),
+                        Polynomial.multiply(r, quotient, y), remainder)
+                  by divisionEquation;
+              claim mDividesX : Ring.divides(Polynomial.ring(r), m, x)
+                  by rewrite(Equality.symmetry(xAsRingAdd),
+                         Ring.divides_add(Polynomial.ring(r), m,
+                             Polynomial.multiply(r, quotient, y), remainder,
+                             mDividesQuotientY, mDividesRemainder));
+
+              ⟨m, bRest,
+               Polynomial.add(r, aRest,
+                   Polynomial.negate(r, Polynomial.multiply(r, bRest, quotient))),
+               calc m
+                  = Polynomial.add(r, Polynomial.multiply(r, aRest, y),
+                        Polynomial.multiply(r, bRest, remainder))
+                        by restEquation
+                  = Polynomial.add(r, Polynomial.multiply(r, aRest, y),
+                        Polynomial.multiply(r, bRest,
+                            Polynomial.add(r, x,
+                                Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))))
+                        by remainderEquation
+                  = Polynomial.add(r, Polynomial.multiply(r, aRest, y),
+                        Polynomial.add(r, Polynomial.multiply(r, bRest, x),
+                            Polynomial.multiply(r, bRest,
+                                Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))))
+                        by Polynomial.multiply_distributivity_left(r, bRest, x,
+                               Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))
+                  = Polynomial.add(r, Polynomial.multiply(r, aRest, y),
+                        Polynomial.add(r, Polynomial.multiply(r, bRest, x),
+                            Polynomial.negate(r,
+                                Polynomial.multiply(r, bRest,
+                                    Polynomial.multiply(r, quotient, y)))))
+                        by Polynomial.multiply_negate_right(r, bRest,
+                               Polynomial.multiply(r, quotient, y))
+                  = Polynomial.add(r, Polynomial.multiply(r, bRest, x),
+                        Polynomial.add(r, Polynomial.multiply(r, aRest, y),
+                            Polynomial.negate(r,
+                                Polynomial.multiply(r, bRest,
+                                    Polynomial.multiply(r, quotient, y)))))
+                        by Polynomial.add_swap_first(r,
+                               Polynomial.multiply(r, aRest, y),
+                               Polynomial.multiply(r, bRest, x),
+                               Polynomial.negate(r,
+                                   Polynomial.multiply(r, bRest,
+                                       Polynomial.multiply(r, quotient, y))))
+                  = Polynomial.add(r, Polynomial.multiply(r, bRest, x),
+                        Polynomial.add(r, Polynomial.multiply(r, aRest, y),
+                            Polynomial.negate(r,
+                                Polynomial.multiply(r,
+                                    Polynomial.multiply(r, bRest, quotient), y))))
+                        by congruenceOf(
+                               function (t : Polynomial(Ring.carrier(r), Ring.zero(r))) =>
+                                   Polynomial.add(r, Polynomial.multiply(r, bRest, x),
+                                       Polynomial.add(r, Polynomial.multiply(r, aRest, y),
+                                           Polynomial.negate(r, t))),
+                               Equality.symmetry(Polynomial.multiply_associative(r,
+                                   bRest, quotient, y)))
+                  = Polynomial.add(r, Polynomial.multiply(r, bRest, x),
+                        Polynomial.add(r, Polynomial.multiply(r, aRest, y),
+                            Polynomial.multiply(r,
+                                Polynomial.negate(r, Polynomial.multiply(r, bRest, quotient)), y)))
+                        by congruenceOf(
+                               function (t : Polynomial(Ring.carrier(r), Ring.zero(r))) =>
+                                   Polynomial.add(r, Polynomial.multiply(r, bRest, x),
+                                       Polynomial.add(r, Polynomial.multiply(r, aRest, y), t)),
+                               Equality.symmetry(Polynomial.multiply_negate_left(r,
+                                   Polynomial.multiply(r, bRest, quotient), y)))
+                  = Polynomial.add(r, Polynomial.multiply(r, bRest, x),
+                        Polynomial.multiply(r,
+                            Polynomial.add(r, aRest,
+                                Polynomial.negate(r, Polynomial.multiply(r, bRest, quotient))),
+                            y))
+                        by Equality.symmetry(Polynomial.multiply_distributivity_right(r,
+                               aRest,
+                               Polynomial.negate(r, Polynomial.multiply(r, bRest, quotient)),
+                               y)),
+               mDividesX,
+               mDividesY⟩
+            }
+        },
+    bound)
