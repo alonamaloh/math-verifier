@@ -1,0 +1,131 @@
+-- ComplexNumber/real_positivity.math
+--
+-- Squares are nonnegative — built up Integer → Rational → Real, since
+-- ℝ's order layer is additive-only — and the consequence that −1 is not
+-- a square in ℝ. This is the positivity fact that makes x²+1 have no
+-- real root, hence be irreducible over ℝ (ComplexNumber/irreducible).
+
+module ComplexNumber.real_positivity
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.instances
+import Integer.order
+import Integer.sign
+import Integer.embedding
+import Algebra.ring
+import Algebra.ring_lemmas
+import Rational.basics
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.instances
+import Rational.order
+import Rational.positive
+import Rational.linearity
+import Rational.order_arithmetic
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.field
+
+-- An Integer square is nonnegative.
+theorem Integer.square_IsNonneg (x : Integer)
+        : Integer.IsNonneg(Integer.multiply(x, x)) :=
+  cases Integer.sign_split(x) {
+    | Or.introduceLeft(xIsNonneg) =>
+        Integer.IsNonneg.multiply(x, x, xIsNonneg, xIsNonneg)
+    | Or.introduceRight(negativeEvidence) => {
+        obtain ⟨k, xEqualsNegativeK⟩ from negativeEvidence;
+        claim kIsNonneg : Integer.IsNonneg((k : Integer))
+            by ⟨k, reflexivity(Integer, (k : Integer))⟩;
+        claim squareEquation
+            : Integer.multiply(x, x)
+              = Integer.multiply((k : Integer), (k : Integer))
+            by calc Integer.multiply(x, x)
+                  = Integer.multiply(-(k : Integer), x)
+                        by xEqualsNegativeK
+                  = Integer.multiply(-(k : Integer), -(k : Integer))
+                        by xEqualsNegativeK
+                  = Integer.multiply((k : Integer), (k : Integer))
+                        by Ring.negate_multiply_negate(Integer, Integer.add,
+                               Integer.zero, Integer.negate, Integer.multiply,
+                               Integer.one, Integer.is_ring,
+                               (k : Integer), (k : Integer));
+        rewrite(Equality.symmetry(squareEquation),
+            Integer.IsNonneg.multiply((k : Integer), (k : Integer), kIsNonneg, kIsNonneg))
+      }
+  }
+
+-- A Rational square is nonnegative.
+theorem Rational.square_IsNonneg (q : Rational)
+        : Rational.IsNonneg(Rational.multiply(q, q)) :=
+  cases Rational.IsNonneg_or_negate_IsNonneg(q) {
+    | Or.introduceLeft(qIsNonneg) =>
+        Rational.IsNonneg.multiply(q, q, qIsNonneg, qIsNonneg)
+    | Or.introduceRight(negateQIsNonneg) =>
+        rewrite(
+            Ring.negate_multiply_negate(Rational, Rational.add, Rational.zero,
+                Rational.negate, Rational.multiply, Rational.one, Rational.is_ring,
+                q, q),
+            Rational.IsNonneg.multiply(Rational.negate(q), Rational.negate(q),
+                negateQIsNonneg, negateQIsNonneg))
+  }
+
+-- A Real square is nonnegative: at a representative the squared sequence
+-- is pointwise a Rational square (≥ 0), so eventually-nonnegative.
+theorem Real.square_IsNonneg (x : Real)
+        : Real.IsNonneg(Real.multiply(x, x)) :=
+  cases x { | c =>
+    function (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) =>
+      witness 0 with
+          function (m : Natural) (zeroLessOrEqualM : 0 ≤ m) =>
+            rewrite(
+                Equality.symmetry(
+                    CauchyRationalSequence.sequenceFunction_multiply(c, c, m)),
+                Rational.LessThan.transitive_right(
+                    Rational.negate(epsilon), Rational.zero,
+                    Rational.multiply(
+                        CauchyRationalSequence.sequenceFunction(c, m),
+                        CauchyRationalSequence.sequenceFunction(c, m)),
+                    Rational.negate_LessThan_zero_of_positive(epsilon, epsilonPositive),
+                    Rational.LessOrEqual_zero_of_IsNonneg(
+                        Rational.multiply(
+                            CauchyRationalSequence.sequenceFunction(c, m),
+                            CauchyRationalSequence.sequenceFunction(c, m)),
+                        Rational.square_IsNonneg(
+                            CauchyRationalSequence.sequenceFunction(c, m))))) }
+
+-- −1 is not nonnegative in ℝ (else 1 = 0).
+theorem Real.negate_one_not_IsNonneg
+        : ¬(Real.IsNonneg(Real.negate(Real.one))) :=
+  function (negateOneIsNonneg : Real.IsNonneg(Real.negate(Real.one))) => {
+    claim oneIsNonneg : Real.IsNonneg(Real.one)
+        by rewrite(Real.multiply_one(Real.one), Real.square_IsNonneg(Real.one));
+    Real.zero_not_equal_one(
+        Equality.symmetry(
+            Real.IsNonneg_and_negate_IsNonneg_implies_zero(Real.one, oneIsNonneg,
+                negateOneIsNonneg)))
+  }
+
+-- Hence −1 has no real square root: no t with t² = −1.
+theorem Real.no_square_root_of_negate_one (t : Real)
+        : ¬(Real.multiply(t, t) = Real.negate(Real.one)) :=
+  function (squareEqualsNegateOne : Real.multiply(t, t) = Real.negate(Real.one)) =>
+    Real.negate_one_not_IsNonneg(
+        rewrite(squareEqualsNegateOne, Real.square_IsNonneg(t)))
