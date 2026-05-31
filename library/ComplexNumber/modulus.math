@@ -1,0 +1,198 @@
+-- ComplexNumber/modulus.math
+--
+-- The coefficients of the modulus x²+1 over ℝ: [1, 0, 1]. Enough to
+-- show it has degree exactly 2 (HasDegree 2) and to read off the
+-- coefficient equations a factorization would force.
+
+module ComplexNumber.modulus
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.monus
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.ring
+import Real.instances
+import Real.field
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.instances
+import Polynomial.degree
+import Polynomial.multiply_coefficient
+import Polynomial.monomial
+import Polynomial.division_support
+import Polynomial.degree_product
+import ComplexNumber.basics
+
+-- monus(2,1) = 1.
+theorem Natural.monus_two_one : Natural.monus(2, 1) = 1 :=
+  calc Natural.monus(2, 1)
+     = Natural.monus(1, 0)   by Natural.monus_succ_succ(1, 0)
+     = 1                      by Natural.monus_zero(1)
+
+-- Coefficient of x·x at a positive index: coeff(x, k−1).
+theorem Complex.x_squared_coefficient_high (k : Natural) (oneLessOrEqualK : 1 ≤ k)
+        : Polynomial.coefficientOf(Real.ring,
+              Polynomial.multiply(Real.ring, Complex.x, Complex.x), k)
+          = Polynomial.coefficientOf(Real.ring, Complex.x, Natural.monus(k, 1)) :=
+  calc Polynomial.coefficientOf(Real.ring,
+           Polynomial.multiply(Real.ring, Complex.x, Complex.x), k)
+     = Real.multiply(Real.one,
+           Polynomial.coefficientOf(Real.ring, Complex.x, Natural.monus(k, 1)))
+           by Polynomial.coefficientOf_monomial_multiply(Real.ring, Real.one,
+                  Complex.x, 1, k, oneLessOrEqualK)
+     = Polynomial.coefficientOf(Real.ring, Complex.x, Natural.monus(k, 1))
+           by Real.one_multiply(
+                  Polynomial.coefficientOf(Real.ring, Complex.x, Natural.monus(k, 1)))
+
+-- x has degree < 2.
+theorem Complex.x_DegreeLessThan_two
+        : Polynomial.DegreeLessThan(Real.ring, Complex.x, 2) :=
+  function (k : Natural) (twoLessOrEqualK : 2 ≤ k) =>
+      Polynomial.coefficientOf_monomial_off(Real.ring, Real.one, 1, k,
+          function (kEqualsOne : k = 1) =>
+              Natural.not_successor_less_or_equal_self(1,
+                  rewrite(kEqualsOne, twoLessOrEqualK)))
+
+-- x·x has degree < 3.
+theorem Complex.x_squared_DegreeLessThan_three
+        : Polynomial.DegreeLessThan(Real.ring,
+              Polynomial.multiply(Real.ring, Complex.x, Complex.x), 3) :=
+  Polynomial.product_DegreeLessThan(Real.ring, Complex.x, Complex.x, 1, 1,
+      Complex.x_DegreeLessThan_two, Complex.x_DegreeLessThan_two)
+
+-- coeff(x·x, 0) = 0.
+theorem Complex.x_squared_coefficient_zero
+        : Polynomial.coefficientOf(Real.ring,
+              Polynomial.multiply(Real.ring, Complex.x, Complex.x), 0) = Real.zero :=
+  calc Polynomial.coefficientOf(Real.ring,
+           Polynomial.multiply(Real.ring, Complex.x, Complex.x), 0)
+     = Real.multiply(
+           Polynomial.coefficientOf(Real.ring, Complex.x, 0),
+           Polynomial.coefficientOf(Real.ring, Complex.x, Natural.monus(0, 0)))
+           by Polynomial.coefficientOf_multiply(Real.ring, Complex.x, Complex.x, 0)
+     = Real.multiply(Real.zero,
+           Polynomial.coefficientOf(Real.ring, Complex.x, Natural.monus(0, 0)))
+           by Polynomial.coefficientOf_monomial_off(Real.ring, Real.one, 1, 0,
+                  Natural.zero_not_successor(0))
+     = Real.zero
+           by Ring.zero_multiply_left(Real.ring,
+                  Polynomial.coefficientOf(Real.ring, Complex.x, Natural.monus(0, 0)))
+
+-- coeff(modulus, 2) = 1.
+theorem Complex.modulus_coefficient_two
+        : Polynomial.coefficientOf(Real.ring, Complex.modulus, 2) = Real.one :=
+  calc Polynomial.coefficientOf(Real.ring, Complex.modulus, 2)
+     = Real.add(
+           Polynomial.coefficientOf(Real.ring,
+               Polynomial.multiply(Real.ring, Complex.x, Complex.x), 2),
+           Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 2))
+           by Polynomial.coefficientOf_add(Real.ring,
+                  Polynomial.multiply(Real.ring, Complex.x, Complex.x),
+                  Polynomial.one(Real.ring), 2)
+     = Real.add(
+           Polynomial.coefficientOf(Real.ring, Complex.x, Natural.monus(2, 1)),
+           Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 2))
+           by Complex.x_squared_coefficient_high(2, Natural.one_less_or_equal_two)
+     = Real.add(
+           Polynomial.coefficientOf(Real.ring, Complex.x, 1),
+           Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 2))
+           by congruenceOf(
+                  function (t : Natural) =>
+                      Real.add(Polynomial.coefficientOf(Real.ring, Complex.x, t),
+                          Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 2)),
+                  Natural.monus_two_one)
+     = Real.add(Real.one,
+           Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 2))
+           by Polynomial.coefficientOf_monomial_at(Real.ring, Real.one, 1)
+     = Real.add(Real.one, Real.zero)
+           by Polynomial.coefficientOf_one_successor(Real.ring, 1)
+     = Real.one
+           by Ring.add_zero(Real.ring, Real.one)
+
+-- coeff(modulus, 0) = 1.
+theorem Complex.modulus_coefficient_zero
+        : Polynomial.coefficientOf(Real.ring, Complex.modulus, 0) = Real.one :=
+  calc Polynomial.coefficientOf(Real.ring, Complex.modulus, 0)
+     = Real.add(
+           Polynomial.coefficientOf(Real.ring,
+               Polynomial.multiply(Real.ring, Complex.x, Complex.x), 0),
+           Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 0))
+           by Polynomial.coefficientOf_add(Real.ring,
+                  Polynomial.multiply(Real.ring, Complex.x, Complex.x),
+                  Polynomial.one(Real.ring), 0)
+     = Real.add(Real.zero,
+           Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 0))
+           by Complex.x_squared_coefficient_zero
+     = Real.add(Real.zero, Real.one)
+           by Polynomial.coefficientOf_one_zero(Real.ring)
+     = Real.one
+           by Ring.zero_add(Real.ring, Real.one)
+
+-- coeff(modulus, 1) = 0.
+theorem Complex.modulus_coefficient_one
+        : Polynomial.coefficientOf(Real.ring, Complex.modulus, 1) = Real.zero :=
+  calc Polynomial.coefficientOf(Real.ring, Complex.modulus, 1)
+     = Real.add(
+           Polynomial.coefficientOf(Real.ring,
+               Polynomial.multiply(Real.ring, Complex.x, Complex.x), 1),
+           Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 1))
+           by Polynomial.coefficientOf_add(Real.ring,
+                  Polynomial.multiply(Real.ring, Complex.x, Complex.x),
+                  Polynomial.one(Real.ring), 1)
+     = Real.add(
+           Polynomial.coefficientOf(Real.ring, Complex.x, Natural.monus(1, 1)),
+           Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 1))
+           by Complex.x_squared_coefficient_high(1, LessOrEqual.reflexivity(1))
+     = Real.add(
+           Polynomial.coefficientOf(Real.ring, Complex.x, 0),
+           Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 1))
+           by congruenceOf(
+                  function (t : Natural) =>
+                      Real.add(Polynomial.coefficientOf(Real.ring, Complex.x, t),
+                          Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 1)),
+                  Natural.monus_self(1))
+     = Real.add(Real.zero,
+           Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 1))
+           by Polynomial.coefficientOf_monomial_off(Real.ring, Real.one, 1, 0,
+                  Natural.zero_not_successor(0))
+     = Real.add(Real.zero, Real.zero)
+           by Polynomial.coefficientOf_one_successor(Real.ring, 0)
+     = Real.zero
+           by Ring.add_zero(Real.ring, Real.zero)
+
+-- modulus has degree < 3.
+theorem Complex.modulus_DegreeLessThan_three
+        : Polynomial.DegreeLessThan(Real.ring, Complex.modulus, 3) :=
+  Polynomial.DegreeLessThan.add(Real.ring,
+      Polynomial.multiply(Real.ring, Complex.x, Complex.x),
+      Polynomial.one(Real.ring), 3,
+      Complex.x_squared_DegreeLessThan_three,
+      function (k : Natural) (threeLessOrEqualK : 3 ≤ k) =>
+          cases k refining threeLessOrEqualK {
+            | zero =>
+                absurd(Natural.not_less_or_equal_successor_zero(2, threeLessOrEqualK))
+            | successor(kPredecessor) =>
+                Polynomial.coefficientOf_one_successor(Real.ring, kPredecessor)
+          })
+
+-- modulus has degree exactly 2.
+theorem Complex.modulus_HasDegree_two
+        : Polynomial.HasDegree(Real.ring, Complex.modulus, 2) :=
+  And.introduction(
+      Complex.modulus_DegreeLessThan_three,
+      function (topZero : Polynomial.coefficientOf(Real.ring, Complex.modulus, 2) = Real.zero) =>
+          Real.zero_not_equal_one(
+              Equality.symmetry(
+                  Equality.transitivity(
+                      Equality.symmetry(Complex.modulus_coefficient_two), topZero))))

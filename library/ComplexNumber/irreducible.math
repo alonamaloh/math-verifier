@@ -1,0 +1,470 @@
+-- ComplexNumber/irreducible.math
+--
+-- x²+1 is irreducible over ℝ. Not a unit (degree 2 ≠ 0); and any
+-- factorization x²+1 = a·b has a unit factor — the degrees add to 2, so
+-- a non-unit factorization would be degree-1 × degree-1, forcing (from
+-- the coefficient equations) a real square equal to −1, which is
+-- impossible.
+
+module ComplexNumber.irreducible
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.subtraction
+import Natural.arithmetic
+import Natural.decide
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_divisibility
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.field
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.instances
+import Polynomial.degree
+import Polynomial.multiply_coefficient
+import Polynomial.monomial
+import Polynomial.division
+import Polynomial.degree_function
+import Polynomial.bezout
+import Polynomial.irreducible
+import Polynomial.degree_product
+import Polynomial.units
+import ComplexNumber.basics
+import ComplexNumber.modulus
+import ComplexNumber.real_positivity
+
+-- Two positive naturals summing to 2 are both 1.
+theorem Natural.both_one_of_add_two (da db : Natural)
+        (daPositive : 1 ≤ da) (dbPositive : 1 ≤ db) (sumTwo : da + db = 2)
+        : And(da = 1, db = 1) :=
+  cases da refining daPositive, sumTwo {
+    | zero => absurd(Natural.not_less_or_equal_successor_zero(0, daPositive))
+    | successor(daPredecessor) =>
+        cases db refining dbPositive, sumTwo {
+          | zero => absurd(Natural.not_less_or_equal_successor_zero(0, dbPositive))
+          | successor(dbPredecessor) => {
+              claim innerEquation
+                  : Natural.add(daPredecessor, successor(dbPredecessor)) = successor(0)
+                  by Natural.successor_injective(
+                         Natural.add(daPredecessor, successor(dbPredecessor)), successor(0),
+                         sumTwo);
+              claim sumPredecessorsZero
+                  : Natural.add(daPredecessor, dbPredecessor) = 0
+                  by Natural.successor_injective(
+                         Natural.add(daPredecessor, dbPredecessor), 0,
+                         calc successor(Natural.add(daPredecessor, dbPredecessor))
+                            = Natural.add(daPredecessor, successor(dbPredecessor))
+                                  by Equality.symmetry(
+                                         Natural.add_successor(daPredecessor, dbPredecessor))
+                            = successor(0)
+                                  by innerEquation);
+              And.introduction(
+                  congruenceOf(function (t : Natural) => successor(t),
+                      Natural.less_or_equal_zero_implies_equals_zero(daPredecessor,
+                          rewrite(sumPredecessorsZero,
+                              Natural.less_or_equal_add_right(daPredecessor, dbPredecessor)))),
+                  congruenceOf(function (t : Natural) => successor(t),
+                      Natural.less_or_equal_zero_implies_equals_zero(dbPredecessor,
+                          rewrite(sumPredecessorsZero,
+                              Natural.less_or_equal_add_left(dbPredecessor, daPredecessor)))))
+            }
+        }
+  }
+
+-- A degree-1 × degree-1 factorization of x²+1 is impossible.
+theorem Complex.no_degree_one_factorization
+        (a b : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
+        (aDegree : Polynomial.HasDegree(Real.ring, a, 1))
+        (bDegree : Polynomial.HasDegree(Real.ring, b, 1))
+        (factorEquation
+            : Complex.modulus = Polynomial.multiply(Real.ring, a, b))
+        : False := {
+  let ⟨aBound, _⟩ := aDegree;
+  let ⟨bBound, _⟩ := bDegree;
+  -- ce = 1 (coefficient at 2).
+  claim coefficientEquationTwo
+      : Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+            Polynomial.coefficientOf(Real.ring, b, 1)) = Real.one
+      by calc Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                  Polynomial.coefficientOf(Real.ring, b, 1))
+            = Polynomial.coefficientOf(Real.ring, Polynomial.multiply(Real.ring, a, b), 2)
+                  by Equality.symmetry(
+                         Polynomial.coefficientOf_product_at_sum(Real.ring, a, b, 1, 1,
+                             aBound, bBound))
+            = Polynomial.coefficientOf(Real.ring, Complex.modulus, 2)
+                  by congruenceOf(
+                         function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                             Polynomial.coefficientOf(Real.ring, p, 2),
+                         Equality.symmetry(factorEquation))
+            = Real.one
+                  by Complex.modulus_coefficient_two;
+  -- df = 1 (coefficient at 0).
+  claim coefficientEquationZero
+      : Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+            Polynomial.coefficientOf(Real.ring, b, 0)) = Real.one
+      by calc Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                  Polynomial.coefficientOf(Real.ring, b, 0))
+            = Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                  Polynomial.coefficientOf(Real.ring, b, Natural.monus(0, 0)))
+                  by congruenceOf(
+                         function (t : Natural) =>
+                             Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                                 Polynomial.coefficientOf(Real.ring, b, t)),
+                         Equality.symmetry(Natural.monus_zero(0)))
+            = Polynomial.coefficientOf(Real.ring, Polynomial.multiply(Real.ring, a, b), 0)
+                  by Equality.symmetry(
+                         Polynomial.coefficientOf_multiply(Real.ring, a, b, 0))
+            = Polynomial.coefficientOf(Real.ring, Complex.modulus, 0)
+                  by congruenceOf(
+                         function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                             Polynomial.coefficientOf(Real.ring, p, 0),
+                         Equality.symmetry(factorEquation))
+            = Real.one
+                  by Complex.modulus_coefficient_zero;
+  -- de + cf = 0 (coefficient at 1).
+  claim coefficientMultiplyOne
+      : Polynomial.coefficientOf(Real.ring, Polynomial.multiply(Real.ring, a, b), 1)
+        = Real.add(
+              Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                  Polynomial.coefficientOf(Real.ring, b, 1)),
+              Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                  Polynomial.coefficientOf(Real.ring, b, 0)))
+      by calc Polynomial.coefficientOf(Real.ring, Polynomial.multiply(Real.ring, a, b), 1)
+            = Real.add(
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                      Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 0))),
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                      Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1))))
+                  by Polynomial.coefficientOf_multiply(Real.ring, a, b, 1)
+            = Real.add(
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                      Polynomial.coefficientOf(Real.ring, b, 1)),
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                      Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1))))
+                  by congruenceOf(
+                         function (t : Natural) =>
+                             Real.add(
+                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                                     Polynomial.coefficientOf(Real.ring, b, t)),
+                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                     Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1)))),
+                         Natural.monus_zero(1))
+            = Real.add(
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                      Polynomial.coefficientOf(Real.ring, b, 1)),
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                      Polynomial.coefficientOf(Real.ring, b, 0)))
+                  by congruenceOf(
+                         function (t : Natural) =>
+                             Real.add(
+                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                                     Polynomial.coefficientOf(Real.ring, b, 1)),
+                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                     Polynomial.coefficientOf(Real.ring, b, t))),
+                         Natural.monus_self(1));
+  claim coefficientEquationOne
+      : Real.add(
+            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                Polynomial.coefficientOf(Real.ring, b, 1)),
+            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                Polynomial.coefficientOf(Real.ring, b, 0))) = Real.zero
+      by calc Real.add(
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                      Polynomial.coefficientOf(Real.ring, b, 1)),
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                      Polynomial.coefficientOf(Real.ring, b, 0)))
+            = Polynomial.coefficientOf(Real.ring, Polynomial.multiply(Real.ring, a, b), 1)
+                  by Equality.symmetry(coefficientMultiplyOne)
+            = Polynomial.coefficientOf(Real.ring, Complex.modulus, 1)
+                  by congruenceOf(
+                         function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                             Polynomial.coefficientOf(Real.ring, p, 1),
+                         Equality.symmetry(factorEquation))
+            = Real.zero
+                  by Complex.modulus_coefficient_one;
+  -- de = −cf.
+  claim deNegateCf
+      : Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+            Polynomial.coefficientOf(Real.ring, b, 1))
+        = Real.negate(
+              Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                  Polynomial.coefficientOf(Real.ring, b, 0)))
+      by Group.left_inverse_unique(Real, Real.add, Real.zero, Real.negate,
+             Real.add_is_group,
+             Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                 Polynomial.coefficientOf(Real.ring, b, 0)),
+             Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                 Polynomial.coefficientOf(Real.ring, b, 1)),
+             coefficientEquationOne);
+  -- cdef = 1.
+  claim cdefOne
+      : Real.multiply(
+            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                Polynomial.coefficientOf(Real.ring, b, 1)),
+            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                Polynomial.coefficientOf(Real.ring, b, 0))) = Real.one
+      by calc Real.multiply(
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                      Polynomial.coefficientOf(Real.ring, b, 1)),
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                      Polynomial.coefficientOf(Real.ring, b, 0)))
+            = Real.multiply(Real.one,
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                      Polynomial.coefficientOf(Real.ring, b, 0)))
+                  by coefficientEquationTwo
+            = Real.multiply(Real.one, Real.one)
+                  by coefficientEquationZero
+            = Real.one
+                  by Real.one_multiply(Real.one);
+  -- Hence (cf)² = −1, impossible.
+  claim cfSquareNegateOne
+      : Real.multiply(
+            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                Polynomial.coefficientOf(Real.ring, b, 0)),
+            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                Polynomial.coefficientOf(Real.ring, b, 0)))
+        = Real.negate(Real.one)
+      by calc Real.multiply(
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                      Polynomial.coefficientOf(Real.ring, b, 0)),
+                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                      Polynomial.coefficientOf(Real.ring, b, 0)))
+            = Real.negate(Real.negate(
+                  Real.multiply(
+                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                          Polynomial.coefficientOf(Real.ring, b, 0)),
+                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                          Polynomial.coefficientOf(Real.ring, b, 0)))))
+                  by Equality.symmetry(
+                         Group.inverse_involution(Real, Real.add, Real.zero, Real.negate,
+                             Real.add_is_group,
+                             Real.multiply(
+                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                     Polynomial.coefficientOf(Real.ring, b, 0)),
+                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                     Polynomial.coefficientOf(Real.ring, b, 0)))))
+            = Real.negate(Real.one)
+                  by congruenceOf(function (t : Real) => Real.negate(t),
+                         Equality.symmetry(
+                             calc Real.one
+                                = Real.multiply(
+                                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                          Polynomial.coefficientOf(Real.ring, b, 1)),
+                                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                                          Polynomial.coefficientOf(Real.ring, b, 0)))
+                                      by Equality.symmetry(cdefOne)
+                                = Real.multiply(
+                                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                                          Polynomial.coefficientOf(Real.ring, b, 1)),
+                                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                          Polynomial.coefficientOf(Real.ring, b, 0)))
+                                      by (ring : Real.multiply(
+                                                     Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                                         Polynomial.coefficientOf(Real.ring, b, 1)),
+                                                     Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                                                         Polynomial.coefficientOf(Real.ring, b, 0)))
+                                                 = Real.multiply(
+                                                       Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
+                                                           Polynomial.coefficientOf(Real.ring, b, 1)),
+                                                       Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                                           Polynomial.coefficientOf(Real.ring, b, 0))))
+                                = Real.multiply(
+                                      Real.negate(
+                                          Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                              Polynomial.coefficientOf(Real.ring, b, 0))),
+                                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                          Polynomial.coefficientOf(Real.ring, b, 0)))
+                                      by deNegateCf
+                                = Real.negate(
+                                      Real.multiply(
+                                          Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                              Polynomial.coefficientOf(Real.ring, b, 0)),
+                                          Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                              Polynomial.coefficientOf(Real.ring, b, 0))))
+                                      by Ring.multiply_negate_left(Real, Real.add, Real.zero,
+                                             Real.negate, Real.multiply, Real.one, Real.is_ring,
+                                             Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                                 Polynomial.coefficientOf(Real.ring, b, 0)),
+                                             Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+                                                 Polynomial.coefficientOf(Real.ring, b, 0)))));
+  Real.no_square_root_of_negate_one(
+      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
+          Polynomial.coefficientOf(Real.ring, b, 0)),
+      cfSquareNegateOne)
+}
+
+-- x²+1 is not a unit (it has degree 2).
+theorem Complex.modulus_not_unit
+        : ¬(Polynomial.IsUnit(Real.ring, Complex.modulus)) :=
+  function (isUnit : Polynomial.IsUnit(Real.ring, Complex.modulus)) => {
+    obtain ⟨g, oneEquation⟩ from isUnit;
+    decide g = Polynomial.zero(Real.ring) {
+      | yes gZero => {
+          claim oneIsZero : Polynomial.one(Real.ring) = Polynomial.zero(Real.ring)
+              by calc Polynomial.one(Real.ring)
+                    = Polynomial.multiply(Real.ring, Complex.modulus, g)
+                          by oneEquation
+                    = Polynomial.multiply(Real.ring, Complex.modulus, Polynomial.zero(Real.ring))
+                          by gZero
+                    = Polynomial.zero(Real.ring)
+                          by Ring.multiply_zero_right(Real.polynomial_ring, Complex.modulus);
+          Real.zero_not_equal_one(
+              Equality.symmetry(
+                  calc Real.one
+                     = Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 0)
+                           by Equality.symmetry(Polynomial.coefficientOf_one_zero(Real.ring))
+                     = Polynomial.coefficientOf(Real.ring, Polynomial.zero(Real.ring), 0)
+                           by congruenceOf(
+                                  function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                                      Polynomial.coefficientOf(Real.ring, p, 0),
+                                  oneIsZero)
+                     = Real.zero
+                           by Polynomial.coefficientOf_zero(Real.ring, 0)))
+        }
+      | no gNonzero => {
+          obtain ⟨degreeG, gBound, gLeadingNonzero⟩
+              from Polynomial.exists_degree_of_nonzero(Real.ring, g, gNonzero);
+          let ⟨_, productLeadingNonzero⟩
+              := Polynomial.HasDegree_product(Real.ring, Real.multiply_commutative,
+                     Real.reciprocal_exists_for_nonzero, Complex.modulus, g, 2, degreeG,
+                     Complex.modulus_HasDegree_two,
+                     And.introduction(gBound, gLeadingNonzero));
+          productLeadingNonzero(
+              calc Polynomial.coefficientOf(Real.ring,
+                       Polynomial.multiply(Real.ring, Complex.modulus, g), 2 + degreeG)
+                 = Polynomial.coefficientOf(Real.ring, Polynomial.one(Real.ring), 2 + degreeG)
+                       by congruenceOf(
+                              function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                                  Polynomial.coefficientOf(Real.ring, p, 2 + degreeG),
+                              Equality.symmetry(oneEquation))
+                 = Real.zero
+                       by Polynomial.coefficientOf_one_successor(Real.ring, successor(degreeG)))
+        }
+    }
+  }
+
+-- x²+1 is irreducible over ℝ.
+theorem Complex.modulus_irreducible
+        : Polynomial.IsIrreducible(Real.ring, Complex.modulus) :=
+  And.introduction(
+      Complex.modulus_not_unit,
+      function (a b : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring)))
+               (factorEquation : Complex.modulus = Polynomial.multiply(Real.ring, a, b)) =>
+          decide Polynomial.IsUnit(Real.ring, a) {
+            | yes aUnit => Or.introduceLeft(aUnit)
+            | no aNotUnit =>
+                decide Polynomial.IsUnit(Real.ring, b) {
+                  | yes bUnit => Or.introduceRight(bUnit)
+                  | no bNotUnit => {
+                      -- Neither factor is a unit; derive a contradiction.
+                      claim aNonzero : ¬(a = Polynomial.zero(Real.ring))
+                          by function (aZero : a = Polynomial.zero(Real.ring)) =>
+                               Real.zero_not_equal_one(
+                                   Equality.symmetry(
+                                       calc Real.one
+                                          = Polynomial.coefficientOf(Real.ring, Complex.modulus, 2)
+                                                by Equality.symmetry(Complex.modulus_coefficient_two)
+                                          = Polynomial.coefficientOf(Real.ring,
+                                                Polynomial.multiply(Real.ring,
+                                                    Polynomial.zero(Real.ring), b), 2)
+                                                by congruenceOf(
+                                                       function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                                                           Polynomial.coefficientOf(Real.ring, p, 2),
+                                                       Equality.transitivity(factorEquation,
+                                                           congruenceOf(
+                                                               function (q : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                                                                   Polynomial.multiply(Real.ring, q, b),
+                                                               aZero)))
+                                          = Polynomial.coefficientOf(Real.ring,
+                                                Polynomial.zero(Real.ring), 2)
+                                                by congruenceOf(
+                                                       function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                                                           Polynomial.coefficientOf(Real.ring, p, 2),
+                                                       Ring.zero_multiply_left(Real.polynomial_ring, b))
+                                          = Real.zero
+                                                by Polynomial.coefficientOf_zero(Real.ring, 2)));
+                      claim bNonzero : ¬(b = Polynomial.zero(Real.ring))
+                          by function (bZero : b = Polynomial.zero(Real.ring)) =>
+                               Real.zero_not_equal_one(
+                                   Equality.symmetry(
+                                       calc Real.one
+                                          = Polynomial.coefficientOf(Real.ring, Complex.modulus, 2)
+                                                by Equality.symmetry(Complex.modulus_coefficient_two)
+                                          = Polynomial.coefficientOf(Real.ring,
+                                                Polynomial.multiply(Real.ring, a,
+                                                    Polynomial.zero(Real.ring)), 2)
+                                                by congruenceOf(
+                                                       function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                                                           Polynomial.coefficientOf(Real.ring, p, 2),
+                                                       Equality.transitivity(factorEquation,
+                                                           congruenceOf(
+                                                               function (q : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                                                                   Polynomial.multiply(Real.ring, a, q),
+                                                               bZero)))
+                                          = Polynomial.coefficientOf(Real.ring,
+                                                Polynomial.zero(Real.ring), 2)
+                                                by congruenceOf(
+                                                       function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
+                                                           Polynomial.coefficientOf(Real.ring, p, 2),
+                                                       Ring.multiply_zero_right(Real.polynomial_ring, a))
+                                          = Real.zero
+                                                by Polynomial.coefficientOf_zero(Real.ring, 2)));
+                      obtain ⟨degreeA, aBound, aLeadingNonzero⟩
+                          from Polynomial.exists_degree_of_nonzero(Real.ring, a, aNonzero);
+                      obtain ⟨degreeB, bBound, bLeadingNonzero⟩
+                          from Polynomial.exists_degree_of_nonzero(Real.ring, b, bNonzero);
+                      claim degreeAPositive : 1 ≤ degreeA
+                          by Natural.less_or_equal_not_equal_successor(0, degreeA,
+                                 Natural.zero_least(degreeA),
+                                 function (degreeAZero : degreeA = 0) =>
+                                     aNotUnit(
+                                         Polynomial.degree_zero_is_unit(Real.ring,
+                                             Real.reciprocal_exists_for_nonzero, a,
+                                             rewrite(degreeAZero,
+                                                 And.introduction(aBound, aLeadingNonzero)))));
+                      claim degreeBPositive : 1 ≤ degreeB
+                          by Natural.less_or_equal_not_equal_successor(0, degreeB,
+                                 Natural.zero_least(degreeB),
+                                 function (degreeBZero : degreeB = 0) =>
+                                     bNotUnit(
+                                         Polynomial.degree_zero_is_unit(Real.ring,
+                                             Real.reciprocal_exists_for_nonzero, b,
+                                             rewrite(degreeBZero,
+                                                 And.introduction(bBound, bLeadingNonzero)))));
+                      claim sumIsTwo : degreeA + degreeB = 2
+                          by Polynomial.HasDegree_unique(Real.ring, Complex.modulus,
+                                 degreeA + degreeB, 2,
+                                 rewrite(Equality.symmetry(factorEquation),
+                                     Polynomial.HasDegree_product(Real.ring,
+                                         Real.multiply_commutative,
+                                         Real.reciprocal_exists_for_nonzero, a, b,
+                                         degreeA, degreeB,
+                                         And.introduction(aBound, aLeadingNonzero),
+                                         And.introduction(bBound, bLeadingNonzero))),
+                                 Complex.modulus_HasDegree_two);
+                      let ⟨degreeAOne, degreeBOne⟩
+                          := Natural.both_one_of_add_two(degreeA, degreeB,
+                                 degreeAPositive, degreeBPositive, sumIsTwo);
+                      absurd(
+                          Complex.no_degree_one_factorization(a, b,
+                              rewrite(degreeAOne, And.introduction(aBound, aLeadingNonzero)),
+                              rewrite(degreeBOne, And.introduction(bBound, bLeadingNonzero)),
+                              factorEquation))
+                    }
+                }
+          })
