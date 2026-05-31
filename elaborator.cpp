@@ -9950,30 +9950,21 @@ private:
         ExpressionPointer term,
         const std::string& carrierOpName,
         std::vector<ExpressionPointer>& factorsOut) {
-        // Walk: if `term = Application(Application(Constant(<carrier>.<op>, ...), a), b)`,
-        // recursively flatten a and b. Otherwise treat as atom.
-        // `<op>` is "multiply" or "add" depending on which axiom-set
-        // the ring tactic is using for this goal.
-        if (auto* outer = std::get_if<Application>(&term->node)) {
-            if (auto* inner =
-                    std::get_if<Application>(&outer->function->node)) {
-                if (auto* op =
-                        std::get_if<Constant>(&inner->function->node)) {
-                    if (op->name == carrierOpName) {
-                        if (!flattenRingProduct(inner->argument,
-                                                  carrierOpName,
-                                                  factorsOut)) {
-                            return false;
-                        }
-                        if (!flattenRingProduct(outer->argument,
-                                                  carrierOpName,
-                                                  factorsOut)) {
-                            return false;
-                        }
-                        return true;
-                    }
-                }
+        // Walk: if `term` is `<op>([prefix,] a, b)` (the structure prefix
+        // is the leading bundle argument for a bundled commutative ring,
+        // absent for a concrete carrier — `matchBinaryRingOp` handles
+        // both), recursively flatten a and b. Otherwise treat as an atom.
+        // `<op>` is "multiply" or "add" depending on which axiom-set the
+        // ring tactic is using for this goal.
+        ExpressionPointer left, right;
+        if (matchBinaryRingOp(term, carrierOpName, left, right)) {
+            if (!flattenRingProduct(left, carrierOpName, factorsOut)) {
+                return false;
             }
+            if (!flattenRingProduct(right, carrierOpName, factorsOut)) {
+                return false;
+            }
+            return true;
         }
         factorsOut.push_back(term);
         return true;
@@ -9987,10 +9978,12 @@ private:
         const std::vector<ExpressionPointer>& factors) {
         ExpressionPointer accumulator = factors[0];
         for (size_t i = 1; i < factors.size(); ++i) {
-            accumulator = makeApplication(
-                makeApplication(makeConstant(carrierMultiplyName),
-                                 accumulator),
-                factors[i]);
+            // buildRingOp threads the active structure prefix (`[c]` for a
+            // bundled commutative ring), so this matches the canonical
+            // forms built elsewhere; for a concrete carrier the prefix is
+            // empty and this is a plain `op(acc, factor)`.
+            accumulator = buildRingOp(
+                carrierMultiplyName, accumulator, factors[i]);
         }
         return accumulator;
     }
@@ -10219,16 +10212,17 @@ private:
     bool ringFastFailAgrees(
         ExpressionPointer leftEndpoint,
         ExpressionPointer rightEndpoint,
-        const std::string& carrierName) {
+        const std::string& carrierName,
+        const std::string& opNamespace) {
         // 2^61 - 1, a Mersenne prime. Largest fitting comfortably in
         // uint64_t so (a * b) % p in __uint128_t stays sound.
         constexpr uint64_t kModulus = (1ULL << 61) - 1;
-        const std::string addName       = carrierName + ".add";
-        const std::string multiplyName  = carrierName + ".multiply";
-        const std::string negateName    = carrierName + ".negate";
-        const std::string subtractName  = carrierName + ".subtract";
-        const std::string zeroName      = carrierName + ".zero";
-        const std::string oneName       = carrierName + ".one";
+        const std::string addName       = opNamespace + ".add";
+        const std::string multiplyName  = opNamespace + ".multiply";
+        const std::string negateName    = opNamespace + ".negate";
+        const std::string subtractName  = opNamespace + ".subtract";
+        const std::string zeroName      = opNamespace + ".zero";
+        const std::string oneName       = opNamespace + ".one";
         uint64_t leftValue = evalRingMod(
             leftEndpoint, carrierName, addName, multiplyName,
             negateName, subtractName, zeroName, oneName, kModulus);
@@ -10255,19 +10249,49 @@ private:
         EqualityComponents goal =
             extractEqualityComponents(expectedType, "ring", line);
         std::string carrierName = headConstantName(goal.carrierType);
+        // How operations/laws are named for this carrier, and the leading
+        // structure argument they carry (`[s]` for a bundled-ring carrier
+        // `Ring.carrier(s)`, empty for a concrete carrier). Installed for
+        // the rest of this `ring` elaboration so the matchers and the
+        // term/law builders thread `s` automatically.
+        RingScheme scheme = computeRingScheme(goal.carrierType);
+        RingStructurePrefixGuard prefixGuard(*this, scheme.structurePrefix);
         // Z/p numerical fast-fail. If the two sides disagree as
         // polynomials over Z/p, ring CANNOT prove them equal — bail
         // immediately without doing the expensive symbolic normalise
         // + polynomial-dict comparison work. See `evalRingMod` for
         // soundness rationale (Schwartz-Zippel).
         if (!ringFastFailAgrees(
-                goal.leftEndpoint, goal.rightEndpoint, carrierName)) {
+                goal.leftEndpoint, goal.rightEndpoint, carrierName,
+                scheme.opNamespace)) {
             throwElaborate(
                 "`ring`: the two sides do not agree mod 2^61 - 1 — "
                 "they are not equal as commutative-ring expressions"
                 + buildFingerprintDiagnostic(
                       goal.leftEndpoint, goal.rightEndpoint,
                       carrierName));
+        }
+        // A bundled-ring carrier's operations carry a leading structure
+        // argument, which the single-operator AC fast path below does not
+        // model. Route it straight to the normaliser (which does). We
+        // open the goal over the local binders first so the carrier index
+        // (`c`) and the atoms become FREE variables: the structure prefix
+        // `c` that the term/law builders thread is then stable under the
+        // congruence lambdas the normaliser builds (a bound-variable
+        // prefix would need shifting inside each lambda). The proof is
+        // closed again before returning.
+        if (!scheme.structurePrefix.empty()) {
+            ExpressionPointer expectedTypeOpened = openOverLocalBinders(
+                expectedType, localBinders, localBinders.size());
+            EqualityComponents openedGoal = extractEqualityComponents(
+                expectedTypeOpened, "ring", line);
+            ExpressionPointer proof = elaborateRingByNormalisation(
+                /*localBinders*/{},
+                openedGoal.leftEndpoint, openedGoal.rightEndpoint,
+                openedGoal.carrierType, openedGoal.carrierUniverseLevel,
+                carrierName, line);
+            return closeOverLocalBinders(
+                proof, localBinders, localBinders.size());
         }
         // Try the multiplicative axioms first; if the goal isn't a
         // pure product, try the additive axioms. Either is acceptable
@@ -10460,11 +10484,73 @@ private:
         std::string commutative;   // e.g. "Integer.multiply_commutative"
     };
 
+    // How `ring` reads a carrier's operations and laws. For a concrete
+    // carrier the operation namespace is the carrier head itself
+    // (`Integer.add`, `Integer.add_associative`) and there is no leading
+    // structure argument. For the bundled commutative-ring carrier
+    // `CommutativeRing.carrier(c)` the operations and laws live under
+    // `CommutativeRing` and each carries `c` as its first kernel argument
+    // (`CommutativeRing.add(c, …)`), captured as `structurePrefix`.
+    struct RingScheme {
+        std::string opNamespace;   // "Integer" | "CommutativeRing"
+        std::string carrierHead;   // "Integer" | "CommutativeRing.carrier"
+        std::vector<ExpressionPointer> structurePrefix;  // [] | [c]
+    };
+
+    RingScheme computeRingScheme(ExpressionPointer carrierType) {
+        RingScheme scheme;
+        scheme.carrierHead = headConstantName(carrierType);
+        scheme.opNamespace = scheme.carrierHead;
+        // Bundled commutative-ring carrier `CommutativeRing.carrier(c)`:
+        // operations/laws are the `CommutativeRing.*` projections applied
+        // to `c`. This is the only sound `ring` target among the bundles,
+        // since `ring` needs multiplicative commutativity (a plain
+        // `Ring.carrier(s)` has no `multiply_commutative`); see
+        // Algebra/commutative_ring_algebra.math.
+        if (scheme.carrierHead == "CommutativeRing.carrier") {
+            if (auto* app =
+                    std::get_if<Application>(&carrierType->node)) {
+                scheme.opNamespace = "CommutativeRing";
+                scheme.structurePrefix = { app->argument };
+            }
+        }
+        return scheme;
+    }
+
+    // RAII: install a ring structure prefix for the duration of one ring
+    // elaboration, restoring the previous value on scope exit (so nested
+    // ring proofs and the normal empty-prefix concrete case are safe).
+    struct RingStructurePrefixGuard {
+        Elaborator& elaborator;
+        std::vector<ExpressionPointer> saved;
+        RingStructurePrefixGuard(
+            Elaborator& e, std::vector<ExpressionPointer> prefix)
+            : elaborator(e), saved(e.ringStructurePrefix_) {
+            elaborator.ringStructurePrefix_ = std::move(prefix);
+        }
+        ~RingStructurePrefixGuard() {
+            elaborator.ringStructurePrefix_ = std::move(saved);
+        }
+    };
+
+    // Build a ring operation/law head: `makeConstant(name)` with the
+    // active structure prefix (`[s]` for a bundled ring, empty for a
+    // concrete carrier) applied first. So `ringConst("Ring.add")` yields
+    // `Ring.add(s)` under a bundled ring and `Integer.add` (bare) under a
+    // concrete one; callers then apply the operands as before.
+    ExpressionPointer ringConst(const std::string& name) {
+        ExpressionPointer head = makeConstant(name);
+        for (const auto& prefixArg : ringStructurePrefix_) {
+            head = makeApplication(std::move(head), prefixArg);
+        }
+        return head;
+    }
+
     // Build `<op>(left, right)`.
     ExpressionPointer buildRingOp(
         const std::string& opName,
         ExpressionPointer left, ExpressionPointer right) {
-        ExpressionPointer call = makeConstant(opName);
+        ExpressionPointer call = ringConst(opName);
         call = makeApplication(std::move(call), std::move(left));
         call = makeApplication(std::move(call), std::move(right));
         return call;
@@ -10562,7 +10648,7 @@ private:
         const RingAxiomNames& axioms,
         ExpressionPointer P, ExpressionPointer a, ExpressionPointer b) {
         ExpressionPointer call =
-            makeConstant(axioms.associative);
+            ringConst(axioms.associative);
         call = makeApplication(std::move(call), std::move(P));
         call = makeApplication(std::move(call), std::move(a));
         call = makeApplication(std::move(call), std::move(b));
@@ -10574,7 +10660,7 @@ private:
         const RingAxiomNames& axioms,
         ExpressionPointer a, ExpressionPointer b) {
         ExpressionPointer call =
-            makeConstant(axioms.commutative);
+            ringConst(axioms.commutative);
         call = makeApplication(std::move(call), std::move(a));
         call = makeApplication(std::move(call), std::move(b));
         return call;
@@ -10746,59 +10832,41 @@ private:
         //   proof with congruenceOf(λx. x * rightFactor, ...).
         // Else (both atoms): we'd be at single-element case, handled
         // by the equality check above.
-        auto outerApp =
-            std::get_if<Application>(&expression->node);
-        if (!outerApp) {
-            throwElaborate("ring: unexpected non-application in "
-                            "reassociate");
+        // Decompose `expression = L op R` (prefix-aware via the matcher,
+        // so a bundled `op(c, L, R)` works as well as a concrete
+        // `op(L, R)`).
+        ExpressionPointer leftSubExpr, rightSubExpr;
+        if (!matchBinaryRingOp(expression, opName, leftSubExpr,
+                                  rightSubExpr)) {
+            throwElaborate("ring: unexpected non-op head in reassociate");
         }
-        auto innerApp =
-            std::get_if<Application>(&outerApp->function->node);
-        if (!innerApp) {
-            throwElaborate("ring: unexpected non-op head");
-        }
-        ExpressionPointer leftSubExpr = innerApp->argument;
-        ExpressionPointer rightSubExpr = outerApp->argument;
         // Check if rightSubExpr is itself `<op>(X, Y)`.
-        auto rightOuterApp =
-            std::get_if<Application>(&rightSubExpr->node);
-        if (rightOuterApp) {
-            auto rightInnerApp =
-                std::get_if<Application>(
-                    &rightOuterApp->function->node);
-            if (rightInnerApp) {
-                auto rightHead = std::get_if<Constant>(
-                    &rightInnerApp->function->node);
-                if (rightHead
-                    && rightHead->name == opName) {
-                    // expression = L op (X op Y).
-                    ExpressionPointer X = rightInnerApp->argument;
-                    ExpressionPointer Y = rightOuterApp->argument;
-                    // Step: L op (X op Y) = (L op X) op Y
-                    // by sym associative(L, X, Y).
-                    ExpressionPointer assocProof = buildRingAssoc(
-                        axioms, leftSubExpr, X, Y);
-                    ExpressionPointer LXTimesY = buildRingOp(
-                        axioms.op,
-                        buildRingOp(
-                            axioms.op, leftSubExpr, X),
-                        Y);
-                    ExpressionPointer LTimesXY = buildRingOp(
-                        axioms.op, leftSubExpr,
-                        buildRingOp(axioms.op, X, Y));
-                    ExpressionPointer symAssoc = buildEqualitySymmetry(
-                        universeLevel, carrierType,
-                        LXTimesY, LTimesXY, assocProof);
-                    ExpressionPointer recProof =
-                        buildLeftAssocReassocProof(
-                            axioms, universeLevel, carrierType,
-                            LXTimesY);
-                    return buildEqualityTransitivity(
-                        universeLevel, carrierType,
-                        expression, LXTimesY, canonical,
-                        symAssoc, recProof);
-                }
-            }
+        ExpressionPointer X, Y;
+        if (matchBinaryRingOp(rightSubExpr, opName, X, Y)) {
+            // expression = L op (X op Y).
+            // Step: L op (X op Y) = (L op X) op Y
+            // by sym associative(L, X, Y).
+            ExpressionPointer assocProof = buildRingAssoc(
+                axioms, leftSubExpr, X, Y);
+            ExpressionPointer LXTimesY = buildRingOp(
+                axioms.op,
+                buildRingOp(
+                    axioms.op, leftSubExpr, X),
+                Y);
+            ExpressionPointer LTimesXY = buildRingOp(
+                axioms.op, leftSubExpr,
+                buildRingOp(axioms.op, X, Y));
+            ExpressionPointer symAssoc = buildEqualitySymmetry(
+                universeLevel, carrierType,
+                LXTimesY, LTimesXY, assocProof);
+            ExpressionPointer recProof =
+                buildLeftAssocReassocProof(
+                    axioms, universeLevel, carrierType,
+                    LXTimesY);
+            return buildEqualityTransitivity(
+                universeLevel, carrierType,
+                expression, LXTimesY, canonical,
+                symAssoc, recProof);
         }
         // Right is atomic. Recurse on the left subexpression.
         ExpressionPointer leftCanonical;
@@ -10898,25 +10966,21 @@ private:
     // =====================================================================
     // Ring normaliser — polynomial canonicalisation
     //
-    // Decision procedure that extends v1 with distributivity, identity
-    // (0 and 1), and negation. Both sides of `e1 = e2` are normalised
-    // to a sum-of-monomials over opaque atoms; the atoms are keyed by
-    // subtree hash (so we compare by hash, not by structural equality).
+    // Decision procedure that extends the single-operator AC fast path
+    // with distributivity, identity (0 and 1), and negation. Both sides
+    // of `e1 = e2` are normalised to a sum-of-monomials over opaque
+    // atoms; the atoms are keyed by subtree hash (so we compare by hash,
+    // not by structural equality).
     //
     // A `monomialSignature` is the lex-sorted vector of factor hashes
     // appearing in a monomial (with multiplicity). A polynomial is a
     // `std::map<monomialSignature, signed coefficient>`, with the zero
     // coefficient entries omitted.
     //
-    // v2 of v2 (this version) restricts coefficients to {-1, 0, +1}.
-    // Goals that, after distributivity, collect a like-term coefficient
-    // outside that range (e.g. `a + a = 2 · a`) bail back to the v1
-    // path's error message — they're handled by a future v3.
-    //
-    // Proof generation is staged: this first commit lands the
-    // normaliser + the decision path. If the polynomials agree but the
-    // proof emitter isn't yet ready, the tactic emits a clear error so
-    // we never silently regress.
+    // The proof emitter restricts coefficients to {-1, 0, +1}. Goals
+    // that, after distributivity, collect a like-term coefficient outside
+    // that range (e.g. `a + a = 2 · a`) report a clear "not yet
+    // supported" error rather than silently failing.
     // =====================================================================
 
     // One step in the embedding chain from the source of a numeric
@@ -10943,11 +11007,21 @@ private:
     };
 
     struct RingNormalisationContext {
-        std::string carrierName;           // e.g. "Rational"
-        ExpressionPointer carrierType;      // Constant("Rational")
+        std::string carrierName;           // carrier HEAD, e.g. "Rational"
+                                            // or "Ring.carrier" (bundle)
+        ExpressionPointer carrierType;      // Constant("Rational") / Ring.carrier(s)
         LevelPointer carrierUniverseLevel;  // for Equality.* applications
 
-        std::string addName;                // "<carrier>.add"
+        // Operation/law namespace and the IsRing instance. For a concrete
+        // carrier `opNamespace == carrierName` (`Rational.add`,
+        // `Rational.is_ring`); for the bundled carrier `Ring.carrier(s)`
+        // it is `Ring` (`Ring.add`, `Ring.is_ring`) and every such term
+        // carries `s` as its leading argument (the active
+        // `ringStructurePrefix_`).
+        std::string opNamespace;            // e.g. "Rational" / "Ring"
+        std::string isRingName;             // "<opNamespace>.is_ring"
+
+        std::string addName;                // "<opNamespace>.add"
         std::string multiplyName;           // "<carrier>.multiply"
         std::string negateName;             // "<carrier>.negate"
         std::string subtractName;           // "<carrier>.subtract"
@@ -11074,53 +11148,94 @@ private:
 
     // Recognise `<context.opName>(left, right)` and produce (left,
     // right). Returns true on a match.
+    // Peel an application spine into (head, args), args outermost-LAST
+    // (i.e. in source order). `head` is the innermost function.
+    void peelSpine(ExpressionPointer expression,
+                   ExpressionPointer& headOut,
+                   std::vector<ExpressionPointer>& argsOut) {
+        std::vector<ExpressionPointer> reversed;
+        ExpressionPointer cursor = expression;
+        while (auto* app = std::get_if<Application>(&cursor->node)) {
+            reversed.push_back(app->argument);
+            cursor = app->function;
+        }
+        headOut = cursor;
+        argsOut.assign(reversed.rbegin(), reversed.rend());
+    }
+
+    // Check that the leading `ringStructurePrefix_` arguments of `args`
+    // match the active structure prefix (for a bundled ring, `[s]`).
+    // Empty prefix (concrete carrier) trivially matches.
+    bool structurePrefixMatches(
+        const std::vector<ExpressionPointer>& args) {
+        if (args.size() < ringStructurePrefix_.size()) return false;
+        for (size_t i = 0; i < ringStructurePrefix_.size(); ++i) {
+            if (!structurallyEqual(args[i], ringStructurePrefix_[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Recognise `<opName>([prefix,] left, right)` (the structure prefix
+    // is the leading bundle argument for a bundled ring, absent for a
+    // concrete carrier) and produce (left, right).
     bool matchBinaryRingOp(
         ExpressionPointer expression,
         const std::string& opName,
         ExpressionPointer& leftOut,
         ExpressionPointer& rightOut) {
-        auto* outerApp =
-            std::get_if<Application>(&expression->node);
-        if (!outerApp) return false;
-        auto* innerApp =
-            std::get_if<Application>(&outerApp->function->node);
-        if (!innerApp) return false;
-        auto* head =
-            std::get_if<Constant>(&innerApp->function->node);
-        if (!head || head->name != opName) return false;
-        leftOut = innerApp->argument;
-        rightOut = outerApp->argument;
+        ExpressionPointer head;
+        std::vector<ExpressionPointer> args;
+        peelSpine(expression, head, args);
+        auto* headConstant = std::get_if<Constant>(&head->node);
+        if (!headConstant || headConstant->name != opName) return false;
+        if (args.size() != ringStructurePrefix_.size() + 2) return false;
+        if (!structurePrefixMatches(args)) return false;
+        leftOut = args[ringStructurePrefix_.size()];
+        rightOut = args[ringStructurePrefix_.size() + 1];
         return true;
     }
 
-    // Recognise `<context.negateName>(inner)` and produce `inner`.
+    // Recognise `<negateName>([prefix,] inner)` and produce `inner`.
     bool matchUnaryRingNegate(
         ExpressionPointer expression,
         const std::string& negateName,
         ExpressionPointer& innerOut) {
-        auto* outerApp =
-            std::get_if<Application>(&expression->node);
-        if (!outerApp) return false;
-        auto* head =
-            std::get_if<Constant>(&outerApp->function->node);
-        if (!head || head->name != negateName) return false;
-        innerOut = outerApp->argument;
+        ExpressionPointer head;
+        std::vector<ExpressionPointer> args;
+        peelSpine(expression, head, args);
+        auto* headConstant = std::get_if<Constant>(&head->node);
+        if (!headConstant || headConstant->name != negateName) return false;
+        if (args.size() != ringStructurePrefix_.size() + 1) return false;
+        if (!structurePrefixMatches(args)) return false;
+        innerOut = args[ringStructurePrefix_.size()];
         return true;
     }
 
-    // True if `expression` is `<carrier>.zero` (head Constant whose
-    // name matches `context.zeroName`).
+    // True if `expression` is `<zeroName>` (concrete) / `<zeroName>(s)`
+    // (bundled ring: the constant applied to the structure prefix).
     bool matchRingZero(ExpressionPointer expression,
                           const std::string& zeroName) {
-        auto* head = std::get_if<Constant>(&expression->node);
-        return head != nullptr && head->name == zeroName;
+        ExpressionPointer head;
+        std::vector<ExpressionPointer> args;
+        peelSpine(expression, head, args);
+        auto* headConstant = std::get_if<Constant>(&head->node);
+        if (!headConstant || headConstant->name != zeroName) return false;
+        return args.size() == ringStructurePrefix_.size()
+            && structurePrefixMatches(args);
     }
 
-    // True if `expression` is `<carrier>.one`.
+    // True if `expression` is `<oneName>` / `<oneName>(s)`.
     bool matchRingOne(ExpressionPointer expression,
                          const std::string& oneName) {
-        auto* head = std::get_if<Constant>(&expression->node);
-        return head != nullptr && head->name == oneName;
+        ExpressionPointer head;
+        std::vector<ExpressionPointer> args;
+        peelSpine(expression, head, args);
+        auto* headConstant = std::get_if<Constant>(&head->node);
+        if (!headConstant || headConstant->name != oneName) return false;
+        return args.size() == ringStructurePrefix_.size()
+            && structurePrefixMatches(args);
     }
 
     // True if `expression` is a Natural literal `successor^k(zero)`
@@ -11410,11 +11525,11 @@ private:
     // of `<context.oneName>`, left-associated.  N must be >= 1.
     ExpressionPointer buildRingCoefficientExpression(
         int count, const RingNormalisationContext& context) {
-        ExpressionPointer one = makeConstant(context.oneName);
+        ExpressionPointer one = ringConst(context.oneName);
         if (count == 1) return one;
         ExpressionPointer accumulator = one;
         for (int i = 1; i < count; ++i) {
-            ExpressionPointer onePlus = makeConstant(context.oneName);
+            ExpressionPointer onePlus = ringConst(context.oneName);
             accumulator = buildRingOp(context.addName,
                                         std::move(accumulator),
                                         std::move(onePlus));
@@ -11456,7 +11571,7 @@ private:
             // No explicit coefficient. If no factors, the monomial is
             // just `one`.
             monomial = factorProduct ? factorProduct
-                                      : makeConstant(context.oneName);
+                                      : ringConst(context.oneName);
         } else {
             ExpressionPointer coefficientExpr =
                 buildRingCoefficientExpression(magnitude, context);
@@ -11467,7 +11582,7 @@ private:
                 : std::move(coefficientExpr);
         }
         if (coefficient < 0) {
-            ExpressionPointer negate = makeConstant(context.negateName);
+            ExpressionPointer negate = ringConst(context.negateName);
             monomial = makeApplication(std::move(negate),
                                           std::move(monomial));
         }
@@ -11485,7 +11600,7 @@ private:
         const RingPolynomial& polynomial,
         const RingNormalisationContext& context) {
         if (polynomial.empty()) {
-            return makeConstant(context.zeroName);
+            return ringConst(context.zeroName);
         }
         std::vector<ExpressionPointer> monomials;
         for (const auto& entry : polynomial) {
@@ -11577,6 +11692,17 @@ private:
     // Operation terms (`<carrier>.add`, `.multiply`, `.negate`,
     // `.subtract`, `.zero`, `.one`) are recognised and built by the
     // matchers/builders below.
+    //
+    // The names are resolved relative to an "operation namespace" and an
+    // optional "structure prefix" (see `computeRingScheme` /
+    // `ringStructurePrefix_`): for a concrete carrier the namespace is
+    // the carrier head (`Integer`) with no prefix; for a bundled
+    // commutative-ring carrier `CommutativeRing.carrier(c)` the namespace
+    // is `CommutativeRing` and the prefix is `[c]`, so e.g.
+    // `add_associative` resolves to `CommutativeRing.add_associative`
+    // cited as `CommutativeRing.add_associative(c, …)`. A plain
+    // `Ring.carrier(s)` is NOT a `ring` target — `ring` is a commutative-
+    // ring tactic and a bare ring has no `multiply_commutative`.
     // ------------------------------------------------------------------
     struct RingLawNames {
         std::string addZeroRight;          // a + 0 = a
@@ -11611,50 +11737,50 @@ private:
     }
 
     RingLawNames resolveRingLawNames(
-        const std::string& carrierName) {
+        const std::string& opNamespace) {
         RingLawNames names;
         names.zeroAddLeft = pickAxiomName(
-            carrierName + ".zero_add",
-            carrierName + ".add_identity_left");
+            opNamespace + ".zero_add",
+            opNamespace + ".add_identity_left");
         names.addZeroRight = pickAxiomName(
-            carrierName + ".add_zero",
-            carrierName + ".add_identity_right");
+            opNamespace + ".add_zero",
+            opNamespace + ".add_identity_right");
         names.oneMultiplyLeft = pickAxiomName(
-            carrierName + ".one_multiply",
-            carrierName + ".multiply_identity_left");
+            opNamespace + ".one_multiply",
+            opNamespace + ".multiply_identity_left");
         names.multiplyOneRight = pickAxiomName(
-            carrierName + ".multiply_one",
-            carrierName + ".multiply_identity_right");
+            opNamespace + ".multiply_one",
+            opNamespace + ".multiply_identity_right");
         names.multiplyZeroLeft = pickAxiomName(
-            carrierName + ".multiply_zero_left",
-            carrierName + ".zero_multiply");
+            opNamespace + ".multiply_zero_left",
+            opNamespace + ".zero_multiply");
         names.multiplyZeroRight = pickAxiomName(
-            carrierName + ".multiply_zero_right",
-            carrierName + ".multiply_zero");
+            opNamespace + ".multiply_zero_right",
+            opNamespace + ".multiply_zero");
         names.addNegateRight = pickAxiomName(
-            carrierName + ".add_negate_right",
-            carrierName + ".add_negate_right");
+            opNamespace + ".add_negate_right",
+            opNamespace + ".add_negate_right");
         names.addNegateLeft = pickAxiomName(
-            carrierName + ".add_negate_left",
-            carrierName + ".add_negate_left");
+            opNamespace + ".add_negate_left",
+            opNamespace + ".add_negate_left");
         names.negateNegate = pickAxiomName(
-            carrierName + ".negate_negate",
-            carrierName + ".negate_negate");
+            opNamespace + ".negate_negate",
+            opNamespace + ".negate_negate");
         names.negateAdd = pickAxiomName(
-            carrierName + ".negate_add",
-            carrierName + ".negate_add");
+            opNamespace + ".negate_add",
+            opNamespace + ".negate_add");
         names.multiplyNegateLeft = pickAxiomName(
-            carrierName + ".multiply_negate_left",
-            carrierName + ".multiply_negate_left");
+            opNamespace + ".multiply_negate_left",
+            opNamespace + ".multiply_negate_left");
         names.multiplyNegateRight = pickAxiomName(
-            carrierName + ".multiply_negate_right",
-            carrierName + ".multiply_negate_right");
-        names.distributivityLeft = carrierName + ".distributivity_left";
-        names.distributivityRight = carrierName + ".distributivity_right";
-        names.addAssociative = carrierName + ".add_associative";
-        names.addCommutative = carrierName + ".add_commutative";
-        names.multiplyAssociative = carrierName + ".multiply_associative";
-        names.multiplyCommutative = carrierName + ".multiply_commutative";
+            opNamespace + ".multiply_negate_right",
+            opNamespace + ".multiply_negate_right");
+        names.distributivityLeft = opNamespace + ".distributivity_left";
+        names.distributivityRight = opNamespace + ".distributivity_right";
+        names.addAssociative = opNamespace + ".add_associative";
+        names.addCommutative = opNamespace + ".add_commutative";
+        names.multiplyAssociative = opNamespace + ".multiply_associative";
+        names.multiplyCommutative = opNamespace + ".multiply_commutative";
         return names;
     }
 
@@ -11673,7 +11799,7 @@ private:
     // Build `<negateName>(inner)`.
     ExpressionPointer buildRingNegate(
         const std::string& negateName, ExpressionPointer inner) {
-        return makeApplication(makeConstant(negateName), std::move(inner));
+        return makeApplication(ringConst(negateName), std::move(inner));
     }
 
     // Render a signed-monomial pair `(signature, sign)` to its canonical
@@ -12391,9 +12517,9 @@ private:
             // zero + zero = zero. Use zero_add(zero) :  0 + 0 = 0.
             demandAxiomName(axiomNames.zeroAddLeft, "zero_add/add_identity_left",
                               context.carrierName);
-            ExpressionPointer zeroConst = makeConstant(context.zeroName);
+            ExpressionPointer zeroConst = ringConst(context.zeroName);
             ExpressionPointer call =
-                makeApplication(makeConstant(axiomNames.zeroAddLeft),
+                makeApplication(ringConst(axiomNames.zeroAddLeft),
                                   zeroConst);
             return call;
         }
@@ -12402,7 +12528,7 @@ private:
             demandAxiomName(axiomNames.zeroAddLeft, "zero_add/add_identity_left",
                               context.carrierName);
             ExpressionPointer call =
-                makeApplication(makeConstant(axiomNames.zeroAddLeft),
+                makeApplication(ringConst(axiomNames.zeroAddLeft),
                                   rightCanonical);
             return call;
         }
@@ -12411,7 +12537,7 @@ private:
             demandAxiomName(axiomNames.addZeroRight, "add_zero/add_identity_right",
                               context.carrierName);
             ExpressionPointer call =
-                makeApplication(makeConstant(axiomNames.addZeroRight),
+                makeApplication(ringConst(axiomNames.addZeroRight),
                                   leftCanonical);
             return call;
         }
@@ -12616,11 +12742,9 @@ private:
             // directly to `0` via add_negate_right(M), no
             // associativity / add_zero needed.
             if (remainingKernels.empty()) {
-                ExpressionPointer addNegProof = makeConstant(
-                    axiomNames.addNegateRight);
+                ExpressionPointer addNegProof = ringConst(axiomNames.addNegateRight);
                 addNegProof = makeApplication(addNegProof, M);
-                ExpressionPointer zeroConst = makeConstant(
-                    context.zeroName);
+                ExpressionPointer zeroConst = ringConst(context.zeroName);
                 chainProof = buildEqualityTransitivity(
                     universeLevel, carrierType,
                     leftPlusRight, currentForm, zeroConst,
@@ -12639,8 +12763,7 @@ private:
             // currentForm has shape:
             //   ((prefix) + M) + (-M)
             // Step A: associativity. (prefix + M) + (-M) = prefix + (M + (-M)).
-            ExpressionPointer assocProof = makeConstant(
-                axiomNames.addAssociative);
+            ExpressionPointer assocProof = ringConst(axiomNames.addAssociative);
             assocProof = makeApplication(assocProof, prefix);
             assocProof = makeApplication(assocProof, M);
             assocProof = makeApplication(assocProof, negM);
@@ -12649,8 +12772,7 @@ private:
                 buildRingOp(context.addName, M, negM));
             // Step B: congruence with λz. prefix + z, where the inner
             // step is `add_negate_right(M) : M + (-M) = 0`.
-            ExpressionPointer addNegProof = makeConstant(
-                axiomNames.addNegateRight);
+            ExpressionPointer addNegProof = ringConst(axiomNames.addNegateRight);
             addNegProof = makeApplication(addNegProof, M);
             ExpressionPointer prefixLifted =
                 liftBoundVariables(prefix, 1, 0);
@@ -12658,7 +12780,7 @@ private:
                 context.addName, prefixLifted, makeBoundVariable(0));
             ExpressionPointer lambdaB = makeLambda(
                 "_ring_cancel_z", carrierType, lambdaBodyB);
-            ExpressionPointer zeroConst = makeConstant(context.zeroName);
+            ExpressionPointer zeroConst = ringConst(context.zeroName);
             ExpressionPointer congrB =
                 buildEqualityCongruenceSameCarrier(
                     universeLevel, carrierType, lambdaB,
@@ -12668,8 +12790,7 @@ private:
             ExpressionPointer formB = buildRingOp(
                 context.addName, prefix, zeroConst);
             // Step C: add_zero_right(prefix) : prefix + 0 = prefix.
-            ExpressionPointer addZeroProof = makeConstant(
-                axiomNames.addZeroRight);
+            ExpressionPointer addZeroProof = ringConst(axiomNames.addZeroRight);
             addZeroProof = makeApplication(addZeroProof, prefix);
             // Compose: currentForm → formA via assocProof,
             //          formA → formB via congrB,
@@ -12757,38 +12878,46 @@ private:
     // `args` are the lemma-specific term arguments after the IsRing
     // instance (e.g., `x` for `zero_multiply(x)`, `a, b` for
     // `multiply_negate_left(a, b)`).
+    // The seven leading arguments every abstract `Ring.<lemma>` over a
+    // generic `IsRing` takes: (carrier, add, zero, negate, multiply, one,
+    // isRing). The binary/unary operation values (add/negate/multiply)
+    // are passed BARE — under a bundled ring their structure argument is
+    // implicit and is recovered from the lemma's expected operation type
+    // — while the nullary constants (zero/one) and the IsRing instance
+    // carry the structure prefix (`Ring.zero(s)`, `Ring.is_ring(s)`). For
+    // a concrete carrier the prefix is empty, so all seven are the plain
+    // `<carrier>.*` constants, exactly as before.
+    void appendIsRingInstanceArgs(
+        ExpressionPointer& call,
+        const RingNormalisationContext& context) {
+        call = makeApplication(call, context.carrierType);
+        call = makeApplication(call, makeConstant(context.addName));
+        call = makeApplication(call, ringConst(context.zeroName));
+        call = makeApplication(call, makeConstant(context.negateName));
+        call = makeApplication(call, makeConstant(context.multiplyName));
+        call = makeApplication(call, ringConst(context.oneName));
+        call = makeApplication(call, ringConst(context.isRingName));
+    }
+
     ExpressionPointer buildAbstractRingLemmaApplication(
         const std::string& abstractLemmaName,
         const std::string& fallbackPerCarrierName,
         const std::string& fallbackHumanName,
         const std::vector<ExpressionPointer>& args,
         const RingNormalisationContext& context) {
-        const std::string carrierIsRing =
-            context.carrierName + ".is_ring";
         if (environment_.lookup(abstractLemmaName) != nullptr
-            && environment_.lookup(carrierIsRing) != nullptr) {
+            && environment_.lookup(context.isRingName) != nullptr) {
             ExpressionPointer call = makeConstant(abstractLemmaName);
-            call = makeApplication(call, context.carrierType);
-            call = makeApplication(call,
-                                      makeConstant(context.addName));
-            call = makeApplication(call,
-                                      makeConstant(context.zeroName));
-            call = makeApplication(call,
-                                      makeConstant(context.negateName));
-            call = makeApplication(call,
-                                      makeConstant(context.multiplyName));
-            call = makeApplication(call,
-                                      makeConstant(context.oneName));
-            call = makeApplication(call, makeConstant(carrierIsRing));
+            appendIsRingInstanceArgs(call, context);
             for (const auto& arg : args) {
                 call = makeApplication(call, arg);
             }
             return call;
         }
-        // Fall back.
+        // Fall back to a per-carrier wrapper (concrete carriers only).
         demandAxiomName(fallbackPerCarrierName, fallbackHumanName,
                           context.carrierName);
-        ExpressionPointer call = makeConstant(fallbackPerCarrierName);
+        ExpressionPointer call = ringConst(fallbackPerCarrierName);
         for (const auto& arg : args) {
             call = makeApplication(call, arg);
         }
@@ -12963,8 +13092,7 @@ private:
                 // distributivity_right(smallerLeftFactor, L_{lastIdx}, R)
                 //   : (smallerLeftFactor + L_{lastIdx}) * R
                 //     = smallerLeftFactor * R + L_{lastIdx} * R
-                ExpressionPointer distRightCall = makeConstant(
-                    axiomNames.distributivityRight);
+                ExpressionPointer distRightCall = ringConst(axiomNames.distributivityRight);
                 distRightCall = makeApplication(distRightCall,
                                                   smallerLeftFactor);
                 distRightCall = makeApplication(distRightCall, Li);
@@ -13169,8 +13297,7 @@ private:
                             rightMonomialKernels[lastIdx];
                         // distributivity_left(Li, smallerR, Rk):
                         //   Li * (smallerR + Rk) = Li * smallerR + Li * Rk
-                        ExpressionPointer distLeftCall = makeConstant(
-                            axiomNames.distributivityLeft);
+                        ExpressionPointer distLeftCall = ringConst(axiomNames.distributivityLeft);
                         distLeftCall = makeApplication(distLeftCall, Li);
                         distLeftCall = makeApplication(distLeftCall,
                                                           smallerR);
@@ -13623,26 +13750,12 @@ private:
         // negate_negate chain when the abstract isn't in scope.
         bool handledBothNegative = false;
         {
-            const std::string carrierIsRing =
-                context.carrierName + ".is_ring";
             if (leftMono.sign < 0 && rightMono.sign < 0
                 && environment_.lookup("Ring.negate_multiply_negate") != nullptr
-                && environment_.lookup(carrierIsRing) != nullptr) {
+                && environment_.lookup(context.isRingName) != nullptr) {
                 ExpressionPointer call = makeConstant(
                     "Ring.negate_multiply_negate");
-                call = makeApplication(call, context.carrierType);
-                call = makeApplication(call,
-                                          makeConstant(context.addName));
-                call = makeApplication(call,
-                                          makeConstant(context.zeroName));
-                call = makeApplication(call,
-                                          makeConstant(context.negateName));
-                call = makeApplication(call,
-                                          makeConstant(context.multiplyName));
-                call = makeApplication(call,
-                                          makeConstant(context.oneName));
-                call = makeApplication(call,
-                                          makeConstant(carrierIsRing));
+                appendIsRingInstanceArgs(call, context);
                 call = makeApplication(call, Mi);
                 call = makeApplication(call, Mj);
                 // call : (-Mi) * (-Mj) = Mi * Mj
@@ -13721,8 +13834,7 @@ private:
                 // Then collapse via negate_negate.
                 demandAxiomName(axiomNames.negateNegate,
                                   "negate_negate", context.carrierName);
-                ExpressionPointer nnCall = makeConstant(
-                    axiomNames.negateNegate);
+                ExpressionPointer nnCall = ringConst(axiomNames.negateNegate);
                 nnCall = makeApplication(nnCall,
                                             buildRingOp(context.multiplyName,
                                                           Mi, Mj));
@@ -13784,14 +13896,14 @@ private:
                     demandAxiomName(axiomNames.oneMultiplyLeft,
                                       "one_multiply", context.carrierName);
                     rewriteProof = makeApplication(
-                        makeConstant(axiomNames.oneMultiplyLeft), Mj);
+                        ringConst(axiomNames.oneMultiplyLeft), Mj);
                     newInner = Mj;
                 } else {
                     // `Mi * Integer.one = Mi` via multiply_one(Mi).
                     demandAxiomName(axiomNames.multiplyOneRight,
                                       "multiply_one", context.carrierName);
                     rewriteProof = makeApplication(
-                        makeConstant(axiomNames.multiplyOneRight), Mi);
+                        ringConst(axiomNames.multiplyOneRight), Mi);
                     newInner = Mi;
                 }
                 ExpressionPointer newForm;
@@ -13941,12 +14053,12 @@ private:
             demandAxiomName(axiomNames.addNegateLeft,
                               "add_negate_left", context.carrierName);
             ExpressionPointer zeroConst =
-                makeConstant(context.zeroName);
+                ringConst(context.zeroName);
             ExpressionPointer negateZero = buildRingNegate(
                 context.negateName, zeroConst);
             ExpressionPointer addZeroAtNegZero =
                 makeApplication(
-                    makeConstant(axiomNames.addZeroRight), negateZero);
+                    ringConst(axiomNames.addZeroRight), negateZero);
             ExpressionPointer negZeroPlusZero = buildRingOp(
                 context.addName, negateZero, zeroConst);
             ExpressionPointer step1 = buildEqualitySymmetry(
@@ -13954,7 +14066,7 @@ private:
                 negZeroPlusZero, negateZero, addZeroAtNegZero);
             ExpressionPointer step2 =
                 makeApplication(
-                    makeConstant(axiomNames.addNegateLeft), zeroConst);
+                    ringConst(axiomNames.addNegateLeft), zeroConst);
             return buildEqualityTransitivity(
                 universeLevel, carrierType,
                 negateZero, negZeroPlusZero, zeroConst,
@@ -14009,8 +14121,7 @@ private:
                 size_t idx = i - 1;  // index of s_i in innerKernels
                 ExpressionPointer subjectPrefix = runningPrefix[idx - 1];
                 ExpressionPointer subjectSi = innerKernels[idx];
-                ExpressionPointer negAddCall = makeConstant(
-                    axiomNames.negateAdd);
+                ExpressionPointer negAddCall = ringConst(axiomNames.negateAdd);
                 negAddCall = makeApplication(negAddCall, subjectPrefix);
                 negAddCall = makeApplication(negAddCall, subjectSi);
                 // negAddCall has type
@@ -14097,7 +14208,7 @@ private:
                 context.negateName, innerKernels[i]);
             ExpressionPointer newSummand = M_pos;
             // The proof: negate(negate(M_pos)) = M_pos via negate_negate(M_pos).
-            ExpressionPointer nnCall = makeConstant(axiomNames.negateNegate);
+            ExpressionPointer nnCall = ringConst(axiomNames.negateNegate);
             nnCall = makeApplication(nnCall, M_pos);
             // Apply at position i in the flat sum.
             if (innerSigned.size() == 1) {
@@ -14319,16 +14430,20 @@ private:
         LevelPointer carrierUniverseLevel,
         const std::string& carrierName,
         int line) {
+        RingScheme scheme = computeRingScheme(carrierType);
+        RingStructurePrefixGuard prefixGuard(*this, scheme.structurePrefix);
         RingNormalisationContext context;
         context.carrierName = carrierName;
         context.carrierType = carrierType;
         context.carrierUniverseLevel = carrierUniverseLevel;
-        context.addName       = carrierName + ".add";
-        context.multiplyName  = carrierName + ".multiply";
-        context.negateName    = carrierName + ".negate";
-        context.subtractName  = carrierName + ".subtract";
-        context.zeroName      = carrierName + ".zero";
-        context.oneName       = carrierName + ".one";
+        context.opNamespace   = scheme.opNamespace;
+        context.isRingName    = scheme.opNamespace + ".is_ring";
+        context.addName       = scheme.opNamespace + ".add";
+        context.multiplyName  = scheme.opNamespace + ".multiply";
+        context.negateName    = scheme.opNamespace + ".negate";
+        context.subtractName  = scheme.opNamespace + ".subtract";
+        context.zeroName      = scheme.opNamespace + ".zero";
+        context.oneName       = scheme.opNamespace + ".one";
         populateRingEmbeddingChain(context);
         // Sanity-check the carrier supports the v2 vocabulary. We only
         // require add + multiply at the moment — zero, one, and negate
@@ -14360,7 +14475,7 @@ private:
         // unresolved; the merge helpers `demandAxiomName` only what
         // they actually use.
         RingLawNames axiomNames =
-            resolveRingLawNames(carrierName);
+            resolveRingLawNames(scheme.opNamespace);
         // We always need add/multiply assoc and commute (used by
         // every non-trivial merge step).
         demandAxiomName(axiomNames.addAssociative,
@@ -14647,7 +14762,7 @@ private:
         // and lifting outward.
         ExpressionPointer survivorsProduct;
         bool noSurvivors = survivors.empty();
-        ExpressionPointer oneConst = makeConstant(context.oneName);
+        ExpressionPointer oneConst = ringConst(context.oneName);
         if (noSurvivors) {
             // We'll start with the trick: rearranged-product =
             // 1 * (t_1 * r_1 * ... * t_k * r_k). Hmm, but rearranged-product
@@ -14776,8 +14891,7 @@ private:
             }
             // Step B.1: associativity:
             //   (prefixProduct * t) * r = prefixProduct * (t * r)
-            ExpressionPointer assocProof = makeConstant(
-                axiomNames.multiplyAssociative);
+            ExpressionPointer assocProof = ringConst(axiomNames.multiplyAssociative);
             assocProof = makeApplication(assocProof, prefixProduct);
             assocProof = makeApplication(assocProof, tExpr);
             assocProof = makeApplication(assocProof, rExpr);
@@ -14800,8 +14914,7 @@ private:
             ExpressionPointer formB = buildRingOp(
                 multiplyName, prefixProduct, oneConst);
             // Step B.3: multiply_one(prefixProduct) : prefix * 1 = prefix.
-            ExpressionPointer multOneProof = makeConstant(
-                axiomNames.multiplyOneRight);
+            ExpressionPointer multOneProof = ringConst(axiomNames.multiplyOneRight);
             multOneProof = makeApplication(multOneProof, prefixProduct);
             // Compose: currentForm = formA = formB = prefixProduct.
             ExpressionPointer stepAB = buildEqualityTransitivity(
@@ -14951,7 +15064,7 @@ private:
                     context.multiplyName, originalFactors);
             ExpressionPointer contractedProduct;
             if (contractedFactors.empty()) {
-                contractedProduct = makeConstant(context.oneName);
+                contractedProduct = ringConst(context.oneName);
             } else if (contractedFactors.size() == 1) {
                 contractedProduct = contractedFactors[0];
             } else {
@@ -14979,7 +15092,7 @@ private:
                 context.multiplyName, originalFactors);
         ExpressionPointer contractedProduct;
         if (contractedFactors.empty()) {
-            contractedProduct = makeConstant(context.oneName);
+            contractedProduct = ringConst(context.oneName);
         } else if (contractedFactors.size() == 1) {
             contractedProduct = contractedFactors[0];
         } else {
@@ -15028,7 +15141,7 @@ private:
         if (originalPoly.empty()) {
             // canonical of empty = zero. Reflexivity.
             return buildReflexivity(universeLevel, carrierType,
-                                      makeConstant(context.zeroName));
+                                      ringConst(context.zeroName));
         }
         // Build per-monomial kernels and per-monomial contraction proofs.
         // Iterate originalPoly in canonical order (std::map order on signature).
@@ -15261,17 +15374,24 @@ private:
         EqualityComponents goal =
             extractEqualityComponents(expectedTypeOpened, "field", line);
         std::string carrierName = headConstantName(goal.carrierType);
-        // Set up the ring normaliser context.
+        // Set up the ring normaliser context. (The `field` tactic is
+        // only used over concrete carriers, so the operation namespace is
+        // the carrier head and there is no structure prefix; the bundled-
+        // ring path is exercised through `ring`.)
+        RingScheme scheme = computeRingScheme(goal.carrierType);
+        RingStructurePrefixGuard prefixGuard(*this, scheme.structurePrefix);
         RingNormalisationContext context;
         context.carrierName = carrierName;
         context.carrierType = goal.carrierType;
         context.carrierUniverseLevel = goal.carrierUniverseLevel;
-        context.addName       = carrierName + ".add";
-        context.multiplyName  = carrierName + ".multiply";
-        context.negateName    = carrierName + ".negate";
-        context.subtractName  = carrierName + ".subtract";
-        context.zeroName      = carrierName + ".zero";
-        context.oneName       = carrierName + ".one";
+        context.opNamespace   = scheme.opNamespace;
+        context.isRingName    = scheme.opNamespace + ".is_ring";
+        context.addName       = scheme.opNamespace + ".add";
+        context.multiplyName  = scheme.opNamespace + ".multiply";
+        context.negateName    = scheme.opNamespace + ".negate";
+        context.subtractName  = scheme.opNamespace + ".subtract";
+        context.zeroName      = scheme.opNamespace + ".zero";
+        context.oneName       = scheme.opNamespace + ".one";
         populateRingEmbeddingChain(context);
         if (environment_.lookup(context.addName) == nullptr
             || environment_.lookup(context.multiplyName) == nullptr) {
@@ -15473,7 +15593,7 @@ private:
         }
         // Resolve axiom names.
         RingLawNames axiomNames =
-            resolveRingLawNames(carrierName);
+            resolveRingLawNames(scheme.opNamespace);
         demandAxiomName(axiomNames.addAssociative,
                           "add_associative", carrierName);
         demandAxiomName(axiomNames.addCommutative,
@@ -22456,6 +22576,15 @@ private:
     bool reportRedundantByNonEq_ = false;
     bool reportRedundantCalcSteps_ = false;
     std::string currentDeclarationName_;
+    // `ring` over a bundled-ring carrier `Ring.carrier(s)`: the leading
+    // structure argument(s) (`[s]`) that every operation/law term carries
+    // before its operands in the kernel — e.g. `Ring.add(s, x, y)`,
+    // `Ring.add_associative(s, …)`. Empty for a concrete carrier (whose
+    // operations like `Integer.add(x, y)` take no leading structure arg).
+    // Set via `RingStructurePrefixGuard` for the duration of one `ring`
+    // elaboration; consumed by `ringConst` (term/law head builder) and by
+    // the operation matchers.
+    std::vector<ExpressionPointer> ringStructurePrefix_;
     // Stack of expected types active on the current elaboration call
     // chain. The top of the stack is what the `goal` keyword resolves
     // to. Pushed at the entry to elaborateExpression whenever the
