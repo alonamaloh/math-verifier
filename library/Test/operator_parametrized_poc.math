@@ -11,6 +11,7 @@ import Algebra.monoid
 import Algebra.group
 import Algebra.ring
 import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
 import RingModulo.basics
 import RingModulo.operations
 
@@ -30,20 +31,29 @@ theorem Test.recover_operator (s : Ring) (x y : Ring.carrier(s))
         : x + y = Ring.add(s, x, y) :=
   reflexivity(Ring.carrier(s), Ring.add(s, x, y))
 
--- (3) Two implicits, the second dependent: recover {s : Ring} AND
--- {m : Ring.carrier(s)} from x : RingModulo(s, m).
-definition Test.rmAdd {s : Ring} {m : Ring.carrier(s)}
-        (x y : RingModulo(s, m)) : RingModulo(s, m) :=
-  RingModulo.add(s, m, x, y)
+-- (3) Two implicits, the second dependent: recover {c : CommutativeRing}
+-- AND {m : CommutativeRing.carrier(c)} from x : RingModulo(c, m).
+definition Test.rmAdd {c : CommutativeRing} {m : CommutativeRing.carrier(c)}
+        (x y : RingModulo(c, m)) : RingModulo(c, m) :=
+  RingModulo.add(x, y)
 
-theorem Test.recover_two (s : Ring) (m : Ring.carrier(s))
-        (x y : RingModulo(s, m))
-        : Test.rmAdd(x, y) = RingModulo.add(s, m, x, y) :=
-  reflexivity(RingModulo(s, m), RingModulo.add(s, m, x, y))
+theorem Test.recover_two (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x y : RingModulo(c, m))
+        : Test.rmAdd(x, y) = RingModulo.add(x, y) :=
+  reflexivity(RingModulo(c, m), RingModulo.add(x, y))
 
 -- (4) The `-` operator dispatches to RingModulo.subtract, recovering
 -- both implicits from the operands; subtract δ-reduces to add ∘ negate.
-theorem Test.recover_subtract (s : Ring) (m : Ring.carrier(s))
-        (x y : RingModulo(s, m))
+theorem Test.recover_subtract (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x y : RingModulo(c, m))
         : x - y = RingModulo.add(x, RingModulo.negate(y)) :=
-  reflexivity(RingModulo(s, m), RingModulo.add(x, RingModulo.negate(y)))
+  reflexivity(RingModulo(c, m), RingModulo.add(x, RingModulo.negate(y)))
+
+-- (5) The `*` operator dispatches to RingModulo.multiply. This is the
+-- payoff of indexing by CommutativeRing: the commutativity proof
+-- multiply needs is carried by `c`, which is recovered from the operand
+-- type — no commutativity argument is threaded at the call site.
+theorem Test.recover_multiply (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x y : RingModulo(c, m))
+        : x * y = RingModulo.multiply(x, y) :=
+  reflexivity(RingModulo(c, m), RingModulo.multiply(x, y))

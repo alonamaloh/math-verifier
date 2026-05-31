@@ -18,6 +18,7 @@ import Natural.order
 import Natural.monus
 import Algebra.ring
 import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
 import Algebra.group
 import Algebra.group_lemmas
 import Real.basics
@@ -44,36 +45,30 @@ import ComplexNumber.basics
 -- The imaginary unit and i² = −1.
 
 definition ComplexNumber.i : ComplexNumber :=
-  RingModulo.make(Real.polynomial_ring, Complex.modulus, Complex.x)
+  RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus, Complex.x)
 
 -- i² + 1 = 0: the left side is the class of x²+1 = the modulus, which is
 -- zero in the quotient. (Holds by the modulus's definition reducing
 -- through the lifts; the proof is just `modulus_is_zero`.)
 theorem ComplexNumber.i_squared_plus_one
-        : RingModulo.add(RingModulo.multiply(Real.polynomial_ring,
-                  Real.polynomial_ring_commutative, Complex.modulus,
-                  ComplexNumber.i, ComplexNumber.i),
-              RingModulo.one(Real.polynomial_ring, Complex.modulus))
-          = RingModulo.zero(Real.polynomial_ring, Complex.modulus) :=
-  RingModulo.modulus_is_zero(Real.polynomial_ring, Complex.modulus)
+        : RingModulo.add(RingModulo.multiply(ComplexNumber.i, ComplexNumber.i),
+              RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus))
+          = RingModulo.zero(Real.polynomial_commutative_ring, Complex.modulus) :=
+  RingModulo.modulus_is_zero(Real.polynomial_commutative_ring, Complex.modulus)
 
 -- i² = −1.
 theorem ComplexNumber.i_squared
-        : RingModulo.multiply(Real.polynomial_ring,
-              Real.polynomial_ring_commutative, Complex.modulus,
-              ComplexNumber.i, ComplexNumber.i)
+        : RingModulo.multiply(ComplexNumber.i, ComplexNumber.i)
           = RingModulo.negate(
-              RingModulo.one(Real.polynomial_ring, Complex.modulus)) :=
+              RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus)) :=
   Group.left_inverse_unique(
       ComplexNumber,
       RingModulo.add,
-      RingModulo.zero(Real.polynomial_ring, Complex.modulus),
+      RingModulo.zero(Real.polynomial_commutative_ring, Complex.modulus),
       RingModulo.negate,
-      RingModulo.add_is_group(Real.polynomial_ring, Complex.modulus),
-      RingModulo.one(Real.polynomial_ring, Complex.modulus),
-      RingModulo.multiply(Real.polynomial_ring,
-          Real.polynomial_ring_commutative, Complex.modulus,
-          ComplexNumber.i, ComplexNumber.i),
+      RingModulo.add_is_group(Real.polynomial_commutative_ring, Complex.modulus),
+      RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus),
+      RingModulo.multiply(ComplexNumber.i, ComplexNumber.i),
       ComplexNumber.i_squared_plus_one)
 
 -- ----------------------------------------------------------------------
@@ -265,22 +260,22 @@ theorem Complex.constant_zero
 -- The embedding ℝ ↪ ℂ.
 
 definition ComplexNumber.from_real (a : Real) : ComplexNumber :=
-  RingModulo.make(Real.polynomial_ring, Complex.modulus,
+  RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus,
       Polynomial.monomial(Real.ring, a, 0))
 
 -- 1 ↦ 1 (the constant polynomial 1 is literally Polynomial.one).
 theorem ComplexNumber.from_real_one
         : ComplexNumber.from_real(Real.one)
-          = RingModulo.one(Real.polynomial_ring, Complex.modulus) :=
-  reflexivity(ComplexNumber, RingModulo.one(Real.polynomial_ring, Complex.modulus))
+          = RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus) :=
+  reflexivity(ComplexNumber, RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus))
 
 -- 0 ↦ 0.
 theorem ComplexNumber.from_real_zero
         : ComplexNumber.from_real(Real.zero)
-          = RingModulo.zero(Real.polynomial_ring, Complex.modulus) :=
+          = RingModulo.zero(Real.polynomial_commutative_ring, Complex.modulus) :=
   congruenceOf(
       function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
-          RingModulo.make(Real.polynomial_ring, Complex.modulus, p),
+          RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus, p),
       Complex.constant_zero)
 
 -- Preserves addition.
@@ -290,17 +285,16 @@ theorem ComplexNumber.from_real_add (a b : Real)
   Equality.symmetry(
       congruenceOf(
           function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
-              RingModulo.make(Real.polynomial_ring, Complex.modulus, p),
+              RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus, p),
           Complex.constant_add(a, b)))
 
 -- Preserves multiplication.
 theorem ComplexNumber.from_real_multiply (a b : Real)
         : ComplexNumber.from_real(Real.multiply(a, b))
-          = RingModulo.multiply(Real.polynomial_ring,
-              Real.polynomial_ring_commutative, Complex.modulus,
+          = RingModulo.multiply(
               ComplexNumber.from_real(a), ComplexNumber.from_real(b)) :=
   Equality.symmetry(
       congruenceOf(
           function (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) =>
-              RingModulo.make(Real.polynomial_ring, Complex.modulus, p),
+              RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus, p),
           Complex.constant_multiply(a, b)))

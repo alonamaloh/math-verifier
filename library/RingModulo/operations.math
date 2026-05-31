@@ -1,15 +1,18 @@
 -- RingModulo/operations.math
 --
--- The ring operations on RingModulo(s, m): addition, negation, and
--- multiplication, plus the constants zero and one. Each operation
--- descends from the corresponding operation on the base ring `s`
--- through the quotient, mirroring IntegerMod/operations.math.
+-- The ring operations on RingModulo(c, m): addition, negation,
+-- subtraction, and multiplication, plus the constants zero and one.
+-- Each operation descends from the corresponding operation on the
+-- underlying ring `CommutativeRing.ring(c)` through the quotient,
+-- mirroring IntegerMod/operations.math.
 --
 -- The well-definedness obligations are the three `CongruentModulo.*_
--- respects` lemmas: addition and negation respect the congruence for
--- any ring; multiplication needs `s` to be commutative (a left
--- multiple `a'·(b−b')` is only divisible by `m` after commuting), so
--- `multiply` and everything built on it threads a commutativity proof.
+-- respects` lemmas (still stated over a plain `s : Ring`, since they are
+-- general): addition and negation respect the congruence for any ring;
+-- multiplication needs commutativity (a left multiple `a'·(b−b')` is
+-- only divisible by `m` after commuting). The quotient is indexed by a
+-- `CommutativeRing`, so `multiply` reads the commutativity proof off
+-- `CommutativeRing.commutative(c)` rather than taking it as an argument.
 
 module RingModulo.operations
 
@@ -21,17 +24,15 @@ import Algebra.monoid
 import Algebra.group
 import Algebra.ring
 import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
 import Algebra.ring_divisibility
 import Algebra.ring_difference
 import RingModulo.basics
 
--- Multiplication on `s` commutes. Threaded into the multiplicative
--- structure of the quotient.
-definition Ring.MultiplyCommutative (s : Ring) : Proposition :=
-  (x y : Ring.carrier(s)) → Ring.multiply(s, x, y) = Ring.multiply(s, y, x)
-
 -- ----------------------------------------------------------------------
--- Respect of congruence by the base ring operations.
+-- Respect of congruence by the base ring operations. Stated over a
+-- plain `s : Ring` — they are general divisibility/difference facts and
+-- have nothing to do with the bundle.
 
 -- (a + b) − (a' + b') = (a − a') + (b − b'); closed under addition.
 theorem Ring.CongruentModulo.add_respects (s : Ring)
@@ -76,137 +77,153 @@ theorem Ring.CongruentModulo.multiply_respects (s : Ring)
 -- ----------------------------------------------------------------------
 -- The class of a representative. Canonical introduction form.
 
-construction RingModulo.make (s : Ring) (m a : Ring.carrier(s))
-        : RingModulo(s, m) :=
+construction RingModulo.make (c : CommutativeRing) (m a : CommutativeRing.carrier(c))
+        : RingModulo(c, m) :=
   Quotient.mk(a)
 
 -- ----------------------------------------------------------------------
 -- Addition. Lift base addition over both arguments.
 
-definition RingModulo.add_representative (s : Ring) (m a : Ring.carrier(s))
-        (y : RingModulo(s, m)) : RingModulo(s, m) :=
+definition RingModulo.add_representative (c : CommutativeRing)
+        (m a : CommutativeRing.carrier(c))
+        (y : RingModulo(c, m)) : RingModulo(c, m) :=
   Quotient.lift(
-      function (b : Ring.carrier(s)) => RingModulo.make(s, m, Ring.add(s, a, b)),
-      function (b b' : Ring.carrier(s))
-               (congruentB : Ring.CongruentModulo(s, m, b, b')) =>
+      function (b : CommutativeRing.carrier(c)) =>
+          RingModulo.make(c, m, Ring.add(CommutativeRing.ring(c), a, b)),
+      function (b b' : CommutativeRing.carrier(c))
+               (congruentB : Ring.CongruentModulo(CommutativeRing.ring(c), m, b, b')) =>
           Quotient.sound(
-              Ring.add(s, a, b), Ring.add(s, a, b'),
-              Ring.CongruentModulo.add_respects(s, m, a, a, b, b',
-                  Ring.CongruentModulo.reflexive(s, m, a), congruentB)),
+              Ring.add(CommutativeRing.ring(c), a, b),
+              Ring.add(CommutativeRing.ring(c), a, b'),
+              Ring.CongruentModulo.add_respects(CommutativeRing.ring(c), m, a, a, b, b',
+                  Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, a), congruentB)),
       y)
 
-theorem RingModulo.add_representative_respects (s : Ring) (m a a' : Ring.carrier(s))
-        (congruentA : Ring.CongruentModulo(s, m, a, a'))
-        (y : RingModulo(s, m))
-        : RingModulo.add_representative(s, m, a, y)
-          = RingModulo.add_representative(s, m, a', y) :=
+theorem RingModulo.add_representative_respects (c : CommutativeRing)
+        (m a a' : CommutativeRing.carrier(c))
+        (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a'))
+        (y : RingModulo(c, m))
+        : RingModulo.add_representative(c, m, a, y)
+          = RingModulo.add_representative(c, m, a', y) :=
   cases y { | b =>
     Quotient.sound(
-        Ring.add(s, a, b), Ring.add(s, a', b),
-        Ring.CongruentModulo.add_respects(s, m, a, a', b, b,
-            congruentA, Ring.CongruentModulo.reflexive(s, m, b))) }
+        Ring.add(CommutativeRing.ring(c), a, b),
+        Ring.add(CommutativeRing.ring(c), a', b),
+        Ring.CongruentModulo.add_respects(CommutativeRing.ring(c), m, a, a', b, b,
+            congruentA, Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, b))) }
 
-definition RingModulo.add {s : Ring} {m : Ring.carrier(s)}
-        (x y : RingModulo(s, m)) : RingModulo(s, m) :=
+definition RingModulo.add {c : CommutativeRing} {m : CommutativeRing.carrier(c)}
+        (x y : RingModulo(c, m)) : RingModulo(c, m) :=
   Quotient.lift(
-      function (a : Ring.carrier(s)) => RingModulo.add_representative(s, m, a, y),
-      function (a a' : Ring.carrier(s))
-               (congruentA : Ring.CongruentModulo(s, m, a, a')) =>
-          RingModulo.add_representative_respects(s, m, a, a', congruentA, y),
+      function (a : CommutativeRing.carrier(c)) =>
+          RingModulo.add_representative(c, m, a, y),
+      function (a a' : CommutativeRing.carrier(c))
+               (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a')) =>
+          RingModulo.add_representative_respects(c, m, a, a', congruentA, y),
       x)
 
 -- The ring/structure arguments are implicit and recovered from the
--- operand type RingModulo(s, m), so `x + y` dispatches here.
+-- operand type RingModulo(c, m), so `x + y` dispatches here.
 operator (+) on (RingModulo, RingModulo) := RingModulo.add
 
 -- ----------------------------------------------------------------------
 -- Negation. A single lift.
 
-definition RingModulo.negate {s : Ring} {m : Ring.carrier(s)}
-        (x : RingModulo(s, m)) : RingModulo(s, m) :=
+definition RingModulo.negate {c : CommutativeRing} {m : CommutativeRing.carrier(c)}
+        (x : RingModulo(c, m)) : RingModulo(c, m) :=
   Quotient.lift(
-      function (a : Ring.carrier(s)) => RingModulo.make(s, m, Ring.negate(s, a)),
-      function (a a' : Ring.carrier(s))
-               (congruentA : Ring.CongruentModulo(s, m, a, a')) =>
+      function (a : CommutativeRing.carrier(c)) =>
+          RingModulo.make(c, m, Ring.negate(CommutativeRing.ring(c), a)),
+      function (a a' : CommutativeRing.carrier(c))
+               (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a')) =>
           Quotient.sound(
-              Ring.negate(s, a), Ring.negate(s, a'),
-              Ring.CongruentModulo.negate_respects(s, m, a, a', congruentA)),
+              Ring.negate(CommutativeRing.ring(c), a),
+              Ring.negate(CommutativeRing.ring(c), a'),
+              Ring.CongruentModulo.negate_respects(CommutativeRing.ring(c), m, a, a', congruentA)),
       x)
 
 -- ----------------------------------------------------------------------
 -- Subtraction. x − y := x + (−y); the structure arguments are implicit
 -- and recovered from the operand type, so `x - y` dispatches here.
 
-definition RingModulo.subtract {s : Ring} {m : Ring.carrier(s)}
-        (x y : RingModulo(s, m)) : RingModulo(s, m) :=
+definition RingModulo.subtract {c : CommutativeRing} {m : CommutativeRing.carrier(c)}
+        (x y : RingModulo(c, m)) : RingModulo(c, m) :=
   RingModulo.add(x, RingModulo.negate(y))
 
 operator (-) on (RingModulo, RingModulo) := RingModulo.subtract
 
 -- ----------------------------------------------------------------------
--- Multiplication. Same two-lift shape as addition; threads commutativity.
+-- Multiplication. Same two-lift shape as addition; the commutativity
+-- proof comes from the bundle (`CommutativeRing.commutative(c)`).
 
-definition RingModulo.multiply_representative (s : Ring)
-        (commutativity : Ring.MultiplyCommutative(s))
-        (m a : Ring.carrier(s)) (y : RingModulo(s, m)) : RingModulo(s, m) :=
+definition RingModulo.multiply_representative (c : CommutativeRing)
+        (m a : CommutativeRing.carrier(c)) (y : RingModulo(c, m)) : RingModulo(c, m) :=
   Quotient.lift(
-      function (b : Ring.carrier(s)) =>
-          RingModulo.make(s, m, Ring.multiply(s, a, b)),
-      function (b b' : Ring.carrier(s))
-               (congruentB : Ring.CongruentModulo(s, m, b, b')) =>
+      function (b : CommutativeRing.carrier(c)) =>
+          RingModulo.make(c, m, Ring.multiply(CommutativeRing.ring(c), a, b)),
+      function (b b' : CommutativeRing.carrier(c))
+               (congruentB : Ring.CongruentModulo(CommutativeRing.ring(c), m, b, b')) =>
           Quotient.sound(
-              Ring.multiply(s, a, b), Ring.multiply(s, a, b'),
-              Ring.CongruentModulo.multiply_respects(s, commutativity, m, a, a,
-                  b, b', Ring.CongruentModulo.reflexive(s, m, a), congruentB)),
+              Ring.multiply(CommutativeRing.ring(c), a, b),
+              Ring.multiply(CommutativeRing.ring(c), a, b'),
+              Ring.CongruentModulo.multiply_respects(CommutativeRing.ring(c),
+                  CommutativeRing.commutative(c), m, a, a,
+                  b, b', Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, a), congruentB)),
       y)
 
-theorem RingModulo.multiply_representative_respects (s : Ring)
-        (commutativity : Ring.MultiplyCommutative(s))
-        (m a a' : Ring.carrier(s))
-        (congruentA : Ring.CongruentModulo(s, m, a, a'))
-        (y : RingModulo(s, m))
-        : RingModulo.multiply_representative(s, commutativity, m, a, y)
-          = RingModulo.multiply_representative(s, commutativity, m, a', y) :=
+theorem RingModulo.multiply_representative_respects (c : CommutativeRing)
+        (m a a' : CommutativeRing.carrier(c))
+        (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a'))
+        (y : RingModulo(c, m))
+        : RingModulo.multiply_representative(c, m, a, y)
+          = RingModulo.multiply_representative(c, m, a', y) :=
   cases y { | b =>
     Quotient.sound(
-        Ring.multiply(s, a, b), Ring.multiply(s, a', b),
-        Ring.CongruentModulo.multiply_respects(s, commutativity, m, a, a', b, b,
-            congruentA, Ring.CongruentModulo.reflexive(s, m, b))) }
+        Ring.multiply(CommutativeRing.ring(c), a, b),
+        Ring.multiply(CommutativeRing.ring(c), a', b),
+        Ring.CongruentModulo.multiply_respects(CommutativeRing.ring(c),
+            CommutativeRing.commutative(c), m, a, a', b, b,
+            congruentA, Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, b))) }
 
-definition RingModulo.multiply (s : Ring)
-        (commutativity : Ring.MultiplyCommutative(s))
-        (m : Ring.carrier(s)) (x y : RingModulo(s, m)) : RingModulo(s, m) :=
+definition RingModulo.multiply {c : CommutativeRing} {m : CommutativeRing.carrier(c)}
+        (x y : RingModulo(c, m)) : RingModulo(c, m) :=
   Quotient.lift(
-      function (a : Ring.carrier(s)) =>
-          RingModulo.multiply_representative(s, commutativity, m, a, y),
-      function (a a' : Ring.carrier(s))
-               (congruentA : Ring.CongruentModulo(s, m, a, a')) =>
-          RingModulo.multiply_representative_respects(s, commutativity, m, a, a',
-              congruentA, y),
+      function (a : CommutativeRing.carrier(c)) =>
+          RingModulo.multiply_representative(c, m, a, y),
+      function (a a' : CommutativeRing.carrier(c))
+               (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a')) =>
+          RingModulo.multiply_representative_respects(c, m, a, a', congruentA, y),
       x)
+
+-- The commutativity proof is recovered from the bundle `c`, which is
+-- itself recovered from the operand type, so `x * y` dispatches here.
+operator (*) on (RingModulo, RingModulo) := RingModulo.multiply
 
 -- ----------------------------------------------------------------------
 -- Constants.
 
-definition RingModulo.zero (s : Ring) (m : Ring.carrier(s)) : RingModulo(s, m) :=
-  RingModulo.make(s, m, Ring.zero(s))
+definition RingModulo.zero (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        : RingModulo(c, m) :=
+  RingModulo.make(c, m, Ring.zero(CommutativeRing.ring(c)))
 
-definition RingModulo.one (s : Ring) (m : Ring.carrier(s)) : RingModulo(s, m) :=
-  RingModulo.make(s, m, Ring.one(s))
+definition RingModulo.one (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        : RingModulo(c, m) :=
+  RingModulo.make(c, m, Ring.one(CommutativeRing.ring(c)))
 
 -- The class of the modulus is zero: m ≡ 0 (mod m), since m divides
 -- m − 0 = m. (The defining relation of the quotient, packaged.)
-theorem RingModulo.modulus_is_zero (s : Ring) (m : Ring.carrier(s))
-        : RingModulo.make(s, m, m) = RingModulo.zero(s, m) :=
+theorem RingModulo.modulus_is_zero (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        : RingModulo.make(c, m, m) = RingModulo.zero(c, m) :=
   Quotient.sound(
-      Ring.carrier(s), Ring.CongruentModulo(s, m),
-      m, Ring.zero(s),
-      (⟨Ring.one(s),
-        calc Ring.add(s, m, Ring.negate(s, Ring.zero(s)))
-           = Ring.add(s, m, Ring.zero(s))
-                 by Ring.negate_zero(s)
+      CommutativeRing.carrier(c), Ring.CongruentModulo(CommutativeRing.ring(c), m),
+      m, Ring.zero(CommutativeRing.ring(c)),
+      (⟨Ring.one(CommutativeRing.ring(c)),
+        calc Ring.add(CommutativeRing.ring(c), m, Ring.negate(CommutativeRing.ring(c), Ring.zero(CommutativeRing.ring(c))))
+           = Ring.add(CommutativeRing.ring(c), m, Ring.zero(CommutativeRing.ring(c)))
+                 by Ring.negate_zero(CommutativeRing.ring(c))
            = m
-                 by Ring.add_zero(s, m)
-           = Ring.multiply(s, m, Ring.one(s))
-                 by Equality.symmetry(Ring.multiply_one(s, m))⟩
-       : Ring.divides(s, m, Ring.add(s, m, Ring.negate(s, Ring.zero(s))))))
+                 by Ring.add_zero(CommutativeRing.ring(c), m)
+           = Ring.multiply(CommutativeRing.ring(c), m, Ring.one(CommutativeRing.ring(c)))
+                 by Equality.symmetry(Ring.multiply_one(CommutativeRing.ring(c), m))⟩
+       : Ring.divides(CommutativeRing.ring(c), m,
+             Ring.add(CommutativeRing.ring(c), m, Ring.negate(CommutativeRing.ring(c), Ring.zero(CommutativeRing.ring(c)))))))

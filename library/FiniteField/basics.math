@@ -28,6 +28,7 @@ import Algebra.monoid
 import Algebra.group
 import Algebra.ring
 import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
 import IntegerMod.basics
 import IntegerMod.operations
 import IntegerMod.ring
@@ -62,11 +63,18 @@ definition IntegerMod.polynomial_ring_commutative (p : Natural)
   Polynomial.multiply_commutative(IntegerMod.ring(p),
       IntegerMod.multiply_commutative(p))
 
+-- F_p[x] as a bundled commutative ring — the base of the quotient. The
+-- bundle carries the commutativity proof, so the quotient's `*` recovers
+-- it from the operand type.
+definition IntegerMod.polynomial_commutative_ring (p : Natural) : CommutativeRing :=
+  CommutativeRing.make(IntegerMod.polynomial_ring(p),
+      IntegerMod.polynomial_ring_commutative(p))
+
 -- F_{p^k} = F_p[x] / (f). A type for every modulus polynomial f; a
 -- field when f is irreducible (FiniteField/field.math).
 definition FiniteField (p : Natural)
         (f : Ring.carrier(IntegerMod.polynomial_ring(p))) : Type(0) :=
-  RingModulo(IntegerMod.polynomial_ring(p), f)
+  RingModulo(IntegerMod.polynomial_commutative_ring(p), f)
 
 -- F_{p^k} is a commutative ring, for every p and every modulus f.
 theorem FiniteField.is_commutative_ring (p : Natural)
@@ -74,10 +82,8 @@ theorem FiniteField.is_commutative_ring (p : Natural)
         : IsCommutativeRing(
               FiniteField(p, f),
               RingModulo.add,
-              RingModulo.zero(IntegerMod.polynomial_ring(p), f),
+              RingModulo.zero(IntegerMod.polynomial_commutative_ring(p), f),
               RingModulo.negate,
-              RingModulo.multiply(IntegerMod.polynomial_ring(p),
-                  IntegerMod.polynomial_ring_commutative(p), f),
-              RingModulo.one(IntegerMod.polynomial_ring(p), f)) :=
-  RingModulo.is_commutative_ring(IntegerMod.polynomial_ring(p),
-      IntegerMod.polynomial_ring_commutative(p), f)
+              RingModulo.multiply,
+              RingModulo.one(IntegerMod.polynomial_commutative_ring(p), f)) :=
+  RingModulo.is_commutative_ring(IntegerMod.polynomial_commutative_ring(p), f)

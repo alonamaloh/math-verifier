@@ -1,14 +1,16 @@
 -- RingModulo/ring.math
 --
--- The ring laws for RingModulo(s, m). Every law lifts the corresponding
--- law of the base ring `s` through the quotient: on representatives the
--- operations reduce (by the Quotient.lift compute rule) to
--- `RingModulo.make(s, m, <base expression>)`, so the law is exactly
--- `congruenceOf(make, <base law>)`. Mirrors IntegerMod/ring.math, with
--- the base laws supplied by the bundle's flattened projections
--- (`Ring.add_associative`, …) instead of the per-carrier Integer
--- lemmas. The multiplicative laws thread the base commutativity proof,
--- since `RingModulo.multiply` does.
+-- The ring laws for RingModulo(c, m). Every law lifts the corresponding
+-- law of the underlying ring `CommutativeRing.ring(c)` through the
+-- quotient: on representatives the operations reduce (by the
+-- Quotient.lift compute rule) to `RingModulo.make(c, m, <base
+-- expression>)`, so the law is exactly `congruenceOf(make, <base law>)`.
+-- The base laws come from the bundle's flattened projections
+-- (`Ring.add_associative`, …); the multiplicative laws read the base
+-- commutativity off `CommutativeRing.commutative(c)`.
+--
+-- Representatives are named `u v w` to avoid colliding with the bundle
+-- parameter `c`.
 
 module RingModulo.ring
 
@@ -19,163 +21,155 @@ import Algebra.monoid
 import Algebra.group
 import Algebra.ring
 import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
 import RingModulo.basics
 import RingModulo.operations
 
 -- ----------------------------------------------------------------------
 -- Additive abelian group.
 
-theorem RingModulo.add_associative (s : Ring) (m : Ring.carrier(s))
-        (x y z : RingModulo(s, m))
+theorem RingModulo.add_associative (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x y z : RingModulo(c, m))
         : RingModulo.add(RingModulo.add(x, y), z)
           = RingModulo.add(x, RingModulo.add(y, z)) :=
   Quotient.induct_three(
-      function (a b c : Ring.carrier(s)) =>
+      function (u v w : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.add_associative(s, a, b, c)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.add_associative(CommutativeRing.ring(c), u, v, w)),
       x, y, z)
 
-theorem RingModulo.add_identity_left (s : Ring) (m : Ring.carrier(s))
-        (x : RingModulo(s, m))
-        : RingModulo.add(RingModulo.zero(s, m), x) = x :=
+theorem RingModulo.add_identity_left (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x : RingModulo(c, m))
+        : RingModulo.add(RingModulo.zero(c, m), x) = x :=
   Quotient.induct(
-      function (a : Ring.carrier(s)) =>
+      function (u : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.zero_add(s, a)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.zero_add(CommutativeRing.ring(c), u)),
       x)
 
-theorem RingModulo.add_identity_right (s : Ring) (m : Ring.carrier(s))
-        (x : RingModulo(s, m))
-        : RingModulo.add(x, RingModulo.zero(s, m)) = x :=
+theorem RingModulo.add_identity_right (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x : RingModulo(c, m))
+        : RingModulo.add(x, RingModulo.zero(c, m)) = x :=
   Quotient.induct(
-      function (a : Ring.carrier(s)) =>
+      function (u : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.add_zero(s, a)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.add_zero(CommutativeRing.ring(c), u)),
       x)
 
-theorem RingModulo.add_commutative (s : Ring) (m : Ring.carrier(s))
-        (x y : RingModulo(s, m))
+theorem RingModulo.add_commutative (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x y : RingModulo(c, m))
         : RingModulo.add(x, y) = RingModulo.add(y, x) :=
   Quotient.induct_two(
-      function (a b : Ring.carrier(s)) =>
+      function (u v : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.add_commutative(s, a, b)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.add_commutative(CommutativeRing.ring(c), u, v)),
       x, y)
 
-theorem RingModulo.add_negate_left (s : Ring) (m : Ring.carrier(s))
-        (x : RingModulo(s, m))
+theorem RingModulo.add_negate_left (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x : RingModulo(c, m))
         : RingModulo.add(RingModulo.negate(x), x)
-          = RingModulo.zero(s, m) :=
+          = RingModulo.zero(c, m) :=
   Quotient.induct(
-      function (a : Ring.carrier(s)) =>
+      function (u : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.add_negate_left(s, a)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.add_negate_left(CommutativeRing.ring(c), u)),
       x)
 
-theorem RingModulo.add_negate_right (s : Ring) (m : Ring.carrier(s))
-        (x : RingModulo(s, m))
+theorem RingModulo.add_negate_right (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x : RingModulo(c, m))
         : RingModulo.add(x, RingModulo.negate(x))
-          = RingModulo.zero(s, m) :=
+          = RingModulo.zero(c, m) :=
   Quotient.induct(
-      function (a : Ring.carrier(s)) =>
+      function (u : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.add_negate_right(s, a)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.add_negate_right(CommutativeRing.ring(c), u)),
       x)
 
 -- ----------------------------------------------------------------------
 -- Multiplicative monoid.
 
-theorem RingModulo.multiply_associative (s : Ring)
-        (commutativity : Ring.MultiplyCommutative(s)) (m : Ring.carrier(s))
-        (x y z : RingModulo(s, m))
-        : RingModulo.multiply(s, commutativity, m,
-              RingModulo.multiply(s, commutativity, m, x, y), z)
-          = RingModulo.multiply(s, commutativity, m, x,
-              RingModulo.multiply(s, commutativity, m, y, z)) :=
+theorem RingModulo.multiply_associative (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x y z : RingModulo(c, m))
+        : RingModulo.multiply(RingModulo.multiply(x, y), z)
+          = RingModulo.multiply(x, RingModulo.multiply(y, z)) :=
   Quotient.induct_three(
-      function (a b c : Ring.carrier(s)) =>
+      function (u v w : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.multiply_associative(s, a, b, c)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.multiply_associative(CommutativeRing.ring(c), u, v, w)),
       x, y, z)
 
-theorem RingModulo.multiply_identity_left (s : Ring)
-        (commutativity : Ring.MultiplyCommutative(s)) (m : Ring.carrier(s))
-        (x : RingModulo(s, m))
-        : RingModulo.multiply(s, commutativity, m, RingModulo.one(s, m), x) = x :=
+theorem RingModulo.multiply_identity_left (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x : RingModulo(c, m))
+        : RingModulo.multiply(RingModulo.one(c, m), x) = x :=
   Quotient.induct(
-      function (a : Ring.carrier(s)) =>
+      function (u : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.one_multiply(s, a)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.one_multiply(CommutativeRing.ring(c), u)),
       x)
 
-theorem RingModulo.multiply_identity_right (s : Ring)
-        (commutativity : Ring.MultiplyCommutative(s)) (m : Ring.carrier(s))
-        (x : RingModulo(s, m))
-        : RingModulo.multiply(s, commutativity, m, x, RingModulo.one(s, m)) = x :=
+theorem RingModulo.multiply_identity_right (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x : RingModulo(c, m))
+        : RingModulo.multiply(x, RingModulo.one(c, m)) = x :=
   Quotient.induct(
-      function (a : Ring.carrier(s)) =>
+      function (u : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.multiply_one(s, a)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.multiply_one(CommutativeRing.ring(c), u)),
       x)
 
-theorem RingModulo.multiply_commutative (s : Ring)
-        (commutativity : Ring.MultiplyCommutative(s)) (m : Ring.carrier(s))
-        (x y : RingModulo(s, m))
-        : RingModulo.multiply(s, commutativity, m, x, y)
-          = RingModulo.multiply(s, commutativity, m, y, x) :=
+theorem RingModulo.multiply_commutative (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x y : RingModulo(c, m))
+        : RingModulo.multiply(x, y) = RingModulo.multiply(y, x) :=
   Quotient.induct_two(
-      function (a b : Ring.carrier(s)) =>
+      function (u v : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              commutativity(a, b)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              CommutativeRing.commutative(c)(u, v)),
       x, y)
 
 -- ----------------------------------------------------------------------
 -- Distributivity.
 
-theorem RingModulo.distributivity_left (s : Ring)
-        (commutativity : Ring.MultiplyCommutative(s)) (m : Ring.carrier(s))
-        (x y z : RingModulo(s, m))
-        : RingModulo.multiply(s, commutativity, m, x, RingModulo.add(y, z))
-          = RingModulo.add(RingModulo.multiply(s, commutativity, m, x, y),
-                RingModulo.multiply(s, commutativity, m, x, z)) :=
+theorem RingModulo.distributivity_left (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x y z : RingModulo(c, m))
+        : RingModulo.multiply(x, RingModulo.add(y, z))
+          = RingModulo.add(RingModulo.multiply(x, y),
+                RingModulo.multiply(x, z)) :=
   Quotient.induct_three(
-      function (a b c : Ring.carrier(s)) =>
+      function (u v w : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.distributivity_left(s, a, b, c)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.distributivity_left(CommutativeRing.ring(c), u, v, w)),
       x, y, z)
 
-theorem RingModulo.distributivity_right (s : Ring)
-        (commutativity : Ring.MultiplyCommutative(s)) (m : Ring.carrier(s))
-        (x y z : RingModulo(s, m))
-        : RingModulo.multiply(s, commutativity, m, RingModulo.add(x, y), z)
-          = RingModulo.add(RingModulo.multiply(s, commutativity, m, x, z),
-                RingModulo.multiply(s, commutativity, m, y, z)) :=
+theorem RingModulo.distributivity_right (c : CommutativeRing) (m : CommutativeRing.carrier(c))
+        (x y z : RingModulo(c, m))
+        : RingModulo.multiply(RingModulo.add(x, y), z)
+          = RingModulo.add(RingModulo.multiply(x, z),
+                RingModulo.multiply(y, z)) :=
   Quotient.induct_three(
-      function (a b c : Ring.carrier(s)) =>
+      function (u v w : CommutativeRing.carrier(c)) =>
           congruenceOf(
-              function (representativeValue : Ring.carrier(s)) =>
-                  RingModulo.make(s, m, representativeValue),
-              Ring.distributivity_right(s, a, b, c)),
+              function (representativeValue : CommutativeRing.carrier(c)) =>
+                  RingModulo.make(c, m, representativeValue),
+              Ring.distributivity_right(CommutativeRing.ring(c), u, v, w)),
       x, y, z)

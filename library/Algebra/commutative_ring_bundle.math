@@ -1,0 +1,54 @@
+-- Algebra/commutative_ring_bundle.math
+--
+-- A *bundled* commutative ring: a `Ring` together with a proof that its
+-- multiplication commutes. This is the consumer-facing layer for
+-- constructions that are only rings when the base is commutative — most
+-- notably `RingModulo(c, m)`, the quotient by a principal ideal, which
+-- needs commutativity to lift multiplication through the quotient.
+--
+-- Indexing the quotient by a `CommutativeRing` (rather than a plain
+-- `Ring` plus a separately-threaded commutativity proof) is what lets
+-- `RingModulo.multiply` — and the `*` operator on the quotient — recover
+-- the commutativity proof from the operand type alone: `c` is the first
+-- argument of `RingModulo(c, m)`, so it is solved by the same implicit-
+-- argument recovery that solves the modulus.
+--
+-- Like `Ring`, this is a single-constructor inductive (a dependent
+-- record); the projections recover each field and the kernel reduces
+-- them on a concrete `CommutativeRing.make(...)`.
+
+module Algebra.commutative_ring_bundle
+
+import Logic.basics
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_bundle
+
+-- Multiplication on `s` commutes. The property a quotient's
+-- multiplicative structure depends on; carried as a field of
+-- `CommutativeRing` below.
+definition Ring.MultiplyCommutative (s : Ring) : Proposition :=
+  (x y : Ring.carrier(s)) → Ring.multiply(s, x, y) = Ring.multiply(s, y, x)
+
+-- A ring bundled with a proof that its multiplication commutes. Lives in
+-- Type(1) because it carries a `Ring` (itself in Type(1)).
+inductive CommutativeRing : Type(1) where
+  | CommutativeRing.make
+      : (underlyingRing : Ring)
+        → Ring.MultiplyCommutative(underlyingRing)
+        → CommutativeRing
+
+-- ----------------------------------------------------------------------
+-- Field projections. (The bound `underlyingRing` avoids the reserved
+-- `ring` tactic keyword in a bare-identifier body position.)
+
+definition CommutativeRing.ring : CommutativeRing → Ring
+  | CommutativeRing.make(underlyingRing, commutative) => underlyingRing
+
+definition CommutativeRing.commutative (c : CommutativeRing)
+        : Ring.MultiplyCommutative(CommutativeRing.ring(c)) :=
+  cases c { | CommutativeRing.make(underlyingRing, commutative) => commutative }
+
+-- The underlying carrier type, factored through the ring projection.
+definition CommutativeRing.carrier (c : CommutativeRing) : Type(0) :=
+  Ring.carrier(CommutativeRing.ring(c))

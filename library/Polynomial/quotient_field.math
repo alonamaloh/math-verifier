@@ -1,11 +1,20 @@
 -- Polynomial/quotient_field.math
 --
 -- F[x]/(f) is a field when f is irreducible and F is a field. This is
--- RingModulo(Polynomial.ring(F), f); the two facts beyond a commutative
--- ring are 0 ≠ 1 (else f | 1, making f a unit) and invertibility of
--- every nonzero class (Bézout: f ∤ g gives a·f + b·g = 1, so the class
--- of b inverts the class of g). It mirrors IntegerMod/field.math with
--- Bézout-for-polynomials in place of Bézout-for-integers.
+-- RingModulo(Polynomial.commutative_ring(F), f); the two facts beyond a
+-- commutative ring are 0 ≠ 1 (else f | 1, making f a unit) and
+-- invertibility of every nonzero class (Bézout: f ∤ g gives a·f + b·g =
+-- 1, so the class of b inverts the class of g). It mirrors
+-- IntegerMod/field.math with Bézout-for-polynomials in place of
+-- Bézout-for-integers.
+--
+-- The quotient is indexed by the bundled commutative ring
+-- `Polynomial.commutative_ring(r, commutativity)`; commutativity is
+-- carried by that bundle, so `RingModulo.multiply` (and `*`) recover it
+-- from the operand type rather than taking it as an argument. The base-
+-- ring-level facts (`Ring.CongruentModulo`, `RingModulo.equivalence`,
+-- `Ring.divides`, `Ring.carrier`) remain stated over the plain ring
+-- `Polynomial.ring(r)` = `CommutativeRing.ring(...)`.
 
 module Polynomial.quotient_field
 
@@ -16,6 +25,7 @@ import Equality.basics
 import Natural.basics
 import Algebra.ring
 import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
 import Algebra.ring_divisibility
 import Algebra.ring_difference
 import Algebra.field
@@ -34,6 +44,14 @@ import RingModulo.operations
 import RingModulo.ring
 import RingModulo.instances
 
+-- F[x] as a bundled commutative ring — the base of the quotient.
+definition Polynomial.commutative_ring (r : Ring)
+        (commutativity
+            : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+        : CommutativeRing :=
+  CommutativeRing.make(Polynomial.ring(r),
+      Polynomial.multiply_commutative(r, commutativity))
+
 -- From f | (g·h − 1), the class of h inverts the class of g.
 theorem Polynomial.quotient_inverse_from_witness (r : Ring)
         (commutativity
@@ -43,21 +61,22 @@ theorem Polynomial.quotient_inverse_from_witness (r : Ring)
             : Ring.divides(Polynomial.ring(r), f,
                   Polynomial.add(r, Polynomial.multiply(r, g, h),
                       Polynomial.negate(r, Polynomial.one(r)))))
-        : RingModulo.multiply(Polynomial.ring(r),
-              Polynomial.multiply_commutative(r, commutativity), f,
-              RingModulo.make(Polynomial.ring(r), f, g),
-              RingModulo.make(Polynomial.ring(r), f, h))
-          = RingModulo.one(Polynomial.ring(r), f) :=
+        : RingModulo.multiply(
+              RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, g),
+              RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, h))
+          = RingModulo.one(Polynomial.commutative_ring(r, commutativity), f) :=
   Quotient.sound(
       Ring.carrier(Polynomial.ring(r)), Ring.CongruentModulo(Polynomial.ring(r), f),
       Polynomial.multiply(r, g, h), Polynomial.one(r), witnessDivides)
 
 -- Equal classes are congruent representatives.
 theorem Polynomial.quotient_congruent_of_make_equal (r : Ring)
+        (commutativity
+            : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
         (f g h : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (makeEquality
-            : RingModulo.make(Polynomial.ring(r), f, g)
-              = RingModulo.make(Polynomial.ring(r), f, h))
+            : RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, g)
+              = RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, h))
         : Ring.CongruentModulo(Polynomial.ring(r), f, g, h) :=
   Quotient.exact(
       Ring.carrier(Polynomial.ring(r)), Ring.CongruentModulo(Polynomial.ring(r), f),
@@ -65,18 +84,21 @@ theorem Polynomial.quotient_congruent_of_make_equal (r : Ring)
 
 -- 0 ≠ 1 in F[x]/(f): otherwise f | 1, making f a unit.
 theorem Polynomial.quotient_zero_not_one (r : Ring)
+        (commutativity
+            : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
         (f : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (fIrreducible : Polynomial.IsIrreducible(r, f))
-        : ¬(RingModulo.zero(Polynomial.ring(r), f) = RingModulo.one(Polynomial.ring(r), f)) :=
+        : ¬(RingModulo.zero(Polynomial.commutative_ring(r, commutativity), f)
+            = RingModulo.one(Polynomial.commutative_ring(r, commutativity), f)) :=
   function (zeroEqualsOne
-              : RingModulo.zero(Polynomial.ring(r), f)
-                = RingModulo.one(Polynomial.ring(r), f)) => {
+              : RingModulo.zero(Polynomial.commutative_ring(r, commutativity), f)
+                = RingModulo.one(Polynomial.commutative_ring(r, commutativity), f)) => {
     let ⟨fNotUnit, _⟩ := fIrreducible;
     -- [1] = [0] (symmetric), so f | (1 − 0) = 1, i.e. f is a unit.
     claim congruentOneZero
         : Ring.divides(Polynomial.ring(r), f,
               Polynomial.add(r, Polynomial.one(r), Polynomial.negate(r, Polynomial.zero(r))))
-        by Polynomial.quotient_congruent_of_make_equal(r, f,
+        by Polynomial.quotient_congruent_of_make_equal(r, commutativity, f,
                Polynomial.one(r), Polynomial.zero(r), Equality.symmetry(zeroEqualsOne));
     -- congruentOneZero : f | (one + (−zero)); simplify the difference to one.
     claim differenceIsOne
@@ -101,13 +123,12 @@ theorem Polynomial.quotient_invertible_at_representative (r : Ring)
         (fIrreducible : Polynomial.IsIrreducible(r, f))
         (g : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (notZero
-            : ¬(RingModulo.make(Polynomial.ring(r), f, g)
-                = RingModulo.zero(Polynomial.ring(r), f)))
-        : ∃ (y : RingModulo(Polynomial.ring(r), f)).
-            RingModulo.multiply(Polynomial.ring(r),
-                Polynomial.multiply_commutative(r, commutativity), f,
-                RingModulo.make(Polynomial.ring(r), f, g), y)
-            = RingModulo.one(Polynomial.ring(r), f) := {
+            : ¬(RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, g)
+                = RingModulo.zero(Polynomial.commutative_ring(r, commutativity), f)))
+        : ∃ (y : RingModulo(Polynomial.commutative_ring(r, commutativity), f)).
+            RingModulo.multiply(
+                RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, g), y)
+            = RingModulo.one(Polynomial.commutative_ring(r, commutativity), f) := {
         -- A nonzero class means f ∤ g.
         claim notDivides : ¬(Ring.divides(Polynomial.ring(r), f, g))
             by function (fDividesG : Ring.divides(Polynomial.ring(r), f, g)) =>
@@ -129,7 +150,7 @@ theorem Polynomial.quotient_invertible_at_representative (r : Ring)
                      f, fIrreducible, g, notDivides);
         -- bezoutEquation : coefficientF·f + coefficientG·g = 1.
         -- The class of coefficientG inverts the class of g: f | (g·coefficientG − 1).
-        ⟨RingModulo.make(Polynomial.ring(r), f, coefficientG),
+        ⟨RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, coefficientG),
          Polynomial.quotient_inverse_from_witness(r, commutativity, f, g, coefficientG,
              ⟨Polynomial.negate(r, coefficientF),
               calc Polynomial.add(r, Polynomial.multiply(r, g, coefficientG),
@@ -194,24 +215,22 @@ theorem Polynomial.quotient_nonzero_invertible (r : Ring)
                 → ∃ (inverse : Ring.carrier(r)). Ring.multiply(r, x, inverse) = Ring.one(r))
         (f : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (fIrreducible : Polynomial.IsIrreducible(r, f))
-        (x : RingModulo(Polynomial.ring(r), f))
-        : ¬(x = RingModulo.zero(Polynomial.ring(r), f))
-          → ∃ (y : RingModulo(Polynomial.ring(r), f)).
-              RingModulo.multiply(Polynomial.ring(r),
-                  Polynomial.multiply_commutative(r, commutativity), f, x, y)
-              = RingModulo.one(Polynomial.ring(r), f) :=
+        (x : RingModulo(Polynomial.commutative_ring(r, commutativity), f))
+        : ¬(x = RingModulo.zero(Polynomial.commutative_ring(r, commutativity), f))
+          → ∃ (y : RingModulo(Polynomial.commutative_ring(r, commutativity), f)).
+              RingModulo.multiply(x, y)
+              = RingModulo.one(Polynomial.commutative_ring(r, commutativity), f) :=
   Quotient.induct(
       Ring.carrier(Polynomial.ring(r)), Ring.CongruentModulo(Polynomial.ring(r), f),
-      function (xArgument : RingModulo(Polynomial.ring(r), f)) =>
-          ¬(xArgument = RingModulo.zero(Polynomial.ring(r), f))
-          → ∃ (y : RingModulo(Polynomial.ring(r), f)).
-              RingModulo.multiply(Polynomial.ring(r),
-                  Polynomial.multiply_commutative(r, commutativity), f, xArgument, y)
-              = RingModulo.one(Polynomial.ring(r), f),
+      function (xArgument : RingModulo(Polynomial.commutative_ring(r, commutativity), f)) =>
+          ¬(xArgument = RingModulo.zero(Polynomial.commutative_ring(r, commutativity), f))
+          → ∃ (y : RingModulo(Polynomial.commutative_ring(r, commutativity), f)).
+              RingModulo.multiply(xArgument, y)
+              = RingModulo.one(Polynomial.commutative_ring(r, commutativity), f),
       function (g : Polynomial(Ring.carrier(r), Ring.zero(r)))
                (notZero
-                   : ¬(RingModulo.make(Polynomial.ring(r), f, g)
-                       = RingModulo.zero(Polynomial.ring(r), f))) =>
+                   : ¬(RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, g)
+                       = RingModulo.zero(Polynomial.commutative_ring(r, commutativity), f))) =>
           Polynomial.quotient_invertible_at_representative(r, commutativity,
               inverseExistence, f, fIrreducible, g, notZero),
       x)
@@ -226,14 +245,12 @@ theorem Polynomial.quotient_is_field (r : Ring)
         (f : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (fIrreducible : Polynomial.IsIrreducible(r, f))
         : IsField(
-              RingModulo(Polynomial.ring(r), f),
+              RingModulo(Polynomial.commutative_ring(r, commutativity), f),
               RingModulo.add,
-              RingModulo.zero(Polynomial.ring(r), f),
+              RingModulo.zero(Polynomial.commutative_ring(r, commutativity), f),
               RingModulo.negate,
-              RingModulo.multiply(Polynomial.ring(r),
-                  Polynomial.multiply_commutative(r, commutativity), f),
-              RingModulo.one(Polynomial.ring(r), f)) :=
-  ⟨RingModulo.is_commutative_ring(Polynomial.ring(r),
-       Polynomial.multiply_commutative(r, commutativity), f),
-   Polynomial.quotient_zero_not_one(r, f, fIrreducible),
+              RingModulo.multiply,
+              RingModulo.one(Polynomial.commutative_ring(r, commutativity), f)) :=
+  ⟨RingModulo.is_commutative_ring(Polynomial.commutative_ring(r, commutativity), f),
+   Polynomial.quotient_zero_not_one(r, commutativity, f, fIrreducible),
    Polynomial.quotient_nonzero_invertible(r, commutativity, inverseExistence, f, fIrreducible)⟩

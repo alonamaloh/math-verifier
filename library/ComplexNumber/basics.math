@@ -14,6 +14,7 @@ import Equality.basics
 import Natural.basics
 import Algebra.ring
 import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
 import Real.basics
 import Real.addition
 import Real.multiplication
@@ -57,19 +58,23 @@ definition Real.polynomial_ring_commutative
         : Ring.MultiplyCommutative(Real.polynomial_ring) :=
   Polynomial.multiply_commutative(Real.ring, Real.multiply_commutative)
 
+-- ℝ[x] as a bundled commutative ring — the base of the quotient. The
+-- bundle carries commutativity, so the quotient's `*` recovers it from
+-- the operand type.
+definition Real.polynomial_commutative_ring : CommutativeRing :=
+  CommutativeRing.make(Real.polynomial_ring, Real.polynomial_ring_commutative)
+
 -- The complex numbers: ℝ[x] modulo (x²+1).
 definition ComplexNumber : Type(0) :=
-  RingModulo(Real.polynomial_ring, Complex.modulus)
+  RingModulo(Real.polynomial_commutative_ring, Complex.modulus)
 
 -- ℂ is a commutative ring (inherited from ℝ[x] being commutative).
 theorem ComplexNumber.is_commutative_ring
         : IsCommutativeRing(
               ComplexNumber,
               RingModulo.add,
-              RingModulo.zero(Real.polynomial_ring, Complex.modulus),
+              RingModulo.zero(Real.polynomial_commutative_ring, Complex.modulus),
               RingModulo.negate,
-              RingModulo.multiply(Real.polynomial_ring,
-                  Real.polynomial_ring_commutative, Complex.modulus),
-              RingModulo.one(Real.polynomial_ring, Complex.modulus)) :=
-  RingModulo.is_commutative_ring(Real.polynomial_ring,
-      Real.polynomial_ring_commutative, Complex.modulus)
+              RingModulo.multiply,
+              RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus)) :=
+  RingModulo.is_commutative_ring(Real.polynomial_commutative_ring, Complex.modulus)
