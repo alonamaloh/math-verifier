@@ -190,10 +190,12 @@ which otherwise *guesses* lemma names.
   hypotheses into the motive (via the existing `refining` telescope) when
   the plain elaboration fails. Zero-regression (existing proofs take the
   no-revert path). Covers plain `cases` and constructor `by_induction`;
-  `Natural/cancellation.math` dropped an explicit `refining`. NOT yet
-  wired for the lemma-based path (`by_strong_induction` /
-  `by_induction … using`, `elaborateByInductionUsing`) — small surface (6
-  uses), a follow-up. C2's cases-side is subsumed by this; C3 (β/WHNF of
+  `Natural/cancellation.math` dropped an explicit `refining`. ALSO wired
+  for the lemma-based path (`by_strong_induction` / `by_induction …
+  using`) via a try-then-revert wrapper that validates the plain result
+  with `inferType` (that path defers typechecking to the kernel boundary,
+  so the mismatch is a `TypeError`, not an in-elaboration
+  `ElaborateError`). C2's cases-side is subsumed by this; C3 (β/WHNF of
   the expected type before an anonymous tuple reads its motive) was
   already present (`elaborateAnonymousTuple` WHNFs).
 - **Findings that revise this plan:**
