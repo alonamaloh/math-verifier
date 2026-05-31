@@ -1,0 +1,262 @@
+-- Polynomial/degree_product.math
+--
+-- Degree of a product over a field: deg(a·b) = deg a + deg b. The key
+-- fact is that the top coefficient of the product is the product of the
+-- top coefficients — which is nonzero because a field has no zero
+-- divisors. Below the top, the convolution vanishes term by term.
+--
+-- `HasDegree(p, d)` packages "degree exactly d": coefficients vanish
+-- above d and the coefficient at d is nonzero.
+
+module Polynomial.degree_product
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.subtraction
+import Natural.arithmetic
+import Natural.monus
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Polynomial.basics
+import Polynomial.multiplication
+import Polynomial.summation
+import Polynomial.instances
+import Polynomial.degree
+import Polynomial.multiply_coefficient
+import Polynomial.division_support
+
+-- i ≤ m or m < i.
+theorem Natural.le_or_successor_le (i m : Natural)
+        : i ≤ m ∨ successor(m) ≤ i :=
+  cases Natural.totality_of_less_or_equal(i, m) {
+    | Or.introduceLeft(iLessOrEqualM) => Or.introduceLeft(iLessOrEqualM)
+    | Or.introduceRight(mLessOrEqualI) =>
+        decide i = m {
+          | yes indexIsM =>
+              Or.introduceLeft(
+                  Equality.transport_proposition(Natural,
+                      function (t : Natural) => i ≤ t, i, m, indexIsM,
+                      LessOrEqual.reflexivity(i)))
+          | no indexNotM =>
+              Or.introduceRight(
+                  Natural.less_or_equal_not_equal_successor(m, i, mLessOrEqualI, indexNotM))
+        }
+  }
+
+-- Degree exactly d.
+definition Polynomial.HasDegree (r : Ring)
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (d : Natural) : Proposition :=
+  Polynomial.DegreeLessThan(r, p, successor(d))
+  ∧ ¬(Polynomial.coefficientOf(r, p, d) = Ring.zero(r))
+
+-- A field has no zero divisors: x ≠ 0 and x·y = 0 force y = 0.
+theorem Ring.field_no_zero_divisors (r : Ring)
+        (commutativity
+            : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+        (inverseExistence
+            : (x : Ring.carrier(r)) → ¬(x = Ring.zero(r))
+                → ∃ (inverse : Ring.carrier(r)). Ring.multiply(r, x, inverse) = Ring.one(r))
+        (x y : Ring.carrier(r))
+        (xNonzero : ¬(x = Ring.zero(r)))
+        (productZero : Ring.multiply(r, x, y) = Ring.zero(r))
+        : y = Ring.zero(r) := {
+  obtain ⟨xInverse, inverseEquation⟩ from inverseExistence(x, xNonzero);
+  claim inverseLeft : Ring.multiply(r, xInverse, x) = Ring.one(r)
+      by calc Ring.multiply(r, xInverse, x)
+            = Ring.multiply(r, x, xInverse)   by commutativity(xInverse, x)
+            = Ring.one(r)                      by inverseEquation;
+  calc y
+     = Ring.multiply(r, Ring.one(r), y)
+           by Equality.symmetry(Ring.one_multiply(r, y))
+     = Ring.multiply(r, Ring.multiply(r, xInverse, x), y)
+           by Equality.symmetry(inverseLeft)
+     = Ring.multiply(r, xInverse, Ring.multiply(r, x, y))
+           by Ring.multiply_associative(r, xInverse, x, y)
+     = Ring.multiply(r, xInverse, Ring.zero(r))
+           by productZero
+     = Ring.zero(r)
+           by Ring.multiply_zero_right(r, xInverse)
+}
+
+-- Top coefficient of a product: coefficientOf(a·b, m+n) = coeff(a,m)·coeff(b,n).
+theorem Polynomial.coefficientOf_product_at_sum (r : Ring)
+        (a b : Polynomial(Ring.carrier(r), Ring.zero(r))) (m n : Natural)
+        (aBound : Polynomial.DegreeLessThan(r, a, successor(m)))
+        (bBound : Polynomial.DegreeLessThan(r, b, successor(n)))
+        : Polynomial.coefficientOf(r, Polynomial.multiply(r, a, b), m + n)
+          = Ring.multiply(r, Polynomial.coefficientOf(r, a, m),
+                Polynomial.coefficientOf(r, b, n)) :=
+  calc Polynomial.coefficientOf(r, Polynomial.multiply(r, a, b), m + n)
+     = Polynomial.Sum(r,
+           function (i : Natural) =>
+               Ring.multiply(r, Polynomial.coefficientOf(r, a, i),
+                   Polynomial.coefficientOf(r, b, Natural.monus(m + n, i))),
+           m + n)
+           by Polynomial.coefficientOf_multiply(r, a, b, m + n)
+     = Ring.multiply(r, Polynomial.coefficientOf(r, a, m),
+           Polynomial.coefficientOf(r, b, Natural.monus(m + n, m)))
+           by Polynomial.Sum.single_point(r,
+                  function (i : Natural) =>
+                      Ring.multiply(r, Polynomial.coefficientOf(r, a, i),
+                          Polynomial.coefficientOf(r, b, Natural.monus(m + n, i))),
+                  m, m + n, Natural.less_or_equal_add_right(m, n),
+                  function (i : Natural) (indexNotM : ¬(i = m)) =>
+                      cases Natural.totality_of_less_or_equal(i, m) {
+                        | Or.introduceLeft(iLessOrEqualM) => {
+                            -- i < m: the b-index m+n−i ≥ n+1, so coeff(b,·) = 0.
+                            claim successorILessOrEqualM : successor(i) ≤ m
+                                by Natural.less_or_equal_not_equal_successor(i, m,
+                                       iLessOrEqualM,
+                                       function (mEqualsI : m = i) =>
+                                           indexNotM(Equality.symmetry(mEqualsI)));
+                            claim degreeBound : successor(n) ≤ Natural.monus(m + n, i)
+                                by Natural.degree_bound_helper(n, i, m + n,
+                                       rewrite(Natural.add_commutative(n, m),
+                                           Equality.transport_proposition(Natural,
+                                               function (t : Natural) => t ≤ n + m,
+                                               n + successor(i), successor(n + i),
+                                               Natural.add_successor(n, i),
+                                               Natural.le_add_preserves_right(n, successor(i), m,
+                                                   successorILessOrEqualM))));
+                            calc Ring.multiply(r, Polynomial.coefficientOf(r, a, i),
+                                     Polynomial.coefficientOf(r, b, Natural.monus(m + n, i)))
+                               = Ring.multiply(r, Polynomial.coefficientOf(r, a, i), Ring.zero(r))
+                                     by bBound(Natural.monus(m + n, i), degreeBound)
+                               = Ring.zero(r)
+                                     by Ring.multiply_zero_right(r,
+                                            Polynomial.coefficientOf(r, a, i))
+                          }
+                        | Or.introduceRight(mLessOrEqualI) => {
+                            -- m < i: coeff(a,i) = 0.
+                            claim successorMLessOrEqualI : successor(m) ≤ i
+                                by Natural.less_or_equal_not_equal_successor(m, i,
+                                       mLessOrEqualI, indexNotM);
+                            calc Ring.multiply(r, Polynomial.coefficientOf(r, a, i),
+                                     Polynomial.coefficientOf(r, b, Natural.monus(m + n, i)))
+                               = Ring.multiply(r, Ring.zero(r),
+                                     Polynomial.coefficientOf(r, b, Natural.monus(m + n, i)))
+                                     by aBound(i, successorMLessOrEqualI)
+                               = Ring.zero(r)
+                                     by Ring.zero_multiply_left(r,
+                                            Polynomial.coefficientOf(r, b, Natural.monus(m + n, i)))
+                          }
+                      })
+     = Ring.multiply(r, Polynomial.coefficientOf(r, a, m),
+           Polynomial.coefficientOf(r, b, n))
+           by congruenceOf(
+                  function (t : Natural) =>
+                      Ring.multiply(r, Polynomial.coefficientOf(r, a, m),
+                          Polynomial.coefficientOf(r, b, t)),
+                  Natural.monus_add_cancel_left(m, n))
+
+-- A product has degree < (m+n)+1 when the factors are bounded by m+1, n+1.
+theorem Polynomial.product_DegreeLessThan (r : Ring)
+        (a b : Polynomial(Ring.carrier(r), Ring.zero(r))) (m n : Natural)
+        (aBound : Polynomial.DegreeLessThan(r, a, successor(m)))
+        (bBound : Polynomial.DegreeLessThan(r, b, successor(n)))
+        : Polynomial.DegreeLessThan(r, Polynomial.multiply(r, a, b), successor(m + n)) :=
+  function (k : Natural) (successorMNLessOrEqualK : successor(m + n) ≤ k) =>
+    calc Polynomial.coefficientOf(r, Polynomial.multiply(r, a, b), k)
+       = Polynomial.Sum(r,
+             function (i : Natural) =>
+                 Ring.multiply(r, Polynomial.coefficientOf(r, a, i),
+                     Polynomial.coefficientOf(r, b, Natural.monus(k, i))),
+             k)
+             by Polynomial.coefficientOf_multiply(r, a, b, k)
+       = Ring.zero(r)
+             by Polynomial.Sum.vanishes_below(r,
+                    function (i : Natural) =>
+                        Ring.multiply(r, Polynomial.coefficientOf(r, a, i),
+                            Polynomial.coefficientOf(r, b, Natural.monus(k, i))),
+                    k,
+                    function (i : Natural) (iLessOrEqualK : i ≤ k) =>
+                        cases Natural.le_or_successor_le(i, m) {
+                          | Or.introduceLeft(iLessOrEqualM) => {
+                              claim degreeBound : successor(n) ≤ Natural.monus(k, i)
+                                  by Natural.degree_bound_helper(n, i, k,
+                                         LessOrEqual.transitive(successor(n + i),
+                                             successor(m + n), k,
+                                             successorMNLessOrEqualK,
+                                             Natural.successor_less_or_equal_successor(n + i, m + n,
+                                                 rewrite(Natural.add_commutative(n, m),
+                                                     Natural.le_add_preserves_right(n, i, m,
+                                                         iLessOrEqualM)))));
+                              calc Ring.multiply(r, Polynomial.coefficientOf(r, a, i),
+                                       Polynomial.coefficientOf(r, b, Natural.monus(k, i)))
+                                 = Ring.multiply(r, Polynomial.coefficientOf(r, a, i), Ring.zero(r))
+                                       by bBound(Natural.monus(k, i), degreeBound)
+                                 = Ring.zero(r)
+                                       by Ring.multiply_zero_right(r,
+                                              Polynomial.coefficientOf(r, a, i))
+                            }
+                          | Or.introduceRight(successorMLessOrEqualI) =>
+                              calc Ring.multiply(r, Polynomial.coefficientOf(r, a, i),
+                                       Polynomial.coefficientOf(r, b, Natural.monus(k, i)))
+                                 = Ring.multiply(r, Ring.zero(r),
+                                       Polynomial.coefficientOf(r, b, Natural.monus(k, i)))
+                                       by aBound(i, successorMLessOrEqualI)
+                                 = Ring.zero(r)
+                                       by Ring.zero_multiply_left(r,
+                                              Polynomial.coefficientOf(r, b, Natural.monus(k, i)))
+                        })
+
+-- Degree of a product is the sum of degrees (over a field).
+theorem Polynomial.HasDegree_product (r : Ring)
+        (commutativity
+            : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+        (inverseExistence
+            : (x : Ring.carrier(r)) → ¬(x = Ring.zero(r))
+                → ∃ (inverse : Ring.carrier(r)). Ring.multiply(r, x, inverse) = Ring.one(r))
+        (a b : Polynomial(Ring.carrier(r), Ring.zero(r))) (m n : Natural)
+        (aDegree : Polynomial.HasDegree(r, a, m))
+        (bDegree : Polynomial.HasDegree(r, b, n))
+        : Polynomial.HasDegree(r, Polynomial.multiply(r, a, b), m + n) := {
+  let ⟨aBound, aLeadingNonzero⟩ := aDegree;
+  let ⟨bBound, bLeadingNonzero⟩ := bDegree;
+  And.introduction(
+      Polynomial.product_DegreeLessThan(r, a, b, m, n, aBound, bBound),
+      function (topZero
+                  : Polynomial.coefficientOf(r, Polynomial.multiply(r, a, b), m + n)
+                    = Ring.zero(r)) =>
+          bLeadingNonzero(
+              Ring.field_no_zero_divisors(r, commutativity, inverseExistence,
+                  Polynomial.coefficientOf(r, a, m), Polynomial.coefficientOf(r, b, n),
+                  aLeadingNonzero,
+                  Equality.transitivity(
+                      Equality.symmetry(
+                          Polynomial.coefficientOf_product_at_sum(r, a, b, m, n, aBound, bBound)),
+                      topZero))))
+}
+
+-- Degree is unique.
+theorem Polynomial.HasDegree_unique (r : Ring)
+        (p : Polynomial(Ring.carrier(r), Ring.zero(r))) (d e : Natural)
+        (dDegree : Polynomial.HasDegree(r, p, d))
+        (eDegree : Polynomial.HasDegree(r, p, e))
+        : d = e := {
+  let ⟨dBound, dNonzero⟩ := dDegree;
+  let ⟨eBound, eNonzero⟩ := eDegree;
+  cases Natural.totality_of_less_or_equal(d, e) {
+    | Or.introduceLeft(dLessOrEqualE) =>
+        decide d = e {
+          | yes dEqualsE => dEqualsE
+          | no dNotEqualsE =>
+              absurd(eNonzero(dBound(e,
+                  Natural.less_or_equal_not_equal_successor(d, e, dLessOrEqualE,
+                      function (eEqualsD : e = d) => dNotEqualsE(Equality.symmetry(eEqualsD))))))
+        }
+    | Or.introduceRight(eLessOrEqualD) =>
+        decide d = e {
+          | yes dEqualsE => dEqualsE
+          | no dNotEqualsE =>
+              absurd(dNonzero(eBound(d,
+                  Natural.less_or_equal_not_equal_successor(e, d, eLessOrEqualD, dNotEqualsE))))
+        }
+  }
+}

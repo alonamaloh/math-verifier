@@ -87,6 +87,86 @@ theorem Natural.less_or_equal_successor_not_equal (j m : Natural)
   }
 }
 
+-- Cancel a right addend through monus: (a + b) − b = a.
+theorem Natural.monus_add_cancel_right (a b : Natural)
+        : Natural.monus(a + b, b) = a :=
+  calc Natural.monus(a + b, b)
+     = Natural.monus(b + a, b)   by Natural.add_commutative(a, b)
+     = a                          by Natural.monus_add_cancel_left(b, a)
+
+-- a ≤ b + a (a appears on the right).
+theorem Natural.less_or_equal_add_left (a b : Natural) : a ≤ b + a :=
+  rewrite(Natural.add_commutative(a, b), Natural.less_or_equal_add_right(a, b))
+
+-- The high-index degree bound: successor(d + j) ≤ i forces
+-- successor(d) ≤ i − j. Writing i = successor(d + j) + c and
+-- regrouping, i − j = successor(d + c) ≥ successor(d).
+theorem Natural.degree_bound_helper (d j i : Natural)
+        (bound : successor(d + j) ≤ i)
+        : successor(d) ≤ Natural.monus(i, j) := {
+  obtain ⟨c, equation⟩
+      from Natural.subtraction_witness(successor(d + j), i, bound);
+  claim iEquation : i = j + successor(d + c)
+      by calc i
+            = successor(d + j) + c
+                  by equation
+            = successor((d + j) + c)
+                  by reflexivity(Natural, successor((d + j) + c))
+            = successor((j + d) + c)
+                  by congruenceOf(function (t : Natural) => successor(t + c),
+                         Natural.add_commutative(d, j))
+            = successor(j + (d + c))
+                  by congruenceOf(function (t : Natural) => successor(t),
+                         Natural.add_associative(j, d, c))
+            = j + successor(d + c)
+                  by Equality.symmetry(Natural.add_successor(j, d + c));
+  claim monusEquation : Natural.monus(i, j) = successor(d + c)
+      by calc Natural.monus(i, j)
+            = Natural.monus(j + successor(d + c), j)
+                  by congruenceOf(function (t : Natural) => Natural.monus(t, j),
+                         iEquation)
+            = successor(d + c)
+                  by Natural.monus_add_cancel_left(j, successor(d + c));
+  rewrite(Equality.symmetry(monusEquation),
+          Natural.successor_less_or_equal_successor(d, d + c,
+              Natural.less_or_equal_add_right(d, c)))
+}
+
+-- a ≤ i and i ≠ a force successor(a) ≤ i.
+theorem Natural.less_or_equal_not_equal_successor (a i : Natural)
+        (lessOrEqual : a ≤ i) (notEqual : ¬(i = a))
+        : successor(a) ≤ i := {
+  obtain ⟨c, equation⟩ from Natural.subtraction_witness(a, i, lessOrEqual);
+  cases c refining equation {
+    | zero =>
+        absurd(notEqual(calc i = a + 0 by equation = a by Natural.add_zero(a)))
+    | successor(cPredecessor) =>
+        rewrite(Equality.symmetry(
+                    calc i
+                       = a + successor(cPredecessor)   by equation
+                       = successor(a + cPredecessor)   by Natural.add_successor(a, cPredecessor)),
+                Natural.successor_less_or_equal_successor(a, a + cPredecessor,
+                    Natural.less_or_equal_add_right(a, cPredecessor)))
+  }
+}
+
+-- a ≤ c gives a + b ≤ c + b, and b ≤ d gives a + b ≤ a + d.
+theorem Natural.le_add_preserves_left (a c b : Natural) (aLeC : a ≤ c)
+        : a + b ≤ c + b := {
+  let ⟨r, cEqAplusR⟩ := Natural.subtraction_witness(a, c, aLeC);
+  calc a + b
+     ≤ (a + b) + r     by Natural.less_or_equal_add_right(a + b, r)
+     = (a + r) + b
+     = c + b
+}
+
+theorem Natural.le_add_preserves_right (a b d : Natural) (bLeD : b ≤ d)
+        : a + b ≤ a + d :=
+  calc a + b
+     = b + a
+     ≤ d + a       by Natural.le_add_preserves_left(b, d, a, bLeD)
+     = a + d
+
 -- ----------------------------------------------------------------------
 -- Single-point summation.
 
