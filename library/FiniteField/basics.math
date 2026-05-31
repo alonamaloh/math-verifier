@@ -1,0 +1,83 @@
+-- FiniteField/basics.math
+--
+-- Finite fields F_{p^k}, built as F_p[x] modulo a degree-k polynomial:
+--   FiniteField(p, f) := RingModulo(F_p[x], f)
+-- where F_p = IntegerMod(p) and F_p[x] = Polynomial(F_p). For ANY
+-- modulus polynomial `f` this quotient is a commutative ring (proved
+-- here). It is a *field* — and, when `f` is irreducible of degree k,
+-- the field F_{p^k} of p^k elements — exactly when `f` is irreducible;
+-- that proof builds on polynomial division and Bezout (see
+-- FiniteField/field.math).
+--
+-- Note p is NOT required prime for the commutative-ring structure
+-- (IntegerMod(p) is a commutative ring for every p); primality enters
+-- only for the field property, where F_p itself must be a field.
+
+module FiniteField.basics
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.instances
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import IntegerMod.basics
+import IntegerMod.operations
+import IntegerMod.ring
+import IntegerMod.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.commutative
+import Polynomial.instances
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+
+-- The base field F_p = IntegerMod(p), as a bundled ring.
+definition IntegerMod.ring (p : Natural) : Ring :=
+  Ring.make(IntegerMod(p), IntegerMod.add, IntegerMod.zero(p),
+      IntegerMod.negate, IntegerMod.multiply, IntegerMod.one(p),
+      IntegerMod.is_ring(p))
+
+-- F_p[x], the polynomials over F_p, as a bundled ring.
+definition IntegerMod.polynomial_ring (p : Natural) : Ring :=
+  Polynomial.ring(IntegerMod.ring(p))
+
+-- F_p[x] is commutative (F_p is), packaged as the commutativity proof
+-- RingModulo needs for its multiplicative structure.
+definition IntegerMod.polynomial_ring_commutative (p : Natural)
+        : Ring.MultiplyCommutative(IntegerMod.polynomial_ring(p)) :=
+  Polynomial.multiply_commutative(IntegerMod.ring(p),
+      IntegerMod.multiply_commutative(p))
+
+-- F_{p^k} = F_p[x] / (f). A type for every modulus polynomial f; a
+-- field when f is irreducible (FiniteField/field.math).
+definition FiniteField (p : Natural)
+        (f : Ring.carrier(IntegerMod.polynomial_ring(p))) : Type(0) :=
+  RingModulo(IntegerMod.polynomial_ring(p), f)
+
+-- F_{p^k} is a commutative ring, for every p and every modulus f.
+theorem FiniteField.is_commutative_ring (p : Natural)
+        (f : Ring.carrier(IntegerMod.polynomial_ring(p)))
+        : IsCommutativeRing(
+              FiniteField(p, f),
+              RingModulo.add(IntegerMod.polynomial_ring(p), f),
+              RingModulo.zero(IntegerMod.polynomial_ring(p), f),
+              RingModulo.negate(IntegerMod.polynomial_ring(p), f),
+              RingModulo.multiply(IntegerMod.polynomial_ring(p),
+                  IntegerMod.polynomial_ring_commutative(p), f),
+              RingModulo.one(IntegerMod.polynomial_ring(p), f)) :=
+  RingModulo.is_commutative_ring(IntegerMod.polynomial_ring(p),
+      IntegerMod.polynomial_ring_commutative(p), f)
