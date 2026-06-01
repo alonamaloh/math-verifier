@@ -178,6 +178,18 @@ which otherwise *guesses* lemma names.
     `coefficientOf(Complex.x * Complex.x, 2)` (was the full
     `coefficientOf(Real.ring, multiply(Real.ring, Complex.x, Complex.x),
     2)`). Proofs unchanged (identical kernel terms).
+  - `ComplexNumber/irreducible.math` `(cf)²=−1` cluster (the plan's
+    flagged "single largest pile of avoidable proof") — **−97 lines** on
+    `no_degree_one_factorization`. Three moves: `let aZero/aOne/bZero/bOne
+    : Real := coefficientOf(a/b, 0/1)` once (the `: Real` ascription makes
+    +/* dispatch to concrete Real, sidestepping the bundle-operator hazard
+    that blocked `modulus.math`); `Real.multiply`/`Real.add` → `*`/`+`;
+    and the negate-involution / multiply-negate citations (verbose
+    `Group.inverse_involution` / `Ring.multiply_negate_left` with full
+    ring args) → `by ring`. The proof reads as `(aOne·bZero)² = −1`. So
+    the `: Real`-ascribed `let` is the general recipe for the
+    coefficient-algebra files: it both abbreviates AND unlocks concrete
+    operators + `ring`.
   - **Findings:**
     - `make library` EXCLUDES `library/Test/` — use `make -j 16 tests`
       for the full check (it builds the library AND the Test/*.math
