@@ -208,19 +208,16 @@ which otherwise *guesses* lemma names.
     single, scaled, sum, full `k1*h1 + k2*h2`). A *plain* `Ring.carrier(s)`
     stays unsupported — the ring bridge needs multiplicative commutativity
     (the same boundary as `ring`/A2).
-  - **Bare-literal operator dispatch — DONE.** `2 * x` / `x + 2` for
-    `x : Integer/Rational/Real` now elaborate without a `(2 : C)`
-    ascription: when dispatch finds no operator and one operand is a
-    BARE numeric literal (default `Natural`) while the other is a
-    concrete carrier `C` with a registered coercion `(Natural, C)`, the
-    dispatcher coerces the literal up to `C` and retries on `(C, C)`
-    (`desugarArithmeticOperator`, just before the unsupported-operator
-    throw; the coercion registry is transitively closed so multi-hop
-    `Natural→Integer→Rational→Real` is one entry). `ring` then reasons
-    with the coerced literal as the value (`2 * x = x + x` closes).
-    Zero-regression (only fires when dispatch would otherwise error;
-    `2 * 3` stays Natural). Tested in
-    `Test/bare_literal_multiply_test.math`.
+  - **Bare-literal operator dispatch — NOT pursued (by design).** A
+    prototype that coerced a bare `Natural` literal up to the other
+    operand's carrier (`2 * x` for `x : Integer`) was reverted: it
+    violates the project's "coercions explicit only, never implicit"
+    principle — it would make `2` silently mean Integer/Rational/Real
+    by context, and would wrongly accept `x + 2` for an `x` whose
+    carrier has no `Natural` coercion. The user writes `(2 : Integer)`
+    to disambiguate. The only acceptable direction discussed is flipping
+    the literal DEFAULT to Integer (Integer embeds canonically into
+    every ring), which is a separate, deliberate change — see TODO.
   - **Remaining — literal coefficients in a multi-term
     `linear_combination` (deferred, ring-normaliser).** A single
     literal-scaled hypothesis works; a SUM (`(2:Integer)*h1 +

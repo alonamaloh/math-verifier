@@ -616,30 +616,14 @@ real limitation:
   `Rational.to_real` for Real. The named constants `Integer.one` /
   `Rational.one` etc. are also recognized as literal 1.
 
-- **Bare literals in operator position now coerce from the other
-  operand.** A numeric literal still parses as a `Natural`, but when it
-  is ONE operand of an arithmetic operator (`+`, `*`, …) whose OTHER
-  operand is a concrete carrier `C` with a registered coercion
-  `(Natural, C)`, the dispatcher coerces the literal up to `C` and
-  dispatches on `(C, C)`. So `2 * x`, `x + 2`, `2 * x = x + x` all work
-  for `x : Integer/Rational/Real` with no `(2 : C)` ascription, and
-  `ring` reasons with the coerced literal as the value 2. Only a BARE
-  literal operand is promoted: `2 * 3` (both literals) stays `Natural`,
-  and a genuine `Natural`-typed variable is left to error. The carrier
-  must be reachable from `Natural` by a registered coercion (import the
-  carrier's `embedding` module, e.g. `Integer.embedding`).
-- **Still Natural-only: a literal with NO carrier-typed operand.** Bare
-  `1 + 1` whose *expected type* (not an operand) is Rational still
-  parses as `Natural` and fails — there is no operand to coerce from.
-  Write `Rational.one + Rational.one`, ascribe one operand
-  `(1 : Rational) + 1` (the other then coerces), or use the scalar
-  pattern `(2 : Integer) * x`.
-- **Scalar Integer multiplication at Rational/Real.** The `*` operator
-  on `(Integer, R)` / `(R, Integer)` is registered via
-  `R.from_integer_multiply` for R in {Rational, Real}; `(n : Integer) *
-  x` is a real operation (see the dedicated note above). With the
-  bare-literal coercion, `n * x` for a literal `n` now also works
-  directly.
+- **Bare-literal Rational/Real (not multiplied).** Each numeric
+  literal still parses as a Natural — bare `1 + 1` for a Rational
+  target fails, and `x + 2` for `x : Integer/Rational/Real` errors
+  (no implicit coercion: the user writes `(2 : Integer)` to say which
+  `2` they mean). For a Rational two, write `Rational.one +
+  Rational.one` or ascribe `(2 : Integer) * x` (scalar pattern). The
+  literal default stays Natural by design — coercions are explicit
+  only, never inferred from a neighbouring operand.
 
 When the goal is `(ring : Foo = Bar)` and you intend to `rewrite` with
 it, double-check the direction: `rewrite(eq, term)` looks for the LHS
