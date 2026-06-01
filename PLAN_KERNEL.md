@@ -42,6 +42,47 @@ defensible time to invest. Companion: **4.3 export to an external checker**
 (e.g. a known proof format) — higher cost, locks in an encoding; do only if a
 strong external guarantee is wanted, and after 4.2.
 
+### 4.3 feasibility — Lean export, and the cumulativity finding (2026-06)
+
+A subagent divergence audit of our kernel against Lean 4's theory found our
+type theory is a near-match (impredicative `Prop` via `imax`; β/η/δ/ι/ζ +
+definitional proof irrelevance; auto-generated recursors with Lean's
+argument order; the same Prop large-elimination restriction as a strict
+subset of Lean's subsingleton rule; quotients with the identical
+`lift∘mk ≡ f a` rule) with **one** place we are strictly *more permissive*
+than Lean: **universe cumulativity**. Our `isSubtype` (`kernel.cpp` ~1591)
+accepts `Sort m <: Sort n` for `m ≤ n` and covariant-Pi codomains; Lean is
+non-cumulative (kernel def-eq requires `m = n`). Terms that typecheck *via*
+cumulativity would be rejected by Lean.
+
+**Measured** with a gated probe (`MATH_PROBE_CUMULATIVITY=1`, logs every
+`isSubtype` Sort acceptance where `≤` holds but the levels are not equal —
+the single point all cumulativity reliance, including Pi-covariance, bottoms
+out at). Clean full rebuild → **only 7 strict-cumulativity acceptances, in 3
+files**:
+  - `Set/basics.math` ×1 (`Type(0) <: Type(1)`): `definition Set (T :
+    Type(0)) : Type(1)` over-declares — `T → Proposition` actually inhabits
+    `Type(0)`. One-line tighten to `: Type(0)` (verify downstream `Set`
+    users don't then need `Type(1)`).
+  - `Logic/constructor_totality.math` ×5 (`Prop <: Type(0)`): constructor-
+    totality lemmas for the Prop-inductives (`And`/`Or`/`Exists`/
+    `LessOrEqual`) where a `Proposition` flows into a `Type(0)` slot — e.g.
+    `And.constructor_totality` passes `And(A,B) : Prop` as the `Type(0)`
+    carrier of `Equality.{0}(…)`. The file header already documents this
+    Prop/Type universe friction. In Lean each needs explicit handling
+    (`ULift`, or restructuring so no Prop sits in a Type slot).
+  - `Test/implicit_args_test.math` ×1 — a test, not library content.
+
+**Conclusion:** cumulativity dependence is tiny and localized (6 real
+library sites in 2 files), not pervasive — so a Lean export is essentially
+unobstructed once those are made explicit. Other translation work is
+mechanical (recursor name/shape remap `Foo_recursor`→`Foo.rec`; map our
+`Quotient.*` to Lean's `Quot` *primitives*, not re-axiomatized; export
+`opaque` defs as transparent `def` so characterising-lemma reflexivity
+proofs check; `Internal.sorry`→`sorryAx`). The probe stays in the tree
+(gated, zero-cost) to re-confirm the count drops to 0 as the sites are
+fixed.
+
 ## Deferred kernel capabilities (open, in rough priority)
 
 - **Indexed inductives** (`Vec A n`, where an index varies per constructor).

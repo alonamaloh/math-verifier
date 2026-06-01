@@ -3,7 +3,9 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
+#include <iostream>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -1591,7 +1593,31 @@ bool isSubtype(const Environment& environment,
     // Sort cumulativity: Sort m <: Sort n iff m <= n.
     if (auto* subSort = std::get_if<Sort>(&subReduced->node)) {
         if (auto* superSort = std::get_if<Sort>(&superReduced->node)) {
-            return levelLessOrEqual(subSort->level, superSort->level);
+            bool lessOrEqual =
+                levelLessOrEqual(subSort->level, superSort->level);
+            // Cumulativity probe (gated on MATH_PROBE_CUMULATIVITY, so it
+            // costs nothing normally). This is the ONE place the kernel is
+            // more permissive than Lean 4, which is non-cumulative: it
+            // accepts `Sort m <: Sort n` whenever m <= n, where Lean
+            // requires m = n. Log the cases that rely on STRICT m < n
+            // (<= holds but the levels are not definitionally equal) —
+            // exactly the terms Lean's kernel would reject. The Pi
+            // covariant-codomain recursion below also bottoms out here, so
+            // this single point captures every cumulativity-dependent
+            // acceptance. Measures whether the library actually depends on
+            // cumulativity (→ whether a Lean export is unobstructed).
+            static const bool probeCumulativity = [] {
+                const char* flag = std::getenv("MATH_PROBE_CUMULATIVITY");
+                return flag && flag[0] != '\0' && flag[0] != '0';
+            }();
+            if (probeCumulativity && lessOrEqual
+                && !levelsDefinitionallyEqual(subSort->level,
+                                              superSort->level)) {
+                std::cerr << "[cumulativity] strict Sort subtype accepted: "
+                          << prettyPrintLevel(subSort->level) << " <: "
+                          << prettyPrintLevel(superSort->level) << "\n";
+            }
+            return lessOrEqual;
         }
     }
 
