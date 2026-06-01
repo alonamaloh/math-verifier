@@ -39,34 +39,25 @@ theorem GroupHomomorphism.kernel_is_normal
         : IsNormalSubgroup(G, GroupHomomorphism.kernel(G, H, f)) :=
   ⟨GroupHomomorphism.kernel_is_subgroup(G, H, f, homomorphism),
    function (g x : Group.carrier(G)) (xInKernel : f(x) = Group.identity(H)) =>
-       calc f(Group.operation(G, Group.operation(G, Group.inverse(G, g), x), g))
-          = Group.operation(H,
-                f(Group.operation(G, Group.inverse(G, g), x)), f(g))
-                by homomorphism(Group.operation(G, Group.inverse(G, g), x), g)
-          = Group.operation(H,
-                Group.operation(H, f(Group.inverse(G, g)), f(x)), f(g))
+       calc f(g⁻¹ · x · g)
+          = f(g⁻¹ · x) · f(g)
+                by homomorphism(g⁻¹ · x, g)
+          = (f(g⁻¹) · f(x)) · f(g)
                 by congruenceOf(
-                       function (t : Group.carrier(H)) =>
-                           Group.operation(H, t, f(g)),
-                       homomorphism(Group.inverse(G, g), x))
-          = Group.operation(H,
-                Group.operation(H, Group.inverse(H, f(g)), f(x)), f(g))
+                       function (t : Group.carrier(H)) => t · f(g),
+                       homomorphism(g⁻¹, x))
+          = (f(g)⁻¹ · f(x)) · f(g)
                 by congruenceOf(
-                       function (t : Group.carrier(H)) =>
-                           Group.operation(H, Group.operation(H, t, f(x)), f(g)),
+                       function (t : Group.carrier(H)) => (t · f(x)) · f(g),
                        GroupHomomorphism.preserves_inverse(G, H, f, homomorphism, g))
-          = Group.operation(H,
-                Group.operation(H, Group.inverse(H, f(g)), Group.identity(H)), f(g))
+          = (f(g)⁻¹ · Group.identity(H)) · f(g)
                 by congruenceOf(
-                       function (t : Group.carrier(H)) =>
-                           Group.operation(H,
-                               Group.operation(H, Group.inverse(H, f(g)), t), f(g)),
+                       function (t : Group.carrier(H)) => (f(g)⁻¹ · t) · f(g),
                        xInKernel)
-          = Group.operation(H, Group.inverse(H, f(g)), f(g))
+          = f(g)⁻¹ · f(g)
                 by congruenceOf(
-                       function (t : Group.carrier(H)) =>
-                           Group.operation(H, t, f(g)),
-                       Group.identity_right(H, Group.inverse(H, f(g))))
+                       function (t : Group.carrier(H)) => t · f(g),
+                       Group.identity_right(H, f(g)⁻¹))
           = Group.identity(H)
                 by Group.inverse_left(H, f(g))⟩
 
@@ -79,38 +70,35 @@ theorem GroupHomomorphism.induced_map_well_defined
         (f : Group.carrier(G) → Group.carrier(H))
         (homomorphism : IsHomomorphism(G, H, f))
         (a a' : Group.carrier(G))
-        (related : f(Group.operation(G, Group.inverse(G, a), a')) = Group.identity(H))
+        (related : f(a⁻¹ · a') = Group.identity(H))
         : f(a) = f(a') := {
   -- f(a)⁻¹·f(a') = f(a⁻¹·a') = e.
   claim quotientEquation
-      : Group.operation(H, Group.inverse(H, f(a)), f(a')) = Group.identity(H)
-      by calc Group.operation(H, Group.inverse(H, f(a)), f(a'))
-            = Group.operation(H, f(Group.inverse(G, a)), f(a'))
+      : f(a)⁻¹ · f(a') = Group.identity(H)
+      by calc f(a)⁻¹ · f(a')
+            = f(a⁻¹) · f(a')
                   by congruenceOf(
-                         function (t : Group.carrier(H)) =>
-                             Group.operation(H, t, f(a')),
+                         function (t : Group.carrier(H)) => t · f(a'),
                          Equality.symmetry(
                              GroupHomomorphism.preserves_inverse(G, H, f, homomorphism, a)))
-            = f(Group.operation(G, Group.inverse(G, a), a'))
-                  by Equality.symmetry(homomorphism(Group.inverse(G, a), a'))
+            = f(a⁻¹ · a')
+                  by Equality.symmetry(homomorphism(a⁻¹, a'))
             = Group.identity(H)
                   by related;
   -- multiply through by f(a): f(a) = f(a)·(f(a)⁻¹·f(a')) = f(a').
   calc f(a)
-     = Group.operation(H, f(a), Group.identity(H))
+     = f(a) · Group.identity(H)
            by Equality.symmetry(Group.identity_right(H, f(a)))
-     = Group.operation(H, f(a),
-           Group.operation(H, Group.inverse(H, f(a)), f(a')))
+     = f(a) · (f(a)⁻¹ · f(a'))
            by congruenceOf(
-                  function (t : Group.carrier(H)) => Group.operation(H, f(a), t),
+                  function (t : Group.carrier(H)) => f(a) · t,
                   Equality.symmetry(quotientEquation))
-     = Group.operation(H,
-           Group.operation(H, f(a), Group.inverse(H, f(a))), f(a'))
+     = (f(a) · f(a)⁻¹) · f(a')
            by Equality.symmetry(
-                  Group.associative(H, f(a), Group.inverse(H, f(a)), f(a')))
-     = Group.operation(H, Group.identity(H), f(a'))
+                  Group.associative(H, f(a), f(a)⁻¹, f(a')))
+     = Group.identity(H) · f(a')
            by congruenceOf(
-                  function (t : Group.carrier(H)) => Group.operation(H, t, f(a')),
+                  function (t : Group.carrier(H)) => t · f(a'),
                   Group.inverse_right(H, f(a)))
      = f(a')
            by Group.identity_left(H, f(a'))
@@ -170,19 +158,17 @@ theorem GroupHomomorphism.induced_map_is_injective
         -- mapsEqual now reduces to f(a) = f(b).
         claim sameCoset
             : Group.SameCoset(G, GroupHomomorphism.kernel(G, H, f), a, b)
-            by calc f(Group.operation(G, Group.inverse(G, a), b))
-                  = Group.operation(H, f(Group.inverse(G, a)), f(b))
-                        by homomorphism(Group.inverse(G, a), b)
-                  = Group.operation(H, Group.inverse(H, f(a)), f(b))
+            by calc f(a⁻¹ · b)
+                  = f(a⁻¹) · f(b)
+                        by homomorphism(a⁻¹, b)
+                  = f(a)⁻¹ · f(b)
                         by congruenceOf(
-                               function (t : Group.carrier(H)) =>
-                                   Group.operation(H, t, f(b)),
+                               function (t : Group.carrier(H)) => t · f(b),
                                GroupHomomorphism.preserves_inverse(
                                    G, H, f, homomorphism, a))
-                  = Group.operation(H, Group.inverse(H, f(b)), f(b))
+                  = f(b)⁻¹ · f(b)
                         by congruenceOf(
-                               function (t : Group.carrier(H)) =>
-                                   Group.operation(H, Group.inverse(H, t), f(b)),
+                               function (t : Group.carrier(H)) => t⁻¹ · f(b),
                                mapsEqual)
                   = Group.identity(H)
                         by Group.inverse_left(H, f(b));
