@@ -7304,7 +7304,7 @@ private:
                 // endpoints are `Sum`s and the proof elaborates pointwise,
                 // so it never shadows an ordinary step proof.
                 if (step.relation == CalcRelation::Equality) {
-                    stepProofKernel = tryUnderSumStep(
+                    stepProofKernel = tryUnderBinderStep(
                         localBinders, previousKernel, nextKernel,
                         *step.stepProof, step.line, step.column);
                 }
@@ -8897,87 +8897,145 @@ private:
         }
     }
 
-    // Prototype: rewrite-under-Σ. A calc `=` step whose endpoints are
-    // `Polynomial.Sum(r, f, n)` and `Polynomial.Sum(r, g, n)` is a
-    // congruence under the summation binder: it holds when `f(i) = g(i)`
-    // pointwise. Instead of making the author respell BOTH summands inside
-    // a `Polynomial.Sum.extensional(r, λi.…, λi.…, λi.proof, n)` call, let
-    // them write the per-index proof as the `by` step; `f` and `g` are
-    // read off the endpoints. We assemble `Sum.extensional(r, f, g)`
-    // partially, ask the kernel for the expected pointwise-proof type (its
-    // first remaining Pi domain, already β-reduced to the summand
-    // equality), elaborate the user's proof against that, and finish the
-    // application. Returns nullptr unless both endpoints are `Sum`s and the
-    // proof elaborates pointwise — so it never shadows an ordinary step.
-    ExpressionPointer tryUnderSumStep(
+    // Does `type` ultimately conclude in an `Equality(…)` after peeling
+    // its leading Pi binders? Identifies a "pointwise" hypothesis like
+    // `(i) → f(i) = g(i)` or `(i) → i ≤ n → f(i) = g(i)`.
+    bool isPointwiseEqualityType(ExpressionPointer type) {
+        ExpressionPointer cursor = weakHeadNormalForm(environment_, type);
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            cursor = weakHeadNormalForm(environment_, pi->codomain);
+        }
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            cursor = application->function;
+        }
+        auto* head = std::get_if<Constant>(&cursor->node);
+        return head && head->name == "Equality";
+    }
+
+    // Rewrite-under-a-binder. A calc `=` step whose endpoints are the SAME
+    // function `F` applied to argument lists that differ in exactly one
+    // position — a lambda (the binder body f vs g) — is a congruence under
+    // that binder: it holds when `f(i) = g(i)` pointwise. Instead of the
+    // author respelling both lambdas inside an
+    // `F.extensional(…, λi.…, λi.…, λi.proof, …)` call, they write only the
+    // per-index proof as the `by` step; `f`/`g` and all the shared
+    // arguments are read off the endpoints.
+    //
+    // Generic over `F` and over the congruence lemma's argument order: we
+    // look up `<F>.extensional` / `<F>.extensional_range` by convention,
+    // apply it to the shared prefix + f + g, then fill its remaining
+    // binders by walking them — the user's lambda goes to the unique
+    // POINTWISE-equality binder (whatever its position), every other binder
+    // is filled from the next shared suffix argument of `F`. So both
+    // `Sum.extensional(r,f,g,pointwise,n)` and the range variant
+    // `Sum.extensional_range(r,f,g,n,pointwise_range)` work unchanged.
+    //
+    // Returns nullptr unless the endpoints are a single-lambda-diff
+    // application of a registered `F` and the proof elaborates pointwise —
+    // so it never shadows an ordinary step proof.
+    ExpressionPointer tryUnderBinderStep(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer previous, ExpressionPointer next,
         const SurfaceExpression& proofSurface, int line, int column) {
         (void)line; (void)column;
-        if (!environment_.lookup("Polynomial.Sum.extensional")) {
-            return nullptr;
-        }
         // Only fire when the `by` proof is syntactically a lambda — the
-        // under-Σ form IS `function (i) => <pointwise proof>`. A Sum=Sum
-        // step proved by an ordinary lemma (e.g. `Sum.add`) is left to the
-        // normal path; otherwise its holes would mis-absorb the pointwise
-        // expected type.
+        // under-binder form IS `function (i) => <pointwise proof>`. An
+        // ordinary lemma proof is left to the normal path.
         if (!std::get_if<SurfaceLambda>(&proofSurface.node)) {
             return nullptr;
         }
-        // Peel `Polynomial.Sum(r, fn, bound)` → (ring, fn, bound).
-        auto extractSum = [&](ExpressionPointer expression,
-                              ExpressionPointer& ring,
-                              ExpressionPointer& summand,
-                              ExpressionPointer& bound) -> bool {
-            std::vector<ExpressionPointer> arguments;
+        // Peel `Head(arg0, …, argN)` → (head name, args outermost-first).
+        auto peelApplication = [&](ExpressionPointer expression,
+                                   std::vector<ExpressionPointer>& args)
+                -> std::string {
             ExpressionPointer cursor = expression;
             while (auto* application =
                        std::get_if<Application>(&cursor->node)) {
-                arguments.push_back(application->argument);
+                args.push_back(application->argument);
                 cursor = application->function;
             }
+            std::reverse(args.begin(), args.end());
             auto* head = std::get_if<Constant>(&cursor->node);
-            if (!head || head->name != "Polynomial.Sum") return false;
-            if (arguments.size() != 3) return false;
-            bound = arguments[0];     // peeled innermost-first: [bound, fn, ring]
-            summand = arguments[1];
-            ring = arguments[2];
-            return true;
+            return head ? head->name : std::string();
         };
-        ExpressionPointer ring, summandF, bound;
-        ExpressionPointer ringRight, summandG, boundRight;
-        if (!extractSum(previous, ring, summandF, bound)) return nullptr;
-        if (!extractSum(next, ringRight, summandG, boundRight)) {
+        std::vector<ExpressionPointer> argsLeft, argsRight;
+        std::string headLeft = peelApplication(previous, argsLeft);
+        std::string headRight = peelApplication(next, argsRight);
+        if (headLeft.empty() || headLeft != headRight) return nullptr;
+        if (argsLeft.size() != argsRight.size() || argsLeft.empty()) {
             return nullptr;
         }
-        // Partially apply Sum.extensional to (r, f, g); the kernel hands
-        // back `(pointwise : (i) → f(i) = g(i)) → (n) → Sum = Sum`.
-        ExpressionPointer partial =
-            makeConstant("Polynomial.Sum.extensional");
-        partial = makeApplication(std::move(partial), ring);
-        partial = makeApplication(std::move(partial), summandF);
-        partial = makeApplication(std::move(partial), summandG);
-        ExpressionPointer partialType;
-        try {
-            partialType = weakHeadNormalForm(environment_,
-                inferTypeInLocalContext(localBinders, partial));
-        } catch (const TypeError&) { return nullptr; }
-          catch (const ElaborateError&) { return nullptr; }
-        auto* pointwisePi = std::get_if<Pi>(&partialType->node);
-        if (!pointwisePi) return nullptr;
-        ExpressionPointer pointwiseExpected = closeOverLocalBinders(
-            pointwisePi->domain, localBinders, localBinders.size());
-        ExpressionPointer pointwiseProof;
-        try {
-            pointwiseProof = elaborateExpression(
-                proofSurface, localBinders, pointwiseExpected);
-        } catch (const ElaborateError&) { return nullptr; }
-          catch (const TypeError&) { return nullptr; }
-        ExpressionPointer result =
-            makeApplication(std::move(partial), pointwiseProof);
-        result = makeApplication(std::move(result), bound);
-        return result;
+        // Exactly one differing argument position, and both sides there are
+        // lambdas (the binder body).
+        int diffPosition = -1;
+        for (size_t i = 0; i < argsLeft.size(); ++i) {
+            if (!structurallyEqual(argsLeft[i], argsRight[i])) {
+                if (diffPosition >= 0) return nullptr;  // more than one diff
+                diffPosition = static_cast<int>(i);
+            }
+        }
+        if (diffPosition < 0) return nullptr;  // identical (reflexivity)
+        // The differing argument is the binder body (`f` vs `g`) — it need
+        // not be a literal lambda (an abstract function variable is fine);
+        // the lemma lookup + pointwise elaboration + final type-check below
+        // reject anything that isn't genuinely a congruence-under-binder.
+        ExpressionPointer summandF = argsLeft[diffPosition];
+        ExpressionPointer summandG = argsRight[diffPosition];
+
+        // Try each congruence lemma by naming convention.
+        for (const std::string& suffix : {".extensional", ".extensional_range"}) {
+            std::string lemmaName = headLeft + suffix;
+            if (!environment_.lookup(lemmaName)) continue;
+            try {
+                // Apply to: shared prefix (args before the binder) + f + g.
+                ExpressionPointer partial = makeConstant(lemmaName);
+                for (int i = 0; i < diffPosition; ++i) {
+                    partial = makeApplication(std::move(partial), argsLeft[i]);
+                }
+                partial = makeApplication(std::move(partial), summandF);
+                partial = makeApplication(std::move(partial), summandG);
+                // Fill remaining binders: the user's lambda for the unique
+                // pointwise-equality binder, shared suffix args for the rest.
+                size_t suffixIndex = static_cast<size_t>(diffPosition) + 1;
+                bool lambdaUsed = false;
+                for (int guard = 0; guard < 16; ++guard) {
+                    ExpressionPointer partialType = weakHeadNormalForm(
+                        environment_,
+                        inferTypeInLocalContext(localBinders, partial));
+                    auto* pi = std::get_if<Pi>(&partialType->node);
+                    if (!pi) break;  // fully applied
+                    if (!lambdaUsed
+                        && isPointwiseEqualityType(pi->domain)) {
+                        ExpressionPointer expected = closeOverLocalBinders(
+                            pi->domain, localBinders, localBinders.size());
+                        ExpressionPointer proof = elaborateExpression(
+                            proofSurface, localBinders, expected);
+                        partial = makeApplication(std::move(partial), proof);
+                        lambdaUsed = true;
+                    } else if (suffixIndex < argsLeft.size()) {
+                        partial = makeApplication(std::move(partial),
+                                                   argsLeft[suffixIndex++]);
+                    } else {
+                        break;  // cannot fill
+                    }
+                }
+                if (!lambdaUsed) continue;
+                // Validate: a fully-applied, well-typed proof.
+                ExpressionPointer resultType =
+                    inferTypeInLocalContext(localBinders, partial);
+                if (std::get_if<Pi>(&weakHeadNormalForm(
+                        environment_, resultType)->node)) {
+                    continue;  // still under-applied
+                }
+                return partial;
+            } catch (const ElaborateError&) {
+                continue;
+            } catch (const TypeError&) {
+                continue;
+            }
+        }
+        return nullptr;
     }
 
     // Given a user-supplied `by <equationProof>` for a calc `=` step,
