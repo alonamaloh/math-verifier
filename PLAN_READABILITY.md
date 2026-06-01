@@ -158,8 +158,27 @@ which otherwise *guesses* lemma names.
 
 ### STATUS (live)
 
-- **§4 proving ground — in progress (5 commits).** Rewriting the
-  tax-paying files with the landed ergonomics, the diff as the evidence.
+- **§4 proving ground — high-value surface DONE (~14 files, 4 enablers).**
+  Rewriting the tax-paying files with the landed ergonomics, the diff as
+  the evidence. **Enablers built along the way:** Polynomial `+`/`*`
+  operators + `Polynomial.add`/`multiply`/`negate` ring-implicit;
+  `Polynomial.coefficientOf` and `Polynomial.coefficient` ring-implicit
+  (321 sites); carrier-projection operator dispatch. **Files rewritten:**
+  `ring_difference`, `RingModulo/ring`, `ComplexNumber/modulus` /
+  `irreducible` (cluster) / `embedding_injective`, and the Polynomial
+  coefficient algebra — `multiply_laws` (−172), `commutative`, `division`,
+  `division_support`, `degree_product`, `multiply_coefficient`,
+  `additive_group`, `negation`. **The general recipe** for an
+  abstract-ring coefficient file: drop the implicit ring from
+  `coefficient`/`coefficientOf`, infix `Ring.multiply`/`Ring.add` over
+  `Ring.carrier(r)` operands (bundle operators recover `r`); for a
+  CONCRETE-ring file, `let x : <ConcreteCarrier> := …` so `+`/`*` dispatch
+  to the concrete ops (and `ring` fires). **Excluded** (specific
+  blockers): `degree.math` (defines `coefficientOf` — self-reference),
+  `summation.math` (a `Ring.add` folds inside a recursor → operand head
+  `Ring_recursor`); the structural basics files (`monomial`, `basics`)
+  are mostly `Ring.carrier(r)` type-args, not value algebra, so the recipe
+  doesn't apply.
   - `ring_difference.math` — operators on `Ring.carrier` (`x - y`,
     `(g-h)+(h-k)=g-k`); −89 lines, proofs unchanged (B3 bridging lines
     every `by` up). `ring` can't fire here (plain Ring; finding #1).
