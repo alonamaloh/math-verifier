@@ -275,6 +275,9 @@ struct SurfaceField {
 // walks it, scaling/summing the equations and building the combined proof
 // by congruence + transitivity. So `c1 * h1 + c2 * h2` and `h1 - h2` are
 // one-liners, and a bare hypothesis `h` is the degenerate single leaf.
+// Works over concrete carriers and the bundled `CommutativeRing.carrier(c)`
+// (the ops carry the structure argument `c`); a plain `Ring.carrier(s)`
+// is unsupported (the ring bridge needs commutativity).
 struct SurfaceLinearCombination {
     SurfaceExpressionPointer combination;
 };

@@ -196,12 +196,25 @@ which otherwise *guesses* lemma names.
     Tested in `Test/lincomb_test.math` (7 declarations: single, scaled
     via congruence, scaled inline, sum, full `c1*h1+c2*h2`, difference,
     calc-step). Documented in CLAUDE.md ("`linear_combination(e)`").
+  - **v3 — bundle carrier support.** The op resolution and the tree
+    walker are now structure-prefix-aware: for a goal over the bundled
+    `CommutativeRing.carrier(c)` the ops resolve as `CommutativeRing.*(c)`
+    and the instance as `CommutativeRing.is_ring(c)` (mirroring how `ring`
+    threads the prefix), and `evalLinearCombinationTree` prepends `c` to
+    each op constant it builds. The bridge already routed through the
+    bundle-aware `elaborateRingByNormalisation` (A2). Concrete carriers
+    are the empty-prefix special case, unchanged. Tested in
+    `Test/lc_bundle.math` (4 decls over an abstract `c : CommutativeRing`:
+    single, scaled, sum, full `k1*h1 + k2*h2`). A *plain* `Ring.carrier(s)`
+    stays unsupported — the ring bridge needs multiplicative commutativity
+    (the same boundary as `ring`/A2).
   - **Remaining (deferred, low value):** literal coefficients
     `(2 : Integer) * h` hit the pre-existing bare-literal `*`
     operator-dispatch gap (the literal parses as a Natural — independent
     of `linear_combination`, also blocks `ring` on the same goal); use a
-    variable coefficient meanwhile. Bundle/abstract carriers
-    (`Ring.carrier(s)`) still need the structure argument threaded.
+    variable coefficient meanwhile. Parametrized non-bundle carriers
+    (`RingModulo(c, m)`, the `ComplexNumber` alias) would need
+    `computeRingScheme` + `ring` extended to them first — out of scope.
 
 
 - **§4 proving ground — high-value surface DONE (~14 files, 4 enablers).**

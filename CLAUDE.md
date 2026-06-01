@@ -716,9 +716,13 @@ theorem _ (a b c d : Integer) (h1 : a = b) (h2 : c = d) : a - c = b - d :=
 ```
 
 Works as a calc-step `by` proof too. Scope/limits:
-- **Concrete carriers only** (Integer/Rational/Real/…). A bundled
-  carrier `Ring.carrier(s)` needs the structure argument threaded —
-  not yet supported; cite `Ring.equal_of_linear_combination` by hand.
+- **Concrete carriers** (Integer/Rational/Real/…) **and the bundled
+  commutative-ring carrier `CommutativeRing.carrier(c)`** (the ops are
+  resolved as the `CommutativeRing.*(c)` projections and the instance
+  as `CommutativeRing.is_ring(c)`, mirroring how `ring` threads the
+  structure argument). A *plain* `Ring.carrier(s)` is NOT supported —
+  the ring bridge needs multiplicative commutativity (same limit as
+  `ring`); cite `Ring.equal_of_linear_combination` by hand there.
 - **Literal coefficients** like `(2 : Integer) * h` hit the
   pre-existing "bare-literal `*`" operator-dispatch gap (the literal
   parses as a Natural); use a named/variable coefficient, or

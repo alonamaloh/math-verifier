@@ -10687,12 +10687,23 @@ private:
         ExpressionPointer carrierType,
         LevelPointer carrierLevel,
         const std::string& opNamespace,
+        const std::vector<ExpressionPointer>& structurePrefix,
         int line) {
         size_t binderCount = localBinders.size();
+        // A bundled carrier's operations carry a leading structure argument
+        // (`CommutativeRing.add(c)` not `Integer.add`); prepend it. Empty
+        // for a concrete carrier, so this is the identity in the v1 case.
+        auto opHead = [&](const std::string& opName) {
+            ExpressionPointer head = makeConstant(opName);
+            for (const auto& arg : structurePrefix) {
+                head = makeApplication(std::move(head), arg);
+            }
+            return head;
+        };
         auto opApply = [&](const std::string& opName,
                            ExpressionPointer x, ExpressionPointer y) {
             return makeApplication(
-                makeApplication(makeConstant(opName), std::move(x)),
+                makeApplication(opHead(opName), std::move(x)),
                 std::move(y));
         };
         // Combine `op(a.left, b.left) = op(a.right, b.right)` from the
@@ -10729,10 +10740,10 @@ private:
                        : (sym == "*" ? ".multiply" : ".subtract"));
                 CombinationEquation a = evalLinearCombinationTree(
                     binary->left, localBinders, carrierType, carrierLevel,
-                    opNamespace, line);
+                    opNamespace, structurePrefix, line);
                 CombinationEquation b = evalLinearCombinationTree(
                     binary->right, localBinders, carrierType, carrierLevel,
-                    opNamespace, line);
+                    opNamespace, structurePrefix, line);
                 return combineBinary(opName, a, b);
             }
         }
@@ -10741,14 +10752,14 @@ private:
             if (unary->opSymbol == "-") {
                 CombinationEquation a = evalLinearCombinationTree(
                     unary->operand, localBinders, carrierType, carrierLevel,
-                    opNamespace, line);
+                    opNamespace, structurePrefix, line);
                 std::string negateName = opNamespace + ".negate";
                 ExpressionPointer newLeft =
-                    makeApplication(makeConstant(negateName), a.left);
+                    makeApplication(opHead(negateName), a.left);
                 ExpressionPointer newRight =
-                    makeApplication(makeConstant(negateName), a.right);
+                    makeApplication(opHead(negateName), a.right);
                 ExpressionPointer lambda = makeLambda("_lc_z", carrierType,
-                    makeApplication(makeConstant(negateName),
+                    makeApplication(opHead(negateName),
                                     makeBoundVariable(0)));
                 ExpressionPointer proof = buildEqualityCongruenceSameCarrier(
                     carrierLevel, carrierType, lambda, a.left, a.right,
@@ -10809,16 +10820,12 @@ private:
             expectedOpened, "linear_combination", line);
         std::string carrierName = headConstantName(goal.carrierType);
         RingScheme scheme = computeRingScheme(goal.carrierType);
-        if (!scheme.structurePrefix.empty()) {
-            throwElaborate(
-                "`linear_combination` v1 supports concrete ring carriers "
-                "only (the goal's carrier is a bundle projection `"
-                + carrierName + "`); cite "
-                "`Ring.equal_of_linear_combination` by hand for now");
-        }
-        // Resolve the carrier's ring operations + IsRing instance as plain
-        // named constants (matches `ring`'s normalisation context).
-        auto requireConstant = [&](const std::string& name)
+        // Resolve the carrier's ring operations + IsRing instance (matches
+        // `ring`'s normalisation context). For a bundled carrier
+        // `CommutativeRing.carrier(c)` the ops carry the leading structure
+        // argument `c` (`scheme.structurePrefix`); for a concrete carrier
+        // the prefix is empty and these are the plain named constants.
+        auto requireConstantBare = [&](const std::string& name)
                 -> ExpressionPointer {
             if (!environment_.lookup(name)) {
                 throwElaborate("`linear_combination`: carrier `" + carrierName
@@ -10826,6 +10833,14 @@ private:
                     + "` (import the module that defines it)");
             }
             return makeConstant(name);
+        };
+        auto requireConstant = [&](const std::string& name)
+                -> ExpressionPointer {
+            ExpressionPointer head = requireConstantBare(name);
+            for (const auto& arg : scheme.structurePrefix) {
+                head = makeApplication(std::move(head), arg);
+            }
+            return head;
         };
         ExpressionPointer addOp = requireConstant(scheme.opNamespace + ".add");
         ExpressionPointer zeroOp =
@@ -10837,7 +10852,7 @@ private:
         ExpressionPointer oneOp = requireConstant(scheme.opNamespace + ".one");
         ExpressionPointer isRingTerm =
             requireConstant(scheme.opNamespace + ".is_ring");
-        requireConstant("Ring.equal_of_linear_combination");
+        requireConstantBare("Ring.equal_of_linear_combination");
         auto addApply = [&](ExpressionPointer x, ExpressionPointer y) {
             return makeApplication(makeApplication(addOp, x), y);
         };
@@ -10851,7 +10866,8 @@ private:
         // the degenerate single-leaf tree (the v1 case).
         CombinationEquation comb = evalLinearCombinationTree(
             tactic.combination, localBinders, goal.carrierType,
-            goal.carrierUniverseLevel, scheme.opNamespace, line);
+            goal.carrierUniverseLevel, scheme.opNamespace,
+            scheme.structurePrefix, line);
         ExpressionPointer combProof = comb.proof;
         // Bridge: goalL − goalR = combL − combR, proved by the ring
         // normaliser (it is a pure ring identity — no hypotheses). β-reduce
