@@ -871,6 +871,11 @@ private:
             elaborateOverloadDeclaration(*ov);
             return;
         }
+        if (auto* cong =
+                std::get_if<SurfaceCongruenceDeclaration>(&statement)) {
+            elaborateCongruenceDeclaration(*cong);
+            return;
+        }
         if (auto* coercion =
                 std::get_if<SurfaceCoercionDeclaration>(&statement)) {
             elaborateCoercionDeclaration(*coercion);
@@ -1081,6 +1086,27 @@ private:
     // function `F` must exist; the alias accumulates a list of fully-
     // qualified candidates that the elaborator picks among by argument-
     // type matching at call sites.
+    void elaborateCongruenceDeclaration(
+        const SurfaceCongruenceDeclaration& declaration) {
+        Frame frame(*this,
+            "congruence_under_binder '" + declaration.functionName
+            + "' := '" + declaration.lemmaName + "'");
+        if (!environment_.lookup(declaration.lemmaName)) {
+            throwElaborate(
+                "congruence_under_binder target '" + declaration.lemmaName
+                + "' is not in scope");
+        }
+        auto& lemmas =
+            environment_.congruenceUnderBinderRegistry[
+                declaration.functionName];
+        for (const auto& existing : lemmas) {
+            if (existing == declaration.lemmaName) {
+                return;  // idempotent re-registration
+            }
+        }
+        lemmas.push_back(declaration.lemmaName);
+    }
+
     void elaborateOverloadDeclaration(
         const SurfaceOverloadDeclaration& declaration) {
         Frame frame(*this,
@@ -8983,9 +9009,14 @@ private:
         ExpressionPointer summandF = argsLeft[diffPosition];
         ExpressionPointer summandG = argsRight[diffPosition];
 
-        // Try each congruence lemma by naming convention.
-        for (const std::string& suffix : {".extensional", ".extensional_range"}) {
-            std::string lemmaName = headLeft + suffix;
+        // Try each congruence lemma registered for this function head via
+        // `congruence_under_binder <F> := <L>;`.
+        auto registryEntry =
+            environment_.congruenceUnderBinderRegistry.find(headLeft);
+        if (registryEntry == environment_.congruenceUnderBinderRegistry.end()) {
+            return nullptr;
+        }
+        for (const std::string& lemmaName : registryEntry->second) {
             if (!environment_.lookup(lemmaName)) continue;
             try {
                 // Apply to: shared prefix (args before the binder) + f + g.

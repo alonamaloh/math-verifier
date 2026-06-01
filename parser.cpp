@@ -368,6 +368,8 @@ private:
             }
             case TokenKind::KeywordOperator:   return parseOperatorDeclaration();
             case TokenKind::KeywordOverload:   return parseOverloadDeclaration();
+            case TokenKind::KeywordCongruenceUnderBinder:
+                return parseCongruenceDeclaration();
             case TokenKind::KeywordCoercion:   return parseCoercionDeclaration();
             case TokenKind::KeywordConvention: return parseConventionDeclaration();
             case TokenKind::KeywordInstance:   return parseInstanceDeclaration();
@@ -466,6 +468,25 @@ private:
     }
 
     // `overload <alias> := <Function>`
+    // `congruence_under_binder <F> := <L>` — registers congruence lemma
+    // `L` for function head `F` (the rewrite-under-binder mechanism).
+    SurfaceCongruenceDeclaration parseCongruenceDeclaration() {
+        consumeAny();  // 'congruence_under_binder'
+        SurfaceCongruenceDeclaration declaration;
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a function head name after "
+                      "'congruence_under_binder'");
+        }
+        declaration.functionName = consumeQualifiedNameString();
+        expect(TokenKind::Assign,
+               "expected ':=' before the congruence lemma name");
+        if (!isIdentifierLike(peek().kind)) {
+            throwHere("expected a lemma name as the congruence target");
+        }
+        declaration.lemmaName = consumeQualifiedNameString();
+        return declaration;
+    }
+
     SurfaceOverloadDeclaration parseOverloadDeclaration() {
         consumeAny();  // 'overload'
         SurfaceOverloadDeclaration declaration;

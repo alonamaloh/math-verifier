@@ -862,6 +862,18 @@ struct SurfaceOperatorDeclaration {
     std::string functionName;
 };
 
+// `congruence_under_binder <F> := <L>` — registers `L` as a
+// congruence-under-binder lemma for the function head `F`. In a calc `=`
+// step whose endpoints are `F(…, λx.f, …) = F(…, λx.g, …)`, the elaborator
+// uses `L` to discharge the step from the pointwise `(x) => f(x) = g(x)`
+// the author writes as the `by` proof. Multiple `congruence_under_binder
+// F := L1;` / `… := L2;` accumulate (e.g. a plain and a range-restricted
+// variant); the elaborator tries each.
+struct SurfaceCongruenceDeclaration {
+    std::string functionName;
+    std::string lemmaName;
+};
+
 // `overload <alias> := <function>` — registers `function` as a member of
 // the overload set named `alias`. Multiple `overload alias := F1;` and
 // `overload alias := F2;` declarations build up the set; the elaborator
@@ -923,6 +935,7 @@ using SurfaceTopStatement = std::variant<
     SurfaceInductiveDeclaration, SurfaceAxiomDeclaration,
     SurfaceDefinitionDeclaration,
     SurfaceOperatorDeclaration, SurfaceOverloadDeclaration,
+    SurfaceCongruenceDeclaration,
     SurfaceCoercionDeclaration,
     SurfaceConventionDeclaration,
     SurfaceInstanceDeclaration

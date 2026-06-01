@@ -4969,6 +4969,15 @@ void loadCacheRecursive(Environment& environment,
         }
         if (!seen) candidates.push_back(entry.functionName);
     }
+    for (const auto& entry : contents.congruenceRegistrations) {
+        auto& lemmas =
+            environment.congruenceUnderBinderRegistry[entry.functionName];
+        bool seen = false;
+        for (const auto& existing : lemmas) {
+            if (existing == entry.lemmaName) { seen = true; break; }
+        }
+        if (!seen) lemmas.push_back(entry.lemmaName);
+    }
     for (const auto& entry : contents.coercionRegistrations) {
         auto key = std::make_tuple(entry.sourceTypeName,
                                      entry.targetTypeName);
@@ -5129,6 +5138,13 @@ int verifyWithCache(const std::string& sourcePath,
             overloadsBefore[alias].insert(candidate);
         }
     }
+    std::map<std::string, std::set<std::string>> congruencesBefore;
+    for (const auto& [head, lemmas]
+             : environment.congruenceUnderBinderRegistry) {
+        for (const auto& lemma : lemmas) {
+            congruencesBefore[head].insert(lemma);
+        }
+    }
     std::set<std::tuple<std::string, std::string>> coercionsBefore;
     for (const auto& [key, _] : environment.coercionRegistry) {
         coercionsBefore.insert(key);
@@ -5243,6 +5259,18 @@ int verifyWithCache(const std::string& sourcePath,
                 entry.aliasName = alias;
                 entry.functionName = candidate;
                 cache.overloadRegistrations.push_back(std::move(entry));
+            }
+        }
+    }
+    for (const auto& [head, lemmas]
+             : environment.congruenceUnderBinderRegistry) {
+        auto& seenBefore = congruencesBefore[head];
+        for (const auto& lemma : lemmas) {
+            if (!seenBefore.count(lemma)) {
+                CachedCongruenceRegistration entry;
+                entry.functionName = head;
+                entry.lemmaName = lemma;
+                cache.congruenceRegistrations.push_back(std::move(entry));
             }
         }
     }

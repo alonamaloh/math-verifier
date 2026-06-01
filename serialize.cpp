@@ -12,7 +12,8 @@ constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
 // Format version 2 adds the operator-registry and overload-alias
 // sections at the tail of the file. Files written by version 1 readers
 // are not accepted; on cache-version mismatch the kernel rebuilds.
-constexpr uint32_t cacheVersion = 4;
+// Version 5 adds the congruence-under-binder registry section.
+constexpr uint32_t cacheVersion = 5;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -413,6 +414,12 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
         writer.writeString(entry.functionName);
     }
     writer.writeU32(
+        static_cast<uint32_t>(contents.congruenceRegistrations.size()));
+    for (const auto& entry : contents.congruenceRegistrations) {
+        writer.writeString(entry.functionName);
+        writer.writeString(entry.lemmaName);
+    }
+    writer.writeU32(
         static_cast<uint32_t>(contents.coercionRegistrations.size()));
     for (const auto& entry : contents.coercionRegistrations) {
         writer.writeString(entry.sourceTypeName);
@@ -497,6 +504,14 @@ CacheContents readCacheFile(const std::string& path) {
         entry.aliasName = reader.readString();
         entry.functionName = reader.readString();
         contents.overloadRegistrations.push_back(std::move(entry));
+    }
+    uint32_t congruenceCount = reader.readU32();
+    contents.congruenceRegistrations.reserve(congruenceCount);
+    for (uint32_t i = 0; i < congruenceCount; ++i) {
+        CachedCongruenceRegistration entry;
+        entry.functionName = reader.readString();
+        entry.lemmaName = reader.readString();
+        contents.congruenceRegistrations.push_back(std::move(entry));
     }
     uint32_t coercionCount = reader.readU32();
     contents.coercionRegistrations.reserve(coercionCount);

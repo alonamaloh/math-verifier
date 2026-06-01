@@ -62,6 +62,13 @@ struct CachedOverloadRegistration {
     std::string functionName;
 };
 
+// Congruence-under-binder entry added by this file:
+// `congruence_under_binder F := L`.
+struct CachedCongruenceRegistration {
+    std::string functionName;
+    std::string lemmaName;
+};
+
 // Coercion-registry entry added by this file. May be a direct
 // `coercion (S, T) := F` registration or a transitive entry computed
 // from one. `chain` is the list of function names to compose; apply
@@ -97,6 +104,8 @@ struct CacheContents {
     std::vector<CachedOperatorRegistration> operatorRegistrations;
     // Overload-alias entries added by this file.
     std::vector<CachedOverloadRegistration> overloadRegistrations;
+    // Congruence-under-binder entries added by this file.
+    std::vector<CachedCongruenceRegistration> congruenceRegistrations;
     // Coercion-registry entries added by this file (direct and the
     // transitive-closure entries that the direct one introduced).
     std::vector<CachedCoercionRegistration> coercionRegistrations;

@@ -115,6 +115,15 @@ struct Environment {
     // types at each call site. Populated by `overload <alias> := <F>;`.
     std::map<std::string, std::vector<std::string>> overloadAliases;
 
+    // Congruence-under-binder lemmas. Key: a function head name (e.g.
+    // "Polynomial.Sum"). Value: the congruence lemmas registered for it
+    // (e.g. Sum.extensional, Sum.extensional_range), tried in order. A
+    // calc `=` step `F(…, λx.f, …) = F(…, λx.g, …)` is discharged from the
+    // author's pointwise `(x) => f(x) = g(x)` via one of these. Populated
+    // by `congruence_under_binder <F> := <L>;`. Surface-elaborator concern.
+    std::map<std::string, std::vector<std::string>>
+        congruenceUnderBinderRegistry;
+
     // Coercion registry. Key: (sourceTypeName, targetTypeName). Value:
     // the chain of fully-qualified function names to compose, in order
     // (apply functionNames[0] first, then functionNames[1], etc.). A
