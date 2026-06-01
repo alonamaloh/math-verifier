@@ -33,9 +33,9 @@ definition IsSubgroup (G : Group) (subset : Set(Group.carrier(G)))
         : Proposition :=
   (Group.identity(G) ∈ subset)
   ∧ ((x y : Group.carrier(G)) →
-         x ∈ subset → y ∈ subset → Group.operation(G, x, y) ∈ subset)
+         x ∈ subset → y ∈ subset → (x · y) ∈ subset)
   ∧ ((x : Group.carrier(G)) →
-         x ∈ subset → Group.inverse(G, x) ∈ subset)
+         x ∈ subset → x⁻¹ ∈ subset)
 
 -- ----------------------------------------------------------------------
 -- Kernel and image of a homomorphism.
@@ -66,16 +66,16 @@ theorem GroupHomomorphism.kernel_is_subgroup
    function (x y : Group.carrier(G))
             (xInKernel : f(x) = Group.identity(H))
             (yInKernel : f(y) = Group.identity(H)) =>
-       calc f(Group.operation(G, x, y))
-          = Group.operation(H, f(x), f(y))
+       calc f(x · y)
+          = f(x) · f(y)
                 by homomorphism(x, y)
-          = Group.operation(H, Group.identity(H), f(y))
-          = Group.operation(H, Group.identity(H), Group.identity(H))
+          = Group.identity(H) · f(y)
+          = Group.identity(H) · Group.identity(H)
           = Group.identity(H),
    function (x : Group.carrier(G)) (xInKernel : f(x) = Group.identity(H)) =>
-       calc f(Group.inverse(G, x))
-          = Group.inverse(H, f(x))
-          = Group.inverse(H, Group.identity(H))
+       calc f(x⁻¹)
+          = f(x)⁻¹
+          = Group.identity(H)⁻¹
           = Group.identity(H)⟩
 
 -- The image is a subgroup of H.
@@ -95,30 +95,30 @@ theorem GroupHomomorphism.image_is_subgroup
       : (y1 y2 : Group.carrier(H))
         → (∃ (x : Group.carrier(G)). f(x) = y1)
         → (∃ (x : Group.carrier(G)). f(x) = y2)
-        → ∃ (x : Group.carrier(G)). f(x) = Group.operation(H, y1, y2)
+        → ∃ (x : Group.carrier(G)). f(x) = y1 · y2
       by function (y1 y2 : Group.carrier(H))
                   (y1InImage : ∃ (x : Group.carrier(G)). f(x) = y1)
                   (y2InImage : ∃ (x : Group.carrier(G)). f(x) = y2) => {
            obtain ⟨x1, fx1Equalsy1⟩ from y1InImage;
            obtain ⟨x2, fx2Equalsy2⟩ from y2InImage;
-           ⟨Group.operation(G, x1, x2),
-            calc f(Group.operation(G, x1, x2))
-               = Group.operation(H, f(x1), f(x2))
+           ⟨x1 · x2,
+            calc f(x1 · x2)
+               = f(x1) · f(x2)
                      by homomorphism(x1, x2)
-               = Group.operation(H, y1, f(x2))
-               = Group.operation(H, y1, y2)⟩
+               = y1 · f(x2)
+               = y1 · y2⟩
          };
   claim closedUnderInverse
       : (y : Group.carrier(H))
         → (∃ (x : Group.carrier(G)). f(x) = y)
-        → ∃ (x : Group.carrier(G)). f(x) = Group.inverse(H, y)
+        → ∃ (x : Group.carrier(G)). f(x) = y⁻¹
       by function (y : Group.carrier(H))
                   (yInImage : ∃ (x : Group.carrier(G)). f(x) = y) => {
            obtain ⟨x, fxEqualsy⟩ from yInImage;
-           ⟨Group.inverse(G, x),
-            calc f(Group.inverse(G, x))
-               = Group.inverse(H, f(x))
-               = Group.inverse(H, y)⟩
+           ⟨x⁻¹,
+            calc f(x⁻¹)
+               = f(x)⁻¹
+               = y⁻¹⟩
          };
   ⟨identityInImage, closedUnderOperation, closedUnderInverse⟩
 }
@@ -167,20 +167,20 @@ theorem GroupHomomorphism.trivial_kernel_implies_injective
   function (x y : Group.carrier(G)) (fxEqualsfy : f(x) = f(y)) => {
     -- x·y⁻¹ is in the kernel: f(x·y⁻¹) = f(x)·f(y)⁻¹ = f(y)·f(y)⁻¹ = e_H.
     claim productInKernel
-        : f(Group.operation(G, x, Group.inverse(G, y))) = Group.identity(H)
-        by calc f(Group.operation(G, x, Group.inverse(G, y)))
-              = Group.operation(H, f(x), f(Group.inverse(G, y)))
-                    by homomorphism(x, Group.inverse(G, y))
-              = Group.operation(H, f(x), Group.inverse(H, f(y)))
-              = Group.operation(H, f(y), Group.inverse(H, f(y)))
+        : f(x · y⁻¹) = Group.identity(H)
+        by calc f(x · y⁻¹)
+              = f(x) · f(y⁻¹)
+                    by homomorphism(x, y⁻¹)
+              = f(x) · f(y)⁻¹
+              = f(y) · f(y)⁻¹
               = Group.identity(H);
     -- so x·y⁻¹ = e_G; then x·y⁻¹ = y·y⁻¹ and right-cancel y⁻¹.
     claim productIsIdentity
-        : Group.operation(G, x, Group.inverse(G, y)) = Group.identity(G)
-        by trivialKernel(Group.operation(G, x, Group.inverse(G, y)), productInKernel);
-    Group.cancel_right_bundled(G, Group.inverse(G, y), x, y,
-        calc Group.operation(G, x, Group.inverse(G, y))
+        : x · y⁻¹ = Group.identity(G)
+        by trivialKernel(x · y⁻¹, productInKernel);
+    Group.cancel_right_bundled(G, y⁻¹, x, y,
+        calc x · y⁻¹
            = Group.identity(G)
-           = Group.operation(G, y, Group.inverse(G, y))
+           = y · y⁻¹
                  by Equality.symmetry(Group.inverse_right(G, y)))
   }
