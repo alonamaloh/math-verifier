@@ -96,12 +96,15 @@ theorem Complex.no_degree_one_factorization
         : False := {
   let ⟨aBound, _⟩ := aDegree;
   let ⟨bBound, _⟩ := bDegree;
+  -- The four real coefficients the degree-1 factor equation constrains.
+  let aZero : Real := Polynomial.coefficientOf(a, 0);
+  let aOne  : Real := Polynomial.coefficientOf(a, 1);
+  let bZero : Real := Polynomial.coefficientOf(b, 0);
+  let bOne  : Real := Polynomial.coefficientOf(b, 1);
   -- ce = 1 (coefficient at 2).
   claim coefficientEquationTwo
-      : Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-            Polynomial.coefficientOf(Real.ring, b, 1)) = Real.one
-      by calc Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                  Polynomial.coefficientOf(Real.ring, b, 1))
+      : (aOne * bOne) = Real.one
+      by calc (aOne * bOne)
             = Polynomial.coefficientOf(Real.ring, Polynomial.multiply(Real.ring, a, b), 2)
                   by Equality.symmetry(
                          Polynomial.coefficientOf_product_at_sum(Real.ring, a, b, 1, 1,
@@ -115,16 +118,12 @@ theorem Complex.no_degree_one_factorization
                   by Complex.modulus_coefficient_two;
   -- df = 1 (coefficient at 0).
   claim coefficientEquationZero
-      : Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-            Polynomial.coefficientOf(Real.ring, b, 0)) = Real.one
-      by calc Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                  Polynomial.coefficientOf(Real.ring, b, 0))
-            = Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                  Polynomial.coefficientOf(Real.ring, b, Natural.monus(0, 0)))
+      : (aZero * bZero) = Real.one
+      by calc (aZero * bZero)
+            = (aZero * Polynomial.coefficientOf(Real.ring, b, Natural.monus(0, 0)))
                   by congruenceOf(
                          function (t : Natural) =>
-                             Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                                 Polynomial.coefficientOf(Real.ring, b, t)),
+                             (aZero * Polynomial.coefficientOf(Real.ring, b, t)),
                          Equality.symmetry(Natural.monus_zero(0)))
             = Polynomial.coefficientOf(Real.ring, Polynomial.multiply(Real.ring, a, b), 0)
                   by Equality.symmetry(
@@ -139,55 +138,23 @@ theorem Complex.no_degree_one_factorization
   -- de + cf = 0 (coefficient at 1).
   claim coefficientMultiplyOne
       : Polynomial.coefficientOf(Real.ring, Polynomial.multiply(Real.ring, a, b), 1)
-        = Real.add(
-              Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                  Polynomial.coefficientOf(Real.ring, b, 1)),
-              Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                  Polynomial.coefficientOf(Real.ring, b, 0)))
+        = ((aZero * bOne) + (aOne * bZero))
       by calc Polynomial.coefficientOf(Real.ring, Polynomial.multiply(Real.ring, a, b), 1)
-            = Real.add(
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                      Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 0))),
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                      Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1))))
+            = ((aZero * Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 0))) + (aOne * Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1))))
                   by Polynomial.coefficientOf_multiply(Real.ring, a, b, 1)
-            = Real.add(
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                      Polynomial.coefficientOf(Real.ring, b, 1)),
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                      Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1))))
+            = ((aZero * bOne) + (aOne * Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1))))
                   by congruenceOf(
                          function (t : Natural) =>
-                             Real.add(
-                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                                     Polynomial.coefficientOf(Real.ring, b, t)),
-                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                     Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1)))),
+                             ((aZero * Polynomial.coefficientOf(Real.ring, b, t)) + (aOne * Polynomial.coefficientOf(Real.ring, b, Natural.monus(1, 1)))),
                          Natural.monus_zero(1))
-            = Real.add(
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                      Polynomial.coefficientOf(Real.ring, b, 1)),
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                      Polynomial.coefficientOf(Real.ring, b, 0)))
+            = ((aZero * bOne) + (aOne * bZero))
                   by congruenceOf(
                          function (t : Natural) =>
-                             Real.add(
-                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                                     Polynomial.coefficientOf(Real.ring, b, 1)),
-                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                     Polynomial.coefficientOf(Real.ring, b, t))),
+                             ((aZero * bOne) + (aOne * Polynomial.coefficientOf(Real.ring, b, t))),
                          Natural.monus_self(1));
   claim coefficientEquationOne
-      : Real.add(
-            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                Polynomial.coefficientOf(Real.ring, b, 1)),
-            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                Polynomial.coefficientOf(Real.ring, b, 0))) = Real.zero
-      by calc Real.add(
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                      Polynomial.coefficientOf(Real.ring, b, 1)),
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                      Polynomial.coefficientOf(Real.ring, b, 0)))
+      : ((aZero * bOne) + (aOne * bZero)) = Real.zero
+      by calc ((aZero * bOne) + (aOne * bZero))
             = Polynomial.coefficientOf(Real.ring, Polynomial.multiply(Real.ring, a, b), 1)
                   by Equality.symmetry(coefficientMultiplyOne)
             = Polynomial.coefficientOf(Real.ring, Complex.modulus, 1)
@@ -199,112 +166,48 @@ theorem Complex.no_degree_one_factorization
                   by Complex.modulus_coefficient_one;
   -- de = −cf.
   claim deNegateCf
-      : Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-            Polynomial.coefficientOf(Real.ring, b, 1))
+      : (aZero * bOne)
         = Real.negate(
-              Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                  Polynomial.coefficientOf(Real.ring, b, 0)))
+              (aOne * bZero))
       by Group.left_inverse_unique(Real, Real.add, Real.zero, Real.negate,
              Real.add_is_group,
-             Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                 Polynomial.coefficientOf(Real.ring, b, 0)),
-             Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                 Polynomial.coefficientOf(Real.ring, b, 1)),
+             (aOne * bZero),
+             (aZero * bOne),
              coefficientEquationOne);
   -- cdef = 1.
   claim cdefOne
-      : Real.multiply(
-            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                Polynomial.coefficientOf(Real.ring, b, 1)),
-            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                Polynomial.coefficientOf(Real.ring, b, 0))) = Real.one
-      by calc Real.multiply(
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                      Polynomial.coefficientOf(Real.ring, b, 1)),
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                      Polynomial.coefficientOf(Real.ring, b, 0)))
-            = Real.multiply(Real.one,
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                      Polynomial.coefficientOf(Real.ring, b, 0)))
+      : ((aOne * bOne) * (aZero * bZero)) = Real.one
+      by calc ((aOne * bOne) * (aZero * bZero))
+            = (Real.one * (aZero * bZero))
                   by coefficientEquationTwo
-            = Real.multiply(Real.one, Real.one)
+            = (Real.one * Real.one)
                   by coefficientEquationZero
             = Real.one
                   by Real.one_multiply(Real.one);
   -- Hence (cf)² = −1, impossible.
   claim cfSquareNegateOne
-      : Real.multiply(
-            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                Polynomial.coefficientOf(Real.ring, b, 0)),
-            Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                Polynomial.coefficientOf(Real.ring, b, 0)))
+      : ((aOne * bZero) * (aOne * bZero))
         = Real.negate(Real.one)
-      by calc Real.multiply(
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                      Polynomial.coefficientOf(Real.ring, b, 0)),
-                  Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                      Polynomial.coefficientOf(Real.ring, b, 0)))
+      by calc ((aOne * bZero) * (aOne * bZero))
             = Real.negate(Real.negate(
-                  Real.multiply(
-                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                          Polynomial.coefficientOf(Real.ring, b, 0)),
-                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                          Polynomial.coefficientOf(Real.ring, b, 0)))))
-                  by Equality.symmetry(
-                         Group.inverse_involution(Real, Real.add, Real.zero, Real.negate,
-                             Real.add_is_group,
-                             Real.multiply(
-                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                     Polynomial.coefficientOf(Real.ring, b, 0)),
-                                 Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                     Polynomial.coefficientOf(Real.ring, b, 0)))))
+                  ((aOne * bZero) * (aOne * bZero))))
+                  by ring
             = Real.negate(Real.one)
                   by congruenceOf(function (t : Real) => Real.negate(t),
                          Equality.symmetry(
                              calc Real.one
-                                = Real.multiply(
-                                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                          Polynomial.coefficientOf(Real.ring, b, 1)),
-                                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                                          Polynomial.coefficientOf(Real.ring, b, 0)))
+                                = ((aOne * bOne) * (aZero * bZero))
                                       by Equality.symmetry(cdefOne)
-                                = Real.multiply(
-                                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                                          Polynomial.coefficientOf(Real.ring, b, 1)),
-                                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                          Polynomial.coefficientOf(Real.ring, b, 0)))
-                                      by (ring : Real.multiply(
-                                                     Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                                         Polynomial.coefficientOf(Real.ring, b, 1)),
-                                                     Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                                                         Polynomial.coefficientOf(Real.ring, b, 0)))
-                                                 = Real.multiply(
-                                                       Real.multiply(Polynomial.coefficientOf(Real.ring, a, 0),
-                                                           Polynomial.coefficientOf(Real.ring, b, 1)),
-                                                       Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                                           Polynomial.coefficientOf(Real.ring, b, 0))))
-                                = Real.multiply(
-                                      Real.negate(
-                                          Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                              Polynomial.coefficientOf(Real.ring, b, 0))),
-                                      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                          Polynomial.coefficientOf(Real.ring, b, 0)))
+                                = ((aZero * bOne) * (aOne * bZero))
+                                      by (ring : ((aOne * bOne) * (aZero * bZero))
+                                                 = ((aZero * bOne) * (aOne * bZero)))
+                                = (Real.negate(aOne * bZero) * (aOne * bZero))
                                       by deNegateCf
                                 = Real.negate(
-                                      Real.multiply(
-                                          Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                              Polynomial.coefficientOf(Real.ring, b, 0)),
-                                          Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                              Polynomial.coefficientOf(Real.ring, b, 0))))
-                                      by Ring.multiply_negate_left(Real, Real.add, Real.zero,
-                                             Real.negate, Real.multiply, Real.one, Real.is_ring,
-                                             Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                                 Polynomial.coefficientOf(Real.ring, b, 0)),
-                                             Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-                                                 Polynomial.coefficientOf(Real.ring, b, 0)))));
+                                      ((aOne * bZero) * (aOne * bZero)))
+                                      by ring));
   Real.no_square_root_of_negate_one(
-      Real.multiply(Polynomial.coefficientOf(Real.ring, a, 1),
-          Polynomial.coefficientOf(Real.ring, b, 0)),
+      (aOne * bZero),
       cfSquareNegateOne)
 }
 
