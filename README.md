@@ -7,8 +7,9 @@ mathematicians and easy for LLMs to write.
 ## What this is
 
 - A **kernel** (CIC, ~Lean 4 shape): inductives, recursors, definitions,
-  universe-polymorphic constants, propositional and large elimination
-  rules, propositional extensionality.
+  universe-polymorphic constants (non-cumulative, matching Lean 4's
+  convention), propositional and large elimination rules, propositional
+  extensionality.
 - An **elaborator** that turns a small math-flavored surface language
   into kernel terms.
 - A **library** of mathematics built on top, from logic and naturals
@@ -75,7 +76,8 @@ library/
   Logic/                          Equality, Quotient, ∃, ∧, ∨, Decidable, …
   Equality/basics.math            symmetry, transitivity, congruence
   Algebra/                        IsMonoid/IsGroup/IsRing/IsCommutativeRing/
-                                  IsField, bundled structures, generic lemmas
+                                  IsField, bundled structures, generic lemmas,
+                                  group homomorphisms / subgroups
   Set/                            Set(T), membership, subset
   Natural/                        Naturals through bezout, p-adic valuation
   Integer/                        Integers as Natural² quotient
@@ -103,6 +105,9 @@ Imports flow up the dependency layers: a file in `Integer/` can import
   `IsField` predicates with bundled-structure carriers; generic lemmas
   (cancellation, inverse uniqueness, ring annihilation / negation,
   ring divisibility) usable at any carrier via instance inference.
+  Group theory on the bundled `Group`: homomorphisms (identity- and
+  inverse-preservation, composition), subgroups, the kernel and image
+  of a homomorphism, and injectivity ⟺ trivial kernel.
 - **Natural:** arithmetic, order, divisibility, Bezout, Euclidean
   algorithm, GCD, factorization, primes, p-adic valuation.
 - **Integer:** commutative ring via the (a, b) representative quotient.
@@ -130,7 +135,8 @@ The patterns are documented in detail in `CLAUDE.md`. Highlights:
   signed integer coefficients, cancellation, Integer literals) over any
   carrier with an `IsRing` instance — including an abstract bundled
   ring. `field(h₁, …)` extends it with reciprocal side-relations from
-  nonzero hypotheses.
+  nonzero hypotheses, and `linear_combination(e)` closes a ring
+  equality from a linear combination of equational hypotheses.
 - **Calc with auto-prover.** `by <reason>` is optional on every calc
   step. When absent, the elaborator tries definitional equality →
   reflexivity, single-position diff resolved through a library-wide
@@ -155,9 +161,11 @@ The patterns are documented in detail in `CLAUDE.md`. Highlights:
   `by_induction on n with IH`, `by_strong_induction on n with IH`, and
   `decide P { yes m => … | no n => … }` for case-splits.
 - **`rewrite(lemma)`** in calc steps and **`rewrite(eq, term)`** at the
-  term level; **`congruenceOf(F, eq)`** with diff-inferred congruence;
-  **implicit arguments** `{x : T}`; **name-bound conventions**;
-  **`opaque definition`** with `unfold … in …`.
+  term level; **`congruenceOf(F, eq)`** with diff-inferred congruence,
+  including rewrite-under-binder for heads registered via
+  **`congruence_under_binder`**; **implicit arguments** `{x : T}`;
+  **name-bound conventions**; **`opaque definition`** with
+  `unfold … in …`.
 
 ## Design principles
 
