@@ -158,6 +158,27 @@ which otherwise *guesses* lemma names.
 
 ### STATUS (live)
 
+- **Rewrite-under-a-binder — DONE (one of the two "deep moves" toward
+  proofs that read like math).** A calc `=` step `F(…, λx.f, …) =
+  F(…, λx.g, …)` is a congruence under the binder; the author writes only
+  the pointwise `by (function (x) => f(x) = g(x))` and the elaborator
+  reads f/g + shared args off the endpoints and discharges via a
+  registered congruence lemma. Built as a generic mechanism
+  (`tryUnderBinderStep`): single-binder-diff detection, lemma applied to
+  prefix+f+g, remaining binders filled by walking them (the lambda → the
+  pointwise-equality binder wherever it sits, other binders → suffix
+  args), so it's agnostic to the lemma's argument order (handles both
+  `Sum.extensional` and the differently-ordered `Sum.extensional_range`).
+  Driven by a first-class `congruence_under_binder <F> := <L>;`
+  registration (full lexer→parser→elaborator→Environment→cache-v5
+  pipeline, mirroring `overload`) — no naming convention. Documented in
+  CLAUDE.md ("Rewrite under a binder"). Applied across the Polynomial
+  coefficient-algebra proofs (multiply_laws, multiplication, commutative).
+  Remaining deep move: a `ring`/`field` that consumes equational
+  hypotheses (linear-combination style) — would collapse the
+  calc-with-substitution proofs like `irreducible.math`'s `cfSquareNegateOne`.
+
+
 - **§4 proving ground — high-value surface DONE (~14 files, 4 enablers).**
   Rewriting the tax-paying files with the landed ergonomics, the diff as
   the evidence. **Enablers built along the way:** Polynomial `+`/`*`
