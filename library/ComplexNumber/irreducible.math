@@ -164,48 +164,24 @@ theorem Complex.no_degree_one_factorization
                          Equality.symmetry(factorEquation))
             = Real.zero
                   by Complex.modulus_coefficient_one;
-  -- de = −cf.
+  -- de = −cf (subtract cf from both sides of de + cf = 0).
   claim deNegateCf
       : (aZero * bOne)
         = Real.negate(
               (aOne * bZero))
-      by Group.left_inverse_unique(Real, Real.add, Real.zero, Real.negate,
-             Real.add_is_group,
-             (aOne * bZero),
-             (aZero * bOne),
-             coefficientEquationOne);
-  -- cdef = 1.
+      by linear_combination(coefficientEquationOne);
+  -- cdef = 1: scale ce = 1 by df, then add df = 1.
   claim cdefOne
       : ((aOne * bOne) * (aZero * bZero)) = Real.one
-      by calc ((aOne * bOne) * (aZero * bZero))
-            = (Real.one * (aZero * bZero))
-                  by coefficientEquationTwo
-            = (Real.one * Real.one)
-                  by coefficientEquationZero
-            = Real.one
-                  by Real.one_multiply(Real.one);
-  -- Hence (cf)² = −1, impossible.
+      by linear_combination(
+             (aZero * bZero) * coefficientEquationTwo + coefficientEquationZero);
+  -- Hence (cf)² = −1, impossible. Since (cf)(de) = cdef = 1 and
+  -- de = −cf, we have (cf)(−cf) = 1, i.e. (cf)² = −1. As a linear
+  -- combination: cf·(de = −cf) minus (cdef = 1) is exactly (cf)² + 1 = 0.
   claim cfSquareNegateOne
       : ((aOne * bZero) * (aOne * bZero))
         = Real.negate(Real.one)
-      by calc ((aOne * bZero) * (aOne * bZero))
-            = Real.negate(Real.negate(
-                  ((aOne * bZero) * (aOne * bZero))))
-                  by ring
-            = Real.negate(Real.one)
-                  by congruenceOf(function (t : Real) => Real.negate(t),
-                         Equality.symmetry(
-                             calc Real.one
-                                = ((aOne * bOne) * (aZero * bZero))
-                                      by Equality.symmetry(cdefOne)
-                                = ((aZero * bOne) * (aOne * bZero))
-                                      by (ring : ((aOne * bOne) * (aZero * bZero))
-                                                 = ((aZero * bOne) * (aOne * bZero)))
-                                = (Real.negate(aOne * bZero) * (aOne * bZero))
-                                      by deNegateCf
-                                = Real.negate(
-                                      ((aOne * bZero) * (aOne * bZero)))
-                                      by ring));
+      by linear_combination((aOne * bZero) * deNegateCf - cdefOne);
   Real.no_square_root_of_negate_one(
       (aOne * bZero),
       cfSquareNegateOne)
