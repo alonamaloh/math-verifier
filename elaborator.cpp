@@ -18967,6 +18967,50 @@ private:
                 }
             }
         }
+        // Final registry fallback: WHNF the operand types to expose a
+        // CONCRETE carrier head. A value whose type is a bundle projection
+        // over a concrete ring — `Ring.carrier(Real.polynomial_ring)` (from
+        // a `divides` existential), or `Ring.carrier(Real.ring)` — reduces
+        // to the concrete carrier (`Polynomial(...)`, `Real`), so it then
+        // dispatches like that concrete type. An ABSTRACT carrier
+        // (`Ring.carrier(s)` for a variable `s`) stays stuck under WHNF, so
+        // its bundle dispatch is unchanged. Only consulted after the
+        // raw-head lookup failed, so this never overrides an existing
+        // dispatch — it can only turn a previously-erroring mixed/projected
+        // head pair into a successful one.
+        if (targetFunction.empty()) {
+            // Resolve a carrier PROJECTION over a concrete ring to the
+            // carrier field as written in the bundle's constructor (NOT
+            // further reduced — full WHNF would blow past `Polynomial(…)`
+            // to its underlying `Quotient(…)`). So a value typed
+            // `Ring.carrier(Real.polynomial_ring)` (from a `divides`
+            // existential) dispatches like `Polynomial`. An abstract
+            // `Ring.carrier(s)` resolves to nothing (the bundle arg is
+            // stuck), so its dispatch is unchanged.
+            ExpressionPointer leftProj =
+                carrierProjectionField(leftTypeRaw);
+            ExpressionPointer rightProj =
+                carrierProjectionField(rightTypeRaw);
+            std::string leftProjHead =
+                leftProj ? headConstantName(leftProj) : std::string();
+            std::string rightProjHead =
+                rightProj ? headConstantName(rightProj) : std::string();
+            const std::string leftCandidates[2] =
+                {leftProjHead, operandTypeName};
+            const std::string rightCandidates[2] =
+                {rightProjHead, rightTypeName};
+            for (int li = 0; li < 2 && targetFunction.empty(); ++li) {
+                for (int ri = 0; ri < 2 && targetFunction.empty(); ++ri) {
+                    if (li == 1 && ri == 1) continue;  // raw×raw already tried
+                    if (leftCandidates[li].empty()
+                        || rightCandidates[ri].empty()) continue;
+                    std::string reg = environment_.lookupOperator(
+                        operatorSymbol, leftCandidates[li],
+                        rightCandidates[ri]);
+                    if (!reg.empty()) targetFunction = reg;
+                }
+            }
+        }
         // For `<` we wrap the left operand in `successor`, since
         // `a < b` is defined as `LessOrEqual(successor(a), b)`. This is
         // special enough that we leave it built-in.
@@ -21353,6 +21397,43 @@ private:
             return constant->name;
         }
         return "<unknown>";
+    }
+
+    // If `type` is `Ring.carrier(bundle)` / `CommutativeRing.carrier(bundle)`
+    // and `bundle` WHNF-reduces to a `<Struct>.make(carrier, …)`
+    // constructor, return the `carrier` field AS WRITTEN (not further
+    // reduced) — otherwise nullptr. Lets operator dispatch resolve a value
+    // typed by a carrier projection over a CONCRETE ring to the concrete
+    // carrier head (`Polynomial(…)`), without over-reducing it to the
+    // underlying `Quotient(…)` the way full WHNF would. An abstract
+    // `Ring.carrier(s)` has a stuck bundle argument, so this returns
+    // nullptr and the dispatch is unchanged.
+    ExpressionPointer carrierProjectionField(ExpressionPointer type) {
+        auto* application = std::get_if<Application>(&type->node);
+        if (!application) return nullptr;
+        auto* projector =
+            std::get_if<Constant>(&application->function->node);
+        if (!projector) return nullptr;
+        if (projector->name != "Ring.carrier"
+            && projector->name != "CommutativeRing.carrier") {
+            return nullptr;
+        }
+        ExpressionPointer bundle = weakHeadNormalForm(
+            environment_, application->argument);
+        std::vector<ExpressionPointer> arguments;
+        ExpressionPointer cursor = bundle;
+        while (auto* inner = std::get_if<Application>(&cursor->node)) {
+            arguments.push_back(inner->argument);
+            cursor = inner->function;
+        }
+        auto* constructor = std::get_if<Constant>(&cursor->node);
+        if (!constructor) return nullptr;
+        if (constructor->name != "Ring.make"
+            && constructor->name != "CommutativeRing.make") {
+            return nullptr;
+        }
+        if (arguments.empty()) return nullptr;
+        return arguments.back();  // first constructor arg = the carrier
     }
 
     // Walk `signature`'s Pi chain; check that the first N domains have
