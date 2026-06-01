@@ -1617,6 +1617,18 @@ bool isSubtype(const Environment& environment,
                           << prettyPrintLevel(subSort->level) << " <: "
                           << prettyPrintLevel(superSort->level) << "\n";
             }
+            // Strict-universe scouting mode (gated on MATH_NO_CUMULATIVITY):
+            // simulate Lean 4's non-cumulative kernel by requiring sort
+            // levels to be EQUAL, not just `<=`. Lets us measure exactly
+            // what breaks before committing to the convention change.
+            static const bool strictUniverses = [] {
+                const char* flag = std::getenv("MATH_NO_CUMULATIVITY");
+                return flag && flag[0] != '\0' && flag[0] != '0';
+            }();
+            if (strictUniverses) {
+                return levelsDefinitionallyEqual(subSort->level,
+                                                 superSort->level);
+            }
             return lessOrEqual;
         }
     }

@@ -58,28 +58,46 @@ cumulativity would be rejected by Lean.
 **Measured** with a gated probe (`MATH_PROBE_CUMULATIVITY=1`, logs every
 `isSubtype` Sort acceptance where `≤` holds but the levels are not equal —
 the single point all cumulativity reliance, including Pi-covariance, bottoms
-out at). Clean full rebuild → **only 7 strict-cumulativity acceptances, in 3
-files**:
-  - `Set/basics.math` ×1 (`Type(0) <: Type(1)`): `definition Set (T :
-    Type(0)) : Type(1)` over-declares — `T → Proposition` actually inhabits
-    `Type(0)`. One-line tighten to `: Type(0)` (verify downstream `Set`
-    users don't then need `Type(1)`).
-  - `Logic/constructor_totality.math` ×5 (`Prop <: Type(0)`): constructor-
-    totality lemmas for the Prop-inductives (`And`/`Or`/`Exists`/
-    `LessOrEqual`) where a `Proposition` flows into a `Type(0)` slot — e.g.
-    `And.constructor_totality` passes `And(A,B) : Prop` as the `Type(0)`
-    carrier of `Equality.{0}(…)`. The file header already documents this
-    Prop/Type universe friction. In Lean each needs explicit handling
-    (`ULift`, or restructuring so no Prop sits in a Type slot).
+out at) plus a gated strict-mode (`MATH_NO_CUMULATIVITY=1`, makes the Sort
+case require equality — simulates Lean's kernel so we see exactly what
+fails). Clean full rebuild + scouting → the entire dependence is **2 spots,
+both trivial**:
+  - `Set/basics.math` ×1 (`Type(0) <: Type(1)`) — **FIXED.** `definition Set
+    (T : Type(0)) : Type(1)` over-declared; `T → Proposition` inhabits
+    `Type(0)`. Tightened to `: Type(0)` (strict error confirmed body `Π(T :
+    Type 0). Type 0` vs declared `Type 1`). No downstream ripple; probe
+    7→6.
+  - `Logic/constructor_totality.math` ×5 (`Prop <: Type(0)`) — all from a
+    SINGLE theorem, `And.constructor_totality`, which states an equation
+    whose carrier is a `Proposition`: `Equality.{0}(And(A,B), …)` (and
+    `reflexivity.{0}(And(A,B), …)` in its body), feeding `And(A,B) : Prop`
+    into the `Type(u)` carrier of `Equality`/`reflexivity`. Confirmed sole
+    culprit: commenting it out → the file's other 6 declarations pass strict
+    mode. **It is unused** (grep: 0 downstream users; every Prop-carrier
+    `*.constructor_totality` lemma is unused — only `Natural.*`, over a
+    `Type`, has 1 user and is cumulativity-free).
   - `Test/implicit_args_test.math` ×1 — a test, not library content.
 
-**Conclusion:** cumulativity dependence is tiny and localized (6 real
-library sites in 2 files), not pervasive — so a Lean export is essentially
-unobstructed once those are made explicit. Other translation work is
-mechanical (recursor name/shape remap `Foo_recursor`→`Foo.rec`; map our
-`Quotient.*` to Lean's `Quot` *primitives*, not re-axiomatized; export
-`opaque` defs as transparent `def` so characterising-lemma reflexivity
-proofs check; `Internal.sorry`→`sorryAx`). The probe stays in the tree
+  Root cause of the `And` case: `Equality`/`reflexivity` take a `Type(u)`
+  carrier (`inductive Equality (A : Type) …`), whereas Lean's `Eq` takes
+  `{α : Sort u}` (covers `Prop`). So "equation on a Prop-typed value"
+  needs cumulativity. Two dispositions for the migration: **(a) drop the
+  unused lemma** (zero cost), or **(b) generalize `Equality`/`reflexivity`
+  to `Sort u`** if equalities-on-Props are wanted as a capability — the
+  bigger change (touches the `=` desugaring, which currently needs a
+  syntactic successor universe; foundational blast radius).
+
+**Conclusion:** the core math (numbers, algebra, analysis, polynomials,
+fields, ℂ) uses **zero** cumulativity. The whole dependence is one loose
+`Set` universe (fixed) and one unused helper lemma. **Adopting Lean's
+non-cumulativity is essentially free** — disposition `And.constructor_totality`,
+fix the one test, then change `isSubtype`'s Sort case to require equality
+(which collapses `isSubtype` into `isDefinitionallyEqual` — a net kernel
+simplification). Remaining Lean-export translation work is mechanical
+(recursor name/shape remap `Foo_recursor`→`Foo.rec`; map our `Quotient.*`
+to Lean's `Quot` *primitives*, not re-axiomatized; export `opaque` defs as
+transparent `def` so characterising-lemma reflexivity proofs check;
+`Internal.sorry`→`sorryAx`). The probe + strict-mode flags stay in the tree
 (gated, zero-cost) to re-confirm the count drops to 0 as the sites are
 fixed.
 
