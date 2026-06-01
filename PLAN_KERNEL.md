@@ -44,16 +44,30 @@ strong external guarantee is wanted, and after 4.2.
 
 ### 4.3 feasibility — Lean export, and the cumulativity finding (2026-06)
 
+**Non-cumulativity ADOPTED (2026-06).** The kernel now follows Lean 4's
+convention: sort def-eq requires `m = n`, not `m ≤ n`. `isSubtype` was
+deleted (with cumulativity gone it was identical to `isDefinitionallyEqual`);
+its call sites (Application argument / Let value / addDefinition body checks
+in `kernel.cpp`, plus three elaborator coercion/hint checks) call
+`isDefinitionallyEqual` directly — a net kernel simplification. The two
+real library sites were fixed (`Set` tightened to `Type(0)`; the unused
+`And.constructor_totality` removed) and one test fixture adjusted
+(`implicit_args_test`'s `Related` made a genuine `Type(0)`). Full clean
+rebuild + 393 C++ kernel tests green (the cumulativity unit tests flipped to
+assert rejection). The probe/strict-mode flags were removed (moot once the
+kernel is non-cumulative). The rest of this section is the original finding,
+kept for the record.
+
 A subagent divergence audit of our kernel against Lean 4's theory found our
 type theory is a near-match (impredicative `Prop` via `imax`; β/η/δ/ι/ζ +
 definitional proof irrelevance; auto-generated recursors with Lean's
 argument order; the same Prop large-elimination restriction as a strict
 subset of Lean's subsingleton rule; quotients with the identical
-`lift∘mk ≡ f a` rule) with **one** place we are strictly *more permissive*
-than Lean: **universe cumulativity**. Our `isSubtype` (`kernel.cpp` ~1591)
-accepts `Sort m <: Sort n` for `m ≤ n` and covariant-Pi codomains; Lean is
-non-cumulative (kernel def-eq requires `m = n`). Terms that typecheck *via*
-cumulativity would be rejected by Lean.
+`lift∘mk ≡ f a` rule) with **one** place we were strictly *more permissive*
+than Lean: **universe cumulativity** (now removed). The old `isSubtype`
+accepted `Sort m <: Sort n` for `m ≤ n` and covariant-Pi codomains; Lean is
+non-cumulative (kernel def-eq requires `m = n`). Terms that typechecked *via*
+cumulativity would have been rejected by Lean.
 
 **Measured** with a gated probe (`MATH_PROBE_CUMULATIVITY=1`, logs every
 `isSubtype` Sort acceptance where `≤` holds but the levels are not equal —

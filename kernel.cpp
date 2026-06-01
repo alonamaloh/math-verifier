@@ -5,7 +5,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
-#include <iostream>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -1177,7 +1176,7 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
 namespace {
 
 // Generates a name for an Internal-origin free variable, used by
-// isDefinitionallyEqual / isSubtype to open a Pi or Lambda binder for
+// isDefinitionallyEqual to open a Pi or Lambda binder for
 // recursion. Uniqueness within the call tree comes from the context size,
 // which strictly increases with each opening. The name itself is plain
 // text — collision with user-supplied names is impossible because user
@@ -1579,81 +1578,13 @@ bool isDefinitionallyEqual(const Environment& environment,
     return answer;
 }
 
-bool isSubtype(const Environment& environment,
-               const Context& context,
-               ExpressionPointer subType,
-               ExpressionPointer superType,
-               int fuel) {
-    if (--fuel <= 0) {
-        return false;
-    }
-    auto subReduced   = weakHeadNormalForm(environment, std::move(subType),   fuel);
-    auto superReduced = weakHeadNormalForm(environment, std::move(superType), fuel);
-
-    // Sort cumulativity: Sort m <: Sort n iff m <= n.
-    if (auto* subSort = std::get_if<Sort>(&subReduced->node)) {
-        if (auto* superSort = std::get_if<Sort>(&superReduced->node)) {
-            bool lessOrEqual =
-                levelLessOrEqual(subSort->level, superSort->level);
-            // Cumulativity probe (gated on MATH_PROBE_CUMULATIVITY, so it
-            // costs nothing normally). This is the ONE place the kernel is
-            // more permissive than Lean 4, which is non-cumulative: it
-            // accepts `Sort m <: Sort n` whenever m <= n, where Lean
-            // requires m = n. Log the cases that rely on STRICT m < n
-            // (<= holds but the levels are not definitionally equal) —
-            // exactly the terms Lean's kernel would reject. The Pi
-            // covariant-codomain recursion below also bottoms out here, so
-            // this single point captures every cumulativity-dependent
-            // acceptance. Measures whether the library actually depends on
-            // cumulativity (→ whether a Lean export is unobstructed).
-            static const bool probeCumulativity = [] {
-                const char* flag = std::getenv("MATH_PROBE_CUMULATIVITY");
-                return flag && flag[0] != '\0' && flag[0] != '0';
-            }();
-            if (probeCumulativity && lessOrEqual
-                && !levelsDefinitionallyEqual(subSort->level,
-                                              superSort->level)) {
-                std::cerr << "[cumulativity] strict Sort subtype accepted: "
-                          << prettyPrintLevel(subSort->level) << " <: "
-                          << prettyPrintLevel(superSort->level) << "\n";
-            }
-            // Strict-universe scouting mode (gated on MATH_NO_CUMULATIVITY):
-            // simulate Lean 4's non-cumulative kernel by requiring sort
-            // levels to be EQUAL, not just `<=`. Lets us measure exactly
-            // what breaks before committing to the convention change.
-            static const bool strictUniverses = [] {
-                const char* flag = std::getenv("MATH_NO_CUMULATIVITY");
-                return flag && flag[0] != '\0' && flag[0] != '0';
-            }();
-            if (strictUniverses) {
-                return levelsDefinitionallyEqual(subSort->level,
-                                                 superSort->level);
-            }
-            return lessOrEqual;
-        }
-    }
-
-    // Pi: equal domains, subtype codomains (under the binder).
-    if (auto* subPi = std::get_if<Pi>(&subReduced->node)) {
-        if (auto* superPi = std::get_if<Pi>(&superReduced->node)) {
-            if (!isDefinitionallyEqual(environment, context,
-                                       subPi->domain, superPi->domain, fuel)) {
-                return false;
-            }
-            auto fresh = makeOpeningName(context);
-            Context extendedContext = context;
-            extendedContext.push_back(
-                {fresh, subPi->domain, FreeVariableOrigin::Internal});
-            return isSubtype(environment, extendedContext,
-                             openBinder(subPi->codomain,   fresh, FreeVariableOrigin::Internal),
-                             openBinder(superPi->codomain, fresh, FreeVariableOrigin::Internal),
-                             fuel);
-        }
-    }
-
-    // Everything else: definitional equality is sufficient.
-    return isDefinitionallyEqual(environment, context, subReduced, superReduced, fuel);
-}
+// (`isSubtype` was removed when the kernel adopted Lean 4's non-cumulative
+// universe convention. It used to accept `Sort m <: Sort n` for m <= n
+// (cumulativity) with a covariant-Pi codomain; with cumulativity gone its
+// Sort case required level EQUALITY, at which point it was observationally
+// identical to `isDefinitionallyEqual`. The three call sites — Application
+// argument checks, Let value checks, and the addDefinition body check —
+// now call `isDefinitionallyEqual` directly. See PLAN_KERNEL.md §4.3.)
 
 std::string freshName(const std::string& displayHint, const Context& context) {
     auto isInUse = [&](const std::string& candidate) {
@@ -1865,7 +1796,8 @@ ExpressionPointer inferTypeWork(const Environment& environment,
             throw error;
         }
         auto argumentType = inferType(environment, context, application->argument);
-        if (!isSubtype(environment, context, argumentType, functionAsPi->domain)) {
+        if (!isDefinitionallyEqual(environment, context, argumentType,
+                                   functionAsPi->domain)) {
             TypeError error("Application: argument type does not match Pi domain");
             error.expectedType = functionAsPi->domain;
             error.actualType = argumentType;
@@ -1884,7 +1816,8 @@ ExpressionPointer inferTypeWork(const Environment& environment,
         }
         // Check the value's inferred type matches the declared type.
         auto inferredValueType = inferType(environment, context, let->value);
-        if (!isSubtype(environment, context, inferredValueType, let->type)) {
+        if (!isDefinitionallyEqual(environment, context, inferredValueType,
+                                   let->type)) {
             TypeError error("Let: value type does not match declared type");
             error.expectedType = let->type;
             error.actualType = inferredValueType;
@@ -1950,7 +1883,8 @@ void addDefinition(Environment& environment,
             "addDefinition: declared type is not a type for " + name);
     }
     auto inferredBodyType = inferType(environment, {}, body);
-    if (!isSubtype(environment, {}, inferredBodyType, declaredType)) {
+    if (!isDefinitionallyEqual(environment, {}, inferredBodyType,
+                               declaredType)) {
         TypeError error(
             "addDefinition: body type does not match declared type for " + name);
         error.expectedType = declaredType;

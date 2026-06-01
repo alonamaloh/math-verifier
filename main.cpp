@@ -448,39 +448,34 @@ void runEnvironmentTests(const Environment& environment) {
                     *levelAsConstant(sort->level) == 2);  // Type 1
     }
 
-    // Universe cumulativity: a function expecting Type 1 accepts a Type 0
-    // argument. Natural : Type 0, but Type 0 <: Type 1, so passing Natural
-    // where a Type 1 is expected is fine.
+    // Non-cumulativity (Lean 4's convention, adopted): a function expecting
+    // Type 1 REJECTS a Type 0 argument. Natural : Type 0, and Type 0 is NOT
+    // a subtype of Type 1, so passing Natural where Type 1 is expected fails
+    // — the argument's universe must EQUAL the expected one, not merely be
+    // below it.
     {
         // f := λ(t : Type 1). zero  has type Π(t : Type 1). Natural.
         auto f = makeLambda("t", makeType(1), makeConstant("zero"));
-        // Apply f to Natural (which has type Type 0).
+        // Apply f to Natural (Type 0) — rejected (no cumulativity).
         auto applied = makeApplication(f, makeConstant("Natural"));
-        auto inferredType = inferType(environment, {}, applied);
-        EXPECT_TRUE(isDefinitionallyEqual(environment, {},
-                                          inferredType,
-                                          makeConstant("Natural")));
+        EXPECT_THROW(inferType(environment, {}, applied));
     }
 
-    // But cumulativity is one-way: Type 1 is NOT a subtype of Type 0. So a
-    // function expecting Type 0 rejects a Type 1 argument.
+    // A function expecting Type 0 also rejects a Type 1 argument (Type 1
+    // has type Type 2, far above the expected Type 0).
     {
         auto f = makeLambda("t", makeType(0), makeConstant("zero"));
-        // Type 0 itself has type Type 1 (a level too high), so this fails.
         auto applied = makeApplication(f, makeType(1));
         EXPECT_THROW(inferType(environment, {}, applied));
     }
 
-    // Cumulativity on definitions: declaring  alias : Type 1 := Natural
-    // works because Natural : Type 0 <: Type 1.
+    // Non-cumulativity on definitions: declaring  alias : Type 1 := Natural
+    // is REJECTED — the body Natural has type Type 0, which must EQUAL the
+    // declared Type 1 (cumulativity would have accepted Type 0 <: Type 1).
     {
         Environment localEnvironment = environment;
-        addDefinition(localEnvironment, "natAtTypeOne",
-                      makeType(1), makeConstant("Natural"));
-        auto inferredType = inferType(localEnvironment, {},
-                                      makeConstant("natAtTypeOne"));
-        EXPECT_TRUE(isDefinitionallyEqual(localEnvironment, {}, inferredType,
-                                          makeType(1)));
+        EXPECT_THROW(addDefinition(localEnvironment, "natAtTypeOne",
+                      makeType(1), makeConstant("Natural")));
     }
 
     // Proof irrelevance. In a context with two proofs p and q of the same

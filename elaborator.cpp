@@ -5498,7 +5498,7 @@ private:
             hintType, localBinders, localBinders.size());
         ExpressionPointer goalOpened = openOverLocalBinders(
             goalClosed, localBinders, localBinders.size());
-        if (isSubtype(environment_, openedContext,
+        if (isDefinitionallyEqual(environment_, openedContext,
                       hintTypeOpened, goalOpened)) {
             return hintTerm;
         }
@@ -8342,7 +8342,7 @@ private:
             expectedTypeClosed, localBinders, localBinders.size());
         Context openedContext =
             buildContextFromLocalBinders(localBinders);
-        if (isSubtype(environment_, openedContext,
+        if (isDefinitionallyEqual(environment_, openedContext,
                        coercedType, expectedOpened)) {
             std::cerr << "warning: " << moduleName_ << ":"
                 << surfaceExpression->line << ":"
@@ -8359,14 +8359,14 @@ private:
     // expected type and both are Equality types with a unique
     // single-position diff. Returns the (possibly wrapped) term, or
     // the original term unchanged on either match or failure. Cheap
-    // when types already match (one infer + one isSubtype check).
+    // when types already match (one infer + one isDefinitionallyEqual check).
     ExpressionPointer coerceToExpectedTypeViaDiff(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer term,
         ExpressionPointer expectedTypeClosed) {
         TimedScope _scope(*this, "coerceToExpectedTypeViaDiff");
         // Cheap structural prefilter. The full coerce path runs an
-        // inferType + isSubtype upfront — ~1 ms per call on math-heavy
+        // inferType + isDefinitionallyEqual upfront — ~1 ms per call on math-heavy
         // files — before attempting four sub-strategies:
         //   (a) tryDiffWrapForEqualityGoal    — expected WHNF head must be Equality
         //   (b) tryDiffBridgeViaContextEquality — needs a local Equality hypothesis
@@ -8437,7 +8437,7 @@ private:
             expectedTypeClosed, localBinders, localBinders.size());
         Context openedContext =
             buildContextFromLocalBinders(localBinders);
-        if (isSubtype(environment_, openedContext,
+        if (isDefinitionallyEqual(environment_, openedContext,
                        termTypeOpened, expectedOpened)) {
             return term;
         }

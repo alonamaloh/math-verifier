@@ -62,27 +62,14 @@ theorem LessOrEqual.constructor_totality
           witness largerPredecessor with
               And.introduction(reflexivity(successor(largerPredecessor)), subproof))
 
--- And's components live in Proposition, so we cannot wrap them in
--- `Exists` (which quantifies over Type). And since `Equality` requires
--- its carrier to be in `Type(u)` (and the elaborator's `=` desugaring
--- needs a syntactic successor universe), an equation on the And
--- value itself only goes through with the explicit Equality.{0}(...)
--- form. We use that here to state: every conjunction equals the
--- introduction-form of its projections.
-theorem And.constructor_totality
-        (A B : Proposition)
-        : (conjunction : And(A, B))
-          → Equality.{0}(
-                And(A, B),
-                conjunction,
-                And.introduction(
-                    A, B,
-                    And.left(A, B, conjunction),
-                    And.right(A, B, conjunction)))
-  | And.introduction(leftProof, rightProof) =>
-      reflexivity.{0}(
-          And(A, B),
-          And.introduction(A, B, leftProof, rightProof))
+-- (`And.constructor_totality` once lived here, stating `conjunction =
+-- And.introduction(left, right)` via `Equality.{0}(And(A, B), …)`. That
+-- fed a `Proposition` (`And(A, B)`) into `Equality`/`reflexivity`'s
+-- `Type(u)` carrier slot, which only typechecked under universe
+-- cumulativity. It was the library's only such site and was unused, so it
+-- was removed when the kernel adopted Lean's non-cumulative convention. To
+-- state an equation between two proofs you would need `Equality` over a
+-- `Sort u` carrier — see PLAN_KERNEL.md §4.3.)
 
 -- Every Or value is either an `Or.introduceLeft` of an A-proof or an
 -- `Or.introduceRight` of a B-proof. Because `A` and `B` are

@@ -422,18 +422,10 @@ bool isDefinitionallyEqual(const Environment& environment,
                            ExpressionPointer right,
                            int fuel = defaultFuel);
 
-// Universe cumulativity: returns true if `subType` can be used wherever
-// `superType` is expected. Equivalent to isDefinitionallyEqual except at
-// the Sort head, where Sort m <: Sort n whenever m <= n; and at the Pi
-// head, where the domains must be equal but the codomains may be related
-// by subtyping (covariant codomain). Used in Application argument checks,
-// addDefinition body checks, and Let value checks. Returns false on
-// fuel exhaustion.
-bool isSubtype(const Environment& environment,
-               const Context& context,
-               ExpressionPointer subType,
-               ExpressionPointer superType,
-               int fuel = defaultFuel);
+// (`isSubtype` was removed: the kernel adopted Lean 4's non-cumulative
+// universe convention, which makes it identical to `isDefinitionallyEqual`.
+// Application argument checks, Let value checks, and the addDefinition body
+// check call `isDefinitionallyEqual` directly.)
 
 // Returns the type of `expression` in `environment` and `context`,
 // or throws TypeError.
