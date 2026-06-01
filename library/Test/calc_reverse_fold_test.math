@@ -1,0 +1,40 @@
+-- Regression for the calc whole-endpoint reverse fold (PLAN_READABILITY
+-- B5). A `by <forward-lemma>` whose type is `A = B` closes a step stated
+-- `B = A` — the elaborator wraps it in Equality.symmetry. The structural
+-- congruence diff-walk cannot bridge this case (the endpoints have
+-- different heads — `add` vs `Sum` — and match only up to opaque `monus`
+-- reduction under the summation lambda); the symmetric pre-check does.
+-- Before the fix this required `by Equality.symmetry(?, ?, <lemma>)`.
+
+module Test.calc_reverse_fold_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.monus
+import Algebra.monoid
+import Algebra.ring
+import Algebra.ring_bundle
+import Polynomial.basics
+import Polynomial.summation
+
+theorem Test.reverse_fold_with_monus
+        (r : Ring) (f : Natural → Ring.carrier(r)) (k : Natural)
+        : Ring.add(r, f(Natural.monus(successor(k), 0)),
+              Polynomial.Sum(r, function (j : Natural) => f(Natural.monus(k, j)), k))
+          = Polynomial.Sum(r, function (i : Natural) => f(Natural.monus(successor(k), i)), successor(k)) :=
+  unfold Natural.monus in
+    calc Ring.add(r, f(Natural.monus(successor(k), 0)),
+             Polynomial.Sum(r, function (j : Natural) => f(Natural.monus(k, j)), k))
+       = Polynomial.Sum(r, function (i : Natural) => f(Natural.monus(successor(k), i)), successor(k))
+           by Polynomial.Sum.shift(r,
+                  function (i : Natural) => f(Natural.monus(successor(k), i)), k)
+
+-- Simplest reverse fold (already worked via the per-level symmetric leaf,
+-- kept so the easy case is covered too): lemma `a + b = c`, step `c = a + b`.
+theorem Test.reverse_fold_simple
+        (a b c : Natural) (lemma : a + b = c)
+        : c = a + b :=
+  calc c = a + b   by lemma

@@ -158,6 +158,30 @@ which otherwise *guesses* lemma names.
 
 ### STATUS (live)
 
+- **B3 — NOT a tactic gap (resolved); B5 — FIXED.** Re-audited both by
+  reproducing against real proofs before touching anything (the Track D
+  lesson):
+  - **B3 (diff-matcher can't line up `subtract` vs `add/negate`) does not
+    reproduce.** The calc diff-walk's WHNF-retry (`elaborator.cpp` ~8972)
+    δ-unfolds `Ring.subtract` → `add/negate` and matches, even nested
+    (`-(g - h)` ≡ `-(g + -h)`). So the `ring_difference.math` header's
+    "write everything add/negate" advice is stale — using the `-` operator
+    now works. B3's readability win is a §4 *rewrite* opportunity, not a
+    tactic change. Retire B3 from Track B.
+  - **B5 (reverse-direction folds) was live — now FIXED.** Confirmed in
+    real code: bare `by Polynomial.Sum.shift(…)` for a step stated the
+    reverse of the lemma failed (whole-endpoint reverse: heads differ
+    `add` vs `Sum`, match needs non-structural `monus` defeq), forcing the
+    `by Equality.symmetry(?, ?, …)` workaround. Fix: a **symmetric
+    pre-check** in calc-step elaboration — when the proof's type is `A = B`
+    and the step claims `B = A` (one `isDefinitionallyEqual` against the
+    reversed type), wrap directly in `Equality.symmetry`; tried before the
+    structural congruence walk. This is what the hand-written
+    `Equality.symmetry(?, ?, proof)` achieved, inferred. Re-proved 11
+    explicit-symmetry sites across 6 files (incl. both `commutative.math`
+    `?,?`-hole steps) as `by <lemma>`. Regression
+    `Test/calc_reverse_fold_test.math` (the `monus` non-structural case —
+    verified it fails with the pre-check disabled).
 - **E1 (lemma search) — CLI + error-message surfaces DONE, output
   polished.** The engine is factored into `lemma_search.{hpp,cpp}` (a
   shared TU compiled into both the CLI and the elaborator) so one

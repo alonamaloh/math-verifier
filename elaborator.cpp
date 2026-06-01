@@ -7475,6 +7475,61 @@ private:
                     }
                 }
             }
+            // Whole-endpoint reverse (B5): the proof has type `A = B` but
+            // the step claims `B = A` — a fold that uses a forward-stated
+            // lemma backwards. The structural congruence diff-walk below
+            // can't bridge this when the endpoints have different heads and
+            // the match needs non-structural defeq (e.g. `Sum(succ k)`
+            // unfolding vs an `add`-headed endpoint); a direct symmetry
+            // wrap does. This is exactly what writing
+            // `Equality.symmetry(?, ?, proof)` by hand achieves, but
+            // inferred — tried before the congruence walk because it is a
+            // single cheap defeq check and subsumes the most common case.
+            if (step.stepProof
+                && step.relation == CalcRelation::Equality
+                && !isDefinitionallyEqual(environment_, stepContext,
+                                            stepProofType,
+                                            stepRelationTypeOpened)) {
+                try {
+                    ExpressionPointer proofTypeWhnf = weakHeadNormalForm(
+                        environment_, stepProofType);
+                    EqualityComponents components =
+                        extractEqualityComponents(
+                            proofTypeWhnf, "calc step reverse", step.line);
+                    // The proof proves A = B; the step would need B = A.
+                    ExpressionPointer reversedType = makeApplication(
+                        makeApplication(
+                            makeApplication(
+                                makeConstant("Equality",
+                                    {components.carrierUniverseLevel}),
+                                components.carrierType),
+                            components.rightEndpoint),
+                        components.leftEndpoint);
+                    if (isDefinitionallyEqual(environment_, stepContext,
+                                                reversedType,
+                                                stepRelationTypeOpened)) {
+                        ExpressionPointer symmetryCall = makeConstant(
+                            "Equality.symmetry",
+                            {components.carrierUniverseLevel});
+                        symmetryCall = makeApplication(std::move(symmetryCall),
+                            closeOverLocalBinders(components.carrierType,
+                                localBinders, localBinders.size()));
+                        symmetryCall = makeApplication(std::move(symmetryCall),
+                            closeOverLocalBinders(components.leftEndpoint,
+                                localBinders, localBinders.size()));
+                        symmetryCall = makeApplication(std::move(symmetryCall),
+                            closeOverLocalBinders(components.rightEndpoint,
+                                localBinders, localBinders.size()));
+                        symmetryCall = makeApplication(std::move(symmetryCall),
+                            stepProofKernel);
+                        stepProofKernel = symmetryCall;
+                        stepProofType = inferTypeInLocalContext(
+                            localBinders, stepProofKernel);
+                    }
+                } catch (const ElaborateError&) {
+                } catch (const TypeError&) {
+                }
+            }
             // Diff-inference fallback: if the user's `by <proof>` has
             // type Equality(T, a, b) and the calc step's
             // (previousKernel, nextKernel) differ in a single slot at
