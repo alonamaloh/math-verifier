@@ -10666,13 +10666,130 @@ private:
 
     // `ring` — close an `e1 = e2` goal in a commutative ring.
     // v1: handles pure-multiplication rearrangement.
+    // A node of a `linear_combination` combination tree, evaluated to the
+    // equation it denotes: `left = right` witnessed by `proof`. A leaf is
+    // either a hypothesis (an equality proof `a = b` → ⟨a, b, proof⟩) or a
+    // scalar ring value `v` (the trivial equation `v = v`, witnessed by
+    // reflexivity). The `+`/`*`/`-`/unary-`-` nodes combine their children
+    // pointwise on each side, building the combined proof by two
+    // single-argument congruences + transitivity (unary: one congruence).
+    // All terms are in OPENED form (local binders as free variables); the
+    // caller closes the assembled result once.
+    struct CombinationEquation {
+        ExpressionPointer left;
+        ExpressionPointer right;
+        ExpressionPointer proof;
+    };
+
+    CombinationEquation evalLinearCombinationTree(
+        const SurfaceExpressionPointer& node,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        const std::string& opNamespace,
+        int line) {
+        size_t binderCount = localBinders.size();
+        auto opApply = [&](const std::string& opName,
+                           ExpressionPointer x, ExpressionPointer y) {
+            return makeApplication(
+                makeApplication(makeConstant(opName), std::move(x)),
+                std::move(y));
+        };
+        // Combine `op(a.left, b.left) = op(a.right, b.right)` from the
+        // child proofs: rewrite the first operand (congruence on slot 1),
+        // then the second (congruence on slot 2), chained by transitivity.
+        auto combineBinary = [&](const std::string& opName,
+                                 const CombinationEquation& a,
+                                 const CombinationEquation& b)
+                -> CombinationEquation {
+            ExpressionPointer newLeft = opApply(opName, a.left, b.left);
+            ExpressionPointer middle = opApply(opName, a.right, b.left);
+            ExpressionPointer newRight = opApply(opName, a.right, b.right);
+            ExpressionPointer lambda1 = makeLambda("_lc_z", carrierType,
+                opApply(opName, makeBoundVariable(0),
+                        liftBoundVariables(b.left, 1, 0)));
+            ExpressionPointer step1 = buildEqualityCongruenceSameCarrier(
+                carrierLevel, carrierType, lambda1, a.left, a.right, a.proof);
+            ExpressionPointer lambda2 = makeLambda("_lc_z", carrierType,
+                opApply(opName, liftBoundVariables(a.right, 1, 0),
+                        makeBoundVariable(0)));
+            ExpressionPointer step2 = buildEqualityCongruenceSameCarrier(
+                carrierLevel, carrierType, lambda2, b.left, b.right, b.proof);
+            ExpressionPointer proof = buildEqualityTransitivity(
+                carrierLevel, carrierType, newLeft, middle, newRight,
+                step1, step2);
+            return {newLeft, newRight, proof};
+        };
+        if (auto* binary =
+                std::get_if<SurfaceBinaryOperation>(&node->node)) {
+            const std::string& sym = binary->opSymbol;
+            if (sym == "+" || sym == "*" || sym == "-") {
+                std::string opName = opNamespace
+                    + (sym == "+" ? ".add"
+                       : (sym == "*" ? ".multiply" : ".subtract"));
+                CombinationEquation a = evalLinearCombinationTree(
+                    binary->left, localBinders, carrierType, carrierLevel,
+                    opNamespace, line);
+                CombinationEquation b = evalLinearCombinationTree(
+                    binary->right, localBinders, carrierType, carrierLevel,
+                    opNamespace, line);
+                return combineBinary(opName, a, b);
+            }
+        }
+        if (auto* unary =
+                std::get_if<SurfaceUnaryOperation>(&node->node)) {
+            if (unary->opSymbol == "-") {
+                CombinationEquation a = evalLinearCombinationTree(
+                    unary->operand, localBinders, carrierType, carrierLevel,
+                    opNamespace, line);
+                std::string negateName = opNamespace + ".negate";
+                ExpressionPointer newLeft =
+                    makeApplication(makeConstant(negateName), a.left);
+                ExpressionPointer newRight =
+                    makeApplication(makeConstant(negateName), a.right);
+                ExpressionPointer lambda = makeLambda("_lc_z", carrierType,
+                    makeApplication(makeConstant(negateName),
+                                    makeBoundVariable(0)));
+                ExpressionPointer proof = buildEqualityCongruenceSameCarrier(
+                    carrierLevel, carrierType, lambda, a.left, a.right,
+                    a.proof);
+                return {newLeft, newRight, proof};
+            }
+        }
+        // Leaf: elaborate and inspect its type. An equality proof is a
+        // hypothesis (its endpoints are the equation); anything else is a
+        // scalar ring value `v`, denoting the trivial equation `v = v`.
+        ExpressionPointer leafClosed =
+            elaborateExpression(*node, localBinders);
+        ExpressionPointer leaf =
+            openOverLocalBinders(leafClosed, localBinders, binderCount);
+        ExpressionPointer leafType = weakHeadNormalForm(environment_,
+            inferType(environment_,
+                buildContextFromLocalBinders(localBinders), leaf));
+        try {
+            EqualityComponents eq = extractEqualityComponents(
+                leafType, "linear_combination hypothesis", line);
+            return {eq.leftEndpoint, eq.rightEndpoint, leaf};
+        } catch (const ElaborateError&) {
+            ExpressionPointer reflexivityProof = makeApplication(
+                makeApplication(
+                    makeConstant("reflexivity", {carrierLevel}),
+                    carrierType),
+                leaf);
+            return {leaf, leaf, reflexivityProof};
+        }
+    }
+
     // `linear_combination(e)` — close a commutative-ring equality goal
-    // `goalL = goalR` from an equation proof `e : combL = combR`, when the
-    // goal follows by ring algebra: check the bridge `goalL − goalR = combL
-    // − combR` with the ring normaliser and assemble via
-    // `Ring.equal_of_linear_combination`. v1 handles concrete carriers
-    // (the op/instance names resolve to plain constants); a bundled carrier
-    // `Ring.carrier(s)` would need the structure argument threaded (future).
+    // `goalL = goalR` from a combination `e` of equation hypotheses, when
+    // the goal follows by ring algebra: check the bridge `goalL − goalR =
+    // combL − combR` with the ring normaliser and assemble via
+    // `Ring.equal_of_linear_combination`. `e` is a `+`/`*`/`-` tree whose
+    // leaves are equality proofs (hypotheses) or scalar ring coefficients
+    // (e.g. `c1 * h1 + c2 * h2`); a bare hypothesis is the single-leaf
+    // case. v1 handles concrete carriers (the op/instance names resolve to
+    // plain constants); a bundled carrier `Ring.carrier(s)` would need the
+    // structure argument threaded (future).
     ExpressionPointer elaborateLinearCombination(
         const SurfaceLinearCombination& tactic,
         const std::vector<LocalBinder>& localBinders,
@@ -10727,31 +10844,25 @@ private:
         auto negateApply = [&](ExpressionPointer x) {
             return makeApplication(negateOp, x);
         };
-        // Elaborate the supplied equation proof and read off combL, combR.
-        ExpressionPointer combProofClosed =
-            elaborateExpression(*tactic.combination, localBinders);
-        ExpressionPointer combProof = openOverLocalBinders(
-            combProofClosed, localBinders, binderCount);
-        ExpressionPointer combType = weakHeadNormalForm(environment_,
-            inferType(environment_,
-                buildContextFromLocalBinders(localBinders), combProof));
-        EqualityComponents comb;
-        try {
-            comb = extractEqualityComponents(
-                combType, "linear_combination argument", line);
-        } catch (const ElaborateError&) {
-            throwElaborate("`linear_combination(e)`: the argument must "
-                           "prove an equation `a = b`");
-        }
+        // Walk the combination tree: a `+`/`*`/`-` expression over
+        // hypotheses (equality proofs) and scalar ring coefficients. Each
+        // node denotes an equation; the walker returns the combined
+        // `combLeft = combRight` and a proof of it. A bare hypothesis is
+        // the degenerate single-leaf tree (the v1 case).
+        CombinationEquation comb = evalLinearCombinationTree(
+            tactic.combination, localBinders, goal.carrierType,
+            goal.carrierUniverseLevel, scheme.opNamespace, line);
+        ExpressionPointer combProof = comb.proof;
         // Bridge: goalL − goalR = combL − combR, proved by the ring
         // normaliser (it is a pure ring identity — no hypotheses). β-reduce
-        // the combination's endpoints first: if the user built the equation
-        // with `congruenceOf(λz. …, h)`, combL/combR are β-redexes the ring
-        // normaliser would otherwise treat as opaque atoms.
+        // the combination's endpoints first: a hypothesis built with
+        // `congruenceOf(λz. …, h)`, or a scaled leaf, can leave combL/combR
+        // as β-redexes the ring normaliser would otherwise treat as opaque
+        // atoms.
         ExpressionPointer combLeftReduced =
-            betaNormalizeForDisplay(comb.leftEndpoint);
+            betaNormalizeForDisplay(comb.left);
         ExpressionPointer combRightReduced =
-            betaNormalizeForDisplay(comb.rightEndpoint);
+            betaNormalizeForDisplay(comb.right);
         ExpressionPointer bridgeLeft =
             addApply(goal.leftEndpoint, negateApply(goal.rightEndpoint));
         ExpressionPointer bridgeRight =
@@ -10767,7 +10878,7 @@ private:
         for (ExpressionPointer arg :
                 {goal.carrierType, addOp, zeroOp, negateOp, multiplyOp, oneOp,
                  isRingTerm, goal.leftEndpoint, goal.rightEndpoint,
-                 comb.leftEndpoint, comb.rightEndpoint, combProof,
+                 comb.left, comb.right, combProof,
                  bridgeProof}) {
             result = makeApplication(std::move(result), arg);
         }

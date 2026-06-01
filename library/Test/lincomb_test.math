@@ -28,6 +28,32 @@ theorem Test.lincomb_single (a b k : Integer) (h : a + k = b + k) : a = b :=
 theorem Test.lincomb_scaled (a b c : Integer) (h : a = b) : a * c = b * c :=
   linear_combination(congruenceOf(function (z : Integer) => z * c, h))
 
+-- v2 combination syntax: the coefficient is written inline. `c * h`
+-- scales the equation h : a = b to c*a = c*b. The walker reads the
+-- leaf c as a scalar (c = c) and h as the hypothesis (a = b), and
+-- combines them through `*`.
+theorem Test.lincomb_scaled_inline (a b c : Integer) (h : a = b) : c * a = c * b :=
+  linear_combination(c * h)
+
+-- Multi-hypothesis combination: x = y from h1 : x = z and h2 : z = y,
+-- as the sum 1·h1 + 1·h2 written `h1 + h2` (combL = x + z, combR =
+-- z + y; goalL − goalR = x − y = (x+z) − (z+y) = combL − combR).
+theorem Test.lincomb_sum (x y z : Integer) (h1 : x = z) (h2 : z = y) : x = y :=
+  linear_combination(h1 + h2)
+
+-- The full `c1*h1 + c2*h2` shape: from h1 : a = b and h2 : c = d,
+-- prove c1*a + c2*c = c1*b + c2*d. The walker scales each hypothesis
+-- by its coefficient and sums the two equations.
+theorem Test.lincomb_two_scaled (a b c d c1 c2 : Integer)
+        (h1 : a = b) (h2 : c = d)
+        : c1 * a + c2 * c = c1 * b + c2 * d :=
+  linear_combination(c1 * h1 + c2 * h2)
+
+-- Subtraction in the combination: a − c = b − d from h1 : a = b, h2 : c = d.
+theorem Test.lincomb_difference (a b c d : Integer)
+        (h1 : a = b) (h2 : c = d) : a - c = b - d :=
+  linear_combination(h1 - h2)
+
 -- In a calc step.
 theorem Test.lincomb_in_calc (a b k : Integer) (h : a = b) : a + k = b + k :=
   calc a + k

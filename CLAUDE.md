@@ -681,6 +681,52 @@ When adding a new ring carrier:
    downstream uses of `ring` find the abstract lemmas.
 4. That's it — `ring` works. No per-carrier `zero_multiply` etc.
 
+## `linear_combination(e)` — ring with equational hypotheses
+
+`ring` proves identities that hold *unconditionally*. When the goal
+holds only **given some equation hypotheses**, use
+`linear_combination(e)`: it closes a commutative-ring equality goal
+`goalL = goalR` from a linear combination `e` of hypotheses, checking
+the bridge `goalL − goalR = combL − combR` with the ring normaliser
+and assembling via `Ring.equal_of_linear_combination`.
+
+`e` is a `+`/`*`/`-` expression whose leaves are either **equality
+proofs** (hypotheses `h : a = b`) or **scalar ring coefficients**. The
+elaborator walks the tree, scaling and summing the equations (a scalar
+`c` denotes the trivial `c = c`; `c * h` scales `h` by `c`; `h1 + h2`
+adds them), and builds the combined proof by congruence + transitivity.
+
+```math
+-- subtract a common term: a = b from h : a + k = b + k
+theorem _ (a b k : Integer) (h : a + k = b + k) : a = b :=
+  linear_combination(h)
+
+-- scale a hypothesis: c*a = c*b from h : a = b
+theorem _ (a b c : Integer) (h : a = b) : c * a = c * b :=
+  linear_combination(c * h)
+
+-- the full c1·h1 + c2·h2 shape
+theorem _ (a b c d c1 c2 : Integer) (h1 : a = b) (h2 : c = d)
+        : c1 * a + c2 * c = c1 * b + c2 * d :=
+  linear_combination(c1 * h1 + c2 * h2)
+
+-- difference of hypotheses: a − c = b − d from h1 : a = b, h2 : c = d
+theorem _ (a b c d : Integer) (h1 : a = b) (h2 : c = d) : a - c = b - d :=
+  linear_combination(h1 - h2)
+```
+
+Works as a calc-step `by` proof too. Scope/limits:
+- **Concrete carriers only** (Integer/Rational/Real/…). A bundled
+  carrier `Ring.carrier(s)` needs the structure argument threaded —
+  not yet supported; cite `Ring.equal_of_linear_combination` by hand.
+- **Literal coefficients** like `(2 : Integer) * h` hit the
+  pre-existing "bare-literal `*`" operator-dispatch gap (the literal
+  parses as a Natural); use a named/variable coefficient, or
+  pre-scale with `congruenceOf(λz. z * c, h)` as the leaf.
+- Leaves that aren't equality proofs are treated as scalars (the
+  trivial `v = v`), so a malformed combination surfaces as a ring
+  bridge that doesn't normalise.
+
 ## `calc` with mixed relations
 
 `calc` chains support all five relations as step separators: `=`,

@@ -267,11 +267,14 @@ struct SurfaceField {
 };
 
 // `linear_combination(e)` — closes a commutative-ring equality goal
-// `goalL = goalR` given an equation proof `e : combL = combR`, when the
-// goal follows by ring algebra from that equation: it checks the bridge
-// `goalL − goalR = combL − combR` with `ring` and assembles the result via
-// `Ring.equal_of_linear_combination`. (v1: `e` is a single equation proof;
-// the multi-hypothesis `c1*h1 + c2*h2` combination syntax is future work.)
+// `goalL = goalR` when the goal follows by ring algebra from a combination
+// `e` of equation hypotheses: it checks the bridge `goalL − goalR = combL −
+// combR` with `ring` and assembles via `Ring.equal_of_linear_combination`.
+// `e` is a `+`/`*`/`-` tree (`combination`) whose leaves are equality
+// proofs (hypotheses, `a = b`) or scalar ring coefficients; the elaborator
+// walks it, scaling/summing the equations and building the combined proof
+// by congruence + transitivity. So `c1 * h1 + c2 * h2` and `h1 - h2` are
+// one-liners, and a bare hypothesis `h` is the degenerate single leaf.
 struct SurfaceLinearCombination {
     SurfaceExpressionPointer combination;
 };

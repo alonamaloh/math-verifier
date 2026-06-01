@@ -174,19 +174,34 @@ which otherwise *guesses* lemma names.
   pipeline, mirroring `overload`) — no naming convention. Documented in
   CLAUDE.md ("Rewrite under a binder"). Applied across the Polynomial
   coefficient-algebra proofs (multiply_laws, multiplication, commutative).
-- **Ring-with-hypotheses (`linear_combination`) — DONE (v1), the second
+- **Ring-with-hypotheses (`linear_combination`) — DONE (v2), the second
   deep move.** `linear_combination(e)` closes a commutative-ring equality
-  goal `goalL = goalR` from an equation proof `e : combL = combR` by
+  goal `goalL = goalR` from a combination `e` of equation hypotheses by
   checking the bridge `goalL − goalR = combL − combR` with the ring
   normaliser and assembling via a generic `Ring.equal_of_linear_combination`
   lemma (IsRing). Full surface pipeline (keyword→parser→elaborator); the
   elaborator resolves the carrier's ops via `ring`'s RingScheme,
   β-reduces the combination endpoints, ring-proves the bridge, cites the
-  lemma. v1 = concrete carriers + a single equation (coefficients supplied
-  by pre-building `c·h` via congruence). **Remaining for this move:** the
-  `c1*h1 + c2*h2` combination syntax (walk the SurfaceBinaryOperation tree,
-  scale/add equations) — that's what makes `cfSquareNegateOne`-style
-  multi-hypothesis goals a one-liner; and bundle/abstract carriers.
+  lemma.
+  - **v2 — the combination syntax (`evalLinearCombinationTree`).** `e` is
+    now a `+`/`*`/`-`/unary-`-` tree walked recursively: each leaf is
+    either an equality proof (hypothesis `a = b` → ⟨a, b, proof⟩) or a
+    scalar ring coefficient (`v` → trivial `v = v` via reflexivity);
+    `+`/`*`/`-` nodes combine children pointwise on each side, building
+    the combined proof by two single-argument congruences + transitivity
+    (unary `-`: one congruence). So `c1 * h1 + c2 * h2`, `h1 - h2`, and
+    `c * h` are genuine one-liners — the coefficient is written inline,
+    no pre-`congruenceOf`. A bare hypothesis `h` is the degenerate
+    single-leaf tree (the v1 case, unchanged), so v1 proofs still pass.
+    Tested in `Test/lincomb_test.math` (7 declarations: single, scaled
+    via congruence, scaled inline, sum, full `c1*h1+c2*h2`, difference,
+    calc-step). Documented in CLAUDE.md ("`linear_combination(e)`").
+  - **Remaining (deferred, low value):** literal coefficients
+    `(2 : Integer) * h` hit the pre-existing bare-literal `*`
+    operator-dispatch gap (the literal parses as a Natural — independent
+    of `linear_combination`, also blocks `ring` on the same goal); use a
+    variable coefficient meanwhile. Bundle/abstract carriers
+    (`Ring.carrier(s)`) still need the structure argument threaded.
 
 
 - **§4 proving ground — high-value surface DONE (~14 files, 4 enablers).**
