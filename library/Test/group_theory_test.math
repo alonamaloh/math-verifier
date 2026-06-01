@@ -1,0 +1,40 @@
+-- Test/group_theory_test.math
+--
+-- End-to-end exercise of the bundled-group / homomorphism layer against
+-- a concrete group: the doubling map x ↦ x + x on (ℤ, +). We prove it is
+-- a homomorphism (the homomorphism law is a ring identity), then read off
+-- `double(0) = 0` from the generic `preserves_identity` — no extra work.
+
+module Test.group_theory_test
+
+import Logic.basics
+import Equality.basics
+import Integer.basics
+import Integer.addition
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.instances
+import Algebra.group
+import Algebra.group_bundle
+import Algebra.group_homomorphism
+
+-- The doubling map on the integers.
+definition Integer.double (x : Integer) : Integer := x + x
+
+-- Doubling respects addition: (x+y)+(x+y) = (x+x)+(y+y). The goal is
+-- stated through the bundle's `Group.operation`, which reduces to
+-- `Integer.add`; the ascribed ring identity over Integer matches it by
+-- definitional equality.
+theorem Integer.double_is_homomorphism
+        : IsHomomorphism(Integer.additive_group, Integer.additive_group,
+                         Integer.double) :=
+  function (x y : Integer) =>
+    (ring : (x + y) + (x + y) = (x + x) + (y + y))
+
+-- The structure-preservation fact comes for free from the generic lemma:
+-- a homomorphism sends the identity (here 0) to the identity.
+theorem Integer.double_zero : Integer.double(Integer.zero) = Integer.zero :=
+  GroupHomomorphism.preserves_identity(
+      Integer.additive_group, Integer.additive_group,
+      Integer.double, Integer.double_is_homomorphism)

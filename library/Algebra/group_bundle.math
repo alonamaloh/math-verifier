@@ -1,0 +1,173 @@
+-- Algebra/group_bundle.math
+--
+-- A *bundled* group: a single value `g : Group` carrying its carrier
+-- type, the operation, the identity, the inverse function, and the
+-- `IsGroup` proof together. This is the consumer-facing layer over the
+-- unbundled `IsGroup` predicate — it lets a generic construction (e.g.
+-- a homomorphism between two groups) thread one `g` instead of
+-- `(carrier, operation, identity, inverse, groupProof)` at every call.
+--
+-- Mirrors `Algebra/ring_bundle.math`: `Group` is a single-constructor
+-- inductive (a dependent record), the projections recover each field,
+-- and the flattened law projections (`Group.associative`,
+-- `Group.identity_left`, …) pull the individual equations out of the
+-- nested-∧ `IsGroup` once, so consumers never walk the hierarchy by
+-- hand. The derived facts (`Group.cancel_left`, `Group.inverse_involution`,
+-- …) re-export the generic `group_lemmas.math` results at the bundle.
+--
+-- As with the ring bundle, the field projections are written with
+-- `cases g { … }` rather than the pattern-match-definition form,
+-- because the operation's return type mentions `Group.carrier(g)` and
+-- the pattern-match codegen does not yet handle that dependent motive.
+
+module Algebra.group_bundle
+
+import Logic.basics
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+
+-- A group bundled with its carrier, operation, identity, inverse, and
+-- laws. Lives in Type(1) because it carries a Type(0) carrier.
+inductive Group : Type(1) where
+  | Group.make
+      : (carrier : Type(0))
+        → (operation : carrier → carrier → carrier)
+        → (identity : carrier)
+        → (inverse : carrier → carrier)
+        → IsGroup(carrier, operation, identity, inverse)
+        → Group
+
+-- ----------------------------------------------------------------------
+-- Field projections.
+
+definition Group.carrier : Group → Type(0)
+  | Group.make(carrier, operation, identity, inverse, isGroup) => carrier
+
+-- The operation takes its group implicitly, so it reads as an operator
+-- (`x * y`) over an abstract `Group.carrier`, recovering `{g}` from the
+-- operand type. Full-application call sites (`Group.operation(g, x, y)`)
+-- still pass `g` positionally; only partial/slot uses must be written
+-- bare (`Group.operation`), recovering `g` from the expected type. The
+-- constant `identity` keeps an explicit group (no operand to recover from).
+definition Group.operation {g : Group}
+        : Group.carrier(g) → Group.carrier(g) → Group.carrier(g) :=
+  cases g { | Group.make(carrier, operation, identity, inverse, isGroup) =>
+    operation }
+
+definition Group.identity (g : Group) : Group.carrier(g) :=
+  cases g { | Group.make(carrier, operation, identity, inverse, isGroup) =>
+    identity }
+
+definition Group.inverse {g : Group}
+        : Group.carrier(g) → Group.carrier(g) :=
+  cases g { | Group.make(carrier, operation, identity, inverse, isGroup) =>
+    inverse }
+
+-- The group operation dispatches on the carrier-projection head, distinct
+-- from any concrete carrier's head and from `Ring.carrier`, so it never
+-- clashes with the per-carrier operators (Integer, Rational, …) or the
+-- ring bundle's `*`.
+operator (*) on (Group.carrier, Group.carrier) := Group.operation
+
+definition Group.is_group (g : Group)
+        : IsGroup(Group.carrier(g), Group.operation, Group.identity(g),
+                  Group.inverse) :=
+  cases g { | Group.make(carrier, operation, identity, inverse, isGroup) =>
+    isGroup }
+
+-- ----------------------------------------------------------------------
+-- Flattened law projections. Each destructures `Group.is_group(g)` to
+-- the depth needed and returns the equation. IsGroup unfolds to
+--   IsMonoid(·) ∧ inverseLeft ∧ inverseRight,
+-- and IsMonoid to associative ∧ identityLeft ∧ identityRight.
+
+theorem Group.associative (g : Group)
+        : (x y z : Group.carrier(g))
+          → Group.operation(g, Group.operation(g, x, y), z)
+            = Group.operation(g, x, Group.operation(g, y, z)) := {
+  let ⟨monoidProof, _, _⟩ := Group.is_group(g);
+  let ⟨associative, _, _⟩ := monoidProof;
+  associative
+}
+
+theorem Group.identity_left (g : Group)
+        : (x : Group.carrier(g))
+          → Group.operation(g, Group.identity(g), x) = x := {
+  let ⟨monoidProof, _, _⟩ := Group.is_group(g);
+  let ⟨_, identityLeft, _⟩ := monoidProof;
+  identityLeft
+}
+
+theorem Group.identity_right (g : Group)
+        : (x : Group.carrier(g))
+          → Group.operation(g, x, Group.identity(g)) = x := {
+  let ⟨monoidProof, _, _⟩ := Group.is_group(g);
+  let ⟨_, _, identityRight⟩ := monoidProof;
+  identityRight
+}
+
+theorem Group.inverse_left (g : Group)
+        : (x : Group.carrier(g))
+          → Group.operation(g, Group.inverse(g, x), x) = Group.identity(g) := {
+  let ⟨_, inverseLeft, _⟩ := Group.is_group(g);
+  inverseLeft
+}
+
+theorem Group.inverse_right (g : Group)
+        : (x : Group.carrier(g))
+          → Group.operation(g, x, Group.inverse(g, x)) = Group.identity(g) := {
+  let ⟨_, _, inverseRight⟩ := Group.is_group(g);
+  inverseRight
+}
+
+-- ----------------------------------------------------------------------
+-- Derived facts at the bundle. The generic group lemmas already live
+-- under `Group.*` over the unbundled `(carrier, operation, identity,
+-- inverse, groupProof)` signature; to avoid name collisions the bundle
+-- re-exports them under a `_bundled` suffix (mirroring how `ring_bundle`
+-- gives its annihilation lemmas distinct names from the abstract ones).
+-- Each just feeds the bundle's projections to the generic lemma.
+
+-- Left cancellation: `a·b = a·c` → `b = c`.
+theorem Group.cancel_left_bundled (g : Group) (a b c : Group.carrier(g))
+        (equation : Group.operation(g, a, b) = Group.operation(g, a, c))
+        : b = c :=
+  Group.cancel_left(Group.carrier(g), Group.operation, Group.identity(g),
+      Group.inverse, Group.is_group(g), a, b, c, equation)
+
+-- Right cancellation: `b·a = c·a` → `b = c`.
+theorem Group.cancel_right_bundled (g : Group) (a b c : Group.carrier(g))
+        (equation : Group.operation(g, b, a) = Group.operation(g, c, a))
+        : b = c :=
+  Group.cancel_right(Group.carrier(g), Group.operation, Group.identity(g),
+      Group.inverse, Group.is_group(g), a, b, c, equation)
+
+-- The inverse function is an involution: `inverse(inverse(x)) = x`.
+theorem Group.inverse_involution_bundled (g : Group) (x : Group.carrier(g))
+        : Group.inverse(g, Group.inverse(g, x)) = x :=
+  Group.inverse_involution(Group.carrier(g), Group.operation,
+      Group.identity(g), Group.inverse, Group.is_group(g), x)
+
+-- The inverse of the identity is the identity.
+theorem Group.inverse_identity_bundled (g : Group)
+        : Group.inverse(g, Group.identity(g)) = Group.identity(g) :=
+  Group.inverse_identity(Group.carrier(g), Group.operation,
+      Group.identity(g), Group.inverse, Group.is_group(g))
+
+-- `inverse(a·b) = inverse(b)·inverse(a)`.
+theorem Group.inverse_operation_bundled (g : Group) (a b : Group.carrier(g))
+        : Group.inverse(g, Group.operation(g, a, b))
+          = Group.operation(g, Group.inverse(g, b), Group.inverse(g, a)) :=
+  Group.inverse_operation(Group.carrier(g), Group.operation,
+      Group.identity(g), Group.inverse, Group.is_group(g), a, b)
+
+-- Uniqueness of inverses at the bundle: if `a·b = identity` then
+-- `b = inverse(a)`. Used by the homomorphism inverse-preservation proof.
+theorem Group.right_inverse_unique_bundled (g : Group) (a b : Group.carrier(g))
+        (combineHypothesis : Group.operation(g, a, b) = Group.identity(g))
+        : b = Group.inverse(g, a) :=
+  Group.right_inverse_unique(Group.carrier(g), Group.operation,
+      Group.identity(g), Group.inverse, Group.is_group(g), a, b,
+      combineHypothesis)

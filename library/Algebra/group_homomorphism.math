@@ -1,0 +1,95 @@
+-- Algebra/group_homomorphism.math
+--
+-- A group homomorphism is a function between the carriers of two
+-- bundled groups that respects the operation: f(x·y) = f(x)·f(y).
+-- From that single axiom the two basic structure-preservation facts
+-- follow — f sends the identity to the identity and commutes with
+-- inversion — and homomorphisms compose, with the identity map as a
+-- homomorphism. These are the lemmas every later result (kernel,
+-- image, isomorphism theorems) leans on.
+--
+-- We phrase everything over the bundled `Group` (Algebra/group_bundle),
+-- so a homomorphism is `IsHomomorphism(G, H, f)` rather than a tuple of
+-- ten unbundled components.
+
+module Algebra.group_homomorphism
+
+import Logic.basics
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+
+-- `f : carrier(G) → carrier(H)` is a homomorphism when it carries the
+-- operation of G to the operation of H. The `*` operator dispatches on
+-- the carrier-projection head, inferring its group from the operand
+-- type: `x * y` uses G's operation (operands in `carrier(G)`), while
+-- `f(x) * f(y)` uses H's (operands in `carrier(H)`).
+definition IsHomomorphism
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        : Proposition :=
+  (x y : Group.carrier(G)) → f(x * y) = f(x) * f(y)
+
+-- A homomorphism sends the identity to the identity.
+--
+-- Proof: f(e)·f(e) = f(e·e) = f(e) = f(e)·identity, then cancel f(e)
+-- on the left.
+theorem GroupHomomorphism.preserves_identity
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (homomorphism : IsHomomorphism(G, H, f))
+        : f(Group.identity(G)) = Group.identity(H) := {
+  let imageOfIdentity : Group.carrier(H) := f(Group.identity(G));
+  Group.cancel_left_bundled(H, imageOfIdentity, imageOfIdentity, Group.identity(H),
+      calc Group.operation(H, imageOfIdentity, imageOfIdentity)
+         = f(Group.operation(G, Group.identity(G), Group.identity(G)))
+               by Equality.symmetry(homomorphism(Group.identity(G), Group.identity(G)))
+         = imageOfIdentity
+               by congruenceOf(f, Group.identity_left(G, Group.identity(G)))
+         = Group.operation(H, imageOfIdentity, Group.identity(H))
+               by Equality.symmetry(Group.identity_right(H, imageOfIdentity)))
+}
+
+-- A homomorphism commutes with inversion: f(x⁻¹) = f(x)⁻¹.
+--
+-- Proof: f(x)·f(x⁻¹) = f(x·x⁻¹) = f(e) = e, so by uniqueness of the
+-- right inverse f(x⁻¹) is the inverse of f(x).
+theorem GroupHomomorphism.preserves_inverse
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (homomorphism : IsHomomorphism(G, H, f))
+        (x : Group.carrier(G))
+        : f(Group.inverse(G, x)) = Group.inverse(H, f(x)) :=
+  Group.right_inverse_unique_bundled(H, f(x), f(Group.inverse(G, x)),
+      calc Group.operation(H, f(x), f(Group.inverse(G, x)))
+         = f(Group.operation(G, x, Group.inverse(G, x)))
+               by Equality.symmetry(homomorphism(x, Group.inverse(G, x)))
+         = f(Group.identity(G))
+               by congruenceOf(f, Group.inverse_right(G, x))
+         = Group.identity(H)
+               by GroupHomomorphism.preserves_identity(G, H, f, homomorphism))
+
+-- The identity map on a group is a homomorphism: id(x·y) = x·y = id(x)·id(y).
+theorem GroupHomomorphism.identity_map (G : Group)
+        : IsHomomorphism(G, G, function (x : Group.carrier(G)) => x) :=
+  function (x y : Group.carrier(G)) =>
+    reflexivity(Group.carrier(G), Group.operation(G, x, y))
+
+-- The composite of two homomorphisms is a homomorphism.
+--
+-- (g∘f)(x·y) = g(f(x·y)) = g(f(x)·f(y)) = g(f(x))·g(f(y)).
+theorem GroupHomomorphism.compose
+        (G H K : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (g : Group.carrier(H) → Group.carrier(K))
+        (fHomomorphism : IsHomomorphism(G, H, f))
+        (gHomomorphism : IsHomomorphism(H, K, g))
+        : IsHomomorphism(G, K, function (x : Group.carrier(G)) => g(f(x))) :=
+  function (x y : Group.carrier(G)) =>
+    calc g(f(Group.operation(G, x, y)))
+       = g(Group.operation(H, f(x), f(y)))
+             by congruenceOf(g, fHomomorphism(x, y))
+       = Group.operation(K, g(f(x)), g(f(y)))
+             by gHomomorphism(f(x), f(y))
