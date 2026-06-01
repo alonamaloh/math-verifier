@@ -3551,6 +3551,31 @@ theorem caller (P Q : Proposition) (h : Q) : Q := pick_b(h)
         "under-applied implicit inference",
         __LINE__);
 
+    // Universe-inference footgun: a saturated call to a
+    // universe-polymorphic constant whose universe parameter appears
+    // ONLY in the result (never in a value-argument type) cannot be
+    // pinned from the arguments. It used to default silently to level 0;
+    // it must now report a clear, actionable error naming the call and
+    // suggesting an explicit `.{...}`.
+    expectErrorContains(R"(
+module Test.errors_uninferred_universe
+
+inductive Box.{u} : Type(u) where
+  | Box.point : Box
+
+definition resultType.{u} (placeholder : Box.{0}) : Type(u) :=
+  Box.{u}
+
+definition use_without_universe (placeholder : Box.{0}) : Type(0) :=
+  resultType(placeholder)
+)",
+        {"could not infer",
+         "universe level",
+         "resultType",
+         "explicitly"},
+        "uninferred universe defaults to level 0",
+        __LINE__);
+
     // Regression: trailing-arg placeholders from an outer constructor's
     // leading-argument inference must not leak into the expectedType of
     // a *later* trailing arg whose elaboration itself triggers nested

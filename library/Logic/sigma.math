@@ -8,14 +8,23 @@
 
 module Logic.sigma
 
-inductive Sigma (A : Type) (B : A → Type) : Type where
+-- Explicit universe parameters with the result sort `Type(max(u, v))`.
+-- Writing the sort in terms of the parameter universes (rather than a
+-- bare `Type`, which would be an *independent* third universe) keeps
+-- both `u` and `v` recoverable from the value arguments at every use
+-- site — `Sigma(A, B)` infers them from `A : Type(u)` and
+-- `B : A → Type(v)`. A bare `Type` here would leave the inductive's own
+-- universe undetermined by its arguments, forcing the elaborator to
+-- guess (the universe-inference footgun).
+inductive Sigma.{u, v} (A : Type(u)) (B : A → Type(v)) : Type(max(u, v)) where
   | Sigma.make : (witnessValue : A) → B(witnessValue) → Sigma(A, B)
 
 -- Projections (defined by pattern-match, so the kernel reduces them
 -- when applied to a `make`).
-definition Sigma.first (A : Type) (B : A → Type) : Sigma(A, B) → A
+definition Sigma.first.{u, v} (A : Type(u)) (B : A → Type(v))
+        : Sigma(A, B) → A
   | Sigma.make(a, _) => a
 
-definition Sigma.second (A : Type) (B : A → Type)
+definition Sigma.second.{u, v} (A : Type(u)) (B : A → Type(v))
         : (s : Sigma(A, B)) → B(Sigma.first(A, B, s))
   | Sigma.make(_, b) => b

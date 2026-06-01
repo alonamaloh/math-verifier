@@ -4247,32 +4247,46 @@ private:
                             countLeadingPis(declarationKernelType);
                         int declaredImplicitCount =
                             environment_.implicitArgumentCount(name);
-                        // Leading-argument inference engages ONLY for
-                        // declarations with `{x : T}` implicit binders:
-                        // the user provides exactly the explicit-arg
-                        // count and we infer the declared implicit
-                        // prefix. (PAdic-style convention prefixes also
-                        // land here, since `convention` adds implicit
-                        // binders.)
+                        // Two engagement modes:
+                        //   (a) Declaration uses `{x : T}` implicit
+                        //       binders. The user provides exactly the
+                        //       explicit-arg count and we infer the
+                        //       declared implicit prefix. (PAdic-style
+                        //       convention prefixes also land here, since
+                        //       `convention` adds implicit binders.)
+                        //   (b) Declaration has no implicit binders and
+                        //       is under-applied AGAINST A NON-FUNCTION
+                        //       expected type. Some desugarings (e.g.
+                        //       `by_induction … using <lemma>`) supply
+                        //       trailing args and rely on the leading
+                        //       ones being inferred — arity-based
+                        //       inference fills them.
                         //
-                        // It does NOT engage for declarations with no
-                        // implicit binders. An under-applied call to
-                        // such a declaration is a genuine PARTIAL
-                        // APPLICATION: the user supplied a PREFIX of the
-                        // arguments and the MISSING ones are trailing,
-                        // never leading. The old arity-based heuristic
-                        // (numLeadingToInfer = totalPi − argCount) wrongly
-                        // assumed the missing args were leading and would
+                        // Mode (b) is GATED on the expected type NOT being
+                        // a function (Pi). An under-applied call whose
+                        // expected type IS a function is a genuine PARTIAL
+                        // APPLICATION (prefix supplied, trailing args
+                        // missing); inferring "leading" args there would
                         // duplicate the first argument — e.g.
                         // `induced_map(G, H, f, homo)` passed where a
-                        // function is expected became
-                        // `induced_map G G H f homo …`. Such calls now
-                        // fall through to the partial-application path.
+                        // function is expected used to become
+                        // `induced_map G G H f homo …`. Those fall through
+                        // to the partial-application path instead.
                         int numLeadingToInfer = 0;
                         if (declaredImplicitCount > 0) {
                             if (static_cast<int>(argumentCount)
                                 == totalPiCount - declaredImplicitCount) {
                                 numLeadingToInfer = declaredImplicitCount;
+                            }
+                        } else if (expectedType) {
+                            ExpressionPointer expectedWhnf =
+                                weakHeadNormalForm(environment_, expectedType);
+                            bool expectedIsFunction =
+                                std::holds_alternative<Pi>(expectedWhnf->node);
+                            if (!expectedIsFunction) {
+                                numLeadingToInfer =
+                                    totalPiCount
+                                    - static_cast<int>(argumentCount);
                             }
                         }
                         bool universesProvided =
@@ -4407,7 +4421,10 @@ private:
                     std::vector<LevelPointer> inferredUniverseArguments =
                         inferUniverseArguments(*environmentDeclaration,
                                                  valueArguments,
-                                                 localBinders);
+                                                 localBinders,
+                                                 /*skipLeadingPis=*/0,
+                                                 /*callSiteName=*/name,
+                                                 /*errorOnUninferred=*/true);
                     ExpressionPointer head = makeConstant(
                         name, inferredUniverseArguments);
                     for (auto& valueArgument : valueArguments) {
@@ -23673,7 +23690,9 @@ private:
         const Declaration& declaration,
         const std::vector<ExpressionPointer>& valueArguments,
         const std::vector<LocalBinder>& localBinders,
-        int skipLeadingPis = 0) {
+        int skipLeadingPis = 0,
+        const std::string& callSiteName = "",
+        bool errorOnUninferred = false) {
 
         const std::vector<std::string>& universeParameters =
             declarationUniverseParameters(declaration);
@@ -23720,13 +23739,40 @@ private:
         }
 
         std::vector<LevelPointer> result;
+        int uninferredCount = 0;
         for (const auto& name : universeParameters) {
             auto iterator = assignment.find(name);
             if (iterator != assignment.end()) {
                 result.push_back(iterator->second);
             } else {
+                ++uninferredCount;
                 result.push_back(makeLevelConst(0));
             }
+        }
+        // The footgun guard: a universe parameter that the argument
+        // types don't pin down was historically defaulted to level 0
+        // *silently*. That silently fixes a polymorphic level — fine
+        // when 0 happens to be right, but otherwise it surfaces as a
+        // confusing downstream type error (especially now universes are
+        // non-cumulative, where a wrongly-collapsed level is rejected
+        // rather than absorbed). When the caller opts in, report it
+        // clearly at the call site instead, naming the fix: pass the
+        // levels explicitly with `Name.{...}`.
+        if (errorOnUninferred && uninferredCount > 0) {
+            std::string label =
+                callSiteName.empty() ? "this call" : "'" + callSiteName + "'";
+            throwElaborate(
+                "could not infer "
+                + std::to_string(uninferredCount)
+                + (uninferredCount == 1
+                       ? " universe level of "
+                       : " universe levels of ")
+                + label
+                + " from the argument types. Pass the level"
+                + (uninferredCount == 1 ? "" : "s")
+                + " explicitly, e.g. "
+                + (callSiteName.empty() ? "Name" : callSiteName)
+                + ".{0} (or .{u} to keep it polymorphic).");
         }
         return result;
     }
