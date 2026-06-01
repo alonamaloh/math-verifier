@@ -190,6 +190,20 @@ which otherwise *guesses* lemma names.
     the `: Real`-ascribed `let` is the general recipe for the
     coefficient-algebra files: it both abbreviates AND unlocks concrete
     operators + `ring`.
+  - **Operator dispatch over carrier projections (resolves the
+    mixed-head half of finding #2).** Dispatch is syntactic on the operand
+    type's head, so a value typed `Ring.carrier(Real.polynomial_ring)`
+    (from a `divides` existential) wouldn't match a `Polynomial` operator
+    despite being defeq. Added `carrierProjectionField`: when the raw-head
+    lookup fails, resolve `Ring.carrier(bundle)` to the carrier field as
+    written in the bundle's `Ring.make` constructor — un-reduced, so
+    `Polynomial(…)` is NOT blown past to its `Quotient(…)`. Only runs when
+    dispatch would otherwise error → zero regression. Unblocked
+    `Complex.modulus * quotient` in `embedding_injective.math`. (The OTHER
+    half — `coefficientOf(...) + ...` dispatching to the *bundle* `+`
+    rather than concrete `Real.+` — is unchanged: there the raw bundle
+    lookup succeeds, so the recipe stays a `: Real`-ascribed `let`, as in
+    `irreducible.math`.)
   - **Findings:**
     - `make library` EXCLUDES `library/Test/` — use `make -j 16 tests`
       for the full check (it builds the library AND the Test/*.math
