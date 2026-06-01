@@ -904,6 +904,74 @@ Limits:
   lemma's LHS) vs `v_p(1+dy+dx*(1+dy))` (the step's slot) where
   multiplication reduces structurally.
 
+## Rewrite under a binder — `by (function (x) => …)` in calc
+
+When a calc `=` step's endpoints are the **same function `F` applied to
+argument lists that differ in exactly one position — a binder body
+`λx. f` vs `λx. g`** — the step is a congruence under that binder: it
+holds as soon as `f(x) = g(x)` pointwise. Write the per-index proof
+directly as the `by` step; the elaborator reads `f`/`g` and every shared
+argument off the endpoints and discharges the step with the registered
+congruence lemma. The canonical case is rewriting the summand of a
+`Polynomial.Sum`:
+
+```math
+-- Verbose: respell BOTH summands + the Sum.extensional wrapper.
+= Polynomial.Sum(r, function (i) => coefficient(p, i) * (coefficient(q, k−i) + coefficient(s, k−i)), k)
+      by Polynomial.Sum.extensional(r,
+             function (i) => (coefficient(p, i) * coefficient(q, k−i)) + (coefficient(p, i) * coefficient(s, k−i)),
+             function (i) => coefficient(p, i) * (coefficient(q, k−i) + coefficient(s, k−i)),
+             function (i) => Ring.distributivity_left(r, coefficient(p, i), coefficient(q, k−i), coefficient(s, k−i)),
+             k)
+
+-- Idiomatic: just the per-index proof. f, g, r, k are read off the
+-- endpoints. Note the PARENS around the lambda (see below).
+= Polynomial.Sum(r, function (i) => coefficient(p, i) * (coefficient(q, k−i) + coefficient(s, k−i)), k)
+      by (function (i : Natural) =>
+             Ring.distributivity_left(r, coefficient(p, i), coefficient(q, k−i), coefficient(s, k−i)))
+```
+
+**Registering a congruence lemma.** The mechanism is driven by a
+registry, not a naming convention. Register the lemma for the function
+head once, next to where it's defined:
+
+```math
+congruence_under_binder Polynomial.Sum := Polynomial.Sum.extensional
+```
+
+A `congruence_under_binder <F> := <L>` makes `L` available to discharge
+under-binder steps on `F`. It is generic over `F` and over `L`'s argument
+order: the elaborator applies `L` to the shared prefix + `f` + `g`, then
+fills its remaining binders by walking them — the author's lambda goes to
+the unique **pointwise-equality** binder (a `Pi` chain ending in `=`,
+wherever it sits), every other binder from the next shared suffix argument
+of `F`. So a range-restricted variant with a different layout works from
+the same surface — register it too and the elaborator tries each in turn:
+
+```math
+congruence_under_binder Polynomial.Sum := Polynomial.Sum.extensional_range
+-- now `by (function (i) (smaller : i ≤ k) => …)` closes a Sum step from
+-- the range-restricted pointwise proof (Sum.extensional is tried first,
+-- fails on the 2-binder lambda, then Sum.extensional_range matches).
+```
+
+How it fires: gated to a calc `=` step whose endpoints are a
+single-binder-diff application of a head with a registered lemma AND
+whose `by` proof is syntactically a lambda — so an ordinary lemma proof
+of a `Sum = Sum` step (e.g. `by Sum.add(…)`) takes the normal path
+untouched. The assembled proof is type-checked before use, so a wrong
+guess never shadows a real step.
+
+Gotchas / limits:
+- **Parens are required:** `by (function (x) => …)`. A bare
+  `by function (x) => …` parses wrong — the lambda body is greedy and
+  eats the next calc step. Keep the parens.
+- **One binder argument per step.** The endpoints must differ in exactly
+  one position. Chained rewrites under the same Σ are separate steps.
+- The lambda's binder count selects the variant (1 binder →
+  `extensional`, 2 → `extensional_range`), since elaboration against the
+  wrong lemma's pointwise type fails and falls through.
+
 ## Proof style — write proofs that read like math
 
 The overriding goal is that a proof reads like what a mathematician
