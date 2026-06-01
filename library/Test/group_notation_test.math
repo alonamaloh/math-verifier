@@ -1,0 +1,39 @@
+-- Test/group_notation_test.math
+--
+-- Probing ergonomic notation for group proofs: the `*` operator (already
+-- registered on Group.carrier), the implicit-group `Group.inverse(a)`,
+-- and a local `let inv := …` abbreviation.
+
+module Test.group_notation_test
+
+import Logic.basics
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+
+-- (1) `a * b` is definitionally Group.operation(G, a, b).
+theorem star_is_operation (G : Group) (a b : Group.carrier(G))
+        : a * b = Group.operation(G, a, b) :=
+  reflexivity(Group.carrier(G), Group.operation(G, a, b))
+
+-- (2) `Group.inverse(a)` infers its group from the operand — no G.
+theorem inverse_infers_group (G : Group) (a : Group.carrier(G))
+        : Group.inverse(a) = Group.inverse(G, a) :=
+  reflexivity(Group.carrier(G), Group.inverse(G, a))
+
+-- (3) A local `inv` abbreviation, combined with `*`, reads like math.
+--     This restates the associativity law in the clean notation.
+theorem clean_associativity (G : Group) (a b c : Group.carrier(G))
+        : (a * b) * c = a * (b * c) :=
+  Group.associative(G, a, b, c)
+
+-- (4) `inv(a) * b` via a local let, matching the user's requested shape.
+theorem clean_inverse_left (G : Group) (a : Group.carrier(G))
+        : Group.inverse(a) * a = Group.identity(G) := {
+  let inv : Group.carrier(G) → Group.carrier(G) :=
+      function (x : Group.carrier(G)) => Group.inverse(G, x);
+  -- goal printed with Group.inverse; `inv(a) * a` is ζ/defeq the same term.
+  Group.inverse_left(G, a)
+}

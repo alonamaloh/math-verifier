@@ -1,0 +1,237 @@
+-- Algebra/first_isomorphism.math
+--
+-- The first isomorphism theorem. For a homomorphism f : G → H, the
+-- kernel is a normal subgroup, and the induced map
+--   φ : G/ker(f) → H,   φ([a]) = f(a)
+-- is a well-defined injective homomorphism whose image is exactly im(f).
+-- In other words φ is an isomorphism of G/ker(f) onto im(f) ≤ H.
+--
+-- We state the isomorphism as "injective homomorphism with image im(f)"
+-- (φ injective + image φ = image f as subsets of H) rather than as an
+-- equality of bundled groups, which would require carving im(f) out of
+-- H as a subtype carrier. The two are the same statement.
+
+module Algebra.first_isomorphism
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Logic.quotient
+import Set.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+import Algebra.group_homomorphism
+import Algebra.subgroup
+import Algebra.normal_subgroup
+import Algebra.quotient_group
+
+-- ----------------------------------------------------------------------
+-- The kernel is a normal subgroup.
+--
+-- Conjugation closure: f(g⁻¹·n·g) = f(g)⁻¹·f(n)·f(g) = f(g)⁻¹·e·f(g) = e.
+
+theorem GroupHomomorphism.kernel_is_normal
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (homomorphism : IsHomomorphism(G, H, f))
+        : IsNormalSubgroup(G, GroupHomomorphism.kernel(G, H, f)) :=
+  ⟨GroupHomomorphism.kernel_is_subgroup(G, H, f, homomorphism),
+   function (g x : Group.carrier(G)) (xInKernel : f(x) = Group.identity(H)) =>
+       calc f(Group.operation(G, Group.operation(G, Group.inverse(G, g), x), g))
+          = Group.operation(H,
+                f(Group.operation(G, Group.inverse(G, g), x)), f(g))
+                by homomorphism(Group.operation(G, Group.inverse(G, g), x), g)
+          = Group.operation(H,
+                Group.operation(H, f(Group.inverse(G, g)), f(x)), f(g))
+                by congruenceOf(
+                       function (t : Group.carrier(H)) =>
+                           Group.operation(H, t, f(g)),
+                       homomorphism(Group.inverse(G, g), x))
+          = Group.operation(H,
+                Group.operation(H, Group.inverse(H, f(g)), f(x)), f(g))
+                by congruenceOf(
+                       function (t : Group.carrier(H)) =>
+                           Group.operation(H, Group.operation(H, t, f(x)), f(g)),
+                       GroupHomomorphism.preserves_inverse(G, H, f, homomorphism, g))
+          = Group.operation(H,
+                Group.operation(H, Group.inverse(H, f(g)), Group.identity(H)), f(g))
+                by congruenceOf(
+                       function (t : Group.carrier(H)) =>
+                           Group.operation(H,
+                               Group.operation(H, Group.inverse(H, f(g)), t), f(g)),
+                       xInKernel)
+          = Group.operation(H, Group.inverse(H, f(g)), f(g))
+                by congruenceOf(
+                       function (t : Group.carrier(H)) =>
+                           Group.operation(H, t, f(g)),
+                       Group.identity_right(H, Group.inverse(H, f(g))))
+          = Group.identity(H)
+                by Group.inverse_left(H, f(g))⟩
+
+-- ----------------------------------------------------------------------
+-- The induced map φ : G/ker(f) → H, φ([a]) = f(a).
+
+-- Well-definedness: if a ~ a' (i.e. a⁻¹·a' ∈ ker f) then f(a) = f(a').
+theorem GroupHomomorphism.induced_map_well_defined
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (homomorphism : IsHomomorphism(G, H, f))
+        (a a' : Group.carrier(G))
+        (related : f(Group.operation(G, Group.inverse(G, a), a')) = Group.identity(H))
+        : f(a) = f(a') := {
+  -- f(a)⁻¹·f(a') = f(a⁻¹·a') = e.
+  claim quotientEquation
+      : Group.operation(H, Group.inverse(H, f(a)), f(a')) = Group.identity(H)
+      by calc Group.operation(H, Group.inverse(H, f(a)), f(a'))
+            = Group.operation(H, f(Group.inverse(G, a)), f(a'))
+                  by congruenceOf(
+                         function (t : Group.carrier(H)) =>
+                             Group.operation(H, t, f(a')),
+                         Equality.symmetry(
+                             GroupHomomorphism.preserves_inverse(G, H, f, homomorphism, a)))
+            = f(Group.operation(G, Group.inverse(G, a), a'))
+                  by Equality.symmetry(homomorphism(Group.inverse(G, a), a'))
+            = Group.identity(H)
+                  by related;
+  -- multiply through by f(a): f(a) = f(a)·(f(a)⁻¹·f(a')) = f(a').
+  calc f(a)
+     = Group.operation(H, f(a), Group.identity(H))
+           by Equality.symmetry(Group.identity_right(H, f(a)))
+     = Group.operation(H, f(a),
+           Group.operation(H, Group.inverse(H, f(a)), f(a')))
+           by congruenceOf(
+                  function (t : Group.carrier(H)) => Group.operation(H, f(a), t),
+                  Equality.symmetry(quotientEquation))
+     = Group.operation(H,
+           Group.operation(H, f(a), Group.inverse(H, f(a))), f(a'))
+           by Equality.symmetry(
+                  Group.associative(H, f(a), Group.inverse(H, f(a)), f(a')))
+     = Group.operation(H, Group.identity(H), f(a'))
+           by congruenceOf(
+                  function (t : Group.carrier(H)) => Group.operation(H, t, f(a')),
+                  Group.inverse_right(H, f(a)))
+     = f(a')
+           by Group.identity_left(H, f(a'))
+}
+
+-- φ itself: lift f through the quotient by its kernel.
+definition GroupHomomorphism.induced_map
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (homomorphism : IsHomomorphism(G, H, f))
+        (x : QuotientGroup(G, GroupHomomorphism.kernel(G, H, f)))
+        : Group.carrier(H) :=
+  Quotient.lift(
+      function (a : Group.carrier(G)) => f(a),
+      GroupHomomorphism.induced_map_well_defined(G, H, f, homomorphism),
+      x)
+
+-- The bundled quotient group G/ker(f).
+definition GroupHomomorphism.quotient_by_kernel
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (homomorphism : IsHomomorphism(G, H, f)) : Group :=
+  QuotientGroup.group(G, GroupHomomorphism.kernel(G, H, f),
+                      GroupHomomorphism.kernel_is_normal(G, H, f, homomorphism))
+
+-- ----------------------------------------------------------------------
+-- φ is a homomorphism: φ([a]·[b]) = φ([a·b]) = f(a·b) = f(a)·f(b).
+
+theorem GroupHomomorphism.induced_map_is_homomorphism
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (homomorphism : IsHomomorphism(G, H, f))
+        : IsHomomorphism(
+              GroupHomomorphism.quotient_by_kernel(G, H, f, homomorphism), H,
+              function (q : Group.carrier(
+                                GroupHomomorphism.quotient_by_kernel(G, H, f, homomorphism))) =>
+                  GroupHomomorphism.induced_map(G, H, f, homomorphism, q)) :=
+  function (x y : QuotientGroup(G, GroupHomomorphism.kernel(G, H, f))) =>
+    by_representatives x as a, y as b =>
+      homomorphism(a, b)
+
+-- ----------------------------------------------------------------------
+-- φ is injective: φ([a]) = φ([b]) means f(a) = f(b), so a⁻¹·b ∈ ker f,
+-- i.e. [a] = [b].
+
+theorem GroupHomomorphism.induced_map_is_injective
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (homomorphism : IsHomomorphism(G, H, f))
+        : GroupHomomorphism.IsInjective(
+              GroupHomomorphism.quotient_by_kernel(G, H, f, homomorphism), H,
+              function (q : Group.carrier(
+                                GroupHomomorphism.quotient_by_kernel(G, H, f, homomorphism))) =>
+                  GroupHomomorphism.induced_map(G, H, f, homomorphism, q)) :=
+  function (x y : Group.carrier(
+                      GroupHomomorphism.quotient_by_kernel(G, H, f, homomorphism)))
+           (mapsEqual : GroupHomomorphism.induced_map(G, H, f, homomorphism, x)
+                        = GroupHomomorphism.induced_map(G, H, f, homomorphism, y)) =>
+    cases x refining mapsEqual { | a =>
+      cases y refining mapsEqual { | b => {
+        -- mapsEqual now reduces to f(a) = f(b).
+        claim sameCoset
+            : Group.SameCoset(G, GroupHomomorphism.kernel(G, H, f), a, b)
+            by calc f(Group.operation(G, Group.inverse(G, a), b))
+                  = Group.operation(H, f(Group.inverse(G, a)), f(b))
+                        by homomorphism(Group.inverse(G, a), b)
+                  = Group.operation(H, Group.inverse(H, f(a)), f(b))
+                        by congruenceOf(
+                               function (t : Group.carrier(H)) =>
+                                   Group.operation(H, t, f(b)),
+                               GroupHomomorphism.preserves_inverse(
+                                   G, H, f, homomorphism, a))
+                  = Group.operation(H, Group.inverse(H, f(b)), f(b))
+                        by congruenceOf(
+                               function (t : Group.carrier(H)) =>
+                                   Group.operation(H, Group.inverse(H, t), f(b)),
+                               mapsEqual)
+                  = Group.identity(H)
+                        by Group.inverse_left(H, f(b));
+        Quotient.sound(a, b, sameCoset)
+      } } }
+
+-- ----------------------------------------------------------------------
+-- image(φ) = image(f), as subsets of H — φ maps onto im(f). Both
+-- inclusions; together they say φ is a bijection onto its image im(f).
+
+-- Every value of φ is a value of f (φ([a]) = f(a)).
+theorem GroupHomomorphism.induced_image_subset_image
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (homomorphism : IsHomomorphism(G, H, f))
+        : GroupHomomorphism.image(
+              GroupHomomorphism.quotient_by_kernel(G, H, f, homomorphism), H,
+              function (q : Group.carrier(
+                                GroupHomomorphism.quotient_by_kernel(G, H, f, homomorphism))) =>
+                  GroupHomomorphism.induced_map(G, H, f, homomorphism, q))
+          ⊆ GroupHomomorphism.image(G, H, f) :=
+  function (y : Group.carrier(H))
+           (yInInducedImage
+               : ∃ (x : Group.carrier(
+                         GroupHomomorphism.quotient_by_kernel(G, H, f, homomorphism))).
+                     GroupHomomorphism.induced_map(G, H, f, homomorphism, x) = y) => {
+    obtain ⟨x, inducedMapsTo⟩ from yInInducedImage;
+    cases x refining inducedMapsTo { | a =>
+      -- inducedMapsTo : f(a) = y.
+      ⟨a, inducedMapsTo⟩ }
+  }
+
+-- Every value of f is a value of φ (f(a) = φ([a])).
+theorem GroupHomomorphism.image_subset_induced_image
+        (G H : Group)
+        (f : Group.carrier(G) → Group.carrier(H))
+        (homomorphism : IsHomomorphism(G, H, f))
+        : GroupHomomorphism.image(G, H, f)
+          ⊆ GroupHomomorphism.image(
+                GroupHomomorphism.quotient_by_kernel(G, H, f, homomorphism), H,
+                function (q : Group.carrier(
+                                  GroupHomomorphism.quotient_by_kernel(G, H, f, homomorphism))) =>
+                    GroupHomomorphism.induced_map(G, H, f, homomorphism, q)) :=
+  function (y : Group.carrier(H))
+           (yInImage : ∃ (a : Group.carrier(G)). f(a) = y) => {
+    obtain ⟨a, mapsTo⟩ from yInImage;
+    ⟨QuotientGroup.make(G, GroupHomomorphism.kernel(G, H, f), a), mapsTo⟩
+  }

@@ -1,0 +1,224 @@
+-- Algebra/quotient_group.math
+--
+-- The quotient group G/N for a normal subgroup N: the equivalence
+-- classes of G under the same-coset relation, with the operation
+-- inherited from G. Modelled on IntegerMod (which is exactly ℤ/(nℤ)):
+-- the operation is a two-stage `Quotient.lift`, well-definedness comes
+-- from the translation lemmas of Algebra/normal_subgroup, and every
+-- group law is a one-line `Quotient.induct` that reduces the quotient
+-- operation on representatives back to G's own law via congruence on
+-- the class constructor.
+--
+-- The payoff is `QuotientGroup.group`, the bundled `Group`, plus the
+-- canonical projection G → G/N, which is a homomorphism by reflexivity
+-- (the projection of a product is the product of the projections, on
+-- the nose).
+
+module Algebra.quotient_group
+
+import Logic.basics
+import Equality.basics
+import Logic.quotient
+import Set.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+import Algebra.group_homomorphism
+import Algebra.subgroup
+import Algebra.normal_subgroup
+
+-- The underlying type: equivalence classes of G under the same-coset
+-- relation. Well-formed for any subset; it is a *group* only when the
+-- subset is a normal subgroup (which the operation below requires).
+definition QuotientGroup (G : Group) (subset : Set(Group.carrier(G))) : Type(0) :=
+  Quotient(Group.carrier(G), Group.SameCoset(G, subset))
+
+-- The class of `a`, written as the canonical introduction form.
+construction QuotientGroup.make (G : Group) (subset : Set(Group.carrier(G)))
+        (a : Group.carrier(G)) : QuotientGroup(G, subset) :=
+  Quotient.mk(a)
+
+-- ----------------------------------------------------------------------
+-- The operation [a]·[b] = [a·b], lifted over both arguments. The inner
+-- lift (second operand) uses left translation; the outer lift's
+-- respect proof (first operand) uses right translation — which is where
+-- normality is consumed.
+
+definition QuotientGroup.operation_representative
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (a : Group.carrier(G)) (y : QuotientGroup(G, subset))
+        : QuotientGroup(G, subset) :=
+  Quotient.lift(
+      function (b : Group.carrier(G)) =>
+          QuotientGroup.make(G, subset, Group.operation(G, a, b)),
+      function (b b' : Group.carrier(G))
+               (relatedB : Group.SameCoset(G, subset, b, b')) =>
+          Quotient.sound(Group.operation(G, a, b), Group.operation(G, a, b'),
+              Group.SameCoset.left_translate(G, subset, a, b, b', relatedB)),
+      y)
+
+theorem QuotientGroup.operation_representative_respects
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (a a' : Group.carrier(G))
+        (relatedA : Group.SameCoset(G, subset, a, a'))
+        (y : QuotientGroup(G, subset))
+        : QuotientGroup.operation_representative(G, subset, normal, a, y)
+          = QuotientGroup.operation_representative(G, subset, normal, a', y) :=
+  cases y { | b =>
+      Quotient.sound(Group.operation(G, a, b), Group.operation(G, a', b),
+          Group.SameCoset.right_translate(G, subset, normal, b, a, a', relatedA)) }
+
+definition QuotientGroup.operation
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (x y : QuotientGroup(G, subset)) : QuotientGroup(G, subset) :=
+  Quotient.lift(
+      function (a : Group.carrier(G)) =>
+          QuotientGroup.operation_representative(G, subset, normal, a, y),
+      function (a a' : Group.carrier(G))
+               (relatedA : Group.SameCoset(G, subset, a, a')) =>
+          QuotientGroup.operation_representative_respects(
+              G, subset, normal, a, a', relatedA, y),
+      x)
+
+-- The identity class [e] and the inverse [a⁻¹] (inversion respects the
+-- relation by normality).
+definition QuotientGroup.identity (G : Group) (subset : Set(Group.carrier(G)))
+        : QuotientGroup(G, subset) :=
+  QuotientGroup.make(G, subset, Group.identity(G))
+
+definition QuotientGroup.inverse
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (x : QuotientGroup(G, subset)) : QuotientGroup(G, subset) :=
+  Quotient.lift(
+      function (a : Group.carrier(G)) =>
+          QuotientGroup.make(G, subset, Group.inverse(G, a)),
+      function (a a' : Group.carrier(G))
+               (relatedA : Group.SameCoset(G, subset, a, a')) =>
+          Quotient.sound(Group.inverse(G, a), Group.inverse(G, a'),
+              Group.SameCoset.inverse_respects(G, subset, normal, a, a', relatedA)),
+      x)
+
+-- ----------------------------------------------------------------------
+-- The group laws. Each reduces, on representatives, to G's own law: the
+-- quotient operation on classes [a], [b] computes to [a·b], so the goal
+-- becomes a congruence of the class constructor over G's equation.
+
+theorem QuotientGroup.operation_associative
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (x y z : QuotientGroup(G, subset))
+        : QuotientGroup.operation(G, subset, normal,
+              QuotientGroup.operation(G, subset, normal, x, y), z)
+          = QuotientGroup.operation(G, subset, normal, x,
+              QuotientGroup.operation(G, subset, normal, y, z)) :=
+  Quotient.induct_three(
+      function (a b c : Group.carrier(G)) =>
+          congruenceOf(
+              function (t : Group.carrier(G)) => QuotientGroup.make(G, subset, t),
+              Group.associative(G, a, b, c)),
+      x, y, z)
+
+theorem QuotientGroup.operation_identity_left
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (x : QuotientGroup(G, subset))
+        : QuotientGroup.operation(G, subset, normal,
+              QuotientGroup.identity(G, subset), x) = x :=
+  Quotient.induct(
+      function (a : Group.carrier(G)) =>
+          congruenceOf(
+              function (t : Group.carrier(G)) => QuotientGroup.make(G, subset, t),
+              Group.identity_left(G, a)),
+      x)
+
+theorem QuotientGroup.operation_identity_right
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (x : QuotientGroup(G, subset))
+        : QuotientGroup.operation(G, subset, normal, x,
+              QuotientGroup.identity(G, subset)) = x :=
+  Quotient.induct(
+      function (a : Group.carrier(G)) =>
+          congruenceOf(
+              function (t : Group.carrier(G)) => QuotientGroup.make(G, subset, t),
+              Group.identity_right(G, a)),
+      x)
+
+theorem QuotientGroup.operation_inverse_left
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (x : QuotientGroup(G, subset))
+        : QuotientGroup.operation(G, subset, normal,
+              QuotientGroup.inverse(G, subset, normal, x), x)
+          = QuotientGroup.identity(G, subset) :=
+  Quotient.induct(
+      function (a : Group.carrier(G)) =>
+          congruenceOf(
+              function (t : Group.carrier(G)) => QuotientGroup.make(G, subset, t),
+              Group.inverse_left(G, a)),
+      x)
+
+theorem QuotientGroup.operation_inverse_right
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (x : QuotientGroup(G, subset))
+        : QuotientGroup.operation(G, subset, normal, x,
+              QuotientGroup.inverse(G, subset, normal, x))
+          = QuotientGroup.identity(G, subset) :=
+  Quotient.induct(
+      function (a : Group.carrier(G)) =>
+          congruenceOf(
+              function (t : Group.carrier(G)) => QuotientGroup.make(G, subset, t),
+              Group.inverse_right(G, a)),
+      x)
+
+-- ----------------------------------------------------------------------
+-- The quotient is a group, bundled.
+
+theorem QuotientGroup.is_group
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        : IsGroup(QuotientGroup(G, subset),
+                  QuotientGroup.operation(G, subset, normal),
+                  QuotientGroup.identity(G, subset),
+                  QuotientGroup.inverse(G, subset, normal)) :=
+  ⟨⟨QuotientGroup.operation_associative(G, subset, normal),
+    QuotientGroup.operation_identity_left(G, subset, normal),
+    QuotientGroup.operation_identity_right(G, subset, normal)⟩,
+   QuotientGroup.operation_inverse_left(G, subset, normal),
+   QuotientGroup.operation_inverse_right(G, subset, normal)⟩
+
+-- The bundled quotient group G/N.
+definition QuotientGroup.group
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset)) : Group :=
+  Group.make(QuotientGroup(G, subset),
+             QuotientGroup.operation(G, subset, normal),
+             QuotientGroup.identity(G, subset),
+             QuotientGroup.inverse(G, subset, normal),
+             QuotientGroup.is_group(G, subset, normal))
+
+-- ----------------------------------------------------------------------
+-- The canonical projection π : G → G/N, a ↦ [a].
+
+definition QuotientGroup.projection
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        : Group.carrier(G) → Group.carrier(QuotientGroup.group(G, subset, normal)) :=
+  function (a : Group.carrier(G)) => QuotientGroup.make(G, subset, a)
+
+-- π is a homomorphism: π(a·b) = [a·b] = [a]·[b] = π(a)·π(b), by
+-- reflexivity — the quotient operation on [a], [b] computes to [a·b].
+theorem QuotientGroup.projection_is_homomorphism
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        : IsHomomorphism(G, QuotientGroup.group(G, subset, normal),
+                         QuotientGroup.projection(G, subset, normal)) :=
+  function (a b : Group.carrier(G)) =>
+    reflexivity(QuotientGroup(G, subset),
+        QuotientGroup.make(G, subset, Group.operation(G, a, b)))

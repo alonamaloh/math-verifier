@@ -1,0 +1,247 @@
+-- Algebra/normal_subgroup.math
+--
+-- The data needed to form a quotient group G/N: a *normal* subgroup N
+-- and the same-coset equivalence relation it induces.
+--
+-- Two elements lie in the same left coset of N exactly when a⁻¹·b ∈ N;
+-- we take that as the relation `Group.SameCoset(G, N)`. It is an
+-- equivalence relation for ANY subgroup. What normality buys is that
+-- the relation is a *congruence* for the group operation — translating
+-- on the right preserves it — which is precisely what makes the
+-- quotient operation well defined (Algebra/quotient_group).
+--
+-- Normality is stated in the "g⁻¹·N·g ⊆ N" form: g⁻¹·x·g ∈ N for every
+-- g and every x ∈ N. This is the orientation the right-translation
+-- lemma consumes directly, so no inverse-of-inverse bridging is needed.
+--
+-- Notation: the bundled `*` (Group.operation, group inferred from the
+-- operands) and the implicit-group `Group.inverse(a)` keep the algebra
+-- readable. Groups are not commutative, so there is no `ring` to call —
+-- every step is by hand through `Group.associative` and the
+-- inverse/identity laws.
+
+module Algebra.normal_subgroup
+
+import Logic.basics
+import Equality.basics
+import Logic.quotient
+import Set.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+import Algebra.subgroup
+
+-- N is a normal subgroup of G: a subgroup closed under conjugation,
+-- g⁻¹·x·g ∈ N for all g and all x ∈ N.
+definition IsNormalSubgroup (G : Group) (subset : Set(Group.carrier(G)))
+        : Proposition :=
+  IsSubgroup(G, subset)
+  ∧ ((g x : Group.carrier(G)) →
+         x ∈ subset → Group.inverse(g) * x * g ∈ subset)
+
+-- The underlying subgroup of a normal subgroup.
+theorem IsNormalSubgroup.subgroup (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset)) : IsSubgroup(G, subset) := {
+  let ⟨subgroupPart, _⟩ := normal;
+  subgroupPart
+}
+
+-- ----------------------------------------------------------------------
+-- The same-coset relation: a ~ b  iff  a⁻¹·b ∈ N.
+
+definition Group.SameCoset (G : Group) (subset : Set(Group.carrier(G)))
+        (a b : Group.carrier(G)) : Proposition :=
+  Group.inverse(a) * b ∈ subset
+
+-- ----------------------------------------------------------------------
+-- SameCoset is an equivalence relation — for any subgroup. Each proof
+-- rewrites the coset element a⁻¹·b into a form whose membership is a
+-- subgroup-closure fact.
+
+-- Reflexive: a⁻¹·a = identity ∈ N.
+theorem Group.SameCoset.reflexive (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset)) (a : Group.carrier(G))
+        : Group.SameCoset(G, subset, a, a) := {
+  let ⟨identityInSubset, _, _⟩ := subgroup;
+  rewrite(Equality.symmetry(Group.inverse_left(G, a)), identityInSubset)
+}
+
+-- Symmetric: b⁻¹·a = (a⁻¹·b)⁻¹, and N is closed under inversion.
+theorem Group.SameCoset.symmetric (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset)) (a b : Group.carrier(G))
+        (related : Group.SameCoset(G, subset, a, b))
+        : Group.SameCoset(G, subset, b, a) := {
+  let ⟨_, _, closedUnderInverse⟩ := subgroup;
+  claim cosetEquation
+      : Group.inverse(Group.inverse(a) * b) = Group.inverse(b) * a
+      by calc Group.inverse(Group.inverse(a) * b)
+            = Group.inverse(b) * Group.inverse(Group.inverse(a))
+                  by Group.inverse_operation_bundled(G, Group.inverse(a), b)
+            = Group.inverse(b) * a
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) => Group.inverse(b) * t,
+                         Group.inverse_involution_bundled(G, a));
+  rewrite(cosetEquation, closedUnderInverse(Group.inverse(a) * b, related))
+}
+
+-- Transitive: a⁻¹·c = (a⁻¹·b)·(b⁻¹·c), and N is closed under the operation.
+theorem Group.SameCoset.transitive (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset)) (a b c : Group.carrier(G))
+        (relatedAB : Group.SameCoset(G, subset, a, b))
+        (relatedBC : Group.SameCoset(G, subset, b, c))
+        : Group.SameCoset(G, subset, a, c) := {
+  let ⟨_, closedUnderOperation, _⟩ := subgroup;
+  -- (a⁻¹·b)·(b⁻¹·c) = a⁻¹·c, collapsing b·b⁻¹ in the middle.
+  claim cosetEquation
+      : (Group.inverse(a) * b) * (Group.inverse(b) * c) = Group.inverse(a) * c
+      by calc (Group.inverse(a) * b) * (Group.inverse(b) * c)
+            = Group.inverse(a) * (b * (Group.inverse(b) * c))
+                  by Group.associative(G, Group.inverse(a), b,
+                         Group.inverse(b) * c)
+            = Group.inverse(a) * ((b * Group.inverse(b)) * c)
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) => Group.inverse(a) * t,
+                         Equality.symmetry(
+                             Group.associative(G, b, Group.inverse(b), c)))
+            = Group.inverse(a) * (Group.identity(G) * c)
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) =>
+                             Group.inverse(a) * (t * c),
+                         Group.inverse_right(G, b))
+            = Group.inverse(a) * c
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) => Group.inverse(a) * t,
+                         Group.identity_left(G, c));
+  rewrite(cosetEquation,
+          closedUnderOperation(Group.inverse(a) * b, Group.inverse(b) * c,
+              relatedAB, relatedBC))
+}
+
+-- Bundled as an `IsEquivalenceRelation` for the quotient construction.
+theorem Group.SameCoset.is_equivalence (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset))
+        : IsEquivalenceRelation(Group.carrier(G), Group.SameCoset(G, subset)) :=
+  ⟨Group.SameCoset.reflexive(G, subset, subgroup),
+   Group.SameCoset.symmetric(G, subset, subgroup),
+   Group.SameCoset.transitive(G, subset, subgroup)⟩
+
+-- ----------------------------------------------------------------------
+-- Translation lemmas — the heart of well-definedness.
+
+-- Left translation preserves the coset relation, for any subgroup:
+-- a ~ b  ⟹  g·a ~ g·b, because (g·a)⁻¹·(g·b) = a⁻¹·b.
+theorem Group.SameCoset.left_translate
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (g a b : Group.carrier(G))
+        (related : Group.SameCoset(G, subset, a, b))
+        : Group.SameCoset(G, subset, g * a, g * b) := {
+  claim cosetEquation
+      : Group.inverse(a) * b = Group.inverse(g * a) * (g * b)
+      by calc Group.inverse(a) * b
+            = Group.inverse(a) * (Group.identity(G) * b)
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) => Group.inverse(a) * t,
+                         Equality.symmetry(Group.identity_left(G, b)))
+            = Group.inverse(a) * ((Group.inverse(g) * g) * b)
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) =>
+                             Group.inverse(a) * (t * b),
+                         Equality.symmetry(Group.inverse_left(G, g)))
+            = Group.inverse(a) * (Group.inverse(g) * (g * b))
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) => Group.inverse(a) * t,
+                         Group.associative(G, Group.inverse(g), g, b))
+            = (Group.inverse(a) * Group.inverse(g)) * (g * b)
+                  by Equality.symmetry(
+                         Group.associative(G, Group.inverse(a), Group.inverse(g),
+                             g * b))
+            = Group.inverse(g * a) * (g * b)
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) => t * (g * b),
+                         Equality.symmetry(Group.inverse_operation_bundled(G, g, a)));
+  rewrite(cosetEquation, related)
+}
+
+-- Right translation preserves the coset relation WHEN N is normal:
+-- a ~ b  ⟹  a·g ~ b·g, because (a·g)⁻¹·(b·g) = g⁻¹·(a⁻¹·b)·g, a
+-- conjugate of a⁻¹·b ∈ N, hence in N by normality.
+theorem Group.SameCoset.right_translate
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (g a b : Group.carrier(G))
+        (related : Group.SameCoset(G, subset, a, b))
+        : Group.SameCoset(G, subset, a * g, b * g) := {
+  let ⟨_, conjugationClosed⟩ := normal;
+  -- The conjugate g⁻¹·(a⁻¹·b)·g is in N by normality applied to a⁻¹·b.
+  claim conjugateInSubset
+      : Group.inverse(g) * (Group.inverse(a) * b) * g ∈ subset
+      by conjugationClosed(g, Group.inverse(a) * b, related);
+  -- (a·g)⁻¹·(b·g) equals that conjugate.
+  claim cosetEquation
+      : Group.inverse(g) * (Group.inverse(a) * b) * g
+        = Group.inverse(a * g) * (b * g)
+      by calc Group.inverse(g) * (Group.inverse(a) * b) * g
+            = (Group.inverse(g) * Group.inverse(a)) * b * g
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) => t * g,
+                         Equality.symmetry(
+                             Group.associative(G, Group.inverse(g),
+                                 Group.inverse(a), b)))
+            = Group.inverse(a * g) * b * g
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) => (t * b) * g,
+                         Equality.symmetry(Group.inverse_operation_bundled(G, a, g)))
+            = Group.inverse(a * g) * (b * g)
+                  by Group.associative(G, Group.inverse(a * g), b, g);
+  rewrite(cosetEquation, conjugateInSubset)
+}
+
+-- Inversion preserves the coset relation when N is normal:
+-- a ~ a'  ⟹  a⁻¹ ~ a'⁻¹. The coset element of the conclusion,
+-- (a⁻¹)⁻¹·a'⁻¹, is the conjugate (a⁻¹)⁻¹·(a⁻¹·a')⁻¹·a⁻¹ of the
+-- inverse of a⁻¹·a' ∈ N, hence in N by normality.
+theorem Group.SameCoset.inverse_respects
+        (G : Group) (subset : Set(Group.carrier(G)))
+        (normal : IsNormalSubgroup(G, subset))
+        (a a' : Group.carrier(G))
+        (related : Group.SameCoset(G, subset, a, a'))
+        : Group.SameCoset(G, subset, Group.inverse(a), Group.inverse(a')) := {
+  let ⟨subgroup, conjugationClosed⟩ := normal;
+  let ⟨_, _, closedUnderInverse⟩ := subgroup;
+  let cosetElement : Group.carrier(G) := Group.inverse(a) * a';
+  let doublyInverseA : Group.carrier(G) := Group.inverse(Group.inverse(a));
+  -- The conjugate of (a⁻¹·a')⁻¹ by a⁻¹ is in N.
+  claim conjugateInSubset
+      : doublyInverseA * Group.inverse(cosetElement) * Group.inverse(a) ∈ subset
+      by conjugationClosed(Group.inverse(a), Group.inverse(cosetElement),
+             closedUnderInverse(cosetElement, related));
+  -- That conjugate equals (a⁻¹)⁻¹·a'⁻¹, the coset element of a⁻¹ ~ a'⁻¹.
+  claim cosetEquation
+      : doublyInverseA * Group.inverse(cosetElement) * Group.inverse(a)
+        = doublyInverseA * Group.inverse(a')
+      by calc doublyInverseA * Group.inverse(cosetElement) * Group.inverse(a)
+            = doublyInverseA * (Group.inverse(a') * doublyInverseA) * Group.inverse(a)
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) =>
+                             doublyInverseA * t * Group.inverse(a),
+                         Group.inverse_operation_bundled(G, Group.inverse(a), a'))
+            = doublyInverseA * ((Group.inverse(a') * doublyInverseA) * Group.inverse(a))
+                  by Group.associative(G, doublyInverseA,
+                         Group.inverse(a') * doublyInverseA, Group.inverse(a))
+            = doublyInverseA * (Group.inverse(a') * (doublyInverseA * Group.inverse(a)))
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) => doublyInverseA * t,
+                         Group.associative(G, Group.inverse(a'), doublyInverseA,
+                             Group.inverse(a)))
+            = doublyInverseA * (Group.inverse(a') * Group.identity(G))
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) =>
+                             doublyInverseA * (Group.inverse(a') * t),
+                         Group.inverse_left(G, Group.inverse(a)))
+            = doublyInverseA * Group.inverse(a')
+                  by congruenceOf(
+                         function (t : Group.carrier(G)) => doublyInverseA * t,
+                         Group.identity_right(G, Group.inverse(a')));
+  rewrite(cosetEquation, conjugateInSubset)
+}
