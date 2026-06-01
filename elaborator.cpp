@@ -7298,116 +7298,128 @@ private:
             }
             ExpressionPointer stepProofKernel;
             if (step.stepProof) {
-                stepProofKernel = elaborateExpression(
-                    *step.stepProof, localBinders, stepRelationType);
-                bool checkThisStep = reportRedundantBy_
-                    && (step.relation == CalcRelation::Equality
-                        || reportRedundantByNonEq_);
-                if (checkThisStep) {
-                    ExpressionPointer autoAttempt;
-                    try {
-                        if (step.relation == CalcRelation::Equality) {
-                            autoAttempt = autoProveCalcStep(
-                                localBinders, previousKernel, nextKernel,
-                                carrierType, carrierLevel,
-                                stepRelationType,
-                                step.line, step.column);
-                        } else {
-                            // Non-= step (≤/</≥/>): use only the cheap
-                            // pattern-matching path (tryContextFactMatch
-                            // does a spine-hash lookup over the
-                            // environment, then a bounded
-                            // autoFillHintForClaim per candidate). Still
-                            // expensive for large files — gated behind
-                            // --check-redundant-by-non-eq so default
-                            // builds don't pay the cost.
-                            autoAttempt = tryContextFactMatch(
-                                stepRelationType, localBinders, step.line);
+                // Rewrite-under-Σ: a `Sum(r,f,n) = Sum(r,g,n)` step whose
+                // `by` proof is the pointwise `(i) => f(i) = g(i)` desugars
+                // to `Sum.extensional`. Tried first; nullptr unless both
+                // endpoints are `Sum`s and the proof elaborates pointwise,
+                // so it never shadows an ordinary step proof.
+                if (step.relation == CalcRelation::Equality) {
+                    stepProofKernel = tryUnderSumStep(
+                        localBinders, previousKernel, nextKernel,
+                        *step.stepProof, step.line, step.column);
+                }
+                if (!stepProofKernel) {
+                    stepProofKernel = elaborateExpression(
+                        *step.stepProof, localBinders, stepRelationType);
+                    bool checkThisStep = reportRedundantBy_
+                        && (step.relation == CalcRelation::Equality
+                            || reportRedundantByNonEq_);
+                    if (checkThisStep) {
+                        ExpressionPointer autoAttempt;
+                        try {
+                            if (step.relation == CalcRelation::Equality) {
+                                autoAttempt = autoProveCalcStep(
+                                    localBinders, previousKernel, nextKernel,
+                                    carrierType, carrierLevel,
+                                    stepRelationType,
+                                    step.line, step.column);
+                            } else {
+                                // Non-= step (≤/</≥/>): use only the cheap
+                                // pattern-matching path (tryContextFactMatch
+                                // does a spine-hash lookup over the
+                                // environment, then a bounded
+                                // autoFillHintForClaim per candidate). Still
+                                // expensive for large files — gated behind
+                                // --check-redundant-by-non-eq so default
+                                // builds don't pay the cost.
+                                autoAttempt = tryContextFactMatch(
+                                    stepRelationType, localBinders, step.line);
+                            }
+                        } catch (const ElaborateError&) {
+                            autoAttempt = nullptr;
+                        } catch (const TypeError&) {
+                            autoAttempt = nullptr;
                         }
-                    } catch (const ElaborateError&) {
-                        autoAttempt = nullptr;
-                    } catch (const TypeError&) {
-                        autoAttempt = nullptr;
-                    }
-                    if (autoAttempt) {
-                        std::cerr << "warning: " << moduleName_
-                            << ":" << step.line << ":" << step.column
-                            << ": redundant `by` on calc step — "
-                            "auto-prover closes it without help\n";
-                    } else if (step.relation == CalcRelation::Equality) {
-                        // Auto-prover couldn't close on its own, but
-                        // maybe the user wrote `by congruenceOf(λ, L)`
-                        // and `by L` alone would close via the diff-
-                        // inference fallback. That catches verbose
-                        // congruenceOf wrappers the redundant-by check
-                        // misses (because the lemma's preconditions
-                        // aren't synthesizable without the user's call).
-                        auto* surfApp =
-                            std::get_if<SurfaceApplication>(
-                                &step.stepProof->node);
-                        if (surfApp && surfApp->arguments.size() == 2) {
-                            auto* head =
-                                std::get_if<SurfaceIdentifier>(
-                                    &surfApp->function->node);
-                            if (head
-                                && head->qualifiedName == "congruenceOf"
-                                && head->universeArgs.empty()) {
-                                ExpressionPointer lemmaKernel;
-                                try {
-                                    lemmaKernel = elaborateExpression(
-                                        *surfApp->arguments[1].value,
-                                        localBinders);
-                                } catch (const ElaborateError&) {
-                                    lemmaKernel = nullptr;
-                                } catch (const TypeError&) {
-                                    lemmaKernel = nullptr;
-                                }
-                                if (lemmaKernel) {
-                                    ExpressionPointer lemmaType;
+                        if (autoAttempt) {
+                            std::cerr << "warning: " << moduleName_
+                                << ":" << step.line << ":" << step.column
+                                << ": redundant `by` on calc step — "
+                                "auto-prover closes it without help\n";
+                        } else if (step.relation == CalcRelation::Equality) {
+                            // Auto-prover couldn't close on its own, but
+                            // maybe the user wrote `by congruenceOf(λ, L)`
+                            // and `by L` alone would close via the diff-
+                            // inference fallback. That catches verbose
+                            // congruenceOf wrappers the redundant-by check
+                            // misses (because the lemma's preconditions
+                            // aren't synthesizable without the user's call).
+                            auto* surfApp =
+                                std::get_if<SurfaceApplication>(
+                                    &step.stepProof->node);
+                            if (surfApp && surfApp->arguments.size() == 2) {
+                                auto* head =
+                                    std::get_if<SurfaceIdentifier>(
+                                        &surfApp->function->node);
+                                if (head
+                                    && head->qualifiedName == "congruenceOf"
+                                    && head->universeArgs.empty()) {
+                                    ExpressionPointer lemmaKernel;
                                     try {
-                                        lemmaType =
-                                            inferTypeInLocalContext(
-                                                localBinders,
-                                                lemmaKernel);
-                                    } catch (const TypeError&) {
-                                        lemmaType = nullptr;
+                                        lemmaKernel = elaborateExpression(
+                                            *surfApp->arguments[1].value,
+                                            localBinders);
                                     } catch (const ElaborateError&) {
-                                        lemmaType = nullptr;
+                                        lemmaKernel = nullptr;
+                                    } catch (const TypeError&) {
+                                        lemmaKernel = nullptr;
                                     }
-                                    ExpressionPointer diffAttempt;
-                                    if (lemmaType) {
+                                    if (lemmaKernel) {
+                                        ExpressionPointer lemmaType;
                                         try {
-                                            diffAttempt =
-                                                tryDiffApplyUserProof(
+                                            lemmaType =
+                                                inferTypeInLocalContext(
                                                     localBinders,
-                                                    previousKernel,
-                                                    nextKernel,
-                                                    lemmaKernel,
-                                                    lemmaType,
-                                                    step.line,
-                                                    step.column);
-                                        } catch (const ElaborateError&) {
-                                            diffAttempt = nullptr;
+                                                    lemmaKernel);
                                         } catch (const TypeError&) {
-                                            diffAttempt = nullptr;
+                                            lemmaType = nullptr;
+                                        } catch (const ElaborateError&) {
+                                            lemmaType = nullptr;
                                         }
-                                    }
-                                    if (diffAttempt) {
-                                        std::cerr << "warning: "
-                                            << moduleName_ << ":"
-                                            << step.line << ":"
-                                            << step.column
-                                            << ": redundant congruenceOf "
-                                            "wrapper — `by <inner lemma>`"
-                                            " alone would close this "
-                                            "step (diff inference fills "
-                                            "the lambda)\n";
+                                        ExpressionPointer diffAttempt;
+                                        if (lemmaType) {
+                                            try {
+                                                diffAttempt =
+                                                    tryDiffApplyUserProof(
+                                                        localBinders,
+                                                        previousKernel,
+                                                        nextKernel,
+                                                        lemmaKernel,
+                                                        lemmaType,
+                                                        step.line,
+                                                        step.column);
+                                            } catch (const ElaborateError&) {
+                                                diffAttempt = nullptr;
+                                            } catch (const TypeError&) {
+                                                diffAttempt = nullptr;
+                                            }
+                                        }
+                                        if (diffAttempt) {
+                                            std::cerr << "warning: "
+                                                << moduleName_ << ":"
+                                                << step.line << ":"
+                                                << step.column
+                                                << ": redundant congruenceOf "
+                                                "wrapper — `by <inner lemma>`"
+                                                " alone would close this "
+                                                "step (diff inference fills "
+                                                "the lambda)\n";
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
+                }  // end if (!stepProofKernel) — under-Σ took the step otherwise
             } else if (step.relation == CalcRelation::Equality) {
                 stepProofKernel = autoProveCalcStep(
                     localBinders, previousKernel, nextKernel,
@@ -8883,6 +8895,89 @@ private:
         } catch (const TypeError&) {
             return nullptr;
         }
+    }
+
+    // Prototype: rewrite-under-Σ. A calc `=` step whose endpoints are
+    // `Polynomial.Sum(r, f, n)` and `Polynomial.Sum(r, g, n)` is a
+    // congruence under the summation binder: it holds when `f(i) = g(i)`
+    // pointwise. Instead of making the author respell BOTH summands inside
+    // a `Polynomial.Sum.extensional(r, λi.…, λi.…, λi.proof, n)` call, let
+    // them write the per-index proof as the `by` step; `f` and `g` are
+    // read off the endpoints. We assemble `Sum.extensional(r, f, g)`
+    // partially, ask the kernel for the expected pointwise-proof type (its
+    // first remaining Pi domain, already β-reduced to the summand
+    // equality), elaborate the user's proof against that, and finish the
+    // application. Returns nullptr unless both endpoints are `Sum`s and the
+    // proof elaborates pointwise — so it never shadows an ordinary step.
+    ExpressionPointer tryUnderSumStep(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previous, ExpressionPointer next,
+        const SurfaceExpression& proofSurface, int line, int column) {
+        (void)line; (void)column;
+        if (!environment_.lookup("Polynomial.Sum.extensional")) {
+            return nullptr;
+        }
+        // Only fire when the `by` proof is syntactically a lambda — the
+        // under-Σ form IS `function (i) => <pointwise proof>`. A Sum=Sum
+        // step proved by an ordinary lemma (e.g. `Sum.add`) is left to the
+        // normal path; otherwise its holes would mis-absorb the pointwise
+        // expected type.
+        if (!std::get_if<SurfaceLambda>(&proofSurface.node)) {
+            return nullptr;
+        }
+        // Peel `Polynomial.Sum(r, fn, bound)` → (ring, fn, bound).
+        auto extractSum = [&](ExpressionPointer expression,
+                              ExpressionPointer& ring,
+                              ExpressionPointer& summand,
+                              ExpressionPointer& bound) -> bool {
+            std::vector<ExpressionPointer> arguments;
+            ExpressionPointer cursor = expression;
+            while (auto* application =
+                       std::get_if<Application>(&cursor->node)) {
+                arguments.push_back(application->argument);
+                cursor = application->function;
+            }
+            auto* head = std::get_if<Constant>(&cursor->node);
+            if (!head || head->name != "Polynomial.Sum") return false;
+            if (arguments.size() != 3) return false;
+            bound = arguments[0];     // peeled innermost-first: [bound, fn, ring]
+            summand = arguments[1];
+            ring = arguments[2];
+            return true;
+        };
+        ExpressionPointer ring, summandF, bound;
+        ExpressionPointer ringRight, summandG, boundRight;
+        if (!extractSum(previous, ring, summandF, bound)) return nullptr;
+        if (!extractSum(next, ringRight, summandG, boundRight)) {
+            return nullptr;
+        }
+        // Partially apply Sum.extensional to (r, f, g); the kernel hands
+        // back `(pointwise : (i) → f(i) = g(i)) → (n) → Sum = Sum`.
+        ExpressionPointer partial =
+            makeConstant("Polynomial.Sum.extensional");
+        partial = makeApplication(std::move(partial), ring);
+        partial = makeApplication(std::move(partial), summandF);
+        partial = makeApplication(std::move(partial), summandG);
+        ExpressionPointer partialType;
+        try {
+            partialType = weakHeadNormalForm(environment_,
+                inferTypeInLocalContext(localBinders, partial));
+        } catch (const TypeError&) { return nullptr; }
+          catch (const ElaborateError&) { return nullptr; }
+        auto* pointwisePi = std::get_if<Pi>(&partialType->node);
+        if (!pointwisePi) return nullptr;
+        ExpressionPointer pointwiseExpected = closeOverLocalBinders(
+            pointwisePi->domain, localBinders, localBinders.size());
+        ExpressionPointer pointwiseProof;
+        try {
+            pointwiseProof = elaborateExpression(
+                proofSurface, localBinders, pointwiseExpected);
+        } catch (const ElaborateError&) { return nullptr; }
+          catch (const TypeError&) { return nullptr; }
+        ExpressionPointer result =
+            makeApplication(std::move(partial), pointwiseProof);
+        result = makeApplication(std::move(result), bound);
+        return result;
     }
 
     // Given a user-supplied `by <equationProof>` for a calc `=` step,
