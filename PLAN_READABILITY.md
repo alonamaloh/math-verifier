@@ -158,6 +158,39 @@ which otherwise *guesses* lemma names.
 
 ### STATUS (live)
 
+- **§4 proving ground — in progress (5 commits).** Rewriting the
+  tax-paying files with the landed ergonomics, the diff as the evidence.
+  - `ring_difference.math` — operators on `Ring.carrier` (`x - y`,
+    `(g-h)+(h-k)=g-k`); −89 lines, proofs unchanged (B3 bridging lines
+    every `by` up). `ring` can't fire here (plain Ring; finding #1).
+  - `RingModulo/ring.math` — `+`/`*` in all 12 ring-law statements.
+  - **A1-extension (the enabler the §4 ComplexNumber/Polynomial wins
+    needed):** A1 had registered operators on Ring/CommutativeRing/
+    RingModulo carriers but NOT on `Polynomial` (its ops took an explicit
+    ring). Made `Polynomial.add`/`multiply`/`negate` and
+    `Polynomial.coefficientOf` ring-implicit (`{r}` recovered from the
+    operand type) and registered `(+)`/`(*) on (Polynomial, Polynomial)`.
+    ~800 full-application sites kept working via positional implicit
+    passing; only the ~10 operation-slot partial uses needed the bare
+    spelling. So `Complex.x * Complex.x` and `coefficientOf(p, k)` now
+    elaborate.
+  - `modulus.math` — the §5 north star as far as tooling allows:
+    `coefficientOf(Complex.x * Complex.x, 2)` (was the full
+    `coefficientOf(Real.ring, multiply(Real.ring, Complex.x, Complex.x),
+    2)`). Proofs unchanged (identical kernel terms).
+  - **Findings:**
+    - `make library` EXCLUDES `library/Test/` — use `make -j 16 tests`
+      for the full check (it builds the library AND the Test/*.math
+      exercises). `make library` reported clean while
+      `Test/polynomial_test.math` was actually broken by the implicit
+      change. (Recorded in the build memory.)
+    - The §5 snapshot can't be *fully* closed yet: `coefficientOf`
+      returns `Ring.carrier(R)`, not `R`, so `+`/`*` on coefficient
+      values dispatch to the abstract *bundle* operators rather than the
+      concrete `Real.add`/`Real.multiply` — defeq but it diverges from
+      the `by` lemmas and breaks the calc steps, so `Real.add` stays
+      named in `modulus.math`. Bare `coefficientOf` (namespace alias) and
+      `1` for `Polynomial.one` (literal notation) are also still missing.
 - **B3 — NOT a tactic gap (resolved); B5 — FIXED.** Re-audited both by
   reproducing against real proofs before touching anything (the Track D
   lesson):
