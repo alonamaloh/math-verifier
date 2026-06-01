@@ -79,6 +79,7 @@ enum class TokenKind {
     // Operators
     Plus, Minus, Star, Slash, Caret,
     CenterDot,       // "·" (binary operation symbol, multiplicative precedence)
+    InverseSuperscript,  // "⁻¹" (postfix operator symbol, e.g. group inverse)
     Less, Greater, LessOrEqual, GreaterOrEqual,
     Equal, NotEqual,
     LogicalAnd, LogicalOr, LogicalNot,

@@ -420,12 +420,18 @@ private:
             throwHere("expected a type name (left operand type)");
         }
         declaration.leftTypeName = consumeQualifiedNameString();
-        expect(TokenKind::Comma,
-               "expected ',' between operand-type names");
-        if (!isIdentifierLike(peek().kind)) {
-            throwHere("expected a type name (right operand type)");
+        // Two forms: binary `on (LeftType, RightType)` and postfix
+        // `on (OperandType)`. A postfix declaration leaves rightTypeName
+        // empty, which the elaborator reads as the postfix marker.
+        if (peek().kind == TokenKind::Comma) {
+            consumeAny();  // ','
+            if (!isIdentifierLike(peek().kind)) {
+                throwHere("expected a type name (right operand type)");
+            }
+            declaration.rightTypeName = consumeQualifiedNameString();
+        } else {
+            declaration.rightTypeName = "";
         }
-        declaration.rightTypeName = consumeQualifiedNameString();
         expect(TokenKind::RightParen,
                "expected ')' after operand-type pair");
         expect(TokenKind::Assign,
@@ -1809,7 +1815,16 @@ private:
             return makeSurfaceUnaryOperation("¬", std::move(operand),
                                               op.line, op.column);
         }
-        return parseApplication();
+        // Postfix operators bind tighter than any binary operator and
+        // attach to the application/atom just parsed. `g⁻¹` wraps `g`;
+        // `a · b⁻¹` parses as `a · (b⁻¹)`; `g⁻¹⁻¹` chains.
+        auto base = parseApplication();
+        while (peek().kind == TokenKind::InverseSuperscript) {
+            Token op = consumeAny();
+            base = makeSurfaceUnaryOperation("⁻¹", std::move(base),
+                                              op.line, op.column);
+        }
+        return base;
     }
 
     // Function call: head(arg1, arg2, ...). Tighter than any operator.

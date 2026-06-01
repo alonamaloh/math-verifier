@@ -1036,37 +1036,45 @@ private:
             cursor = weakHeadNormalForm(
                 environment_, implicitPi->codomain);
         }
+        // A postfix operator declaration — `operator (sym) on (T)` —
+        // leaves rightTypeName empty. It validates and registers a
+        // single-operand dispatch function (one explicit arg of type T).
+        bool isPostfix = declaration.rightTypeName.empty();
         auto* leftPi = std::get_if<Pi>(&cursor->node);
         if (!leftPi) {
             throwElaborate(
                 "operator dispatch function '"
                 + declaration.functionName
-                + "' must take at least two arguments");
+                + (isPostfix ? "' must take at least one argument"
+                             : "' must take at least two arguments"));
         }
         if (!leftWildcard
             && !typeHasHeadName(leftPi->domain, declaration.leftTypeName)) {
             throwElaborate(
                 "operator dispatch function '"
                 + declaration.functionName
-                + "' first parameter type does not have '"
+                + (isPostfix ? "' operand parameter type does not have '"
+                             : "' first parameter type does not have '")
                 + declaration.leftTypeName + "' as its head");
         }
-        ExpressionPointer afterLeft = weakHeadNormalForm(
-            environment_, leftPi->codomain);
-        auto* rightPi = std::get_if<Pi>(&afterLeft->node);
-        if (!rightPi) {
-            throwElaborate(
-                "operator dispatch function '"
-                + declaration.functionName
-                + "' must take at least two arguments");
-        }
-        if (!rightWildcard
-            && !typeHasHeadName(rightPi->domain, declaration.rightTypeName)) {
-            throwElaborate(
-                "operator dispatch function '"
-                + declaration.functionName
-                + "' second parameter type does not have '"
-                + declaration.rightTypeName + "' as its head");
+        if (!isPostfix) {
+            ExpressionPointer afterLeft = weakHeadNormalForm(
+                environment_, leftPi->codomain);
+            auto* rightPi = std::get_if<Pi>(&afterLeft->node);
+            if (!rightPi) {
+                throwElaborate(
+                    "operator dispatch function '"
+                    + declaration.functionName
+                    + "' must take at least two arguments");
+            }
+            if (!rightWildcard
+                && !typeHasHeadName(rightPi->domain, declaration.rightTypeName)) {
+                throwElaborate(
+                    "operator dispatch function '"
+                    + declaration.functionName
+                    + "' second parameter type does not have '"
+                    + declaration.rightTypeName + "' as its head");
+            }
         }
         auto key = std::make_tuple(declaration.operatorSymbol,
                                      declaration.leftTypeName,
@@ -4881,9 +4889,60 @@ private:
                 return makeApplication(std::move(call),
                                         std::move(operandKernel));
             }
-            throw ElaborateError(
-                "unary operator '" + unary->opSymbol + "' is not yet "
-                "supported by the elaborator");
+            // Registered POSTFIX operators (e.g. `x⁻¹`). Dispatch on the
+            // operand's type head against the operator registry's
+            // postfix entries (right-type slot empty), then desugar to a
+            // plain call `function(operand)` and re-elaborate it — that
+            // reuses the standard implicit-argument inference, so a
+            // dispatch function like `Group.inverse {g} : C(g) → C(g)`
+            // gets its `{g}` filled from the operand's type.
+            {
+                ExpressionPointer operandKernel =
+                    elaborateExpression(*unary->operand, localBinders);
+                ExpressionPointer operandType =
+                    inferTypeInLocalContext(localBinders, operandKernel);
+                std::string operandTypeName = headConstantName(operandType);
+                std::string postfixFunction = environment_.lookupOperator(
+                    unary->opSymbol, operandTypeName, "");
+                // δ-reduce fallback: a bundle-carrier / alias operand
+                // (head e.g. `Quotient`) matches a registered operand
+                // type whose definition body reduces to the same WHNF.
+                if (postfixFunction.empty()) {
+                    ExpressionPointer operandWHNF = weakHeadNormalForm(
+                        environment_, operandType);
+                    for (const auto& [key, funcName]
+                         : environment_.operatorRegistry) {
+                        const auto& [opSym, leftReg, rightReg] = key;
+                        if (opSym != unary->opSymbol || !rightReg.empty()) {
+                            continue;
+                        }
+                        const Declaration* leftDecl =
+                            environment_.lookup(leftReg);
+                        auto* leftDef = leftDecl
+                            ? std::get_if<Definition>(leftDecl) : nullptr;
+                        if (!leftDef) continue;
+                        if (structurallyEqual(
+                                weakHeadNormalForm(environment_, leftDef->body),
+                                operandWHNF)) {
+                            postfixFunction = funcName;
+                            break;
+                        }
+                    }
+                }
+                if (!postfixFunction.empty()) {
+                    SurfaceExpressionPointer call = makeSurfaceApplication(
+                        makeSurfaceIdentifier(postfixFunction, {},
+                            expression.line, expression.column),
+                        std::vector<SurfaceExpressionPointer>{unary->operand},
+                        expression.line, expression.column);
+                    return elaborateExpression(*call, localBinders, expectedType);
+                }
+                throw ElaborateError(
+                    "postfix operator '" + unary->opSymbol
+                    + "' is not registered for operand type '"
+                    + operandTypeName + "' (line "
+                    + std::to_string(expression.line) + ")");
+            }
         }
         if (auto* tuple =
                 std::get_if<SurfaceAnonymousTuple>(&expression.node)) {

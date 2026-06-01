@@ -13,8 +13,9 @@ namespace {
 // own precedence; child wraps in parens iff `child < parent`.
 constexpr int kPrecedenceRelation       = 1;  // = ≤ <
 constexpr int kPrecedenceAdditive       = 2;  // + -
-constexpr int kPrecedenceMultiplicative = 3;  // *
+constexpr int kPrecedenceMultiplicative = 3;  // * ·
 constexpr int kPrecedencePrefix         = 4;  // unary -
+constexpr int kPrecedencePostfix        = 5;  // postfix ⁻¹
 
 struct BinaryOperatorInfo {
     const char* symbol;
@@ -195,6 +196,21 @@ void writeAtPrecedence(std::ostringstream& output,
                         if (wrap) output << ")";
                         return;
                     }
+                    // Bundled group operation: Group.operation(G, a, b)
+                    // → a · b. The leading group argument (base->argument)
+                    // is dropped from display.
+                    if (head->name == "Group.operation") {
+                        bool wrap = precedence > kPrecedenceMultiplicative;
+                        if (wrap) output << "(";
+                        writeAtPrecedence(output, mid->argument, stack,
+                                          kPrecedenceMultiplicative);
+                        output << " · ";
+                        writeAtPrecedence(output, application->argument,
+                                          stack,
+                                          kPrecedenceMultiplicative + 1);
+                        if (wrap) output << ")";
+                        return;
+                    }
                 }
             }
         }
@@ -211,6 +227,17 @@ void writeAtPrecedence(std::ostringstream& output,
                     output << " " << info->symbol << " ";
                     writeAtPrecedence(output, application->argument,
                                       stack, info->precedence + 1);
+                    if (wrap) output << ")";
+                    return;
+                }
+                // Bundled group inverse: Group.inverse(G, a) → a⁻¹. The
+                // leading group argument (inner->argument) is dropped.
+                if (head->name == "Group.inverse") {
+                    bool wrap = precedence > kPrecedencePostfix;
+                    if (wrap) output << "(";
+                    writeAtPrecedence(output, application->argument, stack,
+                                      kPrecedencePostfix);
+                    output << "⁻¹";
                     if (wrap) output << ")";
                     return;
                 }
