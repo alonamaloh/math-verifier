@@ -725,21 +725,11 @@ Works as a calc-step `by` proof too. Scope/limits:
   structure argument). A *plain* `Ring.carrier(s)` is NOT supported —
   the ring bridge needs multiplicative commutativity (same limit as
   `ring`); cite `Ring.equal_of_linear_combination` by hand there.
-- **Literal coefficients are limited.** A *single* literal-scaled
-  hypothesis works (`linear_combination((2 : Integer) * h)` for a goal
-  `2*a = 2*b`). But a *sum* of literal-scaled hypotheses
-  (`(2:Integer)*h1 + (3:Integer)*h2`) currently fails: the literal
-  expands `multiply(2, x)` into a repeated sum, and the ring bridge —
-  which here runs over OPENED free variables with a `negate` of that
-  multi-term sum — hits a ring-normaliser limitation in that specific
-  combination (standalone `ring` on the same identity with bound
-  variables is fine; it is the opened + literal-expansion + negate path
-  that breaks). Use **variable/named coefficients** (`c1 * h1 + c2 *
-  h2`) — the clean and recommended form — until the ring normaliser's
-  opened-literal path is fixed. (Note this is distinct from the
-  now-fixed bare-literal *operator dispatch*: `2 * x` as an ordinary
-  expression works; the gap is specifically literal coefficients inside
-  a multi-term `linear_combination`.)
+- **Coefficients** may be variables (`c1 * h1 + c2 * h2`) or explicit
+  literals (`(2 : Integer) * h1 + (3 : Integer) * h2`). Write the
+  literal's carrier explicitly — `(2 : Integer)`, never bare `2` (no
+  implicit coercion). Both forms are fine; the variable form is the
+  lightest when the coefficient is already in scope.
 - Leaves that aren't equality proofs are treated as scalars (the
   trivial `v = v`), so a malformed combination surfaces as a ring
   bridge that doesn't normalise.

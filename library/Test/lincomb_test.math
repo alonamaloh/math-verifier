@@ -15,6 +15,7 @@ import Integer.negation
 import Integer.ring
 import Integer.instances
 import Integer.absolute_value
+import Integer.embedding
 import Algebra.ring
 import Algebra.ring_lemmas
 
@@ -53,6 +54,16 @@ theorem Test.lincomb_two_scaled (a b c d c1 c2 : Integer)
 theorem Test.lincomb_difference (a b c d : Integer)
         (h1 : a = b) (h2 : c = d) : a - c = b - d :=
   linear_combination(h1 - h2)
+
+-- Explicit LITERAL coefficients in a multi-term combination. This used to
+-- fail: the ring bridge has a `negate` of a literal-scaled multi-monomial
+-- sum, which tripped the proveNegateMerge Phase-1 left-association bug (now
+-- fixed; regression `v2_negate_multi_coef` in ring_v2_test). The literals
+-- are written `(2 : Integer)` — the carrier is explicit, no implicit coercion.
+theorem Test.lincomb_literal_coefficients (a b c d : Integer)
+        (h1 : a = b) (h2 : c = d)
+        : (2 : Integer) * a + (3 : Integer) * c = (2 : Integer) * b + (3 : Integer) * d :=
+  linear_combination((2 : Integer) * h1 + (3 : Integer) * h2)
 
 -- In a calc step.
 theorem Test.lincomb_in_calc (a b k : Integer) (h : a = b) : a + k = b + k :=

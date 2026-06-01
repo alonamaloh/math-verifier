@@ -304,21 +304,6 @@ none urgent:
   the bridge in `proveEqualsCanonical_impl` for `subtract` breaks.
   Worth a regression test once any such carrier appears.
 
-- **Opened-mode literal-expansion + `negate` produces a malformed
-  proof.** `elaborateRingByNormalisation` called with empty
-  `localBinders` over OPENED free-variable endpoints returns a proof
-  that fails its own `inferType` when the goal contains a `negate` of a
-  literal-expanded multi-term sum — e.g. the bridge
-  `(2a+3c) + −(2b+3d) = (2a+3c) + −(2b+3d)` over free `a,b,c,d`. The
-  identical identity over BOUND variables (ordinary `ring` call with
-  the binders in `localBinders`) verifies fine, so the defect is in the
-  proof generators' handling of free-variable atoms when a literal
-  coefficient expands into a repeated sum under `negate`-distribution.
-  Surfaced by `linear_combination((2:Integer)*h1 + (3:Integer)*h2)`
-  (which passes the opened bridge to the normaliser). Single-term
-  literal coefficients and variable coefficients are unaffected.
-  Likely subsumed by the ring-v3 / binary-literal work above; until
-  then, use variable coefficients in `linear_combination`.
 
 ## Parallel verification
 

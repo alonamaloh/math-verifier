@@ -218,19 +218,20 @@ which otherwise *guesses* lemma names.
     to disambiguate. The only acceptable direction discussed is flipping
     the literal DEFAULT to Integer (Integer embeds canonically into
     every ring), which is a separate, deliberate change — see TODO.
-  - **Remaining — literal coefficients in a multi-term
-    `linear_combination` (deferred, ring-normaliser).** A single
-    literal-scaled hypothesis works; a SUM (`(2:Integer)*h1 +
-    (3:Integer)*h2`) fails because the bridge runs the ring normaliser
-    over OPENED free variables on a `negate` of a literal-expanded
-    multi-term sum, and `elaborateRingByNormalisation` returns a
-    malformed proof there (confirmed by dumping the bridgeProof type —
-    it fails its own `inferType`). Standalone `ring` on the identical
-    identity with BOUND variables succeeds, so it is specifically the
-    opened-free-var + literal-expansion + `negate` path in the ring
-    proof generators — the deferred ring-v3 / literal-handling
-    territory (needs binary literals per TODO). Workaround: variable
-    coefficients (the recommended form anyway).
+  - **Literal coefficients in a multi-term `linear_combination` — FIXED.**
+    `(2:Integer)*h1 + (3:Integer)*h2` now works. The earlier failure was
+    NOT opened-vs-closed (that diagnosis was wrong — the first standalone
+    check passed only because `X = X` took `ring`'s AC fast path, never
+    reaching v2). The real defect was in v2's `proveNegateMerge` Phase 1:
+    the per-step congruence attached the already-pushed tail as a single
+    right subtree (`λz. z + tail`), which mis-associated against the
+    LEFT-associated running form once the tail had ≥2 summands (≥3 unit
+    monomials, i.e. coefficients > 1 spread over multiple monomials),
+    emitting a proof that failed its own typecheck. Fixed by rebuilding
+    the left spine around the hole (`λz. ((z + tail[0]) + tail[1]) + …`).
+    Reproducible through plain `ring` on a closed goal — see regressions
+    `v2_negate_multi_coef` / `v2_negate_three_coef` in ring_v2_test, and
+    `lincomb_literal_coefficients` in lincomb_test.
   - **Remaining (out of scope):** parametrized non-bundle carriers
     (`RingModulo(c, m)`, the `ComplexNumber` alias) would need
     `computeRingScheme` + `ring` extended to them first.

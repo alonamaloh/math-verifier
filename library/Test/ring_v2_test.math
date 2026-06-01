@@ -130,3 +130,20 @@ theorem v2_literal_distribute (a b : Integer)
 -- (26) Literal addition: 2 + 3 = 5 at Integer level.
 theorem v2_literal_add
         : (2 : Integer) + (3 : Integer) = (5 : Integer) := ring
+
+-- (27) Negate of a multi-monomial sum where the coefficients exceed 1.
+-- Regression for the proveNegateMerge Phase-1 left-association bug: the
+-- per-step congruence used to attach the already-pushed tail as a single
+-- right subtree (`z + tail`), which mis-associated against the
+-- left-associated running form once the tail had ≥2 summands (≥3 unit
+-- monomials — i.e. coefficients > 1 across multiple monomials), emitting
+-- a malformed proof. Single-monomial negate and ≤2-unit sums never hit it.
+theorem v2_negate_multi_coef (b d : Integer)
+        : Integer.negate((2 : Integer) * b + (3 : Integer) * d)
+          = Integer.negate((2 : Integer) * b) + Integer.negate((3 : Integer) * d) := ring
+
+-- (28) The same, deeper: three monomials each with coefficient > 1.
+theorem v2_negate_three_coef (a b c : Integer)
+        : Integer.negate((2 : Integer) * a + (3 : Integer) * b + (2 : Integer) * c)
+          = Integer.negate(a) + Integer.negate(a) + Integer.negate(b) + Integer.negate(b)
+              + Integer.negate(b) + Integer.negate(c) + Integer.negate(c) := ring

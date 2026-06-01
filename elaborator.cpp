@@ -15055,24 +15055,36 @@ private:
                     stepProof = negAddCall;
                     newForm = yExpr;
                 } else {
-                    ExpressionPointer tailKernel;
-                    if (tail.size() == 1) {
-                        tailKernel = tail[0];
-                    } else {
-                        tailKernel = assembleLeftAssociatedProduct(
-                            context.addName, tail);
+                    // `currentForm` is LEFT-associated:
+                    //   ((negate(prefix[idx]) + tail[0]) + tail[1]) + …
+                    // so the element being rewritten (negate(prefix[idx]),
+                    // = xExpr) sits at the BOTTOM-LEFT of the spine, not as
+                    // the left child of the top `+`. The congruence lambda
+                    // must therefore rebuild that same left spine around the
+                    // hole — `((z + tail[0]) + tail[1]) + …` — NOT `z + tail`.
+                    // The old `z + tail` form attached the whole tail as one
+                    // right subtree, which mis-associates the moment the tail
+                    // has ≥2 elements (≥3 unit monomials, i.e. coefficients >
+                    // 1 across multiple monomials): the step proof's type then
+                    // failed to match the left-associated `currentForm`. Both
+                    // `lambdaBody` (over the lifted tail) and `newForm` (over
+                    // the tail) fold left, matching the invariant.
+                    ExpressionPointer lambdaBody = makeBoundVariable(0);
+                    for (const auto& tailSummand : tail) {
+                        lambdaBody = buildRingOp(
+                            context.addName, lambdaBody,
+                            liftBoundVariables(tailSummand, 1, 0));
                     }
-                    ExpressionPointer tailLifted = liftBoundVariables(
-                        tailKernel, 1, 0);
-                    ExpressionPointer lambdaBody = buildRingOp(
-                        context.addName, makeBoundVariable(0), tailLifted);
                     ExpressionPointer lambda = makeLambda(
                         "_ring_negpush_z", carrierType, lambdaBody);
                     stepProof = buildEqualityCongruenceSameCarrier(
                         universeLevel, carrierType, lambda,
                         xExpr, yExpr, negAddCall);
-                    newForm = buildRingOp(
-                        context.addName, yExpr, tailKernel);
+                    newForm = yExpr;
+                    for (const auto& tailSummand : tail) {
+                        newForm = buildRingOp(
+                            context.addName, newForm, tailSummand);
+                    }
                 }
                 currentProof = buildEqualityTransitivity(
                     universeLevel, carrierType,
