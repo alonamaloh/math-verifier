@@ -1,0 +1,34 @@
+-- The `linear_combination(e)` tactic (PLAN_READABILITY): close a
+-- commutative-ring equality goal `goalL = goalR` from an equation proof
+-- `e : combL = combR` whose difference ring-matches the goal's. Checks the
+-- bridge `goalL − goalR = combL − combR` with `ring` and assembles via
+-- `Ring.equal_of_linear_combination`.
+module Test.lincomb_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.instances
+import Integer.absolute_value
+import Algebra.ring
+import Algebra.ring_lemmas
+
+-- Single equation, goal differs by a ring rearrangement: a = b from
+-- h : a + k = b + k. (goalL − goalR = a − b = (a+k) − (b+k) = combL − combR.)
+theorem Test.lincomb_single (a b k : Integer) (h : a + k = b + k) : a = b :=
+  linear_combination(h)
+
+-- Coefficients: scale the equation by building the combination first.
+-- a*c = b*c from h : a = b, via the scaled equation `c·h`.
+theorem Test.lincomb_scaled (a b c : Integer) (h : a = b) : a * c = b * c :=
+  linear_combination(congruenceOf(function (z : Integer) => z * c, h))
+
+-- In a calc step.
+theorem Test.lincomb_in_calc (a b k : Integer) (h : a = b) : a + k = b + k :=
+  calc a + k
+     = b + k   by linear_combination(h)

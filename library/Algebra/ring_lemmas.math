@@ -181,3 +181,38 @@ theorem Ring.negate_multiply_negate
                      carrier, add, zero, negate, addGroupProof,
                      multiply(a, b))
 }
+
+-- The reduction behind the `linear_combination` tactic. Given a known
+-- equation `combLeft = combRight` and a RING-IDENTITY bridge
+-- `goalLeft − goalRight = combLeft − combRight` (which `ring` checks),
+-- conclude `goalLeft = goalRight`. The combination's difference is zero
+-- (it's `combRight − combRight`), so the goal's difference is zero, and
+-- cancellation finishes.
+theorem Ring.equal_of_linear_combination
+        (carrier : Type(0))
+        (add : carrier → carrier → carrier)
+        (zero : carrier)
+        (negate : carrier → carrier)
+        (multiply : carrier → carrier → carrier)
+        (one : carrier)
+        (ringProof : IsRing(carrier, add, zero, negate, multiply, one))
+        (goalLeft goalRight combLeft combRight : carrier)
+        (combination : combLeft = combRight)
+        (ringBridge : add(goalLeft, negate(goalRight))
+                      = add(combLeft, negate(combRight)))
+        : goalLeft = goalRight := {
+    let ⟨abelianAdd, _, _, _⟩ := ringProof;
+    let ⟨addGroup, _⟩ := abelianAdd;
+    let ⟨_, _, addInverseRight⟩ := addGroup;
+    claim combinationDifferenceZero
+        : add(combLeft, negate(combRight)) = zero
+        by calc add(combLeft, negate(combRight))
+              = add(combRight, negate(combRight))   by rewrite(combination)
+              = zero                                 by addInverseRight(combRight);
+    Group.cancel_right(carrier, add, zero, negate, addGroup,
+        negate(goalRight), goalLeft, goalRight,
+        calc add(goalLeft, negate(goalRight))
+           = add(combLeft, negate(combRight))   by ringBridge
+           = zero                                by combinationDifferenceZero
+           = add(goalRight, negate(goalRight))   by Equality.symmetry(addInverseRight(goalRight)))
+}

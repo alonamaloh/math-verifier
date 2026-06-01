@@ -54,6 +54,7 @@ enum class TokenKind {
     KeywordSorry,           // `sorry` — placeholder for an unwritten proof
     KeywordRing,            // `ring` — commutative-ring decision tactic
     KeywordField,           // `field` — field decision tactic (ring + reciprocal_function)
+    KeywordLinearCombination,  // `linear_combination(e)` — ring + a known equation
     KeywordConvention,      // `convention p : T with H` — name-bound implicit binder
     KeywordConstruction,    // `construction Name(args) : T := mk(...)` — canonical quotient intro (transparent definition)
     KeywordInstance,        // `instance Name` — register a canonical structure instance (e.g. Integer ⇒ IsGroup)

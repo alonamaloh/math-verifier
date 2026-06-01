@@ -266,6 +266,16 @@ struct SurfaceField {
     std::vector<SurfaceExpressionPointer> nonzeroHypotheses;
 };
 
+// `linear_combination(e)` — closes a commutative-ring equality goal
+// `goalL = goalR` given an equation proof `e : combL = combR`, when the
+// goal follows by ring algebra from that equation: it checks the bridge
+// `goalL − goalR = combL − combR` with `ring` and assembles the result via
+// `Ring.equal_of_linear_combination`. (v1: `e` is a single equation proof;
+// the multi-hypothesis `c1*h1 + c2*h2` combination syntax is future work.)
+struct SurfaceLinearCombination {
+    SurfaceExpressionPointer combination;
+};
+
 // `by_induction on scrutinee using inductionLemma with subjectName,
 // ihName { body }`. The elaborator constructs the motive by
 // abstracting the surrounding expected type over the scrutinee
@@ -453,7 +463,8 @@ struct SurfaceExpression {
         SurfaceLet, SurfaceAscription, SurfaceType, SurfaceProposition,
         SurfaceBinaryOperation, SurfaceUnaryOperation,
         SurfaceAnonymousTuple, SurfaceCases, SurfaceSorry,
-        SurfaceRing, SurfaceField, SurfaceCalc, SurfaceByInductionUsing,
+        SurfaceRing, SurfaceField, SurfaceLinearCombination,
+        SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
         SurfaceByStrongInduction, SurfaceGoal, SurfaceUnfold,
         SurfaceDecide, SurfaceNote, SurfaceHole
@@ -599,6 +610,11 @@ inline SurfaceExpressionPointer makeSurfaceField(
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceField{std::move(nonzeroHypotheses)}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceLinearCombination(
+    SurfaceExpressionPointer combination, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceLinearCombination{std::move(combination)}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceCalc(
     SurfaceExpressionPointer initialExpression,

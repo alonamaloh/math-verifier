@@ -33,6 +33,7 @@ bool isContextualKeyword(TokenKind kind) {
         case TokenKind::KeywordSorry:
         case TokenKind::KeywordRing:
         case TokenKind::KeywordField:
+        case TokenKind::KeywordLinearCombination:
         case TokenKind::KeywordOperator:
         case TokenKind::KeywordOverload:
         case TokenKind::KeywordCoercion:
@@ -1902,6 +1903,19 @@ private:
                    "ending `field` argument list");
             return makeSurfaceField(std::move(hypotheses),
                                      fieldToken.line, fieldToken.column);
+        }
+        if (current.kind == TokenKind::KeywordLinearCombination) {
+            Token tok = consumeAny();
+            if (peek().kind != TokenKind::LeftParen) {
+                throwHere("`linear_combination` requires a parenthesized "
+                          "equation proof (e.g. `linear_combination(h)`)");
+            }
+            consumeAny();  // '('
+            SurfaceExpressionPointer combination = parseExpression();
+            expect(TokenKind::RightParen,
+                   "ending `linear_combination` argument");
+            return makeSurfaceLinearCombination(std::move(combination),
+                                                 tok.line, tok.column);
         }
         // `claim` at expression position starts a structured proof.
         // Checked BEFORE isIdentifierLike, because `claim` is a

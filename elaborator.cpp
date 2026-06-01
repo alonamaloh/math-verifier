@@ -4893,6 +4893,12 @@ private:
             return elaborateField(*fieldTactic, localBinders, expectedType,
                                    expression.line, expression.column);
         }
+        if (auto* lincomb =
+                std::get_if<SurfaceLinearCombination>(&expression.node)) {
+            return elaborateLinearCombination(
+                *lincomb, localBinders, expectedType,
+                expression.line, expression.column);
+        }
         if (auto* calc = std::get_if<SurfaceCalc>(&expression.node)) {
             return elaborateCalc(*calc, localBinders, expectedType,
                                   expression.line, expression.column);
@@ -10660,6 +10666,115 @@ private:
 
     // `ring` — close an `e1 = e2` goal in a commutative ring.
     // v1: handles pure-multiplication rearrangement.
+    // `linear_combination(e)` — close a commutative-ring equality goal
+    // `goalL = goalR` from an equation proof `e : combL = combR`, when the
+    // goal follows by ring algebra: check the bridge `goalL − goalR = combL
+    // − combR` with the ring normaliser and assemble via
+    // `Ring.equal_of_linear_combination`. v1 handles concrete carriers
+    // (the op/instance names resolve to plain constants); a bundled carrier
+    // `Ring.carrier(s)` would need the structure argument threaded (future).
+    ExpressionPointer elaborateLinearCombination(
+        const SurfaceLinearCombination& tactic,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "linear_combination at line " + std::to_string(line),
+            localBinders, expectedType, line, column);
+        if (!expectedType) {
+            throwElaborate("`linear_combination` needs an equality goal "
+                           "from context");
+        }
+        size_t binderCount = localBinders.size();
+        ExpressionPointer expectedOpened =
+            openOverLocalBinders(expectedType, localBinders, binderCount);
+        EqualityComponents goal = extractEqualityComponents(
+            expectedOpened, "linear_combination", line);
+        std::string carrierName = headConstantName(goal.carrierType);
+        RingScheme scheme = computeRingScheme(goal.carrierType);
+        if (!scheme.structurePrefix.empty()) {
+            throwElaborate(
+                "`linear_combination` v1 supports concrete ring carriers "
+                "only (the goal's carrier is a bundle projection `"
+                + carrierName + "`); cite "
+                "`Ring.equal_of_linear_combination` by hand for now");
+        }
+        // Resolve the carrier's ring operations + IsRing instance as plain
+        // named constants (matches `ring`'s normalisation context).
+        auto requireConstant = [&](const std::string& name)
+                -> ExpressionPointer {
+            if (!environment_.lookup(name)) {
+                throwElaborate("`linear_combination`: carrier `" + carrierName
+                    + "` is missing `" + name
+                    + "` (import the module that defines it)");
+            }
+            return makeConstant(name);
+        };
+        ExpressionPointer addOp = requireConstant(scheme.opNamespace + ".add");
+        ExpressionPointer zeroOp =
+            requireConstant(scheme.opNamespace + ".zero");
+        ExpressionPointer negateOp =
+            requireConstant(scheme.opNamespace + ".negate");
+        ExpressionPointer multiplyOp =
+            requireConstant(scheme.opNamespace + ".multiply");
+        ExpressionPointer oneOp = requireConstant(scheme.opNamespace + ".one");
+        ExpressionPointer isRingTerm =
+            requireConstant(scheme.opNamespace + ".is_ring");
+        requireConstant("Ring.equal_of_linear_combination");
+        auto addApply = [&](ExpressionPointer x, ExpressionPointer y) {
+            return makeApplication(makeApplication(addOp, x), y);
+        };
+        auto negateApply = [&](ExpressionPointer x) {
+            return makeApplication(negateOp, x);
+        };
+        // Elaborate the supplied equation proof and read off combL, combR.
+        ExpressionPointer combProofClosed =
+            elaborateExpression(*tactic.combination, localBinders);
+        ExpressionPointer combProof = openOverLocalBinders(
+            combProofClosed, localBinders, binderCount);
+        ExpressionPointer combType = weakHeadNormalForm(environment_,
+            inferType(environment_,
+                buildContextFromLocalBinders(localBinders), combProof));
+        EqualityComponents comb;
+        try {
+            comb = extractEqualityComponents(
+                combType, "linear_combination argument", line);
+        } catch (const ElaborateError&) {
+            throwElaborate("`linear_combination(e)`: the argument must "
+                           "prove an equation `a = b`");
+        }
+        // Bridge: goalL − goalR = combL − combR, proved by the ring
+        // normaliser (it is a pure ring identity — no hypotheses). β-reduce
+        // the combination's endpoints first: if the user built the equation
+        // with `congruenceOf(λz. …, h)`, combL/combR are β-redexes the ring
+        // normaliser would otherwise treat as opaque atoms.
+        ExpressionPointer combLeftReduced =
+            betaNormalizeForDisplay(comb.leftEndpoint);
+        ExpressionPointer combRightReduced =
+            betaNormalizeForDisplay(comb.rightEndpoint);
+        ExpressionPointer bridgeLeft =
+            addApply(goal.leftEndpoint, negateApply(goal.rightEndpoint));
+        ExpressionPointer bridgeRight =
+            addApply(combLeftReduced, negateApply(combRightReduced));
+        ExpressionPointer bridgeProof = elaborateRingByNormalisation(
+            /*localBinders*/{}, bridgeLeft, bridgeRight,
+            goal.carrierType, goal.carrierUniverseLevel, carrierName, line);
+        // Assemble Ring.equal_of_linear_combination(carrier, add, zero,
+        // negate, multiply, one, isRing, goalL, goalR, combL, combR,
+        // combProof, bridgeProof).
+        ExpressionPointer result =
+            makeConstant("Ring.equal_of_linear_combination");
+        for (ExpressionPointer arg :
+                {goal.carrierType, addOp, zeroOp, negateOp, multiplyOp, oneOp,
+                 isRingTerm, goal.leftEndpoint, goal.rightEndpoint,
+                 comb.leftEndpoint, comb.rightEndpoint, combProof,
+                 bridgeProof}) {
+            result = makeApplication(std::move(result), arg);
+        }
+        (void)column;
+        return closeOverLocalBinders(result, localBinders, binderCount);
+    }
+
     ExpressionPointer elaborateRing(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
