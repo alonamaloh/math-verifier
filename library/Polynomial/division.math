@@ -55,7 +55,7 @@ definition Polynomial.Coefficients.length (R : Type(0))
 theorem Polynomial.coefficient_vanishes_beyond_length (r : Ring)
         : (p : Polynomial.Coefficients(Ring.carrier(r))) → (i : Natural)
           → Polynomial.Coefficients.length(Ring.carrier(r), p) ≤ i
-          → Polynomial.coefficient(r, p, i) = Ring.zero(r)
+          → Polynomial.coefficient(p, i) = Ring.zero(r)
   | Polynomial.Coefficients.nil =>
       function (i : Natural) (lengthLessOrEqual : 0 ≤ i) =>
           reflexivity(Ring.carrier(r), Ring.zero(r))
@@ -92,14 +92,13 @@ theorem Polynomial.exists_degree_bound (r : Ring)
 
 theorem Polynomial.divide_by_excess (r : Ring)
         (commutativity
-            : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+            : (x y : Ring.carrier(r)) → (x * y) = (y * x))
         (f : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (degreeF : Natural)
         (fDegreeBound : Polynomial.DegreeLessThan(r, f, successor(degreeF)))
         (leadingInverseValue : Ring.carrier(r))
         (leadingInverseEquation
-            : Ring.multiply(r, Polynomial.coefficientOf(r, f, degreeF),
-                  leadingInverseValue) = Ring.one(r))
+            : (Polynomial.coefficientOf(f, degreeF) * leadingInverseValue) = Ring.one(r))
         (e : Natural)
         : (dividend : Polynomial(Ring.carrier(r), Ring.zero(r)))
           → Polynomial.DegreeLessThan(r, dividend, degreeF + e)
@@ -130,9 +129,9 @@ theorem Polynomial.divide_by_excess (r : Ring)
             : Polynomial.DegreeLessThan(r, dividend, successor(degreeF + ePredecessor))
             by rewrite(Natural.add_successor(degreeF, ePredecessor), dividendBound);
         let leadingCoefficient : Ring.carrier(r) :=
-            Polynomial.coefficientOf(r, dividend, degreeF + ePredecessor);
+            Polynomial.coefficientOf(dividend, degreeF + ePredecessor);
         let quotientStep : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
-            Polynomial.monomial(r, Ring.multiply(r, leadingCoefficient, leadingInverseValue),
+            Polynomial.monomial(r, (leadingCoefficient * leadingInverseValue),
                 ePredecessor);
         let stepProduct : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
             Polynomial.multiply(r, quotientStep, f);
@@ -141,11 +140,11 @@ theorem Polynomial.divide_by_excess (r : Ring)
 
         -- The inverse from the other side (the ring is commutative).
         claim inverseLeadingEquation
-            : Ring.multiply(r, leadingInverseValue, Polynomial.coefficientOf(r, f, degreeF))
+            : (leadingInverseValue * Polynomial.coefficientOf(f, degreeF))
               = Ring.one(r)
-            by calc Ring.multiply(r, leadingInverseValue, Polynomial.coefficientOf(r, f, degreeF))
-                  = Ring.multiply(r, Polynomial.coefficientOf(r, f, degreeF), leadingInverseValue)
-                        by commutativity(leadingInverseValue, Polynomial.coefficientOf(r, f, degreeF))
+            by calc (leadingInverseValue * Polynomial.coefficientOf(f, degreeF))
+                  = (Polynomial.coefficientOf(f, degreeF) * leadingInverseValue)
+                        by commutativity(leadingInverseValue, Polynomial.coefficientOf(f, degreeF))
                   = Ring.one(r)
                         by leadingInverseEquation;
 
@@ -154,50 +153,41 @@ theorem Polynomial.divide_by_excess (r : Ring)
         -- the leading coefficient; strictly above, both vanish.
         claim productAgreesWithDividend
             : (i : Natural) → degreeF + ePredecessor ≤ i
-              → Polynomial.coefficientOf(r, stepProduct, i)
-                = Polynomial.coefficientOf(r, dividend, i)
+              → Polynomial.coefficientOf(stepProduct, i)
+                = Polynomial.coefficientOf(dividend, i)
             by function (i : Natural) (topLessOrEqual : degreeF + ePredecessor ≤ i) =>
                 decide i = degreeF + ePredecessor {
                   | yes indexIsTop =>
-                      calc Polynomial.coefficientOf(r, stepProduct, i)
-                         = Polynomial.coefficientOf(r, stepProduct, degreeF + ePredecessor)
+                      calc Polynomial.coefficientOf(stepProduct, i)
+                         = Polynomial.coefficientOf(stepProduct, degreeF + ePredecessor)
                                by congruenceOf(
                                       function (t : Natural) =>
-                                          Polynomial.coefficientOf(r, stepProduct, t),
+                                          Polynomial.coefficientOf(stepProduct, t),
                                       indexIsTop)
-                         = Ring.multiply(r,
-                               Ring.multiply(r, leadingCoefficient, leadingInverseValue),
-                               Polynomial.coefficientOf(r, f,
-                                   Natural.monus(degreeF + ePredecessor, ePredecessor)))
+                         = ((leadingCoefficient * leadingInverseValue) * Polynomial.coefficientOf(f, Natural.monus(degreeF + ePredecessor, ePredecessor)))
                                by Polynomial.coefficientOf_monomial_multiply(r,
-                                      Ring.multiply(r, leadingCoefficient, leadingInverseValue),
+                                      (leadingCoefficient * leadingInverseValue),
                                       f, ePredecessor, degreeF + ePredecessor,
                                       Natural.less_or_equal_add_left(ePredecessor, degreeF))
-                         = Ring.multiply(r,
-                               Ring.multiply(r, leadingCoefficient, leadingInverseValue),
-                               Polynomial.coefficientOf(r, f, degreeF))
+                         = ((leadingCoefficient * leadingInverseValue) * Polynomial.coefficientOf(f, degreeF))
                                by congruenceOf(
                                       function (t : Natural) =>
-                                          Ring.multiply(r,
-                                              Ring.multiply(r, leadingCoefficient, leadingInverseValue),
-                                              Polynomial.coefficientOf(r, f, t)),
+                                          ((leadingCoefficient * leadingInverseValue) * Polynomial.coefficientOf(f, t)),
                                       Natural.monus_add_cancel_right(degreeF, ePredecessor))
-                         = Ring.multiply(r, leadingCoefficient,
-                               Ring.multiply(r, leadingInverseValue,
-                                   Polynomial.coefficientOf(r, f, degreeF)))
+                         = (leadingCoefficient * (leadingInverseValue * Polynomial.coefficientOf(f, degreeF)))
                                by Ring.multiply_associative(r, leadingCoefficient,
-                                      leadingInverseValue, Polynomial.coefficientOf(r, f, degreeF))
-                         = Ring.multiply(r, leadingCoefficient, Ring.one(r))
+                                      leadingInverseValue, Polynomial.coefficientOf(f, degreeF))
+                         = (leadingCoefficient * Ring.one(r))
                                by inverseLeadingEquation
                          = leadingCoefficient
                                by Ring.multiply_one(r, leadingCoefficient)
-                         = Polynomial.coefficientOf(r, dividend, degreeF + ePredecessor)
+                         = Polynomial.coefficientOf(dividend, degreeF + ePredecessor)
                                by reflexivity(Ring.carrier(r),
-                                      Polynomial.coefficientOf(r, dividend, degreeF + ePredecessor))
-                         = Polynomial.coefficientOf(r, dividend, i)
+                                      Polynomial.coefficientOf(dividend, degreeF + ePredecessor))
+                         = Polynomial.coefficientOf(dividend, i)
                                by congruenceOf(
                                       function (t : Natural) =>
-                                          Polynomial.coefficientOf(r, dividend, t),
+                                          Polynomial.coefficientOf(dividend, t),
                                       Equality.symmetry(indexIsTop))
                   | no indexNotTop => {
                       claim successorLessOrEqual : successor(degreeF + ePredecessor) ≤ i
@@ -208,27 +198,23 @@ theorem Polynomial.divide_by_excess (r : Ring)
                                  Natural.less_or_equal_predecessor_less_or_equal(
                                      degreeF + ePredecessor, i, successorLessOrEqual),
                                  Natural.less_or_equal_add_left(ePredecessor, degreeF));
-                      claim stepZero : Polynomial.coefficientOf(r, stepProduct, i) = Ring.zero(r)
-                          by calc Polynomial.coefficientOf(r, stepProduct, i)
-                                = Ring.multiply(r,
-                                      Ring.multiply(r, leadingCoefficient, leadingInverseValue),
-                                      Polynomial.coefficientOf(r, f, Natural.monus(i, ePredecessor)))
+                      claim stepZero : Polynomial.coefficientOf(stepProduct, i) = Ring.zero(r)
+                          by calc Polynomial.coefficientOf(stepProduct, i)
+                                = ((leadingCoefficient * leadingInverseValue) * Polynomial.coefficientOf(f, Natural.monus(i, ePredecessor)))
                                       by Polynomial.coefficientOf_monomial_multiply(r,
-                                             Ring.multiply(r, leadingCoefficient, leadingInverseValue),
+                                             (leadingCoefficient * leadingInverseValue),
                                              f, ePredecessor, i, predecessorLessOrEqualI)
-                                = Ring.multiply(r,
-                                      Ring.multiply(r, leadingCoefficient, leadingInverseValue),
-                                      Ring.zero(r))
+                                = ((leadingCoefficient * leadingInverseValue) * Ring.zero(r))
                                       by fDegreeBound(Natural.monus(i, ePredecessor),
                                              Natural.degree_bound_helper(degreeF, ePredecessor, i,
                                                  successorLessOrEqual))
                                 = Ring.zero(r)
                                       by Ring.multiply_zero_right(r,
-                                             Ring.multiply(r, leadingCoefficient, leadingInverseValue));
-                      calc Polynomial.coefficientOf(r, stepProduct, i)
+                                             (leadingCoefficient * leadingInverseValue));
+                      calc Polynomial.coefficientOf(stepProduct, i)
                          = Ring.zero(r)
                                by stepZero
-                         = Polynomial.coefficientOf(r, dividend, i)
+                         = Polynomial.coefficientOf(dividend, i)
                                by Equality.symmetry(
                                       dividendBoundSuccessor(i, successorLessOrEqual))
                     }
@@ -238,19 +224,16 @@ theorem Polynomial.divide_by_excess (r : Ring)
         claim residualBound
             : Polynomial.DegreeLessThan(r, residual, degreeF + ePredecessor)
             by function (i : Natural) (topLessOrEqual : degreeF + ePredecessor ≤ i) =>
-                calc Polynomial.coefficientOf(r, residual, i)
-                   = Ring.add(r, Polynomial.coefficientOf(r, dividend, i),
-                         Polynomial.coefficientOf(r, Polynomial.negate(r, stepProduct), i))
+                calc Polynomial.coefficientOf(residual, i)
+                   = (Polynomial.coefficientOf(dividend, i) + Polynomial.coefficientOf(Polynomial.negate(r, stepProduct), i))
                          by Polynomial.coefficientOf_add(r, dividend,
                                 Polynomial.negate(r, stepProduct), i)
-                   = Ring.add(r, Polynomial.coefficientOf(r, dividend, i),
-                         Ring.negate(r, Polynomial.coefficientOf(r, stepProduct, i)))
+                   = (Polynomial.coefficientOf(dividend, i) + Ring.negate(r, Polynomial.coefficientOf(stepProduct, i)))
                          by Polynomial.coefficientOf_negate(r, stepProduct, i)
-                   = Ring.add(r, Polynomial.coefficientOf(r, dividend, i),
-                         Ring.negate(r, Polynomial.coefficientOf(r, dividend, i)))
+                   = (Polynomial.coefficientOf(dividend, i) + Ring.negate(r, Polynomial.coefficientOf(dividend, i)))
                          by productAgreesWithDividend(i, topLessOrEqual)
                    = Ring.zero(r)
-                         by Ring.add_negate_right(r, Polynomial.coefficientOf(r, dividend, i));
+                         by Ring.add_negate_right(r, Polynomial.coefficientOf(dividend, i));
 
         obtain ⟨quotientRest, remainderRest, restEquation, remainderRestBound⟩
             from IH(residual, residualBound);
@@ -301,13 +284,13 @@ theorem Polynomial.divide_by_excess (r : Ring)
 
 theorem Polynomial.division_with_remainder (r : Ring)
         (commutativity
-            : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+            : (x y : Ring.carrier(r)) → (x * y) = (y * x))
         (f : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (degreeF : Natural)
         (fDegreeBound : Polynomial.DegreeLessThan(r, f, successor(degreeF)))
         (leadingInverse
             : ∃ (inverse : Ring.carrier(r)).
-                Ring.multiply(r, Polynomial.coefficientOf(r, f, degreeF), inverse) = Ring.one(r))
+                (Polynomial.coefficientOf(f, degreeF) * inverse) = Ring.one(r))
         (g : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : ∃ (quotient remainder : Polynomial(Ring.carrier(r), Ring.zero(r))).
             g = Polynomial.add(r, Polynomial.multiply(r, quotient, f), remainder)

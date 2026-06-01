@@ -71,13 +71,12 @@ theorem Polynomial.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
     case successor(k):
         unfold Natural.monus in
           calc Polynomial.Sum(r, f, successor(k))
-             = Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k)))
+             = (Polynomial.Sum(r, f, k) + f(successor(k)))
                  by reflexivity(Ring.carrier(r),
-                        Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k))))
-             = Ring.add(r, f(successor(k)), Polynomial.Sum(r, f, k))
+                        (Polynomial.Sum(r, f, k) + f(successor(k))))
+             = (f(successor(k)) + Polynomial.Sum(r, f, k))
                  by Ring.add_commutative(r, Polynomial.Sum(r, f, k), f(successor(k)))
-             = Ring.add(r, f(successor(k)),
-                   Polynomial.Sum(r, function (i : Natural) => f(Natural.monus(k, i)), k))
+             = (f(successor(k)) + Polynomial.Sum(r, function (i : Natural) => f(Natural.monus(k, i)), k))
                  by IH
              = Polynomial.Sum(r, function (i : Natural) => f(Natural.monus(successor(k), i)), successor(k))
                  by Polynomial.Sum.shift(r,
@@ -94,71 +93,62 @@ theorem Polynomial.Sum.extensional_range (r : Ring)
       h(0, LessOrEqual.reflexivity(0))
   | successor(k) => function (h : (i : Natural) → i ≤ successor(k) → f(i) = g(i)) =>
       calc Polynomial.Sum(r, f, successor(k))
-         = Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k)))
+         = (Polynomial.Sum(r, f, k) + f(successor(k)))
              by reflexivity(Ring.carrier(r),
-                    Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k))))
-         = Ring.add(r, Polynomial.Sum(r, g, k), f(successor(k)))
+                    (Polynomial.Sum(r, f, k) + f(successor(k))))
+         = (Polynomial.Sum(r, g, k) + f(successor(k)))
              by Polynomial.Sum.extensional_range(r, f, g, k,
                     function (i : Natural) (smaller : i ≤ k) =>
                         h(i, LessOrEqual.transitive(i, k, successor(k),
                                Natural.le_successor(k), smaller)))
-         = Ring.add(r, Polynomial.Sum(r, g, k), g(successor(k)))
+         = (Polynomial.Sum(r, g, k) + g(successor(k)))
              by h(successor(k), LessOrEqual.reflexivity(successor(k)))
          = Polynomial.Sum(r, g, successor(k))
              by reflexivity(Ring.carrier(r),
-                    Ring.add(r, Polynomial.Sum(r, g, k), g(successor(k))))
+                    (Polynomial.Sum(r, g, k) + g(successor(k))))
 
 -- ----------------------------------------------------------------------
 -- Commutativity of the convolution when the ring is commutative.
 
 theorem Polynomial.Coefficients.multiply_commutative (r : Ring)
-        (ringCommutative : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+        (ringCommutative : (x y : Ring.carrier(r)) → (x * y) = (y * x))
         (p q : Polynomial.Coefficients(Ring.carrier(r)))
         : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
               Polynomial.Coefficients.multiply(r, p, q),
               Polynomial.Coefficients.multiply(r, q, p)) :=
   function (k : Natural) =>
-      calc Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, p, q), k)
+      calc Polynomial.coefficient(Polynomial.Coefficients.multiply(r, p, q), k)
          = Polynomial.Sum(r,
                function (i : Natural) =>
-                   Ring.multiply(r, Polynomial.coefficient(r, p, i),
-                       Polynomial.coefficient(r, q, Natural.monus(k, i))), k)
+                   (Polynomial.coefficient(p, i) * Polynomial.coefficient(q, Natural.monus(k, i))), k)
                by Polynomial.nth_multiply(r, p, q, k)
          = Polynomial.Sum(r,
                function (i : Natural) =>
-                   Ring.multiply(r, Polynomial.coefficient(r, p, Natural.monus(k, i)),
-                       Polynomial.coefficient(r, q, Natural.monus(k, Natural.monus(k, i)))), k)
+                   (Polynomial.coefficient(p, Natural.monus(k, i)) * Polynomial.coefficient(q, Natural.monus(k, Natural.monus(k, i)))), k)
                by Polynomial.Sum.reverse(r,
                       function (i : Natural) =>
-                          Ring.multiply(r, Polynomial.coefficient(r, p, i),
-                              Polynomial.coefficient(r, q, Natural.monus(k, i))), k)
+                          (Polynomial.coefficient(p, i) * Polynomial.coefficient(q, Natural.monus(k, i))), k)
          = Polynomial.Sum(r,
                function (i : Natural) =>
-                   Ring.multiply(r, Polynomial.coefficient(r, q, i),
-                       Polynomial.coefficient(r, p, Natural.monus(k, i))), k)
+                   (Polynomial.coefficient(q, i) * Polynomial.coefficient(p, Natural.monus(k, i))), k)
                by Polynomial.Sum.extensional_range(r,
                       function (i : Natural) =>
-                          Ring.multiply(r, Polynomial.coefficient(r, p, Natural.monus(k, i)),
-                              Polynomial.coefficient(r, q, Natural.monus(k, Natural.monus(k, i)))),
+                          (Polynomial.coefficient(p, Natural.monus(k, i)) * Polynomial.coefficient(q, Natural.monus(k, Natural.monus(k, i)))),
                       function (i : Natural) =>
-                          Ring.multiply(r, Polynomial.coefficient(r, q, i),
-                              Polynomial.coefficient(r, p, Natural.monus(k, i))),
+                          (Polynomial.coefficient(q, i) * Polynomial.coefficient(p, Natural.monus(k, i))),
                       k,
                       function (i : Natural) (smaller : i ≤ k) =>
-                          calc Ring.multiply(r, Polynomial.coefficient(r, p, Natural.monus(k, i)),
-                                   Polynomial.coefficient(r, q, Natural.monus(k, Natural.monus(k, i))))
-                             = Ring.multiply(r, Polynomial.coefficient(r, p, Natural.monus(k, i)),
-                                   Polynomial.coefficient(r, q, i))
+                          calc (Polynomial.coefficient(p, Natural.monus(k, i)) * Polynomial.coefficient(q, Natural.monus(k, Natural.monus(k, i))))
+                             = (Polynomial.coefficient(p, Natural.monus(k, i)) * Polynomial.coefficient(q, i))
                                    by Natural.monus_monus_self(k, i, smaller)
-                             = Ring.multiply(r, Polynomial.coefficient(r, q, i),
-                                   Polynomial.coefficient(r, p, Natural.monus(k, i)))
-                                   by ringCommutative(Polynomial.coefficient(r, p, Natural.monus(k, i)),
-                                          Polynomial.coefficient(r, q, i)))
-         = Polynomial.coefficient(r, Polynomial.Coefficients.multiply(r, q, p), k)
+                             = (Polynomial.coefficient(q, i) * Polynomial.coefficient(p, Natural.monus(k, i)))
+                                   by ringCommutative(Polynomial.coefficient(p, Natural.monus(k, i)),
+                                          Polynomial.coefficient(q, i)))
+         = Polynomial.coefficient(Polynomial.Coefficients.multiply(r, q, p), k)
                by Polynomial.nth_multiply(r, q, p, k)
 
 theorem Polynomial.multiply_commutative (r : Ring)
-        (ringCommutative : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+        (ringCommutative : (x y : Ring.carrier(r)) → (x * y) = (y * x))
         (x y : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : Polynomial.multiply(r, x, y) = Polynomial.multiply(r, y, x) :=
   Quotient.induct_two(
@@ -171,7 +161,7 @@ theorem Polynomial.multiply_commutative (r : Ring)
 
 -- The polynomial ring over a commutative ring is commutative.
 theorem Polynomial.is_commutative_ring (r : Ring)
-        (ringCommutative : (x y : Ring.carrier(r)) → Ring.multiply(r, x, y) = Ring.multiply(r, y, x))
+        (ringCommutative : (x y : Ring.carrier(r)) → (x * y) = (y * x))
         : IsCommutativeRing(Polynomial(Ring.carrier(r), Ring.zero(r)),
               Polynomial.add, Polynomial.zero(r), Polynomial.negate,
               Polynomial.multiply, Polynomial.one(r)) :=
