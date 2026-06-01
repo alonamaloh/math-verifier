@@ -1,0 +1,56 @@
+-- Test/partial_app_bug.math
+--
+-- Regression test for the partial-application doubling bug: a
+-- partially-applied function (supplying a PREFIX of its arguments)
+-- passed in a function-typed argument position must not have its
+-- leading argument duplicated by "leading-argument inference".
+--
+-- Mirrors first_isomorphism.math's `IsHomomorphism(QG, H,
+-- induced_map(G, H, f, homo))`, where `induced_map` (5 params) is
+-- supplied 4 and the missing one is the TRAILING argument.
+
+module Test.partial_app_bug
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+
+-- A bundle carrying a carrier type (mirrors `Group`).
+inductive Bundle : Type(1) where
+  | Bundle.make : (carrier : Type(0)) → (point : carrier) → Bundle
+
+definition Bundle.carrier : Bundle → Type(0)
+  | Bundle.make(carrier, point) => carrier
+
+definition Wrap (n : Natural) : Type(0) := Natural
+
+definition mkBundle (n : Natural) : Bundle :=
+  Bundle.make(Wrap(n), n)
+
+-- A 5-parameter function whose last parameter is the trailing one and
+-- whose codomain is `Bundle.carrier(target)` (mirrors induced_map:
+-- (G H : Group)(f)(homomorphism)(x) → carrier H).
+definition mapBetween
+        (source target : Bundle)
+        (f : Bundle.carrier(source) → Bundle.carrier(target))
+        (extra : Bundle.carrier(source))
+        (x : Bundle.carrier(source))
+        : Bundle.carrier(target) :=
+  f(x)
+
+-- Consumer whose function-parameter type depends on earlier args
+-- (mirrors IsHomomorphism's `f : carrier G → carrier H`).
+definition Uses (source target : Bundle)
+        (f : Bundle.carrier(source) → Bundle.carrier(target))
+        : Proposition :=
+  (x : Bundle.carrier(source)) → f(x) = f(x)
+
+-- Pass `mapBetween(B, B, g, e)` (4 of 5 args; missing the trailing `x`)
+-- where a function `carrier B → carrier B` is expected. The bug
+-- duplicates the leading `B` → `mapBetween B B B g e`, ill-typed.
+theorem repro (B : Bundle)
+        (g : Bundle.carrier(B) → Bundle.carrier(B))
+        (e : Bundle.carrier(B))
+        : Uses(B, B, mapBetween(B, B, g, e)) :=
+  function (x : Bundle.carrier(B)) =>
+    reflexivity(Bundle.carrier(B), mapBetween(B, B, g, e, x))

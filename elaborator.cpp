@@ -4247,25 +4247,33 @@ private:
                             countLeadingPis(declarationKernelType);
                         int declaredImplicitCount =
                             environment_.implicitArgumentCount(name);
-                        // Two engagement modes:
-                        //   (a) Declaration uses `{x : T}` implicit
-                        //       binders. The user provides exactly the
-                        //       explicit-arg count and we infer the
-                        //       declared implicit prefix.
-                        //   (b) Declaration has no implicit binders.
-                        //       Fall back to arity-based inference:
-                        //       under-applied calls infer the missing
-                        //       leading args.
+                        // Leading-argument inference engages ONLY for
+                        // declarations with `{x : T}` implicit binders:
+                        // the user provides exactly the explicit-arg
+                        // count and we infer the declared implicit
+                        // prefix. (PAdic-style convention prefixes also
+                        // land here, since `convention` adds implicit
+                        // binders.)
+                        //
+                        // It does NOT engage for declarations with no
+                        // implicit binders. An under-applied call to
+                        // such a declaration is a genuine PARTIAL
+                        // APPLICATION: the user supplied a PREFIX of the
+                        // arguments and the MISSING ones are trailing,
+                        // never leading. The old arity-based heuristic
+                        // (numLeadingToInfer = totalPi − argCount) wrongly
+                        // assumed the missing args were leading and would
+                        // duplicate the first argument — e.g.
+                        // `induced_map(G, H, f, homo)` passed where a
+                        // function is expected became
+                        // `induced_map G G H f homo …`. Such calls now
+                        // fall through to the partial-application path.
                         int numLeadingToInfer = 0;
                         if (declaredImplicitCount > 0) {
                             if (static_cast<int>(argumentCount)
                                 == totalPiCount - declaredImplicitCount) {
                                 numLeadingToInfer = declaredImplicitCount;
                             }
-                        } else {
-                            numLeadingToInfer =
-                                totalPiCount
-                                - static_cast<int>(argumentCount);
                         }
                         bool universesProvided =
                             declarationUniverseParams->empty()
