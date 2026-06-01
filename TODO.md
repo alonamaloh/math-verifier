@@ -249,6 +249,29 @@ none urgent:
   call; payoff is mainly in interactive mode. Park until an
   interactive front-end lands.
 
+- **Logarithmic (binary) representation for Naturals + ring
+  coefficients — PERFORMANCE.** `999999999 + 1 = 1000000000` should be
+  cheap; today it is catastrophic, for two compounding reasons:
+    1. **Kernel Naturals are unary.** The literal `1000000000` is a
+       successor chain a billion deep — just *building* the term is
+       linear in the value, and def-eq over such chains is O(N²) (see
+       the Ring v3 note below: `4999 + 1 = 5000` by reflexivity ≈ 5.5s).
+    2. **`ring`'s internal canonical form unit-expands coefficients.**
+       `buildCanonicalPolynomial` / `polynomialToSignedMonomials` explode
+       a `(signature, coef)` entry into `|coef|` unit monomials, so a
+       single coefficient `k` produces a `k`-term sum and an O(k) proof —
+       a coefficient of 10⁹ is 10⁹ monomials. There is no upper guard;
+       large coefficients simply blow up time and memory.
+  The fix is a logarithmic/binary representation on BOTH layers: a
+  `BinaryNat` (log-depth arithmetic) underlying numeric literals, and
+  `ring` carrying coefficients as binary/`int` values combined via
+  `c·m + d·m = (c+d)·m` (one `distributivity_right` step, O(1) in the
+  coefficient) instead of unit expansion. This is the same
+  binary-literal prerequisite and the same v3 coefficient redesign the
+  next item describes — recorded separately here because the *motivation*
+  is performance (a hard cliff on big numbers), not just feature
+  completeness. Do them together.
+
 - **Ring v3 — coefficients as ring elements (DEFERRED until binary
   literals).** Ring v2 only handles canonical coefficients in
   `{-1, +1}`. The clean design for v3 is:
