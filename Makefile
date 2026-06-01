@@ -118,12 +118,18 @@ endif
 # the .mathv prerequisites — listed by the included dependency file —
 # drive `make`'s staleness tracking but are NOT passed to `kernel
 # verify` on the command line: the kernel resolves the source file's
-# `import` declarations against `--cache-root` directly. The kernel
-# binary is an order-only prereq — we want it present, but bumping it
-# shouldn't invalidate every cache (the cache file format is versioned;
-# format bumps will fail to load old caches and force a rebuild
-# explicitly).
-$(BUILD_DIR)/%.mathv: %.math | kernel
+# `import` declarations against `--cache-root` directly.
+#
+# The kernel binary is a NORMAL prerequisite: any change to the
+# elaborator/kernel/parser relinks `kernel`, which then re-verifies every
+# .mathv. This costs a full re-verification after each source change, but
+# it is the only way `make` can catch a behavior change that breaks a
+# .math file whose source didn't change. (It was previously order-only,
+# which let a broken elaborator change pass an incremental build and only
+# fail on a clean rebuild — a real trap.) Note `kernel` itself only
+# relinks when an object file actually changes, so warm rebuilds with no
+# source edits don't re-verify anything.
+$(BUILD_DIR)/%.mathv: %.math kernel
 	@mkdir -p $(dir $@)
 	./kernel verify --source $< --output $@ --cache-root $(BUILD_DIR) $(VERIFY_FLAGS)
 
