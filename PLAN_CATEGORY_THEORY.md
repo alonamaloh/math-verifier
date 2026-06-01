@@ -74,12 +74,57 @@ category theory becomes *possible*. Three issues remain and are deliberately
 separate future work:
 
 1. **Universe handling must mature first.** Categories, functor categories,
-   and Yoneda need fluent universe polymorphism. The library is mostly
-   `Type(0)` and the elaborator has known universe-inference holes (the
-   `induct_three` universe fight; generic/polymorphic-lemma indexing skipping
-   universe-parametric theorems). Harden universe inference *before*
-   attempting categories — it will stress the least-tested part of the
-   elaborator.
+   and Yoneda need fluent universe polymorphism, and that is the
+   least-tested part of the elaborator. A 2026-06 audit established what
+   exists and what's missing.
+
+   **What works today** (enough for the all-`Type(0)` math built so far, and
+   it suffices for a *prototype* category layer via the explicit path):
+   - **Auto-generalized bare `Type`.** Writing `Type` (no index) in a
+     signature becomes a fresh universe parameter auto-bound to the
+     declaration (`freshAutoBoundUniverseName` → `finalUniverseParameters`,
+     `elaborator.cpp` ~19236, ~23748). So `inductive Equality (A : Type)` is
+     silently polymorphic — no `.{u}` written. Lean's "don't track levels"
+     convenience for the common case.
+   - **Explicit `.{u, v}` declarations + `Type(u)`** for naming/reusing a
+     level across positions, e.g. `axiom Quotient.lift.{u, v}`. Multi-
+     universe polymorphism works end-to-end (the Quotient axioms prove it).
+   - **Use-site universe-argument inference** (`inferUniverseArguments` +
+     `unifyLevels`/`unifyTypes`): `Equality(…)` / `Quotient.lift(…)` without
+     `.{u}`, levels read off the value args. Tested in
+     `Test/universe_inference_test.math`.
+
+   **The four gaps — and they are exactly the category-theory pressure
+   points** (`Category.{v,u}`, functor categories, `max u v` everywhere):
+   - **`unifyLevels` doesn't handle `max`/`imax`** (only Param/Successor/
+     Const, `elaborator.cpp` ~23571). Any argument whose type sits at
+     `max u v` can't have its level inferred → must be written explicitly.
+   - **Unpinned parameters silently default to level 0**
+     (`inferUniverseArguments` fallback). Not unsound — the kernel rechecks,
+     and now that it is non-cumulative (see `PLAN_KERNEL.md` §4.3) a wrongly
+     collapsed level is *rejected* rather than absorbed — but a polymorphic
+     level that should stay variable surfaces as a confusing downstream type
+     error instead of a clear "couldn't infer this universe." This is the
+     footgun.
+   - **`unifyTypes` skips Pi domains** (matches only codomains). A universe
+     param appearing only in an argument's domain isn't inferred — common
+     once functors/morphisms are passed around.
+   - **No `universe` command and no level constraints.** There is no
+     `universe u v` keyword to share a named level across a block, and no
+     `u ≤ v`. Each bare `Type` is an *independent* fresh param, so forcing
+     two positions to the same level requires explicit `.{u}` + `Type(u)`.
+
+   **Recommended enhancements, in order** (do *before* the category work
+   gets heavy; none is a blocker — the explicit `.{u,v}`/`Type(u)` path is
+   fully functional today):
+   (a) teach `unifyLevels` to unify against `max`/`imax`;
+   (b) replace "default unpinned to 0" with a genuine universe metavariable
+       that is either solved or reported as an explicit inference failure;
+   (c) a `universe`-style facility for a shared named level (and eventually
+       level constraints).
+   Also fold in the older symptoms this subsumes: the `induct_three`
+   universe fight, and generic/polymorphic-lemma indexing skipping
+   universe-parametric theorems (`TODO.md`, calc auto-prover follow-ups).
 
 2. **Coherence automation is an open philosophical decision.** Category theory
    leans on automation (Mathlib's `aesop_cat`, coherence simp sets) to
