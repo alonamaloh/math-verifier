@@ -174,9 +174,19 @@ which otherwise *guesses* lemma names.
   pipeline, mirroring `overload`) — no naming convention. Documented in
   CLAUDE.md ("Rewrite under a binder"). Applied across the Polynomial
   coefficient-algebra proofs (multiply_laws, multiplication, commutative).
-  Remaining deep move: a `ring`/`field` that consumes equational
-  hypotheses (linear-combination style) — would collapse the
-  calc-with-substitution proofs like `irreducible.math`'s `cfSquareNegateOne`.
+- **Ring-with-hypotheses (`linear_combination`) — DONE (v1), the second
+  deep move.** `linear_combination(e)` closes a commutative-ring equality
+  goal `goalL = goalR` from an equation proof `e : combL = combR` by
+  checking the bridge `goalL − goalR = combL − combR` with the ring
+  normaliser and assembling via a generic `Ring.equal_of_linear_combination`
+  lemma (IsRing). Full surface pipeline (keyword→parser→elaborator); the
+  elaborator resolves the carrier's ops via `ring`'s RingScheme,
+  β-reduces the combination endpoints, ring-proves the bridge, cites the
+  lemma. v1 = concrete carriers + a single equation (coefficients supplied
+  by pre-building `c·h` via congruence). **Remaining for this move:** the
+  `c1*h1 + c2*h2` combination syntax (walk the SurfaceBinaryOperation tree,
+  scale/add equations) — that's what makes `cfSquareNegateOne`-style
+  multi-hypothesis goals a one-liner; and bundle/abstract carriers.
 
 
 - **§4 proving ground — high-value surface DONE (~14 files, 4 enablers).**
