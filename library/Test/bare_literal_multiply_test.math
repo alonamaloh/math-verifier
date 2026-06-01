@@ -1,0 +1,50 @@
+-- Bare numeric literals in operator position take their carrier from the
+-- other operand. A literal defaults to `Natural`; when it is one operand of
+-- an arithmetic operator whose other operand is a concrete carrier `C` with
+-- a registered coercion `(Natural, C)`, the dispatcher coerces the literal
+-- up to `C` and dispatches on `(C, C)`. So `2 * x` reads as math without an
+-- explicit `(2 : C)` ascription. Only a BARE literal operand is promoted —
+-- `2 * 3` (both literals) stays Natural, and a genuine Natural variable is
+-- left to error.
+module Test.bare_literal_multiply_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.instances
+import Integer.embedding
+import Integer.absolute_value
+import Rational.basics
+import Rational.addition
+import Rational.multiplication
+import Rational.ring
+import Rational.instances
+import Rational.embedding
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.embedding
+import Algebra.ring
+
+-- Integer: literal on either side of `*` and `+`.
+theorem Test.bare_integer_left (x : Integer) : 2 * x = 2 * x := ring
+theorem Test.bare_integer_right (x : Integer) : x * 2 = x * 2 := ring
+theorem Test.bare_integer_add (x : Integer) : 2 + x = x + 2 := ring
+
+-- Rational and Real (multi-hop coercion chains from Natural).
+theorem Test.bare_rational (x : Rational) : 2 * x = 2 * x := ring
+theorem Test.bare_real (x : Real) : 2 * x = 2 * x := ring
+
+-- No regression: both operands literal stays Natural arithmetic.
+theorem Test.both_literals_natural : 2 * 3 = 2 * 3 := ring
+
+-- The coerced literal is a genuine ring value, so `ring` reasons with it.
+theorem Test.coerced_literal_ring (x : Integer) : 2 * x = x + x := ring

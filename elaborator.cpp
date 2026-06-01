@@ -19451,6 +19451,68 @@ private:
                 else if (operatorSymbol == "∣") targetFunction = "Natural.divides";
             }
         }
+        // Bare-literal coercion retry. If nothing matched and exactly one
+        // operand is a BARE numeric literal (so its default carrier is
+        // `Natural`) while the other operand is a concrete carrier `C` with
+        // a registered coercion `(Natural, C)`, coerce the literal up to `C`
+        // and retry the registry on `(C, C)`. Lets `2 * x` / `x + 2` read
+        // as math when `x : Integer/Rational/Real` fixes the carrier, with
+        // no explicit `(2 : C)` ascription. Only a literal operand is
+        // promoted (a genuine `Natural`-typed variable is left to error), so
+        // `2 * 3` (both literals → both Natural) and real Natural arithmetic
+        // are untouched. The coercion registry is transitively closed, so a
+        // multi-hop `Natural → Integer → Rational → Real` chain is one entry.
+        if (targetFunction.empty()) {
+            auto coerceChainTo = [&](const std::string& destinationHead,
+                                      ExpressionPointer term)
+                    -> ExpressionPointer {
+                auto entry = environment_.coercionRegistry.find(
+                    std::make_tuple(std::string("Natural"), destinationHead));
+                if (entry == environment_.coercionRegistry.end()) {
+                    return nullptr;
+                }
+                ExpressionPointer call = std::move(term);
+                for (const auto& funcName : entry->second) {
+                    call = makeApplication(
+                        makeConstant(funcName), std::move(call));
+                }
+                return call;
+            };
+            bool leftIsLiteral = std::get_if<SurfaceNumericLiteral>(
+                &leftSurface.node) != nullptr;
+            bool rightIsLiteral = std::get_if<SurfaceNumericLiteral>(
+                &rightSurface.node) != nullptr;
+            if (leftIsLiteral && !rightIsLiteral
+                && operandTypeName == "Natural" && rightTypeName != "Natural"
+                && !rightTypeName.empty()) {
+                std::string reg = environment_.lookupOperator(
+                    operatorSymbol, rightTypeName, rightTypeName);
+                if (!reg.empty()) {
+                    if (ExpressionPointer coerced =
+                            coerceChainTo(rightTypeName, leftKernel)) {
+                        leftKernel = std::move(coerced);
+                        leftTypeClosed = closeOverLocalBinders(
+                            inferTypeInLocalContext(localBinders, leftKernel),
+                            localBinders, localBinders.size());
+                        operandTypeName = rightTypeName;
+                        targetFunction = reg;
+                    }
+                }
+            } else if (rightIsLiteral && !leftIsLiteral
+                       && rightTypeName == "Natural"
+                       && operandTypeName != "Natural"
+                       && !operandTypeName.empty()) {
+                std::string reg = environment_.lookupOperator(
+                    operatorSymbol, operandTypeName, operandTypeName);
+                if (!reg.empty()) {
+                    if (ExpressionPointer coerced =
+                            coerceChainTo(operandTypeName, rightKernel)) {
+                        rightKernel = std::move(coerced);
+                        targetFunction = reg;
+                    }
+                }
+            }
+        }
         if (targetFunction.empty()) {
             throw ElaborateError(
                 "operator '" + operatorSymbol + "' is not supported for "

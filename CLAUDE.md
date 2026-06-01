@@ -616,12 +616,30 @@ real limitation:
   `Rational.to_real` for Real. The named constants `Integer.one` /
   `Rational.one` etc. are also recognized as literal 1.
 
-- **Bare-literal Rational/Real (not multiplied).** Each numeric
-  literal still parses as a Natural — bare `1 + 1` for a Rational
-  target fails. For a Rational two, write `Rational.one + Rational.one`
-  or use the scalar pattern `(2 : Integer) * x`. We may revisit this
-  later (flip literal default → Integer) but for now Naturals
-  remain the literal default.
+- **Bare literals in operator position now coerce from the other
+  operand.** A numeric literal still parses as a `Natural`, but when it
+  is ONE operand of an arithmetic operator (`+`, `*`, …) whose OTHER
+  operand is a concrete carrier `C` with a registered coercion
+  `(Natural, C)`, the dispatcher coerces the literal up to `C` and
+  dispatches on `(C, C)`. So `2 * x`, `x + 2`, `2 * x = x + x` all work
+  for `x : Integer/Rational/Real` with no `(2 : C)` ascription, and
+  `ring` reasons with the coerced literal as the value 2. Only a BARE
+  literal operand is promoted: `2 * 3` (both literals) stays `Natural`,
+  and a genuine `Natural`-typed variable is left to error. The carrier
+  must be reachable from `Natural` by a registered coercion (import the
+  carrier's `embedding` module, e.g. `Integer.embedding`).
+- **Still Natural-only: a literal with NO carrier-typed operand.** Bare
+  `1 + 1` whose *expected type* (not an operand) is Rational still
+  parses as `Natural` and fails — there is no operand to coerce from.
+  Write `Rational.one + Rational.one`, ascribe one operand
+  `(1 : Rational) + 1` (the other then coerces), or use the scalar
+  pattern `(2 : Integer) * x`.
+- **Scalar Integer multiplication at Rational/Real.** The `*` operator
+  on `(Integer, R)` / `(R, Integer)` is registered via
+  `R.from_integer_multiply` for R in {Rational, Real}; `(n : Integer) *
+  x` is a real operation (see the dedicated note above). With the
+  bare-literal coercion, `n * x` for a literal `n` now also works
+  directly.
 
 When the goal is `(ring : Foo = Bar)` and you intend to `rewrite` with
 it, double-check the direction: `rewrite(eq, term)` looks for the LHS
@@ -723,10 +741,21 @@ Works as a calc-step `by` proof too. Scope/limits:
   structure argument). A *plain* `Ring.carrier(s)` is NOT supported —
   the ring bridge needs multiplicative commutativity (same limit as
   `ring`); cite `Ring.equal_of_linear_combination` by hand there.
-- **Literal coefficients** like `(2 : Integer) * h` hit the
-  pre-existing "bare-literal `*`" operator-dispatch gap (the literal
-  parses as a Natural); use a named/variable coefficient, or
-  pre-scale with `congruenceOf(λz. z * c, h)` as the leaf.
+- **Literal coefficients are limited.** A *single* literal-scaled
+  hypothesis works (`linear_combination((2 : Integer) * h)` for a goal
+  `2*a = 2*b`). But a *sum* of literal-scaled hypotheses
+  (`(2:Integer)*h1 + (3:Integer)*h2`) currently fails: the literal
+  expands `multiply(2, x)` into a repeated sum, and the ring bridge —
+  which here runs over OPENED free variables with a `negate` of that
+  multi-term sum — hits a ring-normaliser limitation in that specific
+  combination (standalone `ring` on the same identity with bound
+  variables is fine; it is the opened + literal-expansion + negate path
+  that breaks). Use **variable/named coefficients** (`c1 * h1 + c2 *
+  h2`) — the clean and recommended form — until the ring normaliser's
+  opened-literal path is fixed. (Note this is distinct from the
+  now-fixed bare-literal *operator dispatch*: `2 * x` as an ordinary
+  expression works; the gap is specifically literal coefficients inside
+  a multi-term `linear_combination`.)
 - Leaves that aren't equality proofs are treated as scalars (the
   trivial `v = v`), so a malformed combination surfaces as a ring
   bridge that doesn't normalise.

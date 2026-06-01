@@ -208,13 +208,35 @@ which otherwise *guesses* lemma names.
     single, scaled, sum, full `k1*h1 + k2*h2`). A *plain* `Ring.carrier(s)`
     stays unsupported — the ring bridge needs multiplicative commutativity
     (the same boundary as `ring`/A2).
-  - **Remaining (deferred, low value):** literal coefficients
-    `(2 : Integer) * h` hit the pre-existing bare-literal `*`
-    operator-dispatch gap (the literal parses as a Natural — independent
-    of `linear_combination`, also blocks `ring` on the same goal); use a
-    variable coefficient meanwhile. Parametrized non-bundle carriers
+  - **Bare-literal operator dispatch — DONE.** `2 * x` / `x + 2` for
+    `x : Integer/Rational/Real` now elaborate without a `(2 : C)`
+    ascription: when dispatch finds no operator and one operand is a
+    BARE numeric literal (default `Natural`) while the other is a
+    concrete carrier `C` with a registered coercion `(Natural, C)`, the
+    dispatcher coerces the literal up to `C` and retries on `(C, C)`
+    (`desugarArithmeticOperator`, just before the unsupported-operator
+    throw; the coercion registry is transitively closed so multi-hop
+    `Natural→Integer→Rational→Real` is one entry). `ring` then reasons
+    with the coerced literal as the value (`2 * x = x + x` closes).
+    Zero-regression (only fires when dispatch would otherwise error;
+    `2 * 3` stays Natural). Tested in
+    `Test/bare_literal_multiply_test.math`.
+  - **Remaining — literal coefficients in a multi-term
+    `linear_combination` (deferred, ring-normaliser).** A single
+    literal-scaled hypothesis works; a SUM (`(2:Integer)*h1 +
+    (3:Integer)*h2`) fails because the bridge runs the ring normaliser
+    over OPENED free variables on a `negate` of a literal-expanded
+    multi-term sum, and `elaborateRingByNormalisation` returns a
+    malformed proof there (confirmed by dumping the bridgeProof type —
+    it fails its own `inferType`). Standalone `ring` on the identical
+    identity with BOUND variables succeeds, so it is specifically the
+    opened-free-var + literal-expansion + `negate` path in the ring
+    proof generators — the deferred ring-v3 / literal-handling
+    territory (needs binary literals per TODO). Workaround: variable
+    coefficients (the recommended form anyway).
+  - **Remaining (out of scope):** parametrized non-bundle carriers
     (`RingModulo(c, m)`, the `ComplexNumber` alias) would need
-    `computeRingScheme` + `ring` extended to them first — out of scope.
+    `computeRingScheme` + `ring` extended to them first.
 
 
 - **§4 proving ground — high-value surface DONE (~14 files, 4 enablers).**
