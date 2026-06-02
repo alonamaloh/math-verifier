@@ -310,6 +310,42 @@ SurfaceExpressionPointer substituteSurfaceName(
             induction->subjectName, induction->ihName,
             std::move(newBody), line, column);
     }
+    if (auto* structured =
+            std::get_if<SurfaceStructuredClaim>(&node.node)) {
+        // `claim [P] [by HINT] [{ arms }]` — recurse into the stated
+        // proposition, the by-hint, and any `by cases` arm bodies. A
+        // named claim desugars to a structured claim wrapped in a `let`,
+        // so without this a `set`-bound name used in the claim's
+        // proposition would survive unsubstituted.
+        SurfaceExpressionPointer newProposition = structured->proposition
+            ? substituteSurfaceName(structured->proposition,
+                                     targetName, replacement)
+            : nullptr;
+        SurfaceExpressionPointer newByHint = structured->byHint
+            ? substituteSurfaceName(structured->byHint,
+                                     targetName, replacement)
+            : nullptr;
+        std::vector<SurfaceStructuredClaimArm> newArms;
+        for (const auto& arm : structured->arms) {
+            SurfaceStructuredClaimArm newArm;
+            newArm.disjunctType = arm.disjunctType
+                ? substituteSurfaceName(arm.disjunctType,
+                                         targetName, replacement)
+                : nullptr;
+            newArm.binderName = arm.binderName;
+            newArm.body = (arm.binderName == targetName || !arm.body)
+                ? arm.body
+                : substituteSurfaceName(arm.body, targetName, replacement);
+            newArm.line = arm.line;
+            newArm.column = arm.column;
+            newArms.push_back(std::move(newArm));
+        }
+        return makeSurfaceStructuredClaim(
+            std::move(newProposition), structured->label,
+            std::move(newByHint), structured->byCases,
+            std::move(newArms), line, column,
+            structured->byInduction, structured->bySubstitution);
+    }
     // Unhandled node kind: be conservative and return unchanged. If we
     // ever add a new SurfaceExpression variant, the `set` substitution
     // will silently skip it — surfaced by the test suite if it bites.
@@ -1117,53 +1153,27 @@ private:
                 consumeAny();  // ':'
                 wrapper.type = parseExpression();
                 if (isClaim) {
-                    if (peek().kind == TokenKind::KeywordBy
-                        && (tokens_[position_ + 1].kind
-                                == TokenKind::KeywordSubstitution
-                            || tokens_[position_ + 1].kind
-                                   == TokenKind::KeywordSubstituting)) {
-                        // `claim NAME : TYPE by substitution[ <eq>]` — the
-                        // named-claim analogue of the anonymous
-                        // `claim P by substituting <eq>`. Build a
-                        // structured-claim whose proposition is the stated
-                        // TYPE and let the equality bridge discharge it, so
-                        // a nested `rewrite(eq, term)` can be lifted into a
-                        // named, readable fact.
-                        consumeAny();  // 'by'
-                        bool narrowed =
-                            peek().kind == TokenKind::KeywordSubstituting;
-                        consumeAny();  // 'substituting' / 'substitution'
-                        SurfaceExpressionPointer eqHint =
-                            narrowed ? parseExpression() : nullptr;
+                    if (peek().kind == TokenKind::LeftBrace) {
+                        // Footnote form: `claim P : T { proof_block };` is
+                        // sugar for `claim P : T by { proof_block };`. Build
+                        // the same structured-claim node, with the block as
+                        // the by-hint, so it elaborates identically to the
+                        // anonymous form.
                         wrapper.value = makeSurfaceStructuredClaim(
                             wrapper.type, /*label=*/"",
-                            std::move(eqHint), /*byCases=*/false,
+                            parseExpression(), /*byCases=*/false,
                             /*arms=*/{}, statementToken.line,
-                            statementToken.column, /*byInduction=*/false,
-                            /*bySubstitution=*/true);
-                    } else if (peek().kind == TokenKind::KeywordBy) {
-                        consumeAny();  // 'by'
-                        wrapper.value =
-                            parseRecallingWrap(parseExpression());
-                    } else if (peek().kind == TokenKind::LeftBrace) {
-                        // Footnote form: `claim P : T { proof_block };`
-                        // is sugar for `claim P : T by { proof_block };`.
-                        // The block is a normal expression-position
-                        // block, so parseExpression handles it.
-                        wrapper.value = parseExpression();
-                    } else {
-                        // No `by` or `{`: defer to the auto-prover. Wrap
-                        // the binding's expected type in an anonymous
-                        // structured-claim node; the elaborator routes
-                        // bare structured-claims through autoProveClaim.
-                        wrapper.value = makeSurfaceStructuredClaim(
-                            /*proposition=*/nullptr,
-                            /*label=*/"",
-                            /*byHint=*/nullptr,
-                            /*byCases=*/false,
-                            /*arms=*/{},
-                            statementToken.line,
                             statementToken.column);
+                    } else {
+                        // A named claim is exactly an anonymous claim plus a
+                        // let-binding: parse the `[by …]` tail with the SAME
+                        // routine the anonymous `claim P by …` form uses, so
+                        // the two elaborate identically (autoFillHintForClaim,
+                        // `recalling`, the redundant-`by` check, diff-coerce
+                        // fallback). Handles by cases / substitution /
+                        // induction / EXPR and the no-`by` auto-prover case.
+                        wrapper.value = parseStructuredClaimTail(
+                            statementToken, wrapper.type);
                     }
                 } else {
                     expect(TokenKind::Assign, "after let type");

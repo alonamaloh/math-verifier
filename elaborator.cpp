@@ -5655,43 +5655,53 @@ private:
         bool dumpClaimSize = claimSizeFlag && claimSizeFlag[0] != '\0'
             && claimSizeFlag[0] != '0';
         auto t0 = std::chrono::steady_clock::now();
-        ExpressionPointer hintTerm = elaborateExpression(
-            *claim.byHint, localBinders,
-            propagateExpectedTypeToHint ? goalClosed : nullptr);
-        auto tElab = std::chrono::steady_clock::now();
-        // `inferTypeInLocalContext` returns an OPENED type;
-        // `autoFillHintForClaim` expects closed form throughout
-        // (matchAgainstPattern / instantiateLemmaBinders are
-        // closed-form helpers).
-        ExpressionPointer hintTypeOpened =
-            inferTypeInLocalContext(localBinders, hintTerm);
-        ExpressionPointer hintType = closeOverLocalBinders(
-            hintTypeOpened, localBinders, localBinders.size());
-        auto tInfer = std::chrono::steady_clock::now();
-
-        ExpressionPointer result = autoFillHintForClaim(
-            hintTerm, hintType, goalClosed, localBinders, line);
+        ExpressionPointer result;
+        ExpressionPointer hintType;
+        try {
+            ExpressionPointer hintTerm = elaborateExpression(
+                *claim.byHint, localBinders,
+                propagateExpectedTypeToHint ? goalClosed : nullptr);
+            // `inferTypeInLocalContext` returns an OPENED type;
+            // `autoFillHintForClaim` expects closed form throughout
+            // (matchAgainstPattern / instantiateLemmaBinders are
+            // closed-form helpers).
+            ExpressionPointer hintTypeOpened =
+                inferTypeInLocalContext(localBinders, hintTerm);
+            hintType = closeOverLocalBinders(
+                hintTypeOpened, localBinders, localBinders.size());
+            result = autoFillHintForClaim(
+                hintTerm, hintType, goalClosed, localBinders, line);
+        } catch (const ElaborateError&) {
+            // The hint doesn't elaborate / fill against the goal directly.
+            // Fall back to elaborating it WITH the goal as the expected
+            // type and applying diff-inferred congruence — the behaviour
+            // the named (`let`-style) claim path always provided. Having
+            // both strategies here is what makes `claim NAME : T by …` and
+            // `claim T by …` elaborate identically (the name only adds a
+            // binding); e.g. `claim f(a) = f(b) by eq` with `eq : a = b`.
+            result = coerceToExpectedTypeViaDiff(
+                localBinders,
+                elaborateExpression(*claim.byHint, localBinders, goalClosed),
+                goalClosed);
+        } catch (const TypeError&) {
+            result = coerceToExpectedTypeViaDiff(
+                localBinders,
+                elaborateExpression(*claim.byHint, localBinders, goalClosed),
+                goalClosed);
+        }
         auto tFill = std::chrono::steady_clock::now();
-        if (dumpClaimSize) {
+        if (dumpClaimSize && hintType) {
             size_t goalSize = countExpressionNodes(goalClosed);
             size_t hintSize = countExpressionNodes(hintType);
-            long long elabMs =
+            long long totalMs =
                 std::chrono::duration_cast<std::chrono::milliseconds>(
-                    tElab - t0).count();
-            long long inferMs =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    tInfer - tElab).count();
-            long long fillMs =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    tFill - tInfer).count();
-            if (elabMs + inferMs + fillMs >= 50 || goalSize >= 100) {
+                    tFill - t0).count();
+            if (totalMs >= 50 || goalSize >= 100) {
                 std::cerr << "[claim-size] " << moduleName_
                           << ":" << line
                           << " goal=" << goalSize
                           << " hint=" << hintSize
-                          << " elab=" << elabMs
-                          << " infer=" << inferMs
-                          << " fill=" << fillMs << " ms\n";
+                          << " total=" << totalMs << " ms\n";
             }
         }
 
