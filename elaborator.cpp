@@ -8305,6 +8305,103 @@ private:
         return result;
     }
 
+    // Prove `App(leftFn, leftArg) = App(rightFn, rightArg)` when BOTH the
+    // function and the argument differ — the multi-position case the
+    // single-position diff walker bails on (e.g. `a + c = b + d` from
+    // `a = b`, `c = d`). Recursively prove each sub-equality, then combine
+    //   leftFn leftArg = leftFn rightArg   (congruence, rewrite the arg)
+    //   leftFn rightArg = rightFn rightArg (congruence, rewrite the fn)
+    // joined by transitivity. The recursion bottoms out via
+    // autoProveCalcStep on strictly smaller terms. Returns nullptr if
+    // either sub-proof fails or a type/level can't be computed.
+    ExpressionPointer proveApplicationDiff(
+        const std::vector<LocalBinder>& localBinders,
+        const Application* leftApp,
+        const Application* rightApp,
+        int line, int column) {
+        if (environment_.lookup("Equality.transitivity") == nullptr) {
+            return nullptr;
+        }
+        try {
+            ExpressionPointer leftFn = leftApp->function;
+            ExpressionPointer rightFn = rightApp->function;
+            ExpressionPointer leftArg = leftApp->argument;
+            ExpressionPointer rightArg = rightApp->argument;
+            auto closedType = [&](ExpressionPointer t) {
+                return closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, t),
+                    localBinders, localBinders.size());
+            };
+            auto eqType = [&](LevelPointer lvl, ExpressionPointer ty,
+                              ExpressionPointer x, ExpressionPointer y) {
+                ExpressionPointer e = makeConstant("Equality", {lvl});
+                e = makeApplication(std::move(e), ty);
+                e = makeApplication(std::move(e), x);
+                e = makeApplication(std::move(e), y);
+                return e;
+            };
+            ExpressionPointer argType = closedType(leftArg);
+            LevelPointer argLevel = typeUniverseOf(localBinders, leftArg);
+            ExpressionPointer fnType = closedType(leftFn);
+            LevelPointer fnLevel = typeUniverseOf(localBinders, leftFn);
+            ExpressionPointer appLeft = makeApplication(leftFn, leftArg);
+            ExpressionPointer appType = closedType(appLeft);
+            LevelPointer appLevel = typeUniverseOf(localBinders, appLeft);
+
+            ExpressionPointer argProof = autoProveCalcStep(
+                localBinders, leftArg, rightArg, argType, argLevel,
+                eqType(argLevel, argType, leftArg, rightArg), line, column);
+            if (!argProof) return nullptr;
+            ExpressionPointer fnProof = autoProveCalcStep(
+                localBinders, leftFn, rightFn, fnType, fnLevel,
+                eqType(fnLevel, fnType, leftFn, rightFn), line, column);
+            if (!fnProof) return nullptr;
+
+            // cong1 : leftFn leftArg = leftFn rightArg, motive λz. leftFn z
+            ExpressionPointer motive1 = makeLambda("_calc_z", argType,
+                makeApplication(liftBoundVariables(leftFn, 1, 0),
+                                makeBoundVariable(0)));
+            ExpressionPointer cong1 = makeConstant(
+                "Equality.congruence", {argLevel, appLevel});
+            cong1 = makeApplication(std::move(cong1), argType);
+            cong1 = makeApplication(std::move(cong1), appType);
+            cong1 = makeApplication(std::move(cong1), std::move(motive1));
+            cong1 = makeApplication(std::move(cong1), leftArg);
+            cong1 = makeApplication(std::move(cong1), rightArg);
+            cong1 = makeApplication(std::move(cong1), std::move(argProof));
+
+            // cong2 : leftFn rightArg = rightFn rightArg, motive λf. f rightArg
+            ExpressionPointer motive2 = makeLambda("_calc_f", fnType,
+                makeApplication(makeBoundVariable(0),
+                                liftBoundVariables(rightArg, 1, 0)));
+            ExpressionPointer cong2 = makeConstant(
+                "Equality.congruence", {fnLevel, appLevel});
+            cong2 = makeApplication(std::move(cong2), fnType);
+            cong2 = makeApplication(std::move(cong2), appType);
+            cong2 = makeApplication(std::move(cong2), std::move(motive2));
+            cong2 = makeApplication(std::move(cong2), leftFn);
+            cong2 = makeApplication(std::move(cong2), rightFn);
+            cong2 = makeApplication(std::move(cong2), std::move(fnProof));
+
+            // transitivity : leftFn leftArg = rightFn rightArg
+            ExpressionPointer mid = makeApplication(leftFn, rightArg);
+            ExpressionPointer appRight = makeApplication(rightFn, rightArg);
+            ExpressionPointer trans = makeConstant(
+                "Equality.transitivity", {appLevel});
+            trans = makeApplication(std::move(trans), appType);
+            trans = makeApplication(std::move(trans), appLeft);
+            trans = makeApplication(std::move(trans), mid);
+            trans = makeApplication(std::move(trans), appRight);
+            trans = makeApplication(std::move(trans), std::move(cong1));
+            trans = makeApplication(std::move(trans), std::move(cong2));
+            return trans;
+        } catch (const TypeError&) {
+            return nullptr;
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+    }
+
     ExpressionPointer autoProveCalcStepRaw(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer previousKernel,
@@ -8314,8 +8411,6 @@ private:
         ExpressionPointer stepEqualityType,
         int line, int column) {
         (void)stepEqualityType;
-        (void)column;
-        (void)line;
         // Strategy 2 below wraps with Equality.congruence. If that name
         // isn't declared (small test modules sometimes omit it), we'd
         // build a term referencing an undefined constant. Only the
@@ -8408,7 +8503,12 @@ private:
                 rightCursor = rightApp->function;
                 continue;
             }
-            // Multi-position diff at this level. Bail.
+            // Both function and argument differ at this level. Prove the
+            // two sub-equalities recursively and combine (congruence +
+            // transitivity); break with the combined proof (or nullptr if
+            // a sub-proof failed) for the path-step reconstruction below.
+            innerProof = proveApplicationDiff(
+                localBinders, leftApp, rightApp, line, column);
             break;
         }
         if (!innerProof) {
