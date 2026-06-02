@@ -238,6 +238,25 @@ currently fall back to explicit lemmas disappear:
 - **Acceptance:** the symmetry + stepping-stone tests that fail today pass;
   a measured drop in explicit `congruenceOf`/`transport_proposition`.
 
+> **Status — in progress (2026-06).**
+> - **Symmetry orientation DONE.** `tryDiffApplyUserProof`'s symmetric-match
+>   branch was doubly broken (double-close of already-closed endpoints →
+>   the historic "bare BoundVariable" malformed term, *plus* wrong
+>   Equality.symmetry argument order) and had never run (calc matches
+>   forward). Fixed: `theorem t (h : a = b) : b = a := h` and the
+>   `by (a = b)` cited-fact form now close the flipped goal. Surfaced by the
+>   WS8 coerce guard catching the malformed term in the wild. Tests in
+>   `symmetry_flip_test`.
+> - **Multi-position congruence (all facts in context)** already works via
+>   the auto-prover.
+> - *Remaining:* **bounded combining** — a single cited fact bridging a
+>   multi-position goal with the other facts pulled from context (e.g.
+>   `by (a = b)` closing `add(a,c) = add(b,d)` when `c = d` is in scope).
+>   And the **migration sweep** for the "measured drop": ~57 user-space
+>   `by Equality.symmetry(…)` calc/by-step justifications are now absorbable
+>   by the fixed coercion — a mark-then-verify-by-hand cleanup (see
+>   `warning_cleanup_workflow`), not yet done.
+
 ### WS4. Auto-prover completeness for "obvious" steps
 Every step a mathematician calls trivial should close with no hint.
 `autoProveClaim` is strong (equality battery, transitivity, context match,
