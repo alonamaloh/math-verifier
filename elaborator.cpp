@@ -7209,14 +7209,16 @@ private:
                     (direction == 0) ? eq.rhs : eq.lhs;
                 ExpressionPointer toSide =
                     (direction == 0) ? eq.lhs : eq.rhs;
+                // Find the goal form (surface, else deep-WHNF) in which
+                // the endpoint occurs, and how many times.
+                ExpressionPointer chosenForm;
                 int occurrences = 0;
-                ExpressionPointer abstractedBody;
                 int surfaceCount = 0;
                 int deepCount = 0;
                 for (size_t formIdx = 0;
                      formIdx < goalForms.size(); ++formIdx) {
                     int formOccurrences = 0;
-                    abstractedBody = abstractStructuralOccurrence(
+                    abstractStructuralOccurrence(
                         goalForms[formIdx], fromSide,
                         /*currentDepth=*/0, formOccurrences);
                     if (formIdx == 0) {
@@ -7225,6 +7227,7 @@ private:
                         deepCount = formOccurrences;
                     }
                     if (formOccurrences > 0) {
+                        chosenForm = goalForms[formIdx];
                         occurrences = formOccurrences;
                         break;
                     }
@@ -7238,54 +7241,101 @@ private:
                     attemptLog.push_back(attempt);
                     continue;
                 }
-                ExpressionPointer rewrittenGoal = substitute(
-                    abstractedBody, 0, toSide);
-                ExpressionPointer proofRewritten;
-                try {
-                    proofRewritten = autoProveClaim(
-                        rewrittenGoal, localBinders, line);
-                } catch (const ElaborateError&) {
-                    attempt.rewrittenProveFailed = true;
-                    attemptLog.push_back(attempt);
-                    continue;
-                } catch (const TypeError&) {
-                    attempt.rewrittenProveFailed = true;
-                    attemptLog.push_back(attempt);
-                    continue;
+                // Build the transport term from an abstracted motive body
+                // (which occurrences are abstracted is the caller's choice)
+                // and a proof of the rewritten goal. The motive shape is
+                // the only thing that varies between a full and a masked
+                // (single-occurrence) rewrite — the transport plumbing is
+                // identical.
+                auto buildTransport =
+                    [&](ExpressionPointer abstractedBody,
+                        ExpressionPointer proofRewritten) -> ExpressionPointer {
+                    ExpressionPointer motive = makeLambda(
+                        "_rewriteHole", eq.carrierType, abstractedBody);
+                    ExpressionPointer eqForTransport;
+                    ExpressionPointer transportLhs;
+                    ExpressionPointer transportRhs;
+                    if (direction == 0) {
+                        eqForTransport = eq.proofExpr;
+                        transportLhs = eq.lhs;
+                        transportRhs = eq.rhs;
+                    } else {
+                        eqForTransport = makeConstant(
+                            "Equality.symmetry", {eq.carrierLevel});
+                        eqForTransport = makeApplication(
+                            eqForTransport, eq.carrierType);
+                        eqForTransport = makeApplication(
+                            eqForTransport, eq.lhs);
+                        eqForTransport = makeApplication(
+                            eqForTransport, eq.rhs);
+                        eqForTransport = makeApplication(
+                            eqForTransport, eq.proofExpr);
+                        transportLhs = eq.rhs;
+                        transportRhs = eq.lhs;
+                    }
+                    ExpressionPointer call = makeConstant(
+                        "Equality.transport_proposition",
+                        {eq.carrierLevel});
+                    call = makeApplication(call, eq.carrierType);
+                    call = makeApplication(call, motive);
+                    call = makeApplication(call, transportLhs);
+                    call = makeApplication(call, transportRhs);
+                    call = makeApplication(call, eqForTransport);
+                    call = makeApplication(call, proofRewritten);
+                    return call;
+                };
+                auto tryCloseAndBuild =
+                    [&](ExpressionPointer abstractedBody,
+                        int budget) -> ExpressionPointer {
+                    ExpressionPointer rewrittenGoal = substitute(
+                        abstractedBody, 0, toSide);
+                    try {
+                        ExpressionPointer proofRewritten = autoProveClaim(
+                            rewrittenGoal, localBinders, line, budget);
+                        return buildTransport(abstractedBody, proofRewritten);
+                    } catch (const ElaborateError&) {
+                        return nullptr;
+                    } catch (const TypeError&) {
+                        return nullptr;
+                    }
+                };
+                // Phase 1: try rewriting each SUBSET of the occurrences and
+                // closing CHEAPLY (transportBudget 0 — a hypothesis/fact
+                // match, no further equality-bridge search). This finds the
+                // intended rewrite when the endpoint occurs several times —
+                // e.g. only the standalone `0` in `successor(0) ≤ 0`, which
+                // lands on a hypothesis — and returns fast, instead of
+                // rewriting ALL occurrences into an unprovable goal and then
+                // burning the full search on it. Bounded to a small
+                // occurrence count so the 2^n subset sweep stays cheap.
+                constexpr int maxOccurrencesForSubsetSearch = 6;
+                if (occurrences <= maxOccurrencesForSubsetSearch) {
+                    for (uint32_t mask = 1;
+                         mask < (1u << occurrences); ++mask) {
+                        int counter = 0;
+                        ExpressionPointer maskedBody =
+                            abstractStructuralOccurrenceMasked(
+                                chosenForm, fromSide, /*currentDepth=*/0,
+                                counter, mask);
+                        ExpressionPointer result =
+                            tryCloseAndBuild(maskedBody, /*budget=*/0);
+                        if (result) return result;
+                    }
                 }
-                ExpressionPointer motive = makeLambda(
-                    "_rewriteHole", eq.carrierType, abstractedBody);
-                ExpressionPointer eqForTransport;
-                ExpressionPointer transportLhs;
-                ExpressionPointer transportRhs;
-                if (direction == 0) {
-                    eqForTransport = eq.proofExpr;
-                    transportLhs = eq.lhs;
-                    transportRhs = eq.rhs;
-                } else {
-                    eqForTransport = makeConstant(
-                        "Equality.symmetry", {eq.carrierLevel});
-                    eqForTransport = makeApplication(
-                        eqForTransport, eq.carrierType);
-                    eqForTransport = makeApplication(
-                        eqForTransport, eq.lhs);
-                    eqForTransport = makeApplication(
-                        eqForTransport, eq.rhs);
-                    eqForTransport = makeApplication(
-                        eqForTransport, eq.proofExpr);
-                    transportLhs = eq.rhs;
-                    transportRhs = eq.lhs;
+                // Phase 2: rewrite ALL occurrences and close with the full
+                // auto-prover (default budget — may recurse through one
+                // equality bridge, which some goals legitimately need).
+                {
+                    int counter = 0;
+                    ExpressionPointer allBody = abstractStructuralOccurrence(
+                        chosenForm, fromSide, /*currentDepth=*/0, counter);
+                    ExpressionPointer result =
+                        tryCloseAndBuild(allBody, /*budget=*/1);
+                    if (result) return result;
                 }
-                ExpressionPointer call = makeConstant(
-                    "Equality.transport_proposition",
-                    {eq.carrierLevel});
-                call = makeApplication(call, eq.carrierType);
-                call = makeApplication(call, motive);
-                call = makeApplication(call, transportLhs);
-                call = makeApplication(call, transportRhs);
-                call = makeApplication(call, eqForTransport);
-                call = makeApplication(call, proofRewritten);
-                return call;
+                attempt.rewrittenProveFailed = true;
+                attemptLog.push_back(attempt);
+                continue;
             }
         }
         if (claim.byHint) {
