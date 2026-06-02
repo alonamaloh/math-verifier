@@ -88,6 +88,36 @@ void writeAtPrecedence(std::ostringstream& output,
                        std::vector<std::string>& stack,
                        int precedence);
 
+// Does de Bruijn index `target` occur free in `expression`? Used to
+// decide whether a Pi is a plain function type (`A → B`) or a dependent
+// one (`(x : A) → B`). `maxFreeBoundVariable` gives an O(1) reject for the
+// common closed-codomain case, so this is cheap on real terms.
+bool mentionsBoundVariable(const ExpressionPointer& expression, int target) {
+    if (!expression) return false;
+    if (expression->maxFreeBoundVariable < target) return false;
+    if (auto* bv = std::get_if<BoundVariable>(&expression->node)) {
+        return bv->deBruijnIndex == target;
+    }
+    if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        return mentionsBoundVariable(pi->domain, target)
+            || mentionsBoundVariable(pi->codomain, target + 1);
+    }
+    if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        return mentionsBoundVariable(lambda->domain, target)
+            || mentionsBoundVariable(lambda->body, target + 1);
+    }
+    if (auto* application = std::get_if<Application>(&expression->node)) {
+        return mentionsBoundVariable(application->function, target)
+            || mentionsBoundVariable(application->argument, target);
+    }
+    if (auto* let = std::get_if<Let>(&expression->node)) {
+        return mentionsBoundVariable(let->type, target)
+            || mentionsBoundVariable(let->value, target)
+            || mentionsBoundVariable(let->body, target + 1);
+    }
+    return false;  // FreeVariable, Sort, Constant
+}
+
 void writeAtomic(std::ostringstream& output,
                  ExpressionPointer expression,
                  std::vector<std::string>& stack) {
@@ -148,12 +178,27 @@ void writeAtPrecedence(std::ostringstream& output,
                        std::vector<std::string>& stack,
                        int precedence) {
     if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        // Render function types in the surface form the language uses,
+        // never the CIC `Π`. Non-dependent (the binder is unused in the
+        // codomain) prints as `A → B`; dependent as `(x : A) → B`. The
+        // arrow binds loosest (like the old Π), so it parenthesises
+        // exactly when `precedence > 0`.
         bool needsParentheses = precedence > 0;
         if (needsParentheses) output << "(";
         auto displayName = freshenAgainstStack(stack, pi->displayHint);
-        output << "Π(" << displayName << " : ";
-        writeAtPrecedence(output, pi->domain, stack, 0);
-        output << "). ";
+        bool dependent = mentionsBoundVariable(pi->codomain, 0);
+        if (dependent) {
+            output << "(" << displayName << " : ";
+            writeAtPrecedence(output, pi->domain, stack, 0);
+            output << ") → ";
+        } else {
+            // Left of `→`: parenthesise a nested arrow (precedence 0) but
+            // leave tighter forms bare, and print the domain `→`-free.
+            writeAtPrecedence(output, pi->domain, stack, 1);
+            output << " → ";
+        }
+        // Push the binder name even when unused so de Bruijn indices in
+        // the codomain still resolve against the right stack depth.
         stack.push_back(displayName);
         writeAtPrecedence(output, pi->codomain, stack, 0);
         stack.pop_back();
