@@ -59,8 +59,8 @@ theorem Natural.divides_one_implies_equals_one
                 = 0)
        }
      | successor(predD) => {
-         let refinedEq : successor(0) = successor(predD) * q :=
-             rewrite(dEq, oneEqDTimesQ);
+         claim refinedEq : successor(0) = successor(predD) * q
+             by substituting dEq;
          -- successor(predD) * q reduces to q + predD * q.
          -- 1 = q + predD * q. Case-split q to derive `successor predD = 1`,
          -- then transport back to `d = 1` via `Equality.symmetry(dEq)`.
@@ -75,10 +75,10 @@ theorem Natural.divides_one_implies_equals_one
                          = 0)
                 }
               | successor(predQ) => {
-                  let refinedQEq
+                  claim refinedQEq
                         : successor(0)
-                          = successor(predD) * successor(predQ) :=
-                      rewrite(qEq, refinedEq);
+                          = successor(predD) * successor(predQ)
+                      by substituting qEq;
                   -- successor(predD) * successor(predQ) reduces to
                   --   successor(predQ) + predD * successor(predQ).
                   -- That successor expands to
@@ -134,8 +134,10 @@ theorem Natural.bezout_one_when_prime_coprime
            calc (p : Integer) * x + (a : Integer) * y
               = (g : Integer)
               = ((1 : Natural) : Integer)⟩
-      in (g = p) as gEqP:
-          absurd(notDividesA(rewrite(gEqP, gDividesA)))
+      in (g = p) as gEqP: {
+          claim pDividesA : Natural.divides(p, a) by substituting gEqP;
+          absurd(notDividesA(pDividesA))
+        }
     }
 }
 
@@ -251,12 +253,9 @@ theorem Natural.prime_divides_product_when_coprime
            = (p : Integer) * -(negativePart : Integer)
            = -((p : Integer) * (negativePart : Integer))
            = -((p * negativePart) : Integer)                 as bEqNegateProduct;
-        claim bIsZero : b = 0
-          by Natural.natural_eq_negate_natural_implies_first_zero(
-                 b, p * negativePart, bEqNegateProduct);
-        rewrite(
-            Equality.symmetry(bIsZero),
-            Natural.divides_zero(p))
+        claim Natural.divides(p, b)
+          by substituting Natural.natural_eq_negate_natural_implies_first_zero(
+                 b, p * negativePart, bEqNegateProduct)
       }
     }
 }
