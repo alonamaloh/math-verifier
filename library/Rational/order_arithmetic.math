@@ -96,10 +96,9 @@ theorem Rational.IsNonneg_zero : Rational.IsNonneg(Rational.zero) :=
 -- 0 ≤ q ↔ IsNonneg(q) was already in `Rational.positive`. We mirror
 -- as Rational.LessOrEqual.reflexive: x ≤ x.
 theorem Rational.LessOrEqual.reflexive (x : Rational) : x ≤ x :=
-  -- x ≤ x = IsNonneg(x - x) = IsNonneg(0).
-  rewrite(
-      Equality.symmetry(Rational.add_negate_right(x)),
-      Rational.IsNonneg_zero)
+  -- x ≤ x = IsNonneg(x - x); rewrite x - x to 0 and use IsNonneg_zero.
+  claim Rational.IsNonneg(x - x)
+    by substituting (ring : x - x = Rational.zero)
 
 -- IsNonneg(p) ∧ IsNonneg(q) → IsNonneg(p + q). At Integer level the
 -- sum of two non-negatives is non-negative; lift through reps.
@@ -188,13 +187,9 @@ theorem Rational.LessOrEqual.transitive
         (x y z : Rational)
         (xLeqY : x ≤ y) (yLeqZ : y ≤ z)
         : x ≤ z :=
-  rewrite(
-      -- (z - y) + (y - x) = z - x.
-      -- Strategy: (z + -y) + (y + -x) = z + ((-y + y) + -x)
-      --         = z + (0 + -x) = z + -x = z - x.
-      calc (z - y) + (y - x)
-         = z - x,
-      Rational.IsNonneg.add(z - y, y - x, yLeqZ, xLeqY))
+  -- (z - y) + (y - x) = z - x; IsNonneg.add closes the rewritten goal.
+  claim Rational.IsNonneg(z - x)
+    by substituting (ring : (z - y) + (y - x) = z - x)
 
 -- ----------------------------------------------------------------------
 -- Strict transitivity and additive monotonicity.
