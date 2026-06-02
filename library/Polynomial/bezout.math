@@ -71,11 +71,8 @@ theorem Polynomial.add_swap_first (r : Ring)
           = Polynomial.add(r, b, Polynomial.add(r, a, c)) :=
   calc Polynomial.add(r, a, Polynomial.add(r, b, c))
      = Polynomial.add(r, Polynomial.add(r, a, b), c)
-           by Equality.symmetry(Polynomial.add_associative(r, a, b, c))
      = Polynomial.add(r, Polynomial.add(r, b, a), c)
-           by Polynomial.add_commutative(r, a, b)
      = Polynomial.add(r, b, Polynomial.add(r, a, c))
-           by Polynomial.add_associative(r, b, a, c)
 
 -- ----------------------------------------------------------------------
 -- ¬(bound ≤ dy) is what guarantees the recursion shrinks; package the
@@ -147,11 +144,8 @@ theorem Polynomial.gcd_bezout (r : Ring)
               ⟨x, Polynomial.one(r), Polynomial.zero(r),
                calc x
                   = Polynomial.multiply(r, Polynomial.one(r), x)
-                        by Equality.symmetry(Polynomial.multiply_one_left(r, x))
                   = Polynomial.add(r, Polynomial.multiply(r, Polynomial.one(r), x),
                         Polynomial.zero(r))
-                        by Equality.symmetry(Polynomial.add_identity_right(r,
-                               Polynomial.multiply(r, Polynomial.one(r), x)))
                   = Polynomial.add(r, Polynomial.multiply(r, Polynomial.one(r), x),
                         Polynomial.multiply(r, Polynomial.zero(r), y))
                         by Equality.symmetry(
@@ -185,23 +179,14 @@ theorem Polynomial.gcd_bezout (r : Ring)
                          = Polynomial.add(r,
                                Polynomial.add(r, Polynomial.multiply(r, quotient, y), remainder),
                                Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))
-                               by divisionEquation
                          = Polynomial.add(r,
                                Polynomial.add(r, remainder, Polynomial.multiply(r, quotient, y)),
                                Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))
-                               by Polynomial.add_commutative(r,
-                                      Polynomial.multiply(r, quotient, y), remainder)
                          = Polynomial.add(r, remainder,
                                Polynomial.add(r, Polynomial.multiply(r, quotient, y),
                                    Polynomial.negate(r, Polynomial.multiply(r, quotient, y))))
-                               by Polynomial.add_associative(r, remainder,
-                                      Polynomial.multiply(r, quotient, y),
-                                      Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))
                          = Polynomial.add(r, remainder, Polynomial.zero(r))
-                               by Polynomial.add_negate_right(r,
-                                      Polynomial.multiply(r, quotient, y))
-                         = remainder
-                               by Polynomial.add_identity_right(r, remainder));
+                         = remainder);
 
               claim mDividesQuotientY
                   : Ring.divides(Polynomial.ring(r), m,
@@ -221,67 +206,38 @@ theorem Polynomial.gcd_bezout (r : Ring)
                calc m
                   = Polynomial.add(r, Polynomial.multiply(r, aRest, y),
                         Polynomial.multiply(r, bRest, remainder))
-                        by restEquation
                   = Polynomial.add(r, Polynomial.multiply(r, aRest, y),
                         Polynomial.multiply(r, bRest,
                             Polynomial.add(r, x,
                                 Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))))
-                        by remainderEquation
                   = Polynomial.add(r, Polynomial.multiply(r, aRest, y),
                         Polynomial.add(r, Polynomial.multiply(r, bRest, x),
                             Polynomial.multiply(r, bRest,
                                 Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))))
-                        by Polynomial.multiply_distributivity_left(r, bRest, x,
-                               Polynomial.negate(r, Polynomial.multiply(r, quotient, y)))
                   = Polynomial.add(r, Polynomial.multiply(r, aRest, y),
                         Polynomial.add(r, Polynomial.multiply(r, bRest, x),
                             Polynomial.negate(r,
                                 Polynomial.multiply(r, bRest,
                                     Polynomial.multiply(r, quotient, y)))))
-                        by Polynomial.multiply_negate_right(r, bRest,
-                               Polynomial.multiply(r, quotient, y))
                   = Polynomial.add(r, Polynomial.multiply(r, bRest, x),
                         Polynomial.add(r, Polynomial.multiply(r, aRest, y),
                             Polynomial.negate(r,
                                 Polynomial.multiply(r, bRest,
                                     Polynomial.multiply(r, quotient, y)))))
-                        by Polynomial.add_swap_first(r,
-                               Polynomial.multiply(r, aRest, y),
-                               Polynomial.multiply(r, bRest, x),
-                               Polynomial.negate(r,
-                                   Polynomial.multiply(r, bRest,
-                                       Polynomial.multiply(r, quotient, y))))
                   = Polynomial.add(r, Polynomial.multiply(r, bRest, x),
                         Polynomial.add(r, Polynomial.multiply(r, aRest, y),
                             Polynomial.negate(r,
                                 Polynomial.multiply(r,
                                     Polynomial.multiply(r, bRest, quotient), y))))
-                        by congruenceOf(
-                               function (t : Polynomial(Ring.carrier(r), Ring.zero(r))) =>
-                                   Polynomial.add(r, Polynomial.multiply(r, bRest, x),
-                                       Polynomial.add(r, Polynomial.multiply(r, aRest, y),
-                                           Polynomial.negate(r, t))),
-                               Equality.symmetry(Polynomial.multiply_associative(r,
-                                   bRest, quotient, y)))
                   = Polynomial.add(r, Polynomial.multiply(r, bRest, x),
                         Polynomial.add(r, Polynomial.multiply(r, aRest, y),
                             Polynomial.multiply(r,
                                 Polynomial.negate(r, Polynomial.multiply(r, bRest, quotient)), y)))
-                        by congruenceOf(
-                               function (t : Polynomial(Ring.carrier(r), Ring.zero(r))) =>
-                                   Polynomial.add(r, Polynomial.multiply(r, bRest, x),
-                                       Polynomial.add(r, Polynomial.multiply(r, aRest, y), t)),
-                               Equality.symmetry(Polynomial.multiply_negate_left(r,
-                                   Polynomial.multiply(r, bRest, quotient), y)))
                   = Polynomial.add(r, Polynomial.multiply(r, bRest, x),
                         Polynomial.multiply(r,
                             Polynomial.add(r, aRest,
                                 Polynomial.negate(r, Polynomial.multiply(r, bRest, quotient))),
-                            y))
-                        by Equality.symmetry(Polynomial.multiply_distributivity_right(r,
-                               aRest,
-                               Polynomial.negate(r, Polynomial.multiply(r, bRest, quotient)),
-                               y)),
+                            y)),
                mDividesX,
                mDividesY⟩
             }
