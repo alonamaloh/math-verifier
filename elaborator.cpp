@@ -8278,6 +8278,23 @@ private:
                     carrierType, carrierLevel, stepRelationType,
                     step.line, step.column);
                 if (!stepProofKernel) {
+                    // autoProveCalcStep covers reflexivity / single-position
+                    // diff-congruence / AC. Fall back to the full prover for
+                    // everything else — context-fact match, the equality
+                    // bridge, and the symmetry flip (an `a = b` step closing
+                    // from a `b = a` fact). Only runs on steps the cheap path
+                    // couldn't close (which would otherwise error here), so a
+                    // step that already closes pays nothing extra.
+                    try {
+                        stepProofKernel = autoProveClaim(
+                            stepRelationType, localBinders, step.line);
+                    } catch (const ElaborateError&) {
+                        stepProofKernel = nullptr;
+                    } catch (const TypeError&) {
+                        stepProofKernel = nullptr;
+                    }
+                }
+                if (!stepProofKernel) {
                     throwElaborate(
                         "I can't figure out why this calc step is true — "
                         "the auto-prover couldn't close it. Add `by "
