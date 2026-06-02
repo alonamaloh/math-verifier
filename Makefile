@@ -151,8 +151,7 @@ library-clean:
 # CIC-leak dashboard (PLAN_LESS_CIC_STYLE.md, Phase 0.2). Counts CIC-
 # vocabulary tokens in user-space `.math` files — the north-star metric
 # the plan drives to zero. Non-failing report by default; `leak-ratchet`
-# fails if the total exceeds LEAK_BUDGET (wire into CI once a baseline is
-# agreed).
+# fails if the total exceeds LEAK_BUDGET (the no-increase ratchet).
 LEAK_BUDGET ?= 681
 
 leak-report:
@@ -167,8 +166,8 @@ leak-ratchet:
 # Error-provenance audit (PLAN_LESS_CIC_STYLE.md, Phase 0.3). Runs the
 # mistake corpus and classifies each diagnostic as math-shaped or
 # kernel-tagged (a CIC leak). `corpus` reports; `corpus-audit` fails if
-# any case is kernel-tagged (the WS1 acceptance gate — not yet green).
-# Both need the library built. See scripts/error_corpus/README.md.
+# any case is kernel-tagged (the WS1 acceptance gate — GREEN as of the
+# WS1 work). Both need the library built. See scripts/error_corpus/README.md.
 corpus: library
 	@scripts/error_corpus/run
 
@@ -179,3 +178,14 @@ corpus-update: library
 	@scripts/error_corpus/run --update
 
 .PHONY: corpus corpus-audit corpus-update
+
+# ----------------------------------------------------------------------
+# Aggregate gate. Verifies the library + test feature files, then enforces
+# the less-CIC invariants: no kernel-tagged error reaches the user (WS1
+# provenance gate) and the CIC leak count has not increased (Phase 0
+# ratchet). This is the "CI" entry point — run it before committing
+# elaborator/kernel changes.
+check: tests corpus-audit leak-ratchet
+	@echo "check: library + tests verified; provenance gate and leak ratchet OK"
+
+.PHONY: check
