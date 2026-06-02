@@ -8182,7 +8182,69 @@ private:
     //   2. Single-position diff classified as commutativity /
     //      associativity / identity / local-hypothesis.
     //   3. Multi-position composition.
+    // True if `expression` contains any FreeVariable node. Auto-prover
+    // calc-step results are closed over the local binders (binders as de
+    // Bruijn indices, top-level names as Constants), so a leftover
+    // FreeVariable means the term was opened and not re-closed — a bug.
+    static bool containsFreeVariable(const ExpressionPointer& expression) {
+        if (!expression) return false;
+        if (std::holds_alternative<FreeVariable>(expression->node)) {
+            return true;
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            return containsFreeVariable(application->function)
+                || containsFreeVariable(application->argument);
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return containsFreeVariable(lambda->domain)
+                || containsFreeVariable(lambda->body);
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return containsFreeVariable(pi->domain)
+                || containsFreeVariable(pi->codomain);
+        }
+        return false;  // BoundVariable, Sort, Constant
+    }
+
+    // Validating wrapper around autoProveCalcStepRaw: a closedness
+    // invariant check that turns a class of auto-prover bugs from cryptic
+    // kernel rejections into loud, attributed warnings. The raw search is
+    // supposed to return a CLOSED proof; if it leaks a free variable the
+    // term is invalid and must not be used (see the body for details).
     ExpressionPointer autoProveCalcStep(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        ExpressionPointer stepEqualityType,
+        int line, int column) {
+        ExpressionPointer result = autoProveCalcStepRaw(
+            localBinders, previousKernel, nextKernel,
+            carrierType, carrierLevel, stepEqualityType, line, column);
+        if (!result) return nullptr;
+        // A calc-step proof from the auto-prover is built CLOSED over the
+        // local binders, so it must contain NO free variables — the local
+        // binders appear as de Bruijn indices, top-level names as
+        // Constants. A leaked FreeVariable (e.g. an opened-but-not-reclosed
+        // carrier like `Group.carrier(@H)`) means the auto-prover assembled
+        // an invalid term: the kernel would reject it later with a cryptic
+        // "unbound internal variable". Surface it as the auto-prover bug it
+        // is, and treat the step as unproven (so the redundant-`by` check
+        // doesn't flag a `by` whose removal would fail, and the by-less
+        // path reports a clean "couldn't close it" instead).
+        if (containsFreeVariable(result)) {
+            std::cerr << "warning: " << moduleName_ << ":" << line << ":"
+                << column << ": auto-prover produced a calc-step proof with a "
+                "leaked free variable — this is an auto-prover bug; treating "
+                "the step as unproven\n";
+            return nullptr;
+        }
+        return result;
+    }
+
+    ExpressionPointer autoProveCalcStepRaw(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer previousKernel,
         ExpressionPointer nextKernel,
@@ -10302,8 +10364,15 @@ private:
             ExpressionPointer carrierClosed;
             LevelPointer carrierLevelAtThisLevel;
             try {
-                carrierClosed = inferTypeInLocalContext(
-                    localBinders, subLeft);
+                // inferTypeInLocalContext returns the type in OPENED form
+                // (Internal free variables for the local binders). The
+                // symmetry term we splice it into is in CLOSED (de Bruijn)
+                // form, so the carrier MUST be closed too — otherwise an
+                // abstract carrier like `Group.carrier(H)` leaks an
+                // unbound internal `H` that the kernel later rejects.
+                carrierClosed = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, subLeft),
+                    localBinders, localBinders.size());
                 carrierLevelAtThisLevel = typeUniverseOf(
                     localBinders, subLeft);
             } catch (const TypeError&) {
