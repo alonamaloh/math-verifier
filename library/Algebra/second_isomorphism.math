@@ -1,0 +1,162 @@
+-- Algebra/second_isomorphism.math
+--
+-- The second (diamond) isomorphism theorem. For a subgroup A ≤ G and a
+-- normal subgroup N ◁ G, the map
+--   ψ : A → G/N,   ψ(a) = [a]_N
+-- (the inclusion A ↪ G followed by the projection G → G/N) is a
+-- homomorphism whose kernel is A ∩ N and whose image is AN/N. The first
+-- isomorphism theorem then gives  A/(A ∩ N) ≅ AN/N.
+--
+-- A is realised as a group via Algebra/subgroup_group (its carrier is the
+-- subtype { x | x ∈ A }), so it can serve as the domain of ψ. We state the
+-- conclusion in the established style: the induced map A/ker(ψ) → G/N is
+-- an injective homomorphism (its image is im(ψ) = AN/N by the first
+-- theorem), and the distinctive content — ker(ψ) = A ∩ N — is the kernel
+-- characterization `a ∈ ker(ψ) ⟺ value(a) ∈ N`.
+
+module Algebra.second_isomorphism
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Logic.quotient
+import Set.basics
+import Set.subtype
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+import Algebra.group_homomorphism
+import Algebra.subgroup
+import Algebra.subgroup_group
+import Algebra.normal_subgroup
+import Algebra.quotient_group
+import Algebra.first_isomorphism
+
+-- ----------------------------------------------------------------------
+-- The map ψ : A → G/N, ψ(a) = [value(a)]_N.
+
+definition SecondIsomorphism.map
+        (G : Group) (subsetA : Set(Group.carrier(G)))
+        (subgroupA : IsSubgroup(G, subsetA))
+        (subsetN : Set(Group.carrier(G)))
+        (normalN : IsNormalSubgroup(G, subsetN))
+        (a : Group.carrier(Subgroup.group(G, subsetA, subgroupA)))
+        : Group.carrier(QuotientGroup.group(G, subsetN, normalN)) :=
+  QuotientGroup.make(G, subsetN, Subtype.value(a))
+
+-- ψ is a homomorphism: value(a·b) = value(a)·value(b) inside A, and the
+-- quotient operation of [value a],[value b] reduces to [value a · value
+-- b], so both sides are the same class — reflexivity.
+theorem SecondIsomorphism.map_is_homomorphism
+        (G : Group) (subsetA : Set(Group.carrier(G)))
+        (subgroupA : IsSubgroup(G, subsetA))
+        (subsetN : Set(Group.carrier(G)))
+        (normalN : IsNormalSubgroup(G, subsetN))
+        : IsHomomorphism(
+              Subgroup.group(G, subsetA, subgroupA),
+              QuotientGroup.group(G, subsetN, normalN),
+              SecondIsomorphism.map(G, subsetA, subgroupA, subsetN, normalN)) :=
+  function (x y : Group.carrier(Subgroup.group(G, subsetA, subgroupA))) =>
+    reflexivity(QuotientGroup(G, subsetN),
+        QuotientGroup.make(G, subsetN, Subtype.value(x) · Subtype.value(y)))
+
+-- ----------------------------------------------------------------------
+-- The kernel of ψ is A ∩ N: an element a of A is in ker(ψ) exactly when
+-- its value lies in N.
+
+-- (⇐) value(a) ∈ N ⟹ [value(a)]_N = [e]_N, because value(a)⁻¹·e ∈ N.
+theorem SecondIsomorphism.map_kernel_contains
+        (G : Group) (subsetA : Set(Group.carrier(G)))
+        (subgroupA : IsSubgroup(G, subsetA))
+        (subsetN : Set(Group.carrier(G)))
+        (normalN : IsNormalSubgroup(G, subsetN))
+        (a : Group.carrier(Subgroup.group(G, subsetA, subgroupA)))
+        (valueInN : Subtype.value(a) ∈ subsetN)
+        : a ∈ GroupHomomorphism.kernel(
+                  Subgroup.group(G, subsetA, subgroupA),
+                  QuotientGroup.group(G, subsetN, normalN),
+                  SecondIsomorphism.map(G, subsetA, subgroupA, subsetN, normalN)) := {
+  let ⟨_, _, closedUnderInverse⟩ := IsNormalSubgroup.subgroup(G, subsetN, normalN);
+  claim cosetInN : Subtype.value(a)⁻¹ · Group.identity(G) ∈ subsetN
+      by rewrite(Equality.symmetry(Group.identity_right(G, Subtype.value(a)⁻¹)),
+                 closedUnderInverse(Subtype.value(a), valueInN));
+  Quotient.sound(Subtype.value(a), Group.identity(G), cosetInN)
+}
+
+-- (⇒) a ∈ ker(ψ) ⟹ value(a) ∈ N: [value a]_N = [e]_N gives
+-- value(a)⁻¹·e = value(a)⁻¹ ∈ N (Quotient.exact), hence value(a) ∈ N.
+theorem SecondIsomorphism.map_kernel_only
+        (G : Group) (subsetA : Set(Group.carrier(G)))
+        (subgroupA : IsSubgroup(G, subsetA))
+        (subsetN : Set(Group.carrier(G)))
+        (normalN : IsNormalSubgroup(G, subsetN))
+        (a : Group.carrier(Subgroup.group(G, subsetA, subgroupA)))
+        (inKernel
+            : a ∈ GroupHomomorphism.kernel(
+                      Subgroup.group(G, subsetA, subgroupA),
+                      QuotientGroup.group(G, subsetN, normalN),
+                      SecondIsomorphism.map(G, subsetA, subgroupA, subsetN, normalN)))
+        : Subtype.value(a) ∈ subsetN := {
+  let subgroupN : IsSubgroup(G, subsetN)
+      := IsNormalSubgroup.subgroup(G, subsetN, normalN);
+  let ⟨_, _, closedUnderInverse⟩ := subgroupN;
+  let equivalenceN
+      : IsEquivalenceRelation(Group.carrier(G), Group.SameCoset(G, subsetN))
+      := Group.SameCoset.is_equivalence(G, subsetN, subgroupN);
+  claim cosetInN : Subtype.value(a)⁻¹ · Group.identity(G) ∈ subsetN
+      by Quotient.exact(Group.carrier(G), Group.SameCoset(G, subsetN),
+                        equivalenceN, Subtype.value(a), Group.identity(G), inKernel);
+  claim inverseInN : Subtype.value(a)⁻¹ ∈ subsetN
+      by rewrite(Group.identity_right(G, Subtype.value(a)⁻¹), cosetInN);
+  rewrite(Group.inverse_involution_bundled(G, Subtype.value(a)),
+          closedUnderInverse(Subtype.value(a)⁻¹, inverseInN))
+}
+
+-- ----------------------------------------------------------------------
+-- The isomorphism A/ker(ψ) ≅ im(ψ), from the first isomorphism theorem.
+-- With ker(ψ) = A ∩ N (above) and im(ψ) = AN/N, this is A/(A∩N) ≅ AN/N.
+
+-- The quotient A/ker(ψ), bundled.
+definition SecondIsomorphism.quotient
+        (G : Group) (subsetA : Set(Group.carrier(G)))
+        (subgroupA : IsSubgroup(G, subsetA))
+        (subsetN : Set(Group.carrier(G)))
+        (normalN : IsNormalSubgroup(G, subsetN)) : Group :=
+  GroupHomomorphism.quotient_by_kernel(
+      Subgroup.group(G, subsetA, subgroupA),
+      QuotientGroup.group(G, subsetN, normalN),
+      SecondIsomorphism.map(G, subsetA, subgroupA, subsetN, normalN),
+      SecondIsomorphism.map_is_homomorphism(G, subsetA, subgroupA, subsetN, normalN))
+
+-- The induced map ψ̄ : A/ker(ψ) → G/N.
+definition SecondIsomorphism.induced
+        (G : Group) (subsetA : Set(Group.carrier(G)))
+        (subgroupA : IsSubgroup(G, subsetA))
+        (subsetN : Set(Group.carrier(G)))
+        (normalN : IsNormalSubgroup(G, subsetN))
+        : Group.carrier(SecondIsomorphism.quotient(G, subsetA, subgroupA, subsetN, normalN))
+          → Group.carrier(QuotientGroup.group(G, subsetN, normalN)) :=
+  GroupHomomorphism.induced_map(
+      Subgroup.group(G, subsetA, subgroupA),
+      QuotientGroup.group(G, subsetN, normalN),
+      SecondIsomorphism.map(G, subsetA, subgroupA, subsetN, normalN),
+      SecondIsomorphism.map_is_homomorphism(G, subsetA, subgroupA, subsetN, normalN))
+
+-- ψ̄ is injective — directly from the first isomorphism theorem. Together
+-- with image(ψ̄) = image(ψ) (also first isomorphism) this exhibits the
+-- isomorphism A/(A∩N) ≅ AN/N.
+theorem SecondIsomorphism.induced_is_injective
+        (G : Group) (subsetA : Set(Group.carrier(G)))
+        (subgroupA : IsSubgroup(G, subsetA))
+        (subsetN : Set(Group.carrier(G)))
+        (normalN : IsNormalSubgroup(G, subsetN))
+        : GroupHomomorphism.IsInjective(
+              SecondIsomorphism.quotient(G, subsetA, subgroupA, subsetN, normalN),
+              QuotientGroup.group(G, subsetN, normalN),
+              SecondIsomorphism.induced(G, subsetA, subgroupA, subsetN, normalN)) :=
+  GroupHomomorphism.induced_map_is_injective(
+      Subgroup.group(G, subsetA, subgroupA),
+      QuotientGroup.group(G, subsetN, normalN),
+      SecondIsomorphism.map(G, subsetA, subgroupA, subsetN, normalN),
+      SecondIsomorphism.map_is_homomorphism(G, subsetA, subgroupA, subsetN, normalN))
