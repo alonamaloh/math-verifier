@@ -175,9 +175,11 @@ returns its final non-`;`-terminated expression.
   surrounding expected type), `done` / `okay` (bare claim,
   auto-prover closes the goal).
 - `claim <type> by <hint>;` — anonymous claim. Hints include `by
-  substitution` (auto-find equality + body), `by substituting
-  <eqProof>` (narrowed to a supplied equation), `by cases { … }`,
-  `by cases on E { case A: … case B: … }`, `by induction { … }`.
+  (<fact>)` (cite a proposition: auto-proved, then used as a proof of
+  itself — below), `by substitution` (auto-find equality + body), `by
+  substituting <eq>` (narrowed to a supplied equation — `<eq>` may be a
+  proof *or* a bare equation `(a = b)`, which is auto-proved), `by cases
+  { … }`, `by cases on E { case A: … case B: … }`, `by induction { … }`.
 - `obtain ⟨a, b⟩ from <existentialOrAnd>;` — destructure an
   `∃ x. P(x)` or `And(A, B)` into named binders.
 - `choose N such that P(N);` — sugar for `obtain ⟨N, _⟩` followed
@@ -258,12 +260,30 @@ So, in order of preference for a step the auto-prover can close:
    that explains the step. `since` (not `by`) signals "the author is
    explaining," and the redundant-`by` check leaves it alone.
 
-Use `by <proof>` only when the prover **cannot** close the step without
-it — then the citation isn't an explanation, it's the proof, and `by`
-is correct regardless of whether the lemma name enlightens. (Example:
-`claim (0 : Rational) ≤ (n : Rational) by Rational.LessOrEqual_zero_-
-of_IsNonneg((n : Rational), Rational.from_natural_IsNonneg(n))` — the
-auto-prover can't reach `IsNonneg(n)` on its own, so the `by` stays.)
+When the prover **cannot** close the step without help, the citation
+isn't an explanation — it's load-bearing. Prefer, in order:
+
+1. **`by (<fact>)`** — cite the *proposition* that does the work, in
+   parentheses. It is auto-proved and then bridged to the goal exactly
+   like `by <proof-of-that-fact>` (congruence/unification — see
+   `structures-and-inference.md`). Prefer this over a lemma name **when
+   the fact is simple**: `by (a = b)` or `by (x ≤ y)` tells the reader
+   *what's true*, not which plumbing lemma fires. (Judgement call — a
+   short, meaningful fact; not a restatement of the whole goal.)
+2. **`by <lemma>`** — name the lemma, arguments inferred. Use when the
+   *named result itself* is the insight, or when no single fact bridges
+   the step (a combining lemma is needed — then `by <lemma> recalling
+   (<fact>)` supplies its premise; see `structures-and-inference.md`).
+3. **`by <lemma>(args)` / `by <proof>`** — spell it out only when
+   inference can't fill the arguments.
+
+`by (<fact>)` bridges a fact whose proof *directly* establishes the goal
+(equalities via congruence, conclusion-matching facts); it does **not**
+chain through a combining lemma or flip by symmetry — for those, name the
+lemma (optionally `recalling (<fact>)`). Example where the `by` is
+genuinely load-bearing: `claim (0 : Rational) ≤ (n : Rational) by
+Rational.LessOrEqual_zero_of_IsNonneg((n : Rational), Rational.from_-
+natural_is_nonneg(n))` — the prover can't reach `IsNonneg(n)` on its own.
 
 Outermost-arm shorthands for case-splits:
 

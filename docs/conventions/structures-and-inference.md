@@ -156,6 +156,34 @@ that aren't local hypotheses. A partial call leaves the rest as holes:
 Named and anonymous claims elaborate through the **same** path, so all of
 the above works identically in `claim NAME : T by …` and `claim T by …`.
 
+## Citing a fact (a proposition) where a proof is expected
+
+A parenthesised **proposition** written where a proof is expected — e.g.
+`by (1 ≤ 1 + n)` — is **auto-proved**, and the synthesized proof is then
+handled identically to a user-supplied proof of that proposition. One
+primitive, three positions:
+
+- **proof position** — `… ≤ b by (x ≤ y)` on a calc step, or `claim P by
+  (<fact>)`. The proof of the cited fact bridges to the goal by the same
+  paths as `by <proof>`: definitional match, conclusion-unify, and the
+  diff/congruence bridge (so `succ(a) = succ(b)` closes from `by (a =
+  b)`). It does **not** chain through a combining lemma or flip by
+  symmetry — the cited fact's proof must *directly* establish the goal.
+- **recalled-fact position** — `by <lemma> recalling (<fact>)`. The fact
+  is auto-proved into the lemma's discharge scope, so a premise the
+  ambient context doesn't supply is met without writing its proof term.
+  This is how a combining lemma's stepping-stone premise is supplied:
+  `… ≤ … by add_general_LessOrEqual_left recalling (0 ≤ n)`. (Contrast
+  `recalling Natural.zero_least(n)` — the explicit proof-term form.)
+- **substitution equation** — `by substituting (a = b)`: the equation is
+  cited as a bare proposition, auto-proved, then used to rewrite the
+  goal. (`by substituting <eqProof>` still accepts a proof.)
+
+Mnemonic: `by (<fact>)` names the **fact** and lets the prover find the
+lemma; `by <lemma> recalling (<fact>)` names the **lemma** and supplies
+the fact for its premise. Prefer the former when a single simple fact
+carries the step; reach for the latter when a combining lemma is needed.
+
 ## Redundant- and unused-hint exemptions: `since` and `note`
 
 See `proof-style.md`. In short: `since <proof>` is `by <proof>` that the
