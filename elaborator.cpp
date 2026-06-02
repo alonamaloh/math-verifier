@@ -10464,8 +10464,6 @@ private:
             userLeft, localBinders, localBinders.size());
         ExpressionPointer userRightOpened = openOverLocalBinders(
             userRight, localBinders, localBinders.size());
-        ExpressionPointer userCarrierClosed = closeOverLocalBinders(
-            userCarrier, localBinders, localBinders.size());
         while (true) {
             ExpressionPointer leftOpened = openOverLocalBinders(
                 leftCursor, localBinders, localBinders.size());
@@ -10486,19 +10484,26 @@ private:
                 && isDefinitionallyEqual(environment_, openedContext,
                                           rightOpened, userLeftOpened);
             if (symmetricMatch) {
-                // Wrap with Equality.symmetry.
+                // The cursor endpoints are the user proof's endpoints
+                // SWAPPED, so wrap with Equality.symmetry. userCarrier /
+                // userLeft / userRight are already CLOSED over the local
+                // binders — extractEqualityComponents read them off the
+                // closed userProofType, and the `*Opened` values above are
+                // separate opened copies used only for the defeq probe — so
+                // they must NOT be closed again (doing so double-shifts the
+                // local-hypothesis BoundVariables out of scope: the historic
+                // symmetry-flip "bare BoundVariable" bug). With
+                // userProof : userLeft = userRight,
+                // symmetry(A, userLeft, userRight, userProof) : userRight =
+                // userLeft — matching the swapped cursor endpoints.
                 ExpressionPointer symmetryCall = makeConstant(
                     "Equality.symmetry", {userCarrierLevel});
                 symmetryCall = makeApplication(
-                    std::move(symmetryCall), userCarrierClosed);
+                    std::move(symmetryCall), userCarrier);
                 symmetryCall = makeApplication(
-                    std::move(symmetryCall),
-                    closeOverLocalBinders(userRight, localBinders,
-                                            localBinders.size()));
+                    std::move(symmetryCall), userLeft);
                 symmetryCall = makeApplication(
-                    std::move(symmetryCall),
-                    closeOverLocalBinders(userLeft, localBinders,
-                                            localBinders.size()));
+                    std::move(symmetryCall), userRight);
                 symmetryCall = makeApplication(
                     std::move(symmetryCall), userProof);
                 innerProof = std::move(symmetryCall);
