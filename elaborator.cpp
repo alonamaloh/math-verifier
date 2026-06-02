@@ -2894,14 +2894,18 @@ private:
             Context bodyContext = buildContextFromLocalBinders(bodyStack);
             if (!isDefinitionallyEqual(environment_, bodyContext,
                                         bodyTypeOpened, expectedOpened)) {
-                // Pass the OPENED types so the display path doesn't
-                // emit `<bound N>` indices — the body-stack binders
-                // now exist in the types as named FreeVariables.
-                TypeError error("case body's type does not match the "
-                                 "expected return type for this branch");
-                error.expectedType = expectedOpened;
-                error.actualType = bodyTypeOpened;
-                rethrowKernelError(error);
+                // The elaborator just found this mismatch itself, so it
+                // owns the message — report it as mathematics rather than
+                // laundering it through rethrowKernelError's "kernel: "
+                // path (WS1). The OPENED types render with named
+                // FreeVariables, not `<bound N>` indices.
+                throwElaborate(
+                    "this case's result has the wrong type for the "
+                    "function's declared return type\n"
+                    "    expected:            "
+                    + prettyPrintForDisplay(expectedOpened) + "\n"
+                    "    but this case gives: "
+                    + prettyPrintForDisplay(bodyTypeOpened));
             }
         } catch (const TypeError& kernelError) {
             // Wrap any other kernel error from inferType above.
