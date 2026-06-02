@@ -37,18 +37,22 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
 - **quotients.md** — `Quotient.mk`/`.sound`/`.lift`/`.induct[_two/_three]`
   short forms, `construction` intro forms, and pattern-binders
   (`by_representatives`, `cases`, `take`, `suppose`) on quotients.
-- **calc-and-rewrite.md** — `calc` with mixed `=`/`≤`/`<`/`≥`/`>`, `let`
-  abbreviations, `calc ... as NAME`, `rewrite(lemma)` /
+- **calc-and-rewrite.md** — `calc` with mixed `=`/`≤`/`<`/`≥`/`>`, `calc`
+  over preorders (`∣`/`⊆`), by-less `=` steps via the full prover, `let`
+  abbreviations, `calc ... as NAME`, `claim … by substituting` /
   `rewrite(eq, term)`, diff-inferred `by`, and rewrite-under-binder.
 - **algebra-tactics.md** — `ring`, `field`, `linear_combination`, and the
   foundational-vs-derived ring-lemma split.
 - **proof-style.md** — math-like phrasing; `cases`/`by_induction` over
   pattern-match; `cases ... with`; `decide`; statement-level sugar
   (`claim`/`goal`/`obtain`/`choose`/`take`/`suppose`/`let`/`note`/
-  `change`/`unfold`); and CIC-noise-reduction idioms.
+  `change`/`unfold`); `since` (kept hint) and `note … by` (verified
+  comment); and CIC-noise-reduction idioms.
 - **structures-and-inference.md** — name-bound `convention`s, implicit
-  arguments `{x : T}`, canonical `instance` inference, and operator
-  overloading (including the `·` group operator and postfix `⁻¹`).
+  arguments `{x : T}`, canonical `instance` inference, operator
+  overloading (including the `·` group operator and postfix `⁻¹`), and
+  citing a lemma `by <name>` (goal-driven + context-discharge +
+  match-and-unify, `recalling <fact>, …`).
 - **numerals-and-naming.md** — naming, line width, `1 + n` vs
   `successor`, and binding a repeated cast with `let`.
 - **opaque.md** — `opaque definition` discipline: when to use it, the

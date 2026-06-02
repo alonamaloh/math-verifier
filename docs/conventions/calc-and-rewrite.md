@@ -34,6 +34,31 @@ Step proofs are parsed at the parseAdditive level — `=`/`≤`/`<`/`≥`/`>`
 are reserved as separators, so step proofs containing those operators
 must be parenthesised.
 
+A by-less `=` step now runs the **full** auto-prover (not just the
+reflexivity / diff / AC battery): if the cheap battery fails it falls back
+to the same `autoProveClaim` an equality `claim` uses — context-fact
+match, the equality bridge, and the symmetry flip (so `0 = b` closes from
+a `b = 0` fact). A calc `=` step and an equality claim are one prover.
+
+## `calc` over preorders (`∣`, `⊆`, …)
+
+`calc` also chains any transitive relation, not just the order ones. A
+step separated by `∣` (divides) or `⊆` (subset) routes the whole chain to
+a generic-preorder fold that uses the carrier's relation and its
+transitivity lemma (`<R>.transitive` or `<R>_transitive`), absorbing
+interleaved `=` steps by transport:
+
+```math
+calc p
+   ∣ 0                 -- p divides 0   (auto: divides_zero)
+   = b                 -- 0 = b         (auto: the b = 0 fact, flipped)
+```
+
+proves `p ∣ b`, and `calc a = b ∣ c = d` proves `a ∣ d`. A single chain
+uses one non-`=` relation. A new transitive relation becomes calc-usable
+just by having its operator registered and a `<R>.transitive` lemma in
+scope — no parser/elaborator change.
+
 ### `let` for local abbreviations — the auto-prover sees through
 
 `let X : T := V;` introduces a local abbreviation. The kernel

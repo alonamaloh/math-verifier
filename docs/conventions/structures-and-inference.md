@@ -121,3 +121,44 @@ parameterized type applications. So:
   `PAdic.add` takes `(p, primality, x, y)`, not `(x, y)`. Once `(p,
   primality)` become implicit on `PAdic.add`, the operator overload
   will work.
+
+## Citing a lemma by name — let the arguments be inferred
+
+A lemma cited as `by <Lemma>` (no argument list) has its arguments filled
+from the goal and the local context, so you rarely spell them out:
+
+- **Goal-driven**: arguments fixed by the lemma's conclusion are read off
+  the goal. `claim a + 0 = a by add_zero` → `add_zero(a)`.
+- **Discharged from context**: a remaining *proof* premise is matched
+  against an in-scope hypothesis (or a `recalling`-listed fact). This is
+  how an inequality/divisibility lemma whose premises already sit in scope
+  closes with no arguments.
+- **Match-and-unify**: a premise can *also* solve a value the conclusion
+  didn't pin. `Polynomial.HasDegree_unique`'s conclusion is `d = e`, so it
+  leaves the ring `r` and polynomial `p` open; unifying its
+  `HasDegree(r, p, d)` premise against a local `HasDegree(Real.ring, q, d)`
+  fact solves `r` and `p` as a side effect. Search is bounded to the local
+  context + recalled facts — never a global proof search to fill an
+  argument.
+
+```math
+claim productHasDegree : Polynomial.HasDegree(Real.ring, a * b, da + db)
+  by Polynomial.HasDegree_product
+      recalling Real.multiply_commutative, Real.reciprocal_exists_for_nonzero
+```
+
+`recalling f, g` brings extra named facts into that discharge scope as
+bounded, context-local hypotheses (no global library scan) — use it for a
+lemma's "dictionary" premises (a ring's commutativity / inverse witnesses)
+that aren't local hypotheses. A partial call leaves the rest as holes:
+`HasDegree_unique(Real.ring, modulus, d, 2, ?, ?)`.
+
+Named and anonymous claims elaborate through the **same** path, so all of
+the above works identically in `claim NAME : T by …` and `claim T by …`.
+
+## Redundant- and unused-hint exemptions: `since` and `note`
+
+See `proof-style.md`. In short: `since <proof>` is `by <proof>` that the
+redundant-`by` check never flags (a kept explanation); `note P [by V];`
+is a `claim` that does *not* add the fact to the context (a verified
+comment), so it's outside both the unused and redundant checks.
