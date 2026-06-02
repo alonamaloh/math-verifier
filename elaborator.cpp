@@ -19703,6 +19703,122 @@ private:
             }
             unresolved = std::move(remaining);
         }
+        // Step 5c: match-and-unify discharge. A slot Step 5b couldn't
+        // touch because its type STILL references unresolved holes — e.g.
+        // `HasDegree(r, p, d)` where `r`, `p` are value holes the
+        // conclusion never pinned (HasDegree_unique's conclusion is just
+        // `d = e`). Try UNIFYING the slot pattern against each in-scope
+        // hypothesis (local binders — which include `recalling`-bound
+        // facts): a match against `HasDegree(Real.ring, modulus, d)`
+        // solves `r := Real.ring`, `p := modulus` as a side effect, which
+        // then lets the sibling slots discharge. The candidate set is the
+        // local context only — bounded, no library search — so the user
+        // having cited the lemma + recalled facts licenses the extra
+        // unification effort. Iterated to a fixpoint so solved holes
+        // propagate to other slots. Only runs on slots that would
+        // otherwise error, so it never changes an already-resolved call.
+        if (!unresolved.empty()) {
+            Context openedContext =
+                buildContextFromLocalBinders(localBinders);
+            int N = static_cast<int>(localBinders.size());
+            bool progress = true;
+            while (progress && !unresolved.empty()) {
+                progress = false;
+                std::vector<size_t> stillUnresolved;
+                for (size_t i : unresolved) {
+                    // A value hole (e.g. the ring/poly of HasDegree_unique)
+                    // may have been solved as a side effect of unifying a
+                    // sibling proof slot. Resolve it from the assignment
+                    // and drop it from the unresolved set.
+                    {
+                        auto solved = assignment.find(argFreshNames[i]);
+                        if (solved != assignment.end()) {
+                            elaboratedArgs[i] = solved->second;
+                            progress = true;
+                            continue;
+                        }
+                    }
+                    ExpressionPointer slotType =
+                        substituteFreeVariables(piDomains[i], assignment);
+                    ExpressionPointer slotOpened;
+                    try {
+                        slotOpened = openOverLocalBinders(
+                            slotType, localBinders, N);
+                    } catch (...) {
+                        stillUnresolved.push_back(i); continue;
+                    }
+                    // No pre-Prop gate here: the slot type still carries
+                    // unresolved hole FVs (the very ones we hope to solve),
+                    // so it isn't yet well-formed enough to classify. We
+                    // check Prop-ness AFTER unification resolves them, which
+                    // preserves "never fill a value hole from context".
+                    bool filled = false;
+                    for (int j = N - 1; j >= 0 && !filled; --j) {
+                        ExpressionPointer candidateType =
+                            openOverLocalBinders(
+                                localBinders[j].type, localBinders, j);
+                        // Trial-unify the slot pattern against the
+                        // candidate, solving the slot's remaining holes.
+                        std::map<std::string, ExpressionPointer> trial =
+                            assignment;
+                        std::vector<ExpressionPointer> binderStack;
+                        try {
+                            unifyConstructorParameters(
+                                slotOpened, candidateType,
+                                metavariableNames, trial, 0, &binderStack);
+                        } catch (...) { continue; }
+                        // Confirm the solved holes make the slot defeq the
+                        // candidate (so the hypothesis really proves it).
+                        ExpressionPointer slotResolved;
+                        try {
+                            slotResolved = openOverLocalBinders(
+                                substituteFreeVariables(
+                                    piDomains[i], trial),
+                                localBinders, N);
+                        } catch (...) { continue; }
+                        bool eq;
+                        try {
+                            eq = isDefinitionallyEqual(
+                                environment_, openedContext,
+                                slotResolved, candidateType);
+                        } catch (...) { eq = false; }
+                        if (!eq) continue;
+                        // Only ever discharge a PROOF obligation this way —
+                        // never fill a value hole from a same-typed
+                        // hypothesis (that must come from the goal).
+                        bool resolvedIsProp = false;
+                        try {
+                            resolvedIsProp = typeIsProposition(
+                                openedContext,
+                                weakHeadNormalForm(
+                                    environment_, slotResolved));
+                        } catch (...) { resolvedIsProp = false; }
+                        if (!resolvedIsProp) continue;
+                        // Commit: adopt the newly-solved holes (closed to
+                        // the global closed-over-localBinders form) and
+                        // fill this slot with the hypothesis.
+                        for (auto& entry : trial) {
+                            if (assignment.count(entry.first)) continue;
+                            ExpressionPointer closedValue;
+                            try {
+                                closedValue = closeOverLocalBinders(
+                                    entry.second, localBinders, N);
+                            } catch (...) { closedValue = entry.second; }
+                            assignment[entry.first] = closedValue;
+                        }
+                        int deBruijnIndex = N - 1 - j;
+                        elaboratedArgs[i] =
+                            makeBoundVariable(deBruijnIndex);
+                        lastDischarges_.push_back(
+                            {deBruijnIndex, N, localBinders[j].name});
+                        filled = true;
+                        progress = true;
+                    }
+                    if (!filled) stillUnresolved.push_back(i);
+                }
+                unresolved = std::move(stillUnresolved);
+            }
+        }
         if (!unresolved.empty()) {
             std::string message =
                 "call to '" + diagnosticName
