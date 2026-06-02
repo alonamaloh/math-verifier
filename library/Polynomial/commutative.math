@@ -46,9 +46,9 @@ theorem Natural.monus_add_cancel_left
 theorem Natural.monus_add_involution (i d : Natural)
         : Natural.monus(i + d, Natural.monus(i + d, i)) = i :=
   calc Natural.monus(i + d, Natural.monus(i + d, i))
-     = Natural.monus(i + d, d)   by Natural.monus_add_cancel_left(i, d)
-     = Natural.monus(d + i, d)   by Natural.add_commutative(i, d)
-     = i                          by Natural.monus_add_cancel_left(d, i)
+     = Natural.monus(i + d, d)
+     = Natural.monus(d + i, d)
+     = i
 
 theorem Natural.monus_monus_self (k i : Natural) (h : i ≤ k)
         : Natural.monus(k, Natural.monus(k, i)) = i := {
@@ -72,12 +72,8 @@ theorem Polynomial.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
         unfold Natural.monus in
           calc Polynomial.Sum(r, f, successor(k))
              = (Polynomial.Sum(r, f, k) + f(successor(k)))
-                 by reflexivity(Ring.carrier(r),
-                        (Polynomial.Sum(r, f, k) + f(successor(k))))
              = (f(successor(k)) + Polynomial.Sum(r, f, k))
-                 by Ring.add_commutative(r, Polynomial.Sum(r, f, k), f(successor(k)))
              = (f(successor(k)) + Polynomial.Sum(r, function (i : Natural) => f(Natural.monus(k, i)), k))
-                 by IH
              = Polynomial.Sum(r, function (i : Natural) => f(Natural.monus(successor(k), i)), successor(k))
                  by Polynomial.Sum.shift(r,
                         function (i : Natural) => f(Natural.monus(successor(k), i)), k)
@@ -94,8 +90,6 @@ theorem Polynomial.Sum.extensional_range (r : Ring)
   | successor(k) => function (h : (i : Natural) → i ≤ successor(k) → f(i) = g(i)) =>
       calc Polynomial.Sum(r, f, successor(k))
          = (Polynomial.Sum(r, f, k) + f(successor(k)))
-             by reflexivity(Ring.carrier(r),
-                    (Polynomial.Sum(r, f, k) + f(successor(k))))
          = (Polynomial.Sum(r, g, k) + f(successor(k)))
              by Polynomial.Sum.extensional_range(r, f, g, k,
                     function (i : Natural) (smaller : i ≤ k) =>
@@ -104,8 +98,6 @@ theorem Polynomial.Sum.extensional_range (r : Ring)
          = (Polynomial.Sum(r, g, k) + g(successor(k)))
              by h(successor(k), LessOrEqual.reflexivity(successor(k)))
          = Polynomial.Sum(r, g, successor(k))
-             by reflexivity(Ring.carrier(r),
-                    (Polynomial.Sum(r, g, k) + g(successor(k))))
 
 -- Register the range-restricted variant too: a `Sum(r,f,n) = Sum(r,g,n)`
 -- step also closes from `(i) => i ≤ n => f(i) = g(i)`. The elaborator
@@ -139,7 +131,6 @@ theorem Polynomial.Coefficients.multiply_commutative (r : Ring)
                by (function (i : Natural) (smaller : i ≤ k) =>
                       calc (Polynomial.coefficient(p, Natural.monus(k, i)) * Polynomial.coefficient(q, Natural.monus(k, Natural.monus(k, i))))
                          = (Polynomial.coefficient(p, Natural.monus(k, i)) * Polynomial.coefficient(q, i))
-                               by Natural.monus_monus_self(k, i, smaller)
                          = (Polynomial.coefficient(q, i) * Polynomial.coefficient(p, Natural.monus(k, i)))
                                by ringCommutative(Polynomial.coefficient(p, Natural.monus(k, i)),
                                       Polynomial.coefficient(q, i)))

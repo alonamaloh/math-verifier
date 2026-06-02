@@ -116,9 +116,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
          Equality.symmetry(
              calc Polynomial.add(r, Polynomial.multiply(r, Polynomial.zero(r), f), dividend)
                 = Polynomial.add(r, Polynomial.zero(r), dividend)
-                      by multiplyZero
-                = dividend
-                      by Polynomial.add_identity_left(r, dividend)),
+                = dividend),
          rewrite(Natural.add_zero(degreeF), dividendBound)⟩
       }
     case successor(ePredecessor):
@@ -145,8 +143,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
             by calc (leadingInverseValue * Polynomial.coefficientOf(f, degreeF))
                   = (Polynomial.coefficientOf(f, degreeF) * leadingInverseValue)
                         by commutativity(leadingInverseValue, Polynomial.coefficientOf(f, degreeF))
-                  = Ring.one(r)
-                        by leadingInverseEquation;
+                  = Ring.one(r);
 
         -- The step product agrees with the dividend at every index ≥ the
         -- top index (degreeF + ePredecessor): at the top index both equal
@@ -160,35 +157,17 @@ theorem Polynomial.divide_by_excess (r : Ring)
                   | yes indexIsTop =>
                       calc Polynomial.coefficientOf(stepProduct, i)
                          = Polynomial.coefficientOf(stepProduct, degreeF + ePredecessor)
-                               by congruenceOf(
-                                      function (t : Natural) =>
-                                          Polynomial.coefficientOf(stepProduct, t),
-                                      indexIsTop)
                          = ((leadingCoefficient * leadingInverseValue) * Polynomial.coefficientOf(f, Natural.monus(degreeF + ePredecessor, ePredecessor)))
                                by Polynomial.coefficientOf_monomial_multiply(r,
                                       (leadingCoefficient * leadingInverseValue),
                                       f, ePredecessor, degreeF + ePredecessor,
                                       Natural.less_or_equal_add_left(ePredecessor, degreeF))
                          = ((leadingCoefficient * leadingInverseValue) * Polynomial.coefficientOf(f, degreeF))
-                               by congruenceOf(
-                                      function (t : Natural) =>
-                                          ((leadingCoefficient * leadingInverseValue) * Polynomial.coefficientOf(f, t)),
-                                      Natural.monus_add_cancel_right(degreeF, ePredecessor))
                          = (leadingCoefficient * (leadingInverseValue * Polynomial.coefficientOf(f, degreeF)))
-                               by Ring.multiply_associative(r, leadingCoefficient,
-                                      leadingInverseValue, Polynomial.coefficientOf(f, degreeF))
                          = (leadingCoefficient * Ring.one(r))
-                               by inverseLeadingEquation
                          = leadingCoefficient
-                               by Ring.multiply_one(r, leadingCoefficient)
                          = Polynomial.coefficientOf(dividend, degreeF + ePredecessor)
-                               by reflexivity(Ring.carrier(r),
-                                      Polynomial.coefficientOf(dividend, degreeF + ePredecessor))
                          = Polynomial.coefficientOf(dividend, i)
-                               by congruenceOf(
-                                      function (t : Natural) =>
-                                          Polynomial.coefficientOf(dividend, t),
-                                      Equality.symmetry(indexIsTop))
                   | no indexNotTop => {
                       claim successorLessOrEqual : successor(degreeF + ePredecessor) ≤ i
                           by Natural.less_or_equal_not_equal_successor(
@@ -208,12 +187,9 @@ theorem Polynomial.divide_by_excess (r : Ring)
                                       by fDegreeBound(Natural.monus(i, ePredecessor),
                                              Natural.degree_bound_helper(degreeF, ePredecessor, i,
                                                  successorLessOrEqual))
-                                = Ring.zero(r)
-                                      by Ring.multiply_zero_right(r,
-                                             (leadingCoefficient * leadingInverseValue));
+                                = Ring.zero(r);
                       calc Polynomial.coefficientOf(stepProduct, i)
                          = Ring.zero(r)
-                               by stepZero
                          = Polynomial.coefficientOf(dividend, i)
                                by Equality.symmetry(
                                       dividendBoundSuccessor(i, successorLessOrEqual))
@@ -229,11 +205,9 @@ theorem Polynomial.divide_by_excess (r : Ring)
                          by Polynomial.coefficientOf_add(r, dividend,
                                 Polynomial.negate(r, stepProduct), i)
                    = (Polynomial.coefficientOf(dividend, i) + Ring.negate(r, Polynomial.coefficientOf(stepProduct, i)))
-                         by Polynomial.coefficientOf_negate(r, stepProduct, i)
                    = (Polynomial.coefficientOf(dividend, i) + Ring.negate(r, Polynomial.coefficientOf(dividend, i)))
                          by productAgreesWithDividend(i, topLessOrEqual)
-                   = Ring.zero(r)
-                         by Ring.add_negate_right(r, Polynomial.coefficientOf(dividend, i));
+                   = Ring.zero(r);
 
         obtain ⟨quotientRest, remainderRest, restEquation, remainderRestBound⟩
             from IH(residual, residualBound);
@@ -247,23 +221,16 @@ theorem Polynomial.divide_by_excess (r : Ring)
                                Polynomial.negate(r, stepProduct)))
                   = Polynomial.add(r, Polynomial.add(r, dividend, stepProduct),
                         Polynomial.negate(r, stepProduct))
-                        by Polynomial.add_commutative(r, stepProduct, dividend)
                   = Polynomial.add(r, dividend,
                         Polynomial.add(r, stepProduct, Polynomial.negate(r, stepProduct)))
-                        by Polynomial.add_associative(r, dividend, stepProduct,
-                               Polynomial.negate(r, stepProduct))
                   = Polynomial.add(r, dividend, Polynomial.zero(r))
-                        by Polynomial.add_negate_right(r, stepProduct)
-                  = dividend
-                        by Polynomial.add_identity_right(r, dividend);
+                  = dividend;
 
         ⟨Polynomial.add(r, quotientStep, quotientRest), remainderRest,
          calc dividend
             = Polynomial.add(r, stepProduct, residual)
-                  by Equality.symmetry(reconstruct)
             = Polynomial.add(r, stepProduct,
                   Polynomial.add(r, Polynomial.multiply(r, quotientRest, f), remainderRest))
-                  by restEquation
             = Polynomial.add(r,
                   Polynomial.add(r, stepProduct, Polynomial.multiply(r, quotientRest, f)),
                   remainderRest)

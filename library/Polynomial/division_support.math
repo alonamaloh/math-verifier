@@ -73,14 +73,14 @@ theorem Natural.less_or_equal_successor_not_equal (j m : Natural)
     | zero =>
         absurd(notEqual(Equality.symmetry(
             calc successor(m)
-               = j + 0      by equation
-               = j          by Natural.add_zero(j))))
+               = j + 0
+               = j)))
     | successor(cPredecessor) => {
         claim mEquation : m = j + cPredecessor
             by Natural.successor_injective(m, j + cPredecessor,
                    calc successor(m)
-                      = j + successor(cPredecessor)   by equation
-                      = successor(j + cPredecessor)   by Natural.add_successor(j, cPredecessor));
+                      = j + successor(cPredecessor)
+                      = successor(j + cPredecessor));
         rewrite(Equality.symmetry(mEquation),
                 Natural.less_or_equal_add_right(j, cPredecessor))
       }
@@ -91,8 +91,8 @@ theorem Natural.less_or_equal_successor_not_equal (j m : Natural)
 theorem Natural.monus_add_cancel_right (a b : Natural)
         : Natural.monus(a + b, b) = a :=
   calc Natural.monus(a + b, b)
-     = Natural.monus(b + a, b)   by Natural.add_commutative(a, b)
-     = a                          by Natural.monus_add_cancel_left(b, a)
+     = Natural.monus(b + a, b)
+     = a
 
 -- a ≤ b + a (a appears on the right).
 theorem Natural.less_or_equal_add_left (a b : Natural) : a ≤ b + a :=
@@ -109,24 +109,14 @@ theorem Natural.degree_bound_helper (d j i : Natural)
   claim iEquation : i = j + successor(d + c)
       by calc i
             = successor(d + j) + c
-                  by equation
             = successor((d + j) + c)
-                  by reflexivity(Natural, successor((d + j) + c))
             = successor((j + d) + c)
-                  by congruenceOf(function (t : Natural) => successor(t + c),
-                         Natural.add_commutative(d, j))
             = successor(j + (d + c))
-                  by congruenceOf(function (t : Natural) => successor(t),
-                         Natural.add_associative(j, d, c))
-            = j + successor(d + c)
-                  by Equality.symmetry(Natural.add_successor(j, d + c));
+            = j + successor(d + c);
   claim monusEquation : Natural.monus(i, j) = successor(d + c)
       by calc Natural.monus(i, j)
             = Natural.monus(j + successor(d + c), j)
-                  by congruenceOf(function (t : Natural) => Natural.monus(t, j),
-                         iEquation)
-            = successor(d + c)
-                  by Natural.monus_add_cancel_left(j, successor(d + c));
+            = successor(d + c);
   rewrite(Equality.symmetry(monusEquation),
           Natural.successor_less_or_equal_successor(d, d + c,
               Natural.less_or_equal_add_right(d, c)))
@@ -139,12 +129,12 @@ theorem Natural.less_or_equal_not_equal_successor (a i : Natural)
   obtain ⟨c, equation⟩ from Natural.subtraction_witness(a, i, lessOrEqual);
   cases c refining equation {
     | zero =>
-        absurd(notEqual(calc i = a + 0 by equation = a by Natural.add_zero(a)))
+        absurd(notEqual(calc i = a + 0 = a))
     | successor(cPredecessor) =>
         rewrite(Equality.symmetry(
                     calc i
-                       = a + successor(cPredecessor)   by equation
-                       = successor(a + cPredecessor)   by Natural.add_successor(a, cPredecessor)),
+                       = a + successor(cPredecessor)
+                       = successor(a + cPredecessor)),
                 Natural.successor_less_or_equal_successor(a, a + cPredecessor,
                     Natural.less_or_equal_add_right(a, cPredecessor)))
   }
@@ -177,8 +167,6 @@ theorem Polynomial.Sum.vanishes_below (r : Ring)
         : Polynomial.Sum(r, h, n) = Ring.zero(r) :=
   calc Polynomial.Sum(r, h, n)
      = Polynomial.Sum(r, function (i : Natural) => Ring.zero(r), n)
-           by Polynomial.Sum.extensional_range(r, h,
-                  function (i : Natural) => Ring.zero(r), n, vanish)
      = Ring.zero(r)
            by Polynomial.Sum.zero(r, n)
 
@@ -210,14 +198,9 @@ theorem Polynomial.Sum.single_point (r : Ring)
                                                iLessOrEqualM))));
                 calc Polynomial.Sum(r, h, successor(m))
                    = (Polynomial.Sum(r, h, m) + h(successor(m)))
-                         by reflexivity(Ring.carrier(r),
-                                (Polynomial.Sum(r, h, m) + h(successor(m))))
                    = (Ring.zero(r) + h(successor(m)))
-                         by sumBelow
                    = h(successor(m))
-                         by Ring.zero_add(r, h(successor(m)))
                    = h(j)
-                         by congruenceOf(h, Equality.symmetry(jEqualsSuccessor))
               }
             | no jNotEqualsSuccessor => {
                 claim jLessOrEqualM : j ≤ m
@@ -229,14 +212,10 @@ theorem Polynomial.Sum.single_point (r : Ring)
                                jNotEqualsSuccessor(Equality.symmetry(successorEqualsJ)));
                 calc Polynomial.Sum(r, h, successor(m))
                    = (Polynomial.Sum(r, h, m) + h(successor(m)))
-                         by reflexivity(Ring.carrier(r),
-                                (Polynomial.Sum(r, h, m) + h(successor(m))))
                    = (h(j) + h(successor(m)))
                          by IH(jLessOrEqualM, vanish)
                    = (h(j) + Ring.zero(r))
-                         by successorVanishes
                    = h(j)
-                         by Ring.add_zero(r, h(j))
               }
           }
   }
