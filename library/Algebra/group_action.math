@@ -1,0 +1,216 @@
+-- Algebra/group_action.math
+--
+-- A (left) action of a bundled group G on a type X is a function
+-- `action : carrier(G) → X → X` compatible with the group structure:
+-- the identity acts trivially, and acting by g·h is acting by h then by
+-- g. Actions are how groups "do things" to other objects, and three
+-- structural facts fall straight out of the two axioms:
+--
+--   * the stabilizer of a point  { g | g·x₀ = x₀ }  is a subgroup of G,
+--   * the orbit relation  x ~ y ⟺ ∃g. g·x = y  is an equivalence, and
+--   * the kernel of the action  { g | g·x = x for all x }  is a normal
+--     subgroup of G (the elements that act as the identity everywhere).
+--
+-- Notation: `g · h` is the group operation (Algebra/group_bundle); the
+-- action is written `action(g, x)` (it is an arbitrary function, not a
+-- registered operator, so X need not be a group carrier).
+
+module Algebra.group_action
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Logic.quotient
+import Set.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+import Algebra.subgroup
+import Algebra.normal_subgroup
+
+-- `action` is a left action of G on X: the identity acts as identity,
+-- and the action is compatible with the group operation.
+definition IsAction (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X) : Proposition :=
+  ((x : X) → action(Group.identity(G), x) = x)
+  ∧ ((g h : Group.carrier(G)) → (x : X) →
+         action(g · h, x) = action(g, action(h, x)))
+
+-- ----------------------------------------------------------------------
+-- The stabilizer of a point is a subgroup.
+
+-- The stabilizer of x₀: the group elements that fix x₀.
+definition Group.action.stabilizer (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X) (basePoint : X)
+        : Set(Group.carrier(G)) :=
+  function (g : Group.carrier(G)) => action(g, basePoint) = basePoint
+
+-- The stabilizer is a subgroup of G.
+--
+--   * e ∈ Stab:        e·x₀ = x₀                          [identity axiom]
+--   * closed under ·:  (g·h)·x₀ = g·(h·x₀) = g·x₀ = x₀
+--   * closed under ⁻¹:  g⁻¹·x₀ = g⁻¹·(g·x₀) = (g⁻¹·g)·x₀ = e·x₀ = x₀
+theorem Group.action.stabilizer_is_subgroup (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X)
+        (isAction : IsAction(G, X, action))
+        (basePoint : X)
+        : IsSubgroup(G, Group.action.stabilizer(G, X, action, basePoint)) := {
+  let ⟨actsTrivially, compatible⟩ := isAction;
+  ⟨actsTrivially(basePoint),
+   function (g h : Group.carrier(G))
+            (gFixes : action(g, basePoint) = basePoint)
+            (hFixes : action(h, basePoint) = basePoint) =>
+       calc action(g · h, basePoint)
+          = action(g, action(h, basePoint))
+                by compatible(g, h, basePoint)
+          = action(g, basePoint)
+                by rewrite(hFixes)
+          = basePoint,
+   function (g : Group.carrier(G))
+            (gFixes : action(g, basePoint) = basePoint) =>
+       calc action(g⁻¹, basePoint)
+          = action(g⁻¹, action(g, basePoint))
+                by rewrite(Equality.symmetry(gFixes))
+          = action(g⁻¹ · g, basePoint)
+                by Equality.symmetry(compatible(g⁻¹, g, basePoint))
+          = action(Group.identity(G), basePoint)
+                by rewrite(Group.inverse_left(G, g))
+          = basePoint
+                by actsTrivially(basePoint)⟩
+}
+
+-- ----------------------------------------------------------------------
+-- The orbit relation is an equivalence.
+
+-- x ~ y when some group element carries x to y.
+definition Group.action.orbit (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X) (x y : X) : Proposition :=
+  ∃ (g : Group.carrier(G)). action(g, x) = y
+
+-- Reflexive: the identity carries x to x.
+theorem Group.action.orbit.reflexive (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X)
+        (isAction : IsAction(G, X, action)) (x : X)
+        : Group.action.orbit(G, X, action, x, x) := {
+  let ⟨actsTrivially, _⟩ := isAction;
+  ⟨Group.identity(G), actsTrivially(x)⟩
+}
+
+-- Symmetric: if g carries x to y, then g⁻¹ carries y back to x.
+theorem Group.action.orbit.symmetric (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X)
+        (isAction : IsAction(G, X, action)) (x y : X)
+        (related : Group.action.orbit(G, X, action, x, y))
+        : Group.action.orbit(G, X, action, y, x) := {
+  let ⟨actsTrivially, compatible⟩ := isAction;
+  obtain ⟨g, carriesXToY⟩ from related;
+  ⟨g⁻¹,
+   calc action(g⁻¹, y)
+      = action(g⁻¹, action(g, x))
+            by rewrite(Equality.symmetry(carriesXToY))
+      = action(g⁻¹ · g, x)
+            by Equality.symmetry(compatible(g⁻¹, g, x))
+      = action(Group.identity(G), x)
+            by rewrite(Group.inverse_left(G, g))
+      = x
+            by actsTrivially(x)⟩
+}
+
+-- Transitive: composing the carriers, h·g carries x to z.
+theorem Group.action.orbit.transitive (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X)
+        (isAction : IsAction(G, X, action)) (x y z : X)
+        (relatedXY : Group.action.orbit(G, X, action, x, y))
+        (relatedYZ : Group.action.orbit(G, X, action, y, z))
+        : Group.action.orbit(G, X, action, x, z) := {
+  let ⟨_, compatible⟩ := isAction;
+  obtain ⟨g, carriesXToY⟩ from relatedXY;
+  obtain ⟨h, carriesYToZ⟩ from relatedYZ;
+  ⟨h · g,
+   calc action(h · g, x)
+      = action(h, action(g, x))
+            by compatible(h, g, x)
+      = action(h, y)
+            by rewrite(carriesXToY)
+      = z⟩
+}
+
+-- Bundled as an equivalence relation (e.g. for forming the orbit space).
+theorem Group.action.orbit_is_equivalence (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X)
+        (isAction : IsAction(G, X, action))
+        : IsEquivalenceRelation(X, Group.action.orbit(G, X, action)) :=
+  ⟨Group.action.orbit.reflexive(G, X, action, isAction),
+   Group.action.orbit.symmetric(G, X, action, isAction),
+   Group.action.orbit.transitive(G, X, action, isAction)⟩
+
+-- ----------------------------------------------------------------------
+-- The kernel of the action is a normal subgroup.
+
+-- The kernel: the elements that act as the identity on every point.
+definition Group.action.kernel (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X)
+        : Set(Group.carrier(G)) :=
+  function (g : Group.carrier(G)) => (x : X) → action(g, x) = x
+
+-- The kernel is a subgroup: same three facts as the stabilizer, now
+-- holding at every point x simultaneously.
+theorem Group.action.kernel_is_subgroup (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X)
+        (isAction : IsAction(G, X, action))
+        : IsSubgroup(G, Group.action.kernel(G, X, action)) := {
+  let ⟨actsTrivially, compatible⟩ := isAction;
+  ⟨actsTrivially,
+   function (g h : Group.carrier(G))
+            (gInKernel : (x : X) → action(g, x) = x)
+            (hInKernel : (x : X) → action(h, x) = x) =>
+       function (x : X) =>
+         calc action(g · h, x)
+            = action(g, action(h, x))
+                  by compatible(g, h, x)
+            = action(g, x)
+                  by rewrite(hInKernel(x))
+            = x
+                  by gInKernel(x),
+   function (g : Group.carrier(G))
+            (gInKernel : (x : X) → action(g, x) = x) =>
+       function (x : X) =>
+         calc action(g⁻¹, x)
+            = action(g⁻¹, action(g, x))
+                  by rewrite(Equality.symmetry(gInKernel(x)))
+            = action(g⁻¹ · g, x)
+                  by Equality.symmetry(compatible(g⁻¹, g, x))
+            = action(Group.identity(G), x)
+                  by rewrite(Group.inverse_left(G, g))
+            = x
+                  by actsTrivially(x)⟩
+}
+
+-- The kernel is normal: a conjugate g⁻¹·n·g acts trivially because n
+-- acts trivially on every point — in particular on g·x:
+--
+--   (g⁻¹·n·g)·x = g⁻¹·(n·(g·x)) = g⁻¹·(g·x) = (g⁻¹·g)·x = x
+theorem Group.action.kernel_is_normal (G : Group) (X : Type(0))
+        (action : Group.carrier(G) → X → X)
+        (isAction : IsAction(G, X, action))
+        : IsNormalSubgroup(G, Group.action.kernel(G, X, action)) := {
+  let ⟨actsTrivially, compatible⟩ := isAction;
+  ⟨Group.action.kernel_is_subgroup(G, X, action, isAction),
+   function (g n : Group.carrier(G))
+            (nInKernel : (x : X) → action(n, x) = x) =>
+       function (x : X) =>
+         calc action(g⁻¹ · n · g, x)
+            = action(g⁻¹ · n, action(g, x))
+                  by compatible(g⁻¹ · n, g, x)
+            = action(g⁻¹, action(n, action(g, x)))
+                  by compatible(g⁻¹, n, action(g, x))
+            = action(g⁻¹, action(g, x))
+                  by rewrite(nInKernel(action(g, x)))
+            = action(g⁻¹ · g, x)
+                  by Equality.symmetry(compatible(g⁻¹, g, x))
+            = action(Group.identity(G), x)
+                  by rewrite(Group.inverse_left(G, g))
+            = x
+                  by actsTrivially(x)⟩
+}

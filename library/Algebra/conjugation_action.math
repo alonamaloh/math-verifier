@@ -1,0 +1,111 @@
+-- Algebra/conjugation_action.math
+--
+-- The conjugation action of a group on itself: g acts on x by
+-- x ↦ g·x·g⁻¹. This is the canonical non-trivial group action, and it
+-- ties the action machinery (Algebra/group_action) back to the center
+-- (Algebra/center):
+--
+--   * conjugation is an action of G on its own carrier, and
+--   * its kernel — the elements acting trivially on every point — is
+--     exactly the center Z(G).
+--
+-- The second fact is the conceptual content of "the center is the kernel
+-- of the conjugation action", proved here as the two set inclusions:
+-- g⁻¹ disappears precisely when g commutes with everything.
+--
+-- All algebra is by hand through Group.associative and the inverse/
+-- identity laws (groups are not commutative).
+
+module Algebra.conjugation_action
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+import Algebra.subgroup
+import Algebra.normal_subgroup
+import Algebra.group_action
+import Algebra.center
+
+-- Conjugation of x by g: g·x·g⁻¹.
+definition Group.conjugation (G : Group)
+        (g x : Group.carrier(G)) : Group.carrier(G) :=
+  g · x · g⁻¹
+
+-- Conjugation is an action of G on its carrier.
+--
+--   * identity:      e·x·e⁻¹ = x
+--   * compatibility: (g·h)·x·(g·h)⁻¹ = g·(h·x·h⁻¹)·g⁻¹
+theorem Group.conjugation_is_action (G : Group)
+        : IsAction(G, Group.carrier(G), Group.conjugation(G)) :=
+  ⟨function (x : Group.carrier(G)) =>
+     calc Group.identity(G) · x · Group.identity(G)⁻¹
+        = x · Group.identity(G)⁻¹
+              by rewrite(Group.identity_left(G, x))
+        = x · Group.identity(G)
+              by rewrite(Group.inverse_identity_bundled(G))
+        = x
+              by Group.identity_right(G, x),
+   function (g h x : Group.carrier(G)) =>
+     calc (g · h) · x · (g · h)⁻¹
+        = (g · h) · x · (h⁻¹ · g⁻¹)
+              by rewrite(Group.inverse_operation_bundled(G, g, h))
+        = (g · (h · x)) · (h⁻¹ · g⁻¹)
+        = g · ((h · x) · (h⁻¹ · g⁻¹))
+        = g · (((h · x) · h⁻¹) · g⁻¹)
+        = (g · ((h · x) · h⁻¹)) · g⁻¹⟩
+
+-- ----------------------------------------------------------------------
+-- The center is the kernel of the conjugation action.
+--
+-- The kernel of conjugation is { z | z·x·z⁻¹ = x for all x }; the center
+-- is { z | z·g = g·z for all g }. The two conditions are equivalent.
+
+-- A central element acts trivially by conjugation: from z·x = x·z,
+--   z·x·z⁻¹ = x·z·z⁻¹ = x·(z·z⁻¹) = x·e = x.
+theorem Group.center_subset_conjugation_kernel (G : Group)
+        : Group.center(G)
+          ⊆ Group.action.kernel(G, Group.carrier(G), Group.conjugation(G)) :=
+  function (z : Group.carrier(G)) (zCentral : z ∈ Group.center(G)) =>
+    function (x : Group.carrier(G)) =>
+      calc z · x · z⁻¹
+         = x · z · z⁻¹
+               by rewrite(zCentral(x))
+         = x · (z · z⁻¹)
+         = x · Group.identity(G)
+               by rewrite(Group.inverse_right(G, z))
+         = x
+
+-- Conversely, if z acts trivially by conjugation then z is central: from
+-- z·g·z⁻¹ = g, multiply on the right by z to clear the z⁻¹:
+--   z·g = (z·g)·(z⁻¹·z) = ((z·g)·z⁻¹)·z = g·z.
+theorem Group.conjugation_kernel_subset_center (G : Group)
+        : Group.action.kernel(G, Group.carrier(G), Group.conjugation(G))
+          ⊆ Group.center(G) :=
+  function (z : Group.carrier(G))
+           (zActsTrivially
+               : z ∈ Group.action.kernel(G, Group.carrier(G), Group.conjugation(G))) =>
+    function (g : Group.carrier(G)) => {
+      -- z·g·z⁻¹ = g, the conjugation-kernel condition in unfolded form.
+      claim conjugateFixesG : z · g · z⁻¹ = g by zActsTrivially(g);
+      calc z · g
+         = (z · g) · Group.identity(G)
+         = (z · g) · (z⁻¹ · z)
+         = ((z · g) · z⁻¹) · z
+         = g · z
+               by rewrite(conjugateFixesG)
+    }
+
+-- The stabilizer of a point a under conjugation is a subgroup — this is
+-- the centralizer of a, { g | g·a·g⁻¹ = a } = { g | g·a = a·g }.
+-- Instantiated from the generic stabilizer-is-subgroup lemma.
+theorem Group.centralizer_is_subgroup (G : Group) (a : Group.carrier(G))
+        : IsSubgroup(G,
+              Group.action.stabilizer(G, Group.carrier(G), Group.conjugation(G), a)) :=
+  Group.action.stabilizer_is_subgroup(
+      G, Group.carrier(G), Group.conjugation(G),
+      Group.conjugation_is_action(G), a)
