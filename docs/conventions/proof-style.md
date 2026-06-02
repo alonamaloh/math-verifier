@@ -231,6 +231,40 @@ returns its final non-`;`-terminated expression.
 - `unfold <Foo> in <body>` — temporarily mark `Foo` transparent
   inside `<body>` (for opaque definitions; see the opaque section).
 
+### When to hint: prefer the auto-prover, explain only reasons
+
+The guiding light is what a mathematician would write. Most of the
+time that means **leaning on the auto-prover and citing nothing** —
+a by-less `calc` step or a bare `claim P;` reads like "clearly" /
+"and so", which is exactly how a proof flows when the step is routine.
+Spell a justification out only when a *human or LLM reader* genuinely
+benefits from it.
+
+When you do justify a step, point at the **reason it is true**, not the
+**mechanism that discharges it**. The name of a mundane plumbing lemma
+(`add_general_LessOrEqual_left`, `halve_preserves_LessOrEqual`) is
+mechanism — the reader learns nothing from it, so prefer a by-less step
+with a short prose reason in a comment, or none at all. Reserve a cited
+hint for when the *named result itself* is the insight.
+
+So, in order of preference for a step the auto-prover can close:
+
+1. **Nothing** — by-less `calc` step / `claim P;`. The default.
+2. **`note P [by …];`** — surface an intermediate fact for the reader
+   without binding it into context (the proof closes without it). The
+   "observe that …" aside.
+3. **`claim P since <proof>;`** / `… = b since <proof>` — keep a
+   load-bearing-looking citation the prover doesn't strictly need but
+   that explains the step. `since` (not `by`) signals "the author is
+   explaining," and the redundant-`by` check leaves it alone.
+
+Use `by <proof>` only when the prover **cannot** close the step without
+it — then the citation isn't an explanation, it's the proof, and `by`
+is correct regardless of whether the lemma name enlightens. (Example:
+`claim (0 : Rational) ≤ (n : Rational) by Rational.LessOrEqual_zero_-
+of_IsNonneg((n : Rational), Rational.from_natural_IsNonneg(n))` — the
+auto-prover can't reach `IsNonneg(n)` on its own, so the `by` stays.)
+
 Outermost-arm shorthands for case-splits:
 
 - `by_induction on n with IH { case zero: … case successor(k): … }` —

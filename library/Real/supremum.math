@@ -1115,35 +1115,29 @@ theorem Rational.halve_multiply_swap (x y : Rational)
 theorem Rational.halve_two_plus_le_one_plus (n : Natural)
         : Rational.halve((1 : Rational) + (1 : Rational) + (n : Rational))
           ≤ (1 : Rational) + (n : Rational) := {
-  -- Inner bound: 1 + 1 + n ≤ (1 + n) + (1 + n). Via LessOrEqual.sum
-  -- with 1 ≤ 1 + n (using n ≥ 0) and reflexivity on (1 + n).
+  -- 1 ≤ 1 + n because n ≥ 0:  1 = 1 + 0 ≤ 1 + n.
+  claim zeroLeqN : (0 : Rational) ≤ (n : Rational)
+    by Rational.LessOrEqual_zero_of_IsNonneg(
+           (n : Rational), Rational.from_natural_IsNonneg(n));
   claim oneLeqOnePlusN
         : (1 : Rational) ≤ (1 : Rational) + (n : Rational)
-    by rewrite(
-           (ring : (1 : Rational) + (0 : Rational) = (1 : Rational)),
-           Rational.add_general_LessOrEqual_left(
-               (1 : Rational), (0 : Rational), (n : Rational),
-               Rational.LessOrEqual_zero_of_IsNonneg(
-                   (n : Rational),
-                   Rational.from_natural_IsNonneg(n))));
+    by calc (1 : Rational)
+          = (1 : Rational) + (0 : Rational)
+          ≤ (1 : Rational) + (n : Rational);
+  -- 1 + 1 + n = 1 + (1 + n) ≤ (1 + n) + (1 + n), since 1 ≤ 1 + n.
   claim innerBound
         : (1 : Rational) + (1 : Rational) + (n : Rational)
           ≤ ((1 : Rational) + (n : Rational))
             + ((1 : Rational) + (n : Rational))
-    by rewrite(
-           (ring : (1 : Rational) + ((1 : Rational) + (n : Rational))
-                   = (1 : Rational) + (1 : Rational) + (n : Rational)),
-           Rational.LessOrEqual.sum(oneLeqOnePlusN,
-               Rational.LessOrEqual.reflexive(
-                   (1 : Rational) + (n : Rational))));
-  -- halve preserves the inner bound; halve_of_doubled folds the RHS.
-  rewrite(
-      Rational.halve_of_doubled((1 : Rational) + (n : Rational)),
-      Rational.halve_preserves_LessOrEqual(
-          (1 : Rational) + (1 : Rational) + (n : Rational),
-          ((1 : Rational) + (n : Rational))
-              + ((1 : Rational) + (n : Rational)),
-          innerBound))
+    by calc (1 : Rational) + (1 : Rational) + (n : Rational)
+          = (1 : Rational) + ((1 : Rational) + (n : Rational))
+          ≤ ((1 : Rational) + (n : Rational))
+            + ((1 : Rational) + (n : Rational));
+  -- halve is monotone, and halve of a doubled value folds back.
+  calc Rational.halve((1 : Rational) + (1 : Rational) + (n : Rational))
+     ≤ Rational.halve(((1 : Rational) + (n : Rational))
+                       + ((1 : Rational) + (n : Rational)))
+     = (1 : Rational) + (n : Rational)
 }
 
 -- width(n) ≥ 0 inductively from initial width ≥ 0 + halve preserves nonneg.
