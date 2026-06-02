@@ -4969,7 +4969,37 @@ private:
                     && environment_.lookup(operandTypeName + ".negate")
                        != nullptr) {
                     negateFunction = operandTypeName + ".negate";
-                } else {
+                }
+                // Bundle carrier: an operand of type `X.carrier(...)`
+                // negates via `X.negate` (the bundle's own negation),
+                // not the nonexistent `X.carrier.negate`. Re-elaborate a
+                // surface call `X.negate(operand)` so standard implicit-
+                // argument inference fills the bundle instance — the same
+                // trick the postfix `⁻¹` path uses for Group. This gives
+                // `-a` to bundled structures (CommutativeRing, Ring).
+                static const std::string carrierSuffix = ".carrier";
+                if (negateFunction.empty()
+                    && operandTypeName.size() > carrierSuffix.size()
+                    && operandTypeName.compare(
+                           operandTypeName.size() - carrierSuffix.size(),
+                           carrierSuffix.size(), carrierSuffix) == 0) {
+                    std::string bundleName = operandTypeName.substr(
+                        0, operandTypeName.size() - carrierSuffix.size());
+                    if (environment_.lookup(bundleName + ".negate")
+                        != nullptr) {
+                        SurfaceExpressionPointer call =
+                            makeSurfaceApplication(
+                                makeSurfaceIdentifier(
+                                    bundleName + ".negate", {},
+                                    expression.line, expression.column),
+                                std::vector<SurfaceExpressionPointer>{
+                                    unary->operand},
+                                expression.line, expression.column);
+                        return elaborateExpression(
+                            *call, localBinders, expectedType);
+                    }
+                }
+                if (negateFunction.empty()) {
                     // Fallback: search definitions whose body δ-reduces
                     // to the operand's WHNF. For each such T, check if
                     // `<T>.negate` exists; if so, dispatch there. Catches
