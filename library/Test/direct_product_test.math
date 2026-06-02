@@ -1,0 +1,50 @@
+-- Test/direct_product_test.math
+--
+-- The direct product (Algebra/direct_product) against a concrete group:
+-- ℤ × ℤ under coordinatewise addition. We exercise the bundled group and
+-- check the operation computes coordinatewise, that the projection is a
+-- homomorphism, and that ℤ embeds via the left injection.
+
+module Test.direct_product_test
+
+import Logic.basics
+import Equality.basics
+import Logic.product
+import Integer.basics
+import Integer.addition
+import Integer.instances
+import Algebra.group
+import Algebra.group_bundle
+import Algebra.group_homomorphism
+import Algebra.direct_product
+
+-- ℤ × ℤ as a bundled group.
+definition IntegerPair.group : Group :=
+  DirectProduct.group(Integer.additive_group, Integer.additive_group)
+
+-- The operation is coordinatewise addition: (a, b) + (c, d) = (a+c, b+d).
+-- Holds by reflexivity — `DirectProduct.operation` reduces to the pair of
+-- `Integer.add`s.
+theorem IntegerPair.operation_is_coordinatewise (a b c d : Integer)
+        : DirectProduct.operation(Integer.additive_group, Integer.additive_group,
+              Product.make(a, b), Product.make(c, d))
+          = Product.make(a + c, b + d) :=
+  reflexivity(DirectProduct.carrier(Integer.additive_group, Integer.additive_group),
+      Product.make(a + c, b + d))
+
+-- The first projection ℤ × ℤ → ℤ is a homomorphism — instantiate the
+-- generic theorem.
+theorem IntegerPair.projection_is_homomorphism
+        : IsHomomorphism(IntegerPair.group, Integer.additive_group,
+              DirectProduct.first_projection(Integer.additive_group,
+                                             Integer.additive_group)) :=
+  DirectProduct.first_projection_is_homomorphism(
+      Integer.additive_group, Integer.additive_group)
+
+-- ℤ embeds into ℤ × ℤ as the first coordinate via the left injection.
+theorem IntegerPair.injection_is_homomorphism
+        : IsHomomorphism(Integer.additive_group, IntegerPair.group,
+              DirectProduct.left_injection(Integer.additive_group,
+                                           Integer.additive_group)) :=
+  DirectProduct.left_injection_is_homomorphism(
+      Integer.additive_group, Integer.additive_group)

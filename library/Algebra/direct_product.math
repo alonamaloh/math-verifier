@@ -1,0 +1,179 @@
+-- Algebra/direct_product.math
+--
+-- The direct product G × H of two bundled groups: the Cartesian product
+-- of carriers with the operation, identity, and inverse taken
+-- componentwise. This is the basic way to build new groups from old, and
+-- the source of every "coordinatewise" example (ℤ², the Klein four-group
+-- as ℤ/2 × ℤ/2, …).
+--
+-- The carrier is `Logic.product`'s `Product`. The operation is written
+-- through the projections rather than by pattern-matching the pair, so
+-- `Product.first(x · y)` reduces to `Product.first(x) · Product.first(y)`
+-- on the nose — which makes the projection homomorphisms hold by
+-- reflexivity and each group law a one-liner over `Product.make_equal`
+-- (componentwise equality) fed the corresponding laws of G and H.
+--
+-- Notation: `·`/`⁻¹` dispatch on the operand's carrier, so the first
+-- component uses G's operation and the second uses H's — `a · a'` over
+-- `Group.carrier(G)`, `b · b'` over `Group.carrier(H)`.
+
+module Algebra.direct_product
+
+import Logic.basics
+import Equality.basics
+import Logic.product
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+import Algebra.group_homomorphism
+
+-- The carrier of G × H.
+definition DirectProduct.carrier (G H : Group) : Type(0) :=
+  Product(Group.carrier(G), Group.carrier(H))
+
+-- Componentwise operation: (a, b) · (a', b') = (a·a', b·b').
+definition DirectProduct.operation (G H : Group)
+        (x y : DirectProduct.carrier(G, H)) : DirectProduct.carrier(G, H) :=
+  Product.make(Product.first(x) · Product.first(y),
+               Product.second(x) · Product.second(y))
+
+-- The identity is the pair of identities.
+definition DirectProduct.identity (G H : Group) : DirectProduct.carrier(G, H) :=
+  Product.make(Group.identity(G), Group.identity(H))
+
+-- Componentwise inverse: (a, b)⁻¹ = (a⁻¹, b⁻¹).
+definition DirectProduct.inverse (G H : Group)
+        (x : DirectProduct.carrier(G, H)) : DirectProduct.carrier(G, H) :=
+  Product.make(Product.first(x)⁻¹, Product.second(x)⁻¹)
+
+-- ----------------------------------------------------------------------
+-- The group laws. Each is `Product.make_equal` over the two coordinates'
+-- laws — the projections of `operation` reduce, so both sides are
+-- already in `make` form (except where the goal is a bare `x`, which
+-- `cases` exposes as a pair).
+
+theorem DirectProduct.associative (G H : Group)
+        (x y z : DirectProduct.carrier(G, H))
+        : DirectProduct.operation(G, H, DirectProduct.operation(G, H, x, y), z)
+          = DirectProduct.operation(G, H, x, DirectProduct.operation(G, H, y, z)) :=
+  Product.make_equal(Group.carrier(G), Group.carrier(H),
+      (Product.first(x) · Product.first(y)) · Product.first(z),
+      Product.first(x) · (Product.first(y) · Product.first(z)),
+      (Product.second(x) · Product.second(y)) · Product.second(z),
+      Product.second(x) · (Product.second(y) · Product.second(z)),
+      Group.associative(G, Product.first(x), Product.first(y), Product.first(z)),
+      Group.associative(H, Product.second(x), Product.second(y), Product.second(z)))
+
+theorem DirectProduct.identity_left (G H : Group)
+        (x : DirectProduct.carrier(G, H))
+        : DirectProduct.operation(G, H, DirectProduct.identity(G, H), x) = x :=
+  cases x { | Product.make(a, b) =>
+    Product.make_equal(Group.carrier(G), Group.carrier(H),
+        Group.identity(G) · a, a, Group.identity(H) · b, b,
+        Group.identity_left(G, a), Group.identity_left(H, b)) }
+
+theorem DirectProduct.identity_right (G H : Group)
+        (x : DirectProduct.carrier(G, H))
+        : DirectProduct.operation(G, H, x, DirectProduct.identity(G, H)) = x :=
+  cases x { | Product.make(a, b) =>
+    Product.make_equal(Group.carrier(G), Group.carrier(H),
+        a · Group.identity(G), a, b · Group.identity(H), b,
+        Group.identity_right(G, a), Group.identity_right(H, b)) }
+
+theorem DirectProduct.inverse_left (G H : Group)
+        (x : DirectProduct.carrier(G, H))
+        : DirectProduct.operation(G, H, DirectProduct.inverse(G, H, x), x)
+          = DirectProduct.identity(G, H) :=
+  Product.make_equal(Group.carrier(G), Group.carrier(H),
+      Product.first(x)⁻¹ · Product.first(x), Group.identity(G),
+      Product.second(x)⁻¹ · Product.second(x), Group.identity(H),
+      Group.inverse_left(G, Product.first(x)),
+      Group.inverse_left(H, Product.second(x)))
+
+theorem DirectProduct.inverse_right (G H : Group)
+        (x : DirectProduct.carrier(G, H))
+        : DirectProduct.operation(G, H, x, DirectProduct.inverse(G, H, x))
+          = DirectProduct.identity(G, H) :=
+  Product.make_equal(Group.carrier(G), Group.carrier(H),
+      Product.first(x) · Product.first(x)⁻¹, Group.identity(G),
+      Product.second(x) · Product.second(x)⁻¹, Group.identity(H),
+      Group.inverse_right(G, Product.first(x)),
+      Group.inverse_right(H, Product.second(x)))
+
+-- ----------------------------------------------------------------------
+-- G × H is a group, bundled.
+
+theorem DirectProduct.is_group (G H : Group)
+        : IsGroup(DirectProduct.carrier(G, H),
+                  DirectProduct.operation(G, H),
+                  DirectProduct.identity(G, H),
+                  DirectProduct.inverse(G, H)) :=
+  ⟨⟨DirectProduct.associative(G, H),
+    DirectProduct.identity_left(G, H),
+    DirectProduct.identity_right(G, H)⟩,
+   DirectProduct.inverse_left(G, H),
+   DirectProduct.inverse_right(G, H)⟩
+
+definition DirectProduct.group (G H : Group) : Group :=
+  Group.make(DirectProduct.carrier(G, H),
+             DirectProduct.operation(G, H),
+             DirectProduct.identity(G, H),
+             DirectProduct.inverse(G, H),
+             DirectProduct.is_group(G, H))
+
+-- ----------------------------------------------------------------------
+-- The projection and injection homomorphisms.
+
+-- π₁ : G × H → G, (a, b) ↦ a. A homomorphism by reflexivity: the first
+-- projection of a componentwise product is the product of first
+-- projections, definitionally.
+definition DirectProduct.first_projection (G H : Group)
+        : Group.carrier(DirectProduct.group(G, H)) → Group.carrier(G) :=
+  function (x : DirectProduct.carrier(G, H)) => Product.first(x)
+
+theorem DirectProduct.first_projection_is_homomorphism (G H : Group)
+        : IsHomomorphism(DirectProduct.group(G, H), G,
+                         DirectProduct.first_projection(G, H)) :=
+  function (x y : DirectProduct.carrier(G, H)) =>
+    reflexivity(Group.carrier(G), Product.first(x) · Product.first(y))
+
+-- π₂ : G × H → H, (a, b) ↦ b. Likewise a homomorphism by reflexivity.
+definition DirectProduct.second_projection (G H : Group)
+        : Group.carrier(DirectProduct.group(G, H)) → Group.carrier(H) :=
+  function (x : DirectProduct.carrier(G, H)) => Product.second(x)
+
+theorem DirectProduct.second_projection_is_homomorphism (G H : Group)
+        : IsHomomorphism(DirectProduct.group(G, H), H,
+                         DirectProduct.second_projection(G, H)) :=
+  function (x y : DirectProduct.carrier(G, H)) =>
+    reflexivity(Group.carrier(H), Product.second(x) · Product.second(y))
+
+-- ι₁ : G → G × H, a ↦ (a, e_H). A homomorphism: the second coordinate
+-- stays at e_H = e_H·e_H, so (a·a', e_H) = (a, e_H)·(a', e_H).
+definition DirectProduct.left_injection (G H : Group)
+        : Group.carrier(G) → Group.carrier(DirectProduct.group(G, H)) :=
+  function (a : Group.carrier(G)) => Product.make(a, Group.identity(H))
+
+theorem DirectProduct.left_injection_is_homomorphism (G H : Group)
+        : IsHomomorphism(G, DirectProduct.group(G, H),
+                         DirectProduct.left_injection(G, H)) :=
+  function (a a' : Group.carrier(G)) =>
+    Product.make_equal(Group.carrier(G), Group.carrier(H),
+        a · a', a · a', Group.identity(H), Group.identity(H) · Group.identity(H),
+        reflexivity(Group.carrier(G), a · a'),
+        Equality.symmetry(Group.identity_left(H, Group.identity(H))))
+
+-- ι₂ : H → G × H, b ↦ (e_G, b). Symmetric to the left injection.
+definition DirectProduct.right_injection (G H : Group)
+        : Group.carrier(H) → Group.carrier(DirectProduct.group(G, H)) :=
+  function (b : Group.carrier(H)) => Product.make(Group.identity(G), b)
+
+theorem DirectProduct.right_injection_is_homomorphism (G H : Group)
+        : IsHomomorphism(H, DirectProduct.group(G, H),
+                         DirectProduct.right_injection(G, H)) :=
+  function (b b' : Group.carrier(H)) =>
+    Product.make_equal(Group.carrier(G), Group.carrier(H),
+        Group.identity(G), Group.identity(G) · Group.identity(G), b · b', b · b',
+        Equality.symmetry(Group.identity_left(G, Group.identity(G))),
+        reflexivity(Group.carrier(H), b · b'))

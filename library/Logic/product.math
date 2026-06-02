@@ -1,0 +1,46 @@
+-- Logic/product.math
+--
+-- The non-dependent product (Cartesian pair) `Product (A B : Type) :
+-- Type`, packaging an `a : A` with a `b : B`. The Type-level companion
+-- to `And` (which lives in Proposition): unlike `And`, `Product`
+-- supports Type-valued elimination, so the projections recover usable
+-- Type values. It is the special case of `Sigma` with a constant second
+-- family, given its own name so call sites avoid `Sigma`'s explicit
+-- universe annotations.
+
+module Logic.product
+
+import Logic.basics
+import Equality.basics
+
+-- Explicit universe parameters with result sort `Type(max(u, v))`, so
+-- both `u` and `v` are recoverable from `A : Type(u)` and `B : Type(v)`
+-- at every use site (the same universe-inference discipline as `Sigma`).
+inductive Product.{u, v} (A : Type(u)) (B : Type(v)) : Type(max(u, v)) where
+  | Product.make : A → B → Product(A, B)
+
+-- Projections (pattern-match definitions, so the kernel reduces them on
+-- a `make`). The component types are implicit — inferred from the pair —
+-- so call sites read `Product.first(x)`.
+definition Product.first.{u, v} {A : Type(u)} {B : Type(v)}
+        : Product(A, B) → A
+  | Product.make(a, _) => a
+
+definition Product.second.{u, v} {A : Type(u)} {B : Type(v)}
+        : Product(A, B) → B
+  | Product.make(_, b) => b
+
+-- Two pairs are equal when their components are: rewrite each slot in
+-- turn. The workhorse for proving equations between products from the
+-- componentwise equations (e.g. every direct-product group law).
+-- Stated at `Type(0)` — that is where `congruenceOf` lives, and where
+-- every concrete carrier (group, ring, …) sits.
+theorem Product.make_equal (A B : Type(0))
+        (a a' : A) (b b' : B)
+        (firstEqual : a = a') (secondEqual : b = b')
+        : Product.make(a, b) = Product.make(a', b') :=
+  calc Product.make(a, b)
+     = Product.make(a', b)
+           by congruenceOf(function (t : A) => Product.make(t, b), firstEqual)
+     = Product.make(a', b')
+           by congruenceOf(function (t : B) => Product.make(a', t), secondEqual)
