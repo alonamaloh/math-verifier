@@ -26,3 +26,12 @@ theorem Test.eq_then_divides (a b c : Natural)
   calc a
      = b   by hab
      ∣ c   by hbc
+
+-- Regression: a divisibility calc inside a STRUCTURAL cases/recursor body
+-- is rebuilt by rewriteRecursiveCalls (the recursive-self-call rewrite),
+-- which must preserve the relation tag — else the `∣` step silently
+-- degrades to `=`. (This is the path prime_divides_product hit.)
+theorem Test.divides_calc_in_recursor (a b : Natural) (hab : a ∣ b)
+        : (n : Natural) → a ∣ b
+  | zero => calc a ∣ b by hab
+  | successor(k) => calc a ∣ b by hab

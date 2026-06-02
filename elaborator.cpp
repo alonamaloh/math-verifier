@@ -3459,16 +3459,17 @@ private:
                 recursiveArgToHypothesis, outerBinderCount);
             std::vector<SurfaceCalcStep> rewrittenSteps;
             for (const auto& step : calc->steps) {
-                SurfaceCalcStep rewrittenStep;
-                rewrittenStep.relation = step.relation;
+                // Copy the whole step (relation, relationOperator, line,
+                // column) and overwrite only the rewritten sub-expressions,
+                // so a new SurfaceCalcStep field can't be silently dropped
+                // by this pass.
+                SurfaceCalcStep rewrittenStep = step;
                 rewrittenStep.nextExpression = rewriteRecursiveCalls(
                     step.nextExpression, thisDeclName,
                     recursiveArgToHypothesis, outerBinderCount);
                 rewrittenStep.stepProof = rewriteRecursiveCalls(
                     step.stepProof, thisDeclName,
                     recursiveArgToHypothesis, outerBinderCount);
-                rewrittenStep.line = step.line;
-                rewrittenStep.column = step.column;
                 rewrittenSteps.push_back(std::move(rewrittenStep));
             }
             return makeSurfaceCalc(std::move(rewrittenInitial),
