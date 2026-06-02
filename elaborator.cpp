@@ -3928,6 +3928,71 @@ private:
                     }
                 }
             }
+            // `<lemma>` cited by NAME with no arguments where a concrete
+            // (non-function) goal is expected: infer the lemma's arguments
+            // by unifying its conclusion with the goal. Desugar to
+            // `<lemma>(?, …, ?)` (one hole per explicit parameter) and run
+            // the hole-driven call path, which solves the holes against the
+            // expected type. Lets a user (or LLM) cite a fact by name
+            // without remembering its argument order — e.g. `by add_zero`
+            // instead of `by add_zero(a)`. Falls through to the bare
+            // constant when the arguments can't be recovered from the goal,
+            // so nullary citations and bare-value uses are unaffected.
+            if (expectedType && identifier->universeArgs.empty()) {
+                bool shadowedByLocal = false;
+                for (const auto& binder : localBinders) {
+                    if (binder.name == identifier->qualifiedName) {
+                        shadowedByLocal = true;
+                        break;
+                    }
+                }
+                const Declaration* decl =
+                    environment_.lookup(identifier->qualifiedName);
+                if (!shadowedByLocal && decl
+                    && currentDeclarationName_ != identifier->qualifiedName) {
+                    ExpressionPointer declType = declarationType(*decl);
+                    int totalPi = declType ? countLeadingPis(declType) : 0;
+                    int implicitCount =
+                        environment_.implicitArgumentCount(
+                            identifier->qualifiedName);
+                    int explicitCount = totalPi - implicitCount;
+                    // Only when the lemma takes explicit args AND the goal
+                    // is not itself a function type (a bare-value use of the
+                    // lemma wants it unapplied — handled above / below).
+                    bool expectedIsFunction = true;
+                    try {
+                        ExpressionPointer w = weakHeadNormalForm(
+                            environment_,
+                            openOverLocalBinders(expectedType, localBinders,
+                                                  localBinders.size()));
+                        expectedIsFunction =
+                            std::holds_alternative<Pi>(w->node);
+                    } catch (...) { expectedIsFunction = true; }
+                    if (explicitCount > 0 && !expectedIsFunction) {
+                        std::vector<SurfaceArgument> holeArgs;
+                        for (int i = 0; i < explicitCount; ++i) {
+                            holeArgs.push_back(
+                                {"", makeSurfaceHole(expression.line,
+                                                      expression.column)});
+                        }
+                        SurfaceExpressionPointer call =
+                            makeSurfaceApplication(
+                                makeSurfaceIdentifier(
+                                    identifier->qualifiedName, {},
+                                    expression.line, expression.column),
+                                std::move(holeArgs),
+                                expression.line, expression.column);
+                        try {
+                            return elaborateExpression(
+                                *call, localBinders, expectedType);
+                        } catch (const ElaborateError&) {
+                            // fall through to the bare constant
+                        } catch (const TypeError&) {
+                            // fall through to the bare constant
+                        }
+                    }
+                }
+            }
             return elaborateIdentifier(*identifier, localBinders,
                                         expression.line, expression.column);
         }
