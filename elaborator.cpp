@@ -7654,6 +7654,68 @@ private:
                                 }
                             }
                         }
+                        // `by L(args)` where `by L` alone (arguments
+                        // inferred from the goal) would also close the
+                        // step — suggest dropping the explicit arguments.
+                        // Only when the whole `by` isn't already redundant.
+                        if (!autoAttempt
+                            && step.relation == CalcRelation::Equality) {
+                            auto* surfApp = std::get_if<SurfaceApplication>(
+                                &step.stepProof->node);
+                            auto* head = surfApp
+                                ? std::get_if<SurfaceIdentifier>(
+                                      &surfApp->function->node)
+                                : nullptr;
+                            if (surfApp && !surfApp->arguments.empty()
+                                && head && head->universeArgs.empty()
+                                && head->qualifiedName != "congruenceOf"
+                                && environment_.lookup(head->qualifiedName)
+                                       != nullptr) {
+                                ExpressionPointer bareAttempt = nullptr;
+                                try {
+                                    SurfaceExpressionPointer bare =
+                                        makeSurfaceIdentifier(
+                                            head->qualifiedName, {},
+                                            step.line, step.column);
+                                    bareAttempt = elaborateExpression(
+                                        *bare, localBinders,
+                                        stepRelationType);
+                                } catch (const ElaborateError&) {
+                                    bareAttempt = nullptr;
+                                } catch (const TypeError&) {
+                                    bareAttempt = nullptr;
+                                }
+                                bool valid = false;
+                                if (bareAttempt
+                                    && !containsFreeVariable(bareAttempt)) {
+                                    try {
+                                        ExpressionPointer t =
+                                            inferTypeInLocalContext(
+                                                localBinders, bareAttempt);
+                                        ExpressionPointer g =
+                                            openOverLocalBinders(
+                                                stepRelationType,
+                                                localBinders,
+                                                localBinders.size());
+                                        Context c =
+                                            buildContextFromLocalBinders(
+                                                localBinders);
+                                        valid = isDefinitionallyEqual(
+                                            environment_, c, t, g);
+                                    } catch (...) { valid = false; }
+                                }
+                                if (valid) {
+                                    std::cerr << "warning: " << moduleName_
+                                        << ":" << step.line << ":"
+                                        << step.column
+                                        << ": arguments to `"
+                                        << head->qualifiedName
+                                        << "` are inferable from the goal — "
+                                           "`by " << head->qualifiedName
+                                        << "` alone suffices\n";
+                                }
+                            }
+                        }
                     }
                 }  // end if (!stepProofKernel) — under-Σ took the step otherwise
             } else if (step.relation == CalcRelation::Equality) {
