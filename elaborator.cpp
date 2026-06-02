@@ -904,14 +904,41 @@ private:
     // blocks around kernel `inferType` / `isDefinitionallyEqual`
     // calls.
     [[noreturn]] void rethrowKernelError(const TypeError& error) const {
-        std::string message = "kernel: ";
-        message += error.what();
+        // WS1 (PLAN_LESS_CIC_STYLE.md): this is the single chokepoint where
+        // a kernel `TypeError` becomes user-facing. Ideally the elaborator
+        // checks first and the kernel only confirms; where a gap remains,
+        // we re-author the kernel's CIC-shaped wording here in surface
+        // terms. The embedded type rendering is already math-shaped
+        // (prettyPrintForDisplay), so only the message text and the
+        // expected/actual labels need translating. A message we have NOT
+        // taught a surface form keeps the literal "kernel: " prefix — that
+        // prefix is the provenance tag the error-corpus audit keys on, so
+        // leaving it on unmapped messages keeps new leaks visible.
+        const std::string what = error.what();
+        std::string message;
+        const char* expectedLabel = "expected type: ";
+        const char* actualLabel = "actual type:   ";
+        if (what == "Application: function is not of Pi type") {
+            message = "this is being applied to an argument, but it is not "
+                      "a function";
+            actualLabel = "it has type:   ";
+        } else if (what
+                   == "Application: argument type does not match Pi domain") {
+            message = "this argument has the wrong type for the function it "
+                      "is given to";
+            expectedLabel = "the function expects: ";
+            actualLabel = "but this argument is: ";
+        } else {
+            message = "kernel: " + what;
+        }
         if (error.expectedType) {
-            message += "\n    expected type: ";
+            message += "\n    ";
+            message += expectedLabel;
             message += prettyPrintForDisplay(error.expectedType);
         }
         if (error.actualType) {
-            message += "\n    actual type:   ";
+            message += "\n    ";
+            message += actualLabel;
             message += prettyPrintForDisplay(error.actualType);
         }
         // Anchor the error at the innermost frame that knows its source
@@ -8679,12 +8706,17 @@ private:
             if (!isDefinitionallyEqual(environment_, stepContext,
                                         stepProofType,
                                         stepRelationTypeOpened)) {
-                TypeError error(
-                    "calc step proof's type does not match the "
-                    "relation claimed by this step");
-                error.expectedType = stepRelationTypeOpened;
-                error.actualType = stepProofType;
-                rethrowKernelError(error);
+                // The elaborator itself just found this mismatch (the
+                // isDefinitionallyEqual above) — so it owns the message.
+                // Report it as mathematics rather than laundering it
+                // through rethrowKernelError's "kernel: " path (WS1).
+                throwElaborate(
+                    "this step's justification proves a different relation "
+                    "than the step claims\n"
+                    "    this step claims:    "
+                    + prettyPrintForDisplay(stepRelationTypeOpened) + "\n"
+                    "    but its proof shows: "
+                    + prettyPrintForDisplay(stepProofType));
             }
             steps.push_back({step.relation, stepProofKernel});
             endpointKernels.push_back(nextKernel);
