@@ -44,6 +44,20 @@ definition False.eliminate_proposition
       function (_ : False) => GoalProposition,
       proofOfFalse)
 
+-- A proposition equivalent to its own negation is absurd. This is the
+-- engine of every diagonal argument (Cantor, Russell, Tarski): once a
+-- self-referential `Q ⟺ ¬Q` is exhibited, `False` follows. Supplying the
+-- contradiction as a named lemma lets those proofs end with one line that
+-- reads "Q is equivalent to its own negation — absurd" instead of an
+-- open-coded double application of the negation.
+theorem Not.self_negation_absurd (Q : Proposition)
+        (impliesNegation : Q → Not(Q))
+        (negationImplies : Not(Q) → Q)
+        : False := {
+  let negationOfQ : Not(Q) := function (q : Q) => impliesNegation(q)(q);
+  negationOfQ(negationImplies(negationOfQ))
+}
+
 -- Project the left component of a conjunction.
 definition And.left (A B : Proposition) : And(A, B) → A
   | And.introduction(leftProof, _) => leftProof

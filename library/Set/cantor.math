@@ -30,18 +30,16 @@ theorem Cantor.no_surjection_onto_powerset (X : Type(0))
   function (surjective : Function.IsSurjective(X, Set(X), f)) => {
     -- By surjectivity some d maps onto the diagonal.
     obtain ⟨d, imageIsDiagonal⟩ from surjective(Cantor.diagonal(X, f));
-    -- "d ∈ diagonal" is by definition "d ∉ f(d)"; and because f(d) equals
-    -- the diagonal, membership in f(d) and in the diagonal are
-    -- interchangeable by rewriting along that equality. So d ∈ diagonal
-    -- would say d ∈ f(d) and d ∉ f(d) at once: d is not in the diagonal.
-    let notInDiagonal : Not(d ∈ Cantor.diagonal(X, f))
-        := function (inDiagonal : d ∈ Cantor.diagonal(X, f)) =>
-             inDiagonal(rewrite(Equality.symmetry(imageIsDiagonal), inDiagonal));
-    -- Yet "not in the diagonal" is itself a proof that d ∈ f(d) fails,
-    -- i.e. a proof that d ∈ diagonal — contradiction.
-    notInDiagonal(
+    -- "d ∈ diagonal" is by definition "d ∉ f(d)", and f(d) = diagonal lets
+    -- membership move between the two sets. So "d ∈ f(d)" is equivalent to
+    -- its own negation — absurd.
+    Not.self_negation_absurd(d ∈ f(d),
         function (inImage : d ∈ f(d)) =>
-            notInDiagonal(rewrite(imageIsDiagonal, inImage)))
+            Set.transport_member(d, f(d), Cantor.diagonal(X, f),
+                imageIsDiagonal, inImage),
+        function (notInImage : Not(d ∈ f(d))) =>
+            Set.transport_member(d, Cantor.diagonal(X, f), f(d),
+                Equality.symmetry(imageIsDiagonal), notInImage))
   }
 
 -- ----------------------------------------------------------------------
@@ -59,10 +57,7 @@ definition Set.singleton (X : Type(0)) (x : X) : Set(X) :=
 theorem Set.singleton_is_injective (X : Type(0))
         : Function.IsInjective(X, Set(X), Set.singleton(X)) :=
   function (x y : X) (singletonsEqual : Set.singleton(X, x) = Set.singleton(X, y)) =>
-    -- Transport "x is a member" along {x} = {y}: x ∈ {x} holds (x = x), so
+    -- Move "x is a member" along {x} = {y}: x ∈ {x} holds (x = x), so
     -- x ∈ {y}, which is x = y.
-    Equality.transport_proposition(
-        function (s : Set(X)) => x ∈ s,
-        Set.singleton(X, x), Set.singleton(X, y),
-        singletonsEqual,
-        reflexivity(X, x))
+    Set.transport_member(x, Set.singleton(X, x), Set.singleton(X, y),
+        singletonsEqual, reflexivity(X, x))

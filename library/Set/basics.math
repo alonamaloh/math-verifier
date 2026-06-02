@@ -31,6 +31,19 @@ definition Set.subset {T : Type(0)} (smaller larger : Set(T))
 
 operator (⊆) on (Set, Set) := Set.subset
 
+-- Transport membership along an equality of sets: from `source = target`
+-- and `subject ∈ source`, conclude `subject ∈ target`. `rewrite` struggles
+-- here because membership reduces (`x ∈ {…}` unfolds to the predicate
+-- body), erasing the set spelling it would need to target; this lemma
+-- hands `transport_proposition` the membership predicate directly, so call
+-- sites read "membership moves along the set equality."
+theorem Set.transport_member {T : Type(0)} (subject : T)
+        (source target : Set(T)) (setsEqual : source = target)
+        (member : subject ∈ source) : subject ∈ target :=
+  Equality.transport_proposition(
+      function (candidate : Set(T)) => subject ∈ candidate,
+      source, target, setsEqual, member)
+
 -- `Set.IsNonempty(T, S)` — the carrier is passed explicitly because
 -- the implicit-argument inference machinery requires an outer
 -- expectedType to engage, and many call sites (the `(h :
