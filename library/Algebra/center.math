@@ -1,0 +1,133 @@
+-- Algebra/center.math
+--
+-- The center of a group G is the set of elements that commute with
+-- everything: Z(G) = { z | z·g = g·z for all g }. It is the canonical
+-- example of a normal subgroup, and measures how far G is from being
+-- abelian — Z(G) = G exactly when G is abelian.
+--
+-- The two headline results:
+--
+--   * the center is a subgroup of G, and
+--   * the center is in fact a *normal* subgroup.
+--
+-- Normality is almost free: a central z is fixed by every conjugation,
+-- g⁻¹·z·g = z, so the conjugate trivially lands back in the center.
+--
+-- Notation: `·` (Group.operation, group inferred from the operands) and
+-- `a⁻¹` (Group.inverse, postfix). Groups are not commutative, so there
+-- is no `ring` to call — every reassociation is a step through
+-- `Group.associative` and the inverse/identity laws (the no-`by`
+-- auto-prover discharges most of them from the group axioms in scope).
+
+module Algebra.center
+
+import Logic.basics
+import Equality.basics
+import Set.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+import Algebra.subgroup
+import Algebra.normal_subgroup
+
+-- The center: elements that commute with every element of G.
+definition Group.center (G : Group) : Set(Group.carrier(G)) :=
+  function (z : Group.carrier(G)) =>
+    (g : Group.carrier(G)) → z · g = g · z
+
+-- ----------------------------------------------------------------------
+-- The center is a subgroup.
+
+-- The identity is central: e·g = g = g·e.
+theorem Group.center.contains_identity (G : Group)
+        : Group.identity(G) ∈ Group.center(G) :=
+  function (g : Group.carrier(G)) =>
+    calc Group.identity(G) · g
+       = g
+       = g · Group.identity(G)
+
+-- The center is closed under the operation: if z and w each commute
+-- with everything, so does z·w.
+--
+--   (z·w)·g = z·(w·g) = z·(g·w) = (z·g)·w = (g·z)·w = g·(z·w)
+theorem Group.center.closed_under_operation (G : Group)
+        (z w : Group.carrier(G))
+        (zCentral : z ∈ Group.center(G))
+        (wCentral : w ∈ Group.center(G))
+        : (z · w) ∈ Group.center(G) :=
+  function (g : Group.carrier(G)) =>
+    calc (z · w) · g
+       = z · (w · g)
+       = z · (g · w)
+             by rewrite(wCentral(g))
+       = (z · g) · w
+       = (g · z) · w
+             by rewrite(zCentral(g))
+       = g · (z · w)
+
+-- The center is closed under inversion: if z commutes with everything,
+-- so does z⁻¹. Insert e = z·z⁻¹ and e = z⁻¹·z around g·z = z·g:
+--
+--   z⁻¹·g = z⁻¹·g·(z·z⁻¹) = z⁻¹·(g·z)·z⁻¹ = z⁻¹·(z·g)·z⁻¹
+--         = (z⁻¹·z)·g·z⁻¹ = g·z⁻¹
+theorem Group.center.closed_under_inverse (G : Group)
+        (z : Group.carrier(G))
+        (zCentral : z ∈ Group.center(G))
+        : z⁻¹ ∈ Group.center(G) :=
+  function (g : Group.carrier(G)) =>
+    calc z⁻¹ · g
+       = z⁻¹ · (g · Group.identity(G))
+       = z⁻¹ · (g · (z · z⁻¹))
+       = z⁻¹ · ((g · z) · z⁻¹)
+       = z⁻¹ · ((z · g) · z⁻¹)
+             by rewrite(Equality.symmetry(zCentral(g)))
+       = z⁻¹ · (z · (g · z⁻¹))
+       = (z⁻¹ · z) · (g · z⁻¹)
+       = Group.identity(G) · (g · z⁻¹)
+       = g · z⁻¹
+
+-- The center is a subgroup of G.
+theorem Group.center_is_subgroup (G : Group)
+        : IsSubgroup(G, Group.center(G)) :=
+  ⟨Group.center.contains_identity(G),
+   Group.center.closed_under_operation(G),
+   Group.center.closed_under_inverse(G)⟩
+
+-- Any two central elements commute with each other — the defining
+-- property, specialised to a partner that is itself central. (This is
+-- what makes the center an abelian subgroup.)
+theorem Group.center.elements_commute (G : Group)
+        (z w : Group.carrier(G))
+        (zCentral : z ∈ Group.center(G))
+        (wCentral : w ∈ Group.center(G))
+        : z · w = w · z :=
+  zCentral(w)
+
+-- ----------------------------------------------------------------------
+-- The center is a normal subgroup.
+
+-- A central element is fixed by every conjugation: g⁻¹·z·g = z, because
+-- z commutes past g and the surrounding g⁻¹·g collapses.
+--
+--   g⁻¹·z·g = g⁻¹·(z·g) = g⁻¹·(g·z) = (g⁻¹·g)·z = z
+theorem Group.center.conjugation_fixes (G : Group)
+        (g z : Group.carrier(G))
+        (zCentral : z ∈ Group.center(G))
+        : g⁻¹ · z · g = z :=
+  calc g⁻¹ · z · g
+     = g⁻¹ · (z · g)
+     = g⁻¹ · (g · z)
+           by rewrite(zCentral(g))
+     = (g⁻¹ · g) · z
+     = Group.identity(G) · z
+     = z
+
+-- The center is a normal subgroup: each conjugate g⁻¹·z·g equals the
+-- central element z itself, which is already in the center.
+theorem Group.center_is_normal (G : Group)
+        : IsNormalSubgroup(G, Group.center(G)) :=
+  ⟨Group.center_is_subgroup(G),
+   function (g z : Group.carrier(G)) (zCentral : z ∈ Group.center(G)) =>
+     rewrite(Equality.symmetry(Group.center.conjugation_fixes(G, g, z, zCentral)),
+             zCentral)⟩
