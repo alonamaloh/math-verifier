@@ -675,8 +675,8 @@ theorem Natural.padic_valuation_power_divides
                          rewrite(oneEqPower, Natural.one_divides(0)))
                    }
                  | successor(predQ) => {
-                     let refinedMEq : m = prime * successor(predQ) :=
-                         rewrite(qEq, mEqPrimeQ);
+                     claim refinedMEq : m = prime * successor(predQ)
+                       by substituting qEq;
                      claim succQPositive : 1 ≤ successor(predQ)
                        by Natural.successor_positive(predQ);
                        -- succ(q) < m. From m = p * q with p ≥ 2, q ≥ 1:
@@ -735,13 +735,11 @@ theorem Natural.padic_valuation_power_divides
                                                prime, successor(predQ))),
                                        prime),
                                    prime * successor(predQ))
-                         by rewrite(
-                                Equality.symmetry(
-                                    Natural.power_succ(
-                                        Natural.padic_valuation(
-                                            prime, successor(predQ)),
-                                        prime)),
-                                shiftedDivides);
+                         by substituting
+                                Natural.power_succ(
+                                    Natural.padic_valuation(
+                                        prime, successor(predQ)),
+                                    prime);
                        claim valuationPowerDividesProduct
                              : Natural.divides(
                                    Natural.power(
@@ -749,16 +747,16 @@ theorem Natural.padic_valuation_power_divides
                                            prime, prime * successor(predQ)),
                                        prime),
                                    prime * successor(predQ))
-                         by rewrite(
-                                Equality.symmetry(valuationProduct),
-                                succPowerDivides);
+                         by substituting Equality.symmetry(valuationProduct);
                        -- Substitute m ← prime * succ(predQ) (via
                        -- Equality.symmetry(refinedMEq)) in the abstract-all
                        -- motive `λm'. p^v_p(prime, m') ∣ m'`; rewrite's
                        -- expected-type fallback handles both positions.
-                       rewrite(
-                           Equality.symmetry(refinedMEq),
-                           valuationPowerDividesProduct)
+                       claim Natural.divides(
+                                 Natural.power(
+                                     Natural.padic_valuation(prime, m), prime),
+                                 m)
+                         by substituting refinedMEq
                    }
               }
           }
@@ -770,14 +768,13 @@ theorem Natural.padic_valuation_power_divides
               -- Flatten the two rewrites into sequential `claim`s.
               {
                 claim powerZeroDivides : Natural.divides(Natural.power(0, prime), m)
-                  by rewrite(
-                         Equality.symmetry(Natural.power_zero(prime)),
-                         Natural.one_divides(m));
-                rewrite(
-                    Equality.symmetry(
-                        Natural.padic_valuation_when_not_divides(
-                            prime, m, notDivM)),
-                    powerZeroDivides)
+                  by substituting Natural.power_zero(prime);
+                claim Natural.divides(
+                          Natural.power(
+                              Natural.padic_valuation(prime, m), prime),
+                          m)
+                  by substituting Natural.padic_valuation_when_not_divides(
+                         prime, m, notDivM)
               }
         })
 
@@ -1141,13 +1138,11 @@ theorem Natural.divides_distance
   claim (a ≤ b) ∨ (b ≤ a)
   claim by cases {
     in (a ≤ b) as aLeB:
-        rewrite(
-            Equality.symmetry(Natural.distance_monus_when_ge(a, b, aLeB)),
-            Natural.divides_monus(d, b, a, aLeB, dDividesB, dDividesA))
+        claim d ∣ Natural.distance(a, b)
+            by substituting Natural.distance_monus_when_ge(a, b, aLeB)
     in (b ≤ a) as bLeA:
-        rewrite(
-            Equality.symmetry(Natural.distance_monus_when_le(b, a, bLeA)),
-            Natural.divides_monus(d, a, b, bLeA, dDividesA, dDividesB))
+        claim d ∣ Natural.distance(a, b)
+            by substituting Natural.distance_monus_when_le(b, a, bLeA)
   }
 
 -- The key Natural-level identity: distance(a1+b1, a2+b2) is the
@@ -1202,17 +1197,12 @@ theorem Natural.divides_distance_sum
               --                       = distance(a1, a2) + distance(b1, b2).
               claim a1 + b1 ≤ a2 + b2
                 by Natural.le_add_le(a1, a2, b1, b2, a1LeA2, b1LeB2);
-              rewrite(
-                  calc Natural.distance(a1, a2) + Natural.distance(b1, b2)
-                     = Natural.monus(a2, a1) + Natural.distance(b1, b2)
-                     = Natural.monus(a2, a1) + Natural.monus(b2, b1)
-                     = Natural.monus(a2 + b2, a1 + b1)
-                     = Natural.distance(a1 + b1, a2 + b2),
-                  Natural.divides_add(
-                      d,
-                      Natural.distance(a1, a2),
-                      Natural.distance(b1, b2),
-                      dDividesDistanceA, dDividesDistanceB))
+              calc Natural.distance(a1, a2) + Natural.distance(b1, b2)
+                 = Natural.monus(a2, a1) + Natural.distance(b1, b2)
+                 = Natural.monus(a2, a1) + Natural.monus(b2, b1)
+                 = Natural.monus(a2 + b2, a1 + b1)
+                 = Natural.distance(a1 + b1, a2 + b2);
+              claim d ∣ Natural.distance(a1 + b1, a2 + b2) by substitution
             }
           in (b2 ≤ b1) as b2LeB1: {
               -- Cross direction (a1 ≤ a2, b2 ≤ b1). The monus forms
@@ -1221,20 +1211,12 @@ theorem Natural.divides_distance_sum
               -- distance(a1+b1, a2+b2) = distance(monus(b1,b2),
               -- monus(a2,a1)) (cross-le-le) bridges to the goal.
               claim dDividesMonusB1B2 : d ∣ Natural.monus(b1, b2)
-                by rewrite(
-                       Natural.distance_monus_when_le(b2, b1, b2LeB1),
-                       dDividesDistanceB);
+                by substituting Natural.distance_monus_when_le(b2, b1, b2LeB1);
               claim dDividesMonusA2A1 : d ∣ Natural.monus(a2, a1)
-                by rewrite(
-                       Natural.distance_monus_when_ge(a1, a2, a1LeA2),
-                       dDividesDistanceA);
-              rewrite(
-                  Equality.symmetry(
-                      Natural.distance_sum_cross_le_le(
-                          a1, a2, b1, b2, a1LeA2, b2LeB1)),
-                  Natural.divides_distance(
-                      d, Natural.monus(b1, b2), Natural.monus(a2, a1),
-                      dDividesMonusB1B2, dDividesMonusA2A1))
+                by substituting Natural.distance_monus_when_ge(a1, a2, a1LeA2);
+              claim d ∣ Natural.distance(a1 + b1, a2 + b2)
+                by substituting Natural.distance_sum_cross_le_le(
+                       a1, a2, b1, b2, a1LeA2, b2LeB1)
             }
         }
         }
@@ -1248,13 +1230,9 @@ theorem Natural.divides_distance_sum
               -- distance_symmetric to swap distance(a1+b1, a2+b2) and
               -- distance(a2+b2, a1+b1).
               claim dDividesMonusB2B1 : d ∣ Natural.monus(b2, b1)
-                by rewrite(
-                       Natural.distance_monus_when_ge(b1, b2, b1LeB2),
-                       dDividesDistanceB);
+                by substituting Natural.distance_monus_when_ge(b1, b2, b1LeB2);
               claim dDividesMonusA1A2 : d ∣ Natural.monus(a1, a2)
-                by rewrite(
-                       Natural.distance_monus_when_le(a2, a1, a2LeA1),
-                       dDividesDistanceA);
+                by substituting Natural.distance_monus_when_le(a2, a1, a2LeA1);
               -- Chain monus → distance(a2+b2, a1+b1) → distance(a1+b1, a2+b2)
               -- into a single equality, then rewrite the divides claim once.
               claim distancesEqual
@@ -1265,11 +1243,8 @@ theorem Natural.divides_distance_sum
                                           Natural.monus(a1, a2))
                      = Natural.distance(a2 + b2, a1 + b1)
                      = Natural.distance(a1 + b1, a2 + b2);
-              rewrite(
-                  distancesEqual,
-                  Natural.divides_distance(
-                      d, Natural.monus(b2, b1), Natural.monus(a1, a2),
-                      dDividesMonusB2B1, dDividesMonusA1A2))
+              claim d ∣ Natural.distance(a1 + b1, a2 + b2)
+                by substituting distancesEqual
             }
           in (b2 ≤ b1) as b2LeB1: {
               -- Same direction (a2 ≤ a1, b2 ≤ b1). distance is in
@@ -1277,17 +1252,12 @@ theorem Natural.divides_distance_sum
               -- same distributivity / divides_add chain as the first case.
               claim a2 + b2 ≤ a1 + b1
                 by Natural.le_add_le(a2, a1, b2, b1, a2LeA1, b2LeB1);
-              rewrite(
-                  calc Natural.distance(a1, a2) + Natural.distance(b1, b2)
-                     = Natural.monus(a1, a2) + Natural.distance(b1, b2)
-                     = Natural.monus(a1, a2) + Natural.monus(b1, b2)
-                     = Natural.monus(a1 + b1, a2 + b2)
-                     = Natural.distance(a1 + b1, a2 + b2),
-                  Natural.divides_add(
-                      d,
-                      Natural.distance(a1, a2),
-                      Natural.distance(b1, b2),
-                      dDividesDistanceA, dDividesDistanceB))
+              calc Natural.distance(a1, a2) + Natural.distance(b1, b2)
+                 = Natural.monus(a1, a2) + Natural.distance(b1, b2)
+                 = Natural.monus(a1, a2) + Natural.monus(b1, b2)
+                 = Natural.monus(a1 + b1, a2 + b2)
+                 = Natural.distance(a1 + b1, a2 + b2);
+              claim d ∣ Natural.distance(a1 + b1, a2 + b2) by substitution
             }
         }
         }
