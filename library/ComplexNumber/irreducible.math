@@ -247,43 +247,60 @@ theorem Complex.modulus_irreducible
                           from Polynomial.exists_degree_of_nonzero(Real.ring, a, aNonzero);
                       obtain ⟨degreeB, bBound, bLeadingNonzero⟩
                           from Polynomial.exists_degree_of_nonzero(Real.ring, b, bNonzero);
+                      claim aHasDegree : Polynomial.HasDegree(Real.ring, a, degreeA)
+                          by And.introduction(aBound, aLeadingNonzero);
+                      claim bHasDegree : Polynomial.HasDegree(Real.ring, b, degreeB)
+                          by And.introduction(bBound, bLeadingNonzero);
+                      -- Neither factor is degree 0: a degree-0 factor would be
+                      -- a unit, contradicting the nontrivial factorization.
                       claim degreeAPositive : 1 ≤ degreeA
                           by Natural.less_or_equal_not_equal_successor(0, degreeA,
                                  Natural.zero_least(degreeA),
-                                 (degreeAZero : degreeA = 0) ↦
+                                 (degreeAZero : degreeA = 0) ↦ {
+                                     claim aHasDegreeZero : Polynomial.HasDegree(Real.ring, a, 0)
+                                         by substituting degreeAZero;
                                      aNotUnit(
                                          Polynomial.degree_zero_is_unit(Real.ring,
                                              Real.reciprocal_exists_for_nonzero, a,
-                                             rewrite(degreeAZero,
-                                                 And.introduction(aBound, aLeadingNonzero)))));
+                                             aHasDegreeZero))
+                                 });
                       claim degreeBPositive : 1 ≤ degreeB
                           by Natural.less_or_equal_not_equal_successor(0, degreeB,
                                  Natural.zero_least(degreeB),
-                                 (degreeBZero : degreeB = 0) ↦
+                                 (degreeBZero : degreeB = 0) ↦ {
+                                     claim bHasDegreeZero : Polynomial.HasDegree(Real.ring, b, 0)
+                                         by substituting degreeBZero;
                                      bNotUnit(
                                          Polynomial.degree_zero_is_unit(Real.ring,
                                              Real.reciprocal_exists_for_nonzero, b,
-                                             rewrite(degreeBZero,
-                                                 And.introduction(bBound, bLeadingNonzero)))));
+                                             bHasDegreeZero))
+                                 });
+                      -- a·b has degree degreeA + degreeB; it equals the modulus,
+                      -- which has degree 2 — so degreeA + degreeB = 2.
+                      claim productHasDegree
+                            : Polynomial.HasDegree(Real.ring,
+                                  Polynomial.multiply(Real.ring, a, b), degreeA + degreeB)
+                          by Polynomial.HasDegree_product(Real.ring,
+                                 Real.multiply_commutative,
+                                 Real.reciprocal_exists_for_nonzero, a, b,
+                                 degreeA, degreeB, aHasDegree, bHasDegree);
+                      claim modulusHasDegree
+                            : Polynomial.HasDegree(Real.ring, Complex.modulus, degreeA + degreeB)
+                          by substituting factorEquation;
                       claim sumIsTwo : degreeA + degreeB = 2
                           by Polynomial.HasDegree_unique(Real.ring, Complex.modulus,
-                                 degreeA + degreeB, 2,
-                                 rewrite(Equality.symmetry(factorEquation),
-                                     Polynomial.HasDegree_product(Real.ring,
-                                         Real.multiply_commutative,
-                                         Real.reciprocal_exists_for_nonzero, a, b,
-                                         degreeA, degreeB,
-                                         And.introduction(aBound, aLeadingNonzero),
-                                         And.introduction(bBound, bLeadingNonzero))),
+                                 degreeA + degreeB, 2, modulusHasDegree,
                                  Complex.modulus_HasDegree_two);
                       let ⟨degreeAOne, degreeBOne⟩
                           := Natural.both_one_of_add_two(degreeA, degreeB,
                                  degreeAPositive, degreeBPositive, sumIsTwo);
+                      claim aHasDegreeOne : Polynomial.HasDegree(Real.ring, a, 1)
+                          by substituting degreeAOne;
+                      claim bHasDegreeOne : Polynomial.HasDegree(Real.ring, b, 1)
+                          by substituting degreeBOne;
                       absurd(
-                          Complex.no_degree_one_factorization(a, b,
-                              rewrite(degreeAOne, And.introduction(aBound, aLeadingNonzero)),
-                              rewrite(degreeBOne, And.introduction(bBound, bLeadingNonzero)),
-                              factorEquation))
+                          Complex.no_degree_one_factorization(
+                              a, b, aHasDegreeOne, bHasDegreeOne, factorEquation))
                     }
                 }
           })
