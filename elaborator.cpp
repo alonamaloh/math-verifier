@@ -932,6 +932,61 @@ private:
         throw ElaborateError(formatErrorWithContext(message), line, column);
     }
 
+    // WS1 (PLAN_LESS_CIC_STYLE.md): make the elaborator authoritative at
+    // the definition-finalization boundary. `addDefinition` (the kernel)
+    // performs three checks — name-uniqueness, declared-type-is-a-type,
+    // and body-type-matches-declared-type — and on failure throws a
+    // CIC-shaped `TypeError` ("addDefinition: body type does not match
+    // declared type", …). Were that the FIRST check, its wording would
+    // reach the user. So we run the identical checks here first, on the
+    // closed `declaredType`/`body` (empty context — `addDefinition` binds
+    // no universe params either, see kernel.cpp), and report any failure
+    // as mathematics. The kernel call immediately below then only ever
+    // CONFIRMS. `noun` is "theorem"/"definition" for message phrasing;
+    // `bodyNoun` is "proof"/"body".
+    void checkDefinitionWellFormedOrThrow(
+            const std::string& name,
+            const ExpressionPointer& declaredType,
+            const ExpressionPointer& body,
+            const char* noun,
+            const char* bodyNoun) {
+        if (environment_.declarations.count(name)) {
+            throwElaborate(std::string("a declaration named '") + name
+                + "' already exists");
+        }
+        // The declared type must itself be a type (live in some `Sort`).
+        ExpressionPointer declaredKind;
+        try {
+            declaredKind = weakHeadNormalForm(
+                environment_, inferType(environment_, {}, declaredType));
+        } catch (const TypeError& kernelError) {
+            rethrowKernelError(kernelError);
+        }
+        if (!std::holds_alternative<Sort>(declaredKind->node)) {
+            throwElaborate(std::string("the declared type of ") + noun + " '"
+                + name + "' is not itself a type: `"
+                + prettyPrintForDisplay(declaredType)
+                + "` has type `" + prettyPrintForDisplay(declaredKind)
+                + "`, which is not a proposition or a type");
+        }
+        // The body must have the declared type.
+        ExpressionPointer inferredBodyType;
+        try {
+            inferredBodyType = inferType(environment_, {}, body);
+        } catch (const TypeError& kernelError) {
+            rethrowKernelError(kernelError);
+        }
+        if (!isDefinitionallyEqual(environment_, {}, inferredBodyType,
+                                   declaredType)) {
+            throwElaborate(std::string("the ") + bodyNoun + " of " + noun
+                + " '" + name + "' does not have its declared type\n"
+                "    declared type:        "
+                + prettyPrintForDisplay(declaredType) + "\n"
+                "    but this " + bodyNoun + " has type: "
+                + prettyPrintForDisplay(inferredBodyType));
+        }
+    }
+
     // -------- top-level statements --------
 
     void elaborateTopStatement(const SurfaceTopStatement& statement) {
@@ -1873,6 +1928,12 @@ private:
         // a copy of the type for post-registration algebraic-shape
         // detection.
         ExpressionPointer typeForDetection = fullType;
+        // WS1: check authoritatively in the elaborator before deferring to
+        // the kernel, so a malformed definition fails as mathematics.
+        checkDefinitionWellFormedOrThrow(
+            declaration.name, fullType, fullBody,
+            declaration.isTheorem ? "theorem" : "definition",
+            declaration.isTheorem ? "proof" : "body");
         try {
             addDefinition(environment_, declaration.name,
                           finalUniverseParameters(declaration.universeParameters),
