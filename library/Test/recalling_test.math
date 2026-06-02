@@ -1,0 +1,36 @@
+-- Test/recalling_test.math
+--
+-- `by <lemma> recalling <fact>, …` brings extra named facts into the
+-- side-condition discharge scope of a cited lemma, as bounded,
+-- context-local hypotheses (no global library search). Lets a lemma be
+-- cited by name even when one of its premises is not derivable from the
+-- ambient context and is not pinned by the goal.
+
+module Test.recalling_test
+
+import Equality.basics
+import Natural.basics
+import Natural.order
+
+-- A lemma with a side-condition (`0 ≤ n`) that its conclusion (`n = n`)
+-- does not mention — so the obligation cannot be recovered from the goal.
+theorem Test.reflexive_when_bounded (n : Natural) (atLeastZero : 0 ≤ n)
+        : n = n := reflexivity(n)
+
+-- Bare citation: the conclusion `k = k` pins `n := k`, and the leftover
+-- `0 ≤ k` premise is discharged from the `recalling`-bound fact
+-- `Natural.zero_least(k)`. No explicit argument list.
+theorem Test.recalling_discharges (k : Natural) : k = k := {
+  claim result : k = k
+      by Test.reflexive_when_bounded recalling Natural.zero_least(k);
+  result
+}
+
+-- Several recalled facts, comma-separated; the discharge picks the one
+-- whose type matches the premise.
+theorem Test.recalling_multiple (k : Natural) : k = k := {
+  claim result : k = k
+      by Test.reflexive_when_bounded
+          recalling reflexivity(k), Natural.zero_least(k);
+  result
+}

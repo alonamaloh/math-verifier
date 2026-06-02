@@ -4624,21 +4624,36 @@ private:
                 && claimSizeFlag2[0] != '\0'
                 && claimSizeFlag2[0] != '0';
             auto tLet0 = std::chrono::steady_clock::now();
-            ExpressionPointer letType =
-                elaborateExpression(*let->type, localBinders);
+            ExpressionPointer letType;
+            ExpressionPointer letValue;
+            if (let->type) {
+                letType = elaborateExpression(*let->type, localBinders);
+                // Pass the declared type as the expected type for the
+                // value so bidirectional elaborators (cases, anonymous
+                // tuples, hammer, calc) can use it — without this,
+                // `let h : T := ?;` can't trigger the hammer's
+                // reflexivity-match etc.
+                letValue = elaborateExpression(
+                    *let->value, localBinders, letType);
+            } else {
+                // Untyped `let x := v;` — infer the type from the value.
+                // Used by the `recalling` desugaring (which binds facts
+                // whose types are not written) and any other type-free
+                // local binding.
+                letValue = elaborateExpression(*let->value, localBinders);
+                letType = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, letValue),
+                    localBinders, localBinders.size());
+            }
             auto tLetType = std::chrono::steady_clock::now();
-            // Pass the declared type as the expected type for the value
-            // so bidirectional elaborators (cases, anonymous tuples,
-            // hammer, calc) can use it — without this, `let h : T := ?;`
-            // can't trigger the hammer's reflexivity-match etc.
-            ExpressionPointer letValue =
-                elaborateExpression(*let->value, localBinders, letType);
             auto tLetValue = std::chrono::steady_clock::now();
             // Diff-inference for non-calc equality coercion: covers
             // `claim X : succ(a) = succ(b) by eq` (desugars to a
             // SurfaceLet) without an explicit congruenceOf wrapper.
-            letValue = coerceToExpectedTypeViaDiff(
-                localBinders, letValue, letType);
+            if (let->type) {
+                letValue = coerceToExpectedTypeViaDiff(
+                    localBinders, letValue, letType);
+            }
             auto tLetCoerce = std::chrono::steady_clock::now();
             checkRedundantCongruenceOfWrapper(
                 let->value, localBinders, letType,

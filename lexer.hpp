@@ -45,6 +45,7 @@ enum class TokenKind {
     KeywordUnfold,          // `unfold X` — surface tactic to opt into δ-unfolding
     KeywordSubstitution,    // `by substitution` — auto-find equality + body
     KeywordSubstituting,    // `by substituting <eq>` — narrow to specified equality
+    KeywordRecalling,       // `by <lemma> recalling <fact>, …` — facts in discharge scope
     KeywordContradiction,   // `contradiction` — close goal from P / ¬P
     KeywordObtain,          // `obtain ⟨…⟩ from E;` — statement-level let-pattern
     KeywordSuppose,         // `suppose P as h;` — introduce hypothesis as a step

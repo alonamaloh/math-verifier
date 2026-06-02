@@ -1143,7 +1143,8 @@ private:
                             /*bySubstitution=*/true);
                     } else if (peek().kind == TokenKind::KeywordBy) {
                         consumeAny();  // 'by'
-                        wrapper.value = parseExpression();
+                        wrapper.value =
+                            parseRecallingWrap(parseExpression());
                     } else if (peek().kind == TokenKind::LeftBrace) {
                         // Footnote form: `claim P : T { proof_block };`
                         // is sugar for `claim P : T by { proof_block };`.
@@ -2611,7 +2612,7 @@ private:
                 byHint = parseClaimByInduction();
                 byInduction = true;
             } else {
-                byHint = parseExpression();
+                byHint = parseRecallingWrap(parseExpression());
             }
         }
         return makeSurfaceStructuredClaim(
@@ -2619,6 +2620,32 @@ private:
             std::move(byHint), byCases, std::move(arms),
             claimToken.line, claimToken.column, byInduction,
             bySubstitution);
+    }
+
+    // `<hint> recalling <fact>, <fact>, …` — bring extra named facts into
+    // the discharge scope of a `by <lemma>` hint. Desugars to nested
+    // `let`-bindings wrapping the hint, so each fact becomes a local
+    // hypothesis the side-condition discharge can match (a bounded,
+    // context-local search — no global library scan). Returns the hint
+    // unchanged when there is no `recalling` clause.
+    SurfaceExpressionPointer parseRecallingWrap(
+        SurfaceExpressionPointer hint) {
+        if (peek().kind != TokenKind::KeywordRecalling) return hint;
+        Token recallToken = consumeAny();  // 'recalling'
+        std::vector<SurfaceExpressionPointer> facts;
+        facts.push_back(parseExpression());
+        while (peek().kind == TokenKind::Comma) {
+            consumeAny();  // ','
+            facts.push_back(parseExpression());
+        }
+        SurfaceExpressionPointer body = std::move(hint);
+        for (int i = static_cast<int>(facts.size()) - 1; i >= 0; --i) {
+            body = makeSurfaceLet(
+                "_recalled_" + std::to_string(i),
+                /*type=*/nullptr, std::move(facts[i]), std::move(body),
+                recallToken.line, recallToken.column);
+        }
+        return body;
     }
 
     // Parses the tail of `claim P by induction on E [with ih]
