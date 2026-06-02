@@ -182,7 +182,7 @@ theorem Real.exists_rational_below_at_make
       -- hence strictly above q.
       obtain ⟨N, cauchyAt1⟩
           from seqIsCauchy((1 : Rational), (0 : Rational) < (1 : Rational));
-      witness seq(N) - (1 : Rational) with {
+      witness seq(N) - (1 : Rational) with (unfold Real.IsNonneg in {
         -- (q : Real) ≤ mk(make(seq, _)) unfolds (via Quotient.lift
         -- through `LessOrEqual` → `IsNonneg` of the difference) to:
         -- `∀ ε > 0. ∃ M. ∀ m ≥ M. seq(m) - (seq(N) - 1) > -ε`. Take
@@ -216,7 +216,7 @@ theorem Real.exists_rational_below_at_make
              < (0 : Rational)
              < seq(m) - (seq(N) - (1 : Rational))
         }
-      }
+      })
    }
 
 -- Lift the at-make form via Quotient.induct.
@@ -237,7 +237,8 @@ theorem Real.exists_rational_above_at_make
       obtain ⟨N, cauchyAt1⟩
           from seqIsCauchy((1 : Rational), Rational.zero_less_one);
       witness seq(N) + (1 : Rational) with
-          (epsilon : Rational)
+          unfold Real.IsNonneg in
+          ((epsilon : Rational)
                    (epsilonPositive : (0 : Rational) < epsilon) ↦
             witness N with
                 (m : Natural) (mGeN : N ≤ m) ↦ {
@@ -270,7 +271,7 @@ theorem Real.exists_rational_above_at_make
                   calc -epsilon
                      < (0 : Rational)
                      < (seq(N) + (1 : Rational)) - seq(m)
-                }
+                })
    }
 
 -- Lift exists_rational_above_at_make via Quotient.induct.
@@ -669,7 +670,8 @@ theorem Real.LessOrEqual_of_pointwise_at_make
                   ≤ Real.from_cauchy_sequence(b, bIsCauchy))
         : Real.from_cauchy_sequence(s, sIsCauchy)
             ≤ Real.from_cauchy_sequence(b, bIsCauchy) :=
-  (epsilon : Rational)
+  unfold Real.IsNonneg in
+  ((epsilon : Rational)
            (epsilonPositive : (0 : Rational) < epsilon) ↦ {
     claim halvedPositive : (0 : Rational) < Rational.halve(epsilon)
       by Rational.halve_positive(epsilon, epsilonPositive);
@@ -721,7 +723,7 @@ theorem Real.LessOrEqual_of_pointwise_at_make
                          Rational.LessThan.weaken(sFlippedBound))
              = b(m) - s(m)
         }
-  }
+  })
 
 -- Lift to arbitrary Real B via Quotient.induct: case on B = mk(b_rep),
 -- Take a representative B = [(b, bIsCauchy)]; the at-make form proves it.
@@ -756,7 +758,8 @@ theorem Real.LessOrEqual_of_pointwise_lower_at_make
                   ≤ (s(n) : Real))
         : Real.from_cauchy_sequence(b, bIsCauchy)
             ≤ Real.from_cauchy_sequence(s, sIsCauchy) :=
-  (epsilon : Rational)
+  unfold Real.IsNonneg in
+  ((epsilon : Rational)
            (epsilonPositive : (0 : Rational) < epsilon) ↦ {
     claim halvedPositive : (0 : Rational) < Rational.halve(epsilon)
       by Rational.halve_positive(epsilon, epsilonPositive);
@@ -804,7 +807,7 @@ theorem Real.LessOrEqual_of_pointwise_lower_at_make
                          Rational.LessThan.weaken(sBBound))
              = s(m) - b(m)
         }
-  }
+  })
 
 -- Take a representative B = [(b, bIsCauchy)]; the at-make form proves it.
 theorem Real.LessOrEqual_of_pointwise_lower
@@ -1735,7 +1738,8 @@ theorem Rational.LessOrEqual_of_real_LessOrEqual
             claim diffPositive : (0 : Rational) < a - b
               by And.introduction(diffNonneg, diffNonzero);
             -- realLeq at ε = a - b yields the contradiction.
-            obtain ⟨N, bound⟩ from realLeq(a - b, diffPositive);
+            obtain ⟨N, bound⟩
+                from (unfold Real.IsNonneg in realLeq)(a - b, diffPositive);
             claim bMinusASelf : -(a - b) < b - a
               by bound(N, LessOrEqual.reflexivity(N));
             claim bMinusALessSelf : b - a < b - a
@@ -1792,7 +1796,8 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
               ≤ Real.bisectionLimit(
                     subset, initial, initialLeftLeqRight)
   | CauchyRationalSequence.make(yseq, yIsCauchy), yInSubset =>
-  (epsilon : Rational)
+  unfold Real.IsNonneg in
+  ((epsilon : Rational)
            (epsilonPositive : (0 : Rational) < epsilon) ↦ {
     claim halvedPositive : (0 : Rational) < Rational.halve(epsilon)
       by Rational.halve_positive(epsilon, epsilonPositive);
@@ -1861,7 +1866,7 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
              = Real.bisectionLeft(subset, initial, K) - yseq(j)
              ≤ Real.bisectionLeft(subset, initial, j) - yseq(j)
         }
-  }
+  })
 
 -- Take a representative y = [(rep, _)]; the at-rep lemma proves it.
 theorem Real.bisectionLimit_is_upper_bound

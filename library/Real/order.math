@@ -158,7 +158,7 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect
 -- ----------------------------------------------------------------------
 -- Real.IsNonneg, LessOrEqual, LessThan.
 
-definition Real.IsNonneg (x : Real) : Proposition :=
+opaque definition Real.IsNonneg (x : Real) : Proposition :=
   Quotient.lift(
       CauchyRationalSequence.IsEventuallyNonneg,
       CauchyRationalSequence.IsEventuallyNonneg.respect,
@@ -181,12 +181,13 @@ operator (<) on (Real, Real) := Real.LessThan
 -- IsEventuallyNonneg of the constant-0 sequence: at any ε > 0,
 -- N = 0 works; -ε < 0.
 theorem Real.IsNonneg_zero : Real.IsNonneg(Real.zero) :=
-  (epsilon : Rational)
+  unfold Real.IsNonneg in
+  ((epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦
     witness 0 with
         (m : Natural) (_ : 0 ≤ m) ↦
           -- Goal: -ε < sf(to_cauchy_constant(0), m) ≡β Rational.zero.
-          Rational.negate_LessThan_zero_of_positive(epsilon, epsilonPositive)
+          Rational.negate_LessThan_zero_of_positive(epsilon, epsilonPositive))
 
 -- Real.LessOrEqual.reflexive : x ≤ x.
 theorem Real.LessOrEqual.reflexive (x : Real) : x ≤ x :=
@@ -267,10 +268,11 @@ theorem Real.IsNonneg.add
         (xNonneg : Real.IsNonneg(x))
         (yNonneg : Real.IsNonneg(y))
         : Real.IsNonneg(x + y) :=
-  cases x refining xNonneg { | rep_x =>
+  unfold Real.IsNonneg in
+  (cases x refining xNonneg { | rep_x =>
     cases y refining yNonneg { | rep_y =>
       CauchyRationalSequence.IsEventuallyNonneg.add(
-          rep_x, rep_y, xNonneg, yNonneg) } }
+          rep_x, rep_y, xNonneg, yNonneg) } })
 
 -- Real.LessOrEqual.transitive : x ≤ y, y ≤ z → x ≤ z.
 -- From Real.IsNonneg(y - x) and Real.IsNonneg(z - y), use
@@ -372,13 +374,14 @@ theorem Real.IsNonneg_and_negate_IsNonneg_implies_zero
         (xNonneg : Real.IsNonneg(x))
         (negXNonneg : Real.IsNonneg(-x))
         : x = Real.zero :=
-  cases x refining xNonneg, negXNonneg { | rep =>
+  unfold Real.IsNonneg in
+  (cases x refining xNonneg, negXNonneg { | rep =>
     Quotient.sound(
         CauchyRationalSequence, CauchyEquivalent,
         rep,
         Rational.to_cauchy_constant(Rational.zero),
         CauchyRationalSequence.equivalent_zero_of_IsEventuallyNonneg_both(
-            rep, xNonneg, negXNonneg)) }
+            rep, xNonneg, negXNonneg)) })
 
 -- Real.LessOrEqual.antisymmetric : x ≤ y, y ≤ x → x = y. From
 -- IsNonneg(y - x) and IsNonneg(x - y) = IsNonneg(-(y - x)) we get
