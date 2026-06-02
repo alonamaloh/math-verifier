@@ -1,0 +1,45 @@
+-- Set/cantor.math
+--
+-- Cantor's theorem: no function from a type X onto its power set Set(X)
+-- is surjective. In particular Set(X) is strictly "bigger" than X, so the
+-- power set of the naturals is not enumerable — the prototype of an
+-- uncountable collection.
+--
+-- The proof is the diagonal argument. Given f : X → Set(X), form the
+-- diagonal set  D = { x | x ∉ f(x) }.  If some d had f(d) = D then
+-- "d ∈ D" would mean both "d ∈ f(d)" (since f(d) = D) and "d ∉ f(d)" (the
+-- defining property of D) — a contradiction. So D is not in the image and
+-- f is not surjective.
+
+module Set.cantor
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.basics
+import Logic.functions
+
+-- The diagonal set of f: the elements their own image leaves out.
+definition Cantor.diagonal (X : Type(0)) (f : X → Set(X)) : Set(X) :=
+  function (x : X) => Not(x ∈ f(x))
+
+-- No surjection X → Set(X) exists.
+theorem Cantor.no_surjection_onto_powerset (X : Type(0))
+        (f : X → Set(X))
+        : Not(Function.IsSurjective(X, Set(X), f)) :=
+  function (surjective : Function.IsSurjective(X, Set(X), f)) => {
+    -- By surjectivity some d maps onto the diagonal.
+    obtain ⟨d, imageIsDiagonal⟩ from surjective(Cantor.diagonal(X, f));
+    -- "d ∈ diagonal" is by definition "d ∉ f(d)"; and because f(d) equals
+    -- the diagonal, membership in f(d) and in the diagonal are
+    -- interchangeable by rewriting along that equality. So d ∈ diagonal
+    -- would say d ∈ f(d) and d ∉ f(d) at once: d is not in the diagonal.
+    let notInDiagonal : Not(d ∈ Cantor.diagonal(X, f))
+        := function (inDiagonal : d ∈ Cantor.diagonal(X, f)) =>
+             inDiagonal(rewrite(Equality.symmetry(imageIsDiagonal), inDiagonal));
+    -- Yet "not in the diagonal" is itself a proof that d ∈ f(d) fails,
+    -- i.e. a proof that d ∈ diagonal — contradiction.
+    notInDiagonal(
+        function (inImage : d ∈ f(d)) =>
+            notInDiagonal(rewrite(imageIsDiagonal, inImage)))
+  }

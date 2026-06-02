@@ -1,0 +1,77 @@
+-- Set/enumerable.math
+--
+-- A type is *enumerable* (countable) when its elements can be listed by
+-- the naturals: there is a surjection ℕ → X. This is the positive side of
+-- cardinality — the companion to Cantor's theorem (Set/cantor), which
+-- exhibits a type that is NOT enumerable.
+--
+-- The point of the module is the small algebra of closure facts:
+-- enumerability passes along surjections and to quotients. With those,
+-- "X is enumerable" for a concrete X is assembled compositionally rather
+-- than by exhibiting an explicit listing each time — e.g. ℚ is a quotient
+-- of a product of enumerable pieces (Rational/enumerable).
+
+module Set.enumerable
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Logic.quotient
+import Set.basics
+import Set.cantor
+import Logic.functions
+import Natural.basics
+
+-- X is enumerable: some `f : ℕ → X` hits every element.
+definition IsEnumerable (X : Type(0)) : Proposition :=
+  ∃ (f : Natural → X). Function.IsSurjective(Natural, X, f)
+
+-- The naturals are enumerable, by the identity listing.
+theorem Natural.is_enumerable : IsEnumerable(Natural) :=
+  ⟨function (n : Natural) => n, Function.identity_is_surjective(Natural)⟩
+
+-- Enumerability passes along a surjection: if X is enumerable and
+-- g : X → Y is onto, then Y is enumerable (list Y through g).
+theorem IsEnumerable.along_surjection
+        (X Y : Type(0)) (g : X → Y)
+        (enumerableX : IsEnumerable(X))
+        (surjectiveG : Function.IsSurjective(X, Y, g))
+        : IsEnumerable(Y) := {
+  obtain ⟨listing, listingSurjective⟩ from enumerableX;
+  ⟨function (n : Natural) => g(listing(n)),
+   Function.compose_surjective(Natural, X, Y, listing, g,
+       listingSurjective, surjectiveG)⟩
+}
+
+-- The class map T → Quotient(T, R) is surjective: every class is the
+-- class of some representative.
+theorem Quotient.mk_is_surjective (T : Type(0)) (R : T → T → Proposition)
+        : Function.IsSurjective(T, Quotient(T, R),
+                                function (t : T) => Quotient.mk(T, R, t)) :=
+  function (q : Quotient(T, R)) =>
+    Quotient.induct(
+        function (z : Quotient(T, R)) => ∃ (t : T). Quotient.mk(T, R, t) = z,
+        function (x : T) =>
+            (⟨x, reflexivity(Quotient(T, R), Quotient.mk(T, R, x))⟩
+                : ∃ (t : T). Quotient.mk(T, R, t) = Quotient.mk(T, R, x)),
+        q)
+
+-- A quotient of an enumerable type is enumerable: compose the listing of
+-- representatives with the (surjective) class map.
+theorem IsEnumerable.quotient (T : Type(0)) (R : T → T → Proposition)
+        (enumerableT : IsEnumerable(T))
+        : IsEnumerable(Quotient(T, R)) :=
+  IsEnumerable.along_surjection(T, Quotient(T, R),
+      function (t : T) => Quotient.mk(T, R, t),
+      enumerableT,
+      Quotient.mk_is_surjective(T, R))
+
+-- The power set of the naturals is not enumerable — Cantor's theorem
+-- specialised to ℕ. Any candidate listing ℕ → Set(ℕ) is a surjection,
+-- which Cantor forbids.
+theorem Set.powerset_of_naturals_not_enumerable
+        : Not(IsEnumerable(Set(Natural))) :=
+  function (enumerable : IsEnumerable(Set(Natural))) => {
+    obtain ⟨listing, listingSurjective⟩ from enumerable;
+    Cantor.no_surjection_onto_powerset(Natural, listing, listingSurjective)
+  }

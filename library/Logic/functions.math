@@ -1,0 +1,69 @@
+-- Logic/functions.math
+--
+-- The basic properties of a function between two types: injective
+-- (distinct inputs, distinct outputs), surjective (every output is hit),
+-- and bijective (both). These are the vocabulary of cardinality — "X and
+-- Y have the same size" is "there is a bijection X → Y", "X is enumerable"
+-- is "there is a surjection ℕ → X" — so they live in their own module,
+-- separate from the group-homomorphism-specific `IsInjective` in
+-- Algebra/subgroup.
+--
+-- Everything is stated at `Type(0)`, where the concrete carriers
+-- (Natural, Integer, Rational, Real, …) live and where `congruenceOf`
+-- and the `=` desugaring operate.
+
+module Logic.functions
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+
+-- `f` is injective: equal outputs force equal inputs.
+definition Function.IsInjective (A B : Type(0)) (f : A → B) : Proposition :=
+  (x y : A) → f(x) = f(y) → x = y
+
+-- `f` is surjective: every element of the codomain is some `f(x)`.
+definition Function.IsSurjective (A B : Type(0)) (f : A → B) : Proposition :=
+  (y : B) → ∃ (x : A). f(x) = y
+
+-- `f` is bijective: injective and surjective.
+definition Function.IsBijective (A B : Type(0)) (f : A → B) : Proposition :=
+  Function.IsInjective(A, B, f) ∧ Function.IsSurjective(A, B, f)
+
+-- ----------------------------------------------------------------------
+-- The identity is bijective, and both properties compose. These are the
+-- closure facts every cardinality argument leans on.
+
+theorem Function.identity_is_injective (A : Type(0))
+        : Function.IsInjective(A, A, function (x : A) => x) :=
+  function (x y : A) (equalImages : x = y) => equalImages
+
+theorem Function.identity_is_surjective (A : Type(0))
+        : Function.IsSurjective(A, A, function (x : A) => x) :=
+  function (y : A) => ⟨y, reflexivity(A, y)⟩
+
+-- The composite of injective functions is injective.
+theorem Function.compose_injective
+        (A B C : Type(0)) (f : A → B) (g : B → C)
+        (fInjective : Function.IsInjective(A, B, f))
+        (gInjective : Function.IsInjective(B, C, g))
+        : Function.IsInjective(A, C, function (x : A) => g(f(x))) :=
+  function (x y : A) (equalImages : g(f(x)) = g(f(y))) =>
+    fInjective(x, y, gInjective(f(x), f(y), equalImages))
+
+-- The composite of surjective functions is surjective: pull `z` back
+-- through `g`, then that preimage back through `f`.
+theorem Function.compose_surjective
+        (A B C : Type(0)) (f : A → B) (g : B → C)
+        (fSurjective : Function.IsSurjective(A, B, f))
+        (gSurjective : Function.IsSurjective(B, C, g))
+        : Function.IsSurjective(A, C, function (x : A) => g(f(x))) :=
+  function (z : C) => {
+    obtain ⟨y, gMapsTo⟩ from gSurjective(z);
+    obtain ⟨x, fMapsTo⟩ from fSurjective(y);
+    ⟨x,
+     calc g(f(x))
+        = g(y)
+              by Equality.congruence(g, f(x), y, fMapsTo)
+        = z⟩
+  }
