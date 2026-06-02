@@ -1,0 +1,232 @@
+-- Algebra/third_isomorphism.math
+--
+-- The third isomorphism theorem. For normal subgroups N ⊆ M of G, the
+-- "collapse" map
+--   φ : G/N → G/M,   φ([a]_N) = [a]_M
+-- is a well-defined surjective homomorphism whose kernel is exactly M/N,
+-- so the first isomorphism theorem gives  (G/N)/(M/N) ≅ G/M.
+--
+-- We state the conclusion in the same style as Algebra/first_isomorphism:
+-- the induced map  (G/N)/ker(φ) → G/M  is an injective homomorphism that
+-- is also surjective, i.e. an isomorphism. The distinctive content of the
+-- third theorem — that ker(φ) is M/N — is the kernel characterization
+-- `[a]_N ∈ ker(φ) ⟺ a ∈ M`.
+--
+-- Everything is assembled from the existing quotient-group machinery
+-- (Algebra/quotient_group) and the first isomorphism theorem
+-- (Algebra/first_isomorphism); no new group algebra is needed beyond the
+-- identity/inverse bookkeeping in the kernel characterization.
+
+module Algebra.third_isomorphism
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Logic.quotient
+import Set.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+import Algebra.group_homomorphism
+import Algebra.subgroup
+import Algebra.normal_subgroup
+import Algebra.quotient_group
+import Algebra.first_isomorphism
+
+-- ----------------------------------------------------------------------
+-- The collapse map φ : G/N → G/M.
+
+-- Well-definedness: if a ~_N a' (i.e. a⁻¹·a' ∈ N), then a ~_M a' because
+-- N ⊆ M, so [a]_M = [a']_M.
+theorem QuotientGroup.collapse_well_defined
+        (G : Group) (smaller larger : Set(Group.carrier(G)))
+        (containment : smaller ⊆ larger)
+        (a a' : Group.carrier(G))
+        (related : Group.SameCoset(G, smaller, a, a'))
+        : QuotientGroup.make(G, larger, a) = QuotientGroup.make(G, larger, a') :=
+  Quotient.sound(a, a', containment(a⁻¹ · a', related))
+
+-- φ itself: lift the class map a ↦ [a]_M through G/N.
+definition QuotientGroup.collapse
+        (G : Group) (smaller larger : Set(Group.carrier(G)))
+        (normalSmaller : IsNormalSubgroup(G, smaller))
+        (normalLarger : IsNormalSubgroup(G, larger))
+        (containment : smaller ⊆ larger)
+        (x : Group.carrier(QuotientGroup.group(G, smaller, normalSmaller)))
+        : Group.carrier(QuotientGroup.group(G, larger, normalLarger)) :=
+  Quotient.lift(
+      function (a : Group.carrier(G)) => QuotientGroup.make(G, larger, a),
+      QuotientGroup.collapse_well_defined(G, smaller, larger, containment),
+      x)
+
+-- φ is a homomorphism: φ([a]·[b]) = φ([a·b]) = [a·b]_M = [a]_M·[b]_M, by
+-- reflexivity once both quotient operations reduce on representatives.
+theorem QuotientGroup.collapse_is_homomorphism
+        (G : Group) (smaller larger : Set(Group.carrier(G)))
+        (normalSmaller : IsNormalSubgroup(G, smaller))
+        (normalLarger : IsNormalSubgroup(G, larger))
+        (containment : smaller ⊆ larger)
+        : IsHomomorphism(
+              QuotientGroup.group(G, smaller, normalSmaller),
+              QuotientGroup.group(G, larger, normalLarger),
+              QuotientGroup.collapse(G, smaller, larger,
+                  normalSmaller, normalLarger, containment)) :=
+  function (x y : Group.carrier(QuotientGroup.group(G, smaller, normalSmaller))) =>
+    by_representatives x as a, y as b =>
+      reflexivity(QuotientGroup(G, larger),
+          QuotientGroup.make(G, larger, a · b))
+
+-- φ is surjective: every [b]_M is φ([b]_N).
+theorem QuotientGroup.collapse_is_surjective
+        (G : Group) (smaller larger : Set(Group.carrier(G)))
+        (normalSmaller : IsNormalSubgroup(G, smaller))
+        (normalLarger : IsNormalSubgroup(G, larger))
+        (containment : smaller ⊆ larger)
+        (y : Group.carrier(QuotientGroup.group(G, larger, normalLarger)))
+        : ∃ (x : Group.carrier(QuotientGroup.group(G, smaller, normalSmaller))).
+              QuotientGroup.collapse(G, smaller, larger,
+                  normalSmaller, normalLarger, containment, x) = y :=
+  cases y { | b =>
+    ⟨QuotientGroup.make(G, smaller, b),
+     reflexivity(QuotientGroup(G, larger), QuotientGroup.make(G, larger, b))⟩ }
+
+-- ----------------------------------------------------------------------
+-- The kernel of φ is M/N: [a]_N ∈ ker(φ) ⟺ a ∈ M.
+
+-- (⇐) If a ∈ M then [a]_N collapses to the identity: [a]_M = [e]_M,
+-- because a⁻¹·e = a⁻¹ ∈ M.
+theorem QuotientGroup.collapse_kernel_contains
+        (G : Group) (smaller larger : Set(Group.carrier(G)))
+        (normalSmaller : IsNormalSubgroup(G, smaller))
+        (normalLarger : IsNormalSubgroup(G, larger))
+        (containment : smaller ⊆ larger)
+        (a : Group.carrier(G))
+        (aInLarger : a ∈ larger)
+        : QuotientGroup.make(G, smaller, a)
+          ∈ GroupHomomorphism.kernel(
+                QuotientGroup.group(G, smaller, normalSmaller),
+                QuotientGroup.group(G, larger, normalLarger),
+                QuotientGroup.collapse(G, smaller, larger,
+                    normalSmaller, normalLarger, containment)) := {
+  let ⟨_, _, closedUnderInverse⟩ := IsNormalSubgroup.subgroup(G, larger, normalLarger);
+  -- a⁻¹ ∈ M, and a⁻¹·e = a⁻¹, so the coset element a⁻¹·e lies in M.
+  claim cosetInLarger : a⁻¹ · Group.identity(G) ∈ larger
+      by rewrite(Equality.symmetry(Group.identity_right(G, a⁻¹)),
+                 closedUnderInverse(a, aInLarger));
+  Quotient.sound(a, Group.identity(G), cosetInLarger)
+}
+
+-- (⇒) If [a]_N collapses to the identity, then a ∈ M: [a]_M = [e]_M
+-- gives a⁻¹·e = a⁻¹ ∈ M (Quotient.exact), hence a = (a⁻¹)⁻¹ ∈ M.
+theorem QuotientGroup.collapse_kernel_only
+        (G : Group) (smaller larger : Set(Group.carrier(G)))
+        (normalSmaller : IsNormalSubgroup(G, smaller))
+        (normalLarger : IsNormalSubgroup(G, larger))
+        (containment : smaller ⊆ larger)
+        (a : Group.carrier(G))
+        (inKernel
+            : QuotientGroup.make(G, smaller, a)
+              ∈ GroupHomomorphism.kernel(
+                    QuotientGroup.group(G, smaller, normalSmaller),
+                    QuotientGroup.group(G, larger, normalLarger),
+                    QuotientGroup.collapse(G, smaller, larger,
+                        normalSmaller, normalLarger, containment)))
+        : a ∈ larger := {
+  let subgroupLarger : IsSubgroup(G, larger)
+      := IsNormalSubgroup.subgroup(G, larger, normalLarger);
+  let ⟨_, _, closedUnderInverse⟩ := subgroupLarger;
+  let equivalenceLarger
+      : IsEquivalenceRelation(Group.carrier(G), Group.SameCoset(G, larger))
+      := Group.SameCoset.is_equivalence(G, larger, subgroupLarger);
+  -- inKernel : [a]_M = [e]_M; Quotient.exact recovers a⁻¹·e ∈ M.
+  claim cosetInLarger : a⁻¹ · Group.identity(G) ∈ larger
+      by Quotient.exact(Group.carrier(G), Group.SameCoset(G, larger),
+                        equivalenceLarger, a, Group.identity(G), inKernel);
+  -- a⁻¹·e = a⁻¹, so a⁻¹ ∈ M; close under inverse and undo the involution.
+  claim inverseInLarger : a⁻¹ ∈ larger
+      by rewrite(Group.identity_right(G, a⁻¹), cosetInLarger);
+  rewrite(Group.inverse_involution_bundled(G, a),
+          closedUnderInverse(a⁻¹, inverseInLarger))
+}
+
+-- ----------------------------------------------------------------------
+-- The isomorphism (G/N)/ker(φ) ≅ G/M, from the first isomorphism theorem
+-- applied to φ. Since ker(φ) = M/N (above), this is (G/N)/(M/N) ≅ G/M.
+
+-- The double quotient (G/N)/ker(φ), bundled.
+definition QuotientGroup.collapse_kernel_quotient
+        (G : Group) (smaller larger : Set(Group.carrier(G)))
+        (normalSmaller : IsNormalSubgroup(G, smaller))
+        (normalLarger : IsNormalSubgroup(G, larger))
+        (containment : smaller ⊆ larger) : Group :=
+  GroupHomomorphism.quotient_by_kernel(
+      QuotientGroup.group(G, smaller, normalSmaller),
+      QuotientGroup.group(G, larger, normalLarger),
+      QuotientGroup.collapse(G, smaller, larger,
+          normalSmaller, normalLarger, containment),
+      QuotientGroup.collapse_is_homomorphism(G, smaller, larger,
+          normalSmaller, normalLarger, containment))
+
+-- The induced isomorphism φ̄ : (G/N)/ker(φ) → G/M, φ̄([[a]_N]) = [a]_M.
+definition QuotientGroup.collapse_induced
+        (G : Group) (smaller larger : Set(Group.carrier(G)))
+        (normalSmaller : IsNormalSubgroup(G, smaller))
+        (normalLarger : IsNormalSubgroup(G, larger))
+        (containment : smaller ⊆ larger)
+        : Group.carrier(QuotientGroup.collapse_kernel_quotient(G, smaller, larger,
+              normalSmaller, normalLarger, containment))
+          → Group.carrier(QuotientGroup.group(G, larger, normalLarger)) :=
+  GroupHomomorphism.induced_map(
+      QuotientGroup.group(G, smaller, normalSmaller),
+      QuotientGroup.group(G, larger, normalLarger),
+      QuotientGroup.collapse(G, smaller, larger,
+          normalSmaller, normalLarger, containment),
+      QuotientGroup.collapse_is_homomorphism(G, smaller, larger,
+          normalSmaller, normalLarger, containment))
+
+-- φ̄ is injective — directly from the first isomorphism theorem.
+theorem QuotientGroup.collapse_induced_is_injective
+        (G : Group) (smaller larger : Set(Group.carrier(G)))
+        (normalSmaller : IsNormalSubgroup(G, smaller))
+        (normalLarger : IsNormalSubgroup(G, larger))
+        (containment : smaller ⊆ larger)
+        : GroupHomomorphism.IsInjective(
+              QuotientGroup.collapse_kernel_quotient(G, smaller, larger,
+                  normalSmaller, normalLarger, containment),
+              QuotientGroup.group(G, larger, normalLarger),
+              QuotientGroup.collapse_induced(G, smaller, larger,
+                  normalSmaller, normalLarger, containment)) :=
+  GroupHomomorphism.induced_map_is_injective(
+      QuotientGroup.group(G, smaller, normalSmaller),
+      QuotientGroup.group(G, larger, normalLarger),
+      QuotientGroup.collapse(G, smaller, larger,
+          normalSmaller, normalLarger, containment),
+      QuotientGroup.collapse_is_homomorphism(G, smaller, larger,
+          normalSmaller, normalLarger, containment))
+
+-- φ̄ is surjective: φ is surjective and φ̄([[a]_N]) = φ([a]_N), so any
+-- target is hit by the class of a φ-preimage.
+theorem QuotientGroup.collapse_induced_is_surjective
+        (G : Group) (smaller larger : Set(Group.carrier(G)))
+        (normalSmaller : IsNormalSubgroup(G, smaller))
+        (normalLarger : IsNormalSubgroup(G, larger))
+        (containment : smaller ⊆ larger)
+        (y : Group.carrier(QuotientGroup.group(G, larger, normalLarger)))
+        : ∃ (x : Group.carrier(QuotientGroup.collapse_kernel_quotient(G, smaller, larger,
+                  normalSmaller, normalLarger, containment))).
+              QuotientGroup.collapse_induced(G, smaller, larger,
+                  normalSmaller, normalLarger, containment, x) = y := {
+  obtain ⟨preimage, collapsesToY⟩
+      from QuotientGroup.collapse_is_surjective(G, smaller, larger,
+               normalSmaller, normalLarger, containment, y);
+  ⟨QuotientGroup.make(
+       QuotientGroup.group(G, smaller, normalSmaller),
+       GroupHomomorphism.kernel(
+           QuotientGroup.group(G, smaller, normalSmaller),
+           QuotientGroup.group(G, larger, normalLarger),
+           QuotientGroup.collapse(G, smaller, larger,
+               normalSmaller, normalLarger, containment)),
+       preimage),
+   collapsesToY⟩
+}
