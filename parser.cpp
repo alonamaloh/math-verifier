@@ -1117,7 +1117,31 @@ private:
                 consumeAny();  // ':'
                 wrapper.type = parseExpression();
                 if (isClaim) {
-                    if (peek().kind == TokenKind::KeywordBy) {
+                    if (peek().kind == TokenKind::KeywordBy
+                        && (tokens_[position_ + 1].kind
+                                == TokenKind::KeywordSubstitution
+                            || tokens_[position_ + 1].kind
+                                   == TokenKind::KeywordSubstituting)) {
+                        // `claim NAME : TYPE by substitution[ <eq>]` — the
+                        // named-claim analogue of the anonymous
+                        // `claim P by substituting <eq>`. Build a
+                        // structured-claim whose proposition is the stated
+                        // TYPE and let the equality bridge discharge it, so
+                        // a nested `rewrite(eq, term)` can be lifted into a
+                        // named, readable fact.
+                        consumeAny();  // 'by'
+                        bool narrowed =
+                            peek().kind == TokenKind::KeywordSubstituting;
+                        consumeAny();  // 'substituting' / 'substitution'
+                        SurfaceExpressionPointer eqHint =
+                            narrowed ? parseExpression() : nullptr;
+                        wrapper.value = makeSurfaceStructuredClaim(
+                            wrapper.type, /*label=*/"",
+                            std::move(eqHint), /*byCases=*/false,
+                            /*arms=*/{}, statementToken.line,
+                            statementToken.column, /*byInduction=*/false,
+                            /*bySubstitution=*/true);
+                    } else if (peek().kind == TokenKind::KeywordBy) {
                         consumeAny();  // 'by'
                         wrapper.value = parseExpression();
                     } else if (peek().kind == TokenKind::LeftBrace) {
