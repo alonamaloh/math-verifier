@@ -70,8 +70,8 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
         (aEventuallyNonneg
             : CauchyRationalSequence.IsEventuallyNonneg(a))
         : CauchyRationalSequence.IsEventuallyNonneg(b) :=
-  function (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) => {
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦ {
     claim halvedPositive : Rational.zero < Rational.halve(epsilon)
       by Rational.halve_positive(epsilon, epsilonPositive);
     obtain ⟨N_a, aBound⟩
@@ -79,8 +79,8 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
     obtain ⟨N_eq, eqBound⟩
         from aEquivB(Rational.halve(epsilon), halvedPositive);
     witness Natural.maximum(N_a, N_eq) with
-        function (m : Natural)
-                 (mGeMax : Natural.maximum(N_a, N_eq) ≤ m) => {
+        (m : Natural)
+                 (mGeMax : Natural.maximum(N_a, N_eq) ≤ m) ↦ {
           claim aBoundAtM
                 : -Rational.halve(epsilon)
                   < CauchyRationalSequence.sequenceFunction(a, m)
@@ -181,10 +181,10 @@ operator (<) on (Real, Real) := Real.LessThan
 -- IsEventuallyNonneg of the constant-0 sequence: at any ε > 0,
 -- N = 0 works; -ε < 0.
 theorem Real.IsNonneg_zero : Real.IsNonneg(Real.zero) :=
-  function (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) =>
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦
     witness 0 with
-        function (m : Natural) (_ : 0 ≤ m) =>
+        (m : Natural) (_ : 0 ≤ m) ↦
           -- Goal: -ε < sf(to_cauchy_constant(0), m) ≡β Rational.zero.
           Rational.negate_LessThan_zero_of_positive(epsilon, epsilonPositive)
 
@@ -206,9 +206,9 @@ theorem Rational.sequence.IsEventuallyNonneg.add
         (sNonneg : Rational.sequence.IsEventuallyNonneg(s))
         (tNonneg : Rational.sequence.IsEventuallyNonneg(t))
         : Rational.sequence.IsEventuallyNonneg(
-              function (n : Natural) => s(n) + t(n)) :=
-  function (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) => {
+              (n : Natural) ↦ s(n) + t(n)) :=
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦ {
     claim halvedPositive : Rational.zero < Rational.halve(epsilon)
       by Rational.halve_positive(epsilon, epsilonPositive);
     obtain ⟨N_s, sBound⟩
@@ -216,8 +216,8 @@ theorem Rational.sequence.IsEventuallyNonneg.add
     obtain ⟨N_t, tBound⟩
         from tNonneg(Rational.halve(epsilon), halvedPositive);
     witness Natural.maximum(N_s, N_t) with
-        function (m : Natural)
-                 (mGeMax : Natural.maximum(N_s, N_t) ≤ m) => {
+        (m : Natural)
+                 (mGeMax : Natural.maximum(N_s, N_t) ≤ m) ↦ {
           claim sAt : -Rational.halve(epsilon) < s(m)
             by sBound(m, Natural.le_through_max_left(N_s, N_t, m, mGeMax));
           claim tAt : -Rational.halve(epsilon) < t(m)
@@ -244,15 +244,15 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.add
   -- IsEventuallyNonneg of add(a, b) means IsEventuallyNonneg of
   -- sequenceFunction(add(a, b)). Bridge to s(n) + t(n) via
   -- sequenceFunction_add.
-  function (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) => {
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦ {
     set sf := CauchyRationalSequence.sequenceFunction;
     obtain ⟨N, pointwiseBound⟩
         from Rational.sequence.IsEventuallyNonneg.add(
                  sf(a), sf(b), aNonneg, bNonneg)(
                  epsilon, epsilonPositive);
     witness N with
-        function (m : Natural) (N_leq_m : N ≤ m) =>
+        (m : Natural) (N_leq_m : N ≤ m) ↦
           -- -ε < sf(a, m) + sf(b, m) (the pointwise bound), and
           -- sf(a, m) + sf(b, m) = sf(add(a, b), m) (bridge lemma).
           calc -epsilon
@@ -297,19 +297,19 @@ theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
         (sNonneg : Rational.sequence.IsEventuallyNonneg(s))
         (negSNonneg
             : Rational.sequence.IsEventuallyNonneg(
-                  function (n : Natural) => -s(n)))
+                  (n : Natural) ↦ -s(n)))
         : (epsilon : Rational) → Rational.zero < epsilon →
             ∃ (N : Natural).
               (m : Natural) → N ≤ m →
                 abs(s(m) - Rational.zero) < epsilon :=
-  function (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) => {
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦ {
     obtain ⟨N_s, sLowerBound⟩ from sNonneg(epsilon, epsilonPositive);
     obtain ⟨N_negS, negSLowerBound⟩
         from negSNonneg(epsilon, epsilonPositive);
     witness Natural.maximum(N_s, N_negS) with
-        function (m : Natural)
-                 (mGeMax : Natural.maximum(N_s, N_negS) ≤ m) => {
+        (m : Natural)
+                 (mGeMax : Natural.maximum(N_s, N_negS) ≤ m) ↦ {
           -- Lower bound on s(m): -ε < s(m), from sNonneg.
           claim sLowerAtM : -epsilon < s(m)
             by sLowerBound(m,
@@ -414,7 +414,7 @@ theorem Real.LessThan.transitive_left
   And.introduction(
       Real.LessOrEqual.transitive(x, y, z, xLeqY,
           Real.LessThan.weaken(y, z, yLessThanZ)),
-      function (xEqualsZ : x = z) =>
+      (xEqualsZ : x = z) ↦
         -- y ≤ z = x, with x ≤ y gives x = y by antisymmetry.
         -- Then y = x = z contradicts y ≠ z.
         Real.LessThan.distinct(y, z, yLessThanZ)(
@@ -435,7 +435,7 @@ theorem Real.LessThan.transitive_right
   And.introduction(
       Real.LessOrEqual.transitive(x, y, z,
           Real.LessThan.weaken(x, y, xLessThanY), yLeqZ),
-      function (xEqualsZ : x = z) =>
+      (xEqualsZ : x = z) ↦
         Real.LessThan.distinct(x, y, xLessThanY)(
             Real.LessOrEqual.antisymmetric(x, y,
                 Real.LessThan.weaken(x, y, xLessThanY),
@@ -469,7 +469,7 @@ theorem Real.add_preserves_LessThan
   And.introduction(
       Real.add_preserves_LessOrEqual(x, y, z,
           Real.LessThan.weaken(x, y, xLessY)),
-      function (sumEqual : x + z = y + z) =>
+      (sumEqual : x + z = y + z) ↦
         Real.LessThan.distinct(x, y, xLessY)(
             Real.add_cancel_right(x, y, z, sumEqual)))
 

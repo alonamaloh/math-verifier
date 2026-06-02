@@ -46,9 +46,9 @@ theorem Rational.sequence.sum_is_cauchy
         (sIsCauchy : Rational.sequence.IsCauchy(s))
         (tIsCauchy : Rational.sequence.IsCauchy(t))
         : Rational.sequence.IsCauchy(
-              function (n : Natural) => s(n) + t(n)) :=
-  function (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) => {
+              (n : Natural) ↦ s(n) + t(n)) :=
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦ {
     obtain ⟨N_s, sBound⟩
         from sIsCauchy(Rational.halve(epsilon),
                        Rational.halve_positive(epsilon, epsilonPositive));
@@ -56,10 +56,10 @@ theorem Rational.sequence.sum_is_cauchy
         from tIsCauchy(Rational.halve(epsilon),
                        Rational.halve_positive(epsilon, epsilonPositive));
     witness Natural.maximum(N_s, N_t) with
-        function (m : Natural)
+        (m : Natural)
                  (m_ge_max : Natural.maximum(N_s, N_t) ≤ m)
                  (n : Natural)
-                 (n_ge_max : Natural.maximum(N_s, N_t) ≤ n) => {
+                 (n_ge_max : Natural.maximum(N_s, N_t) ≤ n) ↦ {
           claim sBoundAtMN
                 : abs(s(m) - s(n)) < Rational.halve(epsilon)
             by sBound(m,
@@ -91,7 +91,7 @@ definition CauchyRationalSequence.add
   | CauchyRationalSequence.make(s, sCauchy),
     CauchyRationalSequence.make(t, tCauchy) =>
       CauchyRationalSequence.make(
-          function (n : Natural) => s(n) + t(n),
+          (n : Natural) ↦ s(n) + t(n),
           Rational.sequence.sum_is_cauchy(s, t, sCauchy, tCauchy))
 
 -- sf(add(rep_x, rep_y), m) = sf(rep_x, m) + sf(rep_y, m).
@@ -121,11 +121,11 @@ theorem Real.add_after_first_respects
   Quotient.sound(
       CauchyRationalSequence.add(rep_x, rep_y),
       CauchyRationalSequence.add(rep_x, rep_yPrime),
-      function (epsilon : Rational)
-               (epsilonPositive : Rational.zero < epsilon) => {
+      (epsilon : Rational)
+               (epsilonPositive : Rational.zero < epsilon) ↦ {
           obtain ⟨N, yEquiv_at_N⟩ from yEquiv(epsilon, epsilonPositive);
           witness N with
-              function (m : Natural) (N_leq_m : N ≤ m) => {
+              (m : Natural) (N_leq_m : N ≤ m) ↦ {
                 let sx : Rational :=
                     CauchyRationalSequence.sequenceFunction(rep_x, m);
                 let sy : Rational :=
@@ -159,12 +159,12 @@ theorem Real.add_respects
         (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
         (yReal : Real)
         : Quotient.lift(
-              function (rep_y : CauchyRationalSequence) =>
+              (rep_y : CauchyRationalSequence) ↦
                   (Quotient.mk(CauchyRationalSequence.add(rep_x, rep_y)) : Real),
               Real.add_after_first_respects(rep_x),
               yReal)
           = Quotient.lift(
-              function (rep_y : CauchyRationalSequence) =>
+              (rep_y : CauchyRationalSequence) ↦
                   (Quotient.mk(CauchyRationalSequence.add(rep_xPrime, rep_y)) : Real),
               Real.add_after_first_respects(rep_xPrime),
               yReal) :=
@@ -176,11 +176,11 @@ theorem Real.add_respects
         Quotient.sound(
             CauchyRationalSequence.add(rep_x, rep_y),
             CauchyRationalSequence.add(rep_xPrime, rep_y),
-            function (epsilon : Rational)
-                     (epsilonPositive : Rational.zero < epsilon) => {
+            (epsilon : Rational)
+                     (epsilonPositive : Rational.zero < epsilon) ↦ {
                 obtain ⟨N, xEquiv_at_N⟩ from xEquiv(epsilon, epsilonPositive);
                 witness N with
-                    function (m : Natural) (N_leq_m : N ≤ m) => {
+                    (m : Natural) (N_leq_m : N ≤ m) ↦ {
                       let sx : Rational :=
                           CauchyRationalSequence.sequenceFunction(rep_x, m);
                       let sxPrime : Rational :=
@@ -212,7 +212,7 @@ theorem Real.add_respects
 definition Real.add_after_first
         (rep_x : CauchyRationalSequence) (yReal : Real) : Real :=
   Quotient.lift(
-      function (rep_y : CauchyRationalSequence) =>
+      (rep_y : CauchyRationalSequence) ↦
           (Quotient.mk(CauchyRationalSequence.add(rep_x, rep_y)) : Real),
       Real.add_after_first_respects(rep_x),
       yReal)
@@ -220,10 +220,10 @@ definition Real.add_after_first
 -- Real.add itself: lift over x.
 definition Real.add (x y : Real) : Real :=
   Quotient.lift(
-      function (rep_x : CauchyRationalSequence) =>
+      (rep_x : CauchyRationalSequence) ↦
           Real.add_after_first(rep_x, y),
-      function (rep_x rep_xPrime : CauchyRationalSequence)
-               (xEquiv : CauchyEquivalent(rep_x, rep_xPrime)) =>
+      (rep_x rep_xPrime : CauchyRationalSequence)
+               (xEquiv : CauchyEquivalent(rep_x, rep_xPrime)) ↦
           Real.add_respects(rep_x, rep_xPrime, xEquiv, y),
       x)
 
@@ -256,10 +256,10 @@ theorem Rational.to_real.add_preserves_equiv (a b : Rational)
               CauchyRationalSequence.add(
                   Rational.to_cauchy_constant(a),
                   Rational.to_cauchy_constant(b))) :=
-  function (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) =>
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦
     witness 0 with
-        function (m : Natural) (_ : 0 ≤ m) =>
+        (m : Natural) (_ : 0 ≤ m) ↦
           -- Both sequence projections reduce to `a + b`. The LHS via
           -- δ-unfold of Rational.to_cauchy_constant plus ι/β on the
           -- abstract projector. The RHS additionally walks through

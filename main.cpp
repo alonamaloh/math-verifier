@@ -3169,11 +3169,11 @@ void runLexerTests() {
         EXPECT_TRUE(kinds == expected);
     }
     {
-        auto kinds = kindsOf("function (x : T) => x");
+        auto kinds = kindsOf("(x : T) ↦ x");
         std::vector<TokenKind> expected = {
-            TokenKind::KeywordFunction, TokenKind::LeftParen,
+            TokenKind::LeftParen,
             TokenKind::Identifier, TokenKind::Colon, TokenKind::Identifier,
-            TokenKind::RightParen, TokenKind::FatArrow,
+            TokenKind::RightParen, TokenKind::MapsTo,
             TokenKind::Identifier, TokenKind::EndOfFile};
         EXPECT_TRUE(kinds == expected);
     }
@@ -3394,8 +3394,8 @@ void runParserTests() {
                 "Pi(A : Type(0), Pi(_ : A, A))",                            __LINE__);
 
     // Lambdas.
-    expectParse("function (x : T) => x",   "Lambda(x : T, x)",                   __LINE__);
-    expectParse("function (x : T) (y : U) => x",
+    expectParse("(x : T) ↦ x",   "Lambda(x : T, x)",                   __LINE__);
+    expectParse("(x : T) (y : U) ↦ x",
                 "Lambda(x : T, Lambda(y : U, x))",                          __LINE__);
 
     // Let.
@@ -3612,16 +3612,16 @@ inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
 definition Not (P : Proposition) : Proposition := P → False
 
 axiom magic
-  : Exists.{0}(Natural, function (q : Natural) =>
+  : Exists.{0}(Natural, (q : Natural) ↦
                           And(True, Not(Equality.{0}(Natural, q, zero))))
 
 theorem destructure_then_witness
-        : Exists.{0}(Natural, function (q : Natural) =>
+        : Exists.{0}(Natural, (q : Natural) ↦
                                 And(True, Not(Equality.{0}(Natural, q, zero)))) :=
   let ⟨q, qFlag, qNotZero⟩ := magic in
   Exists.introduce(q,
     And.introduction(qFlag,
-      function (h : Equality.{0}(Natural, q, zero)) =>
+      (h : Equality.{0}(Natural, q, zero)) ↦
         qNotZero(h)))
 )");
             ++passed;
@@ -3707,7 +3707,7 @@ module Test.no_warning_on_definition
 inductive Bool : Type(0) where
   | true : Bool
   | false : Bool
-definition Bool.identity : Bool → Bool := function (b : Bool) => b
+definition Bool.identity : Bool → Bool := (b : Bool) ↦ b
 )");
         if (result.capturedStderr.empty()) ++passed;
         else {
@@ -3793,14 +3793,14 @@ definition trivialRelation (x y : Natural) : Proposition := True
 axiom trivialRespect
     : (x y : Natural) → trivialRelation(x, y)
       → Equality.{0}(Natural,
-                      (function (n : Natural) => n)(x),
-                      (function (n : Natural) => n)(y))
+                      ((n : Natural) ↦ n)(x),
+                      ((n : Natural) ↦ n)(y))
 
 theorem lift_reduces_to_f_of_x
         : Equality.{0}(Natural,
                         Quotient.lift.{0, 0}(
                             Natural, trivialRelation, Natural,
-                            function (n : Natural) => n,
+                            (n : Natural) ↦ n,
                             trivialRespect,
                             Quotient.mk.{0}(
                                 Natural, trivialRelation, zero)),
@@ -3984,7 +3984,7 @@ inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
   | Exists.introduce : (witnessValue : A) → P(witnessValue) → Exists(A, P)
 
 theorem some_natural_equals_zero
-        : Exists.{0}(Natural, function (n : Natural) =>
+        : Exists.{0}(Natural, (n : Natural) ↦
                        Equality.{0}(Natural, n, zero)) := {
   witness zero with reflexivity.{0}(Natural, zero);
 }
@@ -4106,11 +4106,11 @@ inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
   | Exists.introduce : (witnessValue : A) → P(witnessValue) → Exists(A, P)
 
 axiom magicExists
-  : Exists.{0}(Natural, function (n : Natural) =>
+  : Exists.{0}(Natural, (n : Natural) ↦
                           Equality.{0}(Natural, n, zero))
 
 theorem obtain_use
-        : Exists.{0}(Natural, function (n : Natural) =>
+        : Exists.{0}(Natural, (n : Natural) ↦
                                 Equality.{0}(Natural, n, zero)) := {
   obtain ⟨w, wEqualsZero⟩ from magicExists;
   Exists.introduce(w, wEqualsZero)
@@ -4188,7 +4188,7 @@ theorem shadowing_test (k : Natural)
   -- The lambda below shadows `n` with the function parameter, so the
   -- body's `n` is the parameter (= k), not zero. The result type
   -- depends on identifying the inner `n` as `k`.
-  (function (n : Natural) => reflexivity.{0}(Natural, n))(k)
+  ((n : Natural) ↦ reflexivity.{0}(Natural, n))(k)
 }
 )",
         "set substitution skips scopes that rebind the name",
@@ -4209,7 +4209,7 @@ definition False.eliminate_proposition
         (GoalProposition : Proposition) (proofOfFalse : False)
         : GoalProposition :=
   False_recursor(
-      function (_ : False) => GoalProposition,
+      (_ : False) ↦ GoalProposition,
       proofOfFalse)
 
 theorem ex_falso (P : Proposition) (h : P) (notH : ¬P) : True := {
@@ -4360,7 +4360,7 @@ inductive True : Proposition where
   | True.trivial : True
 
 theorem trivial_does_not_imply_false (h : True) : ¬False :=
-  function (f : False) => f
+  (f : False) ↦ f
 )",
         "¬ operator desugars to Not",
         __LINE__);
@@ -4385,13 +4385,13 @@ definition Natural.multiply : Natural → Natural → Natural
 
 definition Natural.divides (divisor dividend : Natural) : Proposition :=
   Exists(Natural,
-          function (quotient : Natural)
-              => Equality.{0}(Natural, dividend, Natural.multiply(divisor, quotient)))
+          (quotient : Natural)
+              ↦ Equality.{0}(Natural, dividend, Natural.multiply(divisor, quotient)))
 
 theorem one_divides_one : 1 ∣ 1 :=
   Exists.introduce.{0}(Natural,
-      function (quotient : Natural)
-          => Equality.{0}(Natural, 1, Natural.multiply(1, quotient)),
+      (quotient : Natural)
+          ↦ Equality.{0}(Natural, 1, Natural.multiply(1, quotient)),
       1,
       reflexivity.{0}(Natural, 1))
 )",
@@ -4431,7 +4431,7 @@ inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
   | reflexivity : Equality(A, x, x)
 
 theorem reflexive_for_all : ∀ (n : Natural). Equality.{0}(Natural, n, n) :=
-  function (n : Natural) => reflexivity.{0}(Natural, n)
+  (n : Natural) ↦ reflexivity.{0}(Natural, n)
 )",
         "∀ desugars to a Pi type",
         __LINE__);
@@ -4453,7 +4453,7 @@ inductive Exists.{u} (A : Type(u)) (P : A → Proposition) : Proposition where
 theorem some_natural_equals_zero
         : ∃ (n : Natural). Equality.{0}(Natural, n, zero) :=
   Exists.introduce.{0}(Natural,
-      function (n : Natural) => Equality.{0}(Natural, n, zero),
+      (n : Natural) ↦ Equality.{0}(Natural, n, zero),
       zero,
       reflexivity.{0}(Natural, zero))
 )",
@@ -4474,8 +4474,8 @@ inductive Equality.{u} (A : Type(u)) (x : A) : A → Proposition where
 theorem swap_or_keep
         : ∀ (a b : Natural). Equality.{0}(Natural, a, b)
                               → Equality.{0}(Natural, a, b) :=
-  function (a b : Natural)
-           (h : Equality.{0}(Natural, a, b)) => h
+  (a b : Natural)
+           (h : Equality.{0}(Natural, a, b)) ↦ h
 )",
         "∀ with multiple names in one binder chains Pi",
         __LINE__);
@@ -4684,7 +4684,7 @@ inductive Natural : Type(0) where
   | successor : Natural -> Natural
 
 definition apply_zero (f : Natural -> Natural) : Natural := f(zero)
-definition succ_zero : Natural := apply_zero(function (n : Natural) => successor(n))
+definition succ_zero : Natural := apply_zero((n : Natural) ↦ successor(n))
 )");
         EXPECT_TRUE(isDefinitionallyEqual(
             environment, {},

@@ -75,6 +75,7 @@ enum class TokenKind {
     DotLeftBrace,    // ".{"  introduces universe-argument list
     Assign,          // ":="
     FatArrow,        // "=>"
+    MapsTo,          // "↦"  introduces a lambda: (binders) ↦ body
 
     // Operators
     Plus, Minus, Star, Slash, Caret,

@@ -293,9 +293,9 @@ theorem Rational.sequence.product_is_cauchy
         (sIsCauchy : Rational.sequence.IsCauchy(s))
         (tIsCauchy : Rational.sequence.IsCauchy(t))
         : Rational.sequence.IsCauchy(
-              function (n : Natural) => s(n) * t(n)) :=
-  function (epsilon : Rational)
-           (epsilonPositive : Rational.zero < epsilon) => {
+              (n : Natural) ↦ s(n) * t(n)) :=
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦ {
     -- Step 1: bound |s| eventually by (succ K_s : R) starting from N_s_bound.
     obtain ⟨K_s, N_s_bound, sBound⟩
         from Rational.sequence.cauchy_is_naturally_bounded(s, sIsCauchy);
@@ -325,14 +325,14 @@ theorem Rational.sequence.product_is_cauchy
     witness Natural.maximum(
                 Natural.maximum(N_s_bound, N_t_bound),
                 Natural.maximum(N_s, N_t)) with
-        function (m : Natural)
+        (m : Natural)
                  (m_ge : Natural.maximum(
                             Natural.maximum(N_s_bound, N_t_bound),
                             Natural.maximum(N_s, N_t)) ≤ m)
                  (n : Natural)
                  (n_ge : Natural.maximum(
                             Natural.maximum(N_s_bound, N_t_bound),
-                            Natural.maximum(N_s, N_t)) ≤ n) =>
+                            Natural.maximum(N_s, N_t)) ≤ n) ↦
           -- Bound chain proof comes here.
           Rational.sequence.product_is_cauchy_bound(
               s, t, epsilon,
@@ -363,7 +363,7 @@ definition CauchyRationalSequence.multiply
   | CauchyRationalSequence.make(s, sCauchy),
     CauchyRationalSequence.make(t, tCauchy) =>
       CauchyRationalSequence.make(
-          function (n : Natural) => s(n) * t(n),
+          (n : Natural) ↦ s(n) * t(n),
           Rational.sequence.product_is_cauchy(s, t, sCauchy, tCauchy))
 
 -- sf(multiply(rep_x, rep_y), m) = sf(rep_x, m) * sf(rep_y, m).
@@ -465,8 +465,8 @@ theorem Real.multiply_after_first_respects_at_rep_inner
             Rational.halve_positive(epsilon, epsilonPositive));
     obtain ⟨N_y, yEquivAt⟩ from refinedYEquiv(delta, delta_pos);
     witness Natural.maximum(N_x_bound, N_y) with
-        function (m : Natural)
-                 (m_ge_max : Natural.maximum(N_x_bound, N_y) ≤ m) =>
+        (m : Natural)
+                 (m_ge_max : Natural.maximum(N_x_bound, N_y) ≤ m) ↦
           Real.multiply_respect_bound_chain(
               s_x, s_y, s_yPrime,
               epsilon, K, delta, m,
@@ -498,8 +498,8 @@ theorem Real.multiply_after_first_respects
           CauchyRationalSequence.multiply(
               CauchyRationalSequence.make(s_x, sCauchy_x),
               CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime)),
-          function (epsilon : Rational)
-                   (epsilonPositive : Rational.zero < epsilon) =>
+          (epsilon : Rational)
+                   (epsilonPositive : Rational.zero < epsilon) ↦
             Real.multiply_after_first_respects_at_rep_inner(
                 s_x, sCauchy_x, s_y, s_yPrime,
                 sCauchy_y, sCauchy_yPrime,
@@ -531,7 +531,7 @@ theorem Real.multiply_respects_at_rep_y_inner
                  s_y, sCauchy_y, s_x, s_xPrime, sCauchy_x, sCauchy_xPrime,
                  refinedXEquiv, epsilon, epsilonPositive);
     witness N with
-        function (m : Natural) (N_leq_m : N ≤ m) =>
+        (m : Natural) (N_leq_m : N ≤ m) ↦
           rewrite(
               congruenceOf(
                   Rational.absolute_value,
@@ -561,8 +561,8 @@ theorem Real.multiply_respects_at_rep_y
           CauchyRationalSequence.multiply(
               CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime),
               CauchyRationalSequence.make(s_y, sCauchy_y)),
-          function (epsilon : Rational)
-                   (epsilonPositive : Rational.zero < epsilon) =>
+          (epsilon : Rational)
+                   (epsilonPositive : Rational.zero < epsilon) ↦
             Real.multiply_respects_at_rep_y_inner(
                 s_x, sCauchy_x, s_xPrime, sCauchy_xPrime,
                 s_y, sCauchy_y,
@@ -576,12 +576,12 @@ theorem Real.multiply_respects
         (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
         (yReal : Real)
         : Quotient.lift(
-              function (rep_y : CauchyRationalSequence) =>
+              (rep_y : CauchyRationalSequence) ↦
                   (Quotient.mk(CauchyRationalSequence.multiply(rep_x, rep_y)) : Real),
               Real.multiply_after_first_respects(rep_x),
               yReal)
           = Quotient.lift(
-              function (rep_y : CauchyRationalSequence) =>
+              (rep_y : CauchyRationalSequence) ↦
                   (Quotient.mk(CauchyRationalSequence.multiply(rep_xPrime, rep_y)) : Real),
               Real.multiply_after_first_respects(rep_xPrime),
               yReal) :=
@@ -591,17 +591,17 @@ theorem Real.multiply_respects
 definition Real.multiply_after_first
         (rep_x : CauchyRationalSequence) (yReal : Real) : Real :=
   Quotient.lift(
-      function (rep_y : CauchyRationalSequence) =>
+      (rep_y : CauchyRationalSequence) ↦
           Quotient.mk(CauchyRationalSequence.multiply(rep_x, rep_y)),
       Real.multiply_after_first_respects(rep_x),
       yReal)
 
 definition Real.multiply (x y : Real) : Real :=
   Quotient.lift(
-      function (rep_x : CauchyRationalSequence) =>
+      (rep_x : CauchyRationalSequence) ↦
           Real.multiply_after_first(rep_x, y),
-      function (rep_x rep_xPrime : CauchyRationalSequence)
-               (xEquiv : CauchyEquivalent(rep_x, rep_xPrime)) =>
+      (rep_x rep_xPrime : CauchyRationalSequence)
+               (xEquiv : CauchyEquivalent(rep_x, rep_xPrime)) ↦
           Real.multiply_respects(rep_x, rep_xPrime, xEquiv, y),
       x)
 

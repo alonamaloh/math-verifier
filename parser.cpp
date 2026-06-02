@@ -1458,35 +1458,60 @@ private:
 
 private:
     SurfaceExpressionPointer parseExpression() {
-        if (peek().kind == TokenKind::KeywordFunction) return parseLambda();
         if (peek().kind == TokenKind::KeywordLet) return parseLet();
+        if (looksLikeMapsToLambda()) return parseMapsToLambda();
         return parseImplication();
     }
 
-    SurfaceExpressionPointer parseLambda() {
-        const Token& start = consumeAny();  // 'function'
+    // Lookahead for the keyword-free lambda `(binders)+ ↦ body`: skip the
+    // leading run of balanced `(...)`/`{...}` binder groups and check that a
+    // `↦` follows. Pure lookahead, so an ordinary parenthesised expression,
+    // an ascription `(e : T)`, or a `{ … }` proof block (none followed by
+    // `↦`) falls through to the normal expression parser.
+    bool looksLikeMapsToLambda() {
+        size_t index = position_;
+        if (index >= tokens_.size()
+            || !(tokens_[index].kind == TokenKind::LeftParen
+                 || tokens_[index].kind == TokenKind::LeftBrace)) {
+            return false;
+        }
+        while (index < tokens_.size()
+               && (tokens_[index].kind == TokenKind::LeftParen
+                   || tokens_[index].kind == TokenKind::LeftBrace)) {
+            int depth = 0;
+            do {
+                TokenKind kind = tokens_[index].kind;
+                // `.{` (a universe-argument list, as in `Equality.{0}`) opens
+                // a brace closed by `}`, so it must count toward depth too —
+                // otherwise a binder type mentioning `.{…}` unbalances the scan.
+                if (kind == TokenKind::LeftParen || kind == TokenKind::LeftBrace
+                    || kind == TokenKind::DotLeftBrace) {
+                    depth++;
+                } else if (kind == TokenKind::RightParen
+                           || kind == TokenKind::RightBrace) {
+                    depth--;
+                }
+                index++;
+            } while (index < tokens_.size() && depth > 0);
+        }
+        return index < tokens_.size()
+               && tokens_[index].kind == TokenKind::MapsTo;
+    }
+
+    // `(binders)+ ↦ body` — the lambda. Mirrors parseLambda but takes its
+    // binders directly (no leading keyword) and closes on `↦`.
+    SurfaceExpressionPointer parseMapsToLambda() {
+        const Token start = peek();
         std::vector<SurfaceBinder> binders;
         while (peek().kind == TokenKind::LeftParen
-               || peek().kind == TokenKind::LeftBrace
-               || isIdentifierLike(peek().kind)) {
-            if (peek().kind == TokenKind::LeftParen
-                || peek().kind == TokenKind::LeftBrace) {
-                binders.push_back(parseExplicitBinder());
-            } else {
-                // Untyped binder: a bare name. The elaborator must be
-                // able to recover the binder's type from context
-                // (currently supported only for select special-cased
-                // call sites like congruenceOf's first argument).
-                Token nameToken = consumeAny();
-                binders.push_back({{nameToken.lexeme}, nullptr, false});
-            }
+               || peek().kind == TokenKind::LeftBrace) {
+            binders.push_back(parseExplicitBinder());
         }
         if (binders.empty()) {
-            throwHere("expected at least one binder after 'function'");
+            throwHere("expected at least one binder before '↦'");
         }
-        expect(TokenKind::FatArrow, "after binders in 'function'");
+        expect(TokenKind::MapsTo, "after binders in lambda");
         auto body = parseExpression();
-        // Curry: fun (b1) (b2) ... => body  ↦  λ b1. λ b2. ... body
         for (auto iterator = binders.rbegin(); iterator != binders.rend();
              ++iterator) {
             body = makeSurfaceLambda(std::move(*iterator), std::move(body),
@@ -2394,8 +2419,8 @@ private:
     // proof; users who need a top-level `→`, `∧`, `∨`, `=`, or any
     // inequality inside a step proof must parenthesise.
     SurfaceExpressionPointer parseCalcStepProof() {
-        if (peek().kind == TokenKind::KeywordFunction) return parseLambda();
         if (peek().kind == TokenKind::KeywordLet)      return parseLet();
+        if (looksLikeMapsToLambda()) return parseMapsToLambda();
         return parseAdditive();
     }
 

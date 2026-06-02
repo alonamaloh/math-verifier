@@ -28,7 +28,7 @@ definition IsEnumerable (X : Type(0)) : Proposition :=
 
 -- The naturals are enumerable, by the identity listing.
 theorem Natural.is_enumerable : IsEnumerable(Natural) :=
-  ⟨function (n : Natural) => n, Function.identity_is_surjective(Natural)⟩
+  ⟨(n : Natural) ↦ n, Function.identity_is_surjective(Natural)⟩
 
 -- Enumerability passes along a surjection: if X is enumerable and
 -- g : X → Y is onto, then Y is enumerable (list Y through g).
@@ -38,7 +38,7 @@ theorem IsEnumerable.along_surjection
         (surjectiveG : Function.IsSurjective(X, Y, g))
         : IsEnumerable(Y) := {
   obtain ⟨listing, listingSurjective⟩ from enumerableX;
-  ⟨function (n : Natural) => g(listing(n)),
+  ⟨(n : Natural) ↦ g(listing(n)),
    Function.compose_surjective(Natural, X, Y, listing, g,
        listingSurjective, surjectiveG)⟩
 }
@@ -47,11 +47,11 @@ theorem IsEnumerable.along_surjection
 -- class of some representative.
 theorem Quotient.mk_is_surjective (T : Type(0)) (R : T → T → Proposition)
         : Function.IsSurjective(T, Quotient(T, R),
-                                function (t : T) => Quotient.mk(T, R, t)) :=
-  function (q : Quotient(T, R)) =>
+                                (t : T) ↦ Quotient.mk(T, R, t)) :=
+  (q : Quotient(T, R)) ↦
     Quotient.induct(
-        function (z : Quotient(T, R)) => ∃ (t : T). Quotient.mk(T, R, t) = z,
-        function (x : T) =>
+        (z : Quotient(T, R)) ↦ ∃ (t : T). Quotient.mk(T, R, t) = z,
+        (x : T) ↦
             (⟨x, reflexivity(Quotient(T, R), Quotient.mk(T, R, x))⟩
                 : ∃ (t : T). Quotient.mk(T, R, t) = Quotient.mk(T, R, x)),
         q)
@@ -62,7 +62,7 @@ theorem IsEnumerable.quotient (T : Type(0)) (R : T → T → Proposition)
         (enumerableT : IsEnumerable(T))
         : IsEnumerable(Quotient(T, R)) :=
   IsEnumerable.along_surjection(T, Quotient(T, R),
-      function (t : T) => Quotient.mk(T, R, t),
+      (t : T) ↦ Quotient.mk(T, R, t),
       enumerableT,
       Quotient.mk_is_surjective(T, R))
 
@@ -71,7 +71,7 @@ theorem IsEnumerable.quotient (T : Type(0)) (R : T → T → Proposition)
 -- which Cantor forbids.
 theorem Set.powerset_of_naturals_not_enumerable
         : Not(IsEnumerable(Set(Natural))) :=
-  function (enumerable : IsEnumerable(Set(Natural))) => {
+  (enumerable : IsEnumerable(Set(Natural))) ↦ {
     obtain ⟨listing, listingSurjective⟩ from enumerable;
     Cantor.no_surjection_onto_powerset(Natural, listing, listingSurjective)
   }

@@ -54,7 +54,7 @@ theorem Natural.monus_monus_self (k i : Natural) (h : i ≤ k)
         : Natural.monus(k, Natural.monus(k, i)) = i := {
   obtain ⟨d, decomposition⟩ from Natural.subtraction_witness(i, k, h);
   Equality.transport_proposition(Natural,
-      function (n : Natural) => Natural.monus(n, Natural.monus(n, i)) = i,
+      (n : Natural) ↦ Natural.monus(n, Natural.monus(n, i)) = i,
       i + d, k, Equality.symmetry(?, ?, decomposition),
       Natural.monus_add_involution(i, d))
 }
@@ -65,7 +65,7 @@ theorem Natural.monus_monus_self (k i : Natural) (h : i ≤ k)
 theorem Polynomial.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
         (n : Natural)
         : Polynomial.Sum(r, f, n)
-          = Polynomial.Sum(r, function (i : Natural) => f(Natural.monus(n, i)), n) :=
+          = Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(n, i)), n) :=
   by_induction on n with IH {
     case zero: unfold Natural.monus in reflexivity(Ring.carrier(r), f(0))
     case successor(k):
@@ -73,10 +73,10 @@ theorem Polynomial.Sum.reverse (r : Ring) (f : Natural → Ring.carrier(r))
           calc Polynomial.Sum(r, f, successor(k))
              = (Polynomial.Sum(r, f, k) + f(successor(k)))
              = (f(successor(k)) + Polynomial.Sum(r, f, k))
-             = (f(successor(k)) + Polynomial.Sum(r, function (i : Natural) => f(Natural.monus(k, i)), k))
-             = Polynomial.Sum(r, function (i : Natural) => f(Natural.monus(successor(k), i)), successor(k))
+             = (f(successor(k)) + Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(k, i)), k))
+             = Polynomial.Sum(r, (i : Natural) ↦ f(Natural.monus(successor(k), i)), successor(k))
                  by Polynomial.Sum.shift(r,
-                        function (i : Natural) => f(Natural.monus(successor(k), i)), k)
+                        (i : Natural) ↦ f(Natural.monus(successor(k), i)), k)
   }
 
 -- Sum respects pointwise equality on the summation range 0..n.
@@ -85,14 +85,14 @@ theorem Polynomial.Sum.extensional_range (r : Ring)
         : (n : Natural)
           → ((i : Natural) → i ≤ n → f(i) = g(i))
           → Polynomial.Sum(r, f, n) = Polynomial.Sum(r, g, n)
-  | zero => function (h : (i : Natural) → i ≤ 0 → f(i) = g(i)) =>
+  | zero => (h : (i : Natural) → i ≤ 0 → f(i) = g(i)) ↦
       h(0, LessOrEqual.reflexivity(0))
-  | successor(k) => function (h : (i : Natural) → i ≤ successor(k) → f(i) = g(i)) =>
+  | successor(k) => (h : (i : Natural) → i ≤ successor(k) → f(i) = g(i)) ↦
       calc Polynomial.Sum(r, f, successor(k))
          = (Polynomial.Sum(r, f, k) + f(successor(k)))
          = (Polynomial.Sum(r, g, k) + f(successor(k)))
              by Polynomial.Sum.extensional_range(r, f, g, k,
-                    function (i : Natural) (smaller : i ≤ k) =>
+                    (i : Natural) (smaller : i ≤ k) ↦
                         h(i, LessOrEqual.transitive(i, k, successor(k),
                                Natural.le_successor(k), smaller)))
          = (Polynomial.Sum(r, g, k) + g(successor(k)))
@@ -113,20 +113,20 @@ theorem Polynomial.Coefficients.multiply_commutative (r : Ring)
         : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
               Polynomial.Coefficients.multiply(r, p, q),
               Polynomial.Coefficients.multiply(r, q, p)) :=
-  function (k : Natural) =>
+  (k : Natural) ↦
       calc Polynomial.coefficient(Polynomial.Coefficients.multiply(r, p, q), k)
          = Polynomial.Sum(r,
-               function (i : Natural) =>
+               (i : Natural) ↦
                    (Polynomial.coefficient(p, i) * Polynomial.coefficient(q, Natural.monus(k, i))), k)
                by Polynomial.nth_multiply
          = Polynomial.Sum(r,
-               function (i : Natural) =>
+               (i : Natural) ↦
                    (Polynomial.coefficient(p, Natural.monus(k, i)) * Polynomial.coefficient(q, Natural.monus(k, Natural.monus(k, i)))), k)
                by Polynomial.Sum.reverse
          = Polynomial.Sum(r,
-               function (i : Natural) =>
+               (i : Natural) ↦
                    (Polynomial.coefficient(q, i) * Polynomial.coefficient(p, Natural.monus(k, i))), k)
-               by (function (i : Natural) (smaller : i ≤ k) =>
+               by ((i : Natural) (smaller : i ≤ k) ↦
                       calc (Polynomial.coefficient(p, Natural.monus(k, i)) * Polynomial.coefficient(q, Natural.monus(k, Natural.monus(k, i))))
                          = (Polynomial.coefficient(p, Natural.monus(k, i)) * Polynomial.coefficient(q, i))
                          = (Polynomial.coefficient(q, i) * Polynomial.coefficient(p, Natural.monus(k, i)))
@@ -140,7 +140,7 @@ theorem Polynomial.multiply_commutative (r : Ring)
         (x y : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : Polynomial.multiply(r, x, y) = Polynomial.multiply(r, y, x) :=
   Quotient.induct_two(
-      function (p q : Polynomial.Coefficients(Ring.carrier(r))) =>
+      (p q : Polynomial.Coefficients(Ring.carrier(r))) ↦
           Polynomial.make_equal_of_coefficients_equal(r,
               Polynomial.Coefficients.multiply(r, p, q),
               Polynomial.Coefficients.multiply(r, q, p),

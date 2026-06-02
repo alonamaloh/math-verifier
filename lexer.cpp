@@ -17,7 +17,6 @@ const std::unordered_map<std::string, TokenKind>& keywordTable() {
         {"axiom",         TokenKind::KeywordAxiom},
         {"theorem",       TokenKind::KeywordTheorem},
         {"where",         TokenKind::KeywordWhere},
-        {"function",      TokenKind::KeywordFunction},
         {"let",           TokenKind::KeywordLet},
         {"in",            TokenKind::KeywordIn},
         {"Type",          TokenKind::KeywordType},
@@ -238,6 +237,7 @@ private:
     std::optional<Token> tryUnicodeOperator(int startLine, int startColumn) {
         struct Entry { const char* text; TokenKind kind; };
         static const Entry table[] = {
+            {"↦", TokenKind::MapsTo},
             {"→", TokenKind::Arrow},
             {"≤", TokenKind::LessOrEqual},
             {"≥", TokenKind::GreaterOrEqual},
@@ -430,6 +430,7 @@ const char* tokenKindName(TokenKind kind) {
         case TokenKind::DotLeftBrace:         return "'.{'";
         case TokenKind::Assign:               return "':='";
         case TokenKind::FatArrow:             return "'=>'";
+        case TokenKind::MapsTo:               return "'↦'";
         case TokenKind::Plus:                 return "'+'";
         case TokenKind::Minus:                return "'-'";
         case TokenKind::Star:                 return "'*'";
