@@ -92,22 +92,28 @@ theorem Natural.divides_after_remove_multiple
         : (q : Natural) → (secondSummand : Natural)
           → divisor ∣ (divisor * q + secondSummand)
           → divisor ∣ secondSummand
-  | zero, secondSummand, dividesEnlargedSum =>
-      rewrite(
-          calc divisor * 0 + secondSummand
-             = 0 + secondSummand
-             = secondSummand,
-          dividesEnlargedSum)
-  | successor(predQ), secondSummand, dividesEnlargedSum =>
+  | zero, secondSummand, dividesEnlargedSum => {
+      claim shapeEquation : divisor * 0 + secondSummand = secondSummand
+          by calc divisor * 0 + secondSummand
+                = 0 + secondSummand
+                = secondSummand;
+      claim divisor ∣ secondSummand by substituting shapeEquation
+  }
+  | successor(predQ), secondSummand, dividesEnlargedSum => {
+      claim shapeEquation
+          : divisor * successor(predQ) + secondSummand
+            = divisor + (divisor * predQ + secondSummand)
+          by calc divisor * successor(predQ) + secondSummand
+                = (divisor + divisor * predQ) + secondSummand
+                = divisor + (divisor * predQ + secondSummand);
+      claim shiftedSum
+          : divisor ∣ (divisor + (divisor * predQ + secondSummand))
+          by substituting shapeEquation;
       Natural.divides_after_remove_multiple(
           divisor, predQ, secondSummand,
           Natural.divides_after_remove_one(
-              divisor, divisor * predQ + secondSummand,
-              rewrite(
-                  calc divisor * successor(predQ) + secondSummand
-                     = (divisor + divisor * predQ) + secondSummand
-                     = divisor + (divisor * predQ + secondSummand),
-                  dividesEnlargedSum)))
+              divisor, divisor * predQ + secondSummand, shiftedSum))
+  }
 
 -- ----------------------------------------------------------------------
 -- Main lemma: if d divides a sum and divides one of the summands, then
