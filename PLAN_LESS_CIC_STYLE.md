@@ -75,6 +75,20 @@ like math" stays a vibe.
 **Deliverables:** foundational-layer manifest; `cic_leak_report`; error
 golden corpus. **Acceptance:** baseline numbers recorded; CI shows them.
 
+> **Status — DELIVERED (2026-06).**
+> - Manifest: [`docs/foundational-layer.md`](docs/foundational-layer.md) +
+>   machine-readable [`scripts/foundational_layer.txt`](scripts/foundational_layer.txt)
+>   (axioms + `Logic/` + each type's carrier file; 20 files).
+> - Leak linter: [`scripts/cic_leak_report`](scripts/cic_leak_report),
+>   `make leak-report` / `make leak-ratchet`. **Baseline: 681 token
+>   occurrences across 110 user-space files.**
+> - Error corpus: [`scripts/error_corpus/`](scripts/error_corpus/) (30
+>   mistakes + goldens), `make corpus` / `make corpus-audit`. **Baseline:
+>   18 of 30 kernel-tagged (CIC leak), 12 math-shaped, 0 non-erroring.**
+>   `corpus-audit` is the WS1 acceptance gate (red today). Provenance is
+>   read off the `"kernel: "` prefix per Appendix A — no kernel change
+>   needed yet.
+
 ---
 
 ## Phase 1 — Diagnostics & hardening (cheapest, highest perceived gain)
@@ -205,19 +219,113 @@ library scan, conj/disj intro, contradiction) but not complete.
 Today, constructing a quotient (Real, Rational, Integer, F_p, …) means
 hand-writing the carrier, equivalence, and `Quotient.lift`/`.sound`/
 `.induct`, and downstream code still names `Quotient.*` (short forms help
-but don't hide it).
+but don't hide it). The worst case is a binary operation: `Integer.add`
+(`library/Integer/addition.math`) costs **six declarations** — the
+componentwise formula, two per-argument respect lemmas each split into a
+Natural-level kernel plus a destructure wrapper, an `add_after_first`
+helper, an `add_after_first_respects` lemma, and finally `add` itself as a
+nested `Quotient.lift`. The mathematical content is one line ("add the
+difference-pairs componentwise; well-defined because the sums respect the
+relation"); everything else is CIC bookkeeping forced by the absence of a
+binary lift primitive.
 
-- **Surface construct:** `definition Real := quotient of CauchySequence by CauchyEquivalent`
-  desugaring to the existing primitives, and generating math-named
-  operations:
-  - the constructor (`mk`, already short-formed),
-  - a `by_representatives` eliminator under a math name,
-  - **define-by-representatives** for functions: write `f` on a rep + a
-    respect proof; the lift is synthesized and hidden,
-  - **equality-of-classes** sugar hiding `Quotient.sound` ("these two
-    representatives are equal because `~` holds").
-- **Migration:** re-express one constructed type (Rational is a good size)
-  with zero `Quotient.` tokens outside the one definition file.
+#### The semantic spine: "pick a representative" is two distinct acts
+This distinction is *mathematical*, not CIC noise, so the surface should
+preserve it rather than paper over it:
+- **In a proof** (goal is a `Proposition`): a representative may be picked
+  *freely*, with no obligation — proof irrelevance means the proof can't
+  observe which one. This is `Quotient.induct` / `by_representatives`, and
+  it already reads well.
+- **In a definition** (building a *value*): a representative may be used,
+  but the author owes a proof that the result is independent of the choice
+  — `Quotient.lift`, where the respect-proof is load-bearing content, not
+  boilerplate.
+
+**Design rule.** "Pick a representative" is always a *binder that scopes a
+body*, never an expression that returns a value. A function
+`representative_of(x) : T` must not exist — it is exactly the unsound
+operation the kernel deliberately omits (`Logic/quotient.math:16-19`).
+Mathematicians obey this too ("pick a representative `a` of `x`; … *and the
+result is independent of the choice*"); the language just makes the
+parenthetical a checked obligation.
+
+#### Surface constructs
+- **Quotient formation** — one declaration desugaring to the existing
+  primitives, replacing the type def + `construction` intro + bundled-and-
+  registered `IsEquivalenceRelation` instance that
+  `library/Integer/basics.math:94-115` writes by hand:
+  ```
+  quotient Integer := IntegerRepresentative by IntegerEquivalent
+    with equivalence ⟨…reflexive, …symmetric, …transitive⟩
+    where class of (a b : Natural) := from_difference(a, b)
+  ```
+  Generates the carrier `definition`, the registered `equivalence`
+  `instance` (so `Quotient.exact` resolves automatically), and the named
+  class-former `construction`.
+- **Representatives in proofs** — already ~80% done via
+  `by_representatives`; remaining work is naming uniformity with the
+  `class of` form. Low effort.
+- **Define-by-representatives for functions** — the real prize. Write the
+  per-representative formula plus a **mandatory** `well_defined by`:
+  ```
+  definition Integer.add : Integer → Integer → Integer
+    by representatives ⟨a, b⟩, ⟨c, d⟩ ↦ from_difference(a + c, b + d)
+    well_defined by Integer.add_respects
+
+  theorem Integer.add_respects := …          -- proved right here
+  ```
+  The elaborator generates **one** well-definedness obligation as math —
+  "if `⟨a,b⟩ ~ ⟨a',b'⟩` and `⟨c,d⟩ ~ ⟨c',d'⟩` then
+  `⟨a+c,b+d⟩ ~ ⟨a'+c',b'+d'⟩`" — and synthesizes the entire nested-lift /
+  `induct` / `sound` apparatus. Six declarations and zero `Quotient.` tokens collapse
+  to one definition + one genuinely mathematical lemma. The obligation
+  shape adapts to the codomain: a relation `R(f…, f…)` when the result is
+  itself a quotient (elaborator inserts `Quotient.sound`), plain equality
+  `f(…) = f(…)` when it is an ordinary type. We deliberately do **not**
+  hide the well-definedness proof — that is the content a textbook also
+  pauses on; we hide only the lift cascade.
+- **Equality-of-classes** sugar hiding `Quotient.sound` — a `calc`/proof
+  step reading "the classes are equal *since* `⟨a,b⟩ ≈ ⟨c,d⟩`", supplying
+  the relation proof; the elaborator picks `sound`. (`Quotient.exact` is
+  already near-invisible via implicit `T`/`R`/`equivalence`.)
+
+#### `well_defined`: mandatory, name-or-inline, prove-after
+- **Always required.** No omitted/implicit form, so the *claim* of well-
+  definedness is never silent and sits at the definition site, matching how
+  a careful text reads ("…this is well-defined (Lemma 2.4)").
+- **Accepts an inline proof term** (one-liners) **or a name** (heavier
+  proofs).
+- **A named obligation may be proved on either side, with "right after" as
+  the idiom.** "Before" is a trivial lookup. "After" needs deferred
+  finalization: the respect proof is a genuine argument inside the `lift`
+  term, so the kernel can't seal the value until it exists. The elaborator
+  therefore (1) computes the obligation's *type* from the formula and
+  registers `Integer.add` as **pending** keyed on the name, (2) elaborates
+  the following `theorem` against that auto-generated goal, (3) finalizes
+  the pending definition once the proof is added. The only new user-visible
+  rule: `Integer.add` cannot be *used* in the gap between its definition
+  and its obligation proof — and the error there is math-shaped ("not yet
+  well-defined; prove `Integer.add_respects` first"), never CIC. Nothing
+  normally lives in that gap.
+- **Why this is safe (proof irrelevance).** The obligation lands in `Prop`,
+  and the kernel's `lift`-on-`mk` reduction ignores the proof argument
+  (`Logic/quotient.math:9-13`). *Which* proof discharges `well_defined`
+  never affects how `Integer.add` computes, so deferring finalization can't
+  change the definition's meaning — only satisfy the kernel's bookkeeping.
+- **Open sub-decision (for implementation, not now):** whether the
+  obligation `theorem` must restate its type or may be written bare
+  (`theorem Integer.add_respects := <proof>`). Lean: optional, checked-if-
+  present.
+
+#### Boundary, migration, acceptance
+- All four constructs live in the elaborator and desugar to today's
+  primitives — **no kernel change**. The one defining file per type stays
+  on the foundational-layer manifest and may keep `Quotient.` as an escape
+  hatch; everything downstream hits zero `Quotient.`/`unfold` tokens.
+- **Migration:** re-express one constructed type (Integer is the hardest
+  case because of binary `add`; clearing it means the n-ary ring laws
+  follow — Rational is a gentler alternative) with zero `Quotient.` tokens
+  outside the one definition file.
 - **Acceptance:** a *new* quotient type + its basic theory provable with the
   token `Quotient` appearing only in the foundational layer.
 

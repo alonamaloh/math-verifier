@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""error_corpus/run — the error-provenance audit (PLAN_LESS_CIC_STYLE.md 0.3).
+
+A corpus of representative *mistakes* — apply a non-function, wrong arity, type
+mismatch, missing premise, bad induction motive, … — each a `.math` file under
+`cases/`. For each, we run `kernel verify` and capture the diagnostic. The
+captured text is the golden file under `golden/`.
+
+The audit's question: **does a CIC-shaped message reach the user?** The
+elaborator funnels every kernel `TypeError` through `rethrowKernelError`, which
+prefixes it with `"kernel: "` (see PLAN_LESS_CIC_STYLE.md Appendix A). That
+prefix is the de-facto provenance tag: any user-facing error containing
+`"kernel: "` is a *deferral gap* — the elaborator let the kernel type-check a
+term first instead of checking it itself. The audit passes when no golden error
+is kernel-tagged.
+
+This script does NOT need the kernel to change: it reads provenance off the
+existing message text. It DOES need the library built (`make -j 16 library`),
+because each case imports real modules whose `.mathv` caches it loads.
+
+Usage:
+  scripts/error_corpus/run                 # compare against goldens, report
+  scripts/error_corpus/run --update        # (re)write goldens from current output
+  scripts/error_corpus/run --audit         # exit 1 if any golden is kernel-tagged
+  scripts/error_corpus/run --show NAME     # print one case's captured output
+
+Each case MUST produce an error (a mistake that verifies clean is itself a bug
+in the corpus and is reported).
+"""
+import argparse
+import os
+import re
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(os.path.dirname(HERE))
+CASES_DIR = os.path.join(HERE, "cases")
+GOLDEN_DIR = os.path.join(HERE, "golden")
+KERNEL = os.path.join(REPO_ROOT, "kernel")
+CACHE_ROOT = os.path.join(REPO_ROOT, "build")
+
+IMPORT_RE = re.compile(r"^\s*import\s+([\w.]+)\s*$")
+
+# CIC vocabulary that must never reach a user. The "kernel: " prefix is the
+# primary provenance tag; the rest catch a leak that slips through by other
+# means (a raw kernel message re-thrown without the prefix, say).
+KERNEL_TAGS = [
+    "kernel: ",
+]
+CIC_VOCABULARY = [
+    "Pi type", "Pi domain", "BoundVariable", "inferType", "WHNF",
+    "Sort ", "de Bruijn", "universe level", "Application:",
+    "addDefinition", "motive",
+]
+
+
+def module_to_cache(module_name):
+    parts = module_name.split(".")
+    return os.path.join(CACHE_ROOT, "library", *parts) + ".mathv"
+
+
+def deps_of(case_path):
+    deps = []
+    with open(case_path) as handle:
+        for line in handle:
+            match = IMPORT_RE.match(line)
+            if match:
+                deps.append(module_to_cache(match.group(1)))
+    return deps
+
+
+def run_case(case_path):
+    """Run one case; return its normalized captured diagnostic (str)."""
+    deps = deps_of(case_path)
+    cmd = [KERNEL, "verify", "--source", case_path,
+           "--output", "/dev/null", "--deps", *deps]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    captured = (proc.stdout + proc.stderr).strip()
+    # Normalize the absolute source path so goldens are machine-independent.
+    captured = captured.replace(case_path, "<case>")
+    captured = captured.replace(REPO_ROOT + "/", "")
+    # A clean verify (no error) is itself a corpus defect — flag it loudly.
+    if captured == "" and proc.returncode == 0:
+        captured = "<<NO ERROR — this mistake verified clean; corpus defect>>"
+    return captured
+
+
+def is_kernel_tagged(text):
+    return any(tag in text for tag in KERNEL_TAGS)
+
+
+def cic_vocabulary_in(text):
+    return [v for v in CIC_VOCABULARY if v in text]
+
+
+def golden_path(name):
+    return os.path.join(GOLDEN_DIR, name + ".txt")
+
+
+def list_cases():
+    if not os.path.isdir(CASES_DIR):
+        return []
+    return sorted(f[:-5] for f in os.listdir(CASES_DIR) if f.endswith(".math"))
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--update", action="store_true",
+                        help="(re)write goldens from current output")
+    parser.add_argument("--audit", action="store_true",
+                        help="exit 1 if any golden is kernel-tagged (CIC leak)")
+    parser.add_argument("--show", metavar="NAME",
+                        help="print one case's captured output and exit")
+    args = parser.parse_args()
+
+    if not os.path.exists(KERNEL):
+        print(f"kernel binary not found at {KERNEL}; run `make -j 16` first",
+              file=sys.stderr)
+        return 2
+    os.makedirs(GOLDEN_DIR, exist_ok=True)
+
+    cases = list_cases()
+    if not cases:
+        print("no cases found under cases/", file=sys.stderr)
+        return 2
+
+    if args.show:
+        print(run_case(os.path.join(CASES_DIR, args.show + ".math")))
+        return 0
+
+    kernel_tagged = []
+    clean_defects = []
+    drift = []
+
+    for name in cases:
+        captured = run_case(os.path.join(CASES_DIR, name + ".math"))
+        path = golden_path(name)
+
+        if args.update:
+            with open(path, "w") as handle:
+                handle.write(captured + "\n")
+        else:
+            prior = None
+            if os.path.exists(path):
+                with open(path) as handle:
+                    prior = handle.read().rstrip("\n")
+            if prior is None:
+                drift.append((name, "NO GOLDEN (run --update)"))
+            elif prior != captured:
+                drift.append((name, "DRIFT (output changed)"))
+
+        if captured.startswith("<<NO ERROR"):
+            clean_defects.append(name)
+        elif is_kernel_tagged(captured):
+            kernel_tagged.append((name, cic_vocabulary_in(captured)))
+
+    total = len(cases)
+    leaked = len(kernel_tagged)
+    print(f"error corpus: {total} cases, "
+          f"{total - leaked - len(clean_defects)} math-shaped, "
+          f"{leaked} kernel-tagged (CIC leak), "
+          f"{len(clean_defects)} non-erroring")
+    print("=" * 64)
+
+    if kernel_tagged:
+        print("\nKERNEL-TAGGED (deferral gaps — a CIC error reached the user):")
+        for name, vocab in kernel_tagged:
+            extra = f"  [{', '.join(vocab)}]" if vocab else ""
+            print(f"  ✗ {name}{extra}")
+
+    if clean_defects:
+        print("\nNON-ERRORING (corpus defect — these mistakes verified clean):")
+        for name in clean_defects:
+            print(f"  ? {name}")
+
+    if drift and not args.update:
+        print("\nGOLDEN DRIFT (run --update to refresh):")
+        for name, why in drift:
+            print(f"  ~ {name}: {why}")
+
+    if args.update:
+        print(f"\nwrote {total} goldens to {os.path.relpath(GOLDEN_DIR, REPO_ROOT)}/")
+
+    if args.audit:
+        if leaked:
+            print(f"\nAUDIT FAILED: {leaked} kernel-tagged error(s) reach the user",
+                  file=sys.stderr)
+            return 1
+        print("\nAUDIT PASSED: no kernel-tagged errors reach the user")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

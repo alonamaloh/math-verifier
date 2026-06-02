@@ -146,3 +146,36 @@ $(BUILD_DIR)/library-depends.mk: $(MATH_FILES) | kernel
 
 library-clean:
 	rm -rf $(BUILD_DIR)
+
+# ----------------------------------------------------------------------
+# CIC-leak dashboard (PLAN_LESS_CIC_STYLE.md, Phase 0.2). Counts CIC-
+# vocabulary tokens in user-space `.math` files — the north-star metric
+# the plan drives to zero. Non-failing report by default; `leak-ratchet`
+# fails if the total exceeds LEAK_BUDGET (wire into CI once a baseline is
+# agreed).
+LEAK_BUDGET ?= 681
+
+leak-report:
+	@scripts/cic_leak_report --by-file
+
+leak-ratchet:
+	@scripts/cic_leak_report --max $(LEAK_BUDGET)
+
+.PHONY: leak-report leak-ratchet
+
+# ----------------------------------------------------------------------
+# Error-provenance audit (PLAN_LESS_CIC_STYLE.md, Phase 0.3). Runs the
+# mistake corpus and classifies each diagnostic as math-shaped or
+# kernel-tagged (a CIC leak). `corpus` reports; `corpus-audit` fails if
+# any case is kernel-tagged (the WS1 acceptance gate — not yet green).
+# Both need the library built. See scripts/error_corpus/README.md.
+corpus: library
+	@scripts/error_corpus/run
+
+corpus-audit: library
+	@scripts/error_corpus/run --audit
+
+corpus-update: library
+	@scripts/error_corpus/run --update
+
+.PHONY: corpus corpus-audit corpus-update

@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""cic_leak_report — the north-star dashboard for PLAN_LESS_CIC_STYLE.md.
+
+Scans *user-space* `.math` files (everything not on the foundational-layer
+manifest, see scripts/foundational_layer.txt) for CIC-vocabulary tokens — the
+"leak" of the substrate into surface mathematics — and reports per-category,
+per-file, and total counts.
+
+The goal of the whole plan is to drive the total to zero. This script makes
+"feels like math" a number instead of a vibe, so the later (riskier) work can
+be measured rather than hoped about.
+
+Usage:
+  scripts/cic_leak_report                # human summary, exit 0 always
+  scripts/cic_leak_report --by-file      # add a per-file breakdown
+  scripts/cic_leak_report --json         # machine-readable totals
+  scripts/cic_leak_report --max N        # exit 1 if total > N (ratchet)
+
+Counting notes:
+  - Line comments (`-- …` to end of line) are stripped before matching, so a
+    token merely *mentioned* in prose isn't counted as a leak.
+  - Test files (library/Test/**) are excluded: they deliberately exercise
+    internals and use `sorry`.
+  - Counts are token occurrences, not lines: a line with two `Quotient.` uses
+    counts as two.
+"""
+import argparse
+import json
+import os
+import re
+import sys
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LIBRARY_ROOT = os.path.join(REPO_ROOT, "library")
+MANIFEST = os.path.join(REPO_ROOT, "scripts", "foundational_layer.txt")
+
+# CIC-vocabulary token categories. Each maps a name to a compiled regex; the
+# number of (non-overlapping) matches across the comment-stripped source is the
+# leak count for that category. Patterns are intentionally conservative — we
+# would rather undercount a fuzzy category (function-wrapping) than cry wolf.
+CATEGORIES = {
+    # The clearest construction leak: naming the Quotient primitive directly.
+    "Quotient.":               re.compile(r"\bQuotient\."),
+    # Opacity boundary narrated by hand (WS2 target).
+    "unfold":                  re.compile(r"\bunfold\b"),
+    # Hand-written congruence / transport where calc / auto should suffice.
+    "congruenceOf":            re.compile(r"\bcongruenceOf\b"),
+    "transport_proposition":   re.compile(r"\btransport_proposition\b"),
+    "Equality.symmetry":       re.compile(r"\bEquality\.symmetry\b"),
+    "Equality.transitivity":   re.compile(r"\bEquality\.transitivity\b"),
+    # Prop-elimination plumbing that should be hidden (WS7).
+    "False.eliminate_proposition": re.compile(r"\bFalse\.eliminate_proposition\b"),
+    "double-negation (¬¬)":    re.compile(r"¬\s*¬"),
+    # Universe / sort vocabulary surfacing in user space (WS6). `Type(0)` is a
+    # concrete type, not a leak; only an explicit `Sort`, a `.{u}` universe
+    # binder, or a `Type(<var>)` variable level counts.
+    "Sort":                    re.compile(r"\bSort\b"),
+    "universe annotation":     re.compile(r"\.\{|\bType\(\s*[A-Za-z_]"),
+}
+
+COMMENT_RE = re.compile(r"--.*$")
+
+
+def load_manifest(path):
+    """Return (exact_files, dir_prefixes) as sets of repo-relative paths."""
+    exact, prefixes = set(), []
+    with open(path) as handle:
+        for raw in handle:
+            line = raw.split("#", 1)[0].strip()
+            if not line:
+                continue
+            if line.endswith("/"):
+                prefixes.append(line)
+            else:
+                exact.add(line)
+    return exact, prefixes
+
+
+def is_foundational(rel_path, exact, prefixes):
+    if rel_path in exact:
+        return True
+    return any(rel_path.startswith(p) for p in prefixes)
+
+
+def strip_comments(text):
+    return "\n".join(COMMENT_RE.sub("", line) for line in text.splitlines())
+
+
+def scan_file(path):
+    with open(path) as handle:
+        body = strip_comments(handle.read())
+    return {name: len(rx.findall(body)) for name, rx in CATEGORIES.items()}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--by-file", action="store_true",
+                        help="show a per-file breakdown (nonzero only)")
+    parser.add_argument("--json", action="store_true",
+                        help="emit machine-readable totals")
+    parser.add_argument("--max", type=int, default=None,
+                        help="exit 1 if the total leak exceeds N (ratchet)")
+    args = parser.parse_args()
+
+    exact, prefixes = load_manifest(MANIFEST)
+
+    per_file = {}      # rel_path -> {category: count}
+    category_totals = {name: 0 for name in CATEGORIES}
+    foundational_count = 0
+
+    for dirpath, _dirs, files in os.walk(LIBRARY_ROOT):
+        for filename in sorted(files):
+            if not filename.endswith(".math"):
+                continue
+            full = os.path.join(dirpath, filename)
+            rel = os.path.relpath(full, REPO_ROOT)
+            if rel.startswith(os.path.join("library", "Test") + os.sep):
+                continue
+            if is_foundational(rel, exact, prefixes):
+                foundational_count += 1
+                continue
+            counts = scan_file(full)
+            if sum(counts.values()) > 0:
+                per_file[rel] = counts
+                for name, count in counts.items():
+                    category_totals[name] += count
+
+    total = sum(category_totals.values())
+
+    if args.json:
+        print(json.dumps({
+            "total": total,
+            "by_category": category_totals,
+            "leaking_files": len(per_file),
+            "foundational_files": foundational_count,
+            "per_file": {p: {k: v for k, v in c.items() if v} for p, c in per_file.items()},
+        }, indent=2, ensure_ascii=False))
+    else:
+        print("CIC leak report (user space — outside the foundational layer)")
+        print("=" * 62)
+        for name in CATEGORIES:
+            print(f"  {category_totals[name]:5d}  {name}")
+        print("-" * 62)
+        print(f"  {total:5d}  TOTAL across {len(per_file)} leaking files "
+              f"({foundational_count} foundational files excluded)")
+        if args.by_file:
+            print("\nPer-file (most-leaking first):")
+            ranked = sorted(per_file.items(),
+                            key=lambda kv: sum(kv[1].values()), reverse=True)
+            for rel, counts in ranked:
+                cats = ", ".join(f"{k}:{v}" for k, v in counts.items() if v)
+                print(f"  {sum(counts.values()):4d}  {rel}  ({cats})")
+
+    if args.max is not None and total > args.max:
+        print(f"\nLEAK RATCHET FAILED: total {total} exceeds budget {args.max}",
+              file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
