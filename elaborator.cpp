@@ -6184,6 +6184,58 @@ private:
     // `autoFillHintForClaim` to fill any Pi-binders from the goal +
     // hypotheses and produce a term of the goal type. Subsumes the
     // old "direct hypothesis match" and "library scan" strategies.
+    // Stronger per-candidate attempt for a library lemma matched to the
+    // goal only by its conclusion: build `name(?, …, ?)` and run the full
+    // goal-driven hole-inference + side-condition discharge path (the same
+    // machinery `by <lemma>` uses). This is what lets an INEQUALITY step
+    // close with no `by` when the closing lemma needs proof arguments —
+    // e.g. a monotonicity law `a ≤ b → 0 ≤ c → a*c ≤ b*c` whose premises
+    // already sit in the local context. `autoFillHintForClaim` only does a
+    // purely structural match/discharge and misses these. Returns null on
+    // any failure; the returned term is verified closed and defeq-to-goal.
+    ExpressionPointer tryLemmaByConclusion(
+        const std::string& name,
+        ExpressionPointer lemmaType,
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        int totalPi = countLeadingPis(lemmaType);
+        if (totalPi == 0) return nullptr;
+        std::vector<SurfaceExpressionPointer> holeArgs;
+        for (int i = 0; i < totalPi; ++i) {
+            holeArgs.push_back(makeSurfaceHole(line, 0));
+        }
+        std::vector<ExpressionPointer> resolved;
+        try {
+            resolved = inferCallWithHoles(
+                name, lemmaType, holeArgs, localBinders, goalClosed, line);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        } catch (const TypeError&) {
+            return nullptr;
+        }
+        ExpressionPointer call = makeConstant(name, {});
+        for (auto& argument : resolved) {
+            call = makeApplication(std::move(call), std::move(argument));
+        }
+        if (containsFreeVariable(call)) return nullptr;
+        // Confirm it really proves the goal before handing it back.
+        try {
+            ExpressionPointer inferredOpened =
+                inferTypeInLocalContext(localBinders, call);
+            ExpressionPointer goalOpened = openOverLocalBinders(
+                goalClosed, localBinders, localBinders.size());
+            Context context = buildContextFromLocalBinders(localBinders);
+            if (!isDefinitionallyEqual(environment_, context,
+                                        inferredOpened, goalOpened)) {
+                return nullptr;
+            }
+        } catch (...) {
+            return nullptr;
+        }
+        return call;
+    }
+
     ExpressionPointer tryContextFactMatch(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -6205,19 +6257,34 @@ private:
         int triedCount = 0;
         for (const ContextFact& fact : facts) {
             ++triedCount;
+            ExpressionPointer result;
             try {
-                ExpressionPointer result = autoFillHintForClaim(
+                result = autoFillHintForClaim(
                     fact.proofTerm, fact.type, goalClosed,
                     localBinders, line);
+            } catch (const ElaborateError&) {
+                result = nullptr;
+            } catch (const TypeError&) {
+                result = nullptr;
+            }
+            // When the cheap structural fill fails, retry a library-lemma
+            // candidate with the full hole-inference + context-discharge
+            // machinery (see `tryLemmaByConclusion`). Only pays this cost
+            // on candidates the structural path already rejected.
+            if (!result) {
+                if (auto* constantHead =
+                        std::get_if<Constant>(&fact.proofTerm->node)) {
+                    result = tryLemmaByConclusion(
+                        constantHead->name, fact.type, goalClosed,
+                        localBinders, line);
+                }
+            }
+            if (result) {
                 if (autoProveProfileEnabled_) {
                     lastContextFactWinner_ = fact.source;
                     lastContextFactCandidateCount_ = triedCount;
                 }
                 return result;
-            } catch (const ElaborateError&) {
-                continue;
-            } catch (const TypeError&) {
-                continue;
             }
         }
         if (autoProveProfileEnabled_) {
