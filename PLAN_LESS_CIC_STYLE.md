@@ -147,6 +147,30 @@ and own the message there.
 - **Acceptance:** the WS0.3 audit shows zero kernel-tagged errors reaching
   the user across the mistake corpus; the provenance gate is enforced in CI.
 
+> **Status — acceptance met (2026-06).** Corpus 31/31 math-shaped, 0
+> kernel-tagged; `make check` (= tests + corpus-audit + leak-ratchet) is
+> the enforced gate. Closed gaps:
+> - **Definition finalization** — `checkDefinitionWellFormedOrThrow` runs
+>   addDefinition's three checks (name / declared-type-is-a-type /
+>   body-matches-type) in the elaborator first, on every definition, and
+>   reports as mathematics; the kernel only confirms. Genuine first-check.
+> - **Calc step** and **pattern-match case body** — both already *detected*
+>   the mismatch in the elaborator but laundered it through
+>   `rethrowKernelError`; now throw surface errors directly.
+> - **Application family** ("not of Pi type" / "argument … Pi domain") —
+>   re-authored at the single `rethrowKernelError` chokepoint into surface
+>   wording, covering every path that funnels through it. An *unmapped*
+>   kernel message keeps the literal `kernel:` prefix, so the audit still
+>   catches new leaks.
+> - **Printer** — function types render `A → B` / `(x : A) → B`, never `Π`.
+>
+> Remaining follow-ups (not blocking acceptance):
+> - **Bucket A (WS8)** not yet done: malformed-term assertions / the
+>   `coerceToExpectedTypeViaDiff` contract.
+> - **Universe rendering (WS6)**: errors can still show `reflexivity.{0}`
+>   and the lemma-search index prints `Type _auto_u_0`.
+> - The corpus is a 31-case sample; grow it as new gaps surface.
+
 ### WS8. Representation-contract documentation + assertions
 (Started already: the CLOSED-vs-OPENED-over-local-binders note and
 `assertClosedOverLocalBinders` at `inferTypeInLocalContext`.) Generalize:
