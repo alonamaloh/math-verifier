@@ -205,17 +205,22 @@ returns its final non-`;`-terminated expression.
   `cases` split, before a long calc). The elaborator runs
   `isDefinitionallyEqual` and reports a mismatch with both forms in
   the error.
-- `note <proposition>;` — assert `<proposition>` is closable by the
-  auto-prover at the current point and continue. Reads as "note
-  that …" / "observe that …" — a parenthetical aside in math prose.
-  Useful when the reader benefits from seeing the intermediate
-  fact even though the surrounding proof would close without it.
+- `note <proposition> [by <proof>];` — a *verified comment*: like `claim`,
+  except it does **not** add the fact to the context. Reads as "note
+  that …" / "observe that …" — a parenthetical aside in math prose. With
+  no `by`, the auto-prover must close `<proposition>`; with `by <proof>`
+  the reason is shown (and the note holds even when the auto-prover
+  couldn't close it alone). Because it adds nothing to the context and is
+  for the reader, it is never flagged unused or redundant. Use it to keep
+  an intermediate fact visible even when the surrounding proof would close
+  without it.
 - `since <proof>` — exactly `by <proof>` (same elaboration and
   type-checking), except `--check-redundant-by` never flags it. Use it on
   a calc step (`… = b since <reason>`) or a claim (`claim P since <reason>`)
-  to keep a hint the auto-prover doesn't strictly need but that explains
-  the step to the reader. Mnemonic: `by` = the prover uses it, `since` =
-  the author explains it.
+  to keep a load-bearing hint the auto-prover doesn't strictly need but
+  that explains the step to the reader. Mnemonic: `by` = the prover uses
+  it, `since` = the author explains it. (`note` is the *non-binding*
+  counterpart — a comment; `claim … since` keeps the fact in context.)
 - `change <type>;` — the *active* counterpart of `note goal`: assert
   `<type>` is definitionally equal to the current goal AND replace the
   goal by `<type>` for the rest of the block (the body is elaborated at

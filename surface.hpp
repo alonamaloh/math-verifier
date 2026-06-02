@@ -227,6 +227,11 @@ struct SurfaceNote {
     // replaced), whereas `note goal : T;` only checks and continues at the
     // unchanged goal. Requires `goalType` set.
     bool changesGoal = false;
+    // `note P by V;` — the explicit proof V (else null, and the auto-prover
+    // closes P). A `note` is a reader-facing aside, so it's never flagged
+    // unused or redundant; `by V` lets the reason be shown (and lets it
+    // hold even when the auto-prover can't close P on its own).
+    SurfaceExpressionPointer proof;
 };
 
 // `decide P { | yes m => arm_yes  | no n => arm_no }` —
@@ -602,10 +607,11 @@ inline SurfaceExpressionPointer makeSurfaceNote(
     SurfaceExpressionPointer proposition,
     SurfaceExpressionPointer body,
     int line, int column,
-    bool changesGoal = false) {
+    bool changesGoal = false,
+    SurfaceExpressionPointer proof = nullptr) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceNote{std::move(goalType), std::move(proposition),
-                     std::move(body), changesGoal},
+                     std::move(body), changesGoal, std::move(proof)},
         line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceDecide(

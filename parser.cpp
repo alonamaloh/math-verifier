@@ -346,6 +346,19 @@ SurfaceExpressionPointer substituteSurfaceName(
             std::move(newArms), line, column,
             structured->byInduction, structured->bySubstitution);
     }
+    if (auto* note = std::get_if<SurfaceNote>(&node.node)) {
+        // `note goal : T;` / `note P [by V];` / `change T;` — recurse into
+        // the goal type / proposition / proof / body so a `set`-bound name
+        // used in any of them is substituted (note binds nothing, so the
+        // body has no shadowing to guard).
+        auto sub = [&](const SurfaceExpressionPointer& e) {
+            return e ? substituteSurfaceName(e, targetName, replacement)
+                     : SurfaceExpressionPointer{};
+        };
+        return makeSurfaceNote(
+            sub(note->goalType), sub(note->proposition), sub(note->body),
+            line, column, note->changesGoal, sub(note->proof));
+    }
     // Unhandled node kind: be conservative and return unchanged. If we
     // ever add a new SurfaceExpression variant, the `set` substitution
     // will silently skip it — surfaced by the test suite if it bites.
@@ -1034,6 +1047,13 @@ private:
                 } else {
                     wrapper.kind = BlockWrapper::NoteAssertion;
                     wrapper.value = parseExpression();
+                    // `note P by V;` — optional explicit proof (else the
+                    // auto-prover closes P). Stashed in `wrapper.type`,
+                    // which NoteAssertion otherwise leaves unused.
+                    if (peek().kind == TokenKind::KeywordBy) {
+                        consumeAny();  // 'by'
+                        wrapper.type = parseExpression();
+                    }
                 }
             } else if (isChange) {
                 // `change <type>;` — replace the current goal by the
@@ -1335,7 +1355,9 @@ private:
                         /*goalType=*/nullptr,
                         std::move(iterator->value),
                         std::move(result),
-                        iterator->line, iterator->column);
+                        iterator->line, iterator->column,
+                        /*changesGoal=*/false,
+                        /*proof=*/std::move(iterator->type));
                     break;
                 case BlockWrapper::ChangeGoal:
                     result = makeSurfaceNote(

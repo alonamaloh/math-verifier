@@ -4746,7 +4746,8 @@ private:
                             << ": unused claim/let `" << let->name
                             << "` — its value is never used (not by name,"
                                " not by the auto-prover); delete the"
-                               " binding\n";
+                               " binding, or turn it into `note <prop> [by"
+                               " <proof>];` to keep it for the reader\n";
                     } else {
                         std::cerr << "warning: " << moduleName_
                             << ":" << expression.line
@@ -10867,6 +10868,9 @@ private:
                 return true;
             if (note->proposition
                 && surfaceMentionsName(*note->proposition, name))
+                return true;
+            if (note->proof
+                && surfaceMentionsName(*note->proof, name))
                 return true;
             return note->body
                 && surfaceMentionsName(*note->body, name);
@@ -18447,22 +18451,48 @@ private:
             ExpressionPointer propKernel = elaborateExpression(
                 *note.proposition, localBinders,
                 makeSort(makeLevelConst(0)));
-            try {
-                (void)autoProveClaim(propKernel, localBinders, line);
-            } catch (const ElaborateError&) {
-                throwElaborate(
-                    std::string("`note <proposition>` at line ")
-                    + std::to_string(line)
-                    + ": the auto-prover could not close the noted "
-                    "proposition: "
-                    + prettyPrintInLocalScope(propKernel, localBinders));
-            } catch (const TypeError&) {
-                throwElaborate(
-                    std::string("`note <proposition>` at line ")
-                    + std::to_string(line)
-                    + ": the auto-prover raised a type error on the "
-                    "noted proposition: "
-                    + prettyPrintInLocalScope(propKernel, localBinders));
+            if (note.proof) {
+                // `note P by V;` — check the supplied reason V proves P.
+                // Like every `note`, it's non-binding (the term is
+                // discarded) and never flagged unused/redundant; the `by V`
+                // just lets the reason be shown to the reader (and lets the
+                // note hold when the auto-prover can't close P on its own).
+                ExpressionPointer proofKernel = elaborateExpression(
+                    *note.proof, localBinders, propKernel);
+                ExpressionPointer proofType = inferTypeInLocalContext(
+                    localBinders, proofKernel);
+                ExpressionPointer propOpened = openOverLocalBinders(
+                    propKernel, localBinders, localBinders.size());
+                Context context =
+                    buildContextFromLocalBinders(localBinders);
+                if (!isDefinitionallyEqual(environment_, context,
+                                            proofType, propOpened)) {
+                    throwElaborate(
+                        std::string("`note P by V` at line ")
+                        + std::to_string(line)
+                        + ": the proof does not have the noted type `"
+                        + prettyPrintInLocalScope(propKernel, localBinders)
+                        + "`");
+                }
+            } else {
+                try {
+                    (void)autoProveClaim(propKernel, localBinders, line);
+                } catch (const ElaborateError&) {
+                    throwElaborate(
+                        std::string("`note <proposition>` at line ")
+                        + std::to_string(line)
+                        + ": the auto-prover could not close the noted "
+                        "proposition: "
+                        + prettyPrintInLocalScope(propKernel, localBinders)
+                        + " (supply the reason with `note P by <proof>`)");
+                } catch (const TypeError&) {
+                    throwElaborate(
+                        std::string("`note <proposition>` at line ")
+                        + std::to_string(line)
+                        + ": the auto-prover raised a type error on the "
+                        "noted proposition: "
+                        + prettyPrintInLocalScope(propKernel, localBinders));
+                }
             }
         } else {
             throwElaborate(
