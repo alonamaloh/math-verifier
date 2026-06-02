@@ -26,7 +26,7 @@ definition Rational.zero : Rational :=
 
 The short form needs an expected type of shape `Quotient(T, R)` from
 context (the surrounding theorem's return type, or an enclosing
-function argument). The short form does NOT fire in these positions:
+argument). The short form does NOT fire in these positions:
 - Operand of unary `-`, binary `+`, `*`, `=`, `<`, `≤`.
 - Third arg of `Equality.transport_proposition(A, P, x, ...)` (the
   carrier `A` doesn't propagate inward).
@@ -67,14 +67,14 @@ Quotient.sound(RationalRepresentative, RationalEquivalent,
 ```math
 -- Short (preferred): T, R, U all inferred.
 Quotient.lift(
-    function (rep) => ...,
-    function (rep1 rep2 hyp) => ...,
+    (rep) ↦ ...,
+    (rep1 rep2 hyp) ↦ ...,
     q)
 
 -- Verbose:
 Quotient.lift(RationalRepresentative, RationalEquivalent, Rational,
-               function ...,
-               function ...,
+               ...,
+               ...,
                q)
 ```
 
@@ -96,8 +96,8 @@ Quotient.induct(_, atRep, q)
 -- Verbose, when you want a specific motive shape (e.g. to thread
 -- additional hypotheses).
 Quotient.induct(
-    function (xArg : Rational) => P(xArg),
-    function (rep : RationalRepresentative) => proofAtRep(rep),
+    (xArg : Rational) ↦ P(xArg),
+    (rep : RationalRepresentative) ↦ proofAtRep(rep),
     x)
 ```
 
@@ -154,7 +154,7 @@ picks the eliminator from the type. This is the standard idiom for
 
 ### `by_representatives` — the multi-scrutinee elimination idiom
 
-`by_representatives x as <pat>, y as <pat>, … => body` is the preferred
+`by_representatives x as <pat>, y as <pat>, … ↦ body` is the preferred
 "WLOG pick representatives" form. It desugars to nested quotient-`cases`
 (one per scrutinee), so it is exactly the nested `cases` below but reads
 as one line. The pattern after `as` is a tuple `⟨a, b⟩` (the carrier's
@@ -164,7 +164,7 @@ need not be named), an explicit constructor pattern, or a bare name.
 ```math
 theorem Rational.triangle_inequality (x y : Rational)
         : abs(x + y) ≤ abs(x) + abs(y) :=
-  by_representatives x as ⟨n1, d1⟩, y as ⟨n2, d2⟩ =>
+  by_representatives x as ⟨n1, d1⟩, y as ⟨n2, d2⟩ ↦
     Rational.triangle_inequality_at_representatives(n1, n2, d1, d2)
 ```
 
@@ -178,7 +178,7 @@ when destructuring one or more scrutinees with no extra `cases` plumbing.
 
 ```math
 -- Bare name: bind rep_x to the representative.
-cases x { | rep_x => …use rep_x… }
+cases x { | rep_x ↦ …use rep_x… }
 
 -- Constructor pattern: destructure the rep directly.
 cases x { | IntegerRepresentative.make(a, b) =>

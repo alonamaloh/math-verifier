@@ -46,7 +46,7 @@ recursion really demands it.
 ### Multi-pattern bindings (when the pattern-match form is used)
 
 Constructor patterns at non-scrutinee positions of a pattern-match
-definition properly refine the types of later-bound function args
+definition properly refine the types of later-bound args
 (including dependent equality hypotheses). Write all destructures in
 one row:
 
@@ -57,7 +57,7 @@ theorem IntegerEquivalent.symmetric
           → IntegerEquivalent(y, x)
   | IntegerRepresentative.make(a, b),
     IntegerRepresentative.make(c, d),
-    aPlusDEqualsBPlusC =>
+    aPlusDEqualsBPlusC ↦
       …
 ```
 
@@ -83,7 +83,7 @@ cases Integer.absolute_value_natural(x) with refinedEquation {
 }
 ```
 
-The elaborator desugars this to the convoy pattern (`function (caseScrutinee : T) (equalityOuter : X = caseScrutinee) => …`) — the user just picks a name. Each arm gets `refinedEquation` in scope with the type refined per branch.
+The elaborator desugars this to the convoy pattern (`(caseScrutinee : T) (equalityOuter : X = caseScrutinee) ↦ …`) — the user just picks a name. Each arm gets `refinedEquation` in scope with the type refined per branch.
 
 Constructor patterns with arguments (e.g. `successor(predecessor)`) are reconstructed as expressions for the equation type; tuple patterns aren't yet supported.
 
@@ -115,7 +115,7 @@ decide Real.IsUpperBound(subset, (midpoint : Real)) {
 Semantics: builds `Logic.Decidable_recursor(P, motive, λp. arm_yes, λn. arm_no, Logic.classical_decidable(P))`. The motive abstracts every structural occurrence of `Logic.classical_decidable(P)` in the goal (after δ unfolds chained definitions like `bisectionStep`); if none appears, motive defaults to `λ_. Goal` and each arm proves the goal directly with `p` / `notP` in scope.
 
 What it eliminates:
-- The motive-as-lambda boilerplate (`function (decision : Logic.Decidable(…)) => …`).
+- The motive-as-lambda boilerplate (`(decision : Logic.Decidable(…)) ↦ …`).
 - The explicit `Equality.transport_proposition(…)` call wrapping each arm.
 - The `with decisionEq` equation plumbing.
 - The `Or.introduceLeft` / `Or.introduceRight` constructor names.
@@ -191,8 +191,8 @@ returns its final non-`;`-terminated expression.
 - `take <name> : <type>;` — introduce a Pi-binder of the given type
   from the expected type. Reads as the math-prose "take an arbitrary
   <name> of type <type>" / "let <name> ∈ <type> be given". Use
-  `take` over `function (name : type) =>` whenever the binder is
-  the textbook "fix a variable" move; reserve `function` for genuine
+  `take` over `(name : type) ↦` whenever the binder is
+  the textbook "fix a variable" move; reserve `` for genuine
   lambdas that aren't intros. Semantically identical to a single-
   binder `suppose … as …` (both wrap the rest of the block in a
   lambda) but reads as the universal/Pi side rather than the
@@ -280,8 +280,8 @@ constructor form, the kernel's β/ι reduces every
 theorem Foo_at_make
         : (rep_x rep_y : CauchyRationalSequence) → … (Quotient.mk rep_x) … (Quotient.mk rep_y) …
   | CauchyRationalSequence.make(sx, sx_cauchy),
-    CauchyRationalSequence.make(sy, sy_cauchy) =>
-      Quotient.sound(…, …, function (n : Natural) => Rational.foo(sx(n), sy(n)))
+    CauchyRationalSequence.make(sy, sy_cauchy) ↦
+      Quotient.sound(…, …, (n : Natural) ↦ Rational.foo(sx(n), sy(n)))
 
 theorem Foo (x y : Real) : … :=
   Quotient.induct_two(motive, Foo_at_make, x, y)

@@ -163,7 +163,7 @@ Two forms, disambiguated by argument count.
 the unique structural occurrence of `a` on the calc step's LHS and
 replaces with `b`. Only works in calc context (needs the step's
 target as expected type). If `a` occurs multiple times or zero
-times, fall back to explicit `congruenceOf(function (z) => …, L)`.
+times, fall back to explicit `congruenceOf((z) ↦ …, L)`.
 
 **2-arg, term-level**: `rewrite(eq, term)` for `eq : a = b` and
 `term : P(a)` returns a term of type `P(b)`. Desugars to
@@ -193,7 +193,7 @@ calc Natural.power(Natural.padic_valuation(p, (1 + dy + dx*(1+dy))), p)
    = Natural.power(Natural.padic_valuation(p, (1+dx))
                        + Natural.padic_valuation(p, (1+dy)), p)
        by congruenceOf(
-              function (m : Natural) => Natural.power(m, p),
+              (m : Natural) ↦ Natural.power(m, p),
               Natural.padic_valuation_multiplicative(
                   p, (1+dx), (1+dy), primality, succDxPos, succDyPos))
 
@@ -227,7 +227,7 @@ Limits:
   lemma's LHS) vs `v_p(1+dy+dx*(1+dy))` (the step's slot) where
   multiplication reduces structurally.
 
-## Rewrite under a binder — `by (function (x) => …)` in calc
+## Rewrite under a binder — `by ((x) ↦ …)` in calc
 
 When a calc `=` step's endpoints are the **same function `F` applied to
 argument lists that differ in exactly one position — a binder body
@@ -240,17 +240,17 @@ congruence lemma. The canonical case is rewriting the summand of a
 
 ```math
 -- Verbose: respell BOTH summands + the Sum.extensional wrapper.
-= Polynomial.Sum(r, function (i) => coefficient(p, i) * (coefficient(q, k−i) + coefficient(s, k−i)), k)
+= Polynomial.Sum(r, (i) ↦ coefficient(p, i) * (coefficient(q, k−i) + coefficient(s, k−i)), k)
       by Polynomial.Sum.extensional(r,
-             function (i) => (coefficient(p, i) * coefficient(q, k−i)) + (coefficient(p, i) * coefficient(s, k−i)),
-             function (i) => coefficient(p, i) * (coefficient(q, k−i) + coefficient(s, k−i)),
-             function (i) => Ring.distributivity_left(r, coefficient(p, i), coefficient(q, k−i), coefficient(s, k−i)),
+             (i) ↦ (coefficient(p, i) * coefficient(q, k−i)) + (coefficient(p, i) * coefficient(s, k−i)),
+             (i) ↦ coefficient(p, i) * (coefficient(q, k−i) + coefficient(s, k−i)),
+             (i) ↦ Ring.distributivity_left(r, coefficient(p, i), coefficient(q, k−i), coefficient(s, k−i)),
              k)
 
 -- Idiomatic: just the per-index proof. f, g, r, k are read off the
 -- endpoints. Note the PARENS around the lambda (see below).
-= Polynomial.Sum(r, function (i) => coefficient(p, i) * (coefficient(q, k−i) + coefficient(s, k−i)), k)
-      by (function (i : Natural) =>
+= Polynomial.Sum(r, (i) ↦ coefficient(p, i) * (coefficient(q, k−i) + coefficient(s, k−i)), k)
+      by ((i : Natural) ↦
              Ring.distributivity_left(r, coefficient(p, i), coefficient(q, k−i), coefficient(s, k−i)))
 ```
 
@@ -273,7 +273,7 @@ the same surface — register it too and the elaborator tries each in turn:
 
 ```math
 congruence_under_binder Polynomial.Sum := Polynomial.Sum.extensional_range
--- now `by (function (i) (smaller : i ≤ k) => …)` closes a Sum step from
+-- now `by ((i) (smaller : i ≤ k) ↦ …)` closes a Sum step from
 -- the range-restricted pointwise proof (Sum.extensional is tried first,
 -- fails on the 2-binder lambda, then Sum.extensional_range matches).
 ```
@@ -286,8 +286,8 @@ untouched. The assembled proof is type-checked before use, so a wrong
 guess never shadows a real step.
 
 Gotchas / limits:
-- **Parens are required:** `by (function (x) => …)`. A bare
-  `by function (x) => …` parses wrong — the lambda body is greedy and
+- **Parens are required:** `by ((x) ↦ …)`. A bare
+  `by (x) ↦ …` parses wrong — the lambda body is greedy and
   eats the next calc step. Keep the parens.
 - **One binder argument per step.** The endpoints must differ in exactly
   one position. Chained rewrites under the same Σ are separate steps.
