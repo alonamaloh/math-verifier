@@ -915,6 +915,22 @@ private:
         // prefix is the provenance tag the error-corpus audit keys on, so
         // leaving it on unmapped messages keeps new leaks visible.
         const std::string what = error.what();
+        // Bucket A (WS8): an "internal:" error means the elaborator built a
+        // malformed term and the kernel caught it (e.g. a bare BoundVariable
+        // reaching inferType). This is a *defect*, never the user's fault,
+        // and must never surface CIC vocabulary. Show a generic, math-free
+        // "please report" message; log the raw detail to stderr for the
+        // developer. No expected/actual types (they're internal noise).
+        if (what.rfind("internal:", 0) == 0) {
+            std::cerr << "internal diagnostic (please report): " << what
+                      << "\n";
+            auto [line, column] = innermostFramePosition();
+            throw ElaborateError(formatErrorWithContext(
+                "internal error: the elaborator built a malformed term here "
+                "(this is a bug, not a problem with your proof — please "
+                "report it)"),
+                line, column);
+        }
         std::string message;
         const char* expectedLabel = "expected type: ";
         const char* actualLabel = "actual type:   ";
@@ -943,20 +959,23 @@ private:
         }
         // Anchor the error at the innermost frame that knows its source
         // position (the calc step / argument / theorem currently being
-        // elaborated) — same walk as throwElaborate. Without this a kernel
-        // TypeError reported `:1:1` with only the theorem name, leaving
-        // the user to hunt for the offending line.
-        int line = 0;
-        int column = 0;
+        // elaborated). Without this a kernel TypeError reported `:1:1` with
+        // only the theorem name, leaving the user to hunt for the line.
+        auto [line, column] = innermostFramePosition();
+        throw ElaborateError(formatErrorWithContext(message), line, column);
+    }
+
+    // The innermost context frame that carries a source position (the calc
+    // step / argument / theorem currently being elaborated), or {0,0}.
+    // Same walk throwElaborate uses to anchor kernel errors.
+    std::pair<int, int> innermostFramePosition() const {
         for (auto iter = contextFrames_.rbegin();
              iter != contextFrames_.rend(); ++iter) {
             if (iter->line != 0) {
-                line = iter->line;
-                column = iter->column;
-                break;
+                return {iter->line, iter->column};
             }
         }
-        throw ElaborateError(formatErrorWithContext(message), line, column);
+        return {0, 0};
     }
 
     // WS1 (PLAN_LESS_CIC_STYLE.md): make the elaborator authoritative at
