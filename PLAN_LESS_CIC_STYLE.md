@@ -188,6 +188,21 @@ and own the message there.
 - **Acceptance:** no user-facing "bare BoundVariable"; contract comments at
   every mover; the leak linter's internal-crash category is empty.
 
+> **Status — substantially done (2026-06).**
+> - `coerceToExpectedTypeViaDiff` pinned: `acceptCoercionIfClosed` rejects a
+>   non-closed strategy result (O(1) guard), warns, and falls back to the
+>   unwrapped term — the symmetry-flip → bare-BoundVariable class can no
+>   longer crash the kernel. 0 warnings across library+tests.
+> - **No user-facing "bare BoundVariable":** all `internal:` kernel errors
+>   now render at the `rethrowKernelError` chokepoint as a generic
+>   "internal error … please report it" (raw detail → stderr), never CIC
+>   vocabulary.
+> - Contract comments added on `autoProveClaim` / `autoFillHintForClaim`
+>   (the CLOSED/OPENED note already covered the open/close helpers).
+> - *Remaining (low priority):* thread `assertClosedOverLocalBinders`
+>   through more boundaries beyond the coerce guard. The bug-prone mover is
+>   already guarded, so this is defensive depth, not a gap.
+
 ---
 
 ## Phase 2 — Everyday-proof leverage
