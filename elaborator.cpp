@@ -5708,8 +5708,9 @@ private:
 
         // `--check-redundant-by`: speculatively run the bare-`claim`
         // auto-prover on the same goal. If it would also discharge
-        // the goal, warn that the hint is redundant.
-        if (reportRedundantBy_) {
+        // the goal, warn that the hint is redundant. A `since` hint is an
+        // intentional explanation — exempt it from the check.
+        if (reportRedundantBy_ && !claim.byIsExplanation) {
             ExpressionPointer autoAttempt;
             try {
                 autoAttempt = autoProveClaim(
@@ -8080,6 +8081,7 @@ private:
                     stepProofKernel = elaborateExpression(
                         *step.stepProof, localBinders, stepRelationType);
                     bool checkThisStep = reportRedundantBy_
+                        && !step.stepProofIsExplanation
                         && (step.relation == CalcRelation::Equality
                             || reportRedundantByNonEq_);
                     if (checkThisStep) {

@@ -210,6 +210,12 @@ returns its final non-`;`-terminated expression.
   that …" / "observe that …" — a parenthetical aside in math prose.
   Useful when the reader benefits from seeing the intermediate
   fact even though the surrounding proof would close without it.
+- `since <proof>` — exactly `by <proof>` (same elaboration and
+  type-checking), except `--check-redundant-by` never flags it. Use it on
+  a calc step (`… = b since <reason>`) or a claim (`claim P since <reason>`)
+  to keep a hint the auto-prover doesn't strictly need but that explains
+  the step to the reader. Mnemonic: `by` = the prover uses it, `since` =
+  the author explains it.
 - `change <type>;` — the *active* counterpart of `note goal`: assert
   `<type>` is definitionally equal to the current goal AND replace the
   goal by `<type>` for the rest of the block (the body is elaborated at

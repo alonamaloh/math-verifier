@@ -332,6 +332,10 @@ struct SurfaceCalcStep {
     std::string relationOperator;
     SurfaceExpressionPointer nextExpression;
     SurfaceExpressionPointer stepProof;
+    // The step proof was given with `since` rather than `by`: elaborated
+    // and checked identically, but exempt from the redundant-`by` check
+    // (it's an intentional explanation for the reader).
+    bool stepProofIsExplanation = false;
     int line = 0;
     int column = 0;
 };
@@ -461,6 +465,9 @@ struct SurfaceStructuredClaim {
     // and refining list are already baked into the SurfaceCases at
     // parse time.
     bool byInduction = false;                   // `by induction on … { … }`
+    // The hint was given with `since` rather than `by`: same elaboration,
+    // but exempt from the redundant-`by` check.
+    bool byIsExplanation = false;
     // `by substitution` (no arg) — auto-find equality + body via the
     // unified equality bridge. `by substituting <eqExpression>` —
     // narrow the search to the supplied equality. The eqExpression
@@ -681,11 +688,13 @@ inline SurfaceExpressionPointer makeSurfaceStructuredClaim(
     std::vector<SurfaceStructuredClaimArm> arms,
     int line, int column,
     bool byInduction = false,
-    bool bySubstitution = false) {
+    bool bySubstitution = false,
+    bool byIsExplanation = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceStructuredClaim{std::move(proposition), std::move(label),
                                 std::move(byHint), byCases,
                                 std::move(arms), byInduction,
+                                byIsExplanation,
                                 bySubstitution},
         line, column});
 }

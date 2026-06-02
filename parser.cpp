@@ -275,9 +275,10 @@ SurfaceExpressionPointer substituteSurfaceName(
             calc->initialExpression, targetName, replacement);
         std::vector<SurfaceCalcStep> newSteps;
         for (const auto& step : calc->steps) {
-            SurfaceCalcStep newStep;
-            newStep.relation = step.relation;
-            newStep.relationOperator = step.relationOperator;
+            // Whole-struct copy preserves relation, relationOperator,
+            // stepProofIsExplanation, line, column — and any future field;
+            // only the rewritten sub-expressions are overwritten.
+            SurfaceCalcStep newStep = step;
             newStep.nextExpression = substituteSurfaceName(
                 step.nextExpression, targetName, replacement);
             // step.stepProof is null when the user omits `by …`
@@ -287,8 +288,6 @@ SurfaceExpressionPointer substituteSurfaceName(
                 ? substituteSurfaceName(
                       step.stepProof, targetName, replacement)
                 : nullptr;
-            newStep.line = step.line;
-            newStep.column = step.column;
             newSteps.push_back(std::move(newStep));
         }
         return makeSurfaceCalc(std::move(newInitial), std::move(newSteps),
@@ -2522,6 +2521,13 @@ private:
             if (peek().kind == TokenKind::KeywordBy) {
                 consumeAny();  // 'by'
                 step.stepProof = parseCalcStepProof();
+            } else if (peek().kind == TokenKind::KeywordSince) {
+                // `since <proof>` — elaborated like `by`, but the proof is
+                // an intentional explanation, so the redundant-`by` check
+                // leaves it alone.
+                consumeAny();  // 'since'
+                step.stepProof = parseCalcStepProof();
+                step.stepProofIsExplanation = true;
             } else {
                 step.stepProof = nullptr;
             }
@@ -2586,8 +2592,16 @@ private:
         bool byCases = false;
         bool byInduction = false;
         bool bySubstitution = false;
+        bool byIsExplanation = false;
         std::vector<SurfaceStructuredClaimArm> arms;
-        if (peek().kind == TokenKind::KeywordBy) {
+        if (peek().kind == TokenKind::KeywordSince) {
+            // `claim P since <proof>` — elaborated like `by <proof>` but
+            // exempt from the redundant-`by` check (an explanation kept for
+            // the reader). Only the plain-proof form; no cases/substitution.
+            consumeAny();  // 'since'
+            byHint = parseRecallingWrap(parseExpression());
+            byIsExplanation = true;
+        } else if (peek().kind == TokenKind::KeywordBy) {
             consumeAny();  // 'by'
             if (peek().kind == TokenKind::KeywordCases) {
                 Token casesToken = consumeAny();  // 'cases'
@@ -2641,7 +2655,7 @@ private:
             std::move(proposition), /*label=*/"",
             std::move(byHint), byCases, std::move(arms),
             claimToken.line, claimToken.column, byInduction,
-            bySubstitution);
+            bySubstitution, byIsExplanation);
     }
 
     // `<hint> recalling <fact>, <fact>, …` — bring extra named facts into

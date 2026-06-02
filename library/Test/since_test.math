@@ -1,0 +1,25 @@
+-- Test/since_test.math
+--
+-- `since <proof>` is `by <proof>` that the redundant-`by` check leaves
+-- alone: a hint elaborated and type-checked identically, kept because it
+-- explains the step to the reader even when the auto-prover doesn't need
+-- it. Works on calc steps and on claims.
+
+module Test.since_test
+
+import Natural.basics
+import Equality.basics
+
+-- On a calc step. `0 = b` would auto-close from `b = 0` (the symmetry
+-- flip), but `since` keeps the reason visible without being flagged.
+theorem Test.since_calc_step (b : Natural) (hb : b = 0)
+        : Natural.add(0, 0) = b :=
+  calc Natural.add(0, 0)
+     = 0
+     = b   since Equality.symmetry(b, 0, hb)
+
+-- On a claim.
+theorem Test.since_claim (b : Natural) (hb : b = 0) : 0 = b := {
+  claim flipped : 0 = b since Equality.symmetry(b, 0, hb);
+  flipped
+}
