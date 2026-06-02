@@ -767,6 +767,50 @@ private:
         return goal + hints;
     }
 
+    // ---- Term representation convention (read before touching the helpers
+    //      that move terms between scopes) ----
+    //
+    // A term handled by the elaborator is in one of two representations
+    // relative to the ambient `localBinders` (the in-scope hypotheses):
+    //
+    //  • CLOSED over local binders — each in-scope hypothesis appears as a
+    //    `BoundVariable` (de Bruijn), so the term is closed: it references no
+    //    free hypothesis directly. This is the *storage* form: what
+    //    `elaborateExpression` / `autoProveClaim` return, what gets pushed on
+    //    `LocalBinder`s, and what `goalClosed` / `hintType` hold. Invariant:
+    //    such a term must satisfy `maxFreeBoundVariable < localBinders.size()`
+    //    (its bound-variable refs all land within the local scope).
+    //
+    //  • OPENED over local binders — each hypothesis appears as a named
+    //    `FreeVariable` valid in `buildContextFromLocalBinders(localBinders)`.
+    //    This is the *kernel-operation* form: what `inferType`,
+    //    `isDefinitionallyEqual`, and `weakHeadNormalForm` consume.
+    //
+    // Conversions: `openOverLocalBinders` (closed → opened),
+    // `closeOverLocalBinders` (opened → closed). `inferTypeInLocalContext`
+    // takes a CLOSED term, opens it, and returns an OPENED type.
+    //
+    // The trap: a helper that hands back a malformed term (a bound variable
+    // escaping the local scope) passes silent until the next `inferType`,
+    // which dies deep in the kernel with "bare BoundVariable reached
+    // inferType". `assertClosedOverLocalBinders` turns that into an O(1)
+    // check at the boundary, naming the producer.
+    void assertClosedOverLocalBinders(
+        const ExpressionPointer& term,
+        const std::vector<LocalBinder>& localBinders,
+        const char* where) const {
+        int n = static_cast<int>(localBinders.size());
+        if (term->maxFreeBoundVariable >= n) {
+            throw TypeError(
+                std::string("internal: ") + where
+                + " produced a term that is not closed over its local binders"
+                  " (maxFreeBoundVariable="
+                + std::to_string(term->maxFreeBoundVariable)
+                + ", local binders=" + std::to_string(n)
+                + ") — a bound variable escapes the local scope");
+        }
+    }
+
     // Const version of openOverLocalBinders (the existing one in this
     // class is non-const because it shares the helper used during
     // mutating elaboration).
@@ -4642,6 +4686,14 @@ private:
                 // whose types are not written) and any other type-free
                 // local binding.
                 letValue = elaborateExpression(*let->value, localBinders);
+                // `recalling (<proposition>)`: a bare fact cited as a
+                // proposition is auto-proved, so the discharge scope binds a
+                // PROOF of it rather than the Sort-0 proposition itself.
+                if (let->fromRecallingFact
+                    && termIsProposition(localBinders, letValue)) {
+                    letValue = proveCitedFact(
+                        letValue, localBinders, expression.line);
+                }
                 letType = closeOverLocalBinders(
                     inferTypeInLocalContext(localBinders, letValue),
                     localBinders, localBinders.size());
@@ -5667,8 +5719,9 @@ private:
         auto t0 = std::chrono::steady_clock::now();
         ExpressionPointer result;
         ExpressionPointer hintType;
+        ExpressionPointer hintTerm;
         try {
-            ExpressionPointer hintTerm = elaborateExpression(
+            hintTerm = elaborateExpression(
                 *claim.byHint, localBinders,
                 propagateExpectedTypeToHint ? goalClosed : nullptr);
             // `inferTypeInLocalContext` returns an OPENED type;
@@ -5682,22 +5735,19 @@ private:
             result = autoFillHintForClaim(
                 hintTerm, hintType, goalClosed, localBinders, line);
         } catch (const ElaborateError&) {
-            // The hint doesn't elaborate / fill against the goal directly.
-            // Fall back to elaborating it WITH the goal as the expected
-            // type and applying diff-inferred congruence — the behaviour
-            // the named (`let`-style) claim path always provided. Having
-            // both strategies here is what makes `claim NAME : T by …` and
+            // The hint didn't fill against the goal directly. Either it is a
+            // cited fact `by (P)` (a Proposition — prove it, then bridge its
+            // proof to the goal), or an ordinary hint that needs the diff-
+            // congruence path on a goal-typed re-elaboration — the behaviour
+            // the named (`let`-style) claim path always provided. Having both
+            // strategies here is what makes `claim NAME : T by …` and
             // `claim T by …` elaborate identically (the name only adds a
             // binding); e.g. `claim f(a) = f(b) by eq` with `eq : a = b`.
-            result = coerceToExpectedTypeViaDiff(
-                localBinders,
-                elaborateExpression(*claim.byHint, localBinders, goalClosed),
-                goalClosed);
+            result = recoverClaimHint(
+                hintTerm, *claim.byHint, goalClosed, localBinders, line);
         } catch (const TypeError&) {
-            result = coerceToExpectedTypeViaDiff(
-                localBinders,
-                elaborateExpression(*claim.byHint, localBinders, goalClosed),
-                goalClosed);
+            result = recoverClaimHint(
+                hintTerm, *claim.byHint, goalClosed, localBinders, line);
         }
         auto tFill = std::chrono::steady_clock::now();
         if (dumpClaimSize && hintType) {
@@ -7291,6 +7341,12 @@ private:
             // as a single ContextEquality.
             ExpressionPointer eqProof = elaborateExpression(
                 *claim.byHint, localBinders);
+            // `by substituting (<equation>)`: the equation may be cited as a
+            // bare proposition (e.g. `by substituting (a = b)`); auto-prove it
+            // so the substitution runs against a proof of the equation.
+            if (termIsProposition(localBinders, eqProof)) {
+                eqProof = proveCitedFact(eqProof, localBinders, line);
+            }
             ExpressionPointer eqProofTypeOpened;
             try {
                 eqProofTypeOpened = inferTypeInLocalContext(
@@ -8180,7 +8236,19 @@ private:
                 if (!stepProofKernel) {
                     stepProofKernel = elaborateExpression(
                         *step.stepProof, localBinders, stepRelationType);
-                    bool checkThisStep = reportRedundantBy_
+                    // `by (<fact>)`: when the proof position elaborates to a
+                    // proposition P (its type is the `Proposition` sort) rather
+                    // than a proof, the user cited a fact. Prove P and bridge
+                    // its proof to the step exactly like `by <proof-of-P>`.
+                    bool fromFactCitation = false;
+                    if (termIsProposition(localBinders, stepProofKernel)) {
+                        stepProofKernel = bridgeCitedFact(
+                            stepProofKernel, stepRelationType,
+                            localBinders, step.line);
+                        fromFactCitation = true;
+                    }
+                    bool checkThisStep = !fromFactCitation
+                        && reportRedundantBy_
                         && !step.stepProofIsExplanation
                         && (step.relation == CalcRelation::Equality
                             || reportRedundantByNonEq_);
@@ -19983,6 +20051,140 @@ private:
         }
     }
 
+    // ---- `by (<fact>)`: cite a proposition where a proof is expected ----
+    //
+    // The user writes `by (P)` with `P` a proposition (a fact) rather than a
+    // proof. We auto-prove `P` and hand the synthesized proof to the very
+    // same machinery that handles `by <proof-of-P>`, so a cited fact bridges
+    // to the goal through identical unify / ring / rewrite paths. A proof
+    // term has a proposition as its type, whereas a proposition's own type is
+    // the `Proposition` sort — that gap is the dispatch.
+
+    // True iff `term` (in the `localBinders` scope) is itself a proposition —
+    // i.e. its type is the `Proposition` sort (`Sort 0`). A proof term fails
+    // this (its type is a proposition, not the sort), which is exactly the
+    // dispatch between "fact cited" and "proof supplied". Uses
+    // `inferTypeInLocalContext` so it matches the opened representation the
+    // surrounding calc/claim code uses (a raw `inferType` over a freshly built
+    // context mishandles the opened form).
+    bool termIsProposition(
+        const std::vector<LocalBinder>& localBinders,
+        const ExpressionPointer& term) {
+        ExpressionPointer termType;
+        try {
+            termType = inferTypeInLocalContext(localBinders, term);
+        } catch (...) {
+            return false;
+        }
+        ExpressionPointer reduced =
+            weakHeadNormalForm(environment_, termType);
+        auto* sortNode = std::get_if<Sort>(&reduced->node);
+        if (!sortNode) return false;
+        auto* constant =
+            std::get_if<LevelConst>(&sortNode->level->node);
+        return constant && constant->value == 0;
+    }
+
+    // Auto-prove a cited proposition; clear error if the prover can't reach it.
+    ExpressionPointer proveCitedFact(
+        const ExpressionPointer& factProposition,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        try {
+            return autoProveClaim(factProposition, localBinders, line);
+        } catch (const ElaborateError&) {
+        } catch (const TypeError&) {
+        }
+        throwElaborate(
+            "`by (<fact>)`: couldn't prove the cited fact `"
+            + prettyPrintInLocalScope(factProposition, localBinders)
+            + "` — the auto-prover can't reach it on its own. Establish it "
+            "with its own `claim …;` (or give `by <proof>`) instead.");
+    }
+
+    // True iff `result` actually has type `goalClosed` in the local scope.
+    // Guarded: a malformed bridge result (or any inference failure) reads as
+    // "doesn't prove the goal" rather than crashing.
+    bool bridgedResultProvesGoal(
+        const ExpressionPointer& result,
+        const ExpressionPointer& goalClosed,
+        const std::vector<LocalBinder>& localBinders) {
+        try {
+            ExpressionPointer resultType =
+                inferTypeInLocalContext(localBinders, result);
+            ExpressionPointer goalOpened = openOverLocalBinders(
+                goalClosed, localBinders, localBinders.size());
+            Context context = buildContextFromLocalBinders(localBinders);
+            return isDefinitionallyEqual(
+                environment_, context, resultType, goalOpened);
+        } catch (...) {
+            return false;
+        }
+    }
+
+    // Given a cited proposition `factProposition` and a `goalClosed`, prove
+    // the fact and bridge its proof to the goal exactly like `by <proof-of-
+    // fact>`: first the goal-driven hint pipeline (unify conclusion / fill
+    // args), then the diff-congruence path (`f(a) = f(b)` from `a = b`).
+    ExpressionPointer bridgeCitedFact(
+        const ExpressionPointer& factProposition,
+        const ExpressionPointer& goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        ExpressionPointer proof =
+            proveCitedFact(factProposition, localBinders, line);
+        // `proof : factProposition` by construction, so use the cited
+        // proposition as its (closed) type directly — re-inferring is both
+        // unnecessary and unsafe (the auto-prover's result form differs from
+        // an elaborated term and can confuse `inferTypeInLocalContext`).
+        // Each bridge candidate is *validated* against the goal: a diff that
+        // the bridge cannot handle (e.g. a symmetry flip) can return a
+        // malformed term rather than throwing, which would crash downstream.
+        ExpressionPointer candidate;
+        try {
+            candidate = autoFillHintForClaim(
+                proof, factProposition, goalClosed, localBinders, line);
+        } catch (...) { candidate = nullptr; }
+        if (candidate && bridgedResultProvesGoal(
+                candidate, goalClosed, localBinders)) {
+            return candidate;
+        }
+        try {
+            candidate = coerceToExpectedTypeViaDiff(
+                localBinders, proof, goalClosed);
+        } catch (...) { candidate = nullptr; }
+        if (candidate && bridgedResultProvesGoal(
+                candidate, goalClosed, localBinders)) {
+            return candidate;
+        }
+        throwElaborate(
+            "`by (<fact>)`: proved `"
+            + prettyPrintInLocalScope(factProposition, localBinders)
+            + "` but it does not establish the goal — the cited fact must be "
+            "(or bridge by ring / rewrite / congruence to) the goal.");
+    }
+
+    // Claim-path recovery when the direct hint pipeline didn't close the
+    // goal. If the hint was a cited fact (a Proposition), prove it and bridge
+    // its proof to the goal; otherwise fall back to the diff-congruence path
+    // on the hint re-elaborated at the goal type — the behaviour the named-
+    // claim path always had.
+    ExpressionPointer recoverClaimHint(
+        const ExpressionPointer& hintTerm,
+        const SurfaceExpression& byHint,
+        const ExpressionPointer& goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        if (hintTerm && termIsProposition(localBinders, hintTerm)) {
+            return bridgeCitedFact(
+                hintTerm, goalClosed, localBinders, line);
+        }
+        return coerceToExpectedTypeViaDiff(
+            localBinders,
+            elaborateExpression(byHint, localBinders, goalClosed),
+            goalClosed);
+    }
+
     // Like `inferLeadingArguments` but the holes can be at ANY position,
     // marked by `?` in the user's argument list. For each position:
     //   - If it's `?` (SurfaceHole): open a metavariable; resolve it
@@ -24840,6 +25042,11 @@ private:
     ExpressionPointer inferTypeInLocalContext(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer term) {
+        // Precondition: `term` is CLOSED over `localBinders` (see the
+        // representation-convention note above). Catch a violation here —
+        // O(1) — rather than as a "bare BoundVariable" crash inside inferType.
+        assertClosedOverLocalBinders(
+            term, localBinders, "inferTypeInLocalContext input");
         ExpressionPointer openedTerm = openOverLocalBinders(
             term, localBinders, localBinders.size());
         Context context = buildContextFromLocalBinders(localBinders);

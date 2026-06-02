@@ -152,6 +152,12 @@ struct SurfaceLet {
     // NAME — so the surface-text check below catches the case
     // where the `as NAME` adds noise without adding readability.
     bool fromCalcAsBinding = false;
+    // True when this binding came from a `recalling <fact>` clause. Such a
+    // binding auto-proves its value when the value is a *proposition* (a fact
+    // cited bare, e.g. `recalling (0 ≤ n)`), binding the synthesized proof —
+    // so the discharge scope sees a hypothesis of that type, not a `Sort 0`
+    // abbreviation. Ordinary `let X := <proposition>` keeps the proposition.
+    bool fromRecallingFact = false;
 };
 struct SurfaceAscription {
     SurfaceExpressionPointer expression;
@@ -554,11 +560,12 @@ inline SurfaceExpressionPointer makeSurfaceLet(
     std::string name, SurfaceExpressionPointer type,
     SurfaceExpressionPointer value, SurfaceExpressionPointer body,
     int line, int column,
-    bool fromCalcAsBinding = false) {
+    bool fromCalcAsBinding = false,
+    bool fromRecallingFact = false) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceLet{std::move(name), std::move(type),
                    std::move(value), std::move(body),
-                   fromCalcAsBinding},
+                   fromCalcAsBinding, fromRecallingFact},
         line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceAscription(

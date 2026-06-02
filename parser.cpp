@@ -2701,7 +2701,8 @@ private:
             body = makeSurfaceLet(
                 "_recalled_" + std::to_string(i),
                 /*type=*/nullptr, std::move(facts[i]), std::move(body),
-                recallToken.line, recallToken.column);
+                recallToken.line, recallToken.column,
+                /*fromCalcAsBinding=*/false, /*fromRecallingFact=*/true);
         }
         return body;
     }

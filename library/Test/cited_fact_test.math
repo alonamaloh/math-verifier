@@ -1,0 +1,56 @@
+-- Test/cited_fact_test.math
+--
+-- A proposition cited where a proof is expected, written `(<fact>)`, is
+-- auto-proved and used in place of a proof term. The same primitive lands
+-- in three positions:
+--   • `by (<fact>)`               — proof position (calc step / claim)
+--   • `recalling (<fact>)`        — a cited lemma's discharge scope
+--   • `by substituting (<eq>)`    — the substitution equation
+-- The proof synthesized for the fact is then handled identically to a
+-- user-supplied proof of the same type.
+
+module Test.cited_fact_test
+
+import Equality.basics
+import Natural.basics
+import Natural.order
+
+-- ---- `by (<fact>)` in the proof position ----
+
+-- Equality fact: prove `a = b`, then the congruence step `succ(a) =
+-- succ(b)` follows by the diff bridge (the same path `by <eq-proof>` uses).
+theorem Test.by_fact_congruence (a b : Natural) (h : a = b)
+        : successor(a) = successor(b) :=
+  calc successor(a)
+     = successor(b)   by (a = b)
+
+-- As a claim: the cited equality fact bridges to the congruence goal.
+theorem Test.by_fact_claim (a b : Natural) (h : a = b)
+        : successor(a) = successor(b) := {
+  claim stepped : successor(a) = successor(b) by (a = b);
+  stepped
+}
+
+-- ---- `recalling (<fact>)` ----
+
+-- A lemma whose premise `0 ≤ n` is not recoverable from its conclusion.
+theorem Test.needs_bound (n : Natural) (atLeastZero : 0 ≤ n) : 0 = 0 :=
+  reflexivity(0)
+
+-- Cite the lemma, supplying the premise as a bare proposition: it is
+-- auto-proved into the lemma's discharge scope (vs. `recalling
+-- Natural.zero_least(n)`, the proof-term form).
+theorem Test.recalling_proposition (n : Natural) : 0 = 0 := {
+  claim result : 0 = 0 by Test.needs_bound recalling (0 ≤ n);
+  result
+}
+
+-- ---- `by substituting (<equation>)` ----
+
+-- The equation cited as a bare proposition (auto-proved from `h`), then
+-- used to rewrite the goal `b = a` to `a = a`.
+theorem Test.substituting_proposition (a b : Natural) (h : a = b)
+        : b = a := {
+  claim result : b = a by substituting (a = b);
+  result
+}
