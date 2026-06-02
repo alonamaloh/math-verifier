@@ -63,13 +63,24 @@ theorem Natural.not_two_less_or_equal_one : ¬(2 ≤ 1) :=
     Natural.not_less_or_equal_successor_zero(0,
         Natural.less_or_equal_successor_successor_descend(1, 0, twoLessOrEqualOne))
 
--- A divisor of 1 is at most 1 (the "1 = 0" alternative of
--- divides_less_or_equal_or_zero is vacuous).
-theorem Natural.divisor_of_one_at_most_one (d : Natural) (dividesOne : d ∣ 1)
-        : d ≤ 1 :=
+-- 1 is the only divisor of 1. `divides_less_or_equal_or_zero` bounds the
+-- divisor by 1 (the "1 = 0" alternative is vacuous); casing on it rules
+-- out 0 (a zero divisor would force 1 = 0) and leaves exactly 1.
+theorem Natural.one_is_only_divisor_of_one (d : Natural) (dividesOne : d ∣ 1)
+        : d = 1 :=
   cases Natural.divides_less_or_equal_or_zero(d, 1, dividesOne) {
     | Or.introduceLeft(oneEqualsZero) => absurd(oneEqualsZero)
-    | Or.introduceRight(dAtMostOne)   => dAtMostOne
+    | Or.introduceRight(dAtMostOne)   =>
+        cases d refining dAtMostOne, dividesOne {
+          | zero => {
+              obtain ⟨quotient, oneEqualsZeroTimesQuotient⟩ from dividesOne;
+              absurd(calc (1 : Natural) = 0 * quotient = 0)
+            }
+          | successor(dPredecessor) =>
+              Natural.less_or_equal_zero_implies_equals_zero(dPredecessor,
+                  Natural.less_or_equal_successor_successor_descend(
+                      dPredecessor, 0, dAtMostOne))
+        }
   }
 
 -- Euclid's theorem. Let n be the product of all the primes, plus one.
@@ -99,10 +110,9 @@ theorem Natural.infinitely_many_primes
     claim q ∣ NaturalList.productOf(primes);
     -- ...and q divides n = product + 1, so q divides their difference, 1.
     claim q ∣ 1;
-    -- A divisor of 1 is at most 1; but q ≥ 2 since q is prime — and no
-    -- number is both, so the assumption was impossible.
-    claim qAtMostOne : q ≤ 1;
+    -- So q = 1; but q ≥ 2 since q is prime, and 2 ≤ 1 is impossible.
+    claim qEqualsOne : q = 1;
     claim qAtLeastTwo : 2 ≤ q;
-    Natural.not_two_less_or_equal_one(LessOrEqual.transitive(2, q, 1, qAtMostOne, qAtLeastTwo))
+    Natural.not_two_less_or_equal_one(rewrite(qEqualsOne, qAtLeastTwo))
   }⟩
 }
