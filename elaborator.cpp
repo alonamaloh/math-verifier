@@ -7523,11 +7523,250 @@ private:
     // For a single step the result is just the step proof (no transitivity
     // wrapper). For N ≥ 2 steps the result is left-folded:
     //   transitivity(... transitivity(transitivity(p1, p2), p3) ..., pN).
+    // `calc` over a generic preorder relation R (e.g. `∣`, `⊆`): a chain
+    // of `R` steps and `=` steps proving `R(first, last)`. Resolves R's
+    // function and transitivity lemma from the carrier, folds the `R`
+    // steps via transitivity, and absorbs interleaved `=` steps by
+    // `Equality.transport_proposition`. All terms are closed-over-
+    // localBinders form, like the rest of the elaborator.
+    ExpressionPointer elaborateCalcPreorder(
+        const SurfaceCalc& calc,
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer expectedType,
+        int line, int column) {
+        Frame frame(*this,
+            "calc block at line " + std::to_string(line),
+            localBinders, expectedType, line, column);
+        ExpressionPointer e0 = elaborateExpression(
+            *calc.initialExpression, localBinders);
+        ExpressionPointer carrierTypeOpen =
+            inferTypeInLocalContext(localBinders, e0);
+        ExpressionPointer carrierType = closeOverLocalBinders(
+            carrierTypeOpen, localBinders, localBinders.size());
+        LevelPointer carrierLevel = typeUniverseOf(localBinders, e0);
+        auto* carrierConstant =
+            std::get_if<Constant>(&carrierTypeOpen->node);
+        std::string carrierTypeName =
+            carrierConstant ? carrierConstant->name : std::string{};
+
+        // The single relation symbol used by all non-`=` steps.
+        std::string symbol;
+        for (const auto& s : calc.steps) {
+            if (s.relationOperator.empty()) continue;
+            if (symbol.empty()) symbol = s.relationOperator;
+            else if (symbol != s.relationOperator) {
+                throwElaborate(
+                    "calc chain mixes the relations '" + symbol + "' and '"
+                    + s.relationOperator + "'; a single calc may use only "
+                    "one non-`=` relation");
+            }
+        }
+        // Resolve the relation function (operator registry, then the
+        // built-in Natural fallback for `∣`).
+        std::string relationFn = environment_.lookupOperator(
+            symbol, carrierTypeName, carrierTypeName);
+        if (relationFn.empty() && carrierTypeName == "Natural"
+            && symbol == "∣") {
+            relationFn = "Natural.divides";
+        }
+        if (relationFn.empty()) {
+            throwElaborate(
+                "calc step uses '" + symbol + "' but no such relation is "
+                "available on " + carrierTypeName + " — register one via "
+                "`operator (" + symbol + ") on (" + carrierTypeName + ", "
+                + carrierTypeName + ") := <fn>;`");
+        }
+        // Transitivity lemma: accept either the dotted `<R>.transitive`
+        // convention (the order relations) or the `<R>_transitive`
+        // convention (e.g. Natural.divides_transitive).
+        std::string transitiveName;
+        for (const std::string& candidate :
+             {relationFn + ".transitive", relationFn + "_transitive"}) {
+            if (environment_.lookup(candidate)) {
+                transitiveName = candidate;
+                break;
+            }
+        }
+        if (transitiveName.empty()) {
+            throwElaborate(
+                "calc over '" + symbol + "' needs a transitivity lemma "
+                + relationFn + ".transitive (or " + relationFn
+                + "_transitive) in scope");
+        }
+        // R(x, y) as a Proposition.
+        auto relationType =
+            [&](ExpressionPointer x, ExpressionPointer y) {
+                return makeApplication(
+                    makeApplication(makeConstant(relationFn), x), y);
+            };
+        // Equality(carrier, x, y).
+        auto equalityType =
+            [&](ExpressionPointer x, ExpressionPointer y) {
+                return makeApplication(makeApplication(makeApplication(
+                    makeConstant("Equality", {carrierLevel}),
+                    carrierType), x), y);
+            };
+
+        // Elaborate every endpoint and its step proof.
+        std::vector<ExpressionPointer> endpoints;
+        endpoints.push_back(e0);
+        std::vector<ExpressionPointer> proofs;
+        std::vector<bool> isEquality;
+        ExpressionPointer previous = e0;
+        Context context = buildContextFromLocalBinders(localBinders);
+        for (size_t k = 0; k < calc.steps.size(); ++k) {
+            const auto& step = calc.steps[k];
+            ExpressionPointer next = elaborateExpression(
+                *step.nextExpression, localBinders, carrierType);
+            bool eqStep = step.relationOperator.empty();
+            ExpressionPointer wantType = eqStep
+                ? equalityType(previous, next)
+                : relationType(previous, next);
+            ExpressionPointer proof;
+            if (step.stepProof) {
+                proof = elaborateExpression(
+                    *step.stepProof, localBinders, wantType);
+            } else {
+                proof = autoProveClaim(wantType, localBinders, step.line);
+            }
+            // Confirm the proof has the claimed step type.
+            ExpressionPointer proofType =
+                inferTypeInLocalContext(localBinders, proof);
+            ExpressionPointer wantOpened = openOverLocalBinders(
+                wantType, localBinders, localBinders.size());
+            if (!isDefinitionallyEqual(environment_, context,
+                                        proofType, wantOpened)) {
+                throwElaborate(
+                    "calc step " + std::to_string(k + 1)
+                    + " proof does not have the claimed type `"
+                    + prettyPrintInLocalScope(wantType, localBinders) + "`");
+            }
+            endpoints.push_back(next);
+            proofs.push_back(proof);
+            isEquality.push_back(eqStep);
+            previous = next;
+        }
+
+        // Index of the first `∣`/`⊆` step (guaranteed to exist — the
+        // dispatch only routes here when one is present).
+        size_t firstRel = 0;
+        while (firstRel < isEquality.size() && isEquality[firstRel]) {
+            ++firstRel;
+        }
+
+        // Phase A: fold the leading `=` prefix endpoints[0..firstRel] into
+        // a single `endpoints[0] = endpoints[firstRel]`.
+        ExpressionPointer prefixEquality;  // null when firstRel == 0
+        if (firstRel > 0) {
+            prefixEquality = proofs[0];
+            for (size_t k = 1; k < firstRel; ++k) {
+                ExpressionPointer call =
+                    makeConstant("Equality.transitivity", {carrierLevel});
+                for (ExpressionPointer a : {carrierType, endpoints[0],
+                                             endpoints[k], endpoints[k + 1],
+                                             prefixEquality, proofs[k]}) {
+                    call = makeApplication(call, a);
+                }
+                prefixEquality = call;
+            }
+        }
+
+        // Phase B: from the first `∣` step, fold the rest. `current`
+        // always proves `R(endpoints[firstRel], curRight)`; `=` steps
+        // transport its right endpoint, `∣` steps compose by transitivity.
+        ExpressionPointer left = endpoints[firstRel];
+        ExpressionPointer current = proofs[firstRel];
+        for (size_t k = firstRel + 1; k < proofs.size(); ++k) {
+            ExpressionPointer mid = endpoints[k];
+            ExpressionPointer next = endpoints[k + 1];
+            if (isEquality[k]) {
+                // transport_proposition(λz. R(left, z), mid, next, proof,
+                //                        current) : R(left, next)
+                ExpressionPointer predicate = makeLambda(
+                    "z", carrierType,
+                    makeApplication(
+                        makeApplication(makeConstant(relationFn),
+                            shift(left, 1)),
+                        makeBoundVariable(0)));
+                ExpressionPointer call = makeConstant(
+                    "Equality.transport_proposition", {carrierLevel});
+                for (ExpressionPointer a : {carrierType, predicate, mid,
+                                             next, proofs[k], current}) {
+                    call = makeApplication(call, a);
+                }
+                current = call;
+            } else {
+                ExpressionPointer call = makeConstant(transitiveName);
+                for (ExpressionPointer a : {left, mid, next,
+                                             current, proofs[k]}) {
+                    call = makeApplication(call, a);
+                }
+                current = call;
+            }
+        }
+
+        // Phase C: fold the prefix equality `endpoints[0] = left` into the
+        // left endpoint: R(endpoints[0], last) from R(left, last).
+        if (prefixEquality) {
+            ExpressionPointer last = endpoints.back();
+            // symmetry : left = endpoints[0]
+            ExpressionPointer symmetry = makeConstant(
+                "Equality.symmetry", {carrierLevel});
+            for (ExpressionPointer a : {carrierType, endpoints[0], left,
+                                         prefixEquality}) {
+                symmetry = makeApplication(symmetry, a);
+            }
+            // transport_proposition(λz. R(z, last), left, endpoints[0],
+            //                        symmetry, current) : R(endpoints[0], last)
+            ExpressionPointer predicate = makeLambda(
+                "z", carrierType,
+                makeApplication(
+                    makeApplication(makeConstant(relationFn),
+                        makeBoundVariable(0)),
+                    shift(last, 1)));
+            ExpressionPointer call = makeConstant(
+                "Equality.transport_proposition", {carrierLevel});
+            for (ExpressionPointer a : {carrierType, predicate, left,
+                                         endpoints[0], symmetry, current}) {
+                call = makeApplication(call, a);
+            }
+            current = call;
+        }
+
+        // Final sanity check against the intended conclusion.
+        ExpressionPointer resultType = relationType(
+            endpoints[0], endpoints.back());
+        ExpressionPointer resultTypeOpened = openOverLocalBinders(
+            resultType, localBinders, localBinders.size());
+        ExpressionPointer currentType =
+            inferTypeInLocalContext(localBinders, current);
+        if (!isDefinitionallyEqual(environment_, context,
+                                    currentType, resultTypeOpened)) {
+            throwElaborate(
+                "calc chain over '" + symbol + "' did not fold to `"
+                + prettyPrintInLocalScope(resultType, localBinders)
+                + "` (the transitivity lemma " + transitiveName
+                + " may take its arguments in a different order)");
+        }
+        return current;
+    }
+
     ExpressionPointer elaborateCalc(
         const SurfaceCalc& calc,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
         int line, int column) {
+        // Generic-preorder calc (`∣`, `⊆`, …): any step carrying a
+        // relation-operator symbol routes the whole chain to the preorder
+        // fold, which uses the carrier's registered relation + its
+        // transitivity lemma and absorbs interleaved `=` steps by
+        // transport. The built-in order engine below handles =/≤/</≥/>.
+        for (const auto& s : calc.steps) {
+            if (!s.relationOperator.empty()) {
+                return elaborateCalcPreorder(
+                    calc, localBinders, expectedType, line, column);
+            }
+        }
         Frame frame(*this,
             "calc block at line " + std::to_string(line),
             localBinders, expectedType, line, column);

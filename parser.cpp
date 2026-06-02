@@ -277,6 +277,7 @@ SurfaceExpressionPointer substituteSurfaceName(
         for (const auto& step : calc->steps) {
             SurfaceCalcStep newStep;
             newStep.relation = step.relation;
+            newStep.relationOperator = step.relationOperator;
             newStep.nextExpression = substituteSurfaceName(
                 step.nextExpression, targetName, replacement);
             // step.stepProof is null when the user omits `by …`
@@ -2479,9 +2480,12 @@ private:
                || peek().kind == TokenKind::LessOrEqual
                || peek().kind == TokenKind::Less
                || peek().kind == TokenKind::GreaterOrEqual
-               || peek().kind == TokenKind::Greater) {
+               || peek().kind == TokenKind::Greater
+               || peek().kind == TokenKind::Divides
+               || peek().kind == TokenKind::SubsetOf) {
             Token relationToken = consumeAny();
-            CalcRelation relation;
+            CalcRelation relation = CalcRelation::Equality;
+            std::string relationOperator;
             switch (relationToken.kind) {
                 case TokenKind::LessOrEqual:
                     relation = CalcRelation::LessOrEqual; break;
@@ -2491,12 +2495,20 @@ private:
                     relation = CalcRelation::GreaterOrEqual; break;
                 case TokenKind::Greater:
                     relation = CalcRelation::GreaterThan; break;
+                // Generic preorder relations: keep `relation` at its
+                // Equality placeholder and record the operator symbol; the
+                // elaborator routes the whole chain to the preorder fold.
+                case TokenKind::Divides:
+                    relationOperator = "∣"; break;
+                case TokenKind::SubsetOf:
+                    relationOperator = "⊆"; break;
                 default:
                     relation = CalcRelation::Equality; break;
             }
             auto nextExpression = parseAdditive();
             SurfaceCalcStep step;
             step.relation = relation;
+            step.relationOperator = std::move(relationOperator);
             step.nextExpression = std::move(nextExpression);
             step.line = relationToken.line;
             step.column = relationToken.column;

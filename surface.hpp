@@ -323,6 +323,13 @@ enum class CalcRelation {
 // the proof of that single step.
 struct SurfaceCalcStep {
     CalcRelation relation = CalcRelation::Equality;
+    // For a step using a generic preorder relation (e.g. `∣`, `⊆`) rather
+    // than one of the built-in order relations, this holds the operator
+    // symbol and `relation` is left at its Equality placeholder. A calc
+    // with any such step routes to the generic-preorder fold, which uses
+    // the carrier's registered relation + its transitivity lemma and
+    // absorbs interleaved `=` steps by transport. Empty for `=`/≤/</≥/>.
+    std::string relationOperator;
     SurfaceExpressionPointer nextExpression;
     SurfaceExpressionPointer stepProof;
     int line = 0;
