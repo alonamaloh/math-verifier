@@ -1,0 +1,31 @@
+-- Test/symmetry_flip_test.math
+--
+-- The auto-prover's symmetry fallback: a goal `x = y` (or `R(x, y)` for a
+-- relation R with a registered symmetry lemma) closes from a fact stated
+-- the other way, by proving the flip and wrapping it.
+
+module Test.symmetry_flip_test
+
+import Natural.basics
+import Equality.basics
+
+-- Equality: `0 = b` closes from `b = 0` in context (no explicit `by`).
+theorem Test.equality_flip (b : Natural) (hb : b = 0) : 0 = b := {
+  claim result : 0 = b;
+  result
+}
+
+-- Generic symmetric relation: a non-Equality relation whose `<R>_symmetric`
+-- lemma the flip discovers. `Test.Sym(0, b)` closes from `Test.Sym(b, 0)`.
+inductive Test.Sym (a : Natural) : Natural → Proposition where
+  | refl : Test.Sym(a, a)
+
+theorem Test.Sym_symmetric (a b : Natural)
+        : Test.Sym(a, b) → Test.Sym(b, a)
+  | refl => refl
+
+theorem Test.generic_flip (b : Natural) (hs : Test.Sym(b, 0))
+        : Test.Sym(0, b) := {
+  claim result : Test.Sym(0, b);
+  result
+}

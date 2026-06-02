@@ -6887,6 +6887,113 @@ private:
     // v1 skips universe-polymorphic candidates (no universe inference
     // yet) and does a linear scan (acceptable at current library size;
     // an indexed lookup is a planned follow-on).
+    // Symmetry fallback. The goal is `x = y` (or `R(x, y)` for a relation
+    // R that advertises a symmetry lemma): if the direct close fails, prove
+    // the flipped goal `y = x` / `R(y, x)` and wrap it. Lets e.g. `0 = b`
+    // close from a `b = 0` fact whose conclusion is stated the other way.
+    // Sound only for symmetric relations — `=` always, plus any R with a
+    // `<R>.symmetric` / `<R>_symmetric` lemma; order relations (≤/<) have
+    // no such lemma and are left untouched. Guarded against flip-back.
+    ExpressionPointer trySymmetryFlip(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        if (symmetryFlipDepth_ > 0) return nullptr;
+        int N = static_cast<int>(localBinders.size());
+        ExpressionPointer goalWhnf;
+        try {
+            goalWhnf = weakHeadNormalForm(environment_,
+                openOverLocalBinders(goalClosed, localBinders, N));
+        } catch (...) { return nullptr; }
+
+        // Equality: `x = y`  ←  Equality.symmetry of `y = x`.
+        bool isEquality = true;
+        EqualityComponents comps;
+        try {
+            comps = extractEqualityComponents(
+                goalWhnf, "symmetry flip", line);
+        } catch (const ElaborateError&) { isEquality = false; }
+          catch (const TypeError&) { isEquality = false; }
+        if (isEquality) {
+            ExpressionPointer carrier = closeOverLocalBinders(
+                comps.carrierType, localBinders, N);
+            ExpressionPointer x = closeOverLocalBinders(
+                comps.leftEndpoint, localBinders, N);
+            ExpressionPointer y = closeOverLocalBinders(
+                comps.rightEndpoint, localBinders, N);
+            ExpressionPointer flipped = makeApplication(makeApplication(
+                makeApplication(makeConstant("Equality",
+                    {comps.carrierUniverseLevel}), carrier), y), x);
+            ExpressionPointer flippedProof;
+            ++symmetryFlipDepth_;
+            try {
+                flippedProof = autoProveClaim(flipped, localBinders, line);
+            } catch (const ElaborateError&) { flippedProof = nullptr; }
+              catch (const TypeError&) { flippedProof = nullptr; }
+            --symmetryFlipDepth_;
+            if (!flippedProof) return nullptr;
+            // Equality.symmetry.{u}(carrier, y, x, flippedProof) : x = y
+            ExpressionPointer wrap = makeConstant(
+                "Equality.symmetry", {comps.carrierUniverseLevel});
+            for (ExpressionPointer a : {carrier, y, x, flippedProof}) {
+                wrap = makeApplication(wrap, a);
+            }
+            return wrap;
+        }
+
+        // Generic symmetric relation: `R(x, y)`  ←  `<R>.symmetric` of
+        // `R(y, x)`. Requires R applied to exactly two arguments and a
+        // registered symmetry lemma; the wrapped term is type-checked
+        // against the goal, so a wrong arg shape simply declines.
+        auto* outerApp = std::get_if<Application>(&goalWhnf->node);
+        if (!outerApp) return nullptr;
+        auto* innerApp =
+            std::get_if<Application>(&outerApp->function->node);
+        if (!innerApp) return nullptr;
+        auto* head = std::get_if<Constant>(&innerApp->function->node);
+        if (!head) return nullptr;
+        std::string symName;
+        for (const std::string& candidate :
+             {head->name + ".symmetric", head->name + "_symmetric"}) {
+            if (environment_.lookup(candidate)) {
+                symName = candidate;
+                break;
+            }
+        }
+        if (symName.empty()) return nullptr;
+        ExpressionPointer relation = closeOverLocalBinders(
+            innerApp->function, localBinders, N);
+        ExpressionPointer x = closeOverLocalBinders(
+            innerApp->argument, localBinders, N);
+        ExpressionPointer y = closeOverLocalBinders(
+            outerApp->argument, localBinders, N);
+        ExpressionPointer flipped = makeApplication(
+            makeApplication(relation, y), x);
+        ExpressionPointer flippedProof;
+        ++symmetryFlipDepth_;
+        try {
+            flippedProof = autoProveClaim(flipped, localBinders, line);
+        } catch (const ElaborateError&) { flippedProof = nullptr; }
+          catch (const TypeError&) { flippedProof = nullptr; }
+        --symmetryFlipDepth_;
+        if (!flippedProof) return nullptr;
+        // <R>.symmetric(y, x, flippedProof) : R(x, y) — verified below.
+        ExpressionPointer wrap = makeConstant(symName);
+        for (ExpressionPointer a : {y, x, flippedProof}) {
+            wrap = makeApplication(wrap, a);
+        }
+        try {
+            ExpressionPointer wrapType =
+                inferTypeInLocalContext(localBinders, wrap);
+            Context context = buildContextFromLocalBinders(localBinders);
+            if (!isDefinitionallyEqual(environment_, context,
+                    wrapType, goalWhnf)) {
+                return nullptr;
+            }
+        } catch (...) { return nullptr; }
+        return wrap;
+    }
+
     ExpressionPointer autoProveClaim(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -6982,6 +7089,19 @@ private:
             if (attempt) return attempt;
         } else {
             (void)transportBudget;
+        }
+
+        // Symmetry flip — true last resort: `x = y` (or symmetric
+        // `R(x, y)`) from a fact stated the other way. Placed last so the
+        // bridge (which already rewrites equalities) closes the common
+        // equality cases first; this is what uniquely catches a symmetric
+        // NON-equality relation `R`. Recursively runs the prover on the
+        // flipped goal, so it must come after everything cheaper.
+        {
+            ExpressionPointer attempt = runTactic("symmetryFlip",
+                [&] { return trySymmetryFlip(
+                    goalClosed, localBinders, line); });
+            if (attempt) return attempt;
         }
 
         throwElaborate(
@@ -24908,6 +25028,10 @@ private:
     // aggregate but do not emit rows.
     bool autoProveProfileEnabled_ = false;
     int autoProveDepth_ = 0;
+    // Recursion guard for the symmetry-flip tactic: proving `x = y` by
+    // proving `y = x` and wrapping in symmetry must not flip back to
+    // `x = y`. Allowed only at depth 0.
+    int symmetryFlipDepth_ = 0;
     // Set by tryContextFactMatch (only when profiling is on) to the
     // `source` string of whichever fact closed the goal. Read by
     // autoProveClaim's profiling path immediately after the tactic
