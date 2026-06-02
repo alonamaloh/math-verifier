@@ -5904,6 +5904,12 @@ private:
     // `goalClosed`, fills remaining binders from local hypotheses,
     // and returns the resulting application of `hintTerm`. All
     // inputs and outputs are in closed-over-localBinders form.
+    // Representation contract (WS8): `goalClosed` and the returned proof are
+    // CLOSED over `localBinders` (BoundVariable indices, not FreeVariables).
+    // `hintTerm`/`hintType` come in CLOSED too. Internally the unification
+    // works on OPENED forms (openOverLocalBinders), but every value crossing
+    // this boundary is closed — callers feed the result straight back into
+    // closed-term assembly.
     ExpressionPointer autoFillHintForClaim(
         ExpressionPointer hintTerm,
         ExpressionPointer hintType,
@@ -7165,6 +7171,11 @@ private:
         return wrap;
     }
 
+    // Representation contract (WS8): `goalClosed` is CLOSED over
+    // `localBinders`; the returned proof is CLOSED over them too (a proof of
+    // exactly `goalClosed`), or this throws an ElaborateError ("couldn't
+    // close this goal", already math-shaped). Each `tryX` tactic owns the
+    // closed↔opened conversions internally and hands back closed terms.
     ExpressionPointer autoProveClaim(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
