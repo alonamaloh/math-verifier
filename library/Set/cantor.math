@@ -43,3 +43,26 @@ theorem Cantor.no_surjection_onto_powerset (X : Type(0))
         function (inImage : d ∈ f(d)) =>
             notInDiagonal(rewrite(imageIsDiagonal, inImage)))
   }
+
+-- ----------------------------------------------------------------------
+-- The other half of "Set(X) is strictly bigger than X": X does embed
+-- into its power set, by sending each point to its singleton. With the
+-- theorem above (no surjection X → Set(X)), this is the order-theoretic
+-- statement that the power set is strictly larger.
+
+-- The singleton set {x}.
+definition Set.singleton (X : Type(0)) (x : X) : Set(X) :=
+  function (y : X) => y = x
+
+-- x ↦ {x} is injective: if {x} = {y} then, since x ∈ {x}, also x ∈ {y},
+-- i.e. x = y.
+theorem Set.singleton_is_injective (X : Type(0))
+        : Function.IsInjective(X, Set(X), Set.singleton(X)) :=
+  function (x y : X) (singletonsEqual : Set.singleton(X, x) = Set.singleton(X, y)) =>
+    -- Transport "x is a member" along {x} = {y}: x ∈ {x} holds (x = x), so
+    -- x ∈ {y}, which is x = y.
+    Equality.transport_proposition(
+        function (s : Set(X)) => x ∈ s,
+        Set.singleton(X, x), Set.singleton(X, y),
+        singletonsEqual,
+        reflexivity(X, x))
