@@ -113,6 +113,9 @@ VERIFY_FLAGS :=
 ifeq ($(CHECK_REDUNDANT_BY),1)
 VERIFY_FLAGS := --check-redundant-by
 endif
+ifeq ($(CHECK_REDUNDANT_BY_NON_EQ),1)
+VERIFY_FLAGS := --check-redundant-by --check-redundant-by-non-eq
+endif
 
 # Recipe for a .mathv. The pattern rule provides the .math prerequisite;
 # the .mathv prerequisites — listed by the included dependency file —

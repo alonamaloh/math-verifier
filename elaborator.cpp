@@ -7581,7 +7581,8 @@ private:
                                 << ":" << step.line << ":" << step.column
                                 << ": redundant `by` on calc step — "
                                 "auto-prover closes it without help\n";
-                        } else if (step.relation == CalcRelation::Equality) {
+                        } else {
+                          if (step.relation == CalcRelation::Equality) {
                             // Auto-prover couldn't close on its own, but
                             // maybe the user wrote `by congruenceOf(λ, L)`
                             // and `by L` alone would close via the diff-
@@ -7654,12 +7655,15 @@ private:
                                 }
                             }
                         }
+                          }  // end if (step.relation == Equality)
                         // `by L(args)` where `by L` alone (arguments
-                        // inferred from the goal) would also close the
+                        // inferred from the goal, side-conditions discharged
+                        // from in-scope hypotheses) would also close the
                         // step — suggest dropping the explicit arguments.
+                        // Relation-agnostic: order-lemma side conditions
+                        // (e.g. `weaken`) make most discharge cases `≤`/`<`.
                         // Only when the whole `by` isn't already redundant.
-                        if (!autoAttempt
-                            && step.relation == CalcRelation::Equality) {
+                        if (!autoAttempt) {
                             auto* surfApp = std::get_if<SurfaceApplication>(
                                 &step.stepProof->node);
                             auto* head = surfApp
@@ -7713,6 +7717,24 @@ private:
                                         << "` are inferable from the goal — "
                                            "`by " << head->qualifiedName
                                         << "` alone suffices\n";
+                                    // Statistics on where each discharged
+                                    // side-condition proof lives (gated, so
+                                    // ordinary builds stay quiet).
+                                    if (std::getenv("BY_DISCHARGE_STATS")) {
+                                        for (const auto& d : lastDischarges_) {
+                                            std::cerr << "discharge-stat: "
+                                                << moduleName_ << ":"
+                                                << step.line
+                                                << " lemma="
+                                                << head->qualifiedName
+                                                << " rel="
+                                                << relationSymbol(step.relation)
+                                                << " depth=" << std::get<0>(d)
+                                                << " total=" << std::get<1>(d)
+                                                << " name=" << std::get<2>(d)
+                                                << "\n";
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -19267,6 +19289,26 @@ private:
         return result;
     }
 
+    // True when `openedType` (already opened over `localBinders`) is a
+    // Proposition — i.e. its own type weak-head-reduces to `Sort 0`. Used
+    // to restrict context-discharge to proof obligations, never values.
+    bool typeIsProposition(const Context& context,
+                            const ExpressionPointer& openedType) {
+        try {
+            ExpressionPointer typeOfType =
+                inferType(environment_, context, openedType);
+            ExpressionPointer reduced =
+                weakHeadNormalForm(environment_, typeOfType);
+            auto* sortNode = std::get_if<Sort>(&reduced->node);
+            if (!sortNode) return false;
+            auto* constant =
+                std::get_if<LevelConst>(&sortNode->level->node);
+            return constant && constant->value == 0;
+        } catch (...) {
+            return false;
+        }
+    }
+
     // Like `inferLeadingArguments` but the holes can be at ANY position,
     // marked by `?` in the user's argument list. For each position:
     //   - If it's `?` (SurfaceHole): open a metavariable; resolve it
@@ -19289,6 +19331,7 @@ private:
         ExpressionPointer expectedType,
         int line) {
 
+        lastDischarges_.clear();
         // Step 1: walk the function's Pi chain. At each position, allocate
         // a fresh Internal FreeVariable. Hole positions add their name to
         // `metavariableNames` (to be resolved by unification); non-hole
@@ -19414,16 +19457,89 @@ private:
 
         // Step 5: resolve holes from the assignment. Build the final
         // arg list by substituting metavariables.
-        std::vector<std::string> unresolved;
+        std::vector<size_t> unresolved;
         for (size_t i = 0; i < surfaceArgs.size(); ++i) {
             if (isHole[i]) {
                 auto iterator = assignment.find(argFreshNames[i]);
                 if (iterator == assignment.end()) {
-                    unresolved.push_back(std::to_string(i));
+                    unresolved.push_back(i);
                 } else {
                     elaboratedArgs[i] = iterator->second;
                 }
             }
+        }
+        // Step 5b: discharge leftover PROOF holes from in-scope hypotheses.
+        // A hole the goal didn't pin is typically a side-condition proof
+        // argument of a named lemma cited as `by L` (desugared to
+        // `L(?, …, ?)`): the conclusion fixes the value holes, leaving a
+        // propositional precondition the goal never mentions. If a proof of
+        // that exact proposition is already available in the local context,
+        // use it — the same precondition discharge the rewrite-lemma index
+        // performs (`tryLemmaIndexLookup`). Gated to Prop-typed slots whose
+        // type is fully determined (no remaining unresolved hole), so an
+        // open VALUE hole — which must come from the goal — is never
+        // guessed from context.
+        if (!unresolved.empty()) {
+            std::set<std::string> stillUnresolvedNames;
+            for (size_t idx : unresolved) {
+                stillUnresolvedNames.insert(argFreshNames[idx]);
+            }
+            Context openedContext =
+                buildContextFromLocalBinders(localBinders);
+            std::vector<size_t> remaining;
+            for (size_t i : unresolved) {
+                ExpressionPointer slotType =
+                    substituteFreeVariables(piDomains[i], assignment);
+                if (containsNamedFreeVariable(slotType,
+                                              stillUnresolvedNames)) {
+                    remaining.push_back(i);
+                    continue;
+                }
+                ExpressionPointer slotOpened;
+                ExpressionPointer slotNormalised;
+                try {
+                    slotOpened = openOverLocalBinders(
+                        slotType, localBinders, localBinders.size());
+                    slotNormalised = weakHeadNormalForm(
+                        environment_, slotOpened);
+                } catch (const TypeError&) {
+                    remaining.push_back(i);
+                    continue;
+                }
+                if (!typeIsProposition(openedContext, slotNormalised)) {
+                    remaining.push_back(i);
+                    continue;
+                }
+                bool found = false;
+                for (int j = static_cast<int>(localBinders.size()) - 1;
+                     j >= 0; --j) {
+                    ExpressionPointer candidateType =
+                        openOverLocalBinders(
+                            localBinders[j].type, localBinders, j);
+                    bool eq;
+                    try {
+                        eq = isDefinitionallyEqual(
+                            environment_, openedContext,
+                            candidateType, slotNormalised);
+                    } catch (const TypeError&) {
+                        eq = false;
+                    }
+                    if (eq) {
+                        int deBruijnIndex =
+                            static_cast<int>(localBinders.size()) - 1 - j;
+                        elaboratedArgs[i] =
+                            makeBoundVariable(deBruijnIndex);
+                        lastDischarges_.push_back(
+                            {deBruijnIndex,
+                             static_cast<int>(localBinders.size()),
+                             localBinders[j].name});
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) remaining.push_back(i);
+            }
+            unresolved = std::move(remaining);
         }
         if (!unresolved.empty()) {
             std::string message =
@@ -19431,7 +19547,9 @@ private:
                 + "' at line " + std::to_string(line)
                 + ": could not infer hole(s) at position";
             if (unresolved.size() > 1) message += "s";
-            for (const auto& p : unresolved) message += " " + p;
+            for (size_t p : unresolved) {
+                message += " " + std::to_string(p);
+            }
             if (expectedType) {
                 message += "\n  expected return type: ";
                 message += prettyPrintInLocalScope(
@@ -24308,6 +24426,14 @@ private:
     bool reportRedundantBy_ = false;
     bool reportRedundantByNonEq_ = false;
     bool reportRedundantCalcSteps_ = false;
+    // Records, for the most recent `inferCallWithHoles` call, every PROOF
+    // hole that was discharged from an in-scope hypothesis rather than the
+    // goal: (depth = de Bruijn distance from innermost binder, 0 = the
+    // immediately preceding binder; total = local binder count; name = the
+    // matched binder's name). Read by the args-inferable diagnostic to emit
+    // BY_DISCHARGE_STATS lines characterising where the discharged proof
+    // lives. Cleared at the top of every `inferCallWithHoles`.
+    std::vector<std::tuple<int, int, std::string>> lastDischarges_;
     std::string currentDeclarationName_;
     // `ring` over a bundled-ring carrier `Ring.carrier(s)`: the leading
     // structure argument(s) (`[s]`) that every operation/law term carries
