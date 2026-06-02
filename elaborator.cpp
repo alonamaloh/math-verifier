@@ -4728,28 +4728,36 @@ private:
                            && let->name[0] != '_'
                            && !surfaceMentionsName(
                                *let->body, let->name)) {
-                    // `let X := V;` / `claim X : T by V;` whose name
-                    // is never typed in the body. Three ways to fix:
-                    //   1. Drop the binding entirely (the value/claim
-                    //      is dead — nothing in scope after needs it).
-                    //   2. If the auto-prover is consuming it by type-
-                    //      match, switch to the anonymous form
-                    //      (`claim T by V;`) — same effect, no name.
-                    //   3. If the claim is documentation only (for the
-                    //      reader's benefit, not the kernel's), switch
-                    //      to `note T;` — the auto-prover still has to
-                    //      close it, but the intent is clearly
-                    //      "observe that …" rather than "introduce a
-                    //      named hypothesis."
-                    std::cerr << "warning: " << moduleName_
-                        << ":" << expression.line
-                        << ":" << expression.column
-                        << ": unused name `" << let->name
-                        << "` introduced by let / claim binding —"
-                           " drop it, or switch to anonymous form"
-                           " (`claim T by V;`) if the auto-prover"
-                           " consumes it, or to `note T;` if it's"
-                           " for the reader\n";
+                    // The name is never typed in the body. Distinguish two
+                    // cases by whether the binding's BV(0) appears anywhere
+                    // in the elaborated body — if the auto-prover consumed
+                    // the fact by type-match, its proof references BV(0):
+                    //   • BV(0) absent  → the claim/let is genuinely DEAD
+                    //     (used by neither name nor auto-prover); delete it.
+                    //   • BV(0) present → only the NAME is dead; the fact is
+                    //     load-bearing via type-match, so go anonymous (or
+                    //     `note T;` if it's there for the reader).
+                    bool bindingUsed =
+                        referencesBoundVariable(letBody, 0);
+                    if (!bindingUsed) {
+                        std::cerr << "warning: " << moduleName_
+                            << ":" << expression.line
+                            << ":" << expression.column
+                            << ": unused claim/let `" << let->name
+                            << "` — its value is never used (not by name,"
+                               " not by the auto-prover); delete the"
+                               " binding\n";
+                    } else {
+                        std::cerr << "warning: " << moduleName_
+                            << ":" << expression.line
+                            << ":" << expression.column
+                            << ": unused name `" << let->name
+                            << "` — the auto-prover consumes this fact by"
+                               " type-match, so the name is dead weight:"
+                               " switch to the anonymous form"
+                               " (`claim T by V;`), or to `note T;` if it's"
+                               " for the reader\n";
+                    }
                 }
             }
             return makeLet(let->name, std::move(letType),
