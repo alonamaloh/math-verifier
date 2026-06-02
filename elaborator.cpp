@@ -582,6 +582,15 @@ private:
                                localBinders, expectedType,
                                line, column});
         }
+        // Position-only frame (no context/goal snapshot) — for top-level
+        // declarations that want their source line as the error anchor.
+        Frame(Elaborator& target, std::string description,
+              int line, int column)
+            : elaborator(target) {
+            elaborator.contextFrames_.push_back(
+                FrameSnapshot{std::move(description), {}, nullptr,
+                               line, column});
+        }
         ~Frame() { elaborator.contextFrames_.pop_back(); }
         Frame(const Frame&) = delete;
         Frame& operator=(const Frame&) = delete;
@@ -836,7 +845,22 @@ private:
             message += "\n    actual type:   ";
             message += prettyPrintForDisplay(error.actualType);
         }
-        throw ElaborateError(formatErrorWithContext(message));
+        // Anchor the error at the innermost frame that knows its source
+        // position (the calc step / argument / theorem currently being
+        // elaborated) — same walk as throwElaborate. Without this a kernel
+        // TypeError reported `:1:1` with only the theorem name, leaving
+        // the user to hunt for the offending line.
+        int line = 0;
+        int column = 0;
+        for (auto iter = contextFrames_.rbegin();
+             iter != contextFrames_.rend(); ++iter) {
+            if (iter->line != 0) {
+                line = iter->line;
+                column = iter->column;
+                break;
+            }
+        }
+        throw ElaborateError(formatErrorWithContext(message), line, column);
     }
 
     // -------- top-level statements --------
@@ -1715,7 +1739,9 @@ private:
         }
         Frame frame(*this,
             (declaration.isTheorem ? "theorem '" : "definition '")
-            + declaration.name + "'");
+            + declaration.name + "'",
+            declaration.body ? declaration.body->line : 0,
+            declaration.body ? declaration.body->column : 0);
         currentUniverseParametersOrdered_ = declaration.universeParameters;
         currentUniverseParameters_ = std::set<std::string>(
             declaration.universeParameters.begin(),
