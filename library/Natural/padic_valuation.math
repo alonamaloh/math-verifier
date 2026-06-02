@@ -360,16 +360,28 @@ theorem Natural.padic_valuation_strip
   -- Case-split on prime * quotient to expose successor structure for step_succ_when_divides.
   cases prime * quotient with refinedPqEq {
     | zero =>
+        -- prime * quotient = 0 contradicts productPositive; rewrite the
+        -- TERM here (one occurrence of `prime * quotient`) rather than the
+        -- goal, whose `0` would occur ambiguously.
         absurd(rewrite(refinedPqEq, productPositive))
-    | successor(predPQ) =>
+    | successor(predPQ) => {
+        -- Specialise the three facts about `prime * quotient` to the
+        -- refined `successor(predPQ)`, so the calc reads without any
+        -- nested rewrites.
+        claim moduloAtSuccessor : Natural.modulo(prime, successor(predPQ)) = 0
+          by substituting refinedPqEq;
+        claim successorQuotientLeProduct : successor(quotient) ≤ prime * quotient
+          by Natural.successor_less_or_equal_multiply(
+                 prime, quotient, primeAtLeastTwo, quotientPositive);
+        claim successorQuotientLeSuccessor : successor(quotient) ≤ successor(predPQ)
+          by substituting refinedPqEq;
         calc Natural.padic_valuation(prime, prime * quotient)
            = Natural.padic_valuation(prime, successor(predPQ))
            = successor(Natural.padic_valuation_step(
                  predPQ, prime,
                  Natural.divide(prime, successor(predPQ))))
                   by Natural.padic_valuation_step_succ_when_divides(
-                         predPQ, prime, successor(predPQ),
-                         rewrite(refinedPqEq, moduloZero))
+                         predPQ, prime, successor(predPQ), moduloAtSuccessor)
            = successor(Natural.padic_valuation_step(
                  predPQ, prime, quotient))
                   by (calc Natural.divide(prime, successor(predPQ))
@@ -380,16 +392,10 @@ theorem Natural.padic_valuation_strip
                   by Natural.padic_valuation_step_fuel_stable(
                          prime, quotient, predPQ, quotient,
                          primeAtLeastTwo, quotientPositive,
-                         -- quotient ≤ predPQ via succ(quotient) ≤ succ(predPQ).
                          Natural.less_or_equal_successor_successor_descend(
-                             quotient, predPQ,
-                             rewrite(
-                                 refinedPqEq,
-                                 Natural.successor_less_or_equal_multiply(
-                                     prime, quotient,
-                                     primeAtLeastTwo,
-                                     quotientPositive))),
+                             quotient, predPQ, successorQuotientLeSuccessor),
                          LessOrEqual.reflexivity(quotient))
+    }
   }
 }
 
@@ -967,11 +973,10 @@ theorem Natural.divides_monus
   claim aEqBPlusMonus : a = b + Natural.monus(a, b)
     by Natural.monus_zero_implies_decompose(
            b, a, Natural.le_implies_monus_zero(a, b, bLeA));
-  -- Transport dDividesA along aEqBPlusMonus to get d | (b + monus(a, b)).
+  claim dDividesBPlusMonus : d ∣ (b + Natural.monus(a, b))
+    by substituting aEqBPlusMonus;
   Natural.divides_subtract_from_sum(
-      d, b, Natural.monus(a, b),
-      rewrite(aEqBPlusMonus, dDividesA),
-      dDividesB)
+      d, b, Natural.monus(a, b), dDividesBPlusMonus, dDividesB)
 }
 
 -- Ultrametric for monus: when v_p(b) ≤ v_p(a) and b ≤ a (so monus is
