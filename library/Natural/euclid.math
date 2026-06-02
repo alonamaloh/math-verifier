@@ -55,6 +55,22 @@ theorem NaturalList.productOf_at_least_one
               allPrime(p,
                 NaturalList.member.there(head, tail, memberOfTail))))
 
+-- No natural number is both at least 2 and at most 1: descend `2 ≤ 1` to
+-- `1 ≤ 0`, which `not_less_or_equal_successor_zero` refutes.
+theorem Natural.not_two_less_or_equal_one : ¬(2 ≤ 1) :=
+  (twoLessOrEqualOne : 2 ≤ 1) ↦
+    Natural.not_less_or_equal_successor_zero(0,
+        Natural.less_or_equal_successor_successor_descend(1, 0, twoLessOrEqualOne))
+
+-- A divisor of 1 is at most 1 (the "1 = 0" alternative of
+-- divides_less_or_equal_or_zero is vacuous).
+theorem Natural.divisor_of_one_at_most_one (d : Natural) (dividesOne : d ∣ 1)
+        : d ≤ 1 :=
+  cases Natural.divides_less_or_equal_or_zero(d, 1, dividesOne) {
+    | Or.introduceLeft(oneEqualsZero) => absurd(oneEqualsZero)
+    | Or.introduceRight(dAtMostOne)   => dAtMostOne
+  }
+
 -- Euclid's theorem. Let n be the product of all the primes, plus one.
 -- By has_prime_divisor, n has a prime divisor q. q is our witness: it
 -- is prime, and we show it is not in `primes` by contradiction —
@@ -67,31 +83,30 @@ theorem Natural.infinitely_many_primes
                       → Natural.is_prime(p))
         : ∃ (q : Natural).
             Natural.is_prime(q) ∧ ¬NaturalList.member(q, primes) := {
+  -- Let n be one more than the product of all the listed primes.
   set n := successor(NaturalList.productOf(primes));
+  claim productAtLeastOne : 1 ≤ NaturalList.productOf(primes)
+    since NaturalList.productOf_at_least_one(primes, allPrime);
+  -- Then n ≥ 2, so it has a prime divisor q.
   claim nAtLeastTwo : 2 ≤ n
-    by Natural.successor_less_or_equal_successor(?, ?,
-           NaturalList.productOf_at_least_one(primes, allPrime));
+    by Natural.successor_less_or_equal_successor(?, ?, productAtLeastOne);
   obtain ⟨q, qIsPrime, qDividesN⟩
     from Natural.has_prime_divisor(n, nAtLeastTwo);
+  -- q is our witness: it is prime, and we show it is not in the list.
   witness q with ⟨qIsPrime, {
+    -- Suppose, for contradiction, that q is already listed.
     suppose NaturalList.member(q, primes) as qInPrimes;
-    claim qAtLeastTwo : 2 ≤ q
-      by And.left(?, ?, qIsPrime);
-    cases Natural.divides_less_or_equal_or_zero(?, ?,
-              Natural.divides_consecutive_implies_one(
-                  q, NaturalList.productOf(primes),
-                  NaturalList.member_divides_product(
-                      q, primes, qInPrimes),
-                  qDividesN)) {
-      case Or.introduceLeft(oneEqualsZero):
-          Natural.successor_not_zero(?, oneEqualsZero);
-      case Or.introduceRight(qLessOrEqualOne):
-          Natural.not_less_or_equal_successor_zero(
-              0,
-              Natural.less_or_equal_successor_successor_descend(
-                  1, 0,
-                  LessOrEqual.transitive(
-                      2, q, 1, qLessOrEqualOne, qAtLeastTwo)));
-    }
+    -- Then q divides the product of the list...
+    claim qDividesProduct : q ∣ NaturalList.productOf(primes)
+      since NaturalList.member_divides_product(q, primes, qInPrimes);
+    -- ...and q divides n = product + 1, so q divides their difference, 1.
+    claim qDividesOne : q ∣ 1
+      since Natural.divides_consecutive_implies_one(
+                q, NaturalList.productOf(primes), qDividesProduct, qDividesN);
+    -- A divisor of 1 is at most 1; but q ≥ 2 since q is prime — and no
+    -- number is both, so the assumption was impossible.
+    claim qAtMostOne : q ≤ 1 since Natural.divisor_of_one_at_most_one(q, qDividesOne);
+    claim qAtLeastTwo : 2 ≤ q since And.left(?, ?, qIsPrime);
+    Natural.not_two_less_or_equal_one(LessOrEqual.transitive(2, q, 1, qAtMostOne, qAtLeastTwo))
   }⟩
 }
