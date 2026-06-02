@@ -283,3 +283,74 @@ establish the measurement and safety net the later, riskier surgery needs.
 3. **Error audit** — the mistake corpus is entirely CIC-free.
 4. **Foundational layer** — the manifest is bounded and shrinking; all
    files above it are CIC-free in both code and diagnostics.
+
+---
+
+## Appendix A — WS1 implementation notes (concrete deferral sites)
+
+Captured while the elaborator internals were warm (the `by (<fact>)`
+session). Line numbers are approximate — grep the quoted strings.
+
+### The provenance chokepoint already exists
+`rethrowKernelError` (`elaborator.cpp:906`) is the **single** place a kernel
+`TypeError` is converted into a user-facing `ElaborateError`. It already:
+- prefixes the message with `"kernel: "`,
+- surface-renders the embedded `expectedType`/`actualType` via
+  `prettyPrintForDisplay` (so the *types* are already math-shaped),
+- anchors the source position at the innermost frame.
+
+What it does **not** do is re-author the kernel's *message text* — it passes
+`error.what()` through verbatim. So **the `"kernel: "` prefix is the
+de-facto provenance tag** WS0.3 asks for: any user-facing error containing
+`"kernel: "` is a deferral gap. Cheap first move: assert/lint that no error
+shown to a user contains `"kernel: "`, then drive that count to zero.
+
+Call sites that funnel into it (each a deferral point to audit):
+`elaborator.cpp:1408, 1850, 1884, 2349, 2816, 2822, 2825, 3595, 8626, …`
+(grep `rethrowKernelError`). Each wraps a `try { …kernel call… } catch
+(TypeError&)` — i.e. a spot where the elaborator hands the kernel a term and
+lets it check first.
+
+### Bucket B — the three CIC-shaped messages and their sources
+- **"Application: function is not of Pi type"** — `kernel.cpp:1794`, thrown
+  by `inferType` on an `Application` whose function's type isn't a `Pi`.
+  Elaborator path: `SurfaceApplication` dispatch at `elaborator.cpp:1691`
+  builds the application and defers. *Fix:* before assembling, check the
+  function's inferred type WHNFs to a `Pi`; else surface error ("you're
+  applying this as a function, but it has type `T`").
+- **"Application: argument type does not match Pi domain"** —
+  `kernel.cpp:1801`. *Fix:* check the argument's type against the (meta-
+  substituted) domain in the elaborator. Note there is **already a
+  precedent**: `elaborator.cpp:18887–18895` pre-empts exactly this message
+  in the `cases`/refining path — model the general fix on it.
+- **"addDefinition: body type does not match declared type"** —
+  `kernel.cpp:1889`. The elaborator should compare the proof's inferred type
+  to the declared theorem type itself (a surface diff) before calling
+  `addDefinition`. This is the "body doesn't match" leak from the Rational
+  opacity work.
+
+### Bucket A — malformed terms (never user-facing)
+- **"internal: bare BoundVariable reached inferType"** — `kernel.cpp:1675`.
+  An elaborator bug producing an ill-formed term (hit this session via
+  `coerceToExpectedTypeViaDiff` returning a malformed result on a symmetry
+  diff). `assertClosedOverLocalBinders` already guards
+  `inferTypeInLocalContext`'s entry (`elaborator.cpp`, search the helper);
+  thread it through the other movers and pin
+  `coerceToExpectedTypeViaDiff`'s contract (WS8).
+
+### What is already surface-good (don't touch)
+- Embedded type rendering: `prettyPrintForDisplay` /
+  `prettyPrintInLocalScope`; `Sort 0` already prints as `Proposition`
+  (`printer.cpp:114`).
+- Auto-prover failure text: `autoProveClaim`'s "no in-scope hypothesis
+  matches… no library theorem with this conclusion shape applies" and
+  `couldNotProveStepHint`. These are the bar; WS1 brings the term-elaborator
+  and definition paths up to it.
+
+### Suggested first PR (Phase 0 + start of WS1)
+1. Lint: no user-facing error contains `"kernel: "` (turns every deferral
+   gap into a failing case in the WS0.3 corpus).
+2. Close the **application** gap (`elaborator.cpp:1691`) — highest-frequency
+   source, and `18887` shows the pattern.
+3. Close the **addDefinition** gap.
+Leave WS2+ for later phases; these three make the common leaks math-shaped.
