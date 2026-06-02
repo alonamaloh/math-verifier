@@ -44,7 +44,59 @@ term go" surprises.
 
 Currently opaque: `Natural.monus`, `Natural.divide_step`,
 `Natural.modulo_step`, `Natural.padic_valuation_step`,
-`Natural.power`.
+`Natural.power`, `Real.IsNonneg`, `Rational.IsNonneg`.
+
+### A second motivation: a `Quotient.lift` abstraction boundary
+
+`Real.IsNonneg` and `Rational.IsNonneg` are opaque for a different
+reason than the recursive functions above — they are **not** recursive,
+they are `Quotient.lift(predicate_at_representative, respect, x)`
+wrappers. The order relations fold on top of them:
+`Real.LessOrEqual(x, z) := Real.IsNonneg(z - x)`.
+
+The problem opacity solves: WHNF on a goal like `x ≤ z` blew straight
+through `LessOrEqual → IsNonneg → Quotient.lift`, landing in
+`Quotient.lift(...)` form. The characterising lemmas (`IsNonneg.add`,
+`IsNonneg.multiply`, `from_natural_is_nonneg`, …) are all stated in
+`IsNonneg(…)` form, so the auto-prover's `contextFactMatch` couldn't
+line a `Quotient.lift`-shaped goal up against them, and the resistant
+order transports needed a hand-written `rewrite(eq, IsNonneg.add(…))`.
+
+Marking `IsNonneg` opaque makes WHNF stop at `IsNonneg(z - x)` — exactly
+the form the characterising lemmas use. The transports then convert to
+`claim IsNonneg(diff) by substituting eq` (see
+`calc-and-rewrite.md`); the auto-prover discharges the rewritten goal
+from the characterising lemma plus the order hypotheses in context. It
+also stops the `Quotient.lift`/`IsEventuallyNonneg` implementation from
+leaking into every order proof.
+
+Classify each failure after marking such a wrapper opaque as **construct**
+or **destruct** and wrap the smallest enclosing term in
+`unfold Real.IsNonneg in (…)`:
+
+- **construct** — the body builds the rep-level form (`(ε) ↦ witness …`
+  for Real, an `Integer.IsNonneg(n)` leaf for Rational) where an
+  `IsNonneg(…)` is expected. Symptoms: `anonymous tuple needs an
+  expected type`, `cases … needs an expected type from context`,
+  `body type does not match declared type` (actual = the rep form).
+- **destruct** — the body consumes an `IsNonneg` value as if it were the
+  rep form: `cases x refining anIsNonneg`, `obtain ⟨…⟩ from anIsNonneg`,
+  applying it as `(ε)(εpos)`, or handing it to a lemma that wants the
+  unfolded type. Symptom: `function is not of Pi type` / `argument type
+  does not match Pi domain` with actual type `IsNonneg (…)`.
+
+Pure **uses** (transitivity/antisymmetry citations, `cases B refining
+hyp` pass-throughs, the `claim by cases` linearity splits) operate on
+the `IsNonneg` arguments and lemmas, not the unfolded body — they keep
+working **unchanged**. Only construct/destruct sites need `unfold`.
+
+The `by substituting` payoff has one wrinkle: substituting only fires on
+a goal whose head it can see, so state the claim in the **`IsNonneg(diff)`
+form** (defeq to the `≤` goal but syntactically exposing `diff`) and give
+the equation as `(ring : <expanded> = <diff>)` with the subtraction
+written the same way on both sides. `claim x ≤ z by substituting …`
+reports `0 occurrences` because the `≤`/`LessOrEqual` head is never
+unfolded for the match.
 
 ### When NOT to mark opaque — the cost / benefit lesson
 
