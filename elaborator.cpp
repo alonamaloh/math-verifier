@@ -8273,26 +8273,20 @@ private:
                     }
                 }  // end if (!stepProofKernel) — under-Σ took the step otherwise
             } else if (step.relation == CalcRelation::Equality) {
-                stepProofKernel = autoProveCalcStep(
-                    localBinders, previousKernel, nextKernel,
-                    carrierType, carrierLevel, stepRelationType,
-                    step.line, step.column);
-                if (!stepProofKernel) {
-                    // autoProveCalcStep covers reflexivity / single-position
-                    // diff-congruence / AC. Fall back to the full prover for
-                    // everything else — context-fact match, the equality
-                    // bridge, and the symmetry flip (an `a = b` step closing
-                    // from a `b = a` fact). Only runs on steps the cheap path
-                    // couldn't close (which would otherwise error here), so a
-                    // step that already closes pays nothing extra.
-                    try {
-                        stepProofKernel = autoProveClaim(
-                            stepRelationType, localBinders, step.line);
-                    } catch (const ElaborateError&) {
-                        stepProofKernel = nullptr;
-                    } catch (const TypeError&) {
-                        stepProofKernel = nullptr;
-                    }
+                // Identical path to a by-less `claim a = b`: autoProveClaim
+                // runs the equality battery (reflexivity / single-position
+                // diff-congruence / AC — the former autoProveCalcStep) as
+                // its FIRST tactic and short-circuits, then, only if that
+                // fails, the full tactic set (context-fact match, equality
+                // bridge, symmetry flip). One path → a calc `=` step and an
+                // equality claim never diverge.
+                try {
+                    stepProofKernel = autoProveClaim(
+                        stepRelationType, localBinders, step.line);
+                } catch (const ElaborateError&) {
+                    stepProofKernel = nullptr;
+                } catch (const TypeError&) {
+                    stepProofKernel = nullptr;
                 }
                 if (!stepProofKernel) {
                     throwElaborate(
