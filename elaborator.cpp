@@ -7494,6 +7494,97 @@ private:
                 continue;
             }
         }
+        // Hypothesis-rewriting fallback (narrowed `by substituting <eq>`
+        // only). Goal-rewriting can't reach an endpoint hidden behind a
+        // FOLDED definition — e.g. Real `x ≤ y` := `IsNonneg(y - x)`, so
+        // the goal `x+z ≤ y+z` never shows `(y+z)-(x+z)` without unfolding.
+        // The dual of the explicit `rewrite(eq, hyp)` works: rewrite an
+        // in-scope HYPOTHESIS by the equation and keep it if the result is
+        // def-equal to the goal (def-eq unfolds the definition). Bounded to
+        // the one supplied equality × 2 directions × in-scope proofs; only
+        // runs once goal-rewriting has already failed.
+        if (claim.byHint && !candidates.empty()) {
+            int N = static_cast<int>(localBinders.size());
+            Context context = buildContextFromLocalBinders(localBinders);
+            ExpressionPointer goalOpened = openOverLocalBinders(
+                goalClosed, localBinders, N);
+            const ContextEquality& eq = candidates.front();
+            for (int dir = 0; dir < 2; ++dir) {
+                ExpressionPointer fromSide = (dir == 0) ? eq.lhs : eq.rhs;
+                ExpressionPointer toSide = (dir == 0) ? eq.rhs : eq.lhs;
+                // eqForTransport : fromSide = toSide.
+                ExpressionPointer eqForTransport;
+                if (dir == 0) {
+                    eqForTransport = eq.proofExpr;
+                } else {
+                    eqForTransport = makeConstant(
+                        "Equality.symmetry", {eq.carrierLevel});
+                    for (ExpressionPointer a :
+                         {eq.carrierType, eq.lhs, eq.rhs, eq.proofExpr}) {
+                        eqForTransport = makeApplication(eqForTransport, a);
+                    }
+                }
+                for (int b = N - 1; b >= 0; --b) {
+                    ExpressionPointer hyp = makeBoundVariable(N - 1 - b);
+                    ExpressionPointer hypTypeOpened;
+                    try {
+                        hypTypeOpened = inferTypeInLocalContext(
+                            localBinders, hyp);
+                    } catch (...) { continue; }
+                    bool isProp = false;
+                    try {
+                        isProp = typeIsProposition(context,
+                            weakHeadNormalForm(environment_, hypTypeOpened));
+                    } catch (...) { isProp = false; }
+                    if (!isProp) continue;
+                    ExpressionPointer hypType = closeOverLocalBinders(
+                        hypTypeOpened, localBinders, N);
+                    // Abstract `fromSide` in the hypothesis type — the
+                    // unreduced form first (preserves the user-visible
+                    // shape), then WHNF (peels a folded def like
+                    // `LessOrEqual` to expose `y - x`). Mirrors the
+                    // explicit `rewrite(eq, term)` search.
+                    ExpressionPointer chosen;
+                    int counter = 0;
+                    abstractStructuralOccurrence(hypType, fromSide, 0,
+                                                  counter);
+                    if (counter > 0) {
+                        chosen = hypType;
+                    } else {
+                        ExpressionPointer whnf = closeOverLocalBinders(
+                            weakHeadNormalForm(environment_, hypTypeOpened),
+                            localBinders, N);
+                        int whnfCount = 0;
+                        abstractStructuralOccurrence(whnf, fromSide, 0,
+                                                      whnfCount);
+                        if (whnfCount == 0) continue;
+                        chosen = whnf;
+                    }
+                    int abstractionCounter = 0;
+                    ExpressionPointer body = abstractStructuralOccurrence(
+                        chosen, fromSide, 0, abstractionCounter);
+                    ExpressionPointer motive = makeLambda(
+                        "_rewriteHole", eq.carrierType, body);
+                    ExpressionPointer transport = makeConstant(
+                        "Equality.transport_proposition", {eq.carrierLevel});
+                    for (ExpressionPointer a : {eq.carrierType, motive,
+                             fromSide, toSide, eqForTransport, hyp}) {
+                        transport = makeApplication(transport, a);
+                    }
+                    ExpressionPointer transportTypeOpened;
+                    try {
+                        transportTypeOpened = inferTypeInLocalContext(
+                            localBinders, transport);
+                    } catch (...) { continue; }
+                    bool matchesGoal = false;
+                    try {
+                        matchesGoal = isDefinitionallyEqual(environment_,
+                            context, transportTypeOpened, goalOpened);
+                    } catch (...) { matchesGoal = false; }
+                    if (matchesGoal) return transport;
+                }
+            }
+        }
         if (claim.byHint) {
             // For the named form there's a single equality — break down
             // the per-direction outcomes so the user can distinguish
