@@ -742,6 +742,31 @@ private:
         }
     }
 
+    // Tail for a "couldn't prove this step" error: the step goal
+    // (LHS rel RHS) followed by library-lemma candidates keyed by the
+    // goal's conclusion shape. The surrounding frame already dumps the
+    // in-scope hypotheses; this adds the concrete goal and suggestions.
+    // Guarded so pretty-printing never amplifies the primary error.
+    std::string couldNotProveStepHint(
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        const std::string& relationSymbol,
+        ExpressionPointer stepRelationType,
+        const std::vector<LocalBinder>& localBinders) const {
+        std::string goal;
+        try {
+            goal = "\n    goal: "
+                 + prettyPrintInLocalScope(previousKernel, localBinders)
+                 + " " + relationSymbol + " "
+                 + prettyPrintInLocalScope(nextKernel, localBinders);
+        } catch (...) { goal.clear(); }
+        std::string hints;
+        try {
+            hints = searchSuggestions(stepRelationType, localBinders);
+        } catch (...) { hints.clear(); }
+        return goal + hints;
+    }
+
     // Const version of openOverLocalBinders (the existing one in this
     // class is non-const because it shares the helper used during
     // mutating elaboration).
@@ -7400,7 +7425,11 @@ private:
                 "calc step " + std::to_string(k + 1)
                 + " at line " + std::to_string(step.line),
                 localBinders,
-                previousKernel,
+                // No goal snapshot here: the step's previous endpoint is
+                // not the step's goal, and printing it as `goal:` misleads.
+                // The concrete step goal is reported by the error message
+                // itself (and the enclosing calc-block frame).
+                nullptr,
                 step.line, /*column*/ 0);
             ExpressionPointer nextKernel = elaborateExpression(
                 *step.nextExpression, localBinders, carrierType);
@@ -7569,9 +7598,11 @@ private:
                     step.line, step.column);
                 if (!stepProofKernel) {
                     throwElaborate(
-                        "calc step has no `by <proof>` and the "
-                        "auto-prover couldn't close it. Add `by "
-                        "<reason>` to disambiguate.");
+                        "I can't figure out why this calc step is true — "
+                        "the auto-prover couldn't close it. Add `by "
+                        "<reason>`, or check that the step actually holds."
+                        + couldNotProveStepHint(previousKernel, nextKernel,
+                              "=", stepRelationType, localBinders));
                 }
             } else {
                 // Non-equality step (≤/</≥/>) without `by`. Dispatch
@@ -7590,10 +7621,14 @@ private:
                 }
                 if (!stepProofKernel) {
                     throwElaborate(
-                        std::string("calc ") + relationSymbol(step.relation)
-                        + " step has no `by <proof>` and the auto-"
-                          "prover couldn't close it from context. "
-                          "Add `by <reason>`.");
+                        std::string("I can't figure out why this calc ")
+                        + relationSymbol(step.relation)
+                        + " step is true — the auto-prover couldn't close it "
+                          "from context. Add `by <reason>`, or check that the "
+                          "step actually holds."
+                        + couldNotProveStepHint(previousKernel, nextKernel,
+                              relationSymbol(step.relation), stepRelationType,
+                              localBinders));
                 }
             }
             ExpressionPointer stepProofType = inferTypeInLocalContext(
