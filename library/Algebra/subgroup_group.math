@@ -1,0 +1,171 @@
+-- Algebra/subgroup_group.math
+--
+-- A subgroup is itself a group. Given `IsSubgroup(G, S)`, we bundle the
+-- subtype { x : carrier(G) | x ∈ S } into a `Group` of its own, with the
+-- operation, identity, and inverse inherited from G (the closure axioms
+-- of the subgroup supply the membership proofs the subtype constructor
+-- needs).
+--
+-- This is the construction the second isomorphism theorem needs: it lets
+-- a subgroup A of G be the *domain* of a homomorphism. Every group law on
+-- the subtype reduces — via `Subtype.equal_of_value_equal` — to the same
+-- law on the underlying values, so the proofs are one-liners citing G's
+-- laws. The inclusion map (the value projection) is an injective
+-- homomorphism back into G.
+
+module Algebra.subgroup_group
+
+import Logic.basics
+import Equality.basics
+import Set.basics
+import Set.subtype
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.group_bundle
+import Algebra.group_homomorphism
+import Algebra.subgroup
+
+-- The carrier of the subgroup-as-a-group: the subtype cut out by S.
+definition Subgroup.carrier (G : Group) (subset : Set(Group.carrier(G)))
+        : Type(0) :=
+  Subtype(Group.carrier(G), subset)
+
+-- Operation, identity, inverse — the underlying G-operations, with the
+-- membership proof supplied by the corresponding closure axiom.
+definition Subgroup.operation (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset))
+        (x y : Subgroup.carrier(G, subset)) : Subgroup.carrier(G, subset) :=
+  Subtype.make(Group.carrier(G), subset,
+      Subtype.value(x) · Subtype.value(y),
+      IsSubgroup.closed_under_operation(G, subset, subgroup,
+          Subtype.value(x), Subtype.value(y),
+          Subtype.property(x), Subtype.property(y)))
+
+definition Subgroup.identity (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset)) : Subgroup.carrier(G, subset) :=
+  Subtype.make(Group.carrier(G), subset, Group.identity(G),
+      IsSubgroup.contains_identity(G, subset, subgroup))
+
+definition Subgroup.inverse (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset))
+        (x : Subgroup.carrier(G, subset)) : Subgroup.carrier(G, subset) :=
+  Subtype.make(Group.carrier(G), subset, Subtype.value(x)⁻¹,
+      IsSubgroup.closed_under_inverse(G, subset, subgroup,
+          Subtype.value(x), Subtype.property(x)))
+
+-- ----------------------------------------------------------------------
+-- The group laws. Each reduces to the value-level law of G: the value of
+-- a subgroup product is the product of the values, so
+-- `Subtype.equal_of_value_equal` discharges the goal from G's own law.
+
+theorem Subgroup.associative (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset))
+        (x y z : Subgroup.carrier(G, subset))
+        : Subgroup.operation(G, subset, subgroup,
+              Subgroup.operation(G, subset, subgroup, x, y), z)
+          = Subgroup.operation(G, subset, subgroup, x,
+              Subgroup.operation(G, subset, subgroup, y, z)) :=
+  Subtype.equal_of_value_equal(Group.carrier(G), subset,
+      Subgroup.operation(G, subset, subgroup,
+          Subgroup.operation(G, subset, subgroup, x, y), z),
+      Subgroup.operation(G, subset, subgroup, x,
+          Subgroup.operation(G, subset, subgroup, y, z)),
+      Group.associative(G, Subtype.value(x), Subtype.value(y), Subtype.value(z)))
+
+theorem Subgroup.identity_left (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset))
+        (x : Subgroup.carrier(G, subset))
+        : Subgroup.operation(G, subset, subgroup,
+              Subgroup.identity(G, subset, subgroup), x) = x :=
+  Subtype.equal_of_value_equal(Group.carrier(G), subset,
+      Subgroup.operation(G, subset, subgroup,
+          Subgroup.identity(G, subset, subgroup), x),
+      x,
+      Group.identity_left(G, Subtype.value(x)))
+
+theorem Subgroup.identity_right (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset))
+        (x : Subgroup.carrier(G, subset))
+        : Subgroup.operation(G, subset, subgroup, x,
+              Subgroup.identity(G, subset, subgroup)) = x :=
+  Subtype.equal_of_value_equal(Group.carrier(G), subset,
+      Subgroup.operation(G, subset, subgroup, x,
+          Subgroup.identity(G, subset, subgroup)),
+      x,
+      Group.identity_right(G, Subtype.value(x)))
+
+theorem Subgroup.inverse_left (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset))
+        (x : Subgroup.carrier(G, subset))
+        : Subgroup.operation(G, subset, subgroup,
+              Subgroup.inverse(G, subset, subgroup, x), x)
+          = Subgroup.identity(G, subset, subgroup) :=
+  Subtype.equal_of_value_equal(Group.carrier(G), subset,
+      Subgroup.operation(G, subset, subgroup,
+          Subgroup.inverse(G, subset, subgroup, x), x),
+      Subgroup.identity(G, subset, subgroup),
+      Group.inverse_left(G, Subtype.value(x)))
+
+theorem Subgroup.inverse_right (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset))
+        (x : Subgroup.carrier(G, subset))
+        : Subgroup.operation(G, subset, subgroup, x,
+              Subgroup.inverse(G, subset, subgroup, x))
+          = Subgroup.identity(G, subset, subgroup) :=
+  Subtype.equal_of_value_equal(Group.carrier(G), subset,
+      Subgroup.operation(G, subset, subgroup, x,
+          Subgroup.inverse(G, subset, subgroup, x)),
+      Subgroup.identity(G, subset, subgroup),
+      Group.inverse_right(G, Subtype.value(x)))
+
+-- ----------------------------------------------------------------------
+-- The subgroup is a group, bundled.
+
+theorem Subgroup.is_group (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset))
+        : IsGroup(Subgroup.carrier(G, subset),
+                  Subgroup.operation(G, subset, subgroup),
+                  Subgroup.identity(G, subset, subgroup),
+                  Subgroup.inverse(G, subset, subgroup)) :=
+  ⟨⟨Subgroup.associative(G, subset, subgroup),
+    Subgroup.identity_left(G, subset, subgroup),
+    Subgroup.identity_right(G, subset, subgroup)⟩,
+   Subgroup.inverse_left(G, subset, subgroup),
+   Subgroup.inverse_right(G, subset, subgroup)⟩
+
+-- The bundled group structure on the subgroup S ≤ G.
+definition Subgroup.group (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset)) : Group :=
+  Group.make(Subgroup.carrier(G, subset),
+             Subgroup.operation(G, subset, subgroup),
+             Subgroup.identity(G, subset, subgroup),
+             Subgroup.inverse(G, subset, subgroup),
+             Subgroup.is_group(G, subset, subgroup))
+
+-- ----------------------------------------------------------------------
+-- The inclusion S ↪ G, an injective homomorphism.
+
+-- The inclusion map is the value projection.
+definition Subgroup.inclusion (G : Group) (subset : Set(Group.carrier(G)))
+        (subgroup : IsSubgroup(G, subset))
+        : Group.carrier(Subgroup.group(G, subset, subgroup)) → Group.carrier(G) :=
+  function (x : Subgroup.carrier(G, subset)) => Subtype.value(x)
+
+-- It is a homomorphism: the value of a product is the product of values,
+-- definitionally.
+theorem Subgroup.inclusion_is_homomorphism (G : Group)
+        (subset : Set(Group.carrier(G))) (subgroup : IsSubgroup(G, subset))
+        : IsHomomorphism(Subgroup.group(G, subset, subgroup), G,
+                         Subgroup.inclusion(G, subset, subgroup)) :=
+  function (x y : Subgroup.carrier(G, subset)) =>
+    reflexivity(Group.carrier(G), Subtype.value(x) · Subtype.value(y))
+
+-- It is injective: equal values mean equal subtype elements.
+theorem Subgroup.inclusion_is_injective (G : Group)
+        (subset : Set(Group.carrier(G))) (subgroup : IsSubgroup(G, subset))
+        : GroupHomomorphism.IsInjective(Subgroup.group(G, subset, subgroup), G,
+                                        Subgroup.inclusion(G, subset, subgroup)) :=
+  function (x y : Subgroup.carrier(G, subset))
+           (valuesEqual : Subtype.value(x) = Subtype.value(y)) =>
+    Subtype.equal_of_value_equal(Group.carrier(G), subset, x, y, valuesEqual)

@@ -1,0 +1,66 @@
+-- Set/subtype.math
+--
+-- The subtype `Subtype(A, predicate)` carved out of a type A by a
+-- Proposition-valued predicate: the elements are the `a : A` paired with
+-- a proof of `predicate(a)`. Unlike `Sigma`, whose second component must
+-- be Type-valued, the predicate here lives in `Proposition`, so this is
+-- the right home for "the elements of A satisfying P" — in particular for
+-- the carrier of a subgroup, { x | x ∈ S }.
+--
+-- Because the predicate is a Proposition and the kernel has definitional
+-- proof irrelevance, two subtype elements are equal as soon as their
+-- underlying values are equal — `Subtype.equal_of_value_equal`. That lemma
+-- is what makes the subtype a usable algebraic carrier: every equation
+-- between subtype elements reduces to the equation between their values,
+-- with the membership proofs carried along silently.
+
+module Set.subtype
+
+import Logic.basics
+import Equality.basics
+import Set.basics
+
+-- `Subtype(A, predicate)` lives in the same universe as A (the membership
+-- proof is in Proposition and adds no universe content); the value is
+-- recoverable, so unlike `Exists` this is genuine subtype data.
+inductive Subtype.{u} (A : Type(u)) (predicate : A → Proposition) : Type(u) where
+  | Subtype.make : (value : A) → predicate(value) → Subtype(A, predicate)
+
+-- The underlying value.
+definition Subtype.value.{u} {A : Type(u)} {predicate : A → Proposition}
+        : Subtype(A, predicate) → A
+  | Subtype.make(value, _) => value
+
+-- The membership proof: every subtype element satisfies the predicate at
+-- its value.
+definition Subtype.property.{u} {A : Type(u)} {predicate : A → Proposition}
+        : (element : Subtype(A, predicate)) → predicate(Subtype.value(element))
+  | Subtype.make(_, membershipProof) => membershipProof
+
+-- Dependent congruence for the constructor: equal values give equal
+-- elements once the membership proof is transported along. Proved by the
+-- equality recursor — at `reflexivity` the transported proof reduces to
+-- the original, so the goal is `make(v, p) = make(v, p)`.
+theorem Subtype.make_equal (A : Type(0)) (predicate : A → Proposition)
+        (v v' : A) (p : predicate(v)) (p' : predicate(v')) (valueEqual : v = v')
+        : Subtype.make(A, predicate, v, p) = Subtype.make(A, predicate, v', p') :=
+  Equality_recursor(
+      A, v,
+      function (rightEnd : A) (stepEquality : v = rightEnd) =>
+        Equality(Subtype(A, predicate),
+            Subtype.make(A, predicate, v, p),
+            Subtype.make(A, predicate, rightEnd,
+                Equality.transport_proposition(predicate, v, rightEnd, stepEquality, p))),
+      reflexivity(Subtype.make(A, predicate, v, p)),
+      v', valueEqual)
+
+-- The workhorse: subtype elements with equal values are equal. The
+-- membership proofs need not be mentioned — proof irrelevance closes the
+-- gap between whatever proofs the two elements carry.
+theorem Subtype.equal_of_value_equal (A : Type(0)) (predicate : A → Proposition)
+        (x y : Subtype(A, predicate))
+        (valueEqual : Subtype.value(x) = Subtype.value(y))
+        : x = y :=
+  cases x refining valueEqual { | Subtype.make(vx, px) =>
+    cases y refining valueEqual { | Subtype.make(vy, py) =>
+      Subtype.make_equal(A, predicate, vx, vy, px, py, valueEqual) } }
