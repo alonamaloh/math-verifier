@@ -9626,6 +9626,33 @@ private:
     // single-position diff. Returns the (possibly wrapped) term, or
     // the original term unchanged on either match or failure. Cheap
     // when types already match (one infer + one isDefinitionallyEqual check).
+    // WS8 contract guard for coerceToExpectedTypeViaDiff's diff
+    // strategies. Each `tryX` helper is supposed to return either nullptr
+    // ("didn't fire") or a term CLOSED over the local binders. A bug that
+    // lets a bound variable escape (historically the symmetry-flip diff)
+    // would pass silently here and die deep in the kernel as "bare
+    // BoundVariable reached inferType". This turns that into an O(1)
+    // check at the source: a non-closed result is rejected (warned about,
+    // for the developer) and treated as "didn't fire", so coerce falls
+    // back to the unwrapped term and the downstream authoritative check
+    // reports a clean, math-shaped error instead of an internal crash.
+    ExpressionPointer acceptCoercionIfClosed(
+        ExpressionPointer wrapped,
+        const std::vector<LocalBinder>& localBinders,
+        const char* strategy) const {
+        if (!wrapped) return nullptr;
+        if (wrapped->maxFreeBoundVariable
+                >= static_cast<int>(localBinders.size())) {
+            std::cerr << "warning: internal: coerceToExpectedTypeViaDiff "
+                         "strategy '" << strategy << "' produced a term that "
+                         "is not closed over its local binders (a bound "
+                         "variable escaped) — falling back to the unwrapped "
+                         "term\n";
+            return nullptr;
+        }
+        return wrapped;
+    }
+
     ExpressionPointer coerceToExpectedTypeViaDiff(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer term,
@@ -9713,7 +9740,8 @@ private:
         // Equality.congruence).
         ExpressionPointer wrapped = tryDiffWrapForEqualityGoal(
             localBinders, term, termTypeClosed, expectedTypeClosed);
-        if (wrapped) return wrapped;
+        if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
+                "diff-wrap")) return ok;
         // Diff-bridge via a local equality hypothesis: when inferred
         // and expected types differ at a single position (a, b) and
         // `a = b` or `b = a` is in scope, wrap with
@@ -9721,14 +9749,16 @@ private:
         // bare term and skip explicit `rewrite(...)`.
         wrapped = tryDiffBridgeViaContextEquality(
             localBinders, term, termTypeClosed, expectedTypeClosed);
-        if (wrapped) return wrapped;
+        if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
+                "diff-bridge-via-context-equality")) return ok;
         // Classical LEM bridge: if term : ¬¬P and expected : P, wrap
         // with Logic.double_negation_eliminate. Lets `suppose ¬P as h;
         // …; claim False` at theorem body close a goal stated as P,
         // mirroring textbook reductio ad absurdum.
         wrapped = tryDoubleNegationElimination(
             localBinders, term, termTypeClosed, expectedTypeClosed);
-        if (wrapped) return wrapped;
+        if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
+                "double-negation-elimination")) return ok;
         // Bare-proposition-as-proof. When the user writes a Proposition
         // value (e.g. `N ≤ m`) where a proof of that proposition was
         // expected, and the written value is kernel-equal to the
@@ -9739,7 +9769,8 @@ private:
         // first, so an unrelated proposition still fails loudly.
         wrapped = tryBarePropositionAsProof(
             localBinders, term, termTypeOpened, expectedTypeClosed);
-        if (wrapped) return wrapped;
+        if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
+                "bare-proposition-as-proof")) return ok;
         return term;
     }
 
