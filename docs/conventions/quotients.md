@@ -78,6 +78,34 @@ Quotient.lift(RationalRepresentative, RationalEquivalent, Rational,
                q)
 ```
 
+### `definition … by representatives … well_defined by …`
+
+The preferred way to define a **function out of a quotient**: state the
+formula on a representative and the well-definedness proof, and never name
+`Quotient.lift` / `Quotient.sound`. Reads as the textbook "define `F` by
+picking a representative; this is well-defined because the formula
+respects the relation".
+
+```math
+definition Rational.negate : Rational → Rational
+  by representatives rep ↦ Quotient.mk(Rational.negate_representatives(rep))
+  well_defined by Rational.negate_respects
+```
+
+Desugars to `(x) ↦ Quotient.lift((rep) ↦ <body>, <proof>, x)`; the
+short-form lift infers `(T, R, U)`. The `well_defined` proof discharges
+the respect obligation `(x y : T) → R(x, y) → <body>[rep:=x] =
+<body>[rep:=y]`, and a proof of the bare equivalence `R(g x, g y)` (when
+the body is `mk(g rep)`) is accepted directly — the elaborator wraps
+`Quotient.sound`. Both a named lemma (`well_defined by Rational.negate_respects`)
+and an inline `(a b) (e) ↦ …` proof work.
+
+Scope (current): **unary**, **bare-name** representative. Apply a
+representative-level function in the body (`mk(negate_representatives(rep))`),
+as the library does — do not destructure the representative in the
+pattern. Binary operations still write the nested `Quotient.lift` form by
+hand.
+
 ### Quotient.induct(motive, atRep, q) — and motive inference
 
 The motive can be omitted (or written as `_`) when it would be
