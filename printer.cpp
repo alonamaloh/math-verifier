@@ -11,6 +11,7 @@ namespace {
 // Operator precedences used when collapsing known function calls into
 // infix / prefix notation. Higher = binds tighter. Caller passes its
 // own precedence; child wraps in parens iff `child < parent`.
+constexpr int kPrecedenceLogical        = 0;  // ∨ (binds loosest)
 constexpr int kPrecedenceRelation       = 1;  // = ≤ <
 constexpr int kPrecedenceAdditive       = 2;  // + -
 constexpr int kPrecedenceMultiplicative = 3;  // * ·
@@ -20,6 +21,9 @@ constexpr int kPrecedencePostfix        = 5;  // postfix ⁻¹
 struct BinaryOperatorInfo {
     const char* symbol;
     int precedence;
+    // Right-associative operators (`∨`) print a same-operator right operand
+    // without redundant parens: `A ∨ B ∨ C`, not `A ∨ (B ∨ C)`.
+    bool rightAssociative = false;
 };
 
 // Detect the conventional `<Carrier>.<op>` shape used throughout the
@@ -49,6 +53,9 @@ classifyBinaryOperator(const std::string& name) {
         return BinaryOperatorInfo{"≤", kPrecedenceRelation};
     if (endsWith(".LessThan") || name == "LessThan")
         return BinaryOperatorInfo{"<", kPrecedenceRelation};
+    // Logical disjunction `Or(A, B)` → `A ∨ B`. Right-associative, loosest.
+    if (name == "Or")
+        return BinaryOperatorInfo{"∨", kPrecedenceLogical, /*rightAssoc=*/true};
     return std::nullopt;
 }
 
@@ -270,8 +277,10 @@ void writeAtPrecedence(std::ostringstream& output,
                     writeAtPrecedence(output, inner->argument, stack,
                                       info->precedence);
                     output << " " << info->symbol << " ";
+                    int rightPrecedence = info->rightAssociative
+                        ? info->precedence : info->precedence + 1;
                     writeAtPrecedence(output, application->argument,
-                                      stack, info->precedence + 1);
+                                      stack, rightPrecedence);
                     if (wrap) output << ")";
                     return;
                 }
