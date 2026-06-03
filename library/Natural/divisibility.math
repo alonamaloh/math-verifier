@@ -1,8 +1,8 @@
 -- Natural/divisibility.math
 --
--- The divides relation on natural numbers: `divides(divisor, dividend)`
--- holds when there is some `quotient` such that
--- `dividend = divisor * quotient`. Plus a few basic facts.
+-- The divides relation on natural numbers: `d ∣ n` holds when some
+-- quotient `q` satisfies `n = d · q`. Together with its basic
+-- reflexivity, transitivity, and arithmetic-compatibility facts.
 
 module Natural.divisibility
 
@@ -14,142 +14,97 @@ import Equality.basics
 import Logic.basics
 import Logic.exists
 
--- The divisor divides the dividend exactly when some quotient witnesses
--- their product relation.
+-- `d ∣ n` exactly when some quotient witnesses `n = d · q`.
 definition Natural.divides(divisor dividend : Natural) : Proposition :=
   ∃ (quotient : Natural). dividend = divisor * quotient
 
--- Every natural divides itself: the quotient is 1, and the proof
--- that `naturalNumber = naturalNumber * 1` comes from multiply_one
--- (reversed).
-theorem Natural.divides_reflexive(naturalNumber : Natural)
-        : naturalNumber ∣ naturalNumber :=
-  ⟨1, Equality.symmetry(Natural.multiply_one(naturalNumber))⟩
+-- Every natural divides itself, with quotient 1.
+theorem Natural.divides_reflexive(n : Natural) : n ∣ n :=
+  ⟨1, calc n = n * 1⟩
 
--- One divides every natural: the quotient is the natural itself, and
--- the proof that `naturalNumber = 1 * naturalNumber` comes from
--- one_multiply (reversed).
-theorem Natural.one_divides(naturalNumber : Natural)
-        : 1 ∣ naturalNumber :=
-  ⟨naturalNumber,
-   Equality.symmetry(Natural.one_multiply(naturalNumber))⟩
+-- One divides every natural, with quotient that natural.
+theorem Natural.one_divides(n : Natural) : 1 ∣ n :=
+  ⟨n, calc n = 1 * n⟩
 
--- Every natural divides zero: the quotient is zero, and the proof
--- that `0 = candidate * 0` comes from multiply_zero (reversed).
-theorem Natural.divides_zero(candidate : Natural)
-        : candidate ∣ 0 :=
-  ⟨0, Equality.symmetry(Natural.multiply_zero(candidate))⟩
+-- Every natural divides zero, with quotient 0.
+theorem Natural.divides_zero(n : Natural) : n ∣ 0 :=
+  ⟨0, calc (0 : Natural) = n * 0⟩
 
--- Divisibility is transitive: if a | b and b | c, then a | c. With
--- witnesses q1 (b = a*q1) and q2 (c = b*q2), the witness for a | c
--- is q1*q2, by multiply_associative.
---
--- The proof goes through a helper because we can only pattern-match
--- on 1 scrutinee at a time; we destructure the first divisibility
--- proof in `divides_transitive` and the second in the helper.
-theorem Natural.divides_transitive_helper
-        (a b c : Natural) (firstQuotient : Natural)
-        (firstEquality : b = a * firstQuotient)
-        : b ∣ c → a ∣ c
-  | Exists.introduce(secondQuotient, secondEquality) =>
-      ⟨firstQuotient * secondQuotient,
-       calc c
-          = b * secondQuotient
-          = (a * firstQuotient) * secondQuotient
-          = a * (firstQuotient * secondQuotient)⟩
-
+-- Divisibility is transitive. From `b = a · q₁` and `c = b · q₂` we get
+-- `c = a · (q₁ · q₂)`, so `q₁ · q₂` witnesses `a ∣ c`.
 theorem Natural.divides_transitive (a b c : Natural)
-        : a ∣ b
-          → b ∣ c
-          → a ∣ c
-  | Exists.introduce(firstQuotient, firstEquality), secondDivides =>
-      Natural.divides_transitive_helper(
-          a, b, c, firstQuotient, firstEquality, secondDivides)
+        (aDividesB : a ∣ b) (bDividesC : b ∣ c)
+        : a ∣ c := {
+  obtain ⟨firstQuotient, bEqualsAtimesFirst⟩ from aDividesB;
+  obtain ⟨secondQuotient, cEqualsBtimesSecond⟩ from bDividesC;
+  ⟨firstQuotient * secondQuotient,
+    calc c
+       = b * secondQuotient
+       = (a * firstQuotient) * secondQuotient
+       = a * (firstQuotient * secondQuotient)⟩
+}
 
--- If d divides n, then either n is zero (with witness quotient also
--- zero) or d ≤ n (because n = d * q ≥ d when q ≥ 1). Helper that
--- pattern-matches the witness quotient.
-theorem Natural.divides_less_or_equal_or_zero_helper (d n : Natural)
-        : (quotient : Natural)
-          → n = d * quotient
-          → n = 0 ∨ d ≤ n
-  | zero, equalityProof =>
-      Or.introduceLeft(
-          calc n
-             = d * 0
-             = 0)
-  | successor(quotientPredecessor), equalityProof =>
-      Or.introduceRight(
-          -- d ≤ d + d*quotientPredecessor by le_add_right.
-          -- d + d*quotientPredecessor = d * successor(quotientPredecessor) = n via multiply_successor and the
-          -- given equality (reversed).
-          rewrite(
-              Equality.symmetry(
-                  calc n
-                     = d * successor(quotientPredecessor)
-                     = d + d * quotientPredecessor),
-              Natural.less_or_equal_add_right(
-                  d, d * quotientPredecessor)))
-
--- And the main statement: if d divides n, either n is zero or d ≤ n.
+-- If `d ∣ n` then either `n = 0` or `d ≤ n` — because when the quotient
+-- is a successor, `n = d · (q′ + 1) = d + d · q′ ≥ d`.
 theorem Natural.divides_less_or_equal_or_zero (d n : Natural)
-        : d ∣ n
-          → n = 0 ∨ d ≤ n
-  | Exists.introduce(quotient, equalityProof) =>
-      Natural.divides_less_or_equal_or_zero_helper(
-          d, n, quotient, equalityProof)
+        (dDividesN : d ∣ n)
+        : n = 0 ∨ d ≤ n := {
+  obtain ⟨quotient, nEqualsDtimesQuotient⟩ from dDividesN;
+  cases quotient refining nEqualsDtimesQuotient {
+    | zero =>
+        Or.introduceLeft(calc n = d * 0 = 0)
+    | successor(quotientPredecessor) =>
+        Or.introduceRight(
+            calc d
+               ≤ d + d * quotientPredecessor
+                   by Natural.less_or_equal_add_right(d, d * quotientPredecessor)
+               = d * successor(quotientPredecessor)
+               = n)
+  }
+}
 
--- A number divides any multiple of itself: n ∣ (n * m). Witness is m.
+-- A number divides any multiple of itself: `n ∣ n · m`, with quotient `m`.
 theorem Natural.divides_self_multiple (n m : Natural)
         : n ∣ n * m :=
   ⟨m, reflexivity(n * m)⟩
 
--- If d divides m, then d divides any multiple k * m. Witness is k * q
--- where q comes from the input proof; the equality is a chain of
--- congruence + associativity + commutativity moves:
---   k * m = k * (d * q)           (substituting m)
---         = (k * d) * q           (assoc, reversed)
---         = (d * k) * q           (commutativity inside)
---         = d * (k * q)           (assoc, forward)
+-- Divisibility passes to multiples: if `d ∣ m` then `d ∣ k · m`. From
+-- `m = d · q`, `k · m = k · (d · q) = d · (k · q)`.
 theorem Natural.divides_multiple_left (d k m : Natural)
-        (h : d ∣ m)
+        (dDividesM : d ∣ m)
         : d ∣ k * m := {
-  obtain ⟨q, mEqualsDTimesQ⟩ from h;
-  ⟨k * q,
+  obtain ⟨quotient, mEqualsDtimesQuotient⟩ from dDividesM;
+  ⟨k * quotient,
     calc k * m
-       = k * (d * q)
-       = d * (k * q)⟩
+       = k * (d * quotient)
+       = d * (k * quotient)⟩
 }
 
--- Divisibility is preserved by addition: if d | a and d | b, then
--- d | a + b. Combining witnesses: a = d * q1 and b = d * q2 give
--- a + b = d * q1 + d * q2 = d * (q1 + q2) via left distributivity.
+-- Divisibility is preserved by addition: if `d ∣ a` and `d ∣ b` then
+-- `d ∣ a + b`. From `a = d · q₁` and `b = d · q₂`,
+-- `a + b = d · q₁ + d · q₂ = d · (q₁ + q₂)`.
 theorem Natural.divides_add (d a b : Natural)
         (dDividesA : d ∣ a) (dDividesB : d ∣ b)
         : d ∣ (a + b) := {
-  obtain ⟨q1, aEqualsDTimesQ1⟩ from dDividesA;
-  obtain ⟨q2, bEqualsDTimesQ2⟩ from dDividesB;
-  ⟨q1 + q2,
+  obtain ⟨firstQuotient, aEqualsDtimesFirst⟩ from dDividesA;
+  obtain ⟨secondQuotient, bEqualsDtimesSecond⟩ from dDividesB;
+  ⟨firstQuotient + secondQuotient,
     calc a + b
-       = d * q1 + b
-       = d * q1 + d * q2
-       = d * (q1 + q2)⟩
+       = d * firstQuotient + b
+       = d * firstQuotient + d * secondQuotient
+       = d * (firstQuotient + secondQuotient)⟩
 }
 
-
--- Helper: if successor(d * q1) = d * q2, then d divides 1. Structural
--- recursion on q1. In the q1 = successor case we case-split q2; an
--- ascription on the `cases` expression makes the motive
--- `function (q2_value) => Equality(…, d * q2_value) → divides(d, 1)`,
--- which refines the equality's type in each branch when we apply the
--- result to the original equalityProof.
+-- When two multiples of `d` are consecutive — `d · q₂ = (d · q₁) + 1` —
+-- the gap `1` must itself be a multiple of `d`, so `d ∣ 1`. Proved by
+-- structural recursion on `q₁`.
 --
---   q1 = 0                       → successor(d*0) = successor(0) = 1; witness q2.
---   q1 = successor, q2 = 0       → successor(_) ≠ 0, contradiction.
---   q1 = successor, q2 = successor → cancel `d` from both sides of
---                                    d + successor(d*q1') = d + d*q2'
---                                    via add_cancel_left and recurse.
-theorem Natural.divides_one_of_consecutive_helper
+--   q₁ = 0                         → 1 = 1 + d · 0 = d · q₂; witness q₂.
+--   q₁ = q₁′ + 1, q₂ = 0           → a successor equals 0, impossible.
+--   q₁ = q₁′ + 1, q₂ = q₂′ + 1     → cancel a `d` from each side
+--                                    (`d + (1 + d·q₁′) = d + d·q₂′`) and
+--                                    recurse on `q₁′, q₂′`.
+theorem Natural.divides_one_of_consecutive_multiples
         (d : Natural)
         : (q1 q2 : Natural)
           → successor(d * q1) = d * q2
@@ -166,7 +121,7 @@ theorem Natural.divides_one_of_consecutive_helper
                    = d * 0
                    = 0)
         | successor(q2Predecessor) =>
-            Natural.divides_one_of_consecutive_helper(
+            Natural.divides_one_of_consecutive_multiples(
                 d, q1Predecessor, q2Predecessor,
                 Natural.add_cancel_left(
                     d, successor(d * q1Predecessor),
@@ -178,20 +133,16 @@ theorem Natural.divides_one_of_consecutive_helper
                        = d + d * q2Predecessor))
       }
 
--- If d divides both a and a+1, then d divides 1. Destructure both
--- divisibility witnesses (a = d*q1, successor(a) = d*q2) into the equation
--- successor(d*q1) = d*q2 and delegate to the helper. We pattern-match
--- on the successor-side proof and destructure the a-side proof in the
--- body, because the pattern-match form only allows constructor
--- patterns in the scrutinee position.
+-- If `d` divides two consecutive numbers `a` and `a + 1`, then `d ∣ 1`.
+-- The witnesses give `a = d · q₁` and `a + 1 = d · q₂`, hence
+-- `(d · q₁) + 1 = d · q₂`; `divides_one_of_consecutive_multiples` finishes.
 theorem Natural.divides_consecutive_implies_one
-        (d a : Natural) (firstDivides : d ∣ a)
-        : d ∣ successor(a)
-          → d ∣ 1
-  | Exists.introduce(q2, secondEquality) => {
-      let ⟨q1, firstEquality⟩ := firstDivides;
-      Natural.divides_one_of_consecutive_helper(d, q1, q2,
-          calc successor(d * q1)
-             = successor(a)
-             = d * q2)
-  }
+        (d a : Natural) (dDividesA : d ∣ a) (dDividesSuccessorA : d ∣ successor(a))
+        : d ∣ 1 := {
+  obtain ⟨firstQuotient, aEqualsDtimesFirst⟩ from dDividesA;
+  obtain ⟨secondQuotient, successorAEqualsDtimesSecond⟩ from dDividesSuccessorA;
+  Natural.divides_one_of_consecutive_multiples(d, firstQuotient, secondQuotient,
+      calc successor(d * firstQuotient)
+         = successor(a)
+         = d * secondQuotient)
+}
