@@ -9783,9 +9783,13 @@ private:
             barePropositionCouldFire =
                 structurallyEqual(termOpened, expectedOpenedForCompare);
         }
+        // Disjunction-injection prefilter: a proof of one disjunct where
+        // `Or(A, B)` is expected wraps with the matching Or.introduce*.
+        bool expectedIsOr = headConstantName(expectedTypeClosed) == "Or";
         if (!expectedCouldFire
             && !contextCouldFire
-            && !barePropositionCouldFire) {
+            && !barePropositionCouldFire
+            && !expectedIsOr) {
             return term;
         }
         ExpressionPointer termTypeOpened;
@@ -9804,6 +9808,51 @@ private:
         if (isDefinitionallyEqual(environment_, openedContext,
                        termTypeOpened, expectedOpened)) {
             return term;
+        }
+        // Disjunction injection: `term` proves one disjunct of an expected
+        // `Or(A, B)`. A targeted, cheap coercion — two defeq checks against
+        // the disjuncts, then wrap the matching Or.introduce* — so a bare
+        // proof of one side (`calc d ≤ … = n`) reads as mathematics. It runs
+        // before the general diff strategies below, which would otherwise
+        // flail on (and run away over) a disjunction goal.
+        if (expectedIsOr) {
+            auto disjuncts =
+                [](const ExpressionPointer& orType) {
+                    std::vector<ExpressionPointer> args;
+                    ExpressionPointer head = orType;
+                    while (auto* app = std::get_if<Application>(&head->node)) {
+                        args.push_back(app->argument);
+                        head = app->function;
+                    }
+                    std::reverse(args.begin(), args.end());
+                    return args;
+                };
+            std::vector<ExpressionPointer> closedDisjuncts =
+                disjuncts(expectedTypeClosed);
+            std::vector<ExpressionPointer> openedDisjuncts =
+                disjuncts(expectedOpened);
+            if (closedDisjuncts.size() == 2 && openedDisjuncts.size() == 2) {
+                const char* constructorName = nullptr;
+                if (isDefinitionallyEqual(environment_, openedContext,
+                        termTypeOpened, openedDisjuncts[0])) {
+                    constructorName = "Or.introduceLeft";
+                } else if (isDefinitionallyEqual(environment_, openedContext,
+                        termTypeOpened, openedDisjuncts[1])) {
+                    constructorName = "Or.introduceRight";
+                }
+                if (constructorName) {
+                    ExpressionPointer injected = makeApplication(
+                        makeApplication(
+                            makeApplication(makeConstant(constructorName),
+                                            closedDisjuncts[0]),
+                            closedDisjuncts[1]),
+                        term);
+                    if (auto ok = acceptCoercionIfClosed(
+                            injected, localBinders, "or-injection")) {
+                        return ok;
+                    }
+                }
+            }
         }
         ExpressionPointer termTypeClosed = closeOverLocalBinders(
             termTypeOpened, localBinders, localBinders.size());

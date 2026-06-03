@@ -124,6 +124,39 @@ When `decide` doesn't apply: the goal mentions some OTHER decidable expression (
 
 Error diagnostic: if the assembled `Decidable_recursor` application doesn't typecheck, the elaborator pre-checks it and dumps each of the 5 arg slots (proposition / motive / yes case / no case / scrutinee) with its inferred type, so the error points at which slot is the culprit. Generic kernel "Application: argument type does not match Pi domain" errors anywhere in the file now also print `expected type:` and `actual type:` lines.
 
+## Introducing a disjunction — state the side, skip `Or.introduce*`
+
+To prove an `A ∨ B` goal you don't have to name `Or.introduceLeft` /
+`Or.introduceRight`. Two by-less options, in preference order:
+
+- **`claim`** — let the auto-prover prove the whole disjunction: it tries
+  `A`, then `B`, from context and wraps the matching constructor. Best when
+  the winning side is *cheap* for the prover (a hypothesis, reflexivity, a
+  short transitivity chain). It will also close sides that need a library
+  search, but that can be slow — don't lean on it for a disjunct that needs
+  a specific cited lemma plus algebra.
+- **State the side directly** — give a proof whose type *is* one disjunct
+  (a hypothesis, a `calc`, a lemma application) and the **disjunction-
+  injection coercion** wraps the right constructor. This is a targeted,
+  search-free coercion (it matches the proof's type against each disjunct up
+  to definitional equality), so it's the right tool when the side needs real
+  work the prover wouldn't find:
+  ```math
+  cases quotient refining nEqualsDtimesQuotient {
+    -- n = d·0 = 0 — the left disjunct.
+    | zero => calc n = d * 0 = 0
+    -- n = d·(q′+1) = d + d·q′ ≥ d — the right disjunct.
+    | successor(quotientPredecessor) =>
+        calc d ≤ d + d * quotientPredecessor
+                  by Natural.less_or_equal_add_right(d, d * quotientPredecessor)
+              = d * successor(quotientPredecessor)
+              = n
+  }
+  ```
+  Both arms read as the mathematics ("n is 0", "n ≥ d") with the `Or` wrapper
+  inferred. Spell out `Or.introduceLeft` / `Or.introduceRight` only when the
+  proof term is itself ambiguous about which side it proves.
+
 ## Proof style — write proofs that read like math
 
 The overriding goal is that a proof reads like what a mathematician
