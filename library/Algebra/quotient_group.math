@@ -92,15 +92,11 @@ definition QuotientGroup.identity (G : Group) (subset : Set(Group.carrier(G)))
 definition QuotientGroup.inverse
         (G : Group) (subset : Set(Group.carrier(G)))
         (normal : IsNormalSubgroup(G, subset))
-        (x : QuotientGroup(G, subset)) : QuotientGroup(G, subset) :=
-  Quotient.lift(
-      (a : Group.carrier(G)) ↦
-          QuotientGroup.make(G, subset, a⁻¹),
-      (a a' : Group.carrier(G))
+        : QuotientGroup(G, subset) → QuotientGroup(G, subset)
+  by representatives a ↦ QuotientGroup.make(G, subset, a⁻¹)
+  well_defined by (a a' : Group.carrier(G))
                (relatedA : Group.SameCoset(G, subset, a, a')) ↦
-          Quotient.sound(a⁻¹, a'⁻¹,
-              Group.SameCoset.inverse_respects(G, subset, normal, a, a', relatedA)),
-      x)
+          Group.SameCoset.inverse_respects(G, subset, normal, a, a', relatedA)
 
 -- ----------------------------------------------------------------------
 -- The group laws. Each reduces, on representatives, to G's own law: the
@@ -115,12 +111,10 @@ theorem QuotientGroup.operation_associative
               QuotientGroup.operation(G, subset, normal, x, y), z)
           = QuotientGroup.operation(G, subset, normal, x,
               QuotientGroup.operation(G, subset, normal, y, z)) :=
-  Quotient.induct_three(
-      (a b c : Group.carrier(G)) ↦
-          claim QuotientGroup.make(G, subset, a · b · c)
-              = QuotientGroup.make(G, subset, a · (b · c))
-            by substituting Group.associative(G, a, b, c),
-      x, y, z)
+  by_representatives x as a, y as b, z as c =>
+    claim QuotientGroup.make(G, subset, a · b · c)
+        = QuotientGroup.make(G, subset, a · (b · c))
+      by substituting Group.associative(G, a, b, c)
 
 theorem QuotientGroup.operation_identity_left
         (G : Group) (subset : Set(Group.carrier(G)))
@@ -128,12 +122,10 @@ theorem QuotientGroup.operation_identity_left
         (x : QuotientGroup(G, subset))
         : QuotientGroup.operation(G, subset, normal,
               QuotientGroup.identity(G, subset), x) = x :=
-  Quotient.induct(
-      (a : Group.carrier(G)) ↦
-          claim QuotientGroup.make(G, subset, Group.identity(G) · a)
-              = QuotientGroup.make(G, subset, a)
-            by substituting Group.identity_left(G, a),
-      x)
+  by_representatives x as a =>
+    claim QuotientGroup.make(G, subset, Group.identity(G) · a)
+        = QuotientGroup.make(G, subset, a)
+      by substituting Group.identity_left(G, a)
 
 theorem QuotientGroup.operation_identity_right
         (G : Group) (subset : Set(Group.carrier(G)))
@@ -141,12 +133,10 @@ theorem QuotientGroup.operation_identity_right
         (x : QuotientGroup(G, subset))
         : QuotientGroup.operation(G, subset, normal, x,
               QuotientGroup.identity(G, subset)) = x :=
-  Quotient.induct(
-      (a : Group.carrier(G)) ↦
-          claim QuotientGroup.make(G, subset, a · Group.identity(G))
-              = QuotientGroup.make(G, subset, a)
-            by substituting Group.identity_right(G, a),
-      x)
+  by_representatives x as a =>
+    claim QuotientGroup.make(G, subset, a · Group.identity(G))
+        = QuotientGroup.make(G, subset, a)
+      by substituting Group.identity_right(G, a)
 
 theorem QuotientGroup.operation_inverse_left
         (G : Group) (subset : Set(Group.carrier(G)))
@@ -155,12 +145,10 @@ theorem QuotientGroup.operation_inverse_left
         : QuotientGroup.operation(G, subset, normal,
               QuotientGroup.inverse(G, subset, normal, x), x)
           = QuotientGroup.identity(G, subset) :=
-  Quotient.induct(
-      (a : Group.carrier(G)) ↦
-          claim QuotientGroup.make(G, subset, a⁻¹ · a)
-              = QuotientGroup.identity(G, subset)
-            by substituting Group.inverse_left(G, a),
-      x)
+  by_representatives x as a =>
+    claim QuotientGroup.make(G, subset, a⁻¹ · a)
+        = QuotientGroup.identity(G, subset)
+      by substituting Group.inverse_left(G, a)
 
 theorem QuotientGroup.operation_inverse_right
         (G : Group) (subset : Set(Group.carrier(G)))
@@ -169,12 +157,10 @@ theorem QuotientGroup.operation_inverse_right
         : QuotientGroup.operation(G, subset, normal, x,
               QuotientGroup.inverse(G, subset, normal, x))
           = QuotientGroup.identity(G, subset) :=
-  Quotient.induct(
-      (a : Group.carrier(G)) ↦
-          claim QuotientGroup.make(G, subset, a · a⁻¹)
-              = QuotientGroup.identity(G, subset)
-            by substituting Group.inverse_right(G, a),
-      x)
+  by_representatives x as a =>
+    claim QuotientGroup.make(G, subset, a · a⁻¹)
+        = QuotientGroup.identity(G, subset)
+      by substituting Group.inverse_right(G, a)
 
 -- ----------------------------------------------------------------------
 -- The quotient is a group, bundled.
