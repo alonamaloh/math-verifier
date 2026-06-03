@@ -130,47 +130,8 @@ theorem Rational.multiply_respects_second
           equivalenceHypothesis)
 
 -- ----------------------------------------------------------------------
--- The lift: Rational.multiply as two nested Quotient.lifts.
-
-definition Rational.multiply_after_first
-        (rep1 : RationalRepresentative)
-        (secondRational : Rational)
-        : Rational :=
-  Quotient.lift(
-      (rep2 : RationalRepresentative) ↦
-          Quotient.mk(Rational.multiply_representatives(rep1, rep2)),
-      (rep2 rep2Prime : RationalRepresentative)
-               (rep2EquivalentRep2Prime
-                   : RationalEquivalent(rep2, rep2Prime)) ↦
-          Rational.multiply_respects_second(
-              rep1, rep2, rep2Prime,
-              rep2EquivalentRep2Prime),
-      secondRational)
-
-theorem Rational.multiply_after_first_respects
-        (rep1 rep1Prime : RationalRepresentative)
-        (rep1EquivalentRep1Prime
-            : RationalEquivalent(rep1, rep1Prime))
-        (secondRational : Rational)
-        : Rational.multiply_after_first(rep1, secondRational)
-          = Rational.multiply_after_first(rep1Prime, secondRational) :=
-  cases secondRational { | rep2 =>
-    Quotient.sound(
-        Rational.multiply_representatives(rep1, rep2),
-        Rational.multiply_representatives(rep1Prime, rep2),
-        Rational.multiply_respects_first(
-            rep1, rep1Prime, rep2,
-            rep1EquivalentRep1Prime)) }
-
-definition Rational.multiply (firstRational secondRational : Rational)
-        : Rational :=
-  Quotient.lift(
-      (rep1 : RationalRepresentative) ↦
-          Rational.multiply_after_first(rep1, secondRational),
-      (rep1 rep1Prime : RationalRepresentative)
-               (rep1EquivalentRep1Prime
-                   : RationalEquivalent(rep1, rep1Prime)) ↦
-          Rational.multiply_after_first_respects(
-              rep1, rep1Prime, rep1EquivalentRep1Prime,
-              secondRational),
-      firstRational)
+-- Multiply the fraction representatives; well-defined in each argument by
+-- the two *_respects lemmas.
+definition Rational.multiply : Rational → Rational → Rational
+  by representatives a, c ↦ Quotient.mk(Rational.multiply_representatives(a, c))
+  well_defined by Rational.multiply_respects_first, Rational.multiply_respects_second

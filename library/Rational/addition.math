@@ -167,49 +167,9 @@ theorem Rational.add_respects_second
           equivalenceHypothesis)
 
 -- ----------------------------------------------------------------------
--- The lift itself: Rational.add as two nested Quotient.lifts, exactly
--- the pattern from Integer.add. The inner lift varies the second
--- Rational; the outer varies the first.
-
-definition Rational.add_after_first
-        (rep1 : RationalRepresentative)
-        (secondRational : Rational)
-        : Rational :=
-  Quotient.lift(
-      (rep2 : RationalRepresentative) ↦
-          Quotient.mk(Rational.add_representatives(rep1, rep2)),
-      (rep2 rep2Prime : RationalRepresentative)
-               (rep2EquivalentRep2Prime
-                   : RationalEquivalent(rep2, rep2Prime)) ↦
-          Rational.add_respects_second(
-              rep1, rep2, rep2Prime,
-              rep2EquivalentRep2Prime),
-      secondRational)
-
-theorem Rational.add_after_first_respects
-        (rep1 rep1Prime : RationalRepresentative)
-        (rep1EquivalentRep1Prime
-            : RationalEquivalent(rep1, rep1Prime))
-        (secondRational : Rational)
-        : Rational.add_after_first(rep1, secondRational)
-          = Rational.add_after_first(rep1Prime, secondRational) :=
-  cases secondRational { | rep2 =>
-    Quotient.sound(
-        Rational.add_representatives(rep1, rep2),
-        Rational.add_representatives(rep1Prime, rep2),
-        Rational.add_respects_first(
-            rep1, rep1Prime, rep2,
-            rep1EquivalentRep1Prime)) }
-
-definition Rational.add (firstRational secondRational : Rational)
-        : Rational :=
-  Quotient.lift(
-      (rep1 : RationalRepresentative) ↦
-          Rational.add_after_first(rep1, secondRational),
-      (rep1 rep1Prime : RationalRepresentative)
-               (rep1EquivalentRep1Prime
-                   : RationalEquivalent(rep1, rep1Prime)) ↦
-          Rational.add_after_first_respects(
-              rep1, rep1Prime, rep1EquivalentRep1Prime,
-              secondRational),
-      firstRational)
+-- Add the fraction representatives; well-defined in each argument by the
+-- two *_respects lemmas. The binary define-by-representatives synthesises
+-- the nested lift over both arguments.
+definition Rational.add : Rational → Rational → Rational
+  by representatives a, c ↦ Quotient.mk(Rational.add_representatives(a, c))
+  well_defined by Rational.add_respects_first, Rational.add_respects_second

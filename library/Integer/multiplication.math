@@ -119,48 +119,11 @@ theorem Integer.multiply_respects_second
           a, b, c, d, cPrime, dPrime, eq)
 
 -- ----------------------------------------------------------------------
--- Integer.multiply: same two-nested-lift structure as Integer.add.
-
-definition Integer.multiply_after_first (rep1 : IntegerRepresentative)
-        (secondInteger : Integer)
-        : Integer :=
-  Quotient.lift(
-      (rep2 : IntegerRepresentative) ↦
-          Quotient.mk(Integer.multiply_representatives(rep1, rep2)),
-      (rep2 rep2Prime : IntegerRepresentative)
-               (rep2EquivalentRep2Prime
-                   : IntegerEquivalent(rep2, rep2Prime)) ↦
-          Integer.multiply_respects_second(
-              rep1, rep2, rep2Prime,
-              rep2EquivalentRep2Prime),
-      secondInteger)
-
-theorem Integer.multiply_after_first_respects
-        (rep1 rep1Prime : IntegerRepresentative)
-        (rep1EquivalentRep1Prime : IntegerEquivalent(rep1, rep1Prime))
-        (secondInteger : Integer)
-        : Integer.multiply_after_first(rep1, secondInteger)
-          = Integer.multiply_after_first(rep1Prime, secondInteger) :=
-  cases secondInteger { | rep2 =>
-    Quotient.sound(
-        Integer.multiply_representatives(rep1, rep2),
-        Integer.multiply_representatives(rep1Prime, rep2),
-        Integer.multiply_respects_first(
-            rep1, rep1Prime, rep2,
-            rep1EquivalentRep1Prime)) }
-
-definition Integer.multiply (firstInteger secondInteger : Integer)
-        : Integer :=
-  Quotient.lift(
-      (rep1 : IntegerRepresentative) ↦
-          Integer.multiply_after_first(rep1, secondInteger),
-      (rep1 rep1Prime : IntegerRepresentative)
-               (rep1EquivalentRep1Prime
-                   : IntegerEquivalent(rep1, rep1Prime)) ↦
-          Integer.multiply_after_first_respects(
-              rep1, rep1Prime, rep1EquivalentRep1Prime,
-              secondInteger),
-      firstInteger)
+-- Integer.multiply: multiply the difference-pair representatives;
+-- well-defined in each argument by the two *_respects lemmas.
+definition Integer.multiply : Integer → Integer → Integer
+  by representatives a, c ↦ Quotient.mk(Integer.multiply_representatives(a, c))
+  well_defined by Integer.multiply_respects_first, Integer.multiply_respects_second
 
 -- Operator overload: `*` on Integers routes here.
 operator (*) on (Integer, Integer) := Integer.multiply
