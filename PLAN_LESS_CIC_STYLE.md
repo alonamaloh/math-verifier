@@ -256,16 +256,20 @@ currently fall back to explicit lemmas disappear:
 >   PAdic/absolute_value). Pattern: structure a claim to match the lemma's
 >   *un-flipped* conclusion (so bare `by <lemma>` infers args) and let the
 >   body/case coercion do the final flip; ring-identity calc steps go bare.
-> - **Blocking bug found:** removing the explicit symmetry at a calc step
->   whose flip sits *under a congruence* (e.g. `epsilon - halve = (halve +
->   halve) + -halve`) makes the calc-step diff path
->   (`tryDiffApplyUserProof` + its post-loop congruence wrapping) emit a
->   term with an escaped *free* variable → a `kernel: unbound internal
->   variable` leak. Pre-existing (the symmetric branch was never exercised
->   before); the WS8 closedness guard (`maxFreeBoundVariable`) does not
->   catch it because the escape is a FreeVariable, not a BoundVariable.
->   Those sites keep their explicit symmetry for now. Fixing the wrapping
->   would unblock the bulk of the remaining sweep AND close the leak.
+> - **Blocking bug FIXED (the leak).** Removing the explicit symmetry at a
+>   calc step whose flip sits *under a congruence* (e.g. `epsilon - halve =
+>   (halve + halve) + -halve`, where subtract WHNF-unfolds during the diff
+>   descent) made `tryDiffApplyUserProof`'s symmetric-match + congruence
+>   wrapping emit a term with an escaped *Internal FreeVariable* →
+>   `kernel: unbound internal variable`. `tryDiffApplyUserProof` now rejects
+>   a free-variable-containing result (`containsFreeVariable`; the
+>   `maxFreeBoundVariable`/`inferType` guards missed it — opening over the
+>   local binders re-supplies a same-named free var), and the calc-step
+>   rewrite/diff fallbacks wrap their inference. Such a step now gives the
+>   clean WS1 "different relation than the step claims" error. Regression:
+>   corpus `calc_congruence_flip_unsupported`. The flip itself stays
+>   *unsupported* for these sites (they keep explicit symmetry) — only the
+>   leak is fixed; correct congruence-flip building is a deeper follow-up.
 > - *Remaining:* **bounded combining** — a single cited fact bridging a
 >   multi-position goal with the other facts pulled from context.
 
