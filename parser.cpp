@@ -761,14 +761,32 @@ private:
         consumeAny();                   // 'representatives'
         int line = byToken.line;
         int column = byToken.column;
-        std::vector<SurfacePatternPointer> representativePatterns;
-        representativePatterns.push_back(parsePattern());
+        // Each representative must be a bare name: a destructuring pattern
+        // would wrap the body in `cases rep { | <pat> => … }` inside the
+        // lift's function argument, where `f(x) = recursor(…x)` is stuck on
+        // an abstract x and the respect coercion can't fire. Apply a
+        // representative-level function in the body instead.
+        std::vector<std::string> representativeNames;
+        auto parseBareRepresentative = [&]() {
+            SurfacePatternPointer pattern = parsePattern();
+            if (auto* bare = std::get_if<SurfacePatternBareName>(
+                    &pattern->node)) {
+                representativeNames.push_back(bare->name);
+            } else {
+                throwHere("`definition ... by representatives` requires a bare "
+                          "representative name; apply a representative-level "
+                          "function in the body (e.g. "
+                          "`mk(negate_representatives(rep))`) rather than "
+                          "destructuring the representative directly");
+            }
+        };
+        parseBareRepresentative();
         while (peek().kind == TokenKind::Comma) {
             consumeAny();
-            representativePatterns.push_back(parsePattern());
+            parseBareRepresentative();
         }
         expect(TokenKind::MapsTo,
-               "after the representative pattern(s) in `by representatives`");
+               "after the representative name(s) in `by representatives`");
         SurfaceExpressionPointer body = parseExpression();
         if (!(isIdentifierLike(peek().kind)
               && peek().lexeme == "well_defined")) {
@@ -777,39 +795,52 @@ private:
         }
         consumeAny();   // 'well_defined'
         expect(TokenKind::KeywordBy, "after `well_defined`");
-        SurfaceExpressionPointer wellDefinedProof = parseExpression();
-        if (representativePatterns.size() != 1) {
-            throwHere("`definition ... by representatives` currently supports "
-                      "a single representative (unary functions); for binary "
-                      "operations write the nested `Quotient.lift` form by "
-                      "hand for now");
+        std::vector<SurfaceExpressionPointer> wellDefinedProofs;
+        wellDefinedProofs.push_back(parseExpression());
+        while (peek().kind == TokenKind::Comma) {
+            consumeAny();
+            wellDefinedProofs.push_back(parseExpression());
         }
-        // Build the per-representative function `(rep) ↦ <body>`. Only a
-        // bare-name representative is supported for now: a destructuring
-        // pattern would wrap the body in `cases rep { | <pat> => … }`
-        // inside the lift's function argument, which currently trips a
-        // motive-scoping bug in that nested position. Bind a bare name and
-        // destructure in the body instead.
-        std::string representativeName;
-        SurfaceExpressionPointer functionBody;
-        if (auto* bare = std::get_if<SurfacePatternBareName>(
-                &representativePatterns[0]->node)) {
-            representativeName = bare->name;
-            functionBody = std::move(body);
-        } else {
-            throwHere("`definition ... by representatives` currently requires "
-                      "a bare representative name; apply a representative-level "
-                      "function to it in the body (as the library does, e.g. "
-                      "`mk(negate_representatives(rep))`) rather than "
-                      "destructuring the representative directly");
+        if (representativeNames.size() == 1 && wellDefinedProofs.size() == 1) {
+            return buildDefineByRepresentativesUnary(
+                representativeNames[0], std::move(body),
+                std::move(wellDefinedProofs[0]), line, column);
         }
-        SurfaceBinder representativeBinder;
-        representativeBinder.names = {representativeName};
-        SurfaceExpressionPointer perRepresentativeFunction = makeSurfaceLambda(
-            std::move(representativeBinder), std::move(functionBody),
-            line, column);
-        // `Quotient.lift(perRepresentativeFunction, wellDefinedProof, arg)`.
+        if (representativeNames.size() == 2 && wellDefinedProofs.size() == 2) {
+            return buildDefineByRepresentativesBinary(
+                representativeNames[0], representativeNames[1], std::move(body),
+                std::move(wellDefinedProofs[0]), std::move(wellDefinedProofs[1]),
+                line, column);
+        }
+        throwHere("`definition ... by representatives` supports one "
+                  "representative + one `well_defined` proof (unary) or two "
+                  "representatives + two proofs (the first- and "
+                  "second-argument respect proofs, in that order); got "
+                  + std::to_string(representativeNames.size())
+                  + " representatives and "
+                  + std::to_string(wellDefinedProofs.size()) + " proofs");
+    }
+
+    // `(name) ↦ body` with a single untyped binder.
+    SurfaceExpressionPointer singleBinderLambda(
+        const std::string& name, SurfaceExpressionPointer body,
+        int line, int column) {
+        SurfaceBinder binder;
+        binder.names = {name};
+        return makeSurfaceLambda(std::move(binder), std::move(body),
+                                  line, column);
+    }
+
+    // Unary: `(arg) ↦ Quotient.lift((rep) ↦ <body>, <proof>, arg)`.
+    SurfaceExpressionPointer buildDefineByRepresentativesUnary(
+        const std::string& representativeName,
+        SurfaceExpressionPointer body,
+        SurfaceExpressionPointer wellDefinedProof,
+        int line, int column) {
         const std::string argumentName = "_argumentOfDefinition";
+        SurfaceExpressionPointer perRepresentativeFunction =
+            singleBinderLambda(representativeName, std::move(body),
+                                line, column);
         std::vector<SurfaceExpressionPointer> liftArguments;
         liftArguments.push_back(std::move(perRepresentativeFunction));
         liftArguments.push_back(std::move(wellDefinedProof));
@@ -818,12 +849,96 @@ private:
         SurfaceExpressionPointer liftCall = makeSurfaceApplication(
             makeSurfaceIdentifier("Quotient.lift", {}, line, column),
             std::move(liftArguments), line, column);
-        // Wrap in the outer argument binder `(arg) ↦ <lift>`; its type is
-        // read from the declaration's `Quotient(T, R) → U` type.
-        SurfaceBinder argumentBinder;
-        argumentBinder.names = {argumentName};
-        return makeSurfaceLambda(std::move(argumentBinder), std::move(liftCall),
-                                  line, column);
+        return singleBinderLambda(argumentName, std::move(liftCall),
+                                   line, column);
+    }
+
+    // Binary: nested lifts. With representatives `a`, `c`, body `<body>`,
+    // and the first/second respect proofs, build
+    //
+    //   (argA argB) ↦
+    //     Quotient.lift(
+    //       (a) ↦ Quotient.lift((c) ↦ <body>, proofSecond(a), argB),
+    //       (a a' eA) ↦ cases argB { | c => proofFirst(a, a', c, eA) },
+    //       argA)
+    //
+    // The inner lift varies the second representative with the first held
+    // fixed; its respect is `proofSecond(a)` (a partial application that
+    // desugarQuotientLift eta-expands + coerces). The outer lift varies the
+    // first; its respect destructures the captured second argument so the
+    // inner lift collapses on `mk` and the class-equality coercion fires on
+    // `proofFirst(a, a', c, eA)`. proofFirst : (repA repA' repB) → R(repA,
+    // repA') → R(body(repA,repB), body(repA',repB)); proofSecond : (repA
+    // repB repB') → R(repB, repB') → R(body(repA,repB), body(repA,repB')).
+    SurfaceExpressionPointer buildDefineByRepresentativesBinary(
+        const std::string& firstRepresentativeName,
+        const std::string& secondRepresentativeName,
+        SurfaceExpressionPointer body,
+        SurfaceExpressionPointer proofFirst,
+        SurfaceExpressionPointer proofSecond,
+        int line, int column) {
+        const std::string argumentFirst = "_argumentOfDefinitionFirst";
+        const std::string argumentSecond = "_argumentOfDefinitionSecond";
+        auto identifier = [&](const std::string& name) {
+            return makeSurfaceIdentifier(name, {}, line, column);
+        };
+        // Inner lift over the second representative; respect = proofSecond
+        // partially applied to the (in-scope) first representative.
+        std::vector<SurfaceExpressionPointer> proofSecondApplied;
+        proofSecondApplied.push_back(identifier(firstRepresentativeName));
+        SurfaceExpressionPointer innerRespect = makeSurfaceApplication(
+            std::move(proofSecond), std::move(proofSecondApplied),
+            line, column);
+        std::vector<SurfaceExpressionPointer> innerLiftArguments;
+        innerLiftArguments.push_back(singleBinderLambda(
+            secondRepresentativeName, std::move(body), line, column));
+        innerLiftArguments.push_back(std::move(innerRespect));
+        innerLiftArguments.push_back(identifier(argumentSecond));
+        SurfaceExpressionPointer innerLift = makeSurfaceApplication(
+            identifier("Quotient.lift"), std::move(innerLiftArguments),
+            line, column);
+        // Outer respect: (a a' eA) ↦ cases argB { | c => proofFirst(a,a',c,eA) }.
+        const std::string firstRep = "_firstRepresentative";
+        const std::string firstRepPrime = "_firstRepresentativePrime";
+        const std::string firstEquiv = "_firstEquivalence";
+        const std::string casesRep = "_secondRepresentativeInRespect";
+        std::vector<SurfaceExpressionPointer> proofFirstApplied;
+        proofFirstApplied.push_back(identifier(firstRep));
+        proofFirstApplied.push_back(identifier(firstRepPrime));
+        proofFirstApplied.push_back(identifier(casesRep));
+        proofFirstApplied.push_back(identifier(firstEquiv));
+        SurfaceExpressionPointer casesBody = makeSurfaceApplication(
+            std::move(proofFirst), std::move(proofFirstApplied), line, column);
+        std::vector<SurfaceCasesClause> casesClauses;
+        casesClauses.push_back(SurfaceCasesClause{
+            makeSurfacePatternBareName(casesRep, line, column),
+            std::move(casesBody), line, column});
+        SurfaceExpressionPointer casesExpression = makeSurfaceCases(
+            identifier(argumentSecond), std::move(casesClauses), line, column);
+        // Nested single-name binders for the outer respect — the equivalence
+        // domain `R(a, a')` depends on the earlier binders, which the
+        // multi-name untyped-binder path mis-shifts.
+        SurfaceExpressionPointer outerRespect = singleBinderLambda(
+            firstRep,
+            singleBinderLambda(
+                firstRepPrime,
+                singleBinderLambda(firstEquiv, std::move(casesExpression),
+                                    line, column),
+                line, column),
+            line, column);
+        std::vector<SurfaceExpressionPointer> outerLiftArguments;
+        outerLiftArguments.push_back(singleBinderLambda(
+            firstRepresentativeName, std::move(innerLift), line, column));
+        outerLiftArguments.push_back(std::move(outerRespect));
+        outerLiftArguments.push_back(identifier(argumentFirst));
+        SurfaceExpressionPointer outerLift = makeSurfaceApplication(
+            identifier("Quotient.lift"), std::move(outerLiftArguments),
+            line, column);
+        return singleBinderLambda(
+            argumentFirst,
+            singleBinderLambda(argumentSecond, std::move(outerLift),
+                                line, column),
+            line, column);
     }
 
     // Parses a `{ stmt; stmt; ...; final_expr }` block. Statement

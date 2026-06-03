@@ -98,56 +98,13 @@ theorem Integer.add_respects_second
 -- Quotient.mk inputs to a plain mk(add_representatives(...)), which
 -- is what the respect proofs need to compare.
 
--- Helper: builds the "add this representative to any integer" function.
--- Inner lift over the SECOND argument with the first held fixed.
-definition Integer.add_after_first (rep1 : IntegerRepresentative)
-        (secondInteger : Integer)
-        : Integer :=
-  Quotient.lift(
-      (rep2 : IntegerRepresentative) ↦
-          Quotient.mk(Integer.add_representatives(rep1, rep2)),
-      (rep2 rep2Prime : IntegerRepresentative)
-               (rep2EquivalentRep2Prime
-                   : IntegerEquivalent(rep2, rep2Prime)) ↦
-          Integer.add_respects_second(
-              rep1, rep2, rep2Prime,
-              rep2EquivalentRep2Prime),
-      secondInteger)
-
--- Respect for `add_after_first` when the first representative varies.
--- Uses Quotient.induct on the second-Integer argument: every q
--- factors as Quotient.mk(rep2), where Quotient.lift's kernel reduction
--- collapses `add_after_first(rep, mk(rep2))` to
--- `mk(add_representatives(rep, rep2))`. Sound + add_respects_first
--- closes it.
-theorem Integer.add_after_first_respects
-        (rep1 rep1Prime : IntegerRepresentative)
-        (rep1EquivalentRep1Prime : IntegerEquivalent(rep1, rep1Prime))
-        (secondInteger : Integer)
-        : Integer.add_after_first(rep1, secondInteger)
-          = Integer.add_after_first(rep1Prime, secondInteger) :=
-  cases secondInteger { | rep2 =>
-    Quotient.sound(
-        Integer.add_representatives(rep1, rep2),
-        Integer.add_representatives(rep1Prime, rep2),
-        Integer.add_respects_first(
-            rep1, rep1Prime, rep2,
-            rep1EquivalentRep1Prime)) }
-
--- The main definition: lift over the first Integer argument. The
--- respect proof feeds `add_after_first_respects` with the captured
--- secondInteger.
-definition Integer.add (firstInteger secondInteger : Integer) : Integer :=
-  Quotient.lift(
-      (rep1 : IntegerRepresentative) ↦
-          Integer.add_after_first(rep1, secondInteger),
-      (rep1 rep1Prime : IntegerRepresentative)
-               (rep1EquivalentRep1Prime
-                   : IntegerEquivalent(rep1, rep1Prime)) ↦
-          Integer.add_after_first_respects(
-              rep1, rep1Prime, rep1EquivalentRep1Prime,
-              secondInteger),
-      firstInteger)
+-- Add the difference-pair representatives componentwise; well-defined in
+-- each argument because addition respects the equivalence (the two
+-- *_respects lemmas above). The binary define-by-representatives
+-- synthesises the nested lift over both arguments.
+definition Integer.add : Integer → Integer → Integer
+  by representatives a, c ↦ Quotient.mk(Integer.add_representatives(a, c))
+  well_defined by Integer.add_respects_first, Integer.add_respects_second
 
 -- ----------------------------------------------------------------------
 -- Canonical constants.

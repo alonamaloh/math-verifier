@@ -18485,6 +18485,20 @@ private:
         ExpressionPointer bodyKernel =
             elaborateExpression(*bodySurface, innerBinders,
                                  bodyExpectedType);
+        // Run the diff/class-equality coercions on the body, exactly as the
+        // structural-`cases` and lambda-body paths do. Without this a
+        // quotient-`cases` arm whose body proves the bare equivalence
+        // `R(g x, g y)` could not close a `motive(mk rep)` goal that
+        // reduces to `mk(g x) = mk(g y)` (e.g. the outer respect of a
+        // binary define-by-representatives, whose goal is a literal
+        // `Quotient.lift(…, mk rep)` equality).
+        // WHNF the expected type first: it is the motive *applied* to
+        // `mk(rep)` (an unreduced redex), and coerceToExpectedTypeViaDiff's
+        // cheap prefilter checks for an `Equality` head without reducing —
+        // so the beta-redex would hide the goal and the coercion would bail.
+        bodyKernel = coerceToExpectedTypeViaDiff(
+            innerBinders, bodyKernel,
+            weakHeadNormalForm(environment_, bodyExpectedType));
 
         // Wrap the body in the representative-case lambda.
         ExpressionPointer representativeCaseLambda = makeLambda(

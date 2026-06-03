@@ -61,3 +61,28 @@ definition Wrap.identity {n : Natural}
         : Quotient(Wrap(n), WrapEquiv(n)) → Quotient(Wrap(n), WrapEquiv(n))
   by representatives rep ↦ (Quotient.mk(rep) : Quotient(Wrap(n), WrapEquiv(n)))
   well_defined by (a b : Wrap(n)) (related : WrapEquiv(n, a, b)) ↦ related
+
+-- (5) Binary define-by-representatives: nested lift over both arguments,
+-- with the first- and second-argument respect proofs. (SeqEquiv is
+-- trivially total here, so the respects are immediate.)
+theorem Seq.always_equiv (a b : Seq) : SeqEquiv(a, b) :=
+  (e : Natural) ↦
+    Exists.introduce(Natural, (k : Natural) ↦ k = k, 0,
+        reflexivity(Natural, 0))
+
+definition Seq.first_of (a b : Seq) : Seq := a
+
+theorem Seq.first_respects_first (a a' b : Seq) (related : SeqEquiv(a, a'))
+        : SeqEquiv(Seq.first_of(a, b), Seq.first_of(a', b)) :=
+  Seq.always_equiv(Seq.first_of(a, b), Seq.first_of(a', b))
+
+theorem Seq.first_respects_second (a b b' : Seq) (related : SeqEquiv(b, b'))
+        : SeqEquiv(Seq.first_of(a, b), Seq.first_of(a, b')) :=
+  Seq.always_equiv(Seq.first_of(a, b), Seq.first_of(a, b'))
+
+definition Seq.binary_first
+        : Quotient(Seq, SeqEquiv) → Quotient(Seq, SeqEquiv)
+          → Quotient(Seq, SeqEquiv)
+  by representatives a, b ↦
+       (Quotient.mk(Seq.first_of(a, b)) : Quotient(Seq, SeqEquiv))
+  well_defined by Seq.first_respects_first, Seq.first_respects_second

@@ -13,28 +13,35 @@ import Natural.basics
 import Integer.basics
 import Integer.addition
 
+-- A two-parameter function with explicit, named parameters for the
+-- named-argument checks. (Integer.add is now defined by-representatives,
+-- whose synthesised binder names aren't user-facing, so these use this
+-- wrapper instead — the resolver mechanics are what's under test.)
+definition Test.namedAdd (firstInteger secondInteger : Integer) : Integer :=
+  Integer.add(firstInteger, secondInteger)
+
 -- (1) All-positional baseline.
 theorem all_positional (a b : Integer)
-        : Integer.add(a, b) = Integer.add(a, b) :=
+        : Test.namedAdd(a, b) = Integer.add(a, b) :=
   reflexivity(Integer, Integer.add(a, b))
 
--- (2) All-named: parameter names looked up from `Integer.add`'s Pi
--- chain. The signature is `Integer.add : (firstInteger secondInteger
+-- (2) All-named: parameter names looked up from `Test.namedAdd`'s Pi
+-- chain. The signature is `Test.namedAdd : (firstInteger secondInteger
 -- : Integer) → Integer`; both names are available.
 theorem all_named (a b : Integer)
-        : Integer.add(firstInteger := a, secondInteger := b) = Integer.add(a, b) :=
+        : Test.namedAdd(firstInteger := a, secondInteger := b) = Integer.add(a, b) :=
   reflexivity(Integer, Integer.add(a, b))
 
 -- (3) Named args, reordered: same call but with the second-arg name
 -- supplied first.
 theorem named_reordered (a b : Integer)
-        : Integer.add(secondInteger := b, firstInteger := a) = Integer.add(a, b) :=
+        : Test.namedAdd(secondInteger := b, firstInteger := a) = Integer.add(a, b) :=
   reflexivity(Integer, Integer.add(a, b))
 
 -- (4) Mixed: a positional arg first, then a named arg for the
 -- remaining parameter.
 theorem mixed_positional_and_named (a b : Integer)
-        : Integer.add(a, secondInteger := b) = Integer.add(a, b) :=
+        : Test.namedAdd(a, secondInteger := b) = Integer.add(a, b) :=
   reflexivity(Integer, Integer.add(a, b))
 
 -- (5) Named arguments on a desugared call: `Quotient.sound`'s
