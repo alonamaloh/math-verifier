@@ -7921,8 +7921,50 @@ private:
                 ? "_disjunct_hypothesis" : arm.binderName;
             std::vector<LocalBinder> extendedBinders = localBinders;
             extendedBinders.push_back({binderName, domain});
+            // Frame anchors any error in this arm at the arm's own position,
+            // not at the enclosing eliminator (the misleading "case for
+            // 'Exists.introduce'" / wrong-line report otherwise).
+            Frame armFrame(*this,
+                "`by cases` arm at line " + std::to_string(arm.line),
+                extendedBinders, goalLifted, arm.line, arm.column);
             ExpressionPointer body = elaborateExpression(
                 *arm.body, extendedBinders, goalLifted);
+            // Coerce the arm body to the goal, exactly as a lambda body or a
+            // `cases` arm is coerced. This lets an arm state a proof of one
+            // DISJUNCT (`calc n = … = 0`) and have the disjunction-injection
+            // coercion wrap the matching `Or.introduce*` — consistent with
+            // `cases` arms, instead of demanding an explicit `Or.introduceLeft`.
+            body = coerceToExpectedTypeViaDiff(
+                extendedBinders, body, goalLifted);
+            // If the (coerced) body still doesn't prove the goal, report it
+            // here, at the arm, with a math-shaped message — rather than
+            // letting the mismatch surface later as a kernel Pi-domain error
+            // pinned to the surrounding `obtain`/eliminator.
+            try {
+                ExpressionPointer bodyTypeOpened =
+                    inferTypeInLocalContext(extendedBinders, body);
+                ExpressionPointer goalOpened = openOverLocalBinders(
+                    goalLifted, extendedBinders, extendedBinders.size());
+                if (!isDefinitionallyEqual(
+                        environment_,
+                        buildContextFromLocalBinders(extendedBinders),
+                        bodyTypeOpened, goalOpened)) {
+                    ExpressionPointer bodyTypeClosed = closeOverLocalBinders(
+                        bodyTypeOpened, extendedBinders, extendedBinders.size());
+                    throwElaborate(
+                        "this `by cases` arm must prove the goal\n      "
+                        + prettyPrintInLocalScope(goalLifted, extendedBinders)
+                        + "\n  but its body proves\n      "
+                        + prettyPrintInLocalScope(bodyTypeClosed, extendedBinders)
+                        + "\n  — if that is meant to be one side of the "
+                        "disjunction, make sure it matches a disjunct exactly "
+                        "(it is then wrapped automatically); otherwise this "
+                        "case does not close the goal");
+                }
+            } catch (const TypeError&) {
+                // Body isn't well-typed on its own — let the normal flow
+                // surface that error.
+            }
             warnIfBinderUnused(
                 arm.binderName, body, arm.line, arm.column,
                 "`case ... as`");

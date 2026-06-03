@@ -50,17 +50,17 @@ theorem Natural.divides_less_or_equal_or_zero (d n : Natural)
         (dDividesN : d ∣ n)
         : n = 0 ∨ d ≤ n := {
   obtain ⟨quotient, nEqualsDtimesQuotient⟩ from dDividesN;
-  cases quotient refining nEqualsDtimesQuotient {
-    -- Quotient 0: n = d·0 = 0 — the left disjunct.
-    | zero =>
-        calc n = d * 0 = 0
-    -- Quotient q′+1: n = d·(q′+1) = d + d·q′ ≥ d — the right disjunct.
-    | successor(quotientPredecessor) =>
-        calc d
-           ≤ d + d * quotientPredecessor
-               by Natural.less_or_equal_add_right(d, d * quotientPredecessor)
-           = d * successor(quotientPredecessor)
-           = n
+  claim by cases {
+    in (quotient = 0) as quotientIsZero:
+        calc n = d * quotient = d * 0 = 0
+    in (∃ (predecessor : Natural). quotient = successor(predecessor)) as quotientIsSuccessor: {
+        obtain ⟨predecessor, quotientEqualsSuccessor⟩ from quotientIsSuccessor;
+        calc d ≤ d + d * predecessor
+                  by Natural.less_or_equal_add_right(d, d * predecessor)
+              = d * successor(predecessor)
+              = d * quotient
+              = n
+    }
   }
 }
 
