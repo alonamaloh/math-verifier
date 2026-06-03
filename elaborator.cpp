@@ -9780,9 +9780,14 @@ private:
         }
         ExpressionPointer termTypeClosed = closeOverLocalBinders(
             termTypeOpened, localBinders, localBinders.size());
-        // Try the diff-wrap first (equality coercion via
-        // Equality.congruence).
-        ExpressionPointer wrapped = tryDiffWrapForEqualityGoal(
+        // Equality-of-classes (WS3): a proof of `R(x, y)` where
+        // `mk(x) = mk(y)` is expected wraps with Quotient.sound.
+        ExpressionPointer wrapped = tryQuotientSoundForClassEquality(
+            localBinders, term, termTypeClosed, expectedTypeClosed);
+        if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
+                "quotient-sound")) return ok;
+        // Try the diff-wrap (equality coercion via Equality.congruence).
+        wrapped = tryDiffWrapForEqualityGoal(
             localBinders, term, termTypeClosed, expectedTypeClosed);
         if (auto ok = acceptCoercionIfClosed(wrapped, localBinders,
                 "diff-wrap")) return ok;
@@ -10235,6 +10240,86 @@ private:
             }
         }
         return nullptr;
+    }
+
+    // Equality-of-classes coercion (WS3). When a proof of the underlying
+    // equivalence `R(x, y)` is supplied where an equality of quotient
+    // classes `Quotient.mk(T, R, x) = Quotient.mk(T, R, y)` is expected,
+    // wrap it in `Quotient.sound(T, R, x, y, proof)` — so proofs say "these
+    // representatives are equivalent" and never name the quotient axiom.
+    // The expected endpoints may be `construction` forms (e.g.
+    // `Rational.fraction(...)`) that δ-reduce to `Quotient.mk`; WHNF exposes
+    // the head. Returns nullptr unless the expected type really is an
+    // equality of two `Quotient.mk` applications over the same (T, R) and
+    // the term's type is definitionally `R(x, y)`.
+    ExpressionPointer tryQuotientSoundForClassEquality(
+            const std::vector<LocalBinder>& localBinders,
+            ExpressionPointer term,
+            ExpressionPointer termTypeClosed,
+            ExpressionPointer expectedTypeClosed) {
+        if (!environment_.lookup("Quotient.sound")) return nullptr;
+        Context openedContext = buildContextFromLocalBinders(localBinders);
+        ExpressionPointer expectedOpened = openOverLocalBinders(
+            expectedTypeClosed, localBinders, localBinders.size());
+        EqualityComponents comps;
+        try {
+            comps = extractEqualityComponents(
+                weakHeadNormalForm(environment_, expectedOpened),
+                "quotient-sound coercion", 0);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+        // Peel `Quotient.mk.{u}(T, R, rep)` (three Application layers).
+        auto peelMk = [&](ExpressionPointer endpoint,
+                          ExpressionPointer& carrier, ExpressionPointer& relation,
+                          ExpressionPointer& rep, LevelPointer& level) -> bool {
+            ExpressionPointer e = weakHeadNormalForm(environment_, endpoint);
+            auto* a3 = std::get_if<Application>(&e->node);
+            if (!a3) return false;
+            rep = a3->argument;
+            auto* a2 = std::get_if<Application>(&a3->function->node);
+            if (!a2) return false;
+            relation = a2->argument;
+            auto* a1 = std::get_if<Application>(&a2->function->node);
+            if (!a1) return false;
+            carrier = a1->argument;
+            auto* head = std::get_if<Constant>(&a1->function->node);
+            if (!head || head->name != "Quotient.mk") return false;
+            level = head->universeArguments.empty()
+                ? nullptr : head->universeArguments[0];
+            return true;
+        };
+        ExpressionPointer carrierLeft, relationLeft, x;
+        ExpressionPointer carrierRight, relationRight, y;
+        LevelPointer levelLeft = nullptr, levelRight = nullptr;
+        if (!peelMk(comps.leftEndpoint, carrierLeft, relationLeft, x, levelLeft))
+            return nullptr;
+        if (!peelMk(comps.rightEndpoint, carrierRight, relationRight, y,
+                    levelRight))
+            return nullptr;
+        if (!levelLeft) return nullptr;
+        // The term must prove the equivalence `R(x, y)`.
+        ExpressionPointer relationApplied = makeApplication(
+            makeApplication(relationLeft, x), y);
+        ExpressionPointer termTypeOpened = openOverLocalBinders(
+            termTypeClosed, localBinders, localBinders.size());
+        if (!isDefinitionallyEqual(environment_, openedContext,
+                                   termTypeOpened, relationApplied)) {
+            return nullptr;
+        }
+        // Build Quotient.sound.{u}(T, R, x, y, term); close the opened
+        // endpoint pieces (term is already closed over the local binders).
+        auto closeBack = [&](ExpressionPointer e) {
+            return closeOverLocalBinders(e, localBinders, localBinders.size());
+        };
+        ExpressionPointer sound = makeConstant(
+            "Quotient.sound", {levelLeft});
+        sound = makeApplication(std::move(sound), closeBack(carrierLeft));
+        sound = makeApplication(std::move(sound), closeBack(relationLeft));
+        sound = makeApplication(std::move(sound), closeBack(x));
+        sound = makeApplication(std::move(sound), closeBack(y));
+        sound = makeApplication(std::move(sound), term);
+        return sound;
     }
 
     ExpressionPointer tryDiffWrapForEqualityGoal(
