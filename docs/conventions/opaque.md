@@ -21,31 +21,35 @@ through **characterising lemmas** — published equations that
 describe `Foo`'s behaviour — rather than relying on automatic
 unfolding.
 
-**The kernel bridges *construct* sites automatically.** Opacity blocks
-δ-unfolding during general `weakHeadNormalForm`, so goal/term *shape* is
-preserved — but the kernel's definitional-equality check has an
-opacity-tolerant fallback (`unfoldOpaqueHeadOnce` in `kernel.cpp`): when a
-comparison would otherwise fail and one side is headed by an opaque constant,
-it retries with that head made transparent, a single local unfold. So a proof
-whose type is `Foo`'s *unfolded* form, checked against an expected `Foo(…)`
-type, type-checks **without any `unfold`** — the kernel sees through the
-opaque wrapper at the final equality step only. This is what makes the bulk
-of the old construct-site `unfold`s unnecessary.
+**`opaque` is now transparent at every demand point — `unfold` is no longer
+needed in ordinary proofs (WS2).** Opacity blocks δ-unfolding during general
+`weakHeadNormalForm`, so goal/term *shape* is preserved for `rewrite` and the
+auto-prover's syntactic matchers — but wherever the kernel or elaborator
+*genuinely demands* the unfolded head, it transparently unfolds an opaque
+constant on the spot. Five coordinated retries make this work, so a proof
+that produces or consumes `Foo`'s *unfolded* form against an expected `Foo(…)`
+type type-checks with **no `unfold`**:
+- **kernel defeq** (`unfoldOpaqueHeadOnce`, end of `isDefinitionallyEqualImpl`)
+  — a failed leaf comparison retries with the opaque head made transparent.
+  Covers leaf *construct* sites (a rep-level term checked against `Foo(…)`) and
+  reflexivity-bodied characterising lemmas.
+- **kernel inferType (Application)** — applying a value whose type is an opaque
+  definition that unfolds to a Pi (`aFoo(arg)` where `Foo` unfolds to `… → …`).
+- **elaborator anonymous tuple** — `⟨witness, proof⟩` against an opaque
+  expected type whose unfolding is an `Exists`/single-constructor inductive
+  (the constructor's parameters, e.g. the `Exists` predicate, are read from
+  the forced-unfolded head).
+- **elaborator `↦`-lambda** — a `(ε)(εpos) ↦ …` body against an opaque expected
+  type whose unfolding is a `∀`-Pi reads its binder domains through the head.
+- **elaborator `claim by substituting`** — a third, force-unfolding search form
+  (`deepWhnfForcingOpaque`) exposes a substitution target buried inside an
+  opaque recursive body (e.g. `divide_step`'s inner `cases monus(p, n)`), with
+  the equation's own endpoint heads protected from unfolding.
 
-**`unfold Foo in <body>`** remains the escape hatch for the cases the defeq
-bridge can't reach — sites where the *elaborator* (not just the kernel's
-equality check) must see `Foo`'s body:
-- **destruct** — consuming a `Foo`-typed value as its unfolded form
-  (`cases x refining aFoo`, `obtain ⟨…⟩ from aFoo`, applying it as
-  `aFoo(arg)`): the elaborator needs the unfolded *Pi/inductive* head, which
-  general WHNF won't expose.
-- **`claim by substituting` on an opaque recursive step** — the rewrite needs
-  the unfolded body visible to find its target (e.g. `divide_step`'s inner
-  `cases monus(p, n)`).
-- structured intro under an opaque expected type (a `witness …`/block proof
-  driven by `Foo`'s unfolded `∀/∃` shape).
-
-It temporarily flips `Foo` to transparent while elaborating `<body>`.
+**`unfold Foo in <body>`** remains as an explicit feature/escape hatch (it
+temporarily flips `Foo` transparent while elaborating `<body>`), but is no
+longer required at use sites — user-space `unfold` is **0**. Reach for it only
+when you deliberately want a whole block elaborated against the unfolded view.
 
 ### When to mark a definition opaque
 
@@ -90,30 +94,24 @@ from the characterising lemma plus the order hypotheses in context. It
 also stops the `Quotient.lift`/`IsEventuallyNonneg` implementation from
 leaking into every order proof.
 
-Classify each failure after marking such a wrapper opaque as **construct**
-or **destruct**:
+Both **construct** and **destruct** sites now work with **no `unfold`** — the
+demand-point retries above cover them. For reference, the two shapes:
 
 - **construct** — the body builds the rep-level form (`(ε) ↦ witness …`
-  for Real, an `Integer.IsNonneg(n)` leaf for Rational) where an
-  `IsNonneg(…)` is expected. **No `unfold` needed** when the body is a
-  bottom-up-inferable term (a lemma application, `reflexivity`, a `rewrite`,
-  a `cases` ascribed to the `IsNonneg(…)` form): the kernel's defeq bridge
-  matches the rep-level actual type against the opaque expected type
-  directly. Only a *structured* construct — a `witness …`/block proof that
-  needs `IsNonneg`'s unfolded `∀/∃` shape to drive the intros — still wraps
-  in `unfold Real.IsNonneg in (…)`.
+  for Real, an `Integer.IsNonneg(n)` leaf for Rational, an `⟨witness, proof⟩`
+  tuple) where an `IsNonneg(…)` is expected. Leaf terms bridge via the kernel
+  defeq retry; structured intros (`(ε)(εpos) ↦ …`, `⟨…⟩`, `witness …`) read
+  the unfolded `∀/∃` shape via the lambda / anonymous-tuple retries.
 - **destruct** — the body consumes an `IsNonneg` value as if it were the
-  rep form: `cases x refining anIsNonneg`, `obtain ⟨…⟩ from anIsNonneg`,
-  applying it as `(ε)(εpos)`, or handing it to a lemma that wants the
-  unfolded type. Symptom: `function is not of Pi type` / `argument type
-  does not match Pi domain` with actual type `IsNonneg (…)`. These **keep**
-  `unfold Real.IsNonneg in (…)` — the elaborator needs the unfolded Pi/
-  inductive head, which the kernel's equality-only bridge does not provide.
+  rep form: `obtain ⟨…⟩ from anIsNonneg`, applying it as `(ε)(εpos)`, or
+  handing it to a lemma that wants the unfolded type. The kernel inferType
+  retry exposes the Pi/inductive head on application.
 
 Pure **uses** (transitivity/antisymmetry citations, `cases B refining
 hyp` pass-throughs, the `claim by cases` linearity splits) operate on
-the `IsNonneg` arguments and lemmas, not the unfolded body — they keep
-working **unchanged**. Only construct/destruct sites need `unfold`.
+the `IsNonneg` arguments and lemmas, not the unfolded body — they always
+worked unchanged. With the demand-point retries, construct and destruct
+sites now do too: **no site needs `unfold`.**
 
 The `by substituting` payoff has one wrinkle: substituting only fires on
 a goal whose head it can see, so state the claim in the **`IsNonneg(diff)`
@@ -151,13 +149,13 @@ synthetic motive because two `b`s collided," revert.
 
 1. Mark `Foo` `opaque definition`.
 2. Write the **characterising lemmas** — one per defining
-   equation. A `reflexivity`-bodied equation needs **no `unfold`**: the
-   kernel's defeq bridge unfolds `Foo` once to match the two sides (the
-   declared `Foo(constructor args)` reduces, the body's `reflexivity` target
-   is its value). Only an equation that itself case-splits on a hypothesis
-   (`claim by substituting …`, `Equality.transport_proposition(…)`) keeps
-   `unfold Foo in …`, since the rewrite must see `Foo`'s unfolded body.
-   Example for `Natural.monus` (all three are now `unfold`-free):
+   equation, all `unfold`-free. A `reflexivity`-bodied equation bridges via
+   the kernel defeq retry (the declared `Foo(constructor args)` reduces, the
+   body's `reflexivity` target is its value). An equation that case-splits on
+   a hypothesis (`claim by substituting …`) bridges via the force-unfolding
+   substitution search form, which exposes `Foo`'s inner `cases` while keeping
+   the substituted endpoint's head intact.
+   Example for `Natural.monus` (all three are `unfold`-free):
    ```math
    theorem Natural.monus_zero_left (b : Natural)
            : Natural.monus(0, b) = 0 :=
