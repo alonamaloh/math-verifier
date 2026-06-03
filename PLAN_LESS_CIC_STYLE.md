@@ -249,13 +249,20 @@ currently fall back to explicit lemmas disappear:
 >   `symmetry_flip_test`.
 > - **Multi-position congruence (all facts in context)** already works via
 >   the auto-prover.
-> - **Migration sweep IN PROGRESS.** Equality.symmetry occurrences in user
->   space 184 → 172; by-step sites 57 → 50; 9 files cleaned (cancellation,
->   distance, first_isomorphism, ring_divisibility, Real/order,
->   order_arithmetic, reciprocal_function, PAdic/negation,
->   PAdic/absolute_value). Pattern: structure a claim to match the lemma's
->   *un-flipped* conclusion (so bare `by <lemma>` infers args) and let the
->   body/case coercion do the final flip; ring-identity calc steps go bare.
+> - **Migration sweep ESSENTIALLY DONE.** Equality.symmetry in user space
+>   **184 → 119**; by-step sites **57 → 13**; total leak 681 → 616
+>   (LEAK_BUDGET ratcheted to 616). ~20 files cleaned, including the big
+>   three fully (group_lemmas 11, ring_lemmas 7, multiply_laws 11) and
+>   group_action/irreducible (5 each). Pattern: structure a claim to match
+>   the lemma's *un-flipped* conclusion (so bare `by <lemma>` infers args)
+>   and let the body/case coercion do the final flip; ring-identity calc
+>   steps go bare; remove → build → revert the congruence-nested ones.
+>   The remaining ~13 by-step sites are **congruence-nested flips the diff
+>   path cannot build** (they now give a clean WS1 error if removed, so they
+>   keep explicit symmetry) + existential `⟨⟩` tuple components (don't
+>   flip). Clearing the last 13 needs the deeper fix: make
+>   `tryDiffApplyUserProof` correctly *build* a symmetric flip nested under a
+>   congruence (today it only avoids leaking on those).
 > - **Blocking bug FIXED (the leak).** Removing the explicit symmetry at a
 >   calc step whose flip sits *under a congruence* (e.g. `epsilon - halve =
 >   (halve + halve) + -halve`, where subtract WHNF-unfolds during the diff
