@@ -8637,14 +8637,22 @@ private:
                     }
                 }
                 if (rewriteAttempt) {
-                    ExpressionPointer rewriteType =
-                        inferTypeInLocalContext(localBinders,
-                            rewriteAttempt);
-                    if (isDefinitionallyEqual(environment_, stepContext,
-                                                rewriteType,
-                                                stepRelationTypeOpened)) {
-                        stepProofKernel = rewriteAttempt;
-                        stepProofType = rewriteType;
+                    // Speculative: a malformed rewrite candidate must be
+                    // skipped, not type-checked into a "kernel: unbound
+                    // internal variable" leak (WS5/WS8). On failure the step
+                    // falls through to its surface mismatch error.
+                    try {
+                        ExpressionPointer rewriteType =
+                            inferTypeInLocalContext(localBinders,
+                                rewriteAttempt);
+                        if (isDefinitionallyEqual(environment_, stepContext,
+                                                    rewriteType,
+                                                    stepRelationTypeOpened)) {
+                            stepProofKernel = rewriteAttempt;
+                            stepProofType = rewriteType;
+                        }
+                    } catch (const TypeError&) {
+                    } catch (const ElaborateError&) {
                     }
                 }
             }
@@ -8726,14 +8734,20 @@ private:
                     diffAttempt = nullptr;
                 }
                 if (diffAttempt) {
-                    ExpressionPointer diffAttemptType =
-                        inferTypeInLocalContext(localBinders,
-                            diffAttempt);
-                    if (isDefinitionallyEqual(environment_, stepContext,
-                                                diffAttemptType,
-                                                stepRelationTypeOpened)) {
-                        stepProofKernel = diffAttempt;
-                        stepProofType = diffAttemptType;
+                    // Same guard as the rewrite fallback: a malformed diff
+                    // candidate is skipped, never leaked (WS5/WS8).
+                    try {
+                        ExpressionPointer diffAttemptType =
+                            inferTypeInLocalContext(localBinders,
+                                diffAttempt);
+                        if (isDefinitionallyEqual(environment_, stepContext,
+                                                    diffAttemptType,
+                                                    stepRelationTypeOpened)) {
+                            stepProofKernel = diffAttempt;
+                            stepProofType = diffAttemptType;
+                        }
+                    } catch (const TypeError&) {
+                    } catch (const ElaborateError&) {
                     }
                 }
             }
@@ -10625,6 +10639,18 @@ private:
         } catch (const ElaborateError&) {
             return nullptr;
         }
+        // Output contract (WS5/WS8): the symmetric-match + nested-congruence
+        // wrapping above can, on some flips, build a term with an escaped
+        // Internal FreeVariable (e.g. an opened-but-not-reclosed endpoint).
+        // A calc-step proof is supposed to be CLOSED over the local binders
+        // (those appear as de Bruijn indices), so any free variable is a
+        // bug; left unchecked it surfaces downstream as a "kernel: unbound
+        // internal variable" leak. (inferTypeInLocalContext does NOT catch
+        // it — opening over the local binders re-supplies a same-named free
+        // variable, so the ill-formed term type-checks here yet fails later
+        // in a different context.) Reject it so the caller falls through to
+        // its surface "type mismatch" path.
+        if (containsFreeVariable(currentProof)) return nullptr;
         return currentProof;
     }
 
