@@ -24271,9 +24271,19 @@ private:
         }
         ExpressionPointer fExpected = nullptr;
         if (expectedType) {
-            // Build `T → U` (with U = expectedType) as f's expected
-            // type — provided expectedType is a closed expression.
-            fExpected = makePi("_", decompForT.carrierType, expectedType);
+            // Build `T → U` (with U = expectedType) as f's expected type.
+            // `decompForT.carrierType` came out of inferType in OPENED form
+            // (local-binder references are free variables); close it so the
+            // Pi domain matches the closed `expectedType` representation —
+            // otherwise a dependent carrier like `CommutativeRing.carrier(c)`
+            // / `Wrap(n)` would leak its free `c`/`n` into the function the
+            // `Quotient.mk` short form reads its (T, R) from. The codomain
+            // gains the new Pi binder, so lift its bound variables by one.
+            fExpected = makePi(
+                "_",
+                closeOverLocalBinders(
+                    decompForT.carrierType, localBinders, localBinders.size()),
+                liftBoundVariables(expectedType, 1, 0));
         }
         ExpressionPointer fKernel = elaborateExpression(
             *fSurface, localBinders, fExpected);

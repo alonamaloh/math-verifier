@@ -47,3 +47,17 @@ definition Seq.identity_named_obligation
         : Quotient(Seq, SeqEquiv) → Quotient(Seq, SeqEquiv)
   by representatives s ↦ (Quotient.mk(s) : Quotient(Seq, SeqEquiv))
   well_defined by seq_trivially_respects
+
+-- (4) Dependent carrier: `Wrap(n)` depends on the local implicit `{n}`.
+-- Exercises closing the opened carrier + shifting the codomain past the
+-- synthesised Pi binder so the free `n` doesn't leak into the lift.
+inductive Wrap (n : Natural) : Type(0) where
+  | Wrap.make : Natural → Wrap(n)
+
+definition WrapEquiv (n : Natural) (a b : Wrap(n)) : Proposition :=
+  (e : Natural) → ∃ (k : Natural). k = k
+
+definition Wrap.identity {n : Natural}
+        : Quotient(Wrap(n), WrapEquiv(n)) → Quotient(Wrap(n), WrapEquiv(n))
+  by representatives rep ↦ (Quotient.mk(rep) : Quotient(Wrap(n), WrapEquiv(n)))
+  well_defined by (a b : Wrap(n)) (related : WrapEquiv(n, a, b)) ↦ related
