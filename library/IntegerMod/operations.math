@@ -87,36 +87,19 @@ construction IntegerMod.make (modulus : Natural) (a : Integer)
 -- the outer lift varies the first operand, discharged by
 -- `add_representative_respects`.
 
-definition IntegerMod.add_representative (modulus : Natural)
-        (a : Integer) (y : IntegerMod(modulus)) : IntegerMod(modulus) :=
-  Quotient.lift(
-      (b : Integer) ↦ IntegerMod.make(modulus, a + b),
-      (b b' : Integer)
-               (congruentB : Integer.CongruentModulo(modulus, b, b')) ↦
-          Integer.CongruentModulo.add_respects(modulus, a, a, b, b',
-              Integer.CongruentModulo.reflexive(modulus, a), congruentB),
-      y)
-
-theorem IntegerMod.add_representative_respects (modulus : Natural)
-        (a a' : Integer)
-        (congruentA : Integer.CongruentModulo(modulus, a, a'))
-        (y : IntegerMod(modulus))
-        : IntegerMod.add_representative(modulus, a, y)
-          = IntegerMod.add_representative(modulus, a', y) :=
-  cases y { | b =>
-    Quotient.sound(
-        a + b, a' + b,
-        Integer.CongruentModulo.add_respects(modulus, a, a', b, b,
-            congruentA, Integer.CongruentModulo.reflexive(modulus, b))) }
-
+-- Add the Integer representatives modulo `modulus`; well-defined in each
+-- argument because addition respects congruence (with reflexivity on the
+-- held-fixed side).
 definition IntegerMod.add {modulus : Natural}
-        (x y : IntegerMod(modulus)) : IntegerMod(modulus) :=
-  Quotient.lift(
-      (a : Integer) ↦ IntegerMod.add_representative(modulus, a, y),
-      (a a' : Integer)
-               (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
-          IntegerMod.add_representative_respects(modulus, a, a', congruentA, y),
-      x)
+        : IntegerMod(modulus) → IntegerMod(modulus) → IntegerMod(modulus)
+  by representatives a, b ↦ IntegerMod.make(modulus, a + b)
+  well_defined by
+    (a a' b : Integer) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
+        Integer.CongruentModulo.add_respects(modulus, a, a', b, b,
+            congruentA, Integer.CongruentModulo.reflexive(modulus, b)),
+    (a b b' : Integer) (congruentB : Integer.CongruentModulo(modulus, b, b')) ↦
+        Integer.CongruentModulo.add_respects(modulus, a, a, b, b',
+            Integer.CongruentModulo.reflexive(modulus, a), congruentB)
 
 -- ----------------------------------------------------------------------
 -- Negation. A single lift. `modulus` is implicit: it is recovered from
@@ -135,36 +118,16 @@ definition IntegerMod.negate {modulus : Natural}
 -- ----------------------------------------------------------------------
 -- Multiplication. Same two-lift shape as addition.
 
-definition IntegerMod.multiply_representative (modulus : Natural)
-        (a : Integer) (y : IntegerMod(modulus)) : IntegerMod(modulus) :=
-  Quotient.lift(
-      (b : Integer) ↦ IntegerMod.make(modulus, a * b),
-      (b b' : Integer)
-               (congruentB : Integer.CongruentModulo(modulus, b, b')) ↦
-          Integer.CongruentModulo.multiply_respects(modulus, a, a, b, b',
-              Integer.CongruentModulo.reflexive(modulus, a), congruentB),
-      y)
-
-theorem IntegerMod.multiply_representative_respects (modulus : Natural)
-        (a a' : Integer)
-        (congruentA : Integer.CongruentModulo(modulus, a, a'))
-        (y : IntegerMod(modulus))
-        : IntegerMod.multiply_representative(modulus, a, y)
-          = IntegerMod.multiply_representative(modulus, a', y) :=
-  cases y { | b =>
-    Quotient.sound(
-        a * b, a' * b,
-        Integer.CongruentModulo.multiply_respects(modulus, a, a', b, b,
-            congruentA, Integer.CongruentModulo.reflexive(modulus, b))) }
-
 definition IntegerMod.multiply {modulus : Natural}
-        (x y : IntegerMod(modulus)) : IntegerMod(modulus) :=
-  Quotient.lift(
-      (a : Integer) ↦ IntegerMod.multiply_representative(modulus, a, y),
-      (a a' : Integer)
-               (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
-          IntegerMod.multiply_representative_respects(modulus, a, a', congruentA, y),
-      x)
+        : IntegerMod(modulus) → IntegerMod(modulus) → IntegerMod(modulus)
+  by representatives a, b ↦ IntegerMod.make(modulus, a * b)
+  well_defined by
+    (a a' b : Integer) (congruentA : Integer.CongruentModulo(modulus, a, a')) ↦
+        Integer.CongruentModulo.multiply_respects(modulus, a, a', b, b,
+            congruentA, Integer.CongruentModulo.reflexive(modulus, b)),
+    (a b b' : Integer) (congruentB : Integer.CongruentModulo(modulus, b, b')) ↦
+        Integer.CongruentModulo.multiply_respects(modulus, a, a, b, b',
+            Integer.CongruentModulo.reflexive(modulus, a), congruentB)
 
 -- ----------------------------------------------------------------------
 -- Constants.
