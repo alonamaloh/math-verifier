@@ -24317,9 +24317,35 @@ private:
         // R from `q`'s type (already decomposed above).
         ExpressionPointer relation = closeOverLocalBinders(
             decompForT.relation, localBinders, localBinders.size());
+        // Compute `h`'s expected respect type — `(x y : T) → R(x, y) →
+        // f(x) = f(y)` — as the next Pi domain of the lift partially
+        // applied to (T, R, U, f). Passing it in lets the lambda-body
+        // coercion fire the equality-of-classes wrap (WS3): a respect
+        // proof returning the bare equivalence `R(f(x_rep), f(y_rep))`
+        // closes the `mk = mk` obligation without naming Quotient.sound.
+        ExpressionPointer hExpected = nullptr;
+        {
+            ExpressionPointer partialCall = makeConstant(
+                "Quotient.lift", {uLevel, vLevel});
+            partialCall = makeApplication(std::move(partialCall), carrierType);
+            partialCall = makeApplication(std::move(partialCall), relation);
+            partialCall = makeApplication(std::move(partialCall), targetType);
+            partialCall = makeApplication(std::move(partialCall), fKernel);
+            try {
+                ExpressionPointer partialType = weakHeadNormalForm(
+                    environment_,
+                    inferTypeInLocalContext(localBinders, partialCall));
+                if (auto* pi = std::get_if<Pi>(&partialType->node)) {
+                    hExpected = closeOverLocalBinders(
+                        pi->domain, localBinders, localBinders.size());
+                }
+            } catch (...) {
+                hExpected = nullptr;
+            }
+        }
         // Elaborate `h` after we know all the pieces.
         ExpressionPointer hKernel = elaborateExpression(
-            *hSurface, localBinders);
+            *hSurface, localBinders, hExpected);
         ExpressionPointer call = makeConstant(
             "Quotient.lift", {uLevel, vLevel});
         call = makeApplication(std::move(call), carrierType);

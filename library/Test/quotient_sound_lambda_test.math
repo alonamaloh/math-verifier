@@ -27,3 +27,17 @@ theorem sound_lambda_no_ascription (a b : Seq)
   Quotient.sound(a, b,
       (e : Natural) ↦
         { obtain ⟨n, equation⟩ from h(e); witness n with equation })
+
+-- Regression (WS3): the short-form `Quotient.lift` elaborates its respect
+-- proof against the `f(x) = f(y)` obligation, so a proof of the bare
+-- equivalence `R(x, y)` closes the `mk(x) = mk(y)` goal via the
+-- equality-of-classes coercion — no `Quotient.sound` written at the lift
+-- site. (Before the fix, `h` was elaborated with no expected type, the
+-- lambda took its natural `… → R(x,y)` type, and the lift call failed.)
+definition Seq.identity_map
+        : Quotient(Seq, SeqEquiv) → Quotient(Seq, SeqEquiv) :=
+  (q : Quotient(Seq, SeqEquiv)) ↦
+    Quotient.lift(
+        (s : Seq) ↦ (Quotient.mk(s) : Quotient(Seq, SeqEquiv)),
+        (a b : Seq) (related : SeqEquiv(a, b)) ↦ related,
+        q)
