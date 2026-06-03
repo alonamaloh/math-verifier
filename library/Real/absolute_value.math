@@ -92,17 +92,14 @@ theorem CauchyRationalSequence.sequenceFunction_absolute_value
 theorem Real.absolute_value_respects
         (rep rep' : CauchyRationalSequence)
         (equivalenceHypothesis : CauchyEquivalent(rep, rep'))
-        : (Quotient.mk(CauchyRationalSequence.absolute_value(rep))
-              : Real)
-          = Quotient.mk(CauchyRationalSequence.absolute_value(rep')) :=
-  Quotient.sound(
-      CauchyRationalSequence.absolute_value(rep),
-      CauchyRationalSequence.absolute_value(rep'),
-      (epsilon : Rational)
-               (epsilonPositive : Rational.zero < epsilon) ↦ {
-          obtain ⟨N, origAtN⟩
-              from equivalenceHypothesis(epsilon, epsilonPositive);
-          witness N with
+        : CauchyEquivalent(
+              CauchyRationalSequence.absolute_value(rep),
+              CauchyRationalSequence.absolute_value(rep')) :=
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦ {
+      obtain ⟨N, origAtN⟩
+          from equivalenceHypothesis(epsilon, epsilonPositive);
+      witness N with
               (m : Natural) (N_leq_m : N ≤ m) ↦
                 -- Goal: |sf(abs(rep), m) - sf(abs(rep'), m)| < ε.
                 -- Via the bridge: sf(abs(rep), m) = |sf(rep, m)|.
@@ -137,18 +134,15 @@ theorem Real.absolute_value_respects
                              - CauchyRationalSequence.sequenceFunction(rep', m))
                        < epsilon
                             by origAtN(m, N_leq_m))
-        })
+      }
 
 -- ----------------------------------------------------------------------
--- Real.absolute_value.
-
-definition Real.absolute_value (x : Real) : Real :=
-  Quotient.lift(
-      (rep : CauchyRationalSequence) ↦
-          (Quotient.mk(CauchyRationalSequence.absolute_value(rep))
-              : Real),
-      Real.absolute_value_respects,
-      x)
+-- Real.absolute_value: take the pointwise absolute value of the
+-- representative; well-defined by the reverse-triangle respect above.
+definition Real.absolute_value : Real → Real
+  by representatives rep ↦
+       (Quotient.mk(CauchyRationalSequence.absolute_value(rep)) : Real)
+  well_defined by Real.absolute_value_respects
 
 overload abs := Real.absolute_value
 
