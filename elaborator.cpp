@@ -7525,6 +7525,33 @@ private:
         if (goalDeepWhnf.get() != goalClosed.get()) {
             goalForms.push_back(goalDeepWhnf);
         }
+        // Third form: when the goal is headed by an opaque definition, the
+        // substitution target may live inside its body. Force-unfold opaque
+        // heads (search-only) so e.g. `divide_step(succ f, p, n) = …` exposes
+        // its `cases monus(p, n) {…}` and the `monus(p, n)` endpoint becomes
+        // reachable — replacing the old `unfold X in claim by substituting …`
+        // wrap. Gated on an opaque head so ordinary goals skip the extra work;
+        // the kernel's defeq bridge re-checks the rewritten goal.
+        if (mentionsOpaqueDefinition(goalClosed)) {
+            // Protect the substitution endpoints' own heads from being
+            // force-unfolded — they are the targets we need to keep visible
+            // (e.g. unfold `divide_step` to expose its `cases monus(p, n)`,
+            // but keep `monus(p, n)` itself intact to match the `monus(p, n) =
+            // 0` endpoint).
+            std::set<std::string> protectedDefinitions;
+            for (const ContextEquality& eq : candidates) {
+                std::string l = headConstantName(eq.lhs);
+                std::string r = headConstantName(eq.rhs);
+                if (!l.empty()) protectedDefinitions.insert(l);
+                if (!r.empty()) protectedDefinitions.insert(r);
+            }
+            ExpressionPointer goalForced =
+                deepWhnfForcingOpaque(goalClosed, protectedDefinitions);
+            if (goalForced.get() != goalClosed.get()
+                && goalForced.get() != goalDeepWhnf.get()) {
+                goalForms.push_back(goalForced);
+            }
+        }
         // For each candidate, both directions, try the bridge.
         // Track per-attempt outcomes so we can produce a useful
         // diagnostic when nothing closes — the user wants to know
@@ -21734,6 +21761,112 @@ private:
                 deepWhnfThroughApplications(application->function);
             ExpressionPointer argument =
                 deepWhnfThroughApplications(application->argument);
+            if (function.get() != application->function.get()
+                || argument.get() != application->argument.get()) {
+                return makeApplication(std::move(function),
+                                        std::move(argument));
+            }
+        }
+        return expression;
+    }
+
+    // True if `expression` syntactically mentions any opaque Definition
+    // (a Constant whose name resolves to one), reduction-free. Gates the
+    // force-unfolding substitution form so ordinary goals skip it entirely.
+    bool mentionsOpaqueDefinition(const ExpressionPointer& expression) {
+        if (auto* constant = std::get_if<Constant>(&expression->node)) {
+            auto it = environment_.declarations.find(constant->name);
+            if (it != environment_.declarations.end()) {
+                if (auto* def = std::get_if<Definition>(&it->second);
+                    def && def->opacity == Opacity::Opaque) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (auto* app = std::get_if<Application>(&expression->node)) {
+            return mentionsOpaqueDefinition(app->function)
+                || mentionsOpaqueDefinition(app->argument);
+        }
+        if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            return mentionsOpaqueDefinition(pi->domain)
+                || mentionsOpaqueDefinition(pi->codomain);
+        }
+        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            return mentionsOpaqueDefinition(lambda->domain)
+                || mentionsOpaqueDefinition(lambda->body);
+        }
+        if (auto* let = std::get_if<Let>(&expression->node)) {
+            return mentionsOpaqueDefinition(let->value)
+                || mentionsOpaqueDefinition(let->body);
+        }
+        return false;
+    }
+
+    // The opaque-headed application at the WHNF of `expression`, or nullptr.
+    // (Peels the spine and checks whether the head names an opaque Definition.)
+    const Definition* opaqueHeadDefinition(const ExpressionPointer& whnfed,
+                                           const Constant** outConstant) {
+        ExpressionPointer head = whnfed;
+        while (auto* app = std::get_if<Application>(&head->node)) {
+            head = app->function;
+        }
+        auto* constant = std::get_if<Constant>(&head->node);
+        if (!constant) return nullptr;
+        auto it = environment_.declarations.find(constant->name);
+        if (it == environment_.declarations.end()) return nullptr;
+        auto* def = std::get_if<Definition>(&it->second);
+        if (!def || def->opacity != Opacity::Opaque) return nullptr;
+        if (outConstant) *outConstant = constant;
+        return def;
+    }
+
+    // Like deepWhnfThroughApplications, but also δ-unfolds an opaque
+    // definition that remains at a head after WHNF — manually, by splicing in
+    // its body, so no global opacity flip and no leak past this call. A
+    // SEARCH-ONLY fallback for `claim by substituting`: the substitution
+    // target can be buried inside an opaque definition's body (e.g.
+    // `divide_step`'s `cases monus(p, n) {…}`), which opacity-respecting WHNF
+    // never exposes. The rewritten goal this helps build is re-checked by the
+    // kernel's own opacity-tolerant defeq bridge, so opacity is restored for
+    // every downstream consumer.
+    ExpressionPointer deepWhnfForcingOpaque(
+            ExpressionPointer expression,
+            const std::set<std::string>& protectedDefinitions,
+            int fuel = 64) {
+        if (fuel <= 0) return expression;
+        expression = weakHeadNormalForm(environment_, expression);
+        const Constant* constant = nullptr;
+        if (const Definition* def =
+                opaqueHeadDefinition(expression, &constant);
+            def
+            && protectedDefinitions.find(constant->name)
+                   == protectedDefinitions.end()
+            && def->universeParameters.size()
+                   == constant->universeArguments.size()) {
+            std::vector<ExpressionPointer> args;
+            ExpressionPointer head = expression;
+            while (auto* app = std::get_if<Application>(&head->node)) {
+                args.push_back(app->argument);
+                head = app->function;
+            }
+            std::reverse(args.begin(), args.end());
+            ExpressionPointer body = def->body;
+            if (!def->universeParameters.empty()) {
+                body = substituteUniverseLevels(
+                    body, def->universeParameters,
+                    constant->universeArguments);
+            }
+            for (auto& a : args) body = makeApplication(body, a);
+            return deepWhnfForcingOpaque(
+                std::move(body), protectedDefinitions, fuel - 1);
+        }
+        if (auto* application =
+                std::get_if<Application>(&expression->node)) {
+            ExpressionPointer function = deepWhnfForcingOpaque(
+                application->function, protectedDefinitions, fuel - 1);
+            ExpressionPointer argument = deepWhnfForcingOpaque(
+                application->argument, protectedDefinitions, fuel - 1);
             if (function.get() != application->function.get()
                 || argument.get() != application->argument.get()) {
                 return makeApplication(std::move(function),
