@@ -85,81 +85,57 @@ theorem PAdicCauchySequence.equivalent_when_sequenceFunction_equal
               epsilonPositive))
 
 -- ----------------------------------------------------------------------
--- Add is commutative on PAdic.
+-- Two PAdics built from p-adic Cauchy sequences are equal when the
+-- sequences agree pointwise — the p-adic mirror of
+-- `Real.equal_of_pointwise_sequence`. Every ring law below reads as
+-- "pick representatives, prove the sequences agree at each n" and never
+-- names the quotient machinery.
+theorem PAdic.equal_of_pointwise_sequence
+        (rep1 rep2 : PAdicCauchySequence(p, primality))
+        (pointwiseEqual
+            : (n : Natural)
+              → PAdicCauchySequence.sequenceFunction(p, primality, rep1, n)
+                = PAdicCauchySequence.sequenceFunction(p, primality, rep2, n))
+        : (Quotient.mk(rep1) : PAdic(p, primality)) = Quotient.mk(rep2) :=
+  -- A proof of the equivalence where the class-equality is expected
+  -- auto-wraps Quotient.sound (WS3 equality-of-classes coercion).
+  PAdicCauchySequence.equivalent_when_sequenceFunction_equal(
+      p, primality, rep1, rep2, pointwiseEqual)
+
+-- ----------------------------------------------------------------------
+-- Add is commutative on PAdic. Pick representatives; the pointwise
+-- equality is exactly Rational.add_commutative.
 theorem PAdic.add_commutative
         (x y : PAdic(p, primality))
         : PAdic.add(x, y) = PAdic.add(y, x) :=
-  Quotient.induct_two(
-      (rep_x rep_y : PAdicCauchySequence(p, primality)) ↦
-        Quotient.sound(rep_x + rep_y,
-            rep_y + rep_x,
-            PAdicCauchySequence.equivalent_when_sequenceFunction_equal(
-                p, primality,
-                rep_x + rep_y,
-                rep_y + rep_x,
-                (n : Natural) ↦
-                  -- sf(add(rep_x, rep_y), n) = s_x(n) + s_y(n).
-                  -- sf(add(rep_y, rep_x), n) = s_y(n) + s_x(n).
-                  -- Equal by Rational.add_commutative.
-                  calc PAdicCauchySequence.sequenceFunction(
-                           p, primality,
-                           rep_x + rep_y, n)
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality, rep_x, n)
-                       + PAdicCauchySequence.sequenceFunction(
-                             p, primality, rep_y, n)
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality, rep_y, n)
-                       + PAdicCauchySequence.sequenceFunction(
-                             p, primality, rep_x, n)
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality,
-                           rep_y + rep_x, n))),
-      x, y)
+  by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩ => {
+    let a : PAdicCauchySequence(p, primality) :=
+        PAdicCauchySequence.make(sx, sxCauchy);
+    let b : PAdicCauchySequence(p, primality) :=
+        PAdicCauchySequence.make(sy, syCauchy);
+    PAdic.equal_of_pointwise_sequence(
+        a + b, b + a,
+        (n : Natural) ↦ Rational.add_commutative(sx(n), sy(n)))
+  }
 
--- Add is associative on PAdic. Take all three representatives.
+-- Add is associative on PAdic. Pick representatives; the pointwise
+-- equality is Rational.add_associative.
 theorem PAdic.add_associative
         (x y z : PAdic(p, primality))
         : PAdic.add(PAdic.add(x, y), z)
           = PAdic.add(x, PAdic.add(y, z)) :=
-  cases x { | rep_x =>
-    cases y { | rep_y =>
-      cases z { | rep_z =>
-        Quotient.sound((rep_x + rep_y) + rep_z,
-            rep_x + (rep_y + rep_z),
-            PAdicCauchySequence.equivalent_when_sequenceFunction_equal(
-                p, primality,
-                (rep_x + rep_y) + rep_z,
-                rep_x + (rep_y + rep_z),
-                (n : Natural) ↦
-                  calc PAdicCauchySequence.sequenceFunction(
-                           p, primality,
-                           (rep_x + rep_y) + rep_z, n)
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality,
-                           rep_x + rep_y, n)
-                       + PAdicCauchySequence.sequenceFunction(
-                             p, primality, rep_z, n)
-                     = (PAdicCauchySequence.sequenceFunction(
-                            p, primality, rep_x, n)
-                        + PAdicCauchySequence.sequenceFunction(
-                              p, primality, rep_y, n))
-                       + PAdicCauchySequence.sequenceFunction(
-                             p, primality, rep_z, n)
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality, rep_x, n)
-                       + (PAdicCauchySequence.sequenceFunction(
-                              p, primality, rep_y, n)
-                          + PAdicCauchySequence.sequenceFunction(
-                                p, primality, rep_z, n))
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality, rep_x, n)
-                       + PAdicCauchySequence.sequenceFunction(
-                             p, primality,
-                             rep_y + rep_z, n)
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality,
-                           rep_x + (rep_y + rep_z), n))) } } }
+  by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩,
+                     z as ⟨sz, szCauchy⟩ => {
+    let a : PAdicCauchySequence(p, primality) :=
+        PAdicCauchySequence.make(sx, sxCauchy);
+    let b : PAdicCauchySequence(p, primality) :=
+        PAdicCauchySequence.make(sy, syCauchy);
+    let c : PAdicCauchySequence(p, primality) :=
+        PAdicCauchySequence.make(sz, szCauchy);
+    PAdic.equal_of_pointwise_sequence(
+        a + b + c, a + (b + c),
+        (n : Natural) ↦ Rational.add_associative(sx(n), sy(n), sz(n)))
+  }
 
 -- 0 + x = x on PAdic. Use the constant-zero sequence for the zero,
 -- which the constant_is_padic_cauchy lemma proves p-adic Cauchy.
@@ -167,30 +143,25 @@ theorem PAdic.zero_add
         (x : PAdic(p, primality))
         : PAdic.add(PAdic.zero(p, primality), x) = x :=
   cases x { | rep_x =>
-    Quotient.sound(Rational.to_padic_constant_sequence(
-                    p, primality, Rational.zero) + rep_x,
-            rep_x,
-            PAdicCauchySequence.equivalent_when_sequenceFunction_equal(
-                p, primality,
-                Rational.to_padic_constant_sequence(
-                        p, primality, Rational.zero) + rep_x,
-                rep_x,
-                (n : Natural) ↦
-                  calc PAdicCauchySequence.sequenceFunction(
-                           p, primality,
-                           Rational.to_padic_constant_sequence(
-                                   p, primality, Rational.zero) + rep_x, n)
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality,
-                           Rational.to_padic_constant_sequence(
-                               p, primality, Rational.zero), n)
-                       + PAdicCauchySequence.sequenceFunction(
-                             p, primality, rep_x, n)
-                     = Rational.zero
-                       + PAdicCauchySequence.sequenceFunction(
-                             p, primality, rep_x, n)
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality, rep_x, n))) }
+    PAdic.equal_of_pointwise_sequence(
+        Rational.to_padic_constant_sequence(p, primality, Rational.zero) + rep_x,
+        rep_x,
+        (n : Natural) ↦
+          calc PAdicCauchySequence.sequenceFunction(
+                   p, primality,
+                   Rational.to_padic_constant_sequence(
+                           p, primality, Rational.zero) + rep_x, n)
+             = PAdicCauchySequence.sequenceFunction(
+                   p, primality,
+                   Rational.to_padic_constant_sequence(
+                       p, primality, Rational.zero), n)
+               + PAdicCauchySequence.sequenceFunction(
+                     p, primality, rep_x, n)
+             = Rational.zero
+               + PAdicCauchySequence.sequenceFunction(
+                     p, primality, rep_x, n)
+             = PAdicCauchySequence.sequenceFunction(
+                   p, primality, rep_x, n)) }
 
 -- x + 0 = x via add_commutative + zero_add.
 theorem PAdic.add_zero
@@ -206,34 +177,29 @@ theorem PAdic.add_negate_right
         : PAdic.add(x, PAdic.negate(x))
           = PAdic.zero(p, primality) :=
   cases x { | rep_x =>
-    Quotient.sound(rep_x + PAdicCauchySequence.negate(p, primality, rep_x),
-            Rational.to_padic_constant_sequence(
-                p, primality, Rational.zero),
-            PAdicCauchySequence.equivalent_when_sequenceFunction_equal(
-                p, primality,
-                rep_x + PAdicCauchySequence.negate(p, primality, rep_x),
-                Rational.to_padic_constant_sequence(
-                    p, primality, Rational.zero),
-                (n : Natural) ↦
-                  calc PAdicCauchySequence.sequenceFunction(
-                           p, primality,
-                           rep_x + PAdicCauchySequence.negate(
-                                   p, primality, rep_x), n)
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality, rep_x, n)
-                       + PAdicCauchySequence.sequenceFunction(
-                             p, primality,
-                             PAdicCauchySequence.negate(
-                                 p, primality, rep_x), n)
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality, rep_x, n)
-                       + -PAdicCauchySequence.sequenceFunction(
-                              p, primality, rep_x, n)
-                     = Rational.zero
-                     = PAdicCauchySequence.sequenceFunction(
-                           p, primality,
-                           Rational.to_padic_constant_sequence(
-                               p, primality, Rational.zero), n))) }
+    PAdic.equal_of_pointwise_sequence(
+        rep_x + PAdicCauchySequence.negate(p, primality, rep_x),
+        Rational.to_padic_constant_sequence(p, primality, Rational.zero),
+        (n : Natural) ↦
+          calc PAdicCauchySequence.sequenceFunction(
+                   p, primality,
+                   rep_x + PAdicCauchySequence.negate(
+                           p, primality, rep_x), n)
+             = PAdicCauchySequence.sequenceFunction(
+                   p, primality, rep_x, n)
+               + PAdicCauchySequence.sequenceFunction(
+                     p, primality,
+                     PAdicCauchySequence.negate(
+                         p, primality, rep_x), n)
+             = PAdicCauchySequence.sequenceFunction(
+                   p, primality, rep_x, n)
+               + -PAdicCauchySequence.sequenceFunction(
+                      p, primality, rep_x, n)
+             = Rational.zero
+             = PAdicCauchySequence.sequenceFunction(
+                   p, primality,
+                   Rational.to_padic_constant_sequence(
+                       p, primality, Rational.zero), n)) }
 
 -- (-x) + x = 0 via add_commutative + add_negate_right.
 theorem PAdic.add_negate_left
