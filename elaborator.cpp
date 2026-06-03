@@ -7848,12 +7848,12 @@ private:
         Frame frame(*this,
             "claim by cases at line " + std::to_string(line));
 
-        if (claim.arms.size() != 2) {
+        if (claim.arms.size() < 2) {
             throwElaborate(
-                "`by cases` v1 handles exactly 2 arms; got "
-                + std::to_string(claim.arms.size())
-                + " — n-ary disjunctions are a planned later step");
+                "`by cases` needs at least 2 arms; got "
+                + std::to_string(claim.arms.size()));
         }
+        const size_t armCount = claim.arms.size();
 
         // The goal each arm must prove.
         ExpressionPointer goalClosed;
@@ -7868,18 +7868,25 @@ private:
                 "expected type from context");
         }
 
-        // Elaborate arm disjuncts.
-        ExpressionPointer leftDisjunct = elaborateExpression(
-            *claim.arms[0].disjunctType, localBinders);
-        ExpressionPointer rightDisjunct = elaborateExpression(
-            *claim.arms[1].disjunctType, localBinders);
-
-        // Build the expected disjunction type `Or leftDisjunct
-        // rightDisjunct`. Or is a non-polymorphic Proposition.
-        ExpressionPointer expectedDisjunction = makeApplication(
-            makeApplication(
-                makeConstant("Or", {}), leftDisjunct),
-            rightDisjunct);
+        // Elaborate each arm's disjunct proposition.
+        std::vector<ExpressionPointer> disjuncts;
+        for (const auto& arm : claim.arms) {
+            disjuncts.push_back(
+                elaborateExpression(*arm.disjunctType, localBinders));
+        }
+        // Right-nested disjunction `Or` (a non-polymorphic Proposition):
+        // restDisjunction[i] = Pᵢ ∨ Pᵢ₊₁ ∨ … ∨ Pₙ₋₁, so restDisjunction[0]
+        // is the whole `P₀ ∨ … ∨ Pₙ₋₁` the cases must cover.
+        auto makeOr = [&](ExpressionPointer a, ExpressionPointer b) {
+            return makeApplication(
+                makeApplication(makeConstant("Or", {}), a), b);
+        };
+        std::vector<ExpressionPointer> restDisjunction(armCount);
+        restDisjunction[armCount - 1] = disjuncts[armCount - 1];
+        for (int i = static_cast<int>(armCount) - 2; i >= 0; --i) {
+            restDisjunction[i] = makeOr(disjuncts[i], restDisjunction[i + 1]);
+        }
+        ExpressionPointer expectedDisjunction = restDisjunction[0];
 
         // Find OR synthesize the disjunction via the unified hammer
         // dispatch. This is the same "find or synthesize" function
@@ -7896,13 +7903,9 @@ private:
                 "couldn't automatically prove `"
                 + prettyPrintInLocalScope(
                       expectedDisjunction, localBinders)
-                + "` to finish off `by cases` — either bring it "
-                "into scope explicitly (`claim "
-                + prettyPrintInLocalScope(leftDisjunct, localBinders)
-                + " ∨ "
-                + prettyPrintInLocalScope(rightDisjunct, localBinders)
-                + " by …;`), or check that the cases really do "
-                "cover the goal");
+                + "` to finish off `by cases` — either bring that "
+                "disjunction into scope explicitly (`claim <P₀> ∨ … ∨ <Pₙ₋₁> "
+                "by …;`), or check that the cases really do cover the goal");
         }
 
         // Build each arm's lambda. Body is elaborated under
@@ -7970,16 +7973,43 @@ private:
                 "`case ... as`");
             return makeLambda(binderName, domain, body);
         };
-        ExpressionPointer leftLambda = buildArmLambda(0, leftDisjunct);
-        ExpressionPointer rightLambda = buildArmLambda(1, rightDisjunct);
-
-        // Or.eliminate(A, B, Goal, leftLambda, rightLambda, disjProof).
+        // Fold the arms into nested `Or.eliminate` calls. Define
+        //   eliminator(i) : (Pᵢ ∨ … ∨ Pₙ₋₁) → Goal
+        //     eliminator(n-1) = armLambda(n-1)
+        //     eliminator(i)   = λ (tail : Pᵢ ∨ rest).
+        //                         Or.eliminate(Pᵢ, rest, Goal,
+        //                                      armLambda(i), eliminator(i+1),
+        //                                      tail)
+        // The top-level call feeds the proved disjunction directly. For two
+        // arms this is exactly `Or.eliminate(P₀, P₁, Goal, arm₀, arm₁, proof)`.
+        std::function<ExpressionPointer(size_t)> eliminator =
+            [&](size_t i) -> ExpressionPointer {
+                if (i + 1 == armCount) {
+                    return buildArmLambda(i, disjuncts[i]);
+                }
+                ExpressionPointer armLambda = buildArmLambda(i, disjuncts[i]);
+                ExpressionPointer restEliminator = eliminator(i + 1);
+                // Inside the new `tail` binder (de Bruijn 0), the closed
+                // sub-terms shift up by one.
+                auto lift = [this](const ExpressionPointer& e) {
+                    return liftBoundVariables(e, 1, 0);
+                };
+                ExpressionPointer body = makeConstant("Or.eliminate", {});
+                body = makeApplication(body, lift(disjuncts[i]));
+                body = makeApplication(body, lift(restDisjunction[i + 1]));
+                body = makeApplication(body, lift(goalClosed));
+                body = makeApplication(body, lift(armLambda));
+                body = makeApplication(body, lift(restEliminator));
+                body = makeApplication(body, makeBoundVariable(0));
+                return makeLambda(
+                    "_disjunction_tail", restDisjunction[i], body);
+            };
         ExpressionPointer call = makeConstant("Or.eliminate", {});
-        call = makeApplication(call, leftDisjunct);
-        call = makeApplication(call, rightDisjunct);
+        call = makeApplication(call, disjuncts[0]);
+        call = makeApplication(call, restDisjunction[1]);
         call = makeApplication(call, goalClosed);
-        call = makeApplication(call, leftLambda);
-        call = makeApplication(call, rightLambda);
+        call = makeApplication(call, buildArmLambda(0, disjuncts[0]));
+        call = makeApplication(call, eliminator(1));
         call = makeApplication(call, disjProof);
         return call;
     }
