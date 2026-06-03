@@ -1323,6 +1323,43 @@ bool contextHasLetBinders(const Context& context) {
     return false;
 }
 
+// Force a single δ-unfold of an opaque-Definition head, if the expression
+// has one. Returns the unfolded term (the definition's body, re-applied to
+// the spine arguments) or nullptr when the head is not an opaque definition.
+//
+// Used ONLY by isDefinitionallyEqual's opacity-tolerant fallback. Opacity
+// stops δ-unfolding during general `weakHeadNormalForm`, so a goal like
+// `x ≤ z` stays at `IsNonneg(z - x)` rather than blowing through to its
+// `Quotient.lift` implementation — that shape preservation is what the
+// rewrite engine and the auto-prover's syntactic matchers rely on. But an
+// opaque constant is still a genuine definition, so a term headed by it is
+// definitionally equal to its unfolding. When a leaf comparison has otherwise
+// failed, retrying with the opaque head made transparent recovers that
+// equality. This is a single, local unfold at exactly the spot the surface
+// `unfold X in …` form used to mark by hand — never during general WHNF.
+ExpressionPointer unfoldOpaqueHeadOnce(const Environment& environment,
+                                       const ExpressionPointer& expression) {
+    auto spine = peelApplicationSpine(expression);
+    auto* constant = std::get_if<Constant>(&spine.head->node);
+    if (!constant) return nullptr;
+    auto* declaration = environment.lookup(constant->name);
+    auto* definition =
+        declaration ? std::get_if<Definition>(declaration) : nullptr;
+    if (!definition || definition->opacity != Opacity::Opaque) {
+        return nullptr;
+    }
+    if (definition->universeParameters.size()
+            != constant->universeArguments.size()) {
+        return nullptr;
+    }
+    auto body = definition->body;
+    if (!definition->universeParameters.empty()) {
+        body = substituteUniverseLevels(
+            body, definition->universeParameters, constant->universeArguments);
+    }
+    return applyArguments(body, spine.args);
+}
+
 // Inner implementation. The public wrapper below handles the positive-
 // result cache and the step counter; this function does the actual
 // equality work. Fuel decrement happens here so the cache lookup itself
@@ -1518,6 +1555,25 @@ bool isDefinitionallyEqualImpl(const Environment& environment,
         }
     } catch (const TypeError&) {
         // One side isn't well-typed in this context — skip irrelevance.
+    }
+
+    // Opacity-tolerant fallback (see unfoldOpaqueHeadOnce). If either side
+    // is still headed by an opaque definition after WHNF and the structural
+    // comparison failed, the two terms may differ only by that definition's
+    // unfolding. Retry the comparison with the opaque head made transparent —
+    // a single, local transparency that mirrors the manual `unfold` wrap's
+    // scope without disturbing the shape-preserving general WHNF.
+    if (auto unfoldedLeft = unfoldOpaqueHeadOnce(environment, leftReduced)) {
+        if (isDefinitionallyEqual(environment, context,
+                                  unfoldedLeft, rightReduced, fuel)) {
+            return true;
+        }
+    }
+    if (auto unfoldedRight = unfoldOpaqueHeadOnce(environment, rightReduced)) {
+        if (isDefinitionallyEqual(environment, context,
+                                  leftReduced, unfoldedRight, fuel)) {
+            return true;
+        }
     }
 
     return false;
