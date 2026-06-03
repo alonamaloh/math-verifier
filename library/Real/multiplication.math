@@ -42,7 +42,7 @@ import Real.cauchy_bounded
 -- ----------------------------------------------------------------------
 -- Algebraic helper: ab - cd = a(b-d) + d(a-c).
 
--- a * -b = -(a * b). Via multiply_commutative + multiply_negate_left + commute.
+-- a * -b = -(a * b).
 theorem Rational.multiply_negate_right (a b : Rational)
         : a * -b = -(a * b) :=
   calc a * -b
@@ -51,10 +51,7 @@ theorem Rational.multiply_negate_right (a b : Rational)
 
 theorem Rational.product_difference_decomposition (a b c d : Rational)
         : a * b - c * d = a * (b - d) + d * (a - c) :=
-  -- We prove the reverse direction: a * (b - d) + d * (a - c) = a*b - c*d.
-  Equality.symmetry(
-      calc a * (b - d) + d * (a - c)
-         = a * b - c * d)
+  ring
 
 -- ----------------------------------------------------------------------
 -- Natural → Rational monotonicity for `succ`.
@@ -63,37 +60,37 @@ theorem Rational.from_natural_le_preserves
         (a b : Natural) (aLeqB : a ≤ b)
         : (a : Rational) ≤ (b : Rational) := {
     obtain ⟨c, witnessEquation⟩ from Natural.subtraction_witness(a, b, aLeqB);
-    -- (a : R) ≤ (b : R) is IsNonneg((b : R) - (a : R)). With b = a + c,
-    -- (b : R) - (a : R) = (c : R) at value. IsNonneg(c : R) trivial.
-    -- Use Rational.subtract on the representatives.
-    Equality.transport_proposition(
-        Rational.IsNonneg, ?, ?,
-        -- (c : R) = (b : R) - (a : R) requires a chain through reps.
-        Equality.symmetry(
-            calc (b : Rational) - (a : Rational)
-               = ((a + c) : Rational) - (a : Rational)
-               -- ((a+c) : R) - (a : R) = (c : R). Use Quotient.sound.
-               = (c : Rational)
-                      by Quotient.sound(
-                             RationalRepresentative, RationalEquivalent,
-                             RationalRepresentative.make(
-                                 ((a + c) : Integer) * (successor(0) : Integer)
-                                 + -(a : Integer) * (successor(0) : Integer),
-                                 0 + 0 * successor(0)),
-                             RationalRepresentative.make((c : Integer), 0),
-                             -- Cross: LHS_num · 1 = (c : I) · succ(0 + 0·s(0)).
-                             -- After arithmetic, both reduce to (c : I).
-                             calc (((a + c) : Integer) * (successor(0) : Integer)
-                                   + -(a : Integer) * (successor(0) : Integer))
-                                      * (successor(0) : Integer)
-                                = ((a + c) : Integer) + -(a : Integer)
-                                = ((a : Integer) + (c : Integer)) + -(a : Integer)
-                                = (c : Integer) + ((a : Integer) + -(a : Integer))
-                                = (c : Integer) * (successor(0) : Integer)
-                                = (c : Integer)
-                                      * (successor(0 + 0 * successor(0)) : Integer))),
-        unfold Rational.IsNonneg in
-        (Integer.from_natural_is_nonneg(c)))
+    -- With b = a + c, the difference (b : R) - (a : R) is (c : R), and the
+    -- rational image of a natural is nonnegative. Substituting the
+    -- difference turns the goal IsNonneg((b : R) - (a : R)) into the image
+    -- fact directly.
+    claim differenceIsImage : (b : Rational) - (a : Rational) = (c : Rational)
+      by calc (b : Rational) - (a : Rational)
+            = ((a + c) : Rational) - (a : Rational)
+            -- ((a+c) : R) - (a : R) = (c : R) — cross-multiply at the reps,
+            -- where both numerators reduce to (c : Integer).
+            = (c : Rational)
+                   by Quotient.sound(
+                          RationalRepresentative.make(
+                              ((a + c) : Integer) * (successor(0) : Integer)
+                              + -(a : Integer) * (successor(0) : Integer),
+                              0 + 0 * successor(0)),
+                          RationalRepresentative.make((c : Integer), 0),
+                          calc (((a + c) : Integer) * (successor(0) : Integer)
+                                + -(a : Integer) * (successor(0) : Integer))
+                                   * (successor(0) : Integer)
+                             = ((a + c) : Integer) + -(a : Integer)
+                             = ((a : Integer) + (c : Integer)) + -(a : Integer)
+                             = (c : Integer) + ((a : Integer) + -(a : Integer))
+                             = (c : Integer) * (successor(0) : Integer)
+                             = (c : Integer)
+                                   * (successor(0 + 0 * successor(0)) : Integer));
+    -- The goal (a : R) ≤ (b : R) is, by definition, IsNonneg of that
+    -- difference; substitute it to the image and cite the nonneg fact.
+    claim differenceIsNonneg
+        : Rational.IsNonneg((b : Rational) - (a : Rational))
+      by substituting differenceIsImage;
+    differenceIsNonneg
 }
 
 -- ----------------------------------------------------------------------
@@ -229,8 +226,7 @@ theorem Rational.sequence.product_is_cauchy_bound
            t_diff_weak,
            Rational.LessOrEqual_zero_of_IsNonneg(
                (successor(K_s) : Rational),
-               unfold Rational.IsNonneg in
-               (Integer.from_natural_is_nonneg(successor(K_s)))));
+               Rational.from_natural_is_nonneg(successor(K_s))));
   claim second_factor_bound
       : abs(t(n))
             * abs(s(m) - s(n))
@@ -253,8 +249,7 @@ theorem Rational.sequence.product_is_cauchy_bound
            s_diff_weak,
            Rational.LessOrEqual_zero_of_IsNonneg(
                (successor(K_t) : Rational),
-               unfold Rational.IsNonneg in
-               (Integer.from_natural_is_nonneg(successor(K_t)))));
+               Rational.from_natural_is_nonneg(successor(K_t))));
   calc abs(s(m) * (t(m) - t(n)))
      = abs(s(m))
          * abs(t(m) - t(n))
@@ -273,10 +268,13 @@ theorem Rational.sequence.product_is_cauchy_bound
       : abs(s(m) * (t(m) - t(n)))
             + abs(t(n) * (s(m) - s(n)))
           ≤ Rational.halve(epsilon)
-    by rewrite(
-           Rational.halve_doubled(Rational.halve(epsilon)),
-           Rational.LessOrEqual.sum(first_total_bound,
-               second_total_bound));
+    by calc abs(s(m) * (t(m) - t(n)))
+              + abs(t(n) * (s(m) - s(n)))
+         ≤ Rational.halve(Rational.halve(epsilon))
+             + Rational.halve(Rational.halve(epsilon))
+              by Rational.LessOrEqual.sum(first_total_bound, second_total_bound)
+         = Rational.halve(epsilon)
+              by Rational.halve_doubled(Rational.halve(epsilon));
   -- Triangle on the regrouped form; then ≤ ε/2 by the two halves; then
   -- < ε by halve_less_than_self. All in one calc chain.
   calc abs(s(m) * t(m) - s(n) * t(n))
@@ -384,8 +382,7 @@ theorem CauchyRationalSequence.sequenceFunction_multiply
 -- Helper: a*b - a*c = a*(b - c) via distributivity_left + multiply_negate_right.
 theorem Rational.factor_subtract_distribute (a b c : Rational)
         : a * b - a * c = a * (b - c) :=
-  calc a * b - a * c
-     = a * (b - c)
+  ring
 
 -- The respect-proof inner chain: given the bound |s_x(m)| ≤ (succ K : R)
 -- and the difference bound |s_y(m) - s_y'(m)| < δ, conclude
@@ -429,8 +426,7 @@ theorem Real.multiply_respect_bound_chain
            s_y_diff_weak,
            Rational.LessOrEqual_zero_of_IsNonneg(
                (successor(K) : Rational),
-               unfold Rational.IsNonneg in
-               (Integer.from_natural_is_nonneg(successor(K)))));
+               Rational.from_natural_is_nonneg(successor(K))));
   -- Factor s_x(m) out; |·| splits multiplicatively; bound |s_x| by
   -- (K+1), then |s_y - s_yPrime| by δ; finally δ·(K+1) ≤ ε/2 < ε.
   calc abs(s_x(m) * s_y(m) - s_x(m) * s_yPrime(m))
@@ -536,12 +532,12 @@ theorem Real.multiply_respects_at_rep_y_inner
                  refinedXEquiv, epsilon, epsilonPositive);
     witness N with
         (m : Natural) (N_leq_m : N ≤ m) ↦
-          rewrite(
-              congruenceOf(
-                  Rational.absolute_value,
-                  calc s_y(m) * s_x(m) - s_y(m) * s_xPrime(m)
-                     = s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)),
-              boundedY(m, N_leq_m))
+          calc abs(s_x(m) * s_y(m) - s_xPrime(m) * s_y(m))
+             = abs(s_y(m) * s_x(m) - s_y(m) * s_xPrime(m))
+                  by (calc s_x(m) * s_y(m) - s_xPrime(m) * s_y(m)
+                        = s_y(m) * s_x(m) - s_y(m) * s_xPrime(m))
+             < epsilon
+                  by boundedY(m, N_leq_m)
   }
 
 -- Helper for multiply_respects: shows the at-rep-y version of the
