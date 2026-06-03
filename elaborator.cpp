@@ -18316,8 +18316,12 @@ private:
         SurfaceExpressionPointer surfaceCall = makeSurfaceApplication(
             std::move(constructorReference), std::move(components),
             line, column);
-        return elaborateExpression(*surfaceCall, localBinders,
-                                    expectedType);
+        // Pass the inductive-headed `head` (opaque wrappers forced off) as the
+        // expected type, NOT the original opaque `expectedType` — the
+        // constructor-parameter inference needs to read the inductive's
+        // arguments (e.g. `Exists`'s predicate) from it. The kernel's defeq
+        // bridge re-checks the built term against the opaque expected type.
+        return elaborateExpression(*surfaceCall, localBinders, head);
     }
 
     // Handle a `cases` / `obtain` expression whose scrutinee is a
