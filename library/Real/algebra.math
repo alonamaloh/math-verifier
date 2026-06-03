@@ -30,110 +30,59 @@ import Real.multiplication
 import Real.ring
 
 -- ----------------------------------------------------------------------
--- Multiply is commutative on Real.
-
--- At constructor reps: pattern-matching exposes the underlying sequences
--- so multiply and sequenceFunction reduce, and the pointwise equality is
--- exactly Rational.multiply_commutative.
-theorem Real.multiply_commutative_at_make
-        : (rep_x rep_y : CauchyRationalSequence)
-          → Real.multiply((Quotient.mk(rep_x) : Real), (Quotient.mk(rep_y) : Real))
-            = Real.multiply((Quotient.mk(rep_y) : Real), (Quotient.mk(rep_x) : Real))
-  | CauchyRationalSequence.make(sx, sx_cauchy),
-    CauchyRationalSequence.make(sy, sy_cauchy) =>
-      Quotient.sound(
-          CauchyRationalSequence.multiply(
-              CauchyRationalSequence.make(sx, sx_cauchy),
-              CauchyRationalSequence.make(sy, sy_cauchy)),
-          CauchyRationalSequence.multiply(
-              CauchyRationalSequence.make(sy, sy_cauchy),
-              CauchyRationalSequence.make(sx, sx_cauchy)),
-          CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-              CauchyRationalSequence.multiply(
-                  CauchyRationalSequence.make(sx, sx_cauchy),
-                  CauchyRationalSequence.make(sy, sy_cauchy)),
-              CauchyRationalSequence.multiply(
-                  CauchyRationalSequence.make(sy, sy_cauchy),
-                  CauchyRationalSequence.make(sx, sx_cauchy)),
-              (n : Natural) ↦
-                Rational.multiply_commutative(sx(n), sy(n))))
-
+-- Multiply is commutative on Real. Pick representatives; the pointwise
+-- equality is exactly Rational.multiply_commutative.
 theorem Real.multiply_commutative
         (x y : Real)
         : Real.multiply(x, y) = Real.multiply(y, x) :=
-  Quotient.induct_two(Real.multiply_commutative_at_make, x, y)
+  by_representatives x as ⟨sx, sx_cauchy⟩, y as ⟨sy, sy_cauchy⟩ =>
+    Real.equal_of_pointwise_sequence(
+        CauchyRationalSequence.multiply(
+            CauchyRationalSequence.make(sx, sx_cauchy),
+            CauchyRationalSequence.make(sy, sy_cauchy)),
+        CauchyRationalSequence.multiply(
+            CauchyRationalSequence.make(sy, sy_cauchy),
+            CauchyRationalSequence.make(sx, sx_cauchy)),
+        (n : Natural) ↦ Rational.multiply_commutative(sx(n), sy(n)))
 
--- Multiply is associative on Real. At constructor reps, all the bridge
--- proofs reduce away and the pointwise equality is Rational.multiply_associative.
-theorem Real.multiply_associative_at_make
-        : (rep_x rep_y rep_z : CauchyRationalSequence)
-          → Real.multiply(
-                Real.multiply((Quotient.mk(rep_x) : Real), (Quotient.mk(rep_y) : Real)),
-                (Quotient.mk(rep_z) : Real))
-            = Real.multiply(
-                  (Quotient.mk(rep_x) : Real),
-                  Real.multiply((Quotient.mk(rep_y) : Real), (Quotient.mk(rep_z) : Real)))
-  | CauchyRationalSequence.make(sx, sx_cauchy),
-    CauchyRationalSequence.make(sy, sy_cauchy),
-    CauchyRationalSequence.make(sz, sz_cauchy) =>
-      Quotient.sound(
-          CauchyRationalSequence.multiply(
-              CauchyRationalSequence.multiply(
-                  CauchyRationalSequence.make(sx, sx_cauchy),
-                  CauchyRationalSequence.make(sy, sy_cauchy)),
-              CauchyRationalSequence.make(sz, sz_cauchy)),
-          CauchyRationalSequence.multiply(
-              CauchyRationalSequence.make(sx, sx_cauchy),
-              CauchyRationalSequence.multiply(
-                  CauchyRationalSequence.make(sy, sy_cauchy),
-                  CauchyRationalSequence.make(sz, sz_cauchy))),
-          CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-              CauchyRationalSequence.multiply(
-                  CauchyRationalSequence.multiply(
-                      CauchyRationalSequence.make(sx, sx_cauchy),
-                      CauchyRationalSequence.make(sy, sy_cauchy)),
-                  CauchyRationalSequence.make(sz, sz_cauchy)),
-              CauchyRationalSequence.multiply(
-                  CauchyRationalSequence.make(sx, sx_cauchy),
-                  CauchyRationalSequence.multiply(
-                      CauchyRationalSequence.make(sy, sy_cauchy),
-                      CauchyRationalSequence.make(sz, sz_cauchy))),
-              (n : Natural) ↦
-                Rational.multiply_associative(sx(n), sy(n), sz(n))))
-
+-- Multiply is associative on Real. Pick representatives; the pointwise
+-- equality is Rational.multiply_associative.
 theorem Real.multiply_associative
         (x y z : Real)
         : Real.multiply(Real.multiply(x, y), z)
           = Real.multiply(x, Real.multiply(y, z)) :=
-  Quotient.induct_three(Real.multiply_associative_at_make, x, y, z)
+  by_representatives x as ⟨sx, sx_cauchy⟩, y as ⟨sy, sy_cauchy⟩,
+                     z as ⟨sz, sz_cauchy⟩ =>
+    Real.equal_of_pointwise_sequence(
+        CauchyRationalSequence.multiply(
+            CauchyRationalSequence.multiply(
+                CauchyRationalSequence.make(sx, sx_cauchy),
+                CauchyRationalSequence.make(sy, sy_cauchy)),
+            CauchyRationalSequence.make(sz, sz_cauchy)),
+        CauchyRationalSequence.multiply(
+            CauchyRationalSequence.make(sx, sx_cauchy),
+            CauchyRationalSequence.multiply(
+                CauchyRationalSequence.make(sy, sy_cauchy),
+                CauchyRationalSequence.make(sz, sz_cauchy))),
+        (n : Natural) ↦ Rational.multiply_associative(sx(n), sy(n), sz(n)))
 
--- 1 * x = x on Real.
+-- 1 * x = x on Real. Pick a representative; pointwise multiply and
+-- sequenceFunction reduce and the equality is Rational.one_multiply.
 theorem Real.one_multiply
         (x : Real)
         : Real.multiply(Real.one, x) = x :=
-  Quotient.induct(
-      (rep_x : CauchyRationalSequence) ↦
-        Quotient.sound(
-            CauchyRationalSequence, CauchyEquivalent,
-            CauchyRationalSequence.multiply(
-                Rational.to_cauchy_constant(Rational.one), rep_x),
-            rep_x,
-            CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-                CauchyRationalSequence.multiply(
-                    Rational.to_cauchy_constant(Rational.one), rep_x),
-                rep_x,
-                (n : Natural) ↦
-                  calc CauchyRationalSequence.sequenceFunction(
-                           CauchyRationalSequence.multiply(
-                               Rational.to_cauchy_constant(Rational.one),
-                               rep_x), n)
-                     = CauchyRationalSequence.sequenceFunction(
-                           Rational.to_cauchy_constant(Rational.one), n)
-                       * CauchyRationalSequence.sequenceFunction(rep_x, n)
-                     = Rational.one
-                       * CauchyRationalSequence.sequenceFunction(rep_x, n)
-                     = CauchyRationalSequence.sequenceFunction(rep_x, n))),
-      x)
+  cases x { | rep_x =>
+    Real.equal_of_pointwise_sequence(
+        CauchyRationalSequence.multiply(
+            Rational.to_cauchy_constant(Rational.one), rep_x),
+        rep_x,
+        (n : Natural) ↦
+          calc CauchyRationalSequence.sequenceFunction(
+                   CauchyRationalSequence.multiply(
+                       Rational.to_cauchy_constant(Rational.one),
+                       rep_x), n)
+             = Rational.one * CauchyRationalSequence.sequenceFunction(rep_x, n)
+             = CauchyRationalSequence.sequenceFunction(rep_x, n)) }
 
 -- x * 1 = x via multiply_commutative + one_multiply.
 theorem Real.multiply_one
@@ -147,7 +96,9 @@ theorem Real.multiply_one
 -- in `Real/instances.math` via the abstract `Algebra.Ring.*` library
 -- and `Real.is_ring` — no per-carrier rep-level proof needed.
 
--- Distributivity: x * (y + z) = x * y + x * z.
+-- Distributivity: x * (y + z) = x * y + x * z. Pick representatives;
+-- pointwise the sequence values satisfy the Rational distributive law
+-- (proved by the auto-prover).
 theorem Real.distributivity_left
         (x y z : Real)
         : Real.multiply(x, Real.add(y, z))
@@ -155,47 +106,36 @@ theorem Real.distributivity_left
   cases x { | rep_x =>
     cases y { | rep_y =>
       cases z { | rep_z =>
-        Quotient.sound(
-            CauchyRationalSequence, CauchyEquivalent,
+        Real.equal_of_pointwise_sequence(
             CauchyRationalSequence.multiply(rep_x,
                 CauchyRationalSequence.add(rep_y, rep_z)),
             CauchyRationalSequence.add(
                 CauchyRationalSequence.multiply(rep_x, rep_y),
                 CauchyRationalSequence.multiply(rep_x, rep_z)),
-            CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-                CauchyRationalSequence.multiply(rep_x,
-                    CauchyRationalSequence.add(rep_y, rep_z)),
-                CauchyRationalSequence.add(
-                    CauchyRationalSequence.multiply(rep_x, rep_y),
-                    CauchyRationalSequence.multiply(rep_x, rep_z)),
-                (n : Natural) ↦
-                  calc CauchyRationalSequence.sequenceFunction(
-                           CauchyRationalSequence.multiply(rep_x,
-                               CauchyRationalSequence.add(rep_y, rep_z)),
-                           n)
-                     = CauchyRationalSequence.sequenceFunction(rep_x, n)
-                       * CauchyRationalSequence.sequenceFunction(
-                             CauchyRationalSequence.add(rep_y, rep_z), n)
-                     = CauchyRationalSequence.sequenceFunction(rep_x, n)
-                       * (CauchyRationalSequence.sequenceFunction(rep_y, n)
-                          + CauchyRationalSequence.sequenceFunction(rep_z, n))
-                     = CauchyRationalSequence.sequenceFunction(rep_x, n)
-                       * CauchyRationalSequence.sequenceFunction(rep_y, n)
-                       + CauchyRationalSequence.sequenceFunction(rep_x, n)
-                         * CauchyRationalSequence.sequenceFunction(rep_z, n)
-                     = CauchyRationalSequence.sequenceFunction(
-                           CauchyRationalSequence.multiply(rep_x, rep_y), n)
-                       + CauchyRationalSequence.sequenceFunction(rep_x, n)
-                         * CauchyRationalSequence.sequenceFunction(rep_z, n)
-                     = CauchyRationalSequence.sequenceFunction(
-                           CauchyRationalSequence.multiply(rep_x, rep_y), n)
-                       + CauchyRationalSequence.sequenceFunction(
-                             CauchyRationalSequence.multiply(rep_x, rep_z), n)
-                     = CauchyRationalSequence.sequenceFunction(
-                           CauchyRationalSequence.add(
-                               CauchyRationalSequence.multiply(rep_x, rep_y),
-                               CauchyRationalSequence.multiply(rep_x, rep_z)),
-                           n))) } } }
+            (n : Natural) ↦
+              calc CauchyRationalSequence.sequenceFunction(
+                       CauchyRationalSequence.multiply(rep_x,
+                           CauchyRationalSequence.add(rep_y, rep_z)), n)
+                 = CauchyRationalSequence.sequenceFunction(rep_x, n)
+                   * (CauchyRationalSequence.sequenceFunction(rep_y, n)
+                      + CauchyRationalSequence.sequenceFunction(rep_z, n))
+                 = CauchyRationalSequence.sequenceFunction(rep_x, n)
+                   * CauchyRationalSequence.sequenceFunction(rep_y, n)
+                   + CauchyRationalSequence.sequenceFunction(rep_x, n)
+                     * CauchyRationalSequence.sequenceFunction(rep_z, n)
+                 = CauchyRationalSequence.sequenceFunction(
+                       CauchyRationalSequence.multiply(rep_x, rep_y), n)
+                   + CauchyRationalSequence.sequenceFunction(rep_x, n)
+                     * CauchyRationalSequence.sequenceFunction(rep_z, n)
+                 = CauchyRationalSequence.sequenceFunction(
+                       CauchyRationalSequence.multiply(rep_x, rep_y), n)
+                   + CauchyRationalSequence.sequenceFunction(
+                         CauchyRationalSequence.multiply(rep_x, rep_z), n)
+                 = CauchyRationalSequence.sequenceFunction(
+                       CauchyRationalSequence.add(
+                           CauchyRationalSequence.multiply(rep_x, rep_y),
+                           CauchyRationalSequence.multiply(rep_x, rep_z)),
+                       n)) } } }
 
 -- Distributivity (right): (x + y) * z = x * z + y * z. Reduces to
 -- multiply_commutative + distributivity_left.
@@ -217,38 +157,19 @@ theorem Real.negate_subtract (a b : Real) : -(a - b) = b - a := ring
 -- (-x) * y = -(x * y). Lift Rational.multiply_negate_left pointwise.
 -- ring would loop here — multiply_negate_left is itself one of the
 -- axioms ring's coefficient handling depends on.
-theorem Real.multiply_negate_left_at_make
-        : (rep_x rep_y : CauchyRationalSequence)
-          → Real.multiply(-(Quotient.mk(rep_x) : Real),
-                          (Quotient.mk(rep_y) : Real))
-            = -Real.multiply((Quotient.mk(rep_x) : Real),
-                             (Quotient.mk(rep_y) : Real))
-  | CauchyRationalSequence.make(sx, sx_cauchy),
-    CauchyRationalSequence.make(sy, sy_cauchy) =>
-      Quotient.sound(
-          CauchyRationalSequence.multiply(
-              CauchyRationalSequence.negate(
-                  CauchyRationalSequence.make(sx, sx_cauchy)),
-              CauchyRationalSequence.make(sy, sy_cauchy)),
-          CauchyRationalSequence.negate(
-              CauchyRationalSequence.multiply(
-                  CauchyRationalSequence.make(sx, sx_cauchy),
-                  CauchyRationalSequence.make(sy, sy_cauchy))),
-          CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-              CauchyRationalSequence.multiply(
-                  CauchyRationalSequence.negate(
-                      CauchyRationalSequence.make(sx, sx_cauchy)),
-                  CauchyRationalSequence.make(sy, sy_cauchy)),
-              CauchyRationalSequence.negate(
-                  CauchyRationalSequence.multiply(
-                      CauchyRationalSequence.make(sx, sx_cauchy),
-                      CauchyRationalSequence.make(sy, sy_cauchy))),
-              (n : Natural) ↦
-                Rational.multiply_negate_left(sx(n), sy(n))))
-
 theorem Real.multiply_negate_left (x y : Real)
         : Real.multiply(-x, y) = -Real.multiply(x, y) :=
-  Quotient.induct_two(Real.multiply_negate_left_at_make, x, y)
+  by_representatives x as ⟨sx, sx_cauchy⟩, y as ⟨sy, sy_cauchy⟩ =>
+    Real.equal_of_pointwise_sequence(
+        CauchyRationalSequence.multiply(
+            CauchyRationalSequence.negate(
+                CauchyRationalSequence.make(sx, sx_cauchy)),
+            CauchyRationalSequence.make(sy, sy_cauchy)),
+        CauchyRationalSequence.negate(
+            CauchyRationalSequence.multiply(
+                CauchyRationalSequence.make(sx, sx_cauchy),
+                CauchyRationalSequence.make(sy, sy_cauchy))),
+        (n : Natural) ↦ Rational.multiply_negate_left(sx(n), sy(n)))
 
 -- x * (-y) = -(x * y). Reduce to multiply_negate_left via commutativity.
 theorem Real.multiply_negate_right (x y : Real)
