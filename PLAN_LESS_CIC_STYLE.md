@@ -249,13 +249,25 @@ currently fall back to explicit lemmas disappear:
 >   `symmetry_flip_test`.
 > - **Multi-position congruence (all facts in context)** already works via
 >   the auto-prover.
+> - **Migration sweep IN PROGRESS.** Equality.symmetry occurrences in user
+>   space 184 → 172; by-step sites 57 → 50; 9 files cleaned (cancellation,
+>   distance, first_isomorphism, ring_divisibility, Real/order,
+>   order_arithmetic, reciprocal_function, PAdic/negation,
+>   PAdic/absolute_value). Pattern: structure a claim to match the lemma's
+>   *un-flipped* conclusion (so bare `by <lemma>` infers args) and let the
+>   body/case coercion do the final flip; ring-identity calc steps go bare.
+> - **Blocking bug found:** removing the explicit symmetry at a calc step
+>   whose flip sits *under a congruence* (e.g. `epsilon - halve = (halve +
+>   halve) + -halve`) makes the calc-step diff path
+>   (`tryDiffApplyUserProof` + its post-loop congruence wrapping) emit a
+>   term with an escaped *free* variable → a `kernel: unbound internal
+>   variable` leak. Pre-existing (the symmetric branch was never exercised
+>   before); the WS8 closedness guard (`maxFreeBoundVariable`) does not
+>   catch it because the escape is a FreeVariable, not a BoundVariable.
+>   Those sites keep their explicit symmetry for now. Fixing the wrapping
+>   would unblock the bulk of the remaining sweep AND close the leak.
 > - *Remaining:* **bounded combining** — a single cited fact bridging a
->   multi-position goal with the other facts pulled from context (e.g.
->   `by (a = b)` closing `add(a,c) = add(b,d)` when `c = d` is in scope).
->   And the **migration sweep** for the "measured drop": ~57 user-space
->   `by Equality.symmetry(…)` calc/by-step justifications are now absorbable
->   by the fixed coercion — a mark-then-verify-by-hand cleanup (see
->   `warning_cleanup_workflow`), not yet done.
+>   multi-position goal with the other facts pulled from context.
 
 ### WS4. Auto-prover completeness for "obvious" steps
 Every step a mathematician calls trivial should close with no hint.
