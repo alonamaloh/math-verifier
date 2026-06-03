@@ -480,33 +480,27 @@ theorem Real.multiply_after_first_respects_at_rep_inner
               epsilonPositive)
 }
 
--- multiply_after_first_respects: rep_x fixed, y varies.
--- Multi-pattern destructure on all three reps so the bound on s_x is
--- accessible (cauchy_is_naturally_bounded needs the underlying
--- sequence). The inner ε-N bound is supplied by _at_rep_inner.
-theorem Real.multiply_after_first_respects
+-- Respect of multiplication in the second argument: rep_x fixed, y
+-- varies. Multi-pattern destructure on all three reps so the bound on
+-- s_x is accessible (cauchy_is_naturally_bounded needs the underlying
+-- sequence); the inner ε-N bound is supplied by _at_rep_inner.
+theorem Real.multiply_respects_second
         : (rep_x rep_y rep_yPrime : CauchyRationalSequence)
           → CauchyEquivalent(rep_y, rep_yPrime)
-          → (Quotient.mk(rep_x * rep_y) : Real)
-            = Quotient.mk(rep_x * rep_yPrime)
+          → CauchyEquivalent(rep_x * rep_y, rep_x * rep_yPrime)
   | CauchyRationalSequence.make(s_x, sCauchy_x),
     CauchyRationalSequence.make(s_y, sCauchy_y),
     CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime),
     refinedYEquiv =>
-      Quotient.sound(
-          CauchyRationalSequence.make(s_x, sCauchy_x)
-              * CauchyRationalSequence.make(s_y, sCauchy_y),
-          CauchyRationalSequence.make(s_x, sCauchy_x)
-              * CauchyRationalSequence.make(s_yPrime, sCauchy_yPrime),
-          (epsilon : Rational)
-                   (epsilonPositive : Rational.zero < epsilon) ↦
-            Real.multiply_after_first_respects_at_rep_inner(
-                s_x, sCauchy_x, s_y, s_yPrime,
-                sCauchy_y, sCauchy_yPrime,
-                refinedYEquiv,
-                epsilon, epsilonPositive))
+      (epsilon : Rational)
+               (epsilonPositive : Rational.zero < epsilon) ↦
+        Real.multiply_after_first_respects_at_rep_inner(
+            s_x, sCauchy_x, s_y, s_yPrime,
+            sCauchy_y, sCauchy_yPrime,
+            refinedYEquiv,
+            epsilon, epsilonPositive)
 
--- Symmetric inner-chain helper for multiply_respects_at_rep_y: y is
+-- Symmetric inner-chain helper for multiply_respects_first: y is
 -- bounded, x varies via xEquiv.
 theorem Real.multiply_respects_at_rep_y_inner
         (s_x : Rational.sequence.Sequence)
@@ -540,68 +534,30 @@ theorem Real.multiply_respects_at_rep_y_inner
                   by boundedY(m, N_leq_m)
   }
 
--- Helper for multiply_respects: shows the at-rep-y version of the
--- product equivalence given xEquiv. Argument shape is symmetric to
--- multiply_after_first_respects but with the bound on the y-side.
--- Multi-pattern destructure on all three reps; inner ε-N bound is
--- supplied by _at_rep_y_inner.
-theorem Real.multiply_respects_at_rep_y
+-- Respect of multiplication in the first argument: symmetric to
+-- _second but with the bound on the y-side. Multi-pattern destructure
+-- on all three reps; inner ε-N bound supplied by _at_rep_y_inner.
+theorem Real.multiply_respects_first
         : (rep_x rep_xPrime rep_y : CauchyRationalSequence)
           → CauchyEquivalent(rep_x, rep_xPrime)
-          → (Quotient.mk(rep_x * rep_y) : Real)
-            = Quotient.mk(rep_xPrime * rep_y)
+          → CauchyEquivalent(rep_x * rep_y, rep_xPrime * rep_y)
   | CauchyRationalSequence.make(s_x, sCauchy_x),
     CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime),
     CauchyRationalSequence.make(s_y, sCauchy_y),
     refinedXEquiv =>
-      Quotient.sound(
-          CauchyRationalSequence.make(s_x, sCauchy_x)
-              * CauchyRationalSequence.make(s_y, sCauchy_y),
-          CauchyRationalSequence.make(s_xPrime, sCauchy_xPrime)
-              * CauchyRationalSequence.make(s_y, sCauchy_y),
-          (epsilon : Rational)
-                   (epsilonPositive : Rational.zero < epsilon) ↦
-            Real.multiply_respects_at_rep_y_inner(
-                s_x, sCauchy_x, s_xPrime, sCauchy_xPrime,
-                s_y, sCauchy_y,
-                refinedXEquiv,
-                epsilon, epsilonPositive))
+      (epsilon : Rational)
+               (epsilonPositive : Rational.zero < epsilon) ↦
+        Real.multiply_respects_at_rep_y_inner(
+            s_x, sCauchy_x, s_xPrime, sCauchy_xPrime,
+            s_y, sCauchy_y,
+            refinedXEquiv,
+            epsilon, epsilonPositive)
 
--- Symmetric inner-chain helper for multiply_respects_at_rep_y: y is
--- bounded, x varies via xEquiv.
-theorem Real.multiply_respects
-        (rep_x rep_xPrime : CauchyRationalSequence)
-        (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
-        (yReal : Real)
-        : Quotient.lift(
-              (rep_y : CauchyRationalSequence) ↦
-                  (Quotient.mk(rep_x * rep_y) : Real),
-              Real.multiply_after_first_respects(rep_x),
-              yReal)
-          = Quotient.lift(
-              (rep_y : CauchyRationalSequence) ↦
-                  (Quotient.mk(rep_xPrime * rep_y) : Real),
-              Real.multiply_after_first_respects(rep_xPrime),
-              yReal) :=
-  cases yReal { | rep_y =>
-    Real.multiply_respects_at_rep_y(rep_x, rep_xPrime, rep_y, xEquiv) }
-
-definition Real.multiply_after_first
-        (rep_x : CauchyRationalSequence) (yReal : Real) : Real :=
-  Quotient.lift(
-      (rep_y : CauchyRationalSequence) ↦
-          Quotient.mk(rep_x * rep_y),
-      Real.multiply_after_first_respects(rep_x),
-      yReal)
-
-definition Real.multiply (x y : Real) : Real :=
-  Quotient.lift(
-      (rep_x : CauchyRationalSequence) ↦
-          Real.multiply_after_first(rep_x, y),
-      (rep_x rep_xPrime : CauchyRationalSequence)
-               (xEquiv : CauchyEquivalent(rep_x, rep_xPrime)) ↦
-          Real.multiply_respects(rep_x, rep_xPrime, xEquiv, y),
-      x)
+-- Real.multiply: multiply the representative sequences pointwise;
+-- well-defined in each argument by the respect lemmas above.
+definition Real.multiply : Real → Real → Real
+  by representatives a, c ↦ (Quotient.mk(a * c) : Real)
+  well_defined by Real.multiply_respects_first, Real.multiply_respects_second
 
 operator (*) on (Real, Real) := Real.multiply
 

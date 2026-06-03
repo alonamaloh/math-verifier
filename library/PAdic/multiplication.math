@@ -406,30 +406,26 @@ theorem PAdic.multiply_after_first_respects_at_rep_inner
               epsilonPositive)
 }
 
--- multiply_after_first_respects: rep_x fixed, y varies.
--- Multi-pattern destructure on all three reps so the bound on s_x is
--- accessible (cauchy_is_padic_naturally_bounded needs the underlying
--- sequence). The inner ε-N bound is supplied by _at_rep_inner.
-theorem PAdic.multiply_after_first_respects
+-- Respect of multiplication in the second argument: rep_x fixed, y
+-- varies. Multi-pattern destructure on all three reps so the bound on
+-- s_x is accessible (cauchy_is_padic_naturally_bounded needs the
+-- underlying sequence); the inner ε-N bound is supplied by _at_rep_inner.
+theorem PAdic.multiply_respects_second
         : (rep_x rep_y rep_yPrime : PAdicCauchySequence(p, primality))
           → PAdicEquivalent(p, primality, rep_y, rep_yPrime)
-          → (Quotient.mk(rep_x * rep_y)
-             : PAdic(p, primality))
-            = Quotient.mk(rep_x * rep_yPrime)
+          → PAdicEquivalent(p, primality, rep_x * rep_y, rep_x * rep_yPrime)
   | PAdicCauchySequence.make(s_x, sCauchy_x),
     PAdicCauchySequence.make(s_y, sCauchy_y),
     PAdicCauchySequence.make(s_yPrime, sCauchy_yPrime),
     refinedYEquiv =>
-      Quotient.sound(PAdicCauchySequence.make(s_x, sCauchy_x) * PAdicCauchySequence.make(s_y, sCauchy_y),
-          PAdicCauchySequence.make(s_x, sCauchy_x) * PAdicCauchySequence.make(s_yPrime, sCauchy_yPrime),
-          (epsilon : Rational)
-                   (epsilonPositive : Rational.zero < epsilon) ↦
-            PAdic.multiply_after_first_respects_at_rep_inner(
-                p, primality,
-                s_x, sCauchy_x, s_y, s_yPrime,
-                sCauchy_y, sCauchy_yPrime,
-                refinedYEquiv,
-                epsilon, epsilonPositive))
+      (epsilon : Rational)
+               (epsilonPositive : Rational.zero < epsilon) ↦
+        PAdic.multiply_after_first_respects_at_rep_inner(
+            p, primality,
+            s_x, sCauchy_x, s_y, s_yPrime,
+            sCauchy_y, sCauchy_yPrime,
+            refinedYEquiv,
+            epsilon, epsilonPositive)
 
 -- Symmetric inner-chain helper for multiply_respects_at_rep_y: y is
 -- bounded, x varies via xEquiv.
@@ -465,70 +461,30 @@ theorem PAdic.multiply_respects_at_rep_y_inner
         }
   }
 
--- Helper for multiply_respects: shows the at-rep-y version of the
--- product equivalence given xEquiv. Argument shape is symmetric to
--- multiply_after_first_respects but with the bound on the y-side.
--- Multi-pattern destructure on all three reps; inner ε-N bound is
--- supplied by _at_rep_y_inner.
-theorem PAdic.multiply_respects_at_rep_y
+-- Respect of multiplication in the first argument: symmetric to _second
+-- but with the bound on the y-side. Multi-pattern destructure on all
+-- three reps; inner ε-N bound supplied by _at_rep_y_inner.
+theorem PAdic.multiply_respects_first
         : (rep_x rep_xPrime rep_y : PAdicCauchySequence(p, primality))
           → PAdicEquivalent(p, primality, rep_x, rep_xPrime)
-          → (Quotient.mk(rep_x * rep_y)
-             : PAdic(p, primality))
-            = Quotient.mk(rep_xPrime * rep_y)
+          → PAdicEquivalent(p, primality, rep_x * rep_y, rep_xPrime * rep_y)
   | PAdicCauchySequence.make(s_x, sCauchy_x),
     PAdicCauchySequence.make(s_xPrime, sCauchy_xPrime),
     PAdicCauchySequence.make(s_y, sCauchy_y),
     refinedXEquiv =>
-      Quotient.sound(PAdicCauchySequence.make(s_x, sCauchy_x) * PAdicCauchySequence.make(s_y, sCauchy_y),
-          PAdicCauchySequence.make(s_xPrime, sCauchy_xPrime) * PAdicCauchySequence.make(s_y, sCauchy_y),
-          (epsilon : Rational)
-                   (epsilonPositive : Rational.zero < epsilon) ↦
-            PAdic.multiply_respects_at_rep_y_inner(
-                p, primality,
-                s_x, sCauchy_x, s_xPrime, sCauchy_xPrime,
-                s_y, sCauchy_y,
-                refinedXEquiv,
-                epsilon, epsilonPositive))
+      (epsilon : Rational)
+               (epsilonPositive : Rational.zero < epsilon) ↦
+        PAdic.multiply_respects_at_rep_y_inner(
+            p, primality,
+            s_x, sCauchy_x, s_xPrime, sCauchy_xPrime,
+            s_y, sCauchy_y,
+            refinedXEquiv,
+            epsilon, epsilonPositive)
 
--- The full multiply respect proof: lifts over y.
-theorem PAdic.multiply_respects
-        (rep_x rep_xPrime : PAdicCauchySequence(p, primality))
-        (xEquiv : PAdicEquivalent(p, primality, rep_x, rep_xPrime))
-        (yPAdic : PAdic(p, primality))
-        : Quotient.lift(
-              (rep_y : PAdicCauchySequence(p, primality)) ↦
-                  Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
-                               rep_x * rep_y),
-              PAdic.multiply_after_first_respects(p, primality, rep_x),
-              yPAdic)
-          = Quotient.lift(
-              (rep_y : PAdicCauchySequence(p, primality)) ↦
-                  Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
-                               rep_xPrime * rep_y),
-              PAdic.multiply_after_first_respects(p, primality, rep_xPrime),
-              yPAdic) :=
-  cases yPAdic {
-    | rep_y =>
-        PAdic.multiply_respects_at_rep_y(p, primality, rep_x, rep_xPrime, rep_y, xEquiv)
-  }
-
-definition PAdic.multiply_after_first
-        (rep_x : PAdicCauchySequence(p, primality))
-        (yPAdic : PAdic(p, primality)) : PAdic(p, primality) :=
-  Quotient.lift(
-      (rep_y : PAdicCauchySequence(p, primality)) ↦
-          Quotient.mk(PAdicCauchySequence(p, primality), PAdicEquivalent(p, primality),
-                       rep_x * rep_y),
-      PAdic.multiply_after_first_respects(p, primality, rep_x),
-      yPAdic)
-
+-- PAdic.multiply: multiply the representative sequences pointwise;
+-- well-defined in each argument by the respect lemmas above.
 definition PAdic.multiply
-        (x y : PAdic(p, primality)) : PAdic(p, primality) :=
-  Quotient.lift(
-      (rep_x : PAdicCauchySequence(p, primality)) ↦
-          PAdic.multiply_after_first(p, primality, rep_x, y),
-      (rep_x rep_xPrime : PAdicCauchySequence(p, primality))
-               (xEquiv : PAdicEquivalent(p, primality, rep_x, rep_xPrime)) ↦
-          PAdic.multiply_respects(p, primality, rep_x, rep_xPrime, xEquiv, y),
-      x)
+        : PAdic(p, primality) → PAdic(p, primality) → PAdic(p, primality)
+  by representatives a, c ↦ (Quotient.mk(a * c) : PAdic(p, primality))
+  well_defined by PAdic.multiply_respects_first(p, primality),
+                  PAdic.multiply_respects_second(p, primality)

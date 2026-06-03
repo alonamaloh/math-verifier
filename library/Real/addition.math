@@ -112,124 +112,75 @@ theorem CauchyRationalSequence.sequenceFunction_add
     m =>
       reflexivity(Rational, sa(m) + sb(m))
 
--- Inner respect: with x fixed, λ y. mk(add(x, y)) respects
--- CauchyEquivalent. The proof uses the SAME ε (no halving) because
--- the shared rep_x cancels: |(x_m + y_m) - (x_m + y'_m)| = |y_m - y'_m|.
--- Bridge each sf(add(rep_x, rep_•), m) to sf(rep_x, m) + sf(rep_•, m)
--- via sequenceFunction_add, then a single ring step does the cancel.
-theorem Real.add_after_first_respects
+-- Respect of addition in the second argument: with rep_x fixed, varying
+-- rep_y by an equivalence keeps the sum equivalent. The shared rep_x
+-- cancels, so the same ε (no halving) witnesses: |(x+y) - (x+y')| =
+-- |y - y'| < ε.
+theorem Real.add_respects_second
         (rep_x rep_y rep_yPrime : CauchyRationalSequence)
         (yEquiv : CauchyEquivalent(rep_y, rep_yPrime))
-        : (Quotient.mk(rep_x + rep_y) : Real)
-          = Quotient.mk(rep_x + rep_yPrime) :=
-  Quotient.sound(
-      rep_x + rep_y,
-      rep_x + rep_yPrime,
-      (epsilon : Rational)
-               (epsilonPositive : Rational.zero < epsilon) ↦ {
-          obtain ⟨N, yEquiv_at_N⟩ from yEquiv(epsilon, epsilonPositive);
-          witness N with
-              (m : Natural) (N_leq_m : N ≤ m) ↦ {
-                let sx : Rational :=
-                    CauchyRationalSequence.sequenceFunction(rep_x, m);
-                let sy : Rational :=
-                    CauchyRationalSequence.sequenceFunction(rep_y, m);
-                let syPrime : Rational :=
-                    CauchyRationalSequence.sequenceFunction(rep_yPrime, m);
-                -- |sf(add(rep_x, rep_y), m) - sf(add(rep_x, rep_yPrime), m)|
-                --   = |(sx + sy) - (sx + syPrime)|     (push sf through add, twice)
-                --   = |sy - syPrime|                   (ring cancels the shared sx)
-                --   < epsilon                          (yEquiv at N)
-                calc abs(
-                         CauchyRationalSequence.sequenceFunction(
-                             rep_x + rep_y, m)
-                         - CauchyRationalSequence.sequenceFunction(
-                             rep_x + rep_yPrime, m))
-                   = abs((sx + sy)
-                         - CauchyRationalSequence.sequenceFunction(
-                               rep_x + rep_yPrime, m))
-                   = abs((sx + sy) - (sx + syPrime))
-                   = abs(sy - syPrime)
-                   < epsilon
-                       by yEquiv_at_N(m, N_leq_m)
-              }
-        })
-
--- Outer respect: lift over x. The same cancellation argument with
--- (rep_x + rep_y) vs (rep_x' + rep_y) — here the SECOND component
--- shares, so we use add_subtract_cancel_RIGHT instead.
-theorem Real.add_respects
-        (rep_x rep_xPrime : CauchyRationalSequence)
-        (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
-        (yReal : Real)
-        : Quotient.lift(
-              (rep_y : CauchyRationalSequence) ↦
-                  (Quotient.mk(rep_x + rep_y) : Real),
-              Real.add_after_first_respects(rep_x),
-              yReal)
-          = Quotient.lift(
-              (rep_y : CauchyRationalSequence) ↦
-                  (Quotient.mk(rep_xPrime + rep_y) : Real),
-              Real.add_after_first_respects(rep_xPrime),
-              yReal) :=
-  cases yReal {
-    | rep_y =>
-        -- Mirror of add_after_first_respects with the SECOND component
-        -- shared instead of the first; the same sequenceFunction_add
-        -- bridge + ring cancel.
-        Quotient.sound(
-            rep_x + rep_y,
-            rep_xPrime + rep_y,
-            (epsilon : Rational)
-                     (epsilonPositive : Rational.zero < epsilon) ↦ {
-                obtain ⟨N, xEquiv_at_N⟩ from xEquiv(epsilon, epsilonPositive);
-                witness N with
-                    (m : Natural) (N_leq_m : N ≤ m) ↦ {
-                      let sx : Rational :=
-                          CauchyRationalSequence.sequenceFunction(rep_x, m);
-                      let sxPrime : Rational :=
-                          CauchyRationalSequence.sequenceFunction(rep_xPrime, m);
-                      let sy : Rational :=
-                          CauchyRationalSequence.sequenceFunction(rep_y, m);
-                      -- |sf(add(rep_x, rep_y), m) - sf(add(rep_xPrime, rep_y), m)|
-                      --   = |(sx + sy) - (sxPrime + sy)|     (push sf through add, twice)
-                      --   = |sx - sxPrime|                   (ring cancels the shared sy)
-                      --   < epsilon                          (xEquiv at N)
-                      calc abs(
-                               CauchyRationalSequence.sequenceFunction(
-                                   rep_x + rep_y, m)
-                               - CauchyRationalSequence.sequenceFunction(
-                                   rep_xPrime + rep_y, m))
-                         = abs((sx + sy)
-                               - CauchyRationalSequence.sequenceFunction(
-                                     rep_xPrime + rep_y, m))
-                         = abs((sx + sy) - (sxPrime + sy))
-                         = abs(sx - sxPrime)
-                         < epsilon
-                             by xEquiv_at_N(m, N_leq_m)
-                    }
-              })
+        : CauchyEquivalent(rep_x + rep_y, rep_x + rep_yPrime) :=
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦ {
+      obtain ⟨N, yEquiv_at_N⟩ from yEquiv(epsilon, epsilonPositive);
+      witness N with
+          (m : Natural) (N_leq_m : N ≤ m) ↦ {
+            let sx : Rational :=
+                CauchyRationalSequence.sequenceFunction(rep_x, m);
+            let sy : Rational :=
+                CauchyRationalSequence.sequenceFunction(rep_y, m);
+            let syPrime : Rational :=
+                CauchyRationalSequence.sequenceFunction(rep_yPrime, m);
+            calc abs(
+                     CauchyRationalSequence.sequenceFunction(rep_x + rep_y, m)
+                     - CauchyRationalSequence.sequenceFunction(
+                           rep_x + rep_yPrime, m))
+               = abs((sx + sy)
+                     - CauchyRationalSequence.sequenceFunction(
+                           rep_x + rep_yPrime, m))
+               = abs((sx + sy) - (sx + syPrime))
+               = abs(sy - syPrime)
+               < epsilon
+                   by yEquiv_at_N(m, N_leq_m)
+          }
   }
 
--- Inner "add-with-fixed-first": Real → Real, lifts y over the inner
--- respect.
-definition Real.add_after_first
-        (rep_x : CauchyRationalSequence) (yReal : Real) : Real :=
-  Quotient.lift(
-      (rep_y : CauchyRationalSequence) ↦
-          (Quotient.mk(rep_x + rep_y) : Real),
-      Real.add_after_first_respects(rep_x),
-      yReal)
+-- Respect of addition in the first argument: symmetric, the shared rep_y
+-- cancels.
+theorem Real.add_respects_first
+        (rep_x rep_xPrime rep_y : CauchyRationalSequence)
+        (xEquiv : CauchyEquivalent(rep_x, rep_xPrime))
+        : CauchyEquivalent(rep_x + rep_y, rep_xPrime + rep_y) :=
+  (epsilon : Rational)
+           (epsilonPositive : Rational.zero < epsilon) ↦ {
+      obtain ⟨N, xEquiv_at_N⟩ from xEquiv(epsilon, epsilonPositive);
+      witness N with
+          (m : Natural) (N_leq_m : N ≤ m) ↦ {
+            let sx : Rational :=
+                CauchyRationalSequence.sequenceFunction(rep_x, m);
+            let sxPrime : Rational :=
+                CauchyRationalSequence.sequenceFunction(rep_xPrime, m);
+            let sy : Rational :=
+                CauchyRationalSequence.sequenceFunction(rep_y, m);
+            calc abs(
+                     CauchyRationalSequence.sequenceFunction(rep_x + rep_y, m)
+                     - CauchyRationalSequence.sequenceFunction(
+                           rep_xPrime + rep_y, m))
+               = abs((sx + sy)
+                     - CauchyRationalSequence.sequenceFunction(
+                           rep_xPrime + rep_y, m))
+               = abs((sx + sy) - (sxPrime + sy))
+               = abs(sx - sxPrime)
+               < epsilon
+                   by xEquiv_at_N(m, N_leq_m)
+          }
+  }
 
--- Real.add itself: lift over x.
-definition Real.add (x y : Real) : Real :=
-  Quotient.lift(
-      (rep_x : CauchyRationalSequence) ↦
-          Real.add_after_first(rep_x, y),
-      (rep_x rep_xPrime : CauchyRationalSequence)
-               (xEquiv : CauchyEquivalent(rep_x, rep_xPrime)) ↦
-          Real.add_respects(rep_x, rep_xPrime, xEquiv, y),
-      x)
+-- Real.add: add the representative sequences pointwise; well-defined in
+-- each argument by the respect lemmas above.
+definition Real.add : Real → Real → Real
+  by representatives a, c ↦ (Quotient.mk(a + c) : Real)
+  well_defined by Real.add_respects_first, Real.add_respects_second
 
 operator (+) on (Real, Real) := Real.add
 
