@@ -115,48 +115,28 @@ theorem Polynomial.Coefficients.add_respects (r : Ring)
 -- forms throughout — relation/type inference recovers T, R, U from the
 -- expected `Polynomial(...)` type and the respect proofs.
 
-definition Polynomial.add_after_first (r : Ring)
-        (p : Polynomial.Coefficients(Ring.carrier(r)))
-        (secondPolynomial : Polynomial(Ring.carrier(r), Ring.zero(r)))
-        : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
-  Quotient.lift(
-      (q : Polynomial.Coefficients(Ring.carrier(r))) ↦
-          Polynomial.make(Ring.carrier(r), Ring.zero(r),
-              Polynomial.Coefficients.add(r, p, q)),
-      (q qPrime : Polynomial.Coefficients(Ring.carrier(r)))
-               (secondEqual
-                   : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), q, qPrime)) ↦
-          Polynomial.Coefficients.add_respects(r, p, p, q, qPrime,
-              Polynomial.ExtensionallyEqual.reflexive(Ring.carrier(r), Ring.zero(r), p),
-              secondEqual),
-      secondPolynomial)
-
-theorem Polynomial.add_after_first_respects (r : Ring)
-        (p pPrime : Polynomial.Coefficients(Ring.carrier(r)))
-        (firstEqual
-            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime))
-        (secondPolynomial : Polynomial(Ring.carrier(r), Ring.zero(r)))
-        : Polynomial.add_after_first(r, p, secondPolynomial)
-          = Polynomial.add_after_first(r, pPrime, secondPolynomial) :=
-  cases secondPolynomial { | q =>
-    Quotient.sound(
-        Polynomial.Coefficients.add(r, p, q),
-        Polynomial.Coefficients.add(r, pPrime, q),
-        Polynomial.Coefficients.add_respects(r, p, pPrime, q, q,
-            firstEqual,
-            Polynomial.ExtensionallyEqual.reflexive(Ring.carrier(r), Ring.zero(r), q))) }
-
+-- Add the coefficient-list representatives; well-defined in each argument
+-- because Coefficients.add respects extensional equality (reflexivity on
+-- the held-fixed side).
 definition Polynomial.add {r : Ring}
-        (firstPolynomial secondPolynomial : Polynomial(Ring.carrier(r), Ring.zero(r)))
-        : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
-  Quotient.lift(
-      (p : Polynomial.Coefficients(Ring.carrier(r))) ↦
-          Polynomial.add_after_first(r, p, secondPolynomial),
-      (p pPrime : Polynomial.Coefficients(Ring.carrier(r)))
-               (firstEqual
-                   : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), p, pPrime)) ↦
-          Polynomial.add_after_first_respects(r, p, pPrime, firstEqual, secondPolynomial),
-      firstPolynomial)
+        : Polynomial(Ring.carrier(r), Ring.zero(r))
+          → Polynomial(Ring.carrier(r), Ring.zero(r))
+          → Polynomial(Ring.carrier(r), Ring.zero(r))
+  by representatives a, b ↦
+       Polynomial.make(Ring.carrier(r), Ring.zero(r),
+           Polynomial.Coefficients.add(r, a, b))
+  well_defined by
+    (a a' b : Polynomial.Coefficients(Ring.carrier(r)))
+        (firstEqual
+            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), a, a')) ↦
+        Polynomial.Coefficients.add_respects(r, a, a', b, b, firstEqual,
+            Polynomial.ExtensionallyEqual.reflexive(Ring.carrier(r), Ring.zero(r), b)),
+    (a b b' : Polynomial.Coefficients(Ring.carrier(r)))
+        (secondEqual
+            : Polynomial.ExtensionallyEqual(Ring.carrier(r), Ring.zero(r), b, b')) ↦
+        Polynomial.Coefficients.add_respects(r, a, a, b, b',
+            Polynomial.ExtensionallyEqual.reflexive(Ring.carrier(r), Ring.zero(r), a),
+            secondEqual)
 
 -- Operator overload: `p + q` over `Polynomial(...)` dispatches on the
 -- `Polynomial` type head, recovering the implicit ring from the operands.
