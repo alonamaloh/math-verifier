@@ -10459,6 +10459,25 @@ private:
         ExpressionPointer userRight = components.rightEndpoint;
         ExpressionPointer userCarrier = components.carrierType;
         LevelPointer userCarrierLevel = components.carrierUniverseLevel;
+        // Representation contract (WS5/WS8). This helper has two callers that
+        // pass `userProofType` in DIFFERENT representations: the theorem-body
+        // coercion path passes it CLOSED over the local binders (de Bruijn
+        // indices), while the calc-step path passes it OPENED (the binders as
+        // named Internal FreeVariables). The symmetric-flip branch below
+        // builds `Equality.symmetry(carrier, x, y, proof)` directly from these
+        // endpoints — correct only when they are CLOSED, else the opened
+        // `@a`/`@e` free variables leak into the proof term and it is rejected
+        // as malformed (the calc-step case that kept its explicit symmetry).
+        // Normalize to CLOSED here so both callers behave identically; the
+        // `openOverLocalBinders` comparisons below re-open as needed.
+        auto closeIfOpened = [&](const ExpressionPointer& e) {
+            return containsFreeVariable(e)
+                ? closeOverLocalBinders(e, localBinders, localBinders.size())
+                : e;
+        };
+        userLeft = closeIfOpened(userLeft);
+        userRight = closeIfOpened(userRight);
+        userCarrier = closeIfOpened(userCarrier);
         // ζ-unfold local let-binders (consistent with autoProveCalcStep).
         previousKernel = zetaUnfoldLetBinders(previousKernel, localBinders);
         nextKernel = zetaUnfoldLetBinders(nextKernel, localBinders);
