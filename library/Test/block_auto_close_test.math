@@ -1,0 +1,26 @@
+-- Tests for implicit-`goal` block close: a block whose last item is a
+-- binding statement (trailing `;`, no final expression) is closed by the
+-- auto-prover from the facts the statements introduced.
+
+module Test.block_auto_close_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- (1) Trailing all-= calc binds `a = c`; the implicit `goal` finds it.
+theorem block_close_calc (a b c : Natural) (h1 : a = b) (h2 : b = c) : a = c := {
+  calc a = b = c;
+}
+
+-- (2) Trailing `claim` establishes the goal; implicit `goal` closes it.
+theorem block_close_claim (P : Proposition) (hP : P) : P := {
+  claim P by hP;
+}
+
+-- (3) Intermediate fact, then a trailing binding that is the goal.
+theorem block_close_symmetry (a b : Natural) (h : a = b) : b = a := {
+  claim b = a by Equality.symmetry(h);
+}

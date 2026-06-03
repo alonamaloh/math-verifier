@@ -1477,6 +1477,23 @@ private:
             if (peek().kind == TokenKind::Semicolon) {
                 consumeAny();
             }
+        } else if (peek().kind == TokenKind::RightBrace
+                   && !wrappers.empty()) {
+            // The block's last item was a binding statement (`calc …;`,
+            // `claim …;`, `obtain …;`) with no trailing expression. Close it
+            // with an implicit bare `goal`: the auto-prover proves the goal
+            // from the facts those statements introduced. (Without this the
+            // trailing `;` + `}` would be a parse error, so existing proofs
+            // — which always end in an expression — are unaffected.)
+            Token brace = peek();
+            finalExpression = makeSurfaceStructuredClaim(
+                /*proposition=*/nullptr,
+                /*label=*/"",
+                /*byHint=*/nullptr,
+                /*byCases=*/false,
+                /*arms=*/{},
+                brace.line,
+                brace.column);
         } else {
             finalExpression = parseExpression();
             // Optional trailing semicolon for the final expression.
