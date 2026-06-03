@@ -84,40 +84,20 @@ construction RingModulo.make (c : CommutativeRing) (m a : CommutativeRing.carrie
 -- ----------------------------------------------------------------------
 -- Addition. Lift base addition over both arguments.
 
-definition RingModulo.add_representative (c : CommutativeRing)
-        (m a : CommutativeRing.carrier(c))
-        (y : RingModulo(c, m)) : RingModulo(c, m) :=
-  Quotient.lift(
-      (b : CommutativeRing.carrier(c)) ↦
-          RingModulo.make(c, m, Ring.add(CommutativeRing.ring(c), a, b)),
-      (b b' : CommutativeRing.carrier(c))
-               (congruentB : Ring.CongruentModulo(CommutativeRing.ring(c), m, b, b')) ↦
-          Ring.CongruentModulo.add_respects(CommutativeRing.ring(c), m, a, a, b, b',
-              Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, a), congruentB),
-      y)
-
-theorem RingModulo.add_representative_respects (c : CommutativeRing)
-        (m a a' : CommutativeRing.carrier(c))
-        (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a'))
-        (y : RingModulo(c, m))
-        : RingModulo.add_representative(c, m, a, y)
-          = RingModulo.add_representative(c, m, a', y) :=
-  cases y { | b =>
-    Quotient.sound(
-        Ring.add(CommutativeRing.ring(c), a, b),
-        Ring.add(CommutativeRing.ring(c), a', b),
-        Ring.CongruentModulo.add_respects(CommutativeRing.ring(c), m, a, a', b, b,
-            congruentA, Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, b))) }
-
+-- Add the base-ring representatives modulo `m`; well-defined in each
+-- argument because Ring addition respects congruence.
 definition RingModulo.add {c : CommutativeRing} {m : CommutativeRing.carrier(c)}
-        (x y : RingModulo(c, m)) : RingModulo(c, m) :=
-  Quotient.lift(
-      (a : CommutativeRing.carrier(c)) ↦
-          RingModulo.add_representative(c, m, a, y),
-      (a a' : CommutativeRing.carrier(c))
-               (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a')) ↦
-          RingModulo.add_representative_respects(c, m, a, a', congruentA, y),
-      x)
+        : RingModulo(c, m) → RingModulo(c, m) → RingModulo(c, m)
+  by representatives a, b ↦ RingModulo.make(c, m, Ring.add(CommutativeRing.ring(c), a, b))
+  well_defined by
+    (a a' b : CommutativeRing.carrier(c))
+        (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a')) ↦
+        Ring.CongruentModulo.add_respects(CommutativeRing.ring(c), m, a, a', b, b,
+            congruentA, Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, b)),
+    (a b b' : CommutativeRing.carrier(c))
+        (congruentB : Ring.CongruentModulo(CommutativeRing.ring(c), m, b, b')) ↦
+        Ring.CongruentModulo.add_respects(CommutativeRing.ring(c), m, a, a, b, b',
+            Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, a), congruentB)
 
 -- The ring/structure arguments are implicit and recovered from the
 -- operand type RingModulo(c, m), so `x + y` dispatches here.
@@ -148,41 +128,22 @@ operator (-) on (RingModulo, RingModulo) := RingModulo.subtract
 -- Multiplication. Same two-lift shape as addition; the commutativity
 -- proof comes from the bundle (`CommutativeRing.commutative(c)`).
 
-definition RingModulo.multiply_representative (c : CommutativeRing)
-        (m a : CommutativeRing.carrier(c)) (y : RingModulo(c, m)) : RingModulo(c, m) :=
-  Quotient.lift(
-      (b : CommutativeRing.carrier(c)) ↦
-          RingModulo.make(c, m, Ring.multiply(CommutativeRing.ring(c), a, b)),
-      (b b' : CommutativeRing.carrier(c))
-               (congruentB : Ring.CongruentModulo(CommutativeRing.ring(c), m, b, b')) ↦
-          Ring.CongruentModulo.multiply_respects(CommutativeRing.ring(c),
-              CommutativeRing.commutative(c), m, a, a,
-              b, b', Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, a), congruentB),
-      y)
-
-theorem RingModulo.multiply_representative_respects (c : CommutativeRing)
-        (m a a' : CommutativeRing.carrier(c))
-        (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a'))
-        (y : RingModulo(c, m))
-        : RingModulo.multiply_representative(c, m, a, y)
-          = RingModulo.multiply_representative(c, m, a', y) :=
-  cases y { | b =>
-    Quotient.sound(
-        Ring.multiply(CommutativeRing.ring(c), a, b),
-        Ring.multiply(CommutativeRing.ring(c), a', b),
+-- Multiply the base-ring representatives modulo `m`; the commutativity
+-- proof (needed for the left-multiple direction) comes from the bundle.
+definition RingModulo.multiply {c : CommutativeRing} {m : CommutativeRing.carrier(c)}
+        : RingModulo(c, m) → RingModulo(c, m) → RingModulo(c, m)
+  by representatives a, b ↦ RingModulo.make(c, m, Ring.multiply(CommutativeRing.ring(c), a, b))
+  well_defined by
+    (a a' b : CommutativeRing.carrier(c))
+        (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a')) ↦
         Ring.CongruentModulo.multiply_respects(CommutativeRing.ring(c),
             CommutativeRing.commutative(c), m, a, a', b, b,
-            congruentA, Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, b))) }
-
-definition RingModulo.multiply {c : CommutativeRing} {m : CommutativeRing.carrier(c)}
-        (x y : RingModulo(c, m)) : RingModulo(c, m) :=
-  Quotient.lift(
-      (a : CommutativeRing.carrier(c)) ↦
-          RingModulo.multiply_representative(c, m, a, y),
-      (a a' : CommutativeRing.carrier(c))
-               (congruentA : Ring.CongruentModulo(CommutativeRing.ring(c), m, a, a')) ↦
-          RingModulo.multiply_representative_respects(c, m, a, a', congruentA, y),
-      x)
+            congruentA, Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, b)),
+    (a b b' : CommutativeRing.carrier(c))
+        (congruentB : Ring.CongruentModulo(CommutativeRing.ring(c), m, b, b')) ↦
+        Ring.CongruentModulo.multiply_respects(CommutativeRing.ring(c),
+            CommutativeRing.commutative(c), m, a, a, b, b',
+            Ring.CongruentModulo.reflexive(CommutativeRing.ring(c), m, a), congruentB)
 
 -- The commutativity proof is recovered from the bundle `c`, which is
 -- itself recovered from the operand type, so `x * y` dispatches here.
