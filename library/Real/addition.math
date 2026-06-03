@@ -94,13 +94,17 @@ definition CauchyRationalSequence.add
           (n : Natural) ↦ s(n) + t(n),
           Rational.sequence.sum_is_cauchy(s, t, sCauchy, tCauchy))
 
+-- Pointwise sum of representatives, so rep-level proofs read `a + b`
+-- instead of naming `.add`.
+operator (+) on (CauchyRationalSequence, CauchyRationalSequence) := CauchyRationalSequence.add
+
 -- sf(add(rep_x, rep_y), m) = sf(rep_x, m) + sf(rep_y, m).
 -- Bridges the abstract sequenceFunction projector through the
 -- pattern-match definition of add.
 theorem CauchyRationalSequence.sequenceFunction_add
         : (rep_x rep_y : CauchyRationalSequence) → (m : Natural)
           → CauchyRationalSequence.sequenceFunction(
-                CauchyRationalSequence.add(rep_x, rep_y), m)
+                rep_x + rep_y, m)
             = CauchyRationalSequence.sequenceFunction(rep_x, m)
               + CauchyRationalSequence.sequenceFunction(rep_y, m)
   | CauchyRationalSequence.make(sa, _),
@@ -116,11 +120,11 @@ theorem CauchyRationalSequence.sequenceFunction_add
 theorem Real.add_after_first_respects
         (rep_x rep_y rep_yPrime : CauchyRationalSequence)
         (yEquiv : CauchyEquivalent(rep_y, rep_yPrime))
-        : (Quotient.mk(CauchyRationalSequence.add(rep_x, rep_y)) : Real)
-          = Quotient.mk(CauchyRationalSequence.add(rep_x, rep_yPrime)) :=
+        : (Quotient.mk(rep_x + rep_y) : Real)
+          = Quotient.mk(rep_x + rep_yPrime) :=
   Quotient.sound(
-      CauchyRationalSequence.add(rep_x, rep_y),
-      CauchyRationalSequence.add(rep_x, rep_yPrime),
+      rep_x + rep_y,
+      rep_x + rep_yPrime,
       (epsilon : Rational)
                (epsilonPositive : Rational.zero < epsilon) ↦ {
           obtain ⟨N, yEquiv_at_N⟩ from yEquiv(epsilon, epsilonPositive);
@@ -138,12 +142,12 @@ theorem Real.add_after_first_respects
                 --   < epsilon                          (yEquiv at N)
                 calc abs(
                          CauchyRationalSequence.sequenceFunction(
-                             CauchyRationalSequence.add(rep_x, rep_y), m)
+                             rep_x + rep_y, m)
                          - CauchyRationalSequence.sequenceFunction(
-                             CauchyRationalSequence.add(rep_x, rep_yPrime), m))
+                             rep_x + rep_yPrime, m))
                    = abs((sx + sy)
                          - CauchyRationalSequence.sequenceFunction(
-                               CauchyRationalSequence.add(rep_x, rep_yPrime), m))
+                               rep_x + rep_yPrime, m))
                    = abs((sx + sy) - (sx + syPrime))
                    = abs(sy - syPrime)
                    < epsilon
@@ -160,12 +164,12 @@ theorem Real.add_respects
         (yReal : Real)
         : Quotient.lift(
               (rep_y : CauchyRationalSequence) ↦
-                  (Quotient.mk(CauchyRationalSequence.add(rep_x, rep_y)) : Real),
+                  (Quotient.mk(rep_x + rep_y) : Real),
               Real.add_after_first_respects(rep_x),
               yReal)
           = Quotient.lift(
               (rep_y : CauchyRationalSequence) ↦
-                  (Quotient.mk(CauchyRationalSequence.add(rep_xPrime, rep_y)) : Real),
+                  (Quotient.mk(rep_xPrime + rep_y) : Real),
               Real.add_after_first_respects(rep_xPrime),
               yReal) :=
   cases yReal {
@@ -174,8 +178,8 @@ theorem Real.add_respects
         -- shared instead of the first; the same sequenceFunction_add
         -- bridge + ring cancel.
         Quotient.sound(
-            CauchyRationalSequence.add(rep_x, rep_y),
-            CauchyRationalSequence.add(rep_xPrime, rep_y),
+            rep_x + rep_y,
+            rep_xPrime + rep_y,
             (epsilon : Rational)
                      (epsilonPositive : Rational.zero < epsilon) ↦ {
                 obtain ⟨N, xEquiv_at_N⟩ from xEquiv(epsilon, epsilonPositive);
@@ -193,12 +197,12 @@ theorem Real.add_respects
                       --   < epsilon                          (xEquiv at N)
                       calc abs(
                                CauchyRationalSequence.sequenceFunction(
-                                   CauchyRationalSequence.add(rep_x, rep_y), m)
+                                   rep_x + rep_y, m)
                                - CauchyRationalSequence.sequenceFunction(
-                                   CauchyRationalSequence.add(rep_xPrime, rep_y), m))
+                                   rep_xPrime + rep_y, m))
                          = abs((sx + sy)
                                - CauchyRationalSequence.sequenceFunction(
-                                     CauchyRationalSequence.add(rep_xPrime, rep_y), m))
+                                     rep_xPrime + rep_y, m))
                          = abs((sx + sy) - (sxPrime + sy))
                          = abs(sx - sxPrime)
                          < epsilon
@@ -213,7 +217,7 @@ definition Real.add_after_first
         (rep_x : CauchyRationalSequence) (yReal : Real) : Real :=
   Quotient.lift(
       (rep_y : CauchyRationalSequence) ↦
-          (Quotient.mk(CauchyRationalSequence.add(rep_x, rep_y)) : Real),
+          (Quotient.mk(rep_x + rep_y) : Real),
       Real.add_after_first_respects(rep_x),
       yReal)
 
@@ -228,10 +232,6 @@ definition Real.add (x y : Real) : Real :=
       x)
 
 operator (+) on (Real, Real) := Real.add
-
--- Pointwise sum of representatives, so rep-level proofs of the Real
--- addition laws read `a + b` instead of naming `.add`.
-operator (+) on (CauchyRationalSequence, CauchyRationalSequence) := CauchyRationalSequence.add
 
 -- ----------------------------------------------------------------------
 -- Rational → Real embedding preservation lemmas (zero, one, add).
@@ -257,9 +257,7 @@ theorem Rational.to_real.one_preserves
 theorem Rational.to_real.add_preserves_equiv (a b : Rational)
         : CauchyEquivalent(
               Rational.to_cauchy_constant(a + b),
-              CauchyRationalSequence.add(
-                  Rational.to_cauchy_constant(a),
-                  Rational.to_cauchy_constant(b))) :=
+              Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b)) :=
   (epsilon : Rational)
            (epsilonPositive : Rational.zero < epsilon) ↦
     witness 0 with
@@ -272,16 +270,12 @@ theorem Rational.to_real.add_preserves_equiv (a b : Rational)
                    CauchyRationalSequence.sequenceFunction(
                        Rational.to_cauchy_constant(a + b), m)
                    - CauchyRationalSequence.sequenceFunction(
-                         CauchyRationalSequence.add(
-                             Rational.to_cauchy_constant(a),
-                             Rational.to_cauchy_constant(b)),
+                         Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b),
                          m))
              = abs(
                    (a + b)
                    - CauchyRationalSequence.sequenceFunction(
-                         CauchyRationalSequence.add(
-                             Rational.to_cauchy_constant(a),
-                             Rational.to_cauchy_constant(b)),
+                         Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b),
                          m))
              = abs(
                    (a + b)
@@ -300,7 +294,5 @@ theorem Rational.to_real.add_preserves (a b : Rational)
       CauchyRationalSequence,
       CauchyEquivalent,
       Rational.to_cauchy_constant(a + b),
-      CauchyRationalSequence.add(
-          Rational.to_cauchy_constant(a),
-          Rational.to_cauchy_constant(b)),
+      Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b),
       Rational.to_real.add_preserves_equiv(a, b))
