@@ -20,15 +20,15 @@ definition Natural.divides(divisor dividend : Natural) : Proposition :=
 
 -- Every natural divides itself, with quotient 1.
 theorem Natural.divides_reflexive(n : Natural) : n ∣ n :=
-  ⟨1, calc n = n * 1⟩
+  witness 1 with calc n = n * 1
 
 -- One divides every natural, with quotient that natural.
 theorem Natural.one_divides(n : Natural) : 1 ∣ n :=
-  ⟨n, calc n = 1 * n⟩
+  witness n with calc n = 1 * n
 
 -- Every natural divides zero, with quotient 0.
 theorem Natural.divides_zero(n : Natural) : n ∣ 0 :=
-  ⟨0, calc (0 : Natural) = n * 0⟩
+  witness 0 with calc (0 : Natural) = n * 0
 
 -- Divisibility is transitive. From `b = a · q₁` and `c = b · q₂` we get
 -- `c = a · (q₁ · q₂)`, so `q₁ · q₂` witnesses `a ∣ c`.
@@ -37,11 +37,11 @@ theorem Natural.divides_transitive (a b c : Natural)
         : a ∣ c := {
   obtain ⟨firstQuotient, bEqualsAtimesFirst⟩ from aDividesB;
   obtain ⟨secondQuotient, cEqualsBtimesSecond⟩ from bDividesC;
-  ⟨firstQuotient * secondQuotient,
+  witness firstQuotient * secondQuotient with
     calc c
        = b * secondQuotient
        = (a * firstQuotient) * secondQuotient
-       = a * (firstQuotient * secondQuotient)⟩
+       = a * (firstQuotient * secondQuotient)
 }
 
 -- If `d ∣ n` then either `n = 0` or `d ≤ n` — because when the quotient
@@ -66,7 +66,7 @@ theorem Natural.divides_less_or_equal_or_zero (d n : Natural)
 -- A number divides any multiple of itself: `n ∣ n · m`, with quotient `m`.
 theorem Natural.divides_self_multiple (n m : Natural)
         : n ∣ n * m :=
-  ⟨m, reflexivity(n * m)⟩
+  witness m with reflexivity(n * m)
 
 -- Divisibility passes to multiples: if `d ∣ m` then `d ∣ k · m`. From
 -- `m = d · q`, `k · m = k · (d · q) = d · (k · q)`.
@@ -74,10 +74,10 @@ theorem Natural.divides_multiple_left (d k m : Natural)
         (dDividesM : d ∣ m)
         : d ∣ k * m := {
   obtain ⟨quotient, mEqualsDtimesQuotient⟩ from dDividesM;
-  ⟨k * quotient,
+  witness k * quotient with
     calc k * m
        = k * (d * quotient)
-       = d * (k * quotient)⟩
+       = d * (k * quotient)
 }
 
 -- Divisibility is preserved by addition: if `d ∣ a` and `d ∣ b` then
@@ -88,11 +88,11 @@ theorem Natural.divides_add (d a b : Natural)
         : d ∣ (a + b) := {
   obtain ⟨firstQuotient, aEqualsDtimesFirst⟩ from dDividesA;
   obtain ⟨secondQuotient, bEqualsDtimesSecond⟩ from dDividesB;
-  ⟨firstQuotient + secondQuotient,
+  witness firstQuotient + secondQuotient with
     calc a + b
        = d * firstQuotient + b
        = d * firstQuotient + d * secondQuotient
-       = d * (firstQuotient + secondQuotient)⟩
+       = d * (firstQuotient + secondQuotient)
 }
 
 -- When two multiples of `d` are consecutive — `d · q₂ = (d · q₁) + 1` —
@@ -110,9 +110,9 @@ theorem Natural.divides_one_of_consecutive_multiples
           → successor(d * q1) = d * q2
           → d ∣ 1
   | zero, q2, equalityProof =>
-      ⟨q2, calc successor(0)
+      witness q2 with calc successor(0)
               = successor(d * 0)
-              = d * q2⟩
+              = d * q2
   | successor(q1Predecessor), q2, equalityProof =>
       cases q2 refining equalityProof {
         | zero =>
