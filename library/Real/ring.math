@@ -1,12 +1,14 @@
 -- Real/ring.math
 --
 -- Ring laws for Real addition and negation: commutativity,
--- associativity, identity, additive inverse. Each lifts from the
--- corresponding pointwise Rational law via Quotient.induct (or
--- Quotient.induct_two) plus a single helper:
--- `CauchyRationalSequence.equivalent_when_sequenceFunction_equal`,
--- which says that if two Cauchy rational sequences have pointwise-
--- equal sequenceFunctions, they're equivalent in the quotient.
+-- associativity, identity, additive inverse. Each reads as "pick
+-- representatives with `by_representatives`, then prove the underlying
+-- sequences agree at every index". Two helpers carry all the quotient
+-- machinery so the laws never name it:
+--   • `equivalent_when_sequenceFunction_equal` — pointwise-equal Cauchy
+--     sequences are equivalent in the quotient;
+--   • `Real.equal_of_pointwise_sequence` — therefore the two classes are
+--     equal (the one place `Quotient.sound` appears).
 
 module Real.ring
 
@@ -46,123 +48,89 @@ theorem CauchyRationalSequence.equivalent_when_sequenceFunction_equal
            (epsilonPositive : Rational.zero < epsilon) ↦
     witness 0 with
         (m : Natural) (_ : 0 ≤ m) ↦
-          -- |sf(rep1, m) - sf(rep2, m)|
-          --   = |sf(rep2, m) - sf(rep2, m)|     [pointwiseEq congruence]
-          --   = Rational.zero                    [absolute_value_subtract_self]
-          rewrite(
-              Equality.symmetry(
-                  calc abs(
-                           CauchyRationalSequence.sequenceFunction(rep1, m)
-                           - CauchyRationalSequence.sequenceFunction(rep2, m))
-                     = abs(
-                           CauchyRationalSequence.sequenceFunction(rep2, m)
-                           - CauchyRationalSequence.sequenceFunction(rep2, m))
-                            by pointwiseEq(m)
-                     = Rational.zero),
-              epsilonPositive)
+          -- |sf(rep1, m) - sf(rep2, m)| = |sf(rep2, m) - sf(rep2, m)|
+          --   = Rational.zero < epsilon.
+          calc abs(
+                   CauchyRationalSequence.sequenceFunction(rep1, m)
+                   - CauchyRationalSequence.sequenceFunction(rep2, m))
+             = abs(
+                   CauchyRationalSequence.sequenceFunction(rep2, m)
+                   - CauchyRationalSequence.sequenceFunction(rep2, m))
+                  by pointwiseEq(m)
+             = Rational.zero
+             < epsilon
+                  by epsilonPositive
 
 -- ----------------------------------------------------------------------
--- Add is commutative on Real.
+-- Two Reals built from Cauchy sequences are equal when the sequences
+-- agree pointwise. Packages the quotient soundness together with the
+-- pointwise-difference bridge, so every ring law below reads as "pick
+-- representatives, prove the sequences agree at each n" and never names
+-- the quotient machinery directly.
+theorem Real.equal_of_pointwise_sequence
+        (rep1 rep2 : CauchyRationalSequence)
+        (pointwiseEqual
+            : (n : Natural)
+              → CauchyRationalSequence.sequenceFunction(rep1, n)
+                = CauchyRationalSequence.sequenceFunction(rep2, n))
+        : (Quotient.mk(rep1) : Real) = Quotient.mk(rep2) :=
+  Quotient.sound(rep1, rep2,
+      CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
+          rep1, rep2, pointwiseEqual))
 
--- At constructor reps: pattern-matching exposes the underlying sequences
--- so add and sequenceFunction reduce, and the pointwise equality is
--- exactly Rational.add_commutative.
-theorem Real.add_commutative_at_make
-        : (rep_x rep_y : CauchyRationalSequence)
-          → Real.add((Quotient.mk(rep_x) : Real), (Quotient.mk(rep_y) : Real))
-            = Real.add((Quotient.mk(rep_y) : Real), (Quotient.mk(rep_x) : Real))
-  | CauchyRationalSequence.make(sx, sx_cauchy),
-    CauchyRationalSequence.make(sy, sy_cauchy) =>
-      Quotient.sound(
-          CauchyRationalSequence.add(
-              CauchyRationalSequence.make(sx, sx_cauchy),
-              CauchyRationalSequence.make(sy, sy_cauchy)),
-          CauchyRationalSequence.add(
-              CauchyRationalSequence.make(sy, sy_cauchy),
-              CauchyRationalSequence.make(sx, sx_cauchy)),
-          CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-              CauchyRationalSequence.add(
-                  CauchyRationalSequence.make(sx, sx_cauchy),
-                  CauchyRationalSequence.make(sy, sy_cauchy)),
-              CauchyRationalSequence.add(
-                  CauchyRationalSequence.make(sy, sy_cauchy),
-                  CauchyRationalSequence.make(sx, sx_cauchy)),
-              (n : Natural) ↦
-                Rational.add_commutative(sx(n), sy(n))))
+-- ----------------------------------------------------------------------
+-- Add is commutative on Real. Pick representatives; the pointwise
+-- equality is exactly Rational.add_commutative.
+theorem Real.add_commutative (x y : Real) : Real.add(x, y) = Real.add(y, x) :=
+  by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩ =>
+    Real.equal_of_pointwise_sequence(
+        CauchyRationalSequence.add(
+            CauchyRationalSequence.make(sx, sxCauchy),
+            CauchyRationalSequence.make(sy, syCauchy)),
+        CauchyRationalSequence.add(
+            CauchyRationalSequence.make(sy, syCauchy),
+            CauchyRationalSequence.make(sx, sxCauchy)),
+        (n : Natural) ↦ Rational.add_commutative(sx(n), sy(n)))
 
-theorem Real.add_commutative
-        (x y : Real)
-        : Real.add(x, y) = Real.add(y, x) :=
-  Quotient.induct_two(Real.add_commutative_at_make, x, y)
-
--- Add is associative on Real. At constructor reps, all the bridge
--- proofs reduce away and the pointwise equality is Rational.add_associative.
-theorem Real.add_associative_at_make
-        : (rep_x rep_y rep_z : CauchyRationalSequence)
-          → Real.add(
-                Real.add((Quotient.mk(rep_x) : Real), (Quotient.mk(rep_y) : Real)),
-                (Quotient.mk(rep_z) : Real))
-            = Real.add(
-                  (Quotient.mk(rep_x) : Real),
-                  Real.add((Quotient.mk(rep_y) : Real), (Quotient.mk(rep_z) : Real)))
-  | CauchyRationalSequence.make(sx, sx_cauchy),
-    CauchyRationalSequence.make(sy, sy_cauchy),
-    CauchyRationalSequence.make(sz, sz_cauchy) =>
-      Quotient.sound(
-          CauchyRationalSequence.add(
-              CauchyRationalSequence.add(
-                  CauchyRationalSequence.make(sx, sx_cauchy),
-                  CauchyRationalSequence.make(sy, sy_cauchy)),
-              CauchyRationalSequence.make(sz, sz_cauchy)),
-          CauchyRationalSequence.add(
-              CauchyRationalSequence.make(sx, sx_cauchy),
-              CauchyRationalSequence.add(
-                  CauchyRationalSequence.make(sy, sy_cauchy),
-                  CauchyRationalSequence.make(sz, sz_cauchy))),
-          CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-              CauchyRationalSequence.add(
-                  CauchyRationalSequence.add(
-                      CauchyRationalSequence.make(sx, sx_cauchy),
-                      CauchyRationalSequence.make(sy, sy_cauchy)),
-                  CauchyRationalSequence.make(sz, sz_cauchy)),
-              CauchyRationalSequence.add(
-                  CauchyRationalSequence.make(sx, sx_cauchy),
-                  CauchyRationalSequence.add(
-                      CauchyRationalSequence.make(sy, sy_cauchy),
-                      CauchyRationalSequence.make(sz, sz_cauchy))),
-              (n : Natural) ↦
-                Rational.add_associative(sx(n), sy(n), sz(n))))
-
-theorem Real.add_associative
-        (x y z : Real)
+-- Add is associative on Real. Pick representatives; the pointwise
+-- equality is Rational.add_associative.
+theorem Real.add_associative (x y z : Real)
         : Real.add(Real.add(x, y), z) = Real.add(x, Real.add(y, z)) :=
-  Quotient.induct_three(Real.add_associative_at_make, x, y, z)
+  by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩,
+                     z as ⟨sz, szCauchy⟩ =>
+    Real.equal_of_pointwise_sequence(
+        CauchyRationalSequence.add(
+            CauchyRationalSequence.add(
+                CauchyRationalSequence.make(sx, sxCauchy),
+                CauchyRationalSequence.make(sy, syCauchy)),
+            CauchyRationalSequence.make(sz, szCauchy)),
+        CauchyRationalSequence.add(
+            CauchyRationalSequence.make(sx, sxCauchy),
+            CauchyRationalSequence.add(
+                CauchyRationalSequence.make(sy, syCauchy),
+                CauchyRationalSequence.make(sz, szCauchy))),
+        (n : Natural) ↦ Rational.add_associative(sx(n), sy(n), sz(n)))
 
 -- 0 + x = x on Real. Use the constant-zero sequence for the zero.
 theorem Real.zero_add
         (x : Real)
         : Real.add(Real.zero, x) = x :=
   cases x { | rep_x =>
-    Quotient.sound(
-            CauchyRationalSequence, CauchyEquivalent,
-            CauchyRationalSequence.add(
-                Rational.to_cauchy_constant(Rational.zero), rep_x),
-            rep_x,
-            CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-                CauchyRationalSequence.add(
-                    Rational.to_cauchy_constant(Rational.zero), rep_x),
-                rep_x,
-                (n : Natural) ↦
-                  calc CauchyRationalSequence.sequenceFunction(
-                           CauchyRationalSequence.add(
-                               Rational.to_cauchy_constant(Rational.zero),
-                               rep_x), n)
-                     = CauchyRationalSequence.sequenceFunction(
-                           Rational.to_cauchy_constant(Rational.zero), n)
-                       + CauchyRationalSequence.sequenceFunction(rep_x, n)
-                     = Rational.zero
-                       + CauchyRationalSequence.sequenceFunction(rep_x, n)
-                     = CauchyRationalSequence.sequenceFunction(rep_x, n))) }
+    Real.equal_of_pointwise_sequence(
+        CauchyRationalSequence.add(
+            Rational.to_cauchy_constant(Rational.zero), rep_x),
+        rep_x,
+        (n : Natural) ↦
+          calc CauchyRationalSequence.sequenceFunction(
+                   CauchyRationalSequence.add(
+                       Rational.to_cauchy_constant(Rational.zero),
+                       rep_x), n)
+             = CauchyRationalSequence.sequenceFunction(
+                   Rational.to_cauchy_constant(Rational.zero), n)
+               + CauchyRationalSequence.sequenceFunction(rep_x, n)
+             = Rational.zero
+               + CauchyRationalSequence.sequenceFunction(rep_x, n)
+             = CauchyRationalSequence.sequenceFunction(rep_x, n)) }
 
 -- x + 0 = x via add_commutative + zero_add.
 theorem Real.add_zero
@@ -177,26 +145,21 @@ theorem Real.add_negate_right
         (x : Real)
         : Real.add(x, Real.negate(x)) = Real.zero :=
   cases x { | rep_x =>
-    Quotient.sound(
-            CauchyRationalSequence, CauchyEquivalent,
-            CauchyRationalSequence.add(
-                rep_x, CauchyRationalSequence.negate(rep_x)),
-            Rational.to_cauchy_constant(Rational.zero),
-            CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-                CauchyRationalSequence.add(
-                    rep_x, CauchyRationalSequence.negate(rep_x)),
-                Rational.to_cauchy_constant(Rational.zero),
-                (n : Natural) ↦
-                  calc CauchyRationalSequence.sequenceFunction(
-                           CauchyRationalSequence.add(
-                               rep_x,
-                               CauchyRationalSequence.negate(rep_x)), n)
-                     = CauchyRationalSequence.sequenceFunction(rep_x, n)
-                       + CauchyRationalSequence.sequenceFunction(
-                             CauchyRationalSequence.negate(rep_x), n)
-                     = CauchyRationalSequence.sequenceFunction(rep_x, n)
-                       + -CauchyRationalSequence.sequenceFunction(rep_x, n)
-                     = Rational.zero)) }
+    Real.equal_of_pointwise_sequence(
+        CauchyRationalSequence.add(
+            rep_x, CauchyRationalSequence.negate(rep_x)),
+        Rational.to_cauchy_constant(Rational.zero),
+        (n : Natural) ↦
+          calc CauchyRationalSequence.sequenceFunction(
+                   CauchyRationalSequence.add(
+                       rep_x,
+                       CauchyRationalSequence.negate(rep_x)), n)
+             = CauchyRationalSequence.sequenceFunction(rep_x, n)
+               + CauchyRationalSequence.sequenceFunction(
+                     CauchyRationalSequence.negate(rep_x), n)
+             = CauchyRationalSequence.sequenceFunction(rep_x, n)
+               + -CauchyRationalSequence.sequenceFunction(rep_x, n)
+             = Rational.zero) }
 
 -- (-x) + x = 0 via add_commutative + add_negate_right.
 theorem Real.add_negate_left
@@ -210,63 +173,36 @@ theorem Real.add_negate_left
 -- -(-x) = x on Real. Lift the pointwise Rational.negate_negate.
 theorem Real.negate_negate (x : Real) : Real.negate(Real.negate(x)) = x :=
   cases x { | rep_x =>
-    Quotient.sound(
-            CauchyRationalSequence, CauchyEquivalent,
-            CauchyRationalSequence.negate(
-                CauchyRationalSequence.negate(rep_x)),
-            rep_x,
-            CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-                CauchyRationalSequence.negate(
-                    CauchyRationalSequence.negate(rep_x)),
-                rep_x,
-                (n : Natural) ↦
-                  -- sf(neg(neg(rep_x)), n) = -sf(neg(rep_x), n) = -(-sf(rep_x, n))
-                  --                        = sf(rep_x, n) by Rational.negate_negate.
-                  calc CauchyRationalSequence.sequenceFunction(
-                           CauchyRationalSequence.negate(
-                               CauchyRationalSequence.negate(rep_x)), n)
-                     = -CauchyRationalSequence.sequenceFunction(
-                            CauchyRationalSequence.negate(rep_x), n)
-                     = -(-CauchyRationalSequence.sequenceFunction(rep_x, n))
-                     = CauchyRationalSequence.sequenceFunction(rep_x, n))) }
+    Real.equal_of_pointwise_sequence(
+        CauchyRationalSequence.negate(
+            CauchyRationalSequence.negate(rep_x)),
+        rep_x,
+        (n : Natural) ↦
+          -- sf(neg(neg(rep_x)), n) = -sf(neg(rep_x), n) = -(-sf(rep_x, n))
+          --                        = sf(rep_x, n) by Rational.negate_negate.
+          calc CauchyRationalSequence.sequenceFunction(
+                   CauchyRationalSequence.negate(
+                       CauchyRationalSequence.negate(rep_x)), n)
+             = -CauchyRationalSequence.sequenceFunction(
+                    CauchyRationalSequence.negate(rep_x), n)
+             = -(-CauchyRationalSequence.sequenceFunction(rep_x, n))
+             = CauchyRationalSequence.sequenceFunction(rep_x, n)) }
 
--- -(x + y) = -x + -y on Real. Lift the pointwise Rational.negate_add via
--- Quotient.induct_two; the at-make form pattern-matches both reps so
--- every sequenceFunction reduces.
-theorem Real.negate_add_at_make
-        : (rep_x rep_y : CauchyRationalSequence)
-          → Real.negate(
-                Real.add((Quotient.mk(rep_x) : Real),
-                         (Quotient.mk(rep_y) : Real)))
-            = Real.add(Real.negate((Quotient.mk(rep_x) : Real)),
-                       Real.negate((Quotient.mk(rep_y) : Real)))
-  | CauchyRationalSequence.make(sx, sx_cauchy),
-    CauchyRationalSequence.make(sy, sy_cauchy) =>
-      Quotient.sound(
-          CauchyRationalSequence.negate(
-              CauchyRationalSequence.add(
-                  CauchyRationalSequence.make(sx, sx_cauchy),
-                  CauchyRationalSequence.make(sy, sy_cauchy))),
-          CauchyRationalSequence.add(
-              CauchyRationalSequence.negate(
-                  CauchyRationalSequence.make(sx, sx_cauchy)),
-              CauchyRationalSequence.negate(
-                  CauchyRationalSequence.make(sy, sy_cauchy))),
-          CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-              CauchyRationalSequence.negate(
-                  CauchyRationalSequence.add(
-                      CauchyRationalSequence.make(sx, sx_cauchy),
-                      CauchyRationalSequence.make(sy, sy_cauchy))),
-              CauchyRationalSequence.add(
-                  CauchyRationalSequence.negate(
-                      CauchyRationalSequence.make(sx, sx_cauchy)),
-                  CauchyRationalSequence.negate(
-                      CauchyRationalSequence.make(sy, sy_cauchy))),
-              (n : Natural) ↦
-                Rational.negate_add(sx(n), sy(n))))
-
+-- -(x + y) = -x + -y on Real. Pick representatives; pointwise it is
+-- Rational.negate_add.
 theorem Real.negate_add (x y : Real) : -(x + y) = -x + -y :=
-  Quotient.induct_two(Real.negate_add_at_make, x, y)
+  by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩ =>
+    Real.equal_of_pointwise_sequence(
+        CauchyRationalSequence.negate(
+            CauchyRationalSequence.add(
+                CauchyRationalSequence.make(sx, sxCauchy),
+                CauchyRationalSequence.make(sy, syCauchy))),
+        CauchyRationalSequence.add(
+            CauchyRationalSequence.negate(
+                CauchyRationalSequence.make(sx, sxCauchy)),
+            CauchyRationalSequence.negate(
+                CauchyRationalSequence.make(sy, syCauchy))),
+        (n : Natural) ↦ Rational.negate_add(sx(n), sy(n)))
 
 -- The Rational → Real embedding is a homomorphism of addition:
 -- (a + b : Real) = (a : Real) + (b : Real). At rep level the LHS is
@@ -274,23 +210,15 @@ theorem Real.negate_add (x y : Real) : -(x + y) = -x + -y :=
 -- pointwise both sides give a + b at every index.
 theorem Rational.to_real_add (a b : Rational)
         : ((a + b) : Real) = (a : Real) + (b : Real) :=
-  Quotient.sound(
-      CauchyRationalSequence, CauchyEquivalent,
+  Real.equal_of_pointwise_sequence(
       Rational.to_cauchy_constant(a + b),
       CauchyRationalSequence.add(
           Rational.to_cauchy_constant(a),
           Rational.to_cauchy_constant(b)),
-      CauchyRationalSequence.equivalent_when_sequenceFunction_equal(
-          Rational.to_cauchy_constant(a + b),
-          CauchyRationalSequence.add(
-              Rational.to_cauchy_constant(a),
-              Rational.to_cauchy_constant(b)),
-          (n : Natural) ↦
-            -- sf(const_(a+b), n) = a + b
-            -- sf(add(const_a, const_b), n) = sf(const_a, n) + sf(const_b, n)
-            --                              = a + b
-            Equality.symmetry(
-                CauchyRationalSequence.sequenceFunction_add(
-                    Rational.to_cauchy_constant(a),
-                    Rational.to_cauchy_constant(b),
-                    n))))
+      -- pointwise: sf(const_(a+b), n) = a+b = sf(const_a,n) + sf(const_b,n)
+      --                               = sf(add(const_a, const_b), n)
+      (n : Natural) ↦
+        CauchyRationalSequence.sequenceFunction_add(
+            Rational.to_cauchy_constant(a),
+            Rational.to_cauchy_constant(b),
+            n))
