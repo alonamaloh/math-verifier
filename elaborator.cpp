@@ -10242,6 +10242,46 @@ private:
         return nullptr;
     }
 
+    // If `type` WHNFs to a class equality `Quotient.mk(T, R, x) =
+    // Quotient.mk(T, R, y)`, return the underlying equivalence `R(x, y)`;
+    // else nullptr. Used both by the equality-of-classes coercion and by
+    // hole-filling (so a proof citing `R` fills its `?`s against `R(x, y)`
+    // when the surrounding goal is the class equality). `type` is returned
+    // in whatever representation it came in — sub-terms are extracted and
+    // reassembled in place, so callers can stay in opened or closed form.
+    ExpressionPointer relaxClassEqualityToEquivalence(ExpressionPointer type) {
+        ExpressionPointer equality = weakHeadNormalForm(environment_, type);
+        auto* withRight = std::get_if<Application>(&equality->node);
+        if (!withRight) return nullptr;
+        ExpressionPointer rightEndpoint = withRight->argument;
+        auto* withLeft = std::get_if<Application>(&withRight->function->node);
+        if (!withLeft) return nullptr;
+        ExpressionPointer leftEndpoint = withLeft->argument;
+        auto* withCarrier = std::get_if<Application>(&withLeft->function->node);
+        if (!withCarrier) return nullptr;
+        auto* equalityHead = std::get_if<Constant>(&withCarrier->function->node);
+        if (!equalityHead || equalityHead->name != "Equality") return nullptr;
+        auto peelMk = [&](ExpressionPointer endpoint,
+                          ExpressionPointer& relation,
+                          ExpressionPointer& rep) -> bool {
+            ExpressionPointer mk = weakHeadNormalForm(environment_, endpoint);
+            auto* a3 = std::get_if<Application>(&mk->node);
+            if (!a3) return false;
+            rep = a3->argument;
+            auto* a2 = std::get_if<Application>(&a3->function->node);
+            if (!a2) return false;
+            relation = a2->argument;
+            auto* a1 = std::get_if<Application>(&a2->function->node);
+            if (!a1) return false;
+            auto* head = std::get_if<Constant>(&a1->function->node);
+            return head && head->name == "Quotient.mk";
+        };
+        ExpressionPointer relationLeft, x, relationRight, y;
+        if (!peelMk(leftEndpoint, relationLeft, x)) return nullptr;
+        if (!peelMk(rightEndpoint, relationRight, y)) return nullptr;
+        return makeApplication(makeApplication(relationLeft, x), y);
+    }
+
     // Equality-of-classes coercion (WS3). When a proof of the underlying
     // equivalence `R(x, y)` is supplied where an equality of quotient
     // classes `Quotient.mk(T, R, x) = Quotient.mk(T, R, y)` is expected,
@@ -20558,6 +20598,24 @@ private:
                 unifyConstructorParameters(resultPatternNormalised,
                                               expectedTypeNormalised,
                                               metavariableNames, assignment);
+            }
+            // Class-equality relaxation (WS3): when the goal is
+            // `mk(x) = mk(y)` but this function concludes in the underlying
+            // relation `R`, unify the result pattern against `R(x, y)` so
+            // the holes fill. The result then has type `R(x, y)`, and the
+            // equality-of-classes coercion wraps it in Quotient.sound.
+            anyUnassigned = false;
+            for (const auto& name : metavariableNames) {
+                if (!assignment.count(name)) { anyUnassigned = true; break; }
+            }
+            if (anyUnassigned) {
+                if (ExpressionPointer relaxed =
+                        relaxClassEqualityToEquivalence(expectedType)) {
+                    unifyConstructorParameters(
+                        weakHeadNormalForm(environment_, resultTypePattern),
+                        weakHeadNormalForm(environment_, relaxed),
+                        metavariableNames, assignment);
+                }
             }
         }
 
