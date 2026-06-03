@@ -731,10 +731,99 @@ private:
             // expression is the block's value. Desugars at parse time to
             // a nested let-in chain.
             declaration.body = parseBlockBody();
+        } else if (peek().kind == TokenKind::KeywordBy
+                   && position_ + 1 < tokens_.size()
+                   && tokens_[position_ + 1].lexeme == "representatives") {
+            // Define-by-representatives (WS3):
+            //   definition F : Quotient(T, R) → U
+            //     by representatives <pat> ↦ <body>
+            //     well_defined by <proof>
+            // The mathematician's "define F by picking a representative;
+            // well-defined because the formula respects the relation".
+            declaration.body = parseDefineByRepresentatives();
         } else {
-            throwHere("expected ':=', '|', or '{' after declaration type");
+            throwHere("expected ':=', '|', '{', or "
+                      "`by representatives` after declaration type");
         }
         return declaration;
+    }
+
+    // Parse `by representatives <pat> ↦ <body> well_defined by <proof>` and
+    // desugar (unary) to `(x) ↦ Quotient.lift((rep) ↦ <body>, <proof>, x)`.
+    // The short-form `Quotient.lift` infers (T, R, U) and coerces the
+    // respect proof, so a `well_defined` proof of the bare equivalence
+    // closes the obligation — the lift apparatus and `Quotient.sound` are
+    // never named. The carrier representative may be destructured with a
+    // tuple/constructor pattern, in which case `<body>` runs under a
+    // `cases` on a synthesised representative binder.
+    SurfaceExpressionPointer parseDefineByRepresentatives() {
+        Token byToken = consumeAny();   // 'by'
+        consumeAny();                   // 'representatives'
+        int line = byToken.line;
+        int column = byToken.column;
+        std::vector<SurfacePatternPointer> representativePatterns;
+        representativePatterns.push_back(parsePattern());
+        while (peek().kind == TokenKind::Comma) {
+            consumeAny();
+            representativePatterns.push_back(parsePattern());
+        }
+        expect(TokenKind::MapsTo,
+               "after the representative pattern(s) in `by representatives`");
+        SurfaceExpressionPointer body = parseExpression();
+        if (!(isIdentifierLike(peek().kind)
+              && peek().lexeme == "well_defined")) {
+            throwHere("expected `well_defined by <proof>` after the "
+                      "`by representatives` body");
+        }
+        consumeAny();   // 'well_defined'
+        expect(TokenKind::KeywordBy, "after `well_defined`");
+        SurfaceExpressionPointer wellDefinedProof = parseExpression();
+        if (representativePatterns.size() != 1) {
+            throwHere("`definition ... by representatives` currently supports "
+                      "a single representative (unary functions); for binary "
+                      "operations write the nested `Quotient.lift` form by "
+                      "hand for now");
+        }
+        // Build the per-representative function `(rep) ↦ <body>`. Only a
+        // bare-name representative is supported for now: a destructuring
+        // pattern would wrap the body in `cases rep { | <pat> => … }`
+        // inside the lift's function argument, which currently trips a
+        // motive-scoping bug in that nested position. Bind a bare name and
+        // destructure in the body instead.
+        std::string representativeName;
+        SurfaceExpressionPointer functionBody;
+        if (auto* bare = std::get_if<SurfacePatternBareName>(
+                &representativePatterns[0]->node)) {
+            representativeName = bare->name;
+            functionBody = std::move(body);
+        } else {
+            throwHere("`definition ... by representatives` currently requires "
+                      "a bare representative name; apply a representative-level "
+                      "function to it in the body (as the library does, e.g. "
+                      "`mk(negate_representatives(rep))`) rather than "
+                      "destructuring the representative directly");
+        }
+        SurfaceBinder representativeBinder;
+        representativeBinder.names = {representativeName};
+        SurfaceExpressionPointer perRepresentativeFunction = makeSurfaceLambda(
+            std::move(representativeBinder), std::move(functionBody),
+            line, column);
+        // `Quotient.lift(perRepresentativeFunction, wellDefinedProof, arg)`.
+        const std::string argumentName = "_argumentOfDefinition";
+        std::vector<SurfaceExpressionPointer> liftArguments;
+        liftArguments.push_back(std::move(perRepresentativeFunction));
+        liftArguments.push_back(std::move(wellDefinedProof));
+        liftArguments.push_back(
+            makeSurfaceIdentifier(argumentName, {}, line, column));
+        SurfaceExpressionPointer liftCall = makeSurfaceApplication(
+            makeSurfaceIdentifier("Quotient.lift", {}, line, column),
+            std::move(liftArguments), line, column);
+        // Wrap in the outer argument binder `(arg) ↦ <lift>`; its type is
+        // read from the declaration's `Quotient(T, R) → U` type.
+        SurfaceBinder argumentBinder;
+        argumentBinder.names = {argumentName};
+        return makeSurfaceLambda(std::move(argumentBinder), std::move(liftCall),
+                                  line, column);
     }
 
     // Parses a `{ stmt; stmt; ...; final_expr }` block. Statement

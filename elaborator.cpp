@@ -24346,6 +24346,63 @@ private:
         // Elaborate `h` after we know all the pieces.
         ExpressionPointer hKernel = elaborateExpression(
             *hSurface, localBinders, hExpected);
+        // If `h` is a NAMED proof (or any non-lambda) whose type is the
+        // bare-equivalence respect property `(…) → R(f x_rep, f y_rep)`
+        // rather than the `(…) → f x = f y` the lift wants, the direct
+        // elaboration above can't reach the per-leaf class-equality
+        // coercion (it only fires on a lambda body). Eta-expand `h` to the
+        // respect arity and re-elaborate: the application body then sits in
+        // a lambda body and the coercion wraps Quotient.sound. So
+        // `well_defined by <named respects lemma>` works, not just an
+        // inline `(a b) (e) ↦ …` proof.
+        if (hExpected) {
+            bool matches = false;
+            try {
+                ExpressionPointer hTypeOpened = inferTypeInLocalContext(
+                    localBinders, hKernel);
+                ExpressionPointer hExpectedOpened = openOverLocalBinders(
+                    hExpected, localBinders, localBinders.size());
+                Context openedContext =
+                    buildContextFromLocalBinders(localBinders);
+                matches = isDefinitionallyEqual(
+                    environment_, openedContext, hTypeOpened, hExpectedOpened);
+            } catch (...) {
+                matches = true;  // can't tell — leave the direct term
+            }
+            if (!matches) {
+                int respectArity = 0;
+                ExpressionPointer cursor = weakHeadNormalForm(
+                    environment_, hExpected);
+                while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+                    respectArity++;
+                    cursor = pi->codomain;
+                }
+                if (respectArity > 0) {
+                    std::vector<SurfaceExpressionPointer> applicationArguments;
+                    for (int i = 0; i < respectArity; ++i) {
+                        applicationArguments.push_back(makeSurfaceIdentifier(
+                            "_wellDefinedArgument" + std::to_string(i),
+                            {}, line, 0));
+                    }
+                    SurfaceExpressionPointer etaTerm = makeSurfaceApplication(
+                        hSurface, std::move(applicationArguments), line, 0);
+                    // Wrap in NESTED single-name lambdas (not one
+                    // multi-name binder): each peels exactly one Pi, so a
+                    // dependent later domain — `R(x, y)` depending on the
+                    // earlier `x`, `y` — is read correctly after the prior
+                    // binder is substituted.
+                    for (int i = respectArity - 1; i >= 0; --i) {
+                        SurfaceBinder etaBinder;
+                        etaBinder.names = {
+                            "_wellDefinedArgument" + std::to_string(i)};
+                        etaTerm = makeSurfaceLambda(
+                            std::move(etaBinder), std::move(etaTerm), line, 0);
+                    }
+                    hKernel = elaborateExpression(
+                        *etaTerm, localBinders, hExpected);
+                }
+            }
+        }
         ExpressionPointer call = makeConstant(
             "Quotient.lift", {uLevel, vLevel});
         call = makeApplication(std::move(call), carrierType);

@@ -1,0 +1,49 @@
+-- Define-by-representatives (WS3): `definition F : Quotient(T,R) → U by
+-- representatives <pat> ↦ <body> well_defined by <proof>`. Parse-time
+-- sugar for `(x) ↦ Quotient.lift((rep) ↦ <body>, <proof>, x)`; the
+-- short-form lift infers (T, R, U) and coerces the respect proof, so the
+-- `well_defined` proof of the bare equivalence closes the obligation and
+-- neither `Quotient.lift` nor `Quotient.sound` is named.
+
+module Test.define_by_representatives_test
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+
+inductive Seq : Type(0) where
+  | Seq.make : (Natural → Natural) → Seq
+
+definition SeqEquiv (a b : Seq) : Proposition :=
+  (e : Natural) → ∃ (n : Natural). n = n
+
+-- (1) Bare-name representative. The body builds a class with `Quotient.mk`;
+-- the well_defined proof returns the bare equivalence and is coerced.
+definition Seq.identity_by_representatives
+        : Quotient(Seq, SeqEquiv) → Quotient(Seq, SeqEquiv)
+  by representatives s ↦ (Quotient.mk(s) : Quotient(Seq, SeqEquiv))
+  well_defined by (a b : Seq) (related : SeqEquiv(a, b)) ↦ related
+
+-- (2) The body may apply a representative-level function (here a helper
+-- that rebuilds the sequence) to the bare representative.
+definition Seq.shift_representative (s : Seq) : Seq :=
+  cases s { | Seq.make(f) => Seq.make((n : Natural) ↦ f(n)) }
+
+definition Seq.shift_by_representatives
+        : Quotient(Seq, SeqEquiv) → Quotient(Seq, SeqEquiv)
+  by representatives s ↦
+       (Quotient.mk(Seq.shift_representative(s)) : Quotient(Seq, SeqEquiv))
+  well_defined by (a b : Seq) (related : SeqEquiv(a, b)) ↦ related
+
+-- (3) A named well_defined proof works too — eta-expanded so its body
+-- goes through the class-equality coercion.
+theorem seq_trivially_respects (a b : Seq) (related : SeqEquiv(a, b))
+        : SeqEquiv(a, b) :=
+  related
+
+definition Seq.identity_named_obligation
+        : Quotient(Seq, SeqEquiv) → Quotient(Seq, SeqEquiv)
+  by representatives s ↦ (Quotient.mk(s) : Quotient(Seq, SeqEquiv))
+  well_defined by seq_trivially_respects
