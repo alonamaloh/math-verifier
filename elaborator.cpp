@@ -18230,8 +18230,12 @@ private:
                 "anonymous tuple '⟨...⟩' needs an expected type from "
                 "context (line " + std::to_string(line) + ")");
         }
+        // Force opaque heads transparent so an `IsNonneg(x)`-typed expected
+        // type exposes its underlying `Exists` inductive — the construct-site
+        // counterpart of the kernel's opacity-tolerant retries (replaces the
+        // old `unfold IsNonneg in ⟨…⟩` wrap).
         ExpressionPointer head =
-            weakHeadNormalForm(environment_, expectedType);
+            weakHeadNormalFormForcingOpaqueHead(expectedType);
         ExpressionPointer headFunction = head;
         while (auto* application =
                    std::get_if<Application>(&headFunction->node)) {
@@ -21058,14 +21062,19 @@ private:
         std::vector<ExpressionPointer> expectedDomainsPerName;
         ExpressionPointer expectedBody = nullptr;
         if (expectedType) {
+            // Force opaque heads so a `↦`-lambda body written against an
+            // opaque expected type (`IsNonneg(x)`, whose unfolding is the
+            // `∀ ε. ε > 0 → …` Pi) can read its binder domains — the
+            // structured-construct counterpart of the kernel's retries
+            // (replaces `unfold IsNonneg in ((ε)(εpos) ↦ …)`).
             ExpressionPointer cursor =
-                weakHeadNormalForm(environment_, expectedType);
+                weakHeadNormalFormForcingOpaqueHead(expectedType);
             bool ok = true;
             for (size_t k = 0; k < lambda.binder.names.size(); ++k) {
                 auto* pi = std::get_if<Pi>(&cursor->node);
                 if (!pi) { ok = false; break; }
                 expectedDomainsPerName.push_back(pi->domain);
-                cursor = pi->codomain;
+                cursor = weakHeadNormalFormForcingOpaqueHead(pi->codomain);
             }
             if (ok) {
                 expectedBody = cursor;
@@ -21819,6 +21828,44 @@ private:
         if (!def || def->opacity != Opacity::Opaque) return nullptr;
         if (outConstant) *outConstant = constant;
         return def;
+    }
+
+    // WHNF that additionally δ-unfolds opaque definitions remaining at the
+    // HEAD (only the head, not recursively into arguments). Exposes the true
+    // head shape — a Pi, or an inductive like `Exists` — when it is hidden
+    // behind an opaque wrapper (`IsNonneg(x)` → `Quotient.lift …` → `Exists`).
+    // Used where the elaborator genuinely demands the unfolded head to build
+    // or destructure a value (anonymous tuple against an opaque expected type),
+    // mirroring the kernel's opacity-tolerant inferType/defeq retries.
+    ExpressionPointer weakHeadNormalFormForcingOpaqueHead(
+            ExpressionPointer expression, int fuel = 64) {
+        while (fuel-- > 0) {
+            expression = weakHeadNormalForm(environment_, expression);
+            const Constant* constant = nullptr;
+            const Definition* def =
+                opaqueHeadDefinition(expression, &constant);
+            if (!def
+                || def->universeParameters.size()
+                       != constant->universeArguments.size()) {
+                break;
+            }
+            std::vector<ExpressionPointer> args;
+            ExpressionPointer head = expression;
+            while (auto* app = std::get_if<Application>(&head->node)) {
+                args.push_back(app->argument);
+                head = app->function;
+            }
+            std::reverse(args.begin(), args.end());
+            ExpressionPointer body = def->body;
+            if (!def->universeParameters.empty()) {
+                body = substituteUniverseLevels(
+                    body, def->universeParameters,
+                    constant->universeArguments);
+            }
+            for (auto& a : args) body = makeApplication(body, a);
+            expression = std::move(body);
+        }
+        return expression;
     }
 
     // Like deepWhnfThroughApplications, but also δ-unfolds an opaque

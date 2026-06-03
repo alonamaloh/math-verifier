@@ -1847,6 +1847,19 @@ ExpressionPointer inferTypeWork(const Environment& environment,
             inferType(environment, context, application->function));
         auto* functionAsPi = std::get_if<Pi>(&functionType->node);
         if (!functionAsPi) {
+            // Opacity-tolerant retry: the function's type may be headed by an
+            // opaque definition whose unfolding IS a Pi (e.g. applying a value
+            // of opaque `IsNonneg(x)`, which unfolds through `Quotient.lift`
+            // to a `∀ ε. …` Pi). Opacity blocks this during general WHNF to
+            // keep goal shape; here, where a Pi is genuinely demanded, force
+            // the opaque head transparent and re-reduce. Mirrors the defeq
+            // bridge (see unfoldOpaqueHeadOnce).
+            if (auto unfolded = unfoldOpaqueHeadOnce(environment, functionType)) {
+                functionType = weakHeadNormalForm(environment, unfolded);
+                functionAsPi = std::get_if<Pi>(&functionType->node);
+            }
+        }
+        if (!functionAsPi) {
             TypeError error("Application: function is not of Pi type");
             error.actualType = functionType;
             throw error;
