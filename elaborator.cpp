@@ -24287,8 +24287,18 @@ private:
         }
         ExpressionPointer carrierType = closeOverLocalBinders(
             fPi->domain, localBinders, localBinders.size());
+        // The lift target `U` must not depend on the argument. When `f`'s
+        // body is a `cases`/recursor, the inferred codomain is the
+        // *unreduced* `motive(rep)`, which syntactically references the
+        // Pi binder even though the motive is constant — WHNF collapses
+        // that spurious application so the closed target type doesn't carry
+        // an escaping bound variable. (A genuinely dependent `f` survives
+        // WHNF still mentioning the binder and fails the lift's own check
+        // below, as it should — `Quotient.lift` only lifts non-dependent
+        // functions.)
         ExpressionPointer targetType = closeOverLocalBinders(
-            fPi->codomain, localBinders, localBinders.size());
+            weakHeadNormalForm(environment_, fPi->codomain),
+            localBinders, localBinders.size());
         // Compute the carrier and target universe levels.
         LevelPointer uLevel;
         LevelPointer vLevel;

@@ -1,0 +1,30 @@
+-- A short-form Quotient.lift whose function argument is an inline `cases`
+-- has a recursor-typed (spuriously dependent) codomain. Before the WHNF
+-- fix in desugarQuotientLift this crashed with an internal "malformed
+-- term / bare BoundVariable" error; it must now fail as a normal,
+-- math-shaped type mismatch (the respect proof can't close the stuck
+-- `recursor(…x) = recursor(…y)` obligation — the function should apply a
+-- representative-level helper instead of destructuring inline).
+
+module corpus.lift_cases_body_dependent_codomain
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+
+inductive Seq : Type(0) where
+  | Seq.make : (Natural → Natural) → Seq
+
+definition SeqEquiv (a b : Seq) : Proposition :=
+  (e : Natural) → ∃ (n : Natural). n = n
+
+definition leakcase : Quotient(Seq, SeqEquiv) → Quotient(Seq, SeqEquiv) :=
+  (x : Quotient(Seq, SeqEquiv)) ↦
+    Quotient.lift(
+        (rep : Seq) ↦ cases rep { | Seq.make(f) =>
+            (Quotient.mk(Seq.make(f)) : Quotient(Seq, SeqEquiv)) },
+        (a b : Seq) (related : SeqEquiv(a, b)) ↦ related,
+        x)
