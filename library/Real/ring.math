@@ -84,13 +84,10 @@ theorem Real.equal_of_pointwise_sequence
 -- equality is exactly Rational.add_commutative.
 theorem Real.add_commutative (x y : Real) : Real.add(x, y) = Real.add(y, x) :=
   by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩ =>
+    let a : CauchyRationalSequence := CauchyRationalSequence.make(sx, sxCauchy) in
+    let b : CauchyRationalSequence := CauchyRationalSequence.make(sy, syCauchy) in
     Real.equal_of_pointwise_sequence(
-        CauchyRationalSequence.add(
-            CauchyRationalSequence.make(sx, sxCauchy),
-            CauchyRationalSequence.make(sy, syCauchy)),
-        CauchyRationalSequence.add(
-            CauchyRationalSequence.make(sy, syCauchy),
-            CauchyRationalSequence.make(sx, sxCauchy)),
+        a + b, b + a,
         (n : Natural) ↦ Rational.add_commutative(sx(n), sy(n)))
 
 -- Add is associative on Real. Pick representatives; the pointwise
@@ -99,17 +96,11 @@ theorem Real.add_associative (x y z : Real)
         : Real.add(Real.add(x, y), z) = Real.add(x, Real.add(y, z)) :=
   by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩,
                      z as ⟨sz, szCauchy⟩ =>
+    let a : CauchyRationalSequence := CauchyRationalSequence.make(sx, sxCauchy) in
+    let b : CauchyRationalSequence := CauchyRationalSequence.make(sy, syCauchy) in
+    let c : CauchyRationalSequence := CauchyRationalSequence.make(sz, szCauchy) in
     Real.equal_of_pointwise_sequence(
-        CauchyRationalSequence.add(
-            CauchyRationalSequence.add(
-                CauchyRationalSequence.make(sx, sxCauchy),
-                CauchyRationalSequence.make(sy, syCauchy)),
-            CauchyRationalSequence.make(sz, szCauchy)),
-        CauchyRationalSequence.add(
-            CauchyRationalSequence.make(sx, sxCauchy),
-            CauchyRationalSequence.add(
-                CauchyRationalSequence.make(sy, syCauchy),
-                CauchyRationalSequence.make(sz, szCauchy))),
+        a + b + c, a + (b + c),
         (n : Natural) ↦ Rational.add_associative(sx(n), sy(n), sz(n)))
 
 -- 0 + x = x on Real. Use the constant-zero sequence for the zero.
@@ -118,14 +109,11 @@ theorem Real.zero_add
         : Real.add(Real.zero, x) = x :=
   cases x { | rep_x =>
     Real.equal_of_pointwise_sequence(
-        CauchyRationalSequence.add(
-            Rational.to_cauchy_constant(Rational.zero), rep_x),
+        Rational.to_cauchy_constant(Rational.zero) + rep_x,
         rep_x,
         (n : Natural) ↦
           calc CauchyRationalSequence.sequenceFunction(
-                   CauchyRationalSequence.add(
-                       Rational.to_cauchy_constant(Rational.zero),
-                       rep_x), n)
+                   Rational.to_cauchy_constant(Rational.zero) + rep_x, n)
              = CauchyRationalSequence.sequenceFunction(
                    Rational.to_cauchy_constant(Rational.zero), n)
                + CauchyRationalSequence.sequenceFunction(rep_x, n)
@@ -147,14 +135,11 @@ theorem Real.add_negate_right
         : Real.add(x, Real.negate(x)) = Real.zero :=
   cases x { | rep_x =>
     Real.equal_of_pointwise_sequence(
-        CauchyRationalSequence.add(
-            rep_x, CauchyRationalSequence.negate(rep_x)),
+        rep_x + CauchyRationalSequence.negate(rep_x),
         Rational.to_cauchy_constant(Rational.zero),
         (n : Natural) ↦
           calc CauchyRationalSequence.sequenceFunction(
-                   CauchyRationalSequence.add(
-                       rep_x,
-                       CauchyRationalSequence.negate(rep_x)), n)
+                   rep_x + CauchyRationalSequence.negate(rep_x), n)
              = CauchyRationalSequence.sequenceFunction(rep_x, n)
                + CauchyRationalSequence.sequenceFunction(
                      CauchyRationalSequence.negate(rep_x), n)
@@ -193,16 +178,11 @@ theorem Real.negate_negate (x : Real) : Real.negate(Real.negate(x)) = x :=
 -- Rational.negate_add.
 theorem Real.negate_add (x y : Real) : -(x + y) = -x + -y :=
   by_representatives x as ⟨sx, sxCauchy⟩, y as ⟨sy, syCauchy⟩ =>
+    let a : CauchyRationalSequence := CauchyRationalSequence.make(sx, sxCauchy) in
+    let b : CauchyRationalSequence := CauchyRationalSequence.make(sy, syCauchy) in
     Real.equal_of_pointwise_sequence(
-        CauchyRationalSequence.negate(
-            CauchyRationalSequence.add(
-                CauchyRationalSequence.make(sx, sxCauchy),
-                CauchyRationalSequence.make(sy, syCauchy))),
-        CauchyRationalSequence.add(
-            CauchyRationalSequence.negate(
-                CauchyRationalSequence.make(sx, sxCauchy)),
-            CauchyRationalSequence.negate(
-                CauchyRationalSequence.make(sy, syCauchy))),
+        CauchyRationalSequence.negate(a + b),
+        CauchyRationalSequence.negate(a) + CauchyRationalSequence.negate(b),
         (n : Natural) ↦ Rational.negate_add(sx(n), sy(n)))
 
 -- The Rational → Real embedding is a homomorphism of addition:
@@ -213,9 +193,7 @@ theorem Rational.to_real_add (a b : Rational)
         : ((a + b) : Real) = (a : Real) + (b : Real) :=
   Real.equal_of_pointwise_sequence(
       Rational.to_cauchy_constant(a + b),
-      CauchyRationalSequence.add(
-          Rational.to_cauchy_constant(a),
-          Rational.to_cauchy_constant(b)),
+      Rational.to_cauchy_constant(a) + Rational.to_cauchy_constant(b),
       -- pointwise: sf(const_(a+b), n) = a+b = sf(const_a,n) + sf(const_b,n)
       --                               = sf(add(const_a, const_b), n)
       (n : Natural) ↦
