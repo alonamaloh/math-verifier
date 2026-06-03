@@ -257,12 +257,19 @@ currently fall back to explicit lemmas disappear:
 >   the lemma's *un-flipped* conclusion (so bare `by <lemma>` infers args)
 >   and let the body/case coercion do the final flip; ring-identity calc
 >   steps go bare; remove → build → revert the congruence-nested ones.
->   The remaining ~13 by-step sites are **congruence-nested flips the diff
->   path cannot build** (they now give a clean WS1 error if removed, so they
->   keep explicit symmetry) + existential `⟨⟩` tuple components (don't
->   flip). Clearing the last 13 needs the deeper fix: make
->   `tryDiffApplyUserProof` correctly *build* a symmetric flip nested under a
->   congruence (today it only avoids leaking on those).
+>   **Last 13 cleared via a deeper fix.** Root cause: `tryDiffApplyUserProof`
+>   has two callers passing `userProofType` in different representations —
+>   the body/coercion path CLOSED (de Bruijn), the calc-step path OPENED
+>   (named Internal FreeVariables). The symmetric-flip branch builds
+>   `Equality.symmetry` directly from the endpoints, correct only when
+>   CLOSED; for the calc caller the opened `@a`/`@e` leaked in (rejected by
+>   `containsFreeVariable` → kept explicit symmetry). Fix: normalize the
+>   endpoints to CLOSED at entry (`closeIfOpened`). All by-step sites then
+>   flip; cleared by hand (some nested `by (calc …)` need parens to delimit
+>   the inner calc from the outer). **User-space `by Equality.symmetry`: 0.**
+>   Equality.symmetry total 184 → 109 (remaining are non-by-step: existential
+>   `⟨⟩` components and other term positions that genuinely don't flip).
+>   Leak total 681 → 606.
 > - **Blocking bug FIXED (the leak).** Removing the explicit symmetry at a
 >   calc step whose flip sits *under a congruence* (e.g. `epsilon - halve =
 >   (halve + halve) + -halve`, where subtract WHNF-unfolds during the diff
