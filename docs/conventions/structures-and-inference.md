@@ -113,14 +113,21 @@ What instance resolution will NOT touch (by design):
 ## Operator overloading
 
 `operator (sym) on (T1, T2) := F;` registers `sym` to dispatch on
-the heads of T1 and T2. T1 and T2 must be the heads of types, not
-parameterized type applications. So:
+the *heads* of T1 and T2 — `PAdicCauchySequence`, `Ring.carrier`, etc.
+A parameterized head like `PAdicCauchySequence(p, primality)` is fine:
+the dispatcher recovers the structure indices (`{p}`, `{primality}`,
+or a `{r : Ring}` projected out of `Ring.carrier(r)`) from the operand's
+type — the implicit-recovery mechanism pinned by
+`Test/operator_parametrized_poc.math`. So:
 
 - `operator (+) on (Integer, Integer)` works.
-- `operator (+) on (PAdic, PAdic)` would conceptually work but
-  `PAdic.add` takes `(p, primality, x, y)`, not `(x, y)`. Once `(p,
-  primality)` become implicit on `PAdic.add`, the operator overload
-  will work.
+- `operator (*) on (CauchyRationalSequence, …)` and
+  `operator (*) on (PAdicCauchySequence, …)` work: `a * b` recovers any
+  index (e.g. the prime `p` on the p-adic type) from `a`'s type, so the
+  underlying `…multiply` need not be given `(p, primality)` by hand.
+- The one requirement is that those structure indices be *implicit* on
+  the dispatch function `F` (`{p}` not `(p)`), so `F` is callable as
+  `F(a, b)`; the `convention`-prepended `{p}`/`{primality}` satisfy this.
 
 ## Citing a lemma by name — let the arguments be inferred
 
