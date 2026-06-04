@@ -136,6 +136,16 @@ $(BUILD_DIR)/%.mathv: %.math kernel
 	@mkdir -p $(dir $@)
 	./kernel verify --source $< --output $@ --cache-root $(BUILD_DIR) $(VERIFY_FLAGS)
 
+# Interface caches are a *byproduct* of verifying a module: `kernel verify`
+# writes `<module>.mathv.iface` (write-if-changed) alongside the full
+# `.mathv`. Downstream modules depend on the .iface rather than the full
+# cache (see `kernel deps`), so a proof-only edit upstream — which leaves
+# the .iface byte-identical and its mtime untouched — does NOT re-verify
+# this module's consumers. The empty recipe tells `make` the .iface is
+# refreshed by the rule above and stops it inventing an implicit rule; it
+# runs no commands of its own, so it never bumps the .iface's mtime.
+$(BUILD_DIR)/%.mathv.iface: $(BUILD_DIR)/%.mathv ;
+
 -include $(BUILD_DIR)/library-depends.mk
 
 # Depends generation covers ALL math files (library + tests) so the

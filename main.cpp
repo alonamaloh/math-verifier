@@ -5525,8 +5525,13 @@ int emitDeps(const std::vector<std::string>& sourcePaths,
         for (const auto& importName : info.imports) {
             auto iterator = moduleToSource.find(importName);
             if (iterator != moduleToSource.end()) {
+                // Depend on the import's *interface* cache, not its full
+                // cache: a proof-only edit upstream leaves the .iface
+                // byte-identical (write-if-changed preserves its mtime), so
+                // `make` skips re-verifying this file. The .iface itself is
+                // a byproduct of verifying the import (see the Makefile).
                 depCachePaths.push_back(
-                    makeCachePath(iterator->second, cacheRoot));
+                    makeCachePath(iterator->second, cacheRoot) + ".iface");
             }
         }
         if (depCachePaths.empty()) continue;
