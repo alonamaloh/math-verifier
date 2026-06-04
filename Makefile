@@ -96,12 +96,19 @@ LIBRARY_MATH_FILES := $(filter-out library/Test/%,$(MATH_FILES))
 TEST_MATH_FILES := $(filter library/Test/%,$(MATH_FILES))
 LIBRARY_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(LIBRARY_MATH_FILES))
 TEST_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(TEST_MATH_FILES))
+# Interface caches (stage 1). Named as explicit goals so `make` treats them
+# as persisted build products rather than throwaway intermediates it deletes
+# at the end of a build (which would force a full rebuild next time). Listing
+# the concrete files — rather than a blanket `.SECONDARY:` — avoids a
+# pathological implicit-rule-chain search that makes even `make -n` hang.
+LIBRARY_MATHV_IFACE_FILES := $(LIBRARY_MATHV_FILES:.mathv=.mathv.iface)
+TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 
 .PHONY: library library-clean tests
 
-library: $(LIBRARY_MATHV_FILES)
+library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
-tests: library $(TEST_MATHV_FILES)
+tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES)
 
 # Verification flags. The redundant-`by` check is OFF by default: it
 # re-runs the auto-prover speculatively on every `by` annotation, which
@@ -132,19 +139,29 @@ endif
 # fail on a clean rebuild — a real trap.) Note `kernel` itself only
 # relinks when an object file actually changes, so warm rebuilds with no
 # source edits don't re-verify anything.
-$(BUILD_DIR)/%.mathv: %.math kernel
+# Two-stage verification.
+#
+# Stage 1 — interface. `MATH_STATEMENTS_ONLY=1` elaborates each module's
+# statements (declared types) and definition bodies but skips proofs,
+# writing ONLY the interface cache `<module>.mathv.iface` (write-if-changed).
+# Its prerequisites are its imports' interfaces (the interface DAG, emitted
+# by `kernel deps`). Cheap (~4% of total work) and proof-independent.
+$(BUILD_DIR)/%.mathv.iface: %.math kernel
 	@mkdir -p $(dir $@)
-	./kernel verify --source $< --output $@ --cache-root $(BUILD_DIR) $(VERIFY_FLAGS)
+	MATH_STATEMENTS_ONLY=1 ./kernel verify --source $< \
+	    --output $(BUILD_DIR)/$*.mathv --cache-root $(BUILD_DIR)
 
-# Interface caches are a *byproduct* of verifying a module: `kernel verify`
-# writes `<module>.mathv.iface` (write-if-changed) alongside the full
-# `.mathv`. Downstream modules depend on the .iface rather than the full
-# cache (see `kernel deps`), so a proof-only edit upstream — which leaves
-# the .iface byte-identical and its mtime untouched — does NOT re-verify
-# this module's consumers. The empty recipe tells `make` the .iface is
-# refreshed by the rule above and stops it inventing an implicit rule; it
-# runs no commands of its own, so it never bumps the .iface's mtime.
-$(BUILD_DIR)/%.mathv.iface: $(BUILD_DIR)/%.mathv ;
+# Stage 2 — proofs. Verifies the module's proofs against its own interface
+# (from stage 1) plus its imports' interfaces, writing the full `.mathv`.
+# `--no-interface` leaves stage 1's interface untouched. Because a module
+# depends on its imports' *interfaces* (not their full caches), an upstream
+# proof-only edit — which leaves those interfaces byte-identical — does not
+# re-verify this module; every module's stage 2 is otherwise independent of
+# every other's, so they parallelise freely.
+$(BUILD_DIR)/%.mathv: %.math $(BUILD_DIR)/%.mathv.iface kernel
+	@mkdir -p $(dir $@)
+	./kernel verify --source $< --output $@ --cache-root $(BUILD_DIR) \
+	    --no-interface $(VERIFY_FLAGS)
 
 -include $(BUILD_DIR)/library-depends.mk
 

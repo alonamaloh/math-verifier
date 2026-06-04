@@ -5334,15 +5334,33 @@ int verifyWithCache(const std::string& sourcePath,
     // cache (by module name) and record (cachePath, sourceHash).
     std::map<std::string, std::pair<std::string, uint64_t>> moduleToDepInfo;
     for (const auto& dependencyPath : resolvedDependencyCachePaths) {
+        // Read the SAME cache that was loaded — the interface (.iface) when it
+        // exists, falling back to the full cache. Reading the full `.mathv`
+        // unconditionally fails in a two-stage build (where stage 1 has only
+        // produced interfaces), which would silently drop the dependency from
+        // this module's recorded list and break transitive loading downstream.
+        std::string readPath = dependencyPath + ".iface";
+        if (!std::filesystem::exists(readPath)) readPath = dependencyPath;
         try {
-            CacheContents depContents = readCacheFile(dependencyPath);
+            CacheContents depContents = readCacheFile(readPath);
+            // Record the conventional full-cache path (the loader appends
+            // ".iface" itself / deriveInterfaceCache rewrites it); keep the
+            // module-name -> (path, hash) mapping keyed off the real module.
             moduleToDepInfo[depContents.moduleName] =
                 {dependencyPath, depContents.sourceHash};
         } catch (const SerializationError&) {
-            // Already validated above; shouldn't happen.
+            // Dependency cache genuinely unreadable; leave it out.
         }
     }
-    for (const auto& importedName : importedModules) {
+    // Record ALL declared imports (not just the ones elaboration happened to
+    // reference). loadCacheRecursive follows this list to load transitive
+    // declarations, so it must be complete and independent of which imports a
+    // given elaboration used — otherwise a stage-1 interface (which skips
+    // proofs, and so "uses" fewer imports) would record a shorter list and a
+    // downstream load could fail to reach a transitively-needed symbol (e.g.
+    // the `Quotient` axiom). All-declared also matches `kernel deps`, keeping
+    // the runtime load graph and the Makefile graph consistent.
+    for (const auto& importedName : importedModuleNames) {
         auto iterator = moduleToDepInfo.find(importedName);
         if (iterator != moduleToDepInfo.end()) {
             CachedDependency dep;
@@ -5416,6 +5434,11 @@ int verifyWithCache(const std::string& sourcePath,
         }
     }
 
+    // Stage-1 (statements-only) produces ONLY the interface cache: there are
+    // no real proofs to record, so the full `.mathv` is left to stage 2.
+    const char* statementsOnlyEnv = std::getenv("MATH_STATEMENTS_ONLY");
+    bool statementsOnly = statementsOnlyEnv && statementsOnlyEnv[0] != '\0'
+        && statementsOnlyEnv[0] != '0';
     if (!outputCachePath.empty()) {
         try {
             // Make sure the output directory exists.
@@ -5423,11 +5446,13 @@ int verifyWithCache(const std::string& sourcePath,
             if (output.has_parent_path()) {
                 std::filesystem::create_directories(output.parent_path());
             }
-            writeCacheFile(outputCachePath, cache);
-            // Also emit the interface cache (proof bodies stripped),
-            // write-if-changed so a proof-only edit leaves it untouched.
-            // Suppressed by --no-interface (two-stage stage 2, where stage 1
-            // already produced the authoritative interface).
+            if (!statementsOnly) {
+                writeCacheFile(outputCachePath, cache);
+            }
+            // Emit the interface cache (proof bodies stripped), write-if-changed
+            // so a proof-only edit leaves it untouched. This is the sole writer
+            // of the interface in a two-stage build (stage 1). Suppressed by
+            // --no-interface (stage 2, which only re-checks proofs).
             if (writeInterface) {
                 writeCacheFileIfChanged(outputCachePath + ".iface",
                                         deriveInterfaceCache(cache, environment));
@@ -5539,10 +5564,17 @@ int emitDeps(const std::vector<std::string>& sourcePaths,
             }
         }
         if (depCachePaths.empty()) continue;
+        // Two-stage edges. Stage 1: this module's interface is built from its
+        // imports' interfaces (the interface DAG). Stage 2: this module's full
+        // verification depends on its imports' interfaces too, so an upstream
+        // *interface* change re-checks this module's proofs (an upstream proof
+        // change does not — its .iface is unchanged). The `X.mathv:
+        // X.mathv.iface` edge comes from the Makefile's stage-2 pattern rule.
+        std::cout << cachePath << ".iface:";
+        for (const auto& dep : depCachePaths) std::cout << " " << dep;
+        std::cout << "\n";
         std::cout << cachePath << ":";
-        for (const auto& dep : depCachePaths) {
-            std::cout << " " << dep;
-        }
+        for (const auto& dep : depCachePaths) std::cout << " " << dep;
         std::cout << "\n";
     }
     return 0;
