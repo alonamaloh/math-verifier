@@ -5100,17 +5100,34 @@ static CacheContents deriveInterfaceCache(const CacheContents& full,
     iface.sourceHash = 0;
     for (auto& dependency : iface.dependencies) {
         dependency.sourceHash = 0;
+        // Point dependency edges at the dependency's *interface* cache, so
+        // loading this interface pulls interfaces transitively (never a
+        // full proof-carrying cache).
+        dependency.cachePath += ".iface";
     }
+    // A single fixed stand-in body shared by every stripped proof, so the
+    // interface bytes don't move when a proof is edited.
+    const ExpressionPointer strippedProofBody = makeSort(0);
     iface.declarations.clear();
     for (const auto& [name, declaration] : full.declarations) {
         if (auto* definition = std::get_if<Definition>(&declaration)) {
-            bool stripBody =
-                definition->opacity == Opacity::Opaque
-                || typeIsProposition(environment, definition->type);
-            if (stripBody) {
+            // Strip ONLY proofs (Prop-typed definitions): proof irrelevance
+            // makes their bodies invisible to any consumer, unconditionally.
+            // We keep the *kind* `Definition` (theorems serialise as
+            // Definitions, and the elaborator's auto-prover seeding assumes
+            // that — see elaborator.cpp seedAlgebraicRegistryFromEnvironment)
+            // but swap in a fixed placeholder body and mark it opaque so the
+            // placeholder is never δ-unfolded; downstream only ever reads the
+            // declared type, and equality of proofs goes through proof
+            // irrelevance. Opaque *data* definitions, by contrast, keep their
+            // real bodies — this kernel force-unfolds opaque constants at
+            // downstream demand points (unfoldOpaqueHeadOnce, see opaque.md).
+            if (typeIsProposition(environment, definition->type)) {
                 iface.declarations.emplace_back(
                     name,
-                    Axiom{definition->universeParameters, definition->type});
+                    Definition{definition->universeParameters,
+                               definition->type, strippedProofBody,
+                               Opacity::Opaque});
                 continue;
             }
         }
@@ -5193,10 +5210,19 @@ int verifyWithCache(const std::string& sourcePath,
     // Load dependency caches (with transitive expansion).
     auto loadT0 = std::chrono::steady_clock::now();
     for (const auto& dependency : resolvedDependencyCachePaths) {
+        // Prefer the dependency's interface cache: a downstream file's
+        // verification depends only on its imports' interfaces (declaration
+        // types + transparent bodies + registries), never on their proof
+        // bodies. Fall back to the full cache if no interface exists (e.g.
+        // a legacy --deps path), preserving old behaviour.
+        std::string loadPath = dependency + ".iface";
+        if (!std::filesystem::exists(loadPath)) {
+            loadPath = dependency;
+        }
         try {
-            loadCacheRecursive(environment, dependency, alreadyLoaded);
+            loadCacheRecursive(environment, loadPath, alreadyLoaded);
         } catch (const SerializationError& error) {
-            std::cerr << "cache load failure for " << dependency << ": "
+            std::cerr << "cache load failure for " << loadPath << ": "
                       << error.what() << "\n";
             return 1;
         }
