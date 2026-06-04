@@ -1,0 +1,121 @@
+-- Auto-prover / diff-coercion CAPABILITY MATRIX.
+--
+-- The elaborator closes equality obligations at many syntactic positions,
+-- routing each through one of two cores: `autoProveClaim` (goal-in-hand,
+-- no supplied proof) or `coerceToExpectedTypeViaDiff` (a supplied term
+-- whose type is off by a congruence). What closes WHERE has historically
+-- been surprising — different positions reach different subsets. This file
+-- PINS the matrix: every cell that closes is a bare theorem here, so a
+-- regression (a position silently losing a capability) breaks the build,
+-- and every known GAP is documented inline with its cause.
+--
+-- OBLIGATIONS (rows):
+--   O1 single   — supplied `h : a = b`, goal `f(a) = f(b)` (one diff slot)
+--   O2 flip     — supplied `h : a = b`, goal `b = a` (symmetry orientation)
+--   O3 combine  — supplied `h : a = b`, goal `a + c = b + d` with `c = d`
+--                 in context (cited fact in one slot, context in the other;
+--                 WS5 bounded combining via tryCombineCitedWithContext)
+--   O4 auto     — NO supplied proof; context has the facts. Sub-cases:
+--                 single / multi-position / stepping-stone (transitivity)
+--
+-- POSITIONS (columns):
+--   supplied-proof positions (O1/O2/O3 apply):
+--     P1 calc step `by h`            P3 claim `... by h`
+--     P5 theorem body `:= h`         P6 function argument
+--     P7 `cases` arm body            P9 `↦` lambda body
+--     P10 `let` value
+--   auto positions (O4 applies):
+--     P2 by-less calc step           P4 bare `claim`
+--
+-- THE ONE GAP — P8 `decide` arm body: receives the expected type but is
+-- NOT post-coerced (elaborator.cpp elaborateArms ~19981 calls
+-- elaborateExpression with the expected type and stops; contrast the
+-- `cases` arm at ~3076 which then runs coerceToExpectedTypeViaDiff). So a
+-- `decide` arm closes only on exact / defeq type, never via diff / flip /
+-- combine. Demonstrated by `coercion_matrix_decide_arm_no_coerce` in the
+-- error corpus; the working explicit form is P8_explicit below.
+
+module Test.coercion_matrix_test
+
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Equality.basics
+import Logic.basics
+import Logic.excluded_middle
+
+-- ── O1 single-position congruence (supplied h : a = b) ──────────────────
+theorem Test.matrix_O1_P5_body (a b : Natural) (h : a = b)
+        : successor(a) = successor(b) := h
+theorem Test.matrix_O1_P1_calc (a b : Natural) (h : a = b)
+        : successor(a) = successor(b) := calc successor(a) = successor(b) by h
+theorem Test.matrix_O1_P3_claim (a b : Natural) (h : a = b) : True := {
+  claim step : successor(a) = successor(b) by h;
+  True.trivial
+}
+theorem Test.matrix_O1_P6_arg (a b : Natural) (h : a = b)
+        (consume : successor(a) = successor(b) → Natural) : Natural := consume(h)
+theorem Test.matrix_O1_P7_cases (a b : Natural) (h : a = b) (n : Natural)
+        : successor(a) = successor(b) :=
+  cases n { | zero => h | successor(m) => h }
+theorem Test.matrix_O1_P9_lambda (a b : Natural) (h : a = b)
+        : Natural → (successor(a) = successor(b)) := (n : Natural) ↦ h
+theorem Test.matrix_O1_P10_let (a b : Natural) (h : a = b) : True := {
+  let step : successor(a) = successor(b) := h;
+  True.trivial
+}
+
+-- ── O2 symmetry flip (supplied h : a = b, goal b = a) ───────────────────
+theorem Test.matrix_O2_P5_body (a b : Natural) (h : a = b) : b = a := h
+theorem Test.matrix_O2_P1_calc (a b : Natural) (h : a = b) : b = a :=
+  calc b = a by h
+theorem Test.matrix_O2_P7_cases (a b : Natural) (h : a = b) (n : Natural)
+        : b = a := cases n { | zero => h | successor(m) => h }
+
+-- ── O3 bounded combine (cited h : a = b, context ctx : c = d) ────────────
+theorem Test.matrix_O3_P5_body (a b c d : Natural) (h : a = b) (ctx : c = d)
+        : a + c = b + d := h
+theorem Test.matrix_O3_P1_calc (a b c d : Natural) (h : a = b) (ctx : c = d)
+        : a + c = b + d := calc a + c = b + d by h
+theorem Test.matrix_O3_P6_arg (a b c d : Natural) (h : a = b) (ctx : c = d)
+        (consume : (a + c = b + d) → Natural) : Natural := consume(h)
+theorem Test.matrix_O3_P9_lambda (a b c d : Natural) (h : a = b) (ctx : c = d)
+        : Natural → (a + c = b + d) := (n : Natural) ↦ h
+theorem Test.matrix_O3_P7_cases (a b c d : Natural) (h : a = b) (ctx : c = d)
+        (n : Natural) : a + c = b + d :=
+  cases n { | zero => h | successor(m) => h }
+
+-- ── O4 auto from context, NO supplied proof ─────────────────────────────
+-- single-position (by-less calc P2 / bare claim P4)
+theorem Test.matrix_O4single_P2_calc (a b : Natural) (h : a = b)
+        : successor(a) = successor(b) := calc successor(a) = successor(b)
+theorem Test.matrix_O4single_P4_claim (a b : Natural) (h : a = b) : True := {
+  claim step : successor(a) = successor(b);
+  True.trivial
+}
+-- multi-position (proveApplicationDiff)
+theorem Test.matrix_O4multi_P2_calc (a b c d : Natural) (h : a = b) (ctx : c = d)
+        : a + c = b + d := calc a + c = b + d
+theorem Test.matrix_O4multi_P4_claim
+        (a b c d : Natural) (h : a = b) (ctx : c = d) : True := {
+  claim step : a + c = b + d;
+  True.trivial
+}
+-- stepping-stone (transitivity BFS, no cited fact)
+theorem Test.matrix_O4step_P2_calc (a b c : Natural) (h : a = b) (ctx : b = c)
+        : a = c := calc a = c
+theorem Test.matrix_O4step_P4_claim (a b c : Natural) (h : a = b) (ctx : b = c)
+        : True := {
+  claim step : a = c;
+  True.trivial
+}
+
+-- ── P8 `decide` arm — the GAP. The bare `h` form does NOT close (see the
+-- corpus case coercion_matrix_decide_arm_no_coerce); the arm needs the
+-- congruence written explicitly. This is the working explicit form.
+theorem Test.matrix_P8_decide_explicit (a b : Natural) (h : a = b)
+        : successor(a) = successor(b) :=
+  decide a = b {
+    | yes _ => congruenceOf(successor, h)
+    | no _ => congruenceOf(successor, h)
+  }
