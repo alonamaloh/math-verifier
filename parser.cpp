@@ -3120,15 +3120,41 @@ private:
             disjunctType = parseExpression();
         }
         std::string binderName;
+        SurfacePatternPointer destructurePattern;
         if (peek().kind == TokenKind::KeywordAs) {
             consumeAny();  // 'as'
-            if (!isIdentifierLike(peek().kind)) {
-                throwHere("expected an identifier after 'as'");
+            if (peek().kind == TokenKind::LeftAngle) {
+                // `as ⟨pattern⟩` — bind the disjunct hypothesis under a fresh
+                // name and immediately destructure it (e.g. an existential
+                // into its witness and proof), like `take … as ⟨⟩` /
+                // `suppose … as ⟨⟩`. Desugars below to
+                // `cases <fresh> { | <pattern> => body }`.
+                destructurePattern = parsePattern();
+                binderName = "_disjunct_"
+                    + std::to_string(armToken.line) + "_"
+                    + std::to_string(armToken.column);
+            } else if (isIdentifierLike(peek().kind)) {
+                binderName = consumeAny().lexeme;
+            } else {
+                throwHere("expected an identifier or a ⟨…⟩ pattern after 'as'");
             }
-            binderName = consumeAny().lexeme;
         }
         expect(TokenKind::Colon, "after arm header");
         auto body = parseExpression();
+        if (destructurePattern) {
+            // Wrap the body in a destructure of the disjunct hypothesis.
+            SurfaceExpressionPointer scrutinee = makeSurfaceIdentifier(
+                binderName, {}, armToken.line, armToken.column);
+            SurfaceCasesClause clause;
+            clause.pattern = std::move(destructurePattern);
+            clause.body = std::move(body);
+            clause.line = armToken.line;
+            clause.column = armToken.column;
+            std::vector<SurfaceCasesClause> clauses;
+            clauses.push_back(std::move(clause));
+            body = makeSurfaceCases(std::move(scrutinee), std::move(clauses),
+                                    armToken.line, armToken.column);
+        }
         SurfaceStructuredClaimArm arm;
         arm.disjunctType = std::move(disjunctType);
         arm.binderName = std::move(binderName);
