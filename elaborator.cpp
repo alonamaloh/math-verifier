@@ -10633,6 +10633,34 @@ private:
     // when the surrounding goal is the class equality). `type` is returned
     // in whatever representation it came in — sub-terms are extracted and
     // reassembled in place, so callers can stay in opened or closed form.
+    // Components of a `Quotient.mk(T, R, rep)` class. `level` is the mk's
+    // universe argument (null if absent).
+    struct QuotientClassParts {
+        ExpressionPointer carrier, relation, rep;
+        LevelPointer level = nullptr;
+    };
+
+    // WHNF `endpoint` and peel `Quotient.mk(T, R, rep)` (three Application
+    // layers, head `Quotient.mk`). The single shared mk-peeler — used by the
+    // class-equality relaxer, the sound coercion, and the exact bridge.
+    bool peelQuotientClass(ExpressionPointer endpoint, QuotientClassParts& out) {
+        ExpressionPointer e = weakHeadNormalForm(environment_, endpoint);
+        auto* a3 = std::get_if<Application>(&e->node);
+        if (!a3) return false;
+        auto* a2 = std::get_if<Application>(&a3->function->node);
+        if (!a2) return false;
+        auto* a1 = std::get_if<Application>(&a2->function->node);
+        if (!a1) return false;
+        auto* head = std::get_if<Constant>(&a1->function->node);
+        if (!head || head->name != "Quotient.mk") return false;
+        out.rep = a3->argument;
+        out.relation = a2->argument;
+        out.carrier = a1->argument;
+        out.level = head->universeArguments.empty()
+            ? nullptr : head->universeArguments[0];
+        return true;
+    }
+
     ExpressionPointer relaxClassEqualityToEquivalence(ExpressionPointer type) {
         ExpressionPointer equality = weakHeadNormalForm(environment_, type);
         auto* withRight = std::get_if<Application>(&equality->node);
@@ -10645,25 +10673,11 @@ private:
         if (!withCarrier) return nullptr;
         auto* equalityHead = std::get_if<Constant>(&withCarrier->function->node);
         if (!equalityHead || equalityHead->name != "Equality") return nullptr;
-        auto peelMk = [&](ExpressionPointer endpoint,
-                          ExpressionPointer& relation,
-                          ExpressionPointer& rep) -> bool {
-            ExpressionPointer mk = weakHeadNormalForm(environment_, endpoint);
-            auto* a3 = std::get_if<Application>(&mk->node);
-            if (!a3) return false;
-            rep = a3->argument;
-            auto* a2 = std::get_if<Application>(&a3->function->node);
-            if (!a2) return false;
-            relation = a2->argument;
-            auto* a1 = std::get_if<Application>(&a2->function->node);
-            if (!a1) return false;
-            auto* head = std::get_if<Constant>(&a1->function->node);
-            return head && head->name == "Quotient.mk";
-        };
-        ExpressionPointer relationLeft, x, relationRight, y;
-        if (!peelMk(leftEndpoint, relationLeft, x)) return nullptr;
-        if (!peelMk(rightEndpoint, relationRight, y)) return nullptr;
-        return makeApplication(makeApplication(relationLeft, x), y);
+        QuotientClassParts left, right;
+        if (!peelQuotientClass(leftEndpoint, left)) return nullptr;
+        if (!peelQuotientClass(rightEndpoint, right)) return nullptr;
+        return makeApplication(makeApplication(left.relation, left.rep),
+                                right.rep);
     }
 
     // Equality-of-classes coercion (WS3). When a proof of the underlying
@@ -10693,35 +10707,14 @@ private:
         } catch (const ElaborateError&) {
             return nullptr;
         }
-        // Peel `Quotient.mk.{u}(T, R, rep)` (three Application layers).
-        auto peelMk = [&](ExpressionPointer endpoint,
-                          ExpressionPointer& carrier, ExpressionPointer& relation,
-                          ExpressionPointer& rep, LevelPointer& level) -> bool {
-            ExpressionPointer e = weakHeadNormalForm(environment_, endpoint);
-            auto* a3 = std::get_if<Application>(&e->node);
-            if (!a3) return false;
-            rep = a3->argument;
-            auto* a2 = std::get_if<Application>(&a3->function->node);
-            if (!a2) return false;
-            relation = a2->argument;
-            auto* a1 = std::get_if<Application>(&a2->function->node);
-            if (!a1) return false;
-            carrier = a1->argument;
-            auto* head = std::get_if<Constant>(&a1->function->node);
-            if (!head || head->name != "Quotient.mk") return false;
-            level = head->universeArguments.empty()
-                ? nullptr : head->universeArguments[0];
-            return true;
-        };
-        ExpressionPointer carrierLeft, relationLeft, x;
-        ExpressionPointer carrierRight, relationRight, y;
-        LevelPointer levelLeft = nullptr, levelRight = nullptr;
-        if (!peelMk(comps.leftEndpoint, carrierLeft, relationLeft, x, levelLeft))
-            return nullptr;
-        if (!peelMk(comps.rightEndpoint, carrierRight, relationRight, y,
-                    levelRight))
-            return nullptr;
-        if (!levelLeft) return nullptr;
+        QuotientClassParts left, right;
+        if (!peelQuotientClass(comps.leftEndpoint, left)) return nullptr;
+        if (!peelQuotientClass(comps.rightEndpoint, right)) return nullptr;
+        if (!left.level) return nullptr;
+        ExpressionPointer carrierLeft = left.carrier;
+        ExpressionPointer relationLeft = left.relation;
+        ExpressionPointer x = left.rep, y = right.rep;
+        LevelPointer levelLeft = left.level;
         // The term must prove the equivalence `R(x, y)`.
         ExpressionPointer relationApplied = makeApplication(
             makeApplication(relationLeft, x), y);
@@ -10764,55 +10757,86 @@ private:
     // `RingModulo.equivalence(c, m)` / `Group.*` cosets. Returns the instance
     // applied to the solved parameters, or nullptr (no instance / unsolved /
     // universe-polymorphic instance, which this path doesn't handle).
+    // Returns the instance CLOSED over the local binders (ready to drop into
+    // the exact term without further closeBack). `carrierT`/`relationR` are
+    // OPENED (as the bridge holds them).
     ExpressionPointer resolveEquivalenceInstance(
-            ExpressionPointer carrierT, ExpressionPointer relationR) {
+            ExpressionPointer carrierT, ExpressionPointer relationR,
+            const std::vector<LocalBinder>& localBinders) {
+        auto closeBack = [&](ExpressionPointer e) {
+            return closeOverLocalBinders(e, localBinders, localBinders.size());
+        };
         std::string carrierName = headConstantName(carrierT);
         auto entry = environment_.canonicalInstanceRegistry.find(
             std::make_tuple(std::string("IsEquivalenceRelation"), carrierName));
-        if (entry == environment_.canonicalInstanceRegistry.end()) return nullptr;
-        if (!entry->second.universeParameters.empty()) return nullptr;
-        if (entry->second.parameterCount == 0) {
-            return makeConstant(entry->second.termName, {});
+        if (entry != environment_.canonicalInstanceRegistry.end()
+            && entry->second.universeParameters.empty()) {
+            if (entry->second.parameterCount == 0) {
+                return makeConstant(entry->second.termName, {});
+            }
+            // Open the leading parameter Pis as metavariables and solve them
+            // against the actual (carrierT, relationR) by unifying components.
+            std::set<std::string> parameterMetavariables;
+            std::vector<std::string> parameterNames;
+            ExpressionPointer openedType = entry->second.type;
+            bool opened = true;
+            for (int k = 0; k < entry->second.parameterCount; ++k) {
+                auto* pi = std::get_if<Pi>(&openedType->node);
+                if (!pi) { opened = false; break; }
+                std::string fresh = "_eqInstanceParameter_" + std::to_string(k)
+                    + "_" + entry->second.termName;
+                parameterMetavariables.insert(fresh);
+                parameterNames.push_back(fresh);
+                openedType = openBinder(pi->codomain, fresh,
+                                         FreeVariableOrigin::Internal);
+            }
+            auto* outer = opened
+                ? std::get_if<Application>(&openedType->node) : nullptr;
+            auto* inner = outer
+                ? std::get_if<Application>(&outer->function->node) : nullptr;
+            if (inner) {
+                std::map<std::string, ExpressionPointer> assignment;
+                unifyConstructorParameters(inner->argument, carrierT,
+                                            parameterMetavariables, assignment);
+                unifyConstructorParameters(outer->argument, relationR,
+                                            parameterMetavariables, assignment);
+                bool allSolved = true;
+                for (const auto& name : parameterNames)
+                    if (!assignment.count(name)) { allSolved = false; break; }
+                if (allSolved) {
+                    ExpressionPointer instanceTerm =
+                        makeConstant(entry->second.termName, {});
+                    for (const auto& name : parameterNames)
+                        instanceTerm = makeApplication(std::move(instanceTerm),
+                                                        assignment[name]);
+                    return closeBack(instanceTerm);
+                }
+            }
         }
-        // Open the leading parameter Pis as metavariables.
-        std::set<std::string> parameterMetavariables;
-        std::vector<std::string> parameterNames;
-        ExpressionPointer openedType = entry->second.type;
-        for (int k = 0; k < entry->second.parameterCount; ++k) {
-            auto* pi = std::get_if<Pi>(&openedType->node);
-            if (!pi) return nullptr;
-            std::string fresh = "_eqInstanceParameter_" + std::to_string(k)
-                + "_" + entry->second.termName;
-            parameterMetavariables.insert(fresh);
-            parameterNames.push_back(fresh);
-            openedType = openBinder(pi->codomain, fresh,
-                                     FreeVariableOrigin::Internal);
+        // Fallback: a LOCAL hypothesis already proves
+        // `IsEquivalenceRelation(carrierT, relationR)` (the registry can't hold
+        // it — e.g. `Group.SameCoset`'s equivalence needs a subgroup witness).
+        Context openedContext = buildContextFromLocalBinders(localBinders);
+        int N = static_cast<int>(localBinders.size());
+        for (int b = N - 1; b >= 0; --b) {
+            ExpressionPointer hyp = weakHeadNormalForm(environment_,
+                openOverLocalBinders(
+                    liftBoundVariables(localBinders[b].type, N - b, 0),
+                    localBinders, localBinders.size()));
+            auto* outer = std::get_if<Application>(&hyp->node);
+            if (!outer) continue;
+            auto* inner = std::get_if<Application>(&outer->function->node);
+            if (!inner) continue;
+            auto* head = std::get_if<Constant>(&inner->function->node);
+            if (!head || head->name != "IsEquivalenceRelation") continue;
+            if (isDefinitionallyEqual(environment_, openedContext,
+                                       inner->argument, carrierT)
+                && isDefinitionallyEqual(environment_, openedContext,
+                                          outer->argument, relationR)) {
+                return makeBoundVariable(N - 1 - b);
+            }
         }
-        // openedType = IsEquivalenceRelation(instCarrier, instRelation), the
-        // parameters now metavariables. Solve them against the actual
-        // (carrierT, relationR) — unify the components (avoids touching the
-        // IsEquivalenceRelation head's universe arguments).
-        auto* outer = std::get_if<Application>(&openedType->node);
-        if (!outer) return nullptr;
-        ExpressionPointer instRelation = outer->argument;
-        auto* inner = std::get_if<Application>(&outer->function->node);
-        if (!inner) return nullptr;
-        ExpressionPointer instCarrier = inner->argument;
-        std::map<std::string, ExpressionPointer> assignment;
-        unifyConstructorParameters(instCarrier, carrierT,
-                                    parameterMetavariables, assignment);
-        unifyConstructorParameters(instRelation, relationR,
-                                    parameterMetavariables, assignment);
-        for (const auto& name : parameterNames) {
-            if (!assignment.count(name)) return nullptr;
-        }
-        ExpressionPointer instanceTerm =
-            makeConstant(entry->second.termName, {});
-        for (const auto& name : parameterNames) {
-            instanceTerm = makeApplication(std::move(instanceTerm),
-                                            assignment[name]);
-        }
-        return instanceTerm;
+        return nullptr;
     }
 
     ExpressionPointer tryQuotientExactBridge(
@@ -10826,27 +10850,6 @@ private:
             weakHeadNormalForm(environment_, goalOpened);
         // Cheap gate: the goal must at least be an application (R applied).
         if (!std::get_if<Application>(&goalWhnf->node)) return nullptr;
-
-        // Peel `Quotient.mk.{u}(T, R, rep)` (three Application layers).
-        auto peelMk = [&](ExpressionPointer endpoint,
-                          ExpressionPointer& carrier, ExpressionPointer& relation,
-                          ExpressionPointer& rep, LevelPointer& level) -> bool {
-            ExpressionPointer e = weakHeadNormalForm(environment_, endpoint);
-            auto* a3 = std::get_if<Application>(&e->node);
-            if (!a3) return false;
-            rep = a3->argument;
-            auto* a2 = std::get_if<Application>(&a3->function->node);
-            if (!a2) return false;
-            relation = a2->argument;
-            auto* a1 = std::get_if<Application>(&a2->function->node);
-            if (!a1) return false;
-            carrier = a1->argument;
-            auto* head = std::get_if<Constant>(&a1->function->node);
-            if (!head || head->name != "Quotient.mk") return false;
-            level = head->universeArguments.empty()
-                ? nullptr : head->universeArguments[0];
-            return true;
-        };
 
         // Scan LOCAL hypotheses only for an `mk a = mk b` equality (cheap;
         // the expensive library-equality scan in collectContextEqualities is
@@ -10878,20 +10881,19 @@ private:
             ExpressionPointer eqLhs, eqRhs;
             if (!peelEquality(hypInScope, eqLhs, eqRhs)) continue;
             ExpressionPointer proofExpr = makeBoundVariable(N - 1 - b);
-            ExpressionPointer carrierL, relationL, repA;
-            ExpressionPointer carrierR, relationR, repB;
-            LevelPointer levelL = nullptr, levelR = nullptr;
-            if (!peelMk(openOverLocalBinders(eqLhs, localBinders,
-                                              localBinders.size()),
-                        carrierL, relationL, repA, levelL)) continue;
-            if (!peelMk(openOverLocalBinders(eqRhs, localBinders,
-                                              localBinders.size()),
-                        carrierR, relationR, repB, levelR)) continue;
-            if (!levelL) continue;
+            QuotientClassParts left, right;
+            if (!peelQuotientClass(openOverLocalBinders(eqLhs, localBinders,
+                                       localBinders.size()), left)) continue;
+            if (!peelQuotientClass(openOverLocalBinders(eqRhs, localBinders,
+                                       localBinders.size()), right)) continue;
+            if (!left.level) continue;
+            ExpressionPointer carrierL = left.carrier, relationL = left.relation;
+            ExpressionPointer repA = left.rep, repB = right.rep;
+            LevelPointer levelL = left.level;
             if (!isDefinitionallyEqual(environment_, openedContext,
-                                       carrierL, carrierR)) continue;
+                                       carrierL, right.carrier)) continue;
             if (!isDefinitionallyEqual(environment_, openedContext,
-                                       relationL, relationR)) continue;
+                                       relationL, right.relation)) continue;
             // The goal must be exactly `R(a, b)` for these reps.
             ExpressionPointer relationApplied = makeApplication(
                 makeApplication(relationL, repA), repB);
@@ -10899,10 +10901,12 @@ private:
                                        goalWhnf, relationApplied)) continue;
             // Resolve the carrier's IsEquivalenceRelation instance (solving
             // any relation/carrier parameters, e.g. CongruentModulo(m)).
+            // Resolve the equivalence — a registered instance (param-free or
+            // parameterized) or a local IsEquivalenceRelation hypothesis. The
+            // resolver returns it already closed over the local binders.
             ExpressionPointer equivalenceInstance =
-                resolveEquivalenceInstance(carrierL, relationL);
+                resolveEquivalenceInstance(carrierL, relationL, localBinders);
             if (!equivalenceInstance) continue;
-            // Build Quotient.exact.{u}(T, R, equivalence, a, b, h).
             auto closeBack = [&](ExpressionPointer e) {
                 return closeOverLocalBinders(e, localBinders,
                                               localBinders.size());
@@ -10910,10 +10914,7 @@ private:
             ExpressionPointer exact = makeConstant("Quotient.exact", {levelL});
             exact = makeApplication(std::move(exact), closeBack(carrierL));
             exact = makeApplication(std::move(exact), closeBack(relationL));
-            // The resolved instance may mention opened local binders (the
-            // solved parameters, e.g. `modulus`); close it like the others.
-            exact = makeApplication(std::move(exact),
-                                     closeBack(equivalenceInstance));
+            exact = makeApplication(std::move(exact), equivalenceInstance);
             exact = makeApplication(std::move(exact), closeBack(repA));
             exact = makeApplication(std::move(exact), closeBack(repB));
             exact = makeApplication(std::move(exact), proofExpr);
