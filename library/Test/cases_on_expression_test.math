@@ -1,0 +1,72 @@
+-- `cases <expr>` where the scrutinee is an EXPRESSION (not a local
+-- variable) of a non-indexed inductive. The elaborator builds a DEPENDENT
+-- motive by abstracting the scrutinee's structural occurrences in the goal
+-- (Stage 3a) — so an arm's expected type ι-reduces with the constructor
+-- substituted for the scrutinee. This is the capability `decide` relies on
+-- (decide P desugars to cases on `Logic.classical_decidable(P)`); here we
+-- exercise it DIRECTLY on `Logic.Decidable`, independent of `decide`.
+
+module Test.cases_on_expression_test
+
+import axioms
+import Logic.basics
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+
+-- A value-returning function defined by matching on a Decidable, so the
+-- recursor ι-reduces on a constructor.
+definition Test.pick (P : Proposition) : Logic.Decidable(P) → Natural
+  | Logic.Decidable.yes(_) => zero
+  | Logic.Decidable.no(_)  => successor(zero)
+
+-- (1) DEPENDENT goal: the goal mentions the scrutinee expression
+-- `Logic.classical_decidable(P)`. The dependent motive abstracts it, so
+-- the yes arm's type ι-reduces to `zero = zero` and the no arm's to
+-- `successor(zero) = successor(zero)`. A constant motive would leave the
+-- goal un-reduced and reject these bare reflexivities.
+theorem Test.cases_expr_dependent (P : Proposition)
+        : Test.pick(P, Logic.classical_decidable(P))
+          = Test.pick(P, Logic.classical_decidable(P)) :=
+  cases Logic.classical_decidable(P) {
+    | Logic.Decidable.yes(_) => reflexivity(Natural, zero)
+    | Logic.Decidable.no(_)  => reflexivity(Natural, successor(zero))
+  }
+
+-- (2) The arm binder is USED: the yes arm returns the bound proof of P,
+-- the no arm the bound proof of Not(P). The branch type ι-reduces to the
+-- constructor's argument type.
+definition Test.branch (P : Proposition) : Logic.Decidable(P) → Proposition
+  | Logic.Decidable.yes(_) => P
+  | Logic.Decidable.no(_)  => Not(P)
+
+theorem Test.cases_expr_binder_used (P : Proposition)
+        : Test.branch(P, Logic.classical_decidable(P)) :=
+  cases Logic.classical_decidable(P) {
+    | Logic.Decidable.yes(p)    => p
+    | Logic.Decidable.no(notP)  => notP
+  }
+
+-- (3) NON-dependent goal: the goal does NOT mention the scrutinee. The
+-- dependent-motive abstraction finds 0 occurrences and degrades to the
+-- constant motive — so this still works exactly as before.
+theorem Test.cases_expr_nondependent (P : Proposition) (a b : Natural)
+        (h : a = b) : successor(a) = successor(b) :=
+  cases Logic.classical_decidable(P) {
+    | Logic.Decidable.yes(_) => h
+    | Logic.Decidable.no(_)  => h
+  }
+
+-- (4) Scrutinee buried behind a δ-reducible wrapper: the goal mentions
+-- `Test.wrapped(P)` which unfolds to `pick(P, classical_decidable(P))`.
+-- The WHNF-aware abstraction still finds the scrutinee occurrence.
+definition Test.wrapped (P : Proposition) : Natural :=
+  Test.pick(P, Logic.classical_decidable(P))
+
+theorem Test.cases_expr_through_wrapper (P : Proposition)
+        : Test.wrapped(P) = Test.wrapped(P) :=
+  cases Logic.classical_decidable(P) {
+    | Logic.Decidable.yes(_) => reflexivity(Natural, zero)
+    | Logic.Decidable.no(_)  => reflexivity(Natural, successor(zero))
+  }
