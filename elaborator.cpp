@@ -9687,6 +9687,84 @@ private:
         }
     }
 
+    // One step of a single-position congruence descent: which side stayed
+    // fixed (Arg keeps the function and varies the argument; Fn keeps the
+    // argument and varies the function) and the fixed subterm.
+    struct CalcCongruencePathStep {
+        enum class Kind { Arg, Fn };
+        Kind kind;
+        ExpressionPointer savedSide;
+    };
+
+    // Wrap `proof : currentLeft = currentRight` from innermost out with one
+    // `Equality.congruence` per path step (outermost step applied last),
+    // reconstructing the full outer `= ` proof. The per-step domain/codomain
+    // types are inferred in the local context and closed back over the local
+    // binders — the OPEN→CLOSED splice that, done wrong, leaks an unbound
+    // internal variable; kept in ONE place here. Returns nullptr if any
+    // type/level inference fails. Shared by the goal-only walker
+    // (autoProveCalcStepRaw) and the cited-proof applicator
+    // (tryDiffApplyUserProof), which differ only in how they FIND the path
+    // and the inner proof — the wrapping is identical.
+    ExpressionPointer wrapCongruenceChainOutsideIn(
+        const std::vector<LocalBinder>& localBinders,
+        const std::vector<CalcCongruencePathStep>& pathStepsOutsideIn,
+        ExpressionPointer currentLeft,
+        ExpressionPointer currentRight,
+        ExpressionPointer currentProof) {
+        try {
+            for (auto iterator = pathStepsOutsideIn.rbegin();
+                 iterator != pathStepsOutsideIn.rend(); ++iterator) {
+                const CalcCongruencePathStep& step = *iterator;
+                LevelPointer varLevel = typeUniverseOf(
+                    localBinders, currentLeft);
+                ExpressionPointer varType = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, currentLeft),
+                    localBinders, localBinders.size());
+                ExpressionPointer lambdaBody;
+                ExpressionPointer outerLeft, outerRight;
+                if (step.kind == CalcCongruencePathStep::Kind::Arg) {
+                    ExpressionPointer liftedFunction =
+                        liftBoundVariables(step.savedSide, 1, 0);
+                    lambdaBody = makeApplication(
+                        std::move(liftedFunction), makeBoundVariable(0));
+                    outerLeft = makeApplication(step.savedSide, currentLeft);
+                    outerRight = makeApplication(step.savedSide, currentRight);
+                } else {
+                    ExpressionPointer liftedArgument =
+                        liftBoundVariables(step.savedSide, 1, 0);
+                    lambdaBody = makeApplication(
+                        makeBoundVariable(0), std::move(liftedArgument));
+                    outerLeft = makeApplication(currentLeft, step.savedSide);
+                    outerRight = makeApplication(currentRight, step.savedSide);
+                }
+                ExpressionPointer lambda = makeLambda(
+                    "_calc_z", varType, std::move(lambdaBody));
+                LevelPointer outerLevel = typeUniverseOf(
+                    localBinders, outerLeft);
+                ExpressionPointer outerType = closeOverLocalBinders(
+                    inferTypeInLocalContext(localBinders, outerLeft),
+                    localBinders, localBinders.size());
+                ExpressionPointer call = makeConstant(
+                    "Equality.congruence", {varLevel, outerLevel});
+                call = makeApplication(std::move(call), varType);
+                call = makeApplication(std::move(call), outerType);
+                call = makeApplication(std::move(call), std::move(lambda));
+                call = makeApplication(std::move(call), currentLeft);
+                call = makeApplication(std::move(call), currentRight);
+                call = makeApplication(std::move(call), std::move(currentProof));
+                currentProof = std::move(call);
+                currentLeft = std::move(outerLeft);
+                currentRight = std::move(outerRight);
+            }
+        } catch (const TypeError&) {
+            return nullptr;
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+        return currentProof;
+    }
+
     ExpressionPointer autoProveCalcStepRaw(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer previousKernel,
@@ -9742,14 +9820,7 @@ private:
         if (!congruenceAvailable) {
             return nullptr;
         }
-        struct CalcPathStep {
-            enum class Kind { Arg, Fn };
-            Kind kind;
-            // Arg: the function part that we're keeping fixed.
-            // Fn:  the argument part that we're keeping fixed.
-            ExpressionPointer savedSide;
-        };
-        std::vector<CalcPathStep> pathStepsOutsideIn;
+        std::vector<CalcCongruencePathStep> pathStepsOutsideIn;
         ExpressionPointer leftCursor = previousKernel;
         ExpressionPointer rightCursor = nextKernel;
         ExpressionPointer innerProof = nullptr;
@@ -9776,14 +9847,14 @@ private:
             }
             if (functionEqual) {
                 pathStepsOutsideIn.push_back(
-                    {CalcPathStep::Kind::Arg, leftApp->function});
+                    {CalcCongruencePathStep::Kind::Arg, leftApp->function});
                 leftCursor = leftApp->argument;
                 rightCursor = rightApp->argument;
                 continue;
             }
             if (argumentEqual) {
                 pathStepsOutsideIn.push_back(
-                    {CalcPathStep::Kind::Fn, leftApp->argument});
+                    {CalcCongruencePathStep::Kind::Fn, leftApp->argument});
                 leftCursor = leftApp->function;
                 rightCursor = rightApp->function;
                 continue;
@@ -9813,75 +9884,9 @@ private:
         // result of applying the lambda (lambda codomain). We use
         // inferTypeInLocalContext and typeUniverseOf to compute them
         // — if either throws, bail.
-        ExpressionPointer currentLeft = leftCursor;
-        ExpressionPointer currentRight = rightCursor;
-        ExpressionPointer currentProof = innerProof;
-        try {
-            for (auto iterator = pathStepsOutsideIn.rbegin();
-                 iterator != pathStepsOutsideIn.rend(); ++iterator) {
-                const CalcPathStep& step = *iterator;
-                LevelPointer varLevel = typeUniverseOf(
-                    localBinders, currentLeft);
-                // inferTypeInLocalContext returns the type in OPENED form
-                // (with FVar references for local binders). We splice it
-                // into a kernel term that's built in CLOSED form, so we
-                // must close it back — otherwise an FVar reference to a
-                // local binder (e.g. `carrier : Type(0)` parameter) leaks
-                // into the emitted term and the kernel rejects it as an
-                // unbound internal variable.
-                ExpressionPointer varType = closeOverLocalBinders(
-                    inferTypeInLocalContext(localBinders, currentLeft),
-                    localBinders, localBinders.size());
-                ExpressionPointer lambdaBody;
-                ExpressionPointer outerLeft, outerRight;
-                if (step.kind == CalcPathStep::Kind::Arg) {
-                    ExpressionPointer liftedFunction =
-                        liftBoundVariables(step.savedSide, 1, 0);
-                    lambdaBody = makeApplication(
-                        std::move(liftedFunction),
-                        makeBoundVariable(0));
-                    outerLeft = makeApplication(step.savedSide,
-                                                 currentLeft);
-                    outerRight = makeApplication(step.savedSide,
-                                                  currentRight);
-                } else {
-                    ExpressionPointer liftedArgument =
-                        liftBoundVariables(step.savedSide, 1, 0);
-                    lambdaBody = makeApplication(
-                        makeBoundVariable(0),
-                        std::move(liftedArgument));
-                    outerLeft = makeApplication(currentLeft,
-                                                 step.savedSide);
-                    outerRight = makeApplication(currentRight,
-                                                  step.savedSide);
-                }
-                ExpressionPointer lambda = makeLambda(
-                    "_calc_z", varType, std::move(lambdaBody));
-                LevelPointer outerLevel = typeUniverseOf(
-                    localBinders, outerLeft);
-                ExpressionPointer outerType = closeOverLocalBinders(
-                    inferTypeInLocalContext(localBinders, outerLeft),
-                    localBinders, localBinders.size());
-                ExpressionPointer call = makeConstant(
-                    "Equality.congruence",
-                    {varLevel, outerLevel});
-                call = makeApplication(std::move(call), varType);
-                call = makeApplication(std::move(call), outerType);
-                call = makeApplication(std::move(call),
-                                        std::move(lambda));
-                call = makeApplication(std::move(call), currentLeft);
-                call = makeApplication(std::move(call), currentRight);
-                call = makeApplication(std::move(call),
-                                        std::move(currentProof));
-                currentProof = std::move(call);
-                currentLeft = std::move(outerLeft);
-                currentRight = std::move(outerRight);
-            }
-        } catch (const TypeError&) {
-            return nullptr;
-        } catch (const ElaborateError&) {
-            return nullptr;
-        }
+        ExpressionPointer currentProof = wrapCongruenceChainOutsideIn(
+            localBinders, pathStepsOutsideIn, leftCursor, rightCursor,
+            innerProof);
         (void)carrierType;
         (void)carrierLevel;
         return currentProof;
@@ -11364,12 +11369,7 @@ private:
         Context openedContext = buildContextFromLocalBinders(localBinders);
         // Lockstep walk: descend via App nodes, at each level check
         // if the user proof matches (forward or symmetric).
-        struct CalcPathStep {
-            enum class Kind { Arg, Fn };
-            Kind kind;
-            ExpressionPointer savedSide;
-        };
-        std::vector<CalcPathStep> pathStepsOutsideIn;
+        std::vector<CalcCongruencePathStep> pathStepsOutsideIn;
         ExpressionPointer leftCursor = previousKernel;
         ExpressionPointer rightCursor = nextKernel;
         ExpressionPointer innerProof = nullptr;
@@ -11444,7 +11444,7 @@ private:
                     if (functionEqual && argumentEqual) return false;
                     if (functionEqual) {
                         pathStepsOutsideIn.push_back(
-                            {CalcPathStep::Kind::Arg,
+                            {CalcCongruencePathStep::Kind::Arg,
                              leftApp->function});
                         leftCursor = leftApp->argument;
                         rightCursor = rightApp->argument;
@@ -11452,7 +11452,7 @@ private:
                     }
                     if (argumentEqual) {
                         pathStepsOutsideIn.push_back(
-                            {CalcPathStep::Kind::Fn,
+                            {CalcCongruencePathStep::Kind::Fn,
                              leftApp->argument});
                         leftCursor = leftApp->function;
                         rightCursor = rightApp->function;
@@ -11483,69 +11483,12 @@ private:
                 userLeft, userRight, userCarrier, userCarrierLevel,
                 line, column);
         }
-        // Wrap from innermost out with Equality.congruence (mirrors
-        // autoProveCalcStep's wrapping loop).
-        ExpressionPointer currentLeft = leftCursor;
-        ExpressionPointer currentRight = rightCursor;
-        ExpressionPointer currentProof = innerProof;
-        try {
-            for (auto iterator = pathStepsOutsideIn.rbegin();
-                 iterator != pathStepsOutsideIn.rend(); ++iterator) {
-                const CalcPathStep& step = *iterator;
-                LevelPointer varLevel = typeUniverseOf(
-                    localBinders, currentLeft);
-                ExpressionPointer varType = closeOverLocalBinders(
-                    inferTypeInLocalContext(localBinders, currentLeft),
-                    localBinders, localBinders.size());
-                ExpressionPointer lambdaBody;
-                ExpressionPointer outerLeft, outerRight;
-                if (step.kind == CalcPathStep::Kind::Arg) {
-                    ExpressionPointer liftedFunction =
-                        liftBoundVariables(step.savedSide, 1, 0);
-                    lambdaBody = makeApplication(
-                        std::move(liftedFunction),
-                        makeBoundVariable(0));
-                    outerLeft = makeApplication(step.savedSide,
-                                                 currentLeft);
-                    outerRight = makeApplication(step.savedSide,
-                                                  currentRight);
-                } else {
-                    ExpressionPointer liftedArgument =
-                        liftBoundVariables(step.savedSide, 1, 0);
-                    lambdaBody = makeApplication(
-                        makeBoundVariable(0),
-                        std::move(liftedArgument));
-                    outerLeft = makeApplication(currentLeft,
-                                                 step.savedSide);
-                    outerRight = makeApplication(currentRight,
-                                                  step.savedSide);
-                }
-                ExpressionPointer lambda = makeLambda(
-                    "_calc_z", varType, std::move(lambdaBody));
-                LevelPointer outerLevel = typeUniverseOf(
-                    localBinders, outerLeft);
-                ExpressionPointer outerType = closeOverLocalBinders(
-                    inferTypeInLocalContext(localBinders, outerLeft),
-                    localBinders, localBinders.size());
-                ExpressionPointer call = makeConstant(
-                    "Equality.congruence", {varLevel, outerLevel});
-                call = makeApplication(std::move(call), varType);
-                call = makeApplication(std::move(call), outerType);
-                call = makeApplication(std::move(call),
-                                        std::move(lambda));
-                call = makeApplication(std::move(call), currentLeft);
-                call = makeApplication(std::move(call), currentRight);
-                call = makeApplication(std::move(call),
-                                        std::move(currentProof));
-                currentProof = std::move(call);
-                currentLeft = std::move(outerLeft);
-                currentRight = std::move(outerRight);
-            }
-        } catch (const TypeError&) {
-            return nullptr;
-        } catch (const ElaborateError&) {
-            return nullptr;
-        }
+        // Wrap from innermost out with Equality.congruence (shared with
+        // autoProveCalcStepRaw via wrapCongruenceChainOutsideIn).
+        ExpressionPointer currentProof = wrapCongruenceChainOutsideIn(
+            localBinders, pathStepsOutsideIn, leftCursor, rightCursor,
+            innerProof);
+        if (!currentProof) return nullptr;
         // Output contract (WS5/WS8): the symmetric-match + nested-congruence
         // wrapping above can, on some flips, build a term with an escaped
         // Internal FreeVariable (e.g. an opened-but-not-reclosed endpoint).
