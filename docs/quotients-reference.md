@@ -171,7 +171,7 @@ primitive. They are the friction map and the test set for any redesign.
 | `Rational`/`Real.IsNonneg` | `lift` | the definition is `opaque` (deliberate — the `IsNonneg` abstraction boundary); `by representatives` produces a transparent def |
 | `coefficientOf`, `reciprocal_at_integer` | `lift` | **multi-argument**: the quotient arg is not the sole argument, so the one-argument `by representatives` can't express "lift over *this* arg" |
 | `RingModulo`/`ComplexNumber` embedding | `exact` | goal stated over `Ring.divides`/`Polynomial.ring(r)` while the fact's `mk` relation is `CongruentModulo` over `CommutativeRing.ring(c)` — needs **carrier defeq**, not syntactic unify |
-| `Algebra` second/third isomorphism | `exact` | the equivalence is a **local hypothesis** (`Group.SameCoset.is_equivalence`), not a registered instance — needs **context-instance lookup** |
+| ~~`Algebra` second/third isomorphism~~ | ~~`exact`~~ | **CLEARED** — the exact-bridge now also consults *local* `IsEquivalenceRelation` hypotheses, so the locally-bound `Group.SameCoset.is_equivalence` is found |
 | `Algebra` quotient_group / isomorphism maps | `lift` | parameterized group quotients; same carrier-application + local-instance issues as above |
 
 The "short form doesn't fire as an operand / needs an ascription" caveat (§3a)
@@ -248,6 +248,20 @@ not a committed plan.
    algebraic quotients (`IntegerMod`/`RingModulo`/quotient groups) would all
    instantiate the same declaration, which is the real test of whether the
    abstraction is right.
+
+**Spike result (the "one bidirectional bridge" experiment).** Unifying the
+sound-coercion and exact-bridge plumbing was prototyped: the three `Quotient.mk`
+peelers collapsed to one `peelQuotientClass`, and the exact-bridge gained a
+**local-instance fallback** (consult local `IsEquivalenceRelation` hypotheses
+when the registry has none) — which cleared the Group isomorphism `exact`
+sites above. But it came out **code-neutral** (the dedup was offset by the new
+capability), and it did **not** touch the `RingModulo`/`ComplexNumber`
+residue, because that block is a *goal-shape defeq* mismatch
+(`Ring.divides(…, difference)` vs `CongruentModulo(…)` over
+`CommutativeRing.ring(c)`), orthogonal to merging the two bridges. Lesson: the
+class↔rep machinery is roughly **fixed-size** — consolidation buys capability,
+not a smaller bridge. The leverage for the residue is **goal-shape / defeq
+robustness** (and the bigger §8 #1/#5 reworks), not more bridge unification.
 
 The acid test for any of these: it should make the §6 table *shrink* (fewer
 blocked sites, fewer caveats) while *removing* surface forms, not adding them.
