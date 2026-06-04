@@ -238,7 +238,10 @@ currently fall back to explicit lemmas disappear:
 - **Acceptance:** the symmetry + stepping-stone tests that fail today pass;
   a measured drop in explicit `congruenceOf`/`transport_proposition`.
 
-> **Status — in progress (2026-06).**
+> **Status — DONE (2026-06-04).** Symmetry orientation, multi-position
+> congruence, and bounded combining all landed; acceptance met (the
+> stepping-stone/flip cases pass, explicit `congruenceOf`/transitivity
+> dropped). Detail below.
 > - **Symmetry orientation DONE.** `tryDiffApplyUserProof`'s symmetric-match
 >   branch was doubly broken (double-close of already-closed endpoints →
 >   the historic "bare BoundVariable" malformed term, *plus* wrong
@@ -284,8 +287,34 @@ currently fall back to explicit lemmas disappear:
 >   corpus `calc_congruence_flip_unsupported`. The flip itself stays
 >   *unsupported* for these sites (they keep explicit symmetry) — only the
 >   leak is fixed; correct congruence-flip building is a deeper follow-up.
-> - *Remaining:* **bounded combining** — a single cited fact bridging a
->   multi-position goal with the other facts pulled from context.
+> - **Bounded combining DONE (2026-06-04).** New
+>   `tryCombineCitedWithContext` runs on `tryDiffApplyUserProof`'s
+>   failure path: it rewrites ONE endpoint by the cited equation
+>   (`Equality.congruence` over its occurrences) into a stepping stone
+>   `mid`, then lets the auto-prover close the residual (`mid = next` or
+>   `prev = mid`) FROM CONTEXT, joined by `Equality.transitivity`. Four
+>   attempts — rewrite prev/next × forward/flipped cited orientation —
+>   first whose residual closes wins. All terms CLOSED over the local
+>   binders; the caller's coercion type-checks the result, so any returned
+>   proof is sound by construction. Covers the multi-position case
+>   (`a + c = b + d` from cited `a = b`, context `c = d`), the
+>   stepping-stone (`a = c` from cited `a = b`, context `b = c`), and the
+>   ComplexNumber/irreducible pattern (`f(modulus) = f(g(z))` from cited
+>   `a = z` + context `modulus = g(a)`). Tests in
+>   `bounded_combining_test`. As a bonus this CLOSED the former
+>   `calc_congruence_flip_unsupported` corpus case (`e - e = a + a - e`
+>   from `h : a + a = e`), now a valid supported theorem — the negative
+>   corpus case was removed. Sweep: the two
+>   `Equality.transitivity(factor, congruenceOf(…))` sites in
+>   `modulus_irreducible` went bare (`by aZero`/`by bZero`); congruenceOf
+>   29→27, Equality.transitivity 7→5, leak 253→249.
+> - *Wiring limit:* the combine (and even single-position diff inference)
+>   fires on calc-step `by`, `claim … by`, and `:=` theorem bodies, but
+>   NOT inside `decide`/`cases` arm term bodies — those route through
+>   argument-coercion, not `tryDiffApplyUserProof`. So the remaining
+>   explicit `Equality.transitivity(…, congruenceOf(…))` sites (mostly
+>   term positions returned directly, e.g. `degree_function`) stay
+>   explicit until that coercion path is wired (a WS2/WS5 follow-up).
 
 ### WS4. Auto-prover completeness for "obvious" steps
 Every step a mathematician calls trivial should close with no hint.
