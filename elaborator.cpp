@@ -19801,7 +19801,7 @@ private:
         const SurfaceDecide& decide,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
+        int line, int column) {
         Frame frame(*this,
             "decide expression at line " + std::to_string(line));
         TimedScope _scope(*this, "elaborateDecide");
@@ -19809,279 +19809,45 @@ private:
             throwElaborate(
                 "decide P { … } needs an expected type from context");
         }
-        // (1) Elaborate the proposition P (with expected type
-        // Proposition = Sort(0)).
-        ExpressionPointer propositionKernel = elaborateExpression(
-            *decide.proposition, localBinders, makeSort(makeLevelConst(0)));
-
-        // (2) Build the scrutinee X = Logic.classical_decidable(P).
-        ExpressionPointer scrutineeKernel = makeApplication(
-            makeConstant("Logic.classical_decidable", {}),
-            propositionKernel);
-
-        // (3) Build Logic.Decidable(P) — the scrutinee's type.
-        ExpressionPointer decidablePType = makeApplication(
-            makeConstant("Logic.Decidable", {}),
-            propositionKernel);
-
-        // (4) Abstract every structural occurrence of X in expectedType
-        // to form the motive's body. The user may have written P in
-        // terms of in-scope let-binders (e.g.
-        //   let intervals := bisectionIntervals(…);
-        //   decide IsUpperBound(subset, halve(left(intervals) + right(intervals))) {…}
-        // ) but the goal type predates the let-bindings and inlines
-        // their values. ζ-unfold the target's let-references so its
-        // literal form matches the goal's structure.
-        ExpressionPointer targetReduced = zetaUnfoldLetBinders(
-            scrutineeKernel, localBinders, /*currentDepth=*/0);
-        std::string targetHeadName =
-            applicationHeadConstantName(targetReduced);
-        int occurrences = 0;
-        int whnfFuel = 2048;
-        motiveWalkerCache_.clear();
-        // MATH_DECIDE_CONSTANT_MOTIVE=1: skip the WHNF walker entirely
-        // and always use the constant motive `λ_. Goal`. The arms must
-        // prove Goal directly; the kernel's lazy defeq handles any
-        // ι-reduction implicitly when checking the arm's body against
-        // Goal. For supremum.math, this would avoid the 28-s-per-call
-        // motiveAbstraction cost — IF the user's arm proofs survive
-        // without the ι-pre-reduction the explicit motive provides.
-        const char* constMotiveFlag =
-            std::getenv("MATH_DECIDE_CONSTANT_MOTIVE");
-        bool forceConstantMotive = constMotiveFlag
-            && constMotiveFlag[0] != '\0'
-            && constMotiveFlag[0] != '0';
-        ExpressionPointer motiveBody;
-        const char* sizeFlag = std::getenv("MATH_DECIDE_SIZES");
-        bool dumpSizes = sizeFlag && sizeFlag[0] != '\0'
-            && sizeFlag[0] != '0';
-        size_t expectedSize = 0, targetSize = 0;
-        if (dumpSizes) {
-            expectedSize = countExpressionNodes(expectedType);
-            targetSize = countExpressionNodes(targetReduced);
-        }
-        if (forceConstantMotive) {
-            // Skip the walker; use the constant motive directly.
-            // (Same lift as the existing fallback path below.)
-            motiveBody = liftBoundVariables(
-                expectedType, /*increment=*/1, /*threshold=*/0);
-            occurrences = 0;
-        } else {
-            TimedScope _inner(*this, "decide:motiveAbstraction");
-            motiveBody = abstractStructuralOccurrenceWithWHNF(
-                expectedType, targetReduced, targetHeadName,
-                /*currentDepth=*/0, occurrences, whnfFuel);
-        }
-        if (dumpSizes) {
-            size_t motiveSize = countExpressionNodes(motiveBody);
-            std::cerr << "[decide-size] line=" << line
-                      << " expected=" << expectedSize
-                      << " target=" << targetSize
-                      << " motiveBody=" << motiveSize
-                      << " occurrences=" << occurrences
-                      << " whnfFuelLeft=" << whnfFuel << "\n";
-        }
-        if (occurrences == 0) {
-            // No occurrence of `Logic.classical_decidable(P)` in the
-            // goal — use a constant motive `λs. Goal`. The arms each
-            // prove the goal directly without reduction. This is the
-            // proposition-only case (the user just wants `if P then …
-            // else …` reasoning, no value-level branching threaded
-            // through the goal). Lift expectedType by 1 to leave a
-            // free BV(0) for the motive's target parameter.
-            motiveBody = liftBoundVariables(
-                expectedType, /*increment=*/1, /*threshold=*/0);
-        }
-
-        // (5) Infer the motive's universe (Goal's level). For
-        // Proposition-valued Goals this is 0; for Type-valued Goals it
-        // can be higher. Compute by inferring the type of expectedType
-        // and reading its Sort level.
-        LevelPointer motiveLevel;
-        {
-            TimedScope _inner(*this, "decide:motiveLevel");
-            Context openedContext = buildContextFromLocalBinders(localBinders);
-            ExpressionPointer goalOpenedForLevel = openOverLocalBinders(
-                expectedType, localBinders, localBinders.size());
-            ExpressionPointer goalType = inferType(
-                environment_, openedContext, goalOpenedForLevel);
-            ExpressionPointer goalTypeWHNF = weakHeadNormalForm(
-                environment_, goalType);
-            auto* sortNode = std::get_if<Sort>(&goalTypeWHNF->node);
-            if (!sortNode) {
-                throwElaborate(
-                    "decide P { … } at line " + std::to_string(line)
-                    + ": goal's type does not normalise to a Sort");
-            }
-            motiveLevel = sortNode->level;
-        }
-
-        // (6) Build motive M = Lambda(_decideTarget : Decidable(P), motiveBody).
-        ExpressionPointer motive = makeLambda(
-            "_decideTarget", decidablePType, motiveBody);
-
-        // (7) Build each arm. For yes: lambda over a binder of type P,
-        // body elaborated at motiveBody[yes(P, BV(0))/BV(0)] in the
-        // extended scope. Similarly for no with Not(P).
-        const std::string yesBinder =
-            decide.yesBinderName.empty() ? std::string("_") : decide.yesBinderName;
-        const std::string noBinder =
-            decide.noBinderName.empty() ? std::string("_") : decide.noBinderName;
-
-        // P lifted into the arm's body scope (one binder added).
-        ExpressionPointer propositionLifted =
-            liftBoundVariables(propositionKernel, 1, 0);
-
-        // yes(P_lifted, BV(0)) — the constructor applied to the arm's binder.
-        ExpressionPointer yesAppliedToBinder = makeApplication(
-            makeApplication(
-                makeConstant("Logic.Decidable.yes", {}),
-                propositionLifted),
-            makeBoundVariable(0));
-        // no(P_lifted, BV(0)) — similar.
-        ExpressionPointer noAppliedToBinder = makeApplication(
-            makeApplication(
-                makeConstant("Logic.Decidable.no", {}),
-                propositionLifted),
-            makeBoundVariable(0));
-
-        // The motive's body was built with BV(0) bound to the motive's
-        // target (Decidable(P)) parameter, with localBinder refs at
-        // BV(1..N). We want the arm's expected type in the extended
-        // scope `localBinders + [armBinder]`, where BV(0) is the arm
-        // binder and BV(1..N) are the localBinders.
-        //
-        // `substitute(motiveBody, 0, value)` β-reduces, replacing
-        // BV(0) with `value` AND decrementing every other BV by 1 (as
-        // if the motive's binder is being removed). That would mis-
-        // align the localBinder refs in the extended scope. To keep
-        // them aligned, first lift motiveBody by 1 above its motive-
-        // target binder (BV(0) stays, BV(K+1) → BV(K+2)); then
-        // substitute, which restores BV(K+2) → BV(K+1) — exactly the
-        // localBinder slots in the extended scope.
-        ExpressionPointer motiveBodyLifted =
-            liftBoundVariables(motiveBody, /*increment=*/1,
-                                /*threshold=*/1);
-        ExpressionPointer yesArmExpectedType =
-            substitute(motiveBodyLifted, 0, yesAppliedToBinder);
-        ExpressionPointer noArmExpectedType =
-            substitute(motiveBodyLifted, 0, noAppliedToBinder);
-
-        // Not(P) for the no arm's binder.
-        ExpressionPointer notP = makeApplication(
-            makeConstant("Not", {}), propositionKernel);
-
-        ExpressionPointer yesArm;
-        ExpressionPointer noArm;
-        {
-            TimedScope _inner(*this, "decide:elaborateArms");
-            // Yes arm scope: extend with the binder.
-            std::vector<LocalBinder> yesScope = localBinders;
-            yesScope.push_back({yesBinder, propositionKernel});
-            ExpressionPointer yesBodyElab = elaborateExpression(
-                *decide.yesBody, yesScope, yesArmExpectedType);
-            // Run the same arm-body coercion a `cases` arm gets (the
-            // `decide`-as-`cases-on-Decidable` equivalence): an arm body
-            // off by a single-position congruence / symmetry / bounded
-            // combine from its expected type is bridged via
-            // coerceToExpectedTypeViaDiff. Without this, a `decide` arm
-            // closed strictly less than a `cases` arm — the
-            // capability-matrix gap (Test/coercion_matrix_test).
-            yesBodyElab = coerceToExpectedTypeViaDiff(
-                yesScope, yesBodyElab, yesArmExpectedType);
-            yesArm = makeLambda(
-                yesBinder, propositionKernel, yesBodyElab);
-
-            std::vector<LocalBinder> noScope = localBinders;
-            noScope.push_back({noBinder, notP});
-            ExpressionPointer noBodyElab = elaborateExpression(
-                *decide.noBody, noScope, noArmExpectedType);
-            noBodyElab = coerceToExpectedTypeViaDiff(
-                noScope, noBodyElab, noArmExpectedType);
-            noArm = makeLambda(
-                noBinder, notP, noBodyElab);
-        }
-
-        // (8) Build the recursor application:
-        // Logic.Decidable_recursor.{u}(P, motive, yesArm, noArm, X).
-        ExpressionPointer recursorCall = makeConstant(
-            "Logic.Decidable_recursor", {motiveLevel});
-        recursorCall = makeApplication(recursorCall, propositionKernel);
-        recursorCall = makeApplication(recursorCall, motive);
-        recursorCall = makeApplication(recursorCall, yesArm);
-        recursorCall = makeApplication(recursorCall, noArm);
-        recursorCall = makeApplication(recursorCall, scrutineeKernel);
-        // Pre-typecheck the assembled application to produce a
-        // detailed error before the kernel's generic "Application:
-        // argument type does not match Pi domain" message hits. We
-        // open over localBinders so inferType can walk freely; on
-        // failure, dump every arg with its expected/actual types so
-        // the diagnostic points at which slot is the culprit.
-        // Pre-typecheck: only run when MATH_DECIDE_PRETYPECHECK=1 — it
-        // doubles the kernel's defeq work on the assembled term, and
-        // for files like Real/supremum.math that's ~16 seconds per
-        // decide call. Default off; user opts in when they hit an
-        // opaque "argument type does not match Pi domain" error and
-        // want the slot-by-slot diagnostic.
-        const char* preTypecheckFlag =
-            std::getenv("MATH_DECIDE_PRETYPECHECK");
-        bool runPreTypecheck = preTypecheckFlag
-            && preTypecheckFlag[0] != '\0'
-            && preTypecheckFlag[0] != '0';
-        if (!runPreTypecheck) {
-            return recursorCall;
-        }
-        try {
-            TimedScope _inner(*this, "decide:preTypecheck");
-            Context openedContext =
-                buildContextFromLocalBinders(localBinders);
-            ExpressionPointer openedCall = openOverLocalBinders(
-                recursorCall, localBinders, localBinders.size());
-            (void)inferType(environment_, openedContext, openedCall);
-        } catch (const TypeError& kernelError) {
-            const std::string scope =
-                std::string("decide expression at line ")
-                + std::to_string(line);
-            std::string detail;
-            detail += scope + ":\n  kernel rejected the assembled\n"
-                      "  Logic.Decidable_recursor application —\n  ";
-            detail += kernelError.what();
-            detail += "\n\n  Args, in application order:\n";
-            const std::vector<std::pair<std::string, ExpressionPointer>>
-                argSlots = {
-                    {"(1) proposition P", propositionKernel},
-                    {"(2) motive (Decidable(P) -> Sort u)", motive},
-                    {"(3) yes case ((p:P) -> motive(yes P p))", yesArm},
-                    {"(4) no case ((np:Not P) -> motive(no P np))", noArm},
-                    {"(5) scrutinee (Decidable P)", scrutineeKernel},
-                };
-            for (const auto& slot : argSlots) {
-                detail += "    " + slot.first + ":\n";
-                detail += "      term: "
-                       + prettyPrintInLocalScope(slot.second, localBinders)
-                       + "\n";
-                try {
-                    Context ctx =
-                        buildContextFromLocalBinders(localBinders);
-                    ExpressionPointer openedSlot = openOverLocalBinders(
-                        slot.second, localBinders, localBinders.size());
-                    ExpressionPointer slotType = inferType(
-                        environment_, ctx, openedSlot);
-                    ExpressionPointer slotTypeClosed = closeOverLocalBinders(
-                        slotType, localBinders, localBinders.size());
-                    detail += "      type: "
-                           + prettyPrintInLocalScope(
-                                 slotTypeClosed, localBinders)
-                           + "\n";
-                } catch (const TypeError& ignored) {
-                    detail += "      type: <could not infer: ";
-                    detail += ignored.what();
-                    detail += ">\n";
-                }
-            }
-            throwElaborate(detail);
-        }
-        return recursorCall;
+        // `decide P { yes m => Y | no n => N }` IS constructor `cases` on
+        // `Logic.classical_decidable(P) : Logic.Decidable(P)` — a Type(0)
+        // inductive with `yes : P → _` and `no : Not(P) → _`. Desugar to
+        // that surface `cases` and reuse the ordinary cases elaboration:
+        // the expression-scrutinee path builds the dependent motive (so an
+        // arm's expected type ι-reduces with the constructor substituted —
+        // e.g. `decide_pick(P, yes(_))` reduces), and each arm body gets the
+        // standard coerceToExpectedTypeViaDiff treatment. So a `decide` arm
+        // closes exactly what a `cases` arm closes. (This replaced a bespoke
+        // ~270-line recursor/motive build that hand-rolled the motive
+        // abstraction AND skipped arm coercion — the capability-matrix gap.)
+        SurfaceExpressionPointer scrutinee = makeSurfaceApplication(
+            makeSurfaceIdentifier("Logic.classical_decidable", {}, line, column),
+            std::vector<SurfaceExpressionPointer>{decide.proposition},
+            line, column);
+        auto armClause = [&](const std::string& constructorName,
+                             const std::string& binderName,
+                             const SurfaceExpressionPointer& body) {
+            std::vector<SurfacePatternPointer> arguments;
+            arguments.push_back(makeSurfacePatternBareName(
+                binderName.empty() ? std::string("_") : binderName,
+                line, column));
+            SurfaceCasesClause clause;
+            clause.pattern = makeSurfacePatternConstructor(
+                constructorName, std::move(arguments), line, column);
+            clause.body = body;
+            clause.line = line;
+            clause.column = column;
+            return clause;
+        };
+        std::vector<SurfaceCasesClause> clauses;
+        clauses.push_back(armClause("Logic.Decidable.yes",
+            decide.yesBinderName, decide.yesBody));
+        clauses.push_back(armClause("Logic.Decidable.no",
+            decide.noBinderName, decide.noBody));
+        SurfaceExpressionPointer syntheticCases = makeSurfaceCases(
+            std::move(scrutinee), std::move(clauses), line, column);
+        return elaborateExpression(
+            *syntheticCases, localBinders, expectedType);
     }
 
     // Names of in-scope binders introduced AFTER the `cases`/induction
