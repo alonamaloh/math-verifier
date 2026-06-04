@@ -31,12 +31,8 @@ import Lists.basics
 -- Every natural is either zero or ≥ 1. Pattern-match on the natural.
 theorem Natural.is_zero_or_at_least_one
         : (k : Natural) → k = 0 ∨ 1 ≤ k
-  | zero =>
-      Or.introduceLeft(reflexivity(0))
-  | successor(kPredecessor) =>
-      Or.introduceRight(
-          Natural.successor_less_or_equal_successor(?, ?,
-              Natural.zero_least(kPredecessor)))
+  | zero                    => reflexivity(0)
+  | successor(kPredecessor) => okay
 
 -- 1 ≤ n splits into n = 1 ∨ 2 ≤ n. Pattern-match on n: zero
 -- contradicts the hypothesis, successor(predN) re-splits via
@@ -46,15 +42,9 @@ theorem Natural.equals_one_or_at_least_two
   | zero, oneLessOrEqualZero =>
       absurd(oneLessOrEqualZero)
   | successor(nPredecessor), _ =>
-      claim (nPredecessor = 0) ∨ (1 ≤ nPredecessor)
       claim by cases {
-        in (nPredecessor = 0) as nPredecessorIsZero:
-            Or.introduceLeft(
-                congruenceOf(successor, nPredecessorIsZero))
-        in (1 ≤ nPredecessor) as nPredecessorAtLeastOne:
-            Or.introduceRight(
-                Natural.successor_less_or_equal_successor(?, ?,
-                    nPredecessorAtLeastOne))
+        in (nPredecessor = 0):   okay
+        in (1 ≤ nPredecessor):   okay
       }
 
 -- If 1 ≤ n and n = p * q, then 1 ≤ q. By cases on q: q = 0 forces
@@ -71,8 +61,7 @@ theorem Natural.right_factor_at_least_one
                  = 0,
               oneLessOrEqualN))
   | successor(qPredecessor), _, _ =>
-      Natural.successor_less_or_equal_successor(?, ?,
-          Natural.zero_least(qPredecessor))
+      okay
 
 -- ----------------------------------------------------------------------
 -- "All-prime" lift across `prepend`: if the head is prime and all
@@ -96,9 +85,7 @@ theorem NaturalList.all_prime_under_prepend_equality
       -- From `here`, list = prepend(candidate, rest); combined with
       -- listEquality, prepend(candidate, rest) = prepend(head, tail),
       -- so candidate = head and is_prime(candidate) = is_prime(head).
-      claim candidateEqualsHead : candidate = head
-        by NaturalList.prepend_injective_head(
-               candidate, head, rest, tail, listEquality);
+      claim candidateEqualsHead : candidate = head;
       claim Natural.is_prime(candidate) by substituting candidateEqualsHead
     }
   | NaturalList.member.there(headInList, restInList, subMembership),
@@ -106,9 +93,7 @@ theorem NaturalList.all_prime_under_prepend_equality
       -- From `there`, list = prepend(headInList, restInList); combined
       -- with listEquality, restInList = tail, so subMembership lifts to
       -- member(candidate, tail) via Equality.transport.
-      claim restInListEqualsTail : restInList = tail
-        by NaturalList.prepend_injective_tail(
-               headInList, head, restInList, tail, listEquality);
+      claim restInListEqualsTail : restInList = tail;
       claim memberTail : NaturalList.member(candidate, tail)
         by substituting restInListEqualsTail;
       allPrimeTail(candidate, memberTail)
@@ -143,33 +128,29 @@ theorem Natural.prime_factorization_exists
   (by_induction on n using Natural.strong_induction
        with subject, inductionHypothesis {
      (subjectAtLeastOne : 1 ≤ subject) ↦ {
-       cases Natural.equals_one_or_at_least_two(
-                 subject, subjectAtLeastOne) {
-         case Or.introduceLeft(subjectEqualsOne):
+       claim by cases {
+         -- subject = 1: the empty list works (its product is 1 = subject).
+         in (subject = 1) as subjectEqualsOne:
              witness NaturalList.empty
                  with ⟨(k : Natural)
                                 (memberOfEmpty :
                                     NaturalList.member(k, NaturalList.empty)) ↦
                          absurd(NaturalList.no_member_in_empty(k, memberOfEmpty)),
-                       Equality.symmetry(subjectEqualsOne)⟩;
-         case Or.introduceRight(subjectAtLeastTwo): {
+                       calc NaturalList.productOf(NaturalList.empty) = 1 = subject⟩
+         -- subject ≥ 2: peel off a prime divisor and recurse on the quotient.
+         in (2 ≤ subject) as subjectAtLeastTwo: {
              obtain ⟨prime, primeIsPrime, primeDividesSubject⟩
                from Natural.has_prime_divisor(subject, subjectAtLeastTwo);
              obtain ⟨quotient, subjectEqualsPrimeTimesQuotient⟩
                from primeDividesSubject;
-             claim primeAtLeastTwo : 2 ≤ prime
-               by And.left(?, ?, primeIsPrime);
+             claim 2 ≤ prime;
              claim quotientAtLeastOne : 1 ≤ quotient
                by Natural.right_factor_at_least_one(
                       prime, subject, quotient,
                       subjectAtLeastOne,
                       subjectEqualsPrimeTimesQuotient);
-             claim quotientBelowSubject : successor(quotient) ≤ subject
-               by rewrite(
-                      Equality.symmetry(subjectEqualsPrimeTimesQuotient),
-                      Natural.successor_less_or_equal_multiply(
-                          prime, quotient,
-                          primeAtLeastTwo, quotientAtLeastOne));
+             -- quotient < subject: subject = prime·quotient ≥ 2·quotient > quotient.
+             claim quotientBelowSubject : successor(quotient) ≤ subject;
              obtain ⟨tail, allPrimeTail, productOfTailEqualsQuotient⟩
                from inductionHypothesis(quotient, quotientBelowSubject)(
                         quotientAtLeastOne);
