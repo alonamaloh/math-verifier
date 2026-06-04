@@ -62,6 +62,55 @@ Quotient.sound(RationalRepresentative, RationalEquivalent,
                 rep1, rep2, equivProof)
 ```
 
+### Equal classes ⇒ equivalent representatives (the `exact`-bridge)
+
+The converse of `Quotient.sound`: from a proof that two classes are equal,
+`Quotient.exact` recovers the equivalence of their representatives. You never
+name it. The auto-prover discharges a goal `R(a, b)` whenever an in-scope
+hypothesis proves `Quotient.mk(a) = Quotient.mk(b)` — so a proof reads "since
+the classes are equal" and the goal closes as a bare claim or a by-less calc
+step. The class-equality endpoints may be `construction` forms or coercions
+that δ-reduce to `mk` (the match WHNFs them).
+
+```math
+-- Hypothesis in scope: `equality : (b : Integer) = -(m : Integer)`,
+-- i.e. the classes [b/0] and [0/m] are equal.
+
+-- Before — naming the axiom:
+claim representativeEquivalence
+      : IntegerEquivalent(IntegerRepresentative.make(b, 0),
+                          IntegerRepresentative.make(0, m))
+  by Quotient.exact(IntegerRepresentative.make(b, 0),
+         IntegerRepresentative.make(0, m), equality);
+
+-- After — the bridge closes it from `equality`:
+claim representativeEquivalence
+      : IntegerEquivalent(IntegerRepresentative.make(b, 0),
+                          IntegerRepresentative.make(0, m));
+```
+
+The goal may be stated as the relation `R(a, b)` or in its unfolded form (the
+cross-multiplied equation, e.g. as a calc step) — the match is up to
+definitional equality, so both work. A flipped fact (`mk b = mk a` for a goal
+`R(a, b)`) is caught via the symmetry-flip retry recursing onto `R(b, a)`;
+this is what lets nested `0 ≠ 1`-style descents (Rational → Integer → Natural)
+collapse to a sequence of bare claims with no `Equality.symmetry`:
+
+```math
+theorem Rational.zero_not_equal_one : Not(Rational.zero = Rational.one) :=
+  (zeroEqOne : Rational.zero = Rational.one) ↦ {
+    claim integerZeroEqualsOne : Integer.zero = Integer.one;
+    claim successorZeroEqualsZero : successor(0) = (0 : Natural);
+    Natural.successor_not_zero(0, successorZeroEqualsZero)
+  }
+```
+
+Scope: concrete-carrier quotients — those whose carrier has a registered
+`IsEquivalenceRelation` instance with no parameters (Integer / Rational /
+Real / PAdic representatives, …). Parameterised carriers
+(`CongruentModulo(m)`, `SameCoset(G, ·)`) are not yet covered; there, keep the
+explicit `Quotient.exact(T, R, instance, x, y, proof)`.
+
 ### Quotient.lift(f, h, q)
 
 ```math
