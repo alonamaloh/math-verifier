@@ -10003,19 +10003,72 @@ private:
             term, localBinders, localBinders.size());
         ExpressionPointer expectedOpened = openOverLocalBinders(
             expectedTypeClosed, localBinders, localBinders.size());
-        if (!isDefinitionallyEqual(environment_, openedContext,
-                                     termOpened, expectedOpened)) {
-            return nullptr;
+        if (isDefinitionallyEqual(environment_, openedContext,
+                                  termOpened, expectedOpened)) {
+            // The written proposition IS the whole goal: auto-prove it.
+            try {
+                return autoProveClaim(
+                    expectedTypeClosed, localBinders, /*line=*/0);
+            } catch (const ElaborateError&) {
+                return nullptr;
+            } catch (const TypeError&) {
+                return nullptr;
+            }
         }
-        // Dispatch the full auto-prover on the matched proposition.
+        // Otherwise the written proposition may state ONE DISJUNCT of an `Or`
+        // goal — a readable way to discharge a case ("here, k = 0"). Auto-
+        // prove that disjunct and inject the matching `Or.introduce*`. (A
+        // non-trivial disjunct can instead be derived with a `calc`, which the
+        // disjunction-injection coercion handles separately.)
+        ExpressionPointer expectedWhnf = weakHeadNormalForm(
+            environment_, expectedOpened);
+        std::vector<ExpressionPointer> openedDisjuncts;
+        {
+            ExpressionPointer head = expectedWhnf;
+            while (auto* app = std::get_if<Application>(&head->node)) {
+                openedDisjuncts.push_back(app->argument);
+                head = app->function;
+            }
+            std::reverse(openedDisjuncts.begin(), openedDisjuncts.end());
+            auto* headConstant = std::get_if<Constant>(&head->node);
+            if (!headConstant || headConstant->name != "Or"
+                || openedDisjuncts.size() != 2) {
+                return nullptr;
+            }
+        }
+        const char* constructorName = nullptr;
+        int matchedIndex = -1;
+        if (isDefinitionallyEqual(environment_, openedContext,
+                                  termOpened, openedDisjuncts[0])) {
+            constructorName = "Or.introduceLeft";
+            matchedIndex = 0;
+        } else if (isDefinitionallyEqual(environment_, openedContext,
+                                         termOpened, openedDisjuncts[1])) {
+            constructorName = "Or.introduceRight";
+            matchedIndex = 1;
+        }
+        if (!constructorName) return nullptr;
+        int N = static_cast<int>(localBinders.size());
+        ExpressionPointer leftClosed =
+            closeOverLocalBinders(openedDisjuncts[0], localBinders, N);
+        ExpressionPointer rightClosed =
+            closeOverLocalBinders(openedDisjuncts[1], localBinders, N);
+        ExpressionPointer disjunctClosed =
+            (matchedIndex == 0) ? leftClosed : rightClosed;
+        ExpressionPointer disjunctProof;
         try {
-            return autoProveClaim(
-                expectedTypeClosed, localBinders, /*line=*/0);
+            disjunctProof = autoProveClaim(
+                disjunctClosed, localBinders, /*line=*/0);
         } catch (const ElaborateError&) {
             return nullptr;
         } catch (const TypeError&) {
             return nullptr;
         }
+        return makeApplication(
+            makeApplication(
+                makeApplication(makeConstant(constructorName), leftClosed),
+                rightClosed),
+            disjunctProof);
     }
 
     // Classical LEM bridge — when `term : Not(Not(P))` and the goal
