@@ -5060,6 +5060,81 @@ std::string deriveSourceRoot(const std::string& sourcePath,
 // explicitly. Returns 0 on success.
 LibrarySearchIndex buildLibraryIndex(const std::string& cacheRoot);
 
+// ----------------------------------------------------------------------
+// Interface caches (.mathv.iface). The interface of a module is the part
+// of its cache that a downstream file can depend on *definitionally*:
+// declaration types, transparent (data) definition bodies, inductives,
+// and all the surface registries. Two body kinds are invisible downstream
+// and so are stripped to bodyless axioms:
+//   - a Definition whose type is a Proposition: it is a proof, and by
+//     proof irrelevance its body never matters to a consumer;
+//   - an opaque Definition: the kernel never δ-unfolds it downstream.
+// What remains changes only when a module's *interface* changes — never
+// when a proof body is edited — which is what lets `make` skip downstream
+// re-verification (and lets every body verify in parallel). To keep the
+// derived bytes a pure function of the interface, the source-dependent
+// header fields (source hash, per-dependency source hashes) are zeroed.
+
+// True if `type` is a proposition (its kind WHNFs to Sort 0). Mirrors the
+// proof-irrelevance test in kernel.cpp, one level up: there we ask whether
+// a term's type is a Prop; here whether a declaration's *type* is.
+static bool typeIsProposition(const Environment& environment,
+                              const ExpressionPointer& type) {
+    try {
+        Context emptyContext;
+        auto kind = weakHeadNormalForm(
+            environment, inferType(environment, emptyContext, type));
+        if (auto* sort = std::get_if<Sort>(&kind->node)) {
+            auto concreteLevel = levelAsConstant(sort->level);
+            return concreteLevel && *concreteLevel == 0;
+        }
+    } catch (const TypeError&) {
+        // Not well-typed in isolation — be conservative and keep the body.
+    }
+    return false;
+}
+
+static CacheContents deriveInterfaceCache(const CacheContents& full,
+                                          const Environment& environment) {
+    CacheContents iface = full;
+    iface.sourceHash = 0;
+    for (auto& dependency : iface.dependencies) {
+        dependency.sourceHash = 0;
+    }
+    iface.declarations.clear();
+    for (const auto& [name, declaration] : full.declarations) {
+        if (auto* definition = std::get_if<Definition>(&declaration)) {
+            bool stripBody =
+                definition->opacity == Opacity::Opaque
+                || typeIsProposition(environment, definition->type);
+            if (stripBody) {
+                iface.declarations.emplace_back(
+                    name,
+                    Axiom{definition->universeParameters, definition->type});
+                continue;
+            }
+        }
+        iface.declarations.emplace_back(name, declaration);
+    }
+    return iface;
+}
+
+// Write `contents` to `path` only if the serialized bytes differ from
+// what's already there, so an unchanged interface keeps its old mtime
+// (and `make` doesn't re-verify the file's consumers).
+static void writeCacheFileIfChanged(const std::string& path,
+                                    const CacheContents& contents) {
+    const std::string tempPath = path + ".tmp";
+    writeCacheFile(tempPath, contents);
+    auto newBytes = readWholeFile(tempPath);
+    auto oldBytes = readWholeFile(path);
+    if (newBytes && oldBytes && *newBytes == *oldBytes) {
+        std::filesystem::remove(tempPath);
+        return;
+    }
+    std::filesystem::rename(tempPath, path);
+}
+
 int verifyWithCache(const std::string& sourcePath,
                     const std::vector<std::string>& dependencyCachePaths,
                     const std::string& outputCachePath,
@@ -5322,6 +5397,11 @@ int verifyWithCache(const std::string& sourcePath,
                 std::filesystem::create_directories(output.parent_path());
             }
             writeCacheFile(outputCachePath, cache);
+            // Also emit the interface cache (bodies of proofs and opaque
+            // definitions stripped), write-if-changed so a proof-only edit
+            // leaves it untouched. Nothing consumes it yet (increment 1).
+            writeCacheFileIfChanged(outputCachePath + ".iface",
+                                    deriveInterfaceCache(cache, environment));
         } catch (const SerializationError& error) {
             std::cerr << "cache write failure for " << outputCachePath
                       << ": " << error.what() << "\n";
