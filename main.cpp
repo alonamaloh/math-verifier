@@ -5158,7 +5158,8 @@ int verifyWithCache(const std::string& sourcePath,
                     const std::string& cacheRoot = "",
                     bool reportRedundantBy = false,
                     bool reportRedundantCalcSteps = false,
-                    bool reportRedundantByNonEq = false) {
+                    bool reportRedundantByNonEq = false,
+                    bool writeInterface = true) {
     Environment environment;
     std::set<std::string> alreadyLoaded;
 
@@ -5423,11 +5424,14 @@ int verifyWithCache(const std::string& sourcePath,
                 std::filesystem::create_directories(output.parent_path());
             }
             writeCacheFile(outputCachePath, cache);
-            // Also emit the interface cache (bodies of proofs and opaque
-            // definitions stripped), write-if-changed so a proof-only edit
-            // leaves it untouched. Nothing consumes it yet (increment 1).
-            writeCacheFileIfChanged(outputCachePath + ".iface",
-                                    deriveInterfaceCache(cache, environment));
+            // Also emit the interface cache (proof bodies stripped),
+            // write-if-changed so a proof-only edit leaves it untouched.
+            // Suppressed by --no-interface (two-stage stage 2, where stage 1
+            // already produced the authoritative interface).
+            if (writeInterface) {
+                writeCacheFileIfChanged(outputCachePath + ".iface",
+                                        deriveInterfaceCache(cache, environment));
+            }
         } catch (const SerializationError& error) {
             std::cerr << "cache write failure for " << outputCachePath
                       << ": " << error.what() << "\n";
@@ -6057,6 +6061,7 @@ int main(int argc, char* argv[]) {
         bool reportRedundantBy = false;
         bool reportRedundantByNonEq = false;
         bool reportRedundantCalcSteps = false;
+        bool writeInterface = true;
         enum class State { None, Source, Output, Deps, CacheRoot } state = State::None;
         for (int i = 2; i < argc; ++i) {
             std::string argument = argv[i];
@@ -6064,6 +6069,13 @@ int main(int argc, char* argv[]) {
             if (argument == "--output")      { state = State::Output; continue; }
             if (argument == "--deps")        { state = State::Deps;   continue; }
             if (argument == "--cache-root")  { state = State::CacheRoot; continue; }
+            if (argument == "--no-interface") {
+                // Stage-2 of a two-stage build: verify proofs but leave the
+                // interface cache (produced by stage 1) untouched.
+                writeInterface = false;
+                state = State::None;
+                continue;
+            }
             if (argument == "--check-redundant-by") {
                 reportRedundantBy = true;
                 state = State::None;
@@ -6097,7 +6109,8 @@ int main(int argc, char* argv[]) {
                                outputCachePath, cacheRoot,
                                reportRedundantBy,
                                reportRedundantCalcSteps,
-                               reportRedundantByNonEq);
+                               reportRedundantByNonEq,
+                               writeInterface);
     }
     if (argc >= 3 && std::string(argv[1]) == "deps") {
         // kernel deps [--cache-root DIR] SOURCE.math [SOURCE.math ...]
@@ -6112,6 +6125,59 @@ int main(int argc, char* argv[]) {
             sourcePaths.push_back(argument);
         }
         return emitDeps(sourcePaths, cacheRoot);
+    }
+    if (argc >= 3 && std::string(argv[1]) == "dump") {
+        // kernel dump CACHE.mathv[.iface] — print each declaration's name,
+        // kind, universe parameters, and opacity. A diagnostic for cache
+        // (in)equality.
+        try {
+            CacheContents contents = readCacheFile(argv[2]);
+            for (const auto& dependency : contents.dependencies) {
+                std::cout << "dep  " << dependency.moduleName << "\n";
+            }
+            for (const auto& [name, count] : contents.implicitArgumentCounts) {
+                std::cout << "implicit " << name << " = " << count << "\n";
+            }
+            for (const auto& [name, declaration] : contents.declarations) {
+                std::string kind, opacity, universes;
+                if (auto* d = std::get_if<Definition>(&declaration)) {
+                    kind = "def";
+                    opacity = d->opacity == Opacity::Opaque ? " opaque" : "";
+                    for (const auto& u : d->universeParameters)
+                        universes += " " + u;
+                } else if (std::get_if<Axiom>(&declaration)) {
+                    kind = "axiom";
+                } else if (std::get_if<Inductive>(&declaration)) {
+                    kind = "inductive";
+                } else if (std::get_if<Constructor>(&declaration)) {
+                    kind = "ctor";
+                } else if (std::get_if<Recursor>(&declaration)) {
+                    kind = "recursor";
+                }
+                ExpressionPointer type;
+                if (auto* d = std::get_if<Definition>(&declaration)) type = d->type;
+                else if (auto* a = std::get_if<Axiom>(&declaration)) type = a->type;
+                else if (auto* c = std::get_if<Constructor>(&declaration)) type = c->type;
+                else if (auto* r = std::get_if<Recursor>(&declaration)) type = r->type;
+                std::cout << kind << opacity << "  " << name
+                          << "  {univ:" << universes << " }  : "
+                          << (type ? prettyPrint(type) : "<no type>") << "\n";
+            }
+            for (const auto& r : contents.operatorRegistrations)
+                std::cout << "op " << r.operatorSymbol << " " << r.functionName << "\n";
+            for (const auto& r : contents.overloadRegistrations)
+                std::cout << "overload " << r.aliasName << " " << r.functionName << "\n";
+            for (const auto& r : contents.coercionRegistrations)
+                std::cout << "coercion " << r.sourceTypeName << "->" << r.targetTypeName << "\n";
+            for (const auto& r : contents.instanceRegistrations)
+                std::cout << "instance " << r.structureName << " " << r.carrierName << " " << r.termName << "\n";
+            for (const auto& r : contents.congruenceRegistrations)
+                std::cout << "congruence " << r.functionName << " " << r.lemmaName << "\n";
+        } catch (const SerializationError& error) {
+            std::cerr << "dump: " << error.what() << "\n";
+            return 1;
+        }
+        return 0;
     }
     if (argc >= 2 && std::string(argv[1]) == "search") {
         return runSearch(argc, argv);
