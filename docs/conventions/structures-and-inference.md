@@ -147,6 +147,16 @@ from the goal and the local context, so you rarely spell them out:
   fact solves `r` and `p` as a side effect. Search is bounded to the local
   context + recalled facts — never a global proof search to fill an
   argument.
+- **Back-inference (args only in hypotheses)**: this runs to a *fixpoint*,
+  so a lemma whose key arguments never appear in its conclusion is still
+  citable by name. `NaturalList.all_prime_under_prepend_equality`'s
+  conclusion is just `is_prime(candidate)`; citing it recovers everything
+  else from the hypotheses — `member(candidate, list)` matched against the
+  local `membership` pins `list`, `is_prime(head)` / the all-prime-tail
+  premise pin `head` / `tail`, and the leftover equality premise
+  `list = prepend(head, tail)`, now fully determined, is discharged by
+  **reflexivity**. So `:= claim by NaturalList.all_prime_under_prepend_equality`
+  replaces an eight-argument call.
 
 ```math
 claim productHasDegree : Polynomial.HasDegree(Real.ring, a * b, da + db)

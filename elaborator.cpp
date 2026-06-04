@@ -5998,6 +5998,101 @@ private:
                 + "`)");
         }
 
+        // Back-inference pass. The conclusion match above pins only the
+        // binders that appear in the conclusion; many lemmas keep their key
+        // arguments in their HYPOTHESES (e.g. all_prime_under_prepend_equality
+        // mentions head/tail/list only in `member(c, list)` and
+        // `list = prepend(head, tail)`). Recover them by unifying each unfilled
+        // binder's domain against the context:
+        //   (a) a hypothesis premise unifies against an in-scope hypothesis,
+        //       selecting it AND back-filling the data binders it mentions
+        //       (matching `member(c, list)` to `member(c, prepend(h,t))` pins
+        //       `list`); and
+        //   (b) an equality premise whose two sides are now determined and
+        //       definitionally equal is discharged by `reflexivity`.
+        // Iterated to a fixpoint since one discharge can unblock the next.
+        // Additive: when the conclusion already pins everything, the loop is a
+        // no-op, so existing `by <lemma>` sites are unaffected.
+        {
+            int N = static_cast<int>(localBinders.size());
+            auto domainInPatternScope = [&](int innerIndex) {
+                int pos = matchedDepth - 1 - innerIndex;
+                return liftBoundVariables(
+                    domainsOutermostFirst[pos], matchedDepth - pos, 0);
+            };
+            std::function<bool(const ExpressionPointer&, int)> referencesUnfilled =
+                [&](const ExpressionPointer& e, int depth) -> bool {
+                    if (auto* bv = std::get_if<BoundVariable>(&e->node)) {
+                        int rel = bv->deBruijnIndex - depth;
+                        return rel >= 0 && rel < matchedDepth && !bindings[rel];
+                    }
+                    if (auto* app = std::get_if<Application>(&e->node))
+                        return referencesUnfilled(app->function, depth)
+                            || referencesUnfilled(app->argument, depth);
+                    if (auto* pi = std::get_if<Pi>(&e->node))
+                        return referencesUnfilled(pi->domain, depth)
+                            || referencesUnfilled(pi->codomain, depth + 1);
+                    if (auto* lam = std::get_if<Lambda>(&e->node))
+                        return referencesUnfilled(lam->domain, depth)
+                            || referencesUnfilled(lam->body, depth + 1);
+                    return false;
+                };
+            bool progress = true;
+            while (progress) {
+                progress = false;
+                for (int innerIndex = 0; innerIndex < matchedDepth;
+                     ++innerIndex) {
+                    if (bindings[innerIndex]) continue;
+                    ExpressionPointer domain = domainInPatternScope(innerIndex);
+                    // (a) discharge against an in-scope hypothesis, back-
+                    // filling any data binders the premise mentions.
+                    for (int b = N - 1; b >= 0; --b) {
+                        ExpressionPointer hypType = liftBoundVariables(
+                            localBinders[b].type, N - b, 0);
+                        std::vector<ExpressionPointer> trial = bindings;
+                        if (matchAgainstPattern(
+                                domain, hypType, matchedDepth, trial)) {
+                            bindings = std::move(trial);
+                            bindings[innerIndex] = makeBoundVariable(N - 1 - b);
+                            progress = true;
+                            break;
+                        }
+                    }
+                    if (bindings[innerIndex]) continue;
+                    // (b) reflexivity for a now-determined equality premise.
+                    if (referencesUnfilled(domain, 0)) continue;
+                    ExpressionPointer concrete =
+                        instantiateLemmaBinders(domain, bindings);
+                    ExpressionPointer head = concrete;
+                    std::vector<ExpressionPointer> spineArgs;
+                    while (auto* app = std::get_if<Application>(&head->node)) {
+                        spineArgs.push_back(app->argument);
+                        head = app->function;
+                    }
+                    std::reverse(spineArgs.begin(), spineArgs.end());
+                    auto* headConstant = std::get_if<Constant>(&head->node);
+                    if (!headConstant || headConstant->name != "Equality"
+                        || spineArgs.size() != 3) {
+                        continue;
+                    }
+                    ExpressionPointer leftOpened = openOverLocalBinders(
+                        spineArgs[1], localBinders, N);
+                    ExpressionPointer rightOpened = openOverLocalBinders(
+                        spineArgs[2], localBinders, N);
+                    if (!isDefinitionallyEqual(environment_, openedContext,
+                                               leftOpened, rightOpened)) {
+                        continue;
+                    }
+                    ExpressionPointer refl = makeConstant(
+                        "reflexivity", headConstant->universeArguments);
+                    refl = makeApplication(refl, spineArgs[0]);
+                    refl = makeApplication(refl, spineArgs[1]);
+                    bindings[innerIndex] = refl;
+                    progress = true;
+                }
+            }
+        }
+
         // Fill any of the `matchedDepth` peeled-binder slots not
         // determined by unification by searching local binders for a
         // structurally-equal type. Process inner-binder-first
