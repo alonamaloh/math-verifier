@@ -122,6 +122,15 @@ public:
         autoProveProfileEnabled_ = autoProveProfileFlag
             && autoProveProfileFlag[0] != '\0'
             && autoProveProfileFlag[0] != '0';
+        // Stage-1 ("statements-only") mode: elaborate each theorem's
+        // statement (type) but skip its proof body, registering a
+        // placeholder. Produces a module's interface without paying for its
+        // proofs — the first pass of two-stage verification. Gated on an env
+        // var so no call-site signatures change.
+        const char* statementsOnlyFlag = std::getenv("MATH_STATEMENTS_ONLY");
+        statementsOnly_ = statementsOnlyFlag
+            && statementsOnlyFlag[0] != '\0'
+            && statementsOnlyFlag[0] != '0';
     }
 
     ~Elaborator() {
@@ -1903,6 +1912,14 @@ private:
         SurfaceDefinitionDeclaration augmented =
             augmentDeclarationWithConventions(origDecl);
         const SurfaceDefinitionDeclaration& declaration = augmented;
+        // Stage-1: a theorem's proof (body or cases) is skipped; only its
+        // statement is elaborated. Covers both the direct-body and the
+        // pattern (inductive) forms uniformly — the statement is the
+        // declared type either way.
+        if (statementsOnly_ && declaration.isTheorem) {
+            elaborateTheoremStatementOnly(declaration);
+            return;
+        }
         if (!declaration.cases.empty()) {
             elaboratePatternMatchDefinition(declaration);
             return;
@@ -2006,6 +2023,64 @@ private:
             // representative term `mk(make(args…))` back to `Name(args…)`.
             canonicalConstructions_.insert(declaration.name);
         }
+        currentUniverseParametersOrdered_.clear();
+        currentUniverseParameters_.clear();
+        currentDeclarationName_.clear();
+        resetAutoBoundState();
+    }
+
+    // Stage-1 elaboration of a theorem: elaborate the declared type (the
+    // statement) only, then register it with a fixed placeholder body
+    // (opaque, so it never unfolds) — the same shape `deriveInterfaceCache`
+    // produces, but without ever touching the proof. The arguments-to-Pi
+    // construction mirrors `elaborateDefinition`'s; for the pattern
+    // (inductive) form `arguments` is empty and the whole signature lives in
+    // `declaration.type`.
+    void elaborateTheoremStatementOnly(
+            const SurfaceDefinitionDeclaration& declaration) {
+        Frame frame(*this, "theorem '" + declaration.name + "' (statement)",
+                    declaration.type ? declaration.type->line : 0,
+                    declaration.type ? declaration.type->column : 0);
+        currentUniverseParametersOrdered_ = declaration.universeParameters;
+        currentUniverseParameters_ = std::set<std::string>(
+            declaration.universeParameters.begin(),
+            declaration.universeParameters.end());
+        currentDeclarationName_ = declaration.name;
+        resetAutoBoundState();
+
+        std::vector<LocalBinder> localBinders;
+        std::vector<std::pair<std::string, ExpressionPointer>>
+            argumentBinders;
+        for (const auto& binder : declaration.arguments) {
+            ExpressionPointer argumentType =
+                elaborateExpression(*binder.type, localBinders);
+            for (const auto& name : binder.names) {
+                argumentBinders.push_back({name, argumentType});
+                localBinders.push_back({name, argumentType});
+                if (&name != &binder.names.back()) {
+                    argumentType = elaborateExpression(*binder.type,
+                                                        localBinders);
+                }
+            }
+        }
+        ExpressionPointer fullType =
+            elaborateExpression(*declaration.type, localBinders);
+        for (auto iterator = argumentBinders.rbegin();
+             iterator != argumentBinders.rend(); ++iterator) {
+            fullType = makePi(iterator->first, iterator->second, fullType);
+        }
+
+        environment_.declarations[declaration.name] =
+            Definition{finalUniverseParameters(declaration.universeParameters),
+                       fullType, makeSort(0), Opacity::Opaque};
+        invalidateKernelCaches();
+        int implicitCount =
+            countLeadingImplicitArgumentNames(declaration);
+        if (implicitCount > 0) {
+            environment_.implicitArgumentCounts[declaration.name] =
+                implicitCount;
+        }
+        registerAlgebraicShape(declaration.name, fullType);
         currentUniverseParametersOrdered_.clear();
         currentUniverseParameters_.clear();
         currentDeclarationName_.clear();
@@ -26297,6 +26372,8 @@ private:
     // tried, and how long each tactic took. Recursive sub-calls
     // aggregate but do not emit rows.
     bool autoProveProfileEnabled_ = false;
+    // Stage-1 statements-only mode (skip proof bodies). See constructor.
+    bool statementsOnly_ = false;
     int autoProveDepth_ = 0;
     // Recursion guard for the symmetry-flip tactic: proving `x = y` by
     // proving `y = x` and wrapping in symmetry must not flip back to
