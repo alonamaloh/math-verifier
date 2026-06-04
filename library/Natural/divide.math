@@ -363,43 +363,42 @@ theorem Natural.modulo_step_lt_divisor
                                 -- succ(0) ≤ succ(f) proof fits the
                                 -- expected succ(monus(0, succ predD))
                                 -- ≤ succ(f) shape.
-                                rewrite(
-                                    Equality.symmetry(
-                                        Natural.monus_zero_left(
-                                            successor(predD))),
-                                    Natural.successor_less_or_equal_successor(
-                                        0, f, Natural.zero_least(f)))
+                                calc successor(
+                                         Natural.monus(0, successor(predD)))
+                                   = successor(0)
+                                   ≤ successor(f)
+                                         by Natural.successor_less_or_equal_successor(
+                                                0, f, Natural.zero_least(f))
                             case successor(k):
                                 -- monus(succ(k), succ(predD)) = monus(k, predD)
                                 -- via monus_succ_succ (was kernel ι; now
                                 -- an explicit lemma since monus is opaque).
                                 -- Then monus(k, predD) ≤ k ≤ f follows.
-                                rewrite(
-                                    Equality.symmetry(
-                                        Natural.monus_succ_succ(k, predD)),
-                                    calc successor(Natural.monus(k, predD))
-                                       ≤ successor(k)
-                                            by Natural.successor_less_or_equal_successor(
-                                                   Natural.monus(k, predD), k,
-                                                   Natural.monus_le_self(k, predD))
-                                       ≤ successor(f))
+                                calc successor(
+                                         Natural.monus(successor(k),
+                                                       successor(predD)))
+                                   = successor(Natural.monus(k, predD))
+                                   ≤ successor(k)
+                                         by Natural.successor_less_or_equal_successor(
+                                                Natural.monus(k, predD), k,
+                                                Natural.monus_le_self(k, predD))
+                                   ≤ successor(f)
                         }
                 };
-            rewrite(
-                Equality.symmetry(
-                    Natural.modulo_step_succ_fits(f, d, n, monusEq)),
-                Natural.modulo_step_lt_divisor(
-                    f, d, Natural.monus(n, d), dPositive,
-                    monusBoundedByFuel))
+            calc successor(Natural.modulo_step(successor(f), d, n))
+               = successor(Natural.modulo_step(f, d, Natural.monus(n, d)))
+               ≤ d
+                     by Natural.modulo_step_lt_divisor(
+                            f, d, Natural.monus(n, d), dPositive,
+                            monusBoundedByFuel)
         }
         | successor(predM) =>
             -- d > n. modulo_step returns n; monus_succ_implies_gt
             -- supplies succ(n) ≤ d directly.
-            rewrite(
-                Equality.symmetry(
-                    Natural.modulo_step_succ_too_big(
-                        f, d, n, predM, monusEq)),
-                Natural.monus_succ_implies_gt(d, n, predM, monusEq))
+            calc successor(Natural.modulo_step(successor(f), d, n))
+               = successor(n)
+               ≤ d
+                     by Natural.monus_succ_implies_gt(d, n, predM, monusEq)
       }
 
 
@@ -532,33 +531,33 @@ theorem Natural.divides_implies_modulo_zero
         (dividesProof : Natural.divides(divisor, dividend))
         : Natural.modulo(divisor, dividend) = 0 := {
   obtain ⟨q, dividendEq⟩ from dividesProof;
-  -- modulo(divisor, dividend) ≡ modulo_step(dividend, divisor, dividend);
-  -- substitute dividend ← divisor*q (via Equality.symmetry(dividendEq)) in
-  -- the abstract-all motive `λm. modulo_step(m, divisor, m) = 0`.
-  rewrite(
-            Equality.symmetry(dividendEq),
-            -- modulo(divisor, divisor * q) = modulo_step(divisor * q, divisor, divisor * q).
-            -- Need succ(q) ≤ succ(divisor * q), i.e., q ≤ divisor * q.
-            -- For divisor ≥ 1: divisor * q ≥ q. Proof: q = 1 * q ≤ divisor * q.
-            Natural.modulo_step_at_multiple(
-                q, divisor * q, divisor, divisorPositive,
-                Natural.successor_less_or_equal_successor(
-                    q, divisor * q,
-                    -- q ≤ divisor * q for divisor ≥ 1.
-                    -- Chain: q = 1*q ≤ 1*q + monus(d,1)*q = (1 + monus(d,1))*q = d*q.
-                    calc q
-                       = successor(0) * q
-                       ≤ successor(0) * q
-                             + Natural.monus(divisor, successor(0)) * q
-                       = (successor(0)
-                          + Natural.monus(divisor, successor(0))) * q
-                       = divisor * q
-                              -- 1 + monus(d, 1) = d (since d ≥ 1).
-                              by Natural.monus_zero_implies_decompose(
-                                     successor(0), divisor,
-                                     Natural.le_implies_monus_zero(
-                                         divisor, successor(0),
-                                         divisorPositive)))))
+  -- Rewrite the dividend to divisor*q (dividendEq), then it's a multiple:
+  -- modulo(divisor, divisor*q) ≡ modulo_step(divisor*q, divisor, divisor*q),
+  -- which modulo_step_at_multiple sends to 0.
+  calc Natural.modulo(divisor, dividend)
+     = Natural.modulo(divisor, divisor * q)
+     = 0
+           -- Need succ(q) ≤ succ(divisor * q), i.e., q ≤ divisor * q.
+           -- For divisor ≥ 1: divisor * q ≥ q.
+           by Natural.modulo_step_at_multiple(
+                  q, divisor * q, divisor, divisorPositive,
+                  Natural.successor_less_or_equal_successor(
+                      q, divisor * q,
+                      -- q ≤ divisor * q for divisor ≥ 1.
+                      -- Chain: q = 1*q ≤ 1*q + monus(d,1)*q = (1 + monus(d,1))*q = d*q.
+                      calc q
+                         = successor(0) * q
+                         ≤ successor(0) * q
+                               + Natural.monus(divisor, successor(0)) * q
+                         = (successor(0)
+                            + Natural.monus(divisor, successor(0))) * q
+                         = divisor * q
+                                -- 1 + monus(d, 1) = d (since d ≥ 1).
+                                by Natural.monus_zero_implies_decompose(
+                                       successor(0), divisor,
+                                       Natural.le_implies_monus_zero(
+                                           divisor, successor(0),
+                                           divisorPositive))))
 }
 
 -- If modulo(d, n) = 0, then d divides n. The decomposition gives
@@ -568,9 +567,8 @@ theorem Natural.modulo_zero_implies_divides
         (moduloZero : Natural.modulo(divisor, dividend) = 0)
         : Natural.divides(divisor, dividend) :=
   witness Natural.divide(divisor, dividend) with
-      Equality.symmetry(
-          calc divisor * Natural.divide(divisor, dividend)
-             = divisor * Natural.divide(divisor, dividend) + 0
-             = divisor * Natural.divide(divisor, dividend)
-                   + Natural.modulo(divisor, dividend)
-             = dividend)
+      calc dividend
+         = divisor * Natural.divide(divisor, dividend)
+               + Natural.modulo(divisor, dividend)
+         = divisor * Natural.divide(divisor, dividend) + 0
+         = divisor * Natural.divide(divisor, dividend)
