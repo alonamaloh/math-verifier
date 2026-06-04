@@ -116,25 +116,20 @@ theorem Rational.LessOrEqual.multiply_by_nonneg_left
 -- ----------------------------------------------------------------------
 -- Foundational positivity helpers.
 
--- 0 ≠ 1 at Rational. Via Quotient.exact: equality of mks gives Integer
--- equivalence, which forces 0 = 1 at Natural after reduction.
+-- 0 ≠ 1 at Rational. Equal Rational classes give equivalent
+-- representatives, descending through Integer to 0 = successor(0) at
+-- Natural — impossible.
 theorem Rational.zero_not_equal_one : Not(Rational.zero = Rational.one) :=
-  (zeroEqOne : Rational.zero = Rational.one) ↦
-    -- zero = mk(make(Integer.zero, zero)), one = mk(make(Integer.one, zero)).
-    -- Quotient.exact gives RationalEquivalent of reps, i.e.,
-    -- Integer.zero * succ(zero) = Integer.one * succ(zero),
-    -- which reduces to Integer.zero = Integer.one.
-    -- Then Integer.zero = mk(make(0, 0)), Integer.one = mk(make(1, 0)).
-    -- Quotient.exact gives IntegerEquivalent, i.e., 0 + 0 = 0 + 1,
-    -- reducing to 0 = 1 (Natural), contradicting Natural.successor_not_zero.
-    Natural.successor_not_zero(
-        0,
-        Equality.symmetry(
-            Quotient.exact(IntegerRepresentative.make(0, 0),
-                IntegerRepresentative.make(successor(0), 0),
-                Quotient.exact(RationalRepresentative.make(Integer.zero, 0),
-                    RationalRepresentative.make(Integer.one, 0),
-                    zeroEqOne))))
+  (zeroEqOne : Rational.zero = Rational.one) ↦ {
+    -- Rational.zero = [Integer.zero / 0], Rational.one = [Integer.one / 0];
+    -- equal classes ⇒ Integer.zero · 1 = Integer.one · 1, i.e. the Integers
+    -- are equal.
+    claim integerZeroEqualsOne : Integer.zero = Integer.one;
+    -- Integer.zero = [0 / 0], Integer.one = [successor(0) / 0]; equal classes
+    -- ⇒ 0 + 0 = successor(0) + 0, i.e. successor(0) = 0.
+    claim successorZeroEqualsZero : successor(0) = (0 : Natural);
+    Natural.successor_not_zero(0, successorZeroEqualsZero)
+  }
 
 -- 0 < 1 at Rational. And of (0 ≤ 1) and (0 ≠ 1).
 theorem Rational.zero_less_one : Rational.zero < Rational.one :=
@@ -402,23 +397,15 @@ theorem Rational.reciprocal_of_succ_nonzero (K : Natural)
   (zeroEqRecip
               : Rational.zero
                 = StrictPositiveRational.reciprocal(
-                      StrictPositiveRational.make(K, 0))) ↦
-    -- Quotient.exact reduces to IntegerEquivalent of representatives,
-    -- which forces 0 = succ(zero) (Natural) — false.
-    Natural.successor_not_zero(
-        0,
-        Equality.symmetry(
-            Quotient.exact(IntegerRepresentative.make(0, 0),
-                IntegerRepresentative.make(successor(0), 0),
-                Quotient.exact(RationalRepresentative.make(Integer.zero, 0),
-                    RationalRepresentative.make(
-                        (successor(0) : Integer), K),
-                    -- Rational.zero = (succ(zero) : I, K). At Rational:
-                    -- (zero : I, 0) ~ (succ(zero) : I, K) iff
-                    --   zero · succ(K) = succ(zero) · succ(zero), i.e.,
-                    --   zero = succ(zero) (Integer). Quotient.exact at
-                    --   Integer level gives 0 = succ(zero) (Natural).
-                    zeroEqRecip))))
+                      StrictPositiveRational.make(K, 0))) ↦ {
+    -- Rational.zero = [Integer.zero / 0] and 1/(K+1) = [successor(0) / K];
+    -- equal classes ⇒ Integer.zero · succ(K) = successor(0) · 1, i.e. the
+    -- Integers are equal.
+    claim integerZeroEqualsSucc : Integer.zero = (successor(0) : Integer);
+    -- Descending to Natural as in zero_not_equal_one: successor(0) = 0.
+    claim successorZeroEqualsZero : successor(0) = (0 : Natural);
+    Natural.successor_not_zero(0, successorZeroEqualsZero)
+  }
 
 -- 1/(succ(K)) > 0.
 theorem Rational.reciprocal_of_succ_positive (K : Natural)
@@ -493,20 +480,13 @@ theorem Rational.multiply_positive_at_representatives
                                 = (successor(k_x) : Integer)
                                       * (successor(k_y) : Integer)
                                       * (successor(0) : Integer)
-                                -- Quotient.exact yields the equation:
-                                --   (succ(k_x) · succ(k_y) : I) · succ(zero)
-                                --   = Integer.zero · succ(d_y + d_x · succ(d_y))
-                                -- after the Rational-level exact + arithmetic.
+                                -- `zeroEqProduct` says the product class is
+                                -- Rational.zero; equal classes ⇒ equivalent
+                                -- representatives, i.e. this cross-multiplied
+                                -- equation (auto: exact-bridge via symmetry).
                                 = Integer.zero * (successor(d_y + d_x
                                                            * successor(d_y))
                                                       : Integer)
-                                       by Quotient.exact(RationalRepresentative.make(
-                                                  (successor(k_x) : Integer)
-                                                      * (successor(k_y) : Integer),
-                                                  d_y + d_x * successor(d_y)),
-                                              RationalRepresentative.make(
-                                                  Integer.zero, 0),
-                                              Equality.symmetry(zeroEqProduct))
                                 = Integer.zero));
   And.introduction(
       Rational.LessOrEqual_zero_of_IsNonneg(
