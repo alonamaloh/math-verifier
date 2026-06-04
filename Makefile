@@ -32,7 +32,7 @@ lexer.o: lexer.cpp lexer.hpp
 parser.o: parser.cpp parser.hpp surface.hpp lexer.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-elaborator.o: elaborator.cpp elaborator.hpp surface.hpp kernel.hpp expression.hpp level.hpp lemma_search.hpp
+elaborator.o: elaborator.cpp elaborator_internal.hpp elaborator.hpp surface.hpp kernel.hpp expression.hpp level.hpp lemma_search.hpp printer.hpp subtree_hash.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 hash.o: hash.cpp hash.hpp
