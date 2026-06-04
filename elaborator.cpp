@@ -11115,6 +11115,187 @@ private:
         return nullptr;
     }
 
+    // WS5 bounded combining. The single-position descent in
+    // `tryDiffApplyUserProof` finds a proof only when the cited fact
+    // bridges the calc step ALONE — one differing slot, matched forward
+    // or symmetric. When the step has the cited fact in one slot AND
+    // other differing slots that the *context* closes (the multi-position
+    // case `a + c = b + d` from cited `a = b` with `c = d` in scope, or
+    // the stepping-stone `a = c` from cited `a = b` with `b = c` in
+    // scope), that descent bails. This fallback rewrites ONE endpoint by
+    // the cited equation — `Equality.congruence` over every occurrence of
+    // one of its sides — producing a stepping stone `mid`, then asks the
+    // auto-prover to close the residual (`mid = next` or `prev = mid`)
+    // FROM CONTEXT, and joins the two with `Equality.transitivity`. Every
+    // term here is CLOSED over the local binders (de Bruijn indices),
+    // matching `tryDiffApplyUserProof`'s representation contract; the
+    // caller's coercion type-checks the result against the step type, so
+    // any returned proof is sound by construction. Runs only on the
+    // descent's failure path, so it adds no cost to steps that already
+    // close. Returns nullptr if no attempt's residual closes.
+    ExpressionPointer tryCombineCitedWithContext(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer userProof,
+        ExpressionPointer userLeft,
+        ExpressionPointer userRight,
+        ExpressionPointer userCarrier,
+        LevelPointer userCarrierLevel,
+        int line, int column) {
+        if (environment_.lookup("Equality.congruence") == nullptr
+            || environment_.lookup("Equality.transitivity") == nullptr) {
+            return nullptr;
+        }
+        auto carrierTypeOf = [&](const ExpressionPointer& expr) {
+            return closeOverLocalBinders(
+                inferTypeInLocalContext(localBinders, expr),
+                localBinders, localBinders.size());
+        };
+        // The cited proof oriented `from = to`. `forward` uses it as-is
+        // (from = userLeft); otherwise wrap with `Equality.symmetry`
+        // (from = userRight).
+        auto orientedProof = [&](bool forward) -> ExpressionPointer {
+            if (forward) return userProof;
+            ExpressionPointer sym = makeConstant(
+                "Equality.symmetry", {userCarrierLevel});
+            sym = makeApplication(std::move(sym), userCarrier);
+            sym = makeApplication(std::move(sym), userLeft);
+            sym = makeApplication(std::move(sym), userRight);
+            sym = makeApplication(std::move(sym), userProof);
+            return sym;
+        };
+        // Flip a proof `proof : x = y` into `y = x` at the endpoint type.
+        auto symmetrize = [&](const ExpressionPointer& x,
+                              const ExpressionPointer& y,
+                              ExpressionPointer proof) -> ExpressionPointer {
+            LevelPointer level = typeUniverseOf(localBinders, x);
+            ExpressionPointer s = makeConstant(
+                "Equality.symmetry", {level});
+            s = makeApplication(std::move(s), carrierTypeOf(x));
+            s = makeApplication(std::move(s), x);
+            s = makeApplication(std::move(s), y);
+            s = makeApplication(std::move(s), std::move(proof));
+            return s;
+        };
+        // Rewrite `endpoint` by congruence: abstract every occurrence of
+        // `from`, substitute `to`, and wrap with `Equality.congruence`.
+        // Returns {proof : endpoint = rewritten, rewritten} or {nullptr,
+        // nullptr} if `from` does not occur.
+        struct Rewritten {
+            ExpressionPointer proof;
+            ExpressionPointer result;
+        };
+        auto rewriteEndpoint =
+            [&](const ExpressionPointer& endpoint,
+                const ExpressionPointer& from, const ExpressionPointer& to,
+                ExpressionPointer citedProof) -> Rewritten {
+            int occurrences = 0;
+            ExpressionPointer motiveBody = abstractStructuralOccurrence(
+                endpoint, from, 0, occurrences);
+            if (occurrences == 0) return {nullptr, nullptr};
+            ExpressionPointer rewritten = substitute(motiveBody, 0, to);
+            try {
+                ExpressionPointer outerType = carrierTypeOf(endpoint);
+                LevelPointer outerLevel = typeUniverseOf(
+                    localBinders, endpoint);
+                ExpressionPointer motive = makeLambda(
+                    "_combine_z", userCarrier, std::move(motiveBody));
+                ExpressionPointer call = makeConstant(
+                    "Equality.congruence", {userCarrierLevel, outerLevel});
+                call = makeApplication(std::move(call), userCarrier);
+                call = makeApplication(std::move(call), std::move(outerType));
+                call = makeApplication(std::move(call), std::move(motive));
+                call = makeApplication(std::move(call), from);
+                call = makeApplication(std::move(call), to);
+                call = makeApplication(std::move(call), std::move(citedProof));
+                return {std::move(call), std::move(rewritten)};
+            } catch (const TypeError&) {
+                return {nullptr, nullptr};
+            } catch (const ElaborateError&) {
+                return {nullptr, nullptr};
+            }
+        };
+        // Join `prev = mid` (p) and `mid = next` (q) by transitivity.
+        auto transitivityJoin =
+            [&](const ExpressionPointer& prev, const ExpressionPointer& mid,
+                const ExpressionPointer& next, ExpressionPointer p,
+                ExpressionPointer q) -> ExpressionPointer {
+            try {
+                LevelPointer level = typeUniverseOf(localBinders, prev);
+                ExpressionPointer trans = makeConstant(
+                    "Equality.transitivity", {level});
+                trans = makeApplication(std::move(trans), carrierTypeOf(prev));
+                trans = makeApplication(std::move(trans), prev);
+                trans = makeApplication(std::move(trans), mid);
+                trans = makeApplication(std::move(trans), next);
+                trans = makeApplication(std::move(trans), std::move(p));
+                trans = makeApplication(std::move(trans), std::move(q));
+                return trans;
+            } catch (const TypeError&) {
+                return nullptr;
+            } catch (const ElaborateError&) {
+                return nullptr;
+            }
+        };
+        auto eqType = [&](const ExpressionPointer& x,
+                          const ExpressionPointer& y) {
+            LevelPointer level = typeUniverseOf(localBinders, x);
+            ExpressionPointer e = makeConstant("Equality", {level});
+            e = makeApplication(std::move(e), carrierTypeOf(x));
+            e = makeApplication(std::move(e), x);
+            e = makeApplication(std::move(e), y);
+            return e;
+        };
+        auto closeResidual =
+            [&](const ExpressionPointer& a,
+                const ExpressionPointer& b) -> ExpressionPointer {
+            return autoProveCalcStep(
+                localBinders, a, b, carrierTypeOf(a),
+                typeUniverseOf(localBinders, a), eqType(a, b), line, column);
+        };
+        // Four attempts: rewrite the PREVIOUS endpoint (then auto-prove
+        // `mid = next`) or the NEXT endpoint (auto-prove `prev = mid`),
+        // each rewriting in the forward (userLeft → userRight) or flipped
+        // direction. First residual the auto-prover closes from context wins.
+        struct Attempt { bool onPrevious; bool forward; };
+        const Attempt attempts[] = {
+            {true, true}, {true, false}, {false, true}, {false, false}};
+        for (const Attempt& attempt : attempts) {
+            const ExpressionPointer& from =
+                attempt.forward ? userLeft : userRight;
+            const ExpressionPointer& to =
+                attempt.forward ? userRight : userLeft;
+            if (attempt.onPrevious) {
+                Rewritten rw = rewriteEndpoint(
+                    previousKernel, from, to, orientedProof(attempt.forward));
+                if (!rw.proof) continue;
+                ExpressionPointer residual =
+                    closeResidual(rw.result, nextKernel);
+                if (!residual) continue;
+                ExpressionPointer joined = transitivityJoin(
+                    previousKernel, rw.result, nextKernel,
+                    std::move(rw.proof), std::move(residual));
+                if (joined && !containsFreeVariable(joined)) return joined;
+            } else {
+                Rewritten rw = rewriteEndpoint(
+                    nextKernel, from, to, orientedProof(attempt.forward));
+                if (!rw.proof) continue;
+                // rw.proof : nextKernel = mid; flip to mid = nextKernel.
+                ExpressionPointer midToNext =
+                    symmetrize(nextKernel, rw.result, std::move(rw.proof));
+                ExpressionPointer residual =
+                    closeResidual(previousKernel, rw.result);
+                if (!residual) continue;
+                ExpressionPointer joined = transitivityJoin(
+                    previousKernel, rw.result, nextKernel,
+                    std::move(residual), std::move(midToNext));
+                if (joined && !containsFreeVariable(joined)) return joined;
+            }
+        }
+        return nullptr;
+    }
+
     // Given a user-supplied `by <equationProof>` for a calc `=` step,
     // see whether the proof's equation (a = b) sits at a unique
     // single-position diff between `previousKernel` and `nextKernel`.
@@ -11293,7 +11474,15 @@ private:
             };
             if (!descendOrWhnf()) break;
         }
-        if (!innerProof) return nullptr;
+        if (!innerProof) {
+            // The single-position descent found no slot. Fall back to
+            // bounded combining: rewrite one endpoint by the cited fact
+            // and let the auto-prover close the residual from context.
+            return tryCombineCitedWithContext(
+                localBinders, previousKernel, nextKernel, userProof,
+                userLeft, userRight, userCarrier, userCarrierLevel,
+                line, column);
+        }
         // Wrap from innermost out with Equality.congruence (mirrors
         // autoProveCalcStep's wrapping loop).
         ExpressionPointer currentLeft = leftCursor;

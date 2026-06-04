@@ -73,8 +73,11 @@ def deps_of(case_path):
 def run_case(case_path):
     """Run one case; return its normalized captured diagnostic (str)."""
     deps = deps_of(case_path)
+    # `--no-interface`: verify otherwise writes a `.iface` sidecar next to
+    # the output, which fails on `/dev/null` (no `/dev/null.iface.tmp`). The
+    # corpus only cares about the diagnostic, not the cached artifact.
     cmd = [KERNEL, "verify", "--source", case_path,
-           "--output", "/dev/null", "--deps", *deps]
+           "--output", "/dev/null", "--no-interface", "--deps", *deps]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     captured = (proc.stdout + proc.stderr).strip()
     # Normalize the absolute source path so goldens are machine-independent.

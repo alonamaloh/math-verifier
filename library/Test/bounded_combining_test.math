@@ -1,0 +1,62 @@
+-- WS5 bounded combining: a single cited fact bridges ONE slot of a calc
+-- `=` step while the OTHER differing slots are pulled from context. The
+-- single-position diff walker bails on these; the combining fallback
+-- rewrites one endpoint by the cited fact (congruence) and asks the
+-- auto-prover to close the residual from context, joined by transitivity.
+-- The author writes a bare `by <fact>` instead of a hand-built
+-- `Equality.transitivity(..., congruenceOf(...))`.
+
+module Test.bounded_combining_test
+
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Equality.basics
+import Logic.basics
+
+-- Stepping stone: goal `a = c`, cited `eq : a = b`, context `ctx : b = c`.
+-- The cited fact handles `a → b`; `b = c` comes from context.
+theorem Test.combine_stepping_stone
+        (a b c : Natural) (eq : a = b) (ctx : b = c) : a = c := {
+  calc a = c by eq
+}
+
+-- Multi-position congruence: goal `a + c = b + d`, cited `eq : a = b`,
+-- context `ctx : c = d`. Cited fact handles the left summand; the right
+-- summand is closed from context.
+theorem Test.combine_multi_position
+        (a b c d : Natural) (eq : a = b) (ctx : c = d)
+        : a + c = b + d := {
+  calc a + c = b + d by eq
+}
+
+-- Context fact FIRST, then cited congruence — the ComplexNumber/
+-- irreducible pattern in miniature (`Equality.transitivity(factor,
+-- congruenceOf(..., aZero))`). Goal `f(modulus) = f(g(z))` where
+-- `factor : modulus = g(a)` (context) and the cited `aZero : a = z`
+-- rewrites `g(a)` to `g(z)`. Here `f` is `successor` and `g` is
+-- `λx. x + k`. The combine rewrites the NEXT endpoint by the cited fact
+-- (z → a, flipped) and closes `prev = mid` from `factor`.
+theorem Test.combine_congruence_then_context
+        (a z k modulus : Natural)
+        (factor : modulus = a + k) (aZero : a = z)
+        : successor(modulus) = successor(z + k) := {
+  calc successor(modulus) = successor(z + k) by aZero
+}
+
+-- Flipped cited orientation: goal `a = c`, cited `eq : b = a`, context
+-- `ctx : b = c`. The combine must flip the cited fact (a → b via
+-- symmetry) before chaining the context fact.
+theorem Test.combine_flipped_cited
+        (a b c : Natural) (eq : b = a) (ctx : b = c) : a = c := {
+  calc a = c by eq
+}
+
+-- Residual on the previous side: goal `a + c = b + d`, cited `eq : c = d`
+-- (the RIGHT summand), context `ctx : a = b`. The cited fact rewrites the
+-- right slot; the left slot is the residual closed from context.
+theorem Test.combine_right_slot_cited
+        (a b c d : Natural) (eq : c = d) (ctx : a = b)
+        : a + c = b + d := {
+  calc a + c = b + d by eq
+}
