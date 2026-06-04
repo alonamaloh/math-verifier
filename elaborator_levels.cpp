@@ -41,3 +41,26 @@ LevelPointer Elaborator::elaborateLevel(const SurfaceLevel& level) {
     }
     throw ElaborateError("unhandled level variant");
 }
+
+std::string Elaborator::freshAutoBoundUniverseName() {
+    std::string name =
+        "_auto_u_" + std::to_string(metavarCounter_++);
+    autoBoundUniverseParameters_.push_back(name);
+    currentUniverseParametersOrdered_.push_back(name);
+    currentUniverseParameters_.insert(name);
+    return name;
+}
+
+void Elaborator::resetAutoBoundState() {
+    autoBoundUniverseParameters_.clear();
+    metavarCounter_ = 0;
+}
+
+std::vector<std::string> Elaborator::finalUniverseParameters(
+    const std::vector<std::string>& userDeclared) {
+    std::vector<std::string> result = userDeclared;
+    for (const auto& name : autoBoundUniverseParameters_) {
+        result.push_back(name);
+    }
+    return result;
+}
