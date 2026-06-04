@@ -1,0 +1,26 @@
+-- The constructor / anonymous-tuple component coercion limitation, pinned
+-- (see Test/coercion_matrix_test.math, Stage 2 audit). A plain function
+-- argument with a CONCRETE domain coerces an off-by-congruence proof
+-- (`consume(h)` with `consume : (successor a = successor b) → _` and
+-- `h : a = b`). But when the component's type is an INFERRED inductive
+-- PARAMETER — here `And.introduction`'s first argument, whose type is the
+-- parameter `A` solved from the expected `And(...)` — the coercion at the
+-- argument site runs against an as-yet-unsolved metavariable and is a
+-- no-op, so the bare `h` is rejected. This is an inference-ordering
+-- limitation (the expected result type isn't unified into the
+-- constructor's parameters before its components are elaborated), NOT a
+-- missing coercion call. If a future bidirectional-elaboration change
+-- solves the parameters first, this case starts verifying clean and the
+-- corpus flags it — the cue to delete it and add the positive matrix cell.
+
+module corpus.tuple_component_inferred_param_no_coerce
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+
+theorem tuple_component_gap (a b : Natural) (h : a = b)
+        : And(successor(a) = successor(b), True) :=
+  ⟨h, True.trivial⟩

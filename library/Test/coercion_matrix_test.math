@@ -33,6 +33,16 @@
 -- `cases` arm closes — `decide` being constructor-`cases` on
 -- `Logic.Decidable(P)`. (Until 2026-06 this was the one gap: the bespoke
 -- decide path skipped arm coercion. Cells P8_* below pin the fix.)
+--
+-- STAGE 2 AUDIT RESULT: every position with a CONCRETE expected type
+-- routes through the single coercion entry coerceToExpectedTypeViaDiff —
+-- theorem body, function arg, cases arm, decide arm, lambda body, let
+-- value, suppose body, obtain body (all pinned below / above). The only
+-- residual non-uniformity is an anonymous tuple / constructor component
+-- whose type is an INFERRED PARAMETER: the coerce call fires but against
+-- an unsolved metavariable, so an off-by-congruence component is not
+-- bridged. That is an inference-ordering limitation, not a routing gap;
+-- pinned as corpus tuple_component_inferred_param_no_coerce.
 
 module Test.coercion_matrix_test
 
@@ -42,6 +52,7 @@ import Natural.arithmetic
 import Equality.basics
 import Logic.basics
 import Logic.excluded_middle
+import Logic.exists
 
 -- ── O1 single-position congruence (supplied h : a = b) ──────────────────
 theorem Test.matrix_O1_P5_body (a b : Natural) (h : a = b)
@@ -118,3 +129,32 @@ theorem Test.matrix_O1_P8_decide (a b : Natural) (h : a = b)
 theorem Test.matrix_O3_P8_decide (a b c d : Natural) (h : a = b) (ctx : c = d)
         : a + c = b + d :=
   decide a = b { | yes _ => h | no _ => h }
+
+-- ── O1 at the remaining structured-proof body positions (Stage 2 audit) ──
+-- P11 suppose body, P12 obtain body — both coerce uniformly.
+theorem Test.matrix_O1_P11_suppose (a b : Natural)
+        : (a = b) → (successor(a) = successor(b)) := {
+  suppose a = b as h;
+  h
+}
+theorem Test.matrix_O1_P12_obtain (a b : Natural) (ex : ∃ (k : Natural). a = b)
+        : successor(a) = successor(b) := {
+  obtain ⟨k, h⟩ from ex;
+  h
+}
+
+-- ── Anonymous tuple / constructor component (Stage 2 audit). ──────────────
+-- A component coerces when its type is CONCRETE — here the `And` parameter
+-- is pinned by the exact `h`, so the (trivially exact) component goes
+-- through. The diff-coercion of an OFF-by-congruence component does NOT
+-- fire when the component's type is an INFERRED parameter (e.g.
+-- `⟨h, …⟩ : And(successor(a)=successor(b), True)` from `h : a = b`): the
+-- arg coercion runs (elaborator.cpp ~4824) but against an unsolved
+-- parameter metavariable, so it is a no-op. That is an inference-ordering
+-- limitation (the expected result type isn't unified into the
+-- constructor's parameters before its components are elaborated), NOT a
+-- missing coercion-routing call — distinct from the diff-walker work.
+-- Pinned negative: corpus case tuple_component_inferred_param_no_coerce.
+theorem Test.matrix_tuple_concrete_component (a b : Natural) (h : a = b)
+        : And(a = b, True) :=
+  ⟨h, True.trivial⟩
