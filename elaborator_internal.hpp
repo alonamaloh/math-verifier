@@ -21651,41 +21651,8 @@ private:
 
     // -------- level elaboration --------
 
-    LevelPointer elaborateLevel(const SurfaceLevel& level) {
-        if (auto* numeric = std::get_if<SurfaceLevelNumeric>(&level.node)) {
-            return makeLevelConst(numeric->value);
-        }
-        if (auto* name = std::get_if<SurfaceLevelName>(&level.node)) {
-            if (currentUniverseParameters_.count(name->name) == 0) {
-                throw ElaborateError(
-                    "universe parameter '" + name->name
-                    + "' is not declared (use .{...} on the declaration "
-                    "to introduce it)");
-            }
-            return makeLevelParam(name->name);
-        }
-        if (auto* maxLevel = std::get_if<SurfaceLevelMax>(&level.node)) {
-            return makeLevelMax(elaborateLevel(*maxLevel->left),
-                                 elaborateLevel(*maxLevel->right));
-        }
-        if (auto* imaxLevel = std::get_if<SurfaceLevelImax>(&level.node)) {
-            return makeLevelIMax(elaborateLevel(*imaxLevel->left),
-                                  elaborateLevel(*imaxLevel->right));
-        }
-        if (auto* addLevel = std::get_if<SurfaceLevelAdd>(&level.node)) {
-            LevelPointer base = elaborateLevel(*addLevel->base);
-            for (int i = 0; i < addLevel->amount; ++i) {
-                base = makeLevelSuccessor(std::move(base));
-            }
-            return base;
-        }
-        if (std::get_if<SurfaceLevelMeta>(&level.node)) {
-            // Bare `Type` in source: generate a fresh universe parameter
-            // name and let it be auto-bound to the enclosing declaration.
-            return makeLevelParam(freshAutoBoundUniverseName());
-        }
-        throw ElaborateError("unhandled level variant");
-    }
+    // Defined out-of-line in elaborator_levels.cpp.
+    LevelPointer elaborateLevel(const SurfaceLevel& level);
 
     // Resolves a binary arithmetic operator (`+`, `*`, ...) to a kernel
     // function call. For v1 the resolution table is hardcoded to the
