@@ -167,23 +167,17 @@ theorem IntegerMod.nonzero_invertible (p : Natural)
         (x : IntegerMod(p))
         : ¬(x = IntegerMod.zero(p))
           → ∃ (y : IntegerMod(p)). x * y = IntegerMod.one(p) :=
-  Quotient.induct(
-      Integer, Integer.CongruentModulo(p),
-      (xArg : IntegerMod(p)) ↦
-          ¬(xArg = IntegerMod.zero(p))
-          → ∃ (y : IntegerMod(p)). xArg * y = IntegerMod.one(p),
-      (a : Integer) ↦
-          (notZero : ¬(IntegerMod.make(p, a) = IntegerMod.zero(p))) ↦ {
-            claim notDivides : ¬ Integer.divides((p : Integer), a)
-                by (pDividesA : Integer.divides((p : Integer), a)) ↦
-                     notZero(
-                         Quotient.sound(
-                             Integer, Integer.CongruentModulo(p),
-                             a, Integer.zero,
-                             rewrite((ring : a = a - Integer.zero), pDividesA)));
-            IntegerMod.invertible_at_representative(p, a, primality, notDivides)
-          },
-      x)
+  cases x { | a =>
+      (notZero : ¬(IntegerMod.make(p, a) = IntegerMod.zero(p))) ↦ {
+        claim notDivides : ¬ Integer.divides((p : Integer), a)
+            by (pDividesA : Integer.divides((p : Integer), a)) ↦
+                 notZero(
+                     Quotient.sound(
+                         Integer, Integer.CongruentModulo(p),
+                         a, Integer.zero,
+                         rewrite((ring : a = a - Integer.zero), pDividesA)));
+        IntegerMod.invertible_at_representative(p, a, primality, notDivides)
+      } }
 
 -- ----------------------------------------------------------------------
 -- F_p is a field.
