@@ -1478,22 +1478,15 @@ private:
                 consumeAny();
             }
         } else if (peek().kind == TokenKind::RightBrace
-                   && !wrappers.empty()) {
-            // The block's last item was a binding statement (`calc …;`,
-            // `claim …;`, `obtain …;`) with no trailing expression. Close it
-            // with an implicit bare `goal`: the auto-prover proves the goal
-            // from the facts those statements introduced. (Without this the
-            // trailing `;` + `}` would be a parse error, so existing proofs
-            // — which always end in an expression — are unaffected.)
-            Token brace = peek();
-            finalExpression = makeSurfaceStructuredClaim(
-                /*proposition=*/nullptr,
-                /*label=*/"",
-                /*byHint=*/nullptr,
-                /*byCases=*/false,
-                /*arms=*/{},
-                brace.line,
-                brace.column);
+                   && !wrappers.empty()
+                   && wrappers.back().kind == BlockWrapper::TypedLet) {
+            // A stray trailing `;` on the block's last proof step
+            // (`calc … = c;`, `claim P by …;`) is simply ignored: that step
+            // IS the block's result, exactly as if the `;` weren't there.
+            // (To instead auto-close from the accumulated facts, write `goal`
+            // explicitly as the final line.)
+            finalExpression = std::move(wrappers.back().value);
+            wrappers.pop_back();
         } else {
             finalExpression = parseExpression();
             // Optional trailing semicolon for the final expression.
