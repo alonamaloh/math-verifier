@@ -15,6 +15,7 @@
 // methods can be defined in different .cpp files and linked together.
 
 #include "elaborator.hpp"
+#include "elaborator_term_utilities.hpp"  // LocalBinder + pure term helpers
 #include "lemma_search.hpp"
 #include "printer.hpp"
 #include "subtree_hash.hpp"
@@ -31,52 +32,6 @@
 #include <vector>
 
 
-// One local binder in the elaborator's context. Tracks the user-visible
-// name and the kernel type. Used both to compute de Bruijn indices for
-// name lookup and to construct a kernel Context for inferType calls
-// during `=` desugaring and `congruenceOf(...)` elaboration.
-//
-// `value` is non-null for let-style binders (surface `let X := V`). It
-// flows through to ContextEntry.value when the elaborator builds an
-// opened Context for kernel calls — so isDefinitionallyEqual can ζ
-// the let-name during equality checks. The auto-prover separately
-// uses it to ζ-unfold at the closed-term level for structural
-// matchers (lemma index, hypothesis match).
-struct LocalBinder {
-    std::string name;
-    ExpressionPointer type;
-    ExpressionPointer value = nullptr;
-};
-
-// Returns the FreeVariable name used when opening / closing the binder
-// at `localBinders[index]` (Internal origin). Wildcards (`_`) get a
-// position-dependent suffix so multiple `_` binders in the same stack
-// don't collapse to the same FreeVariable. Every site that opens an
-// Internal-origin FV for a local binder OR constructs a Context entry
-// for one MUST go through this helper — otherwise opens and closes get
-// out of sync (`closeBinder` searches by literal name) and inferType
-// fails to find type info for the FV in its context. The user-visible
-// binder name in `localBinders[i].name` stays unchanged; only the FV
-// naming is rewritten here.
-inline std::string openingNameFor(
-    const std::vector<LocalBinder>& localBinders, size_t index) {
-    const std::string& original = localBinders[index].name;
-    if (original == "_") {
-        return "_wildcard_" + std::to_string(index);
-    }
-    // Disambiguate against earlier binders with the same name —
-    // FreeVariables are identified by (name, origin), so two binders
-    // sharing a name would collide as a single FV, breaking
-    // substitution and unification. The inner binder (higher index)
-    // shadows the outer in the user's view, so it's the inner that
-    // gets the unique suffix.
-    for (size_t earlier = 0; earlier < index; ++earlier) {
-        if (localBinders[earlier].name == original) {
-            return original + "_shadow_" + std::to_string(index);
-        }
-    }
-    return original;
-}
 
 // Spine-head hash used to bucket rewrite lemmas in the calc auto-prover's
 // lemma index (Phase 3). We walk the Application spine to its head and
@@ -838,17 +793,6 @@ private:
     // Const version of openOverLocalBinders (the existing one in this
     // class is non-const because it shares the helper used during
     // mutating elaboration).
-    ExpressionPointer openOverLocalBinders(
-        ExpressionPointer term,
-        const std::vector<LocalBinder>& localBinders,
-        size_t count) const {
-        for (size_t i = count; i > 0; --i) {
-            term = openBinder(term,
-                              openingNameFor(localBinders, i - 1),
-                              FreeVariableOrigin::Internal);
-        }
-        return term;
-    }
 
     std::string formatErrorWithContext(const std::string& message) const {
         if (contextFrames_.empty()) return message;
@@ -1629,17 +1573,6 @@ private:
     // becomes the inner Lambda's binder. After each abstraction every
     // other outer reference shifts up by one, so the i-th abstraction
     // targets the original index shifted by i.
-    ExpressionPointer abstractOverBoundVariables(
-        ExpressionPointer expression,
-        const std::vector<int>& indices) {
-        ExpressionPointer result = expression;
-        for (size_t i = 0; i < indices.size(); ++i) {
-            int adjustedIndex =
-                indices[i] + static_cast<int>(i);
-            result = abstractOverBoundVariable(result, adjustedIndex);
-        }
-        return result;
-    }
 
     // Rewrites `expression` so that BoundVariable(targetIndex) becomes
     // BoundVariable(0) at every depth, and every OTHER BoundVariable
@@ -1648,55 +1581,6 @@ private:
     // (the scrutinee of a `cases` expression): the resulting term is
     // suitable as the body of a Lambda whose binder takes the
     // scrutinee's place at index 0.
-    ExpressionPointer abstractOverBoundVariable(
-        ExpressionPointer expression,
-        int targetIndex,
-        int currentDepth = 0) {
-        if (auto* boundVariable =
-                std::get_if<BoundVariable>(&expression->node)) {
-            int index = boundVariable->deBruijnIndex;
-            int effective = index - currentDepth;
-            if (effective == targetIndex) {
-                return makeBoundVariable(currentDepth);
-            }
-            if (effective >= 0) {
-                return makeBoundVariable(index + 1);
-            }
-            return expression;  // refers to a binder we've descended into
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            return makePi(pi->displayHint,
-                abstractOverBoundVariable(pi->domain, targetIndex,
-                                            currentDepth),
-                abstractOverBoundVariable(pi->codomain, targetIndex,
-                                            currentDepth + 1));
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            return makeLambda(lambda->displayHint,
-                abstractOverBoundVariable(lambda->domain, targetIndex,
-                                            currentDepth),
-                abstractOverBoundVariable(lambda->body, targetIndex,
-                                            currentDepth + 1));
-        }
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            return makeApplication(
-                abstractOverBoundVariable(application->function,
-                                            targetIndex, currentDepth),
-                abstractOverBoundVariable(application->argument,
-                                            targetIndex, currentDepth));
-        }
-        if (auto* let = std::get_if<Let>(&expression->node)) {
-            return makeLet(let->displayHint,
-                abstractOverBoundVariable(let->type, targetIndex,
-                                            currentDepth),
-                abstractOverBoundVariable(let->value, targetIndex,
-                                            currentDepth),
-                abstractOverBoundVariable(let->body, targetIndex,
-                                            currentDepth + 1));
-        }
-        return expression;
-    }
 
     // Counts leading implicit binder names in a declaration's argument
     // list. Throws if `{x:T}` and `(y:U)` are interleaved (Phase 2.1
@@ -9547,26 +9431,6 @@ private:
     // calc-step results are closed over the local binders (binders as de
     // Bruijn indices, top-level names as Constants), so a leftover
     // FreeVariable means the term was opened and not re-closed — a bug.
-    static bool containsFreeVariable(const ExpressionPointer& expression) {
-        if (!expression) return false;
-        if (std::holds_alternative<FreeVariable>(expression->node)) {
-            return true;
-        }
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            return containsFreeVariable(application->function)
-                || containsFreeVariable(application->argument);
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            return containsFreeVariable(lambda->domain)
-                || containsFreeVariable(lambda->body);
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            return containsFreeVariable(pi->domain)
-                || containsFreeVariable(pi->codomain);
-        }
-        return false;  // BoundVariable, Sort, Constant
-    }
 
     // Validating wrapper around autoProveCalcStepRaw: a closedness
     // invariant check that turns a class of auto-prover bugs from cryptic
@@ -22836,155 +22700,7 @@ private:
     // original expression. Used by the multi-occurrence rewrite path
     // (when the expected type is known and disambiguates which subset
     // of positions the user wants substituted).
-    ExpressionPointer abstractStructuralOccurrenceMasked(
-        ExpressionPointer expression,
-        ExpressionPointer target,
-        int currentDepth,
-        int& positionCounter,
-        uint32_t mask) {
-        ExpressionPointer shiftedTarget =
-            currentDepth == 0 ? target : shift(target, currentDepth);
-        if (structurallyEqual(expression, shiftedTarget)) {
-            int thisIndex = positionCounter++;
-            if (thisIndex < 32 && (mask & (1u << thisIndex))) {
-                return makeBoundVariable(currentDepth);
-            }
-            // Not selected: keep the occurrence as the original
-            // expression. BVs inside the original still need shifting
-            // by the surrounding lambda we'll add, but `shift` handles
-            // that — except here the expression IS the target itself,
-            // which is closed in the outer scope; no further BV shift
-            // needed since `target` is closed (it lives in the user's
-            // scope, not inside any newly-introduced lambda).
-            return expression;
-        }
-        if (auto* boundVariable =
-                std::get_if<BoundVariable>(&expression->node)) {
-            int index = boundVariable->deBruijnIndex;
-            if (index >= currentDepth) {
-                return makeBoundVariable(index + 1);
-            }
-            return expression;
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            return makePi(pi->displayHint,
-                abstractStructuralOccurrenceMasked(pi->domain, target,
-                    currentDepth, positionCounter, mask),
-                abstractStructuralOccurrenceMasked(pi->codomain, target,
-                    currentDepth + 1, positionCounter, mask));
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            return makeLambda(lambda->displayHint,
-                abstractStructuralOccurrenceMasked(lambda->domain, target,
-                    currentDepth, positionCounter, mask),
-                abstractStructuralOccurrenceMasked(lambda->body, target,
-                    currentDepth + 1, positionCounter, mask));
-        }
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            return makeApplication(
-                abstractStructuralOccurrenceMasked(application->function,
-                    target, currentDepth, positionCounter, mask),
-                abstractStructuralOccurrenceMasked(application->argument,
-                    target, currentDepth, positionCounter, mask));
-        }
-        if (auto* let = std::get_if<Let>(&expression->node)) {
-            return makeLet(let->displayHint,
-                abstractStructuralOccurrenceMasked(let->type, target,
-                    currentDepth, positionCounter, mask),
-                abstractStructuralOccurrenceMasked(let->value, target,
-                    currentDepth, positionCounter, mask),
-                abstractStructuralOccurrenceMasked(let->body, target,
-                    currentDepth + 1, positionCounter, mask));
-        }
-        return expression;
-    }
 
-    ExpressionPointer abstractStructuralOccurrence(
-        ExpressionPointer expression,
-        ExpressionPointer target,
-        int currentDepth,
-        int& occurrenceCount) {
-        ExpressionPointer shiftedTarget =
-            currentDepth == 0 ? target : shift(target, currentDepth);
-        if (structurallyEqual(expression, shiftedTarget)) {
-            occurrenceCount++;
-            return makeBoundVariable(currentDepth);
-        }
-        if (auto* boundVariable =
-                std::get_if<BoundVariable>(&expression->node)) {
-            int index = boundVariable->deBruijnIndex;
-            if (index >= currentDepth) {
-                return makeBoundVariable(index + 1);
-            }
-            return expression;
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            int before = occurrenceCount;
-            auto newDomain = abstractStructuralOccurrence(
-                pi->domain, target, currentDepth, occurrenceCount);
-            auto newCodomain = abstractStructuralOccurrence(
-                pi->codomain, target, currentDepth + 1, occurrenceCount);
-            if (occurrenceCount == before
-                && newDomain.get() == pi->domain.get()
-                && newCodomain.get() == pi->codomain.get()) {
-                return expression;
-            }
-            return makePi(pi->displayHint,
-                std::move(newDomain), std::move(newCodomain));
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            int before = occurrenceCount;
-            auto newDomain = abstractStructuralOccurrence(
-                lambda->domain, target, currentDepth, occurrenceCount);
-            auto newBody = abstractStructuralOccurrence(
-                lambda->body, target, currentDepth + 1, occurrenceCount);
-            if (occurrenceCount == before
-                && newDomain.get() == lambda->domain.get()
-                && newBody.get() == lambda->body.get()) {
-                return expression;
-            }
-            return makeLambda(lambda->displayHint,
-                std::move(newDomain), std::move(newBody));
-        }
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            int before = occurrenceCount;
-            auto newFn = abstractStructuralOccurrence(
-                application->function, target,
-                currentDepth, occurrenceCount);
-            auto newArg = abstractStructuralOccurrence(
-                application->argument, target,
-                currentDepth, occurrenceCount);
-            if (occurrenceCount == before
-                && newFn.get() == application->function.get()
-                && newArg.get() == application->argument.get()) {
-                return expression;
-            }
-            return makeApplication(
-                std::move(newFn), std::move(newArg));
-        }
-        if (auto* let = std::get_if<Let>(&expression->node)) {
-            int before = occurrenceCount;
-            auto newType = abstractStructuralOccurrence(
-                let->type, target, currentDepth, occurrenceCount);
-            auto newValue = abstractStructuralOccurrence(
-                let->value, target, currentDepth, occurrenceCount);
-            auto newBody = abstractStructuralOccurrence(
-                let->body, target, currentDepth + 1, occurrenceCount);
-            if (occurrenceCount == before
-                && newType.get() == let->type.get()
-                && newValue.get() == let->value.get()
-                && newBody.get() == let->body.get()) {
-                return expression;
-            }
-            return makeLet(let->displayHint,
-                std::move(newType), std::move(newValue),
-                std::move(newBody));
-        }
-        // Sort, FreeVariable, Constant — no children, return as-is.
-        return expression;
-    }
 
     // Like `abstractStructuralOccurrence`, but also abstracts a subterm
     // that is only DEFINITIONALLY (not structurally) equal to `target`.
@@ -25604,34 +25320,12 @@ private:
     // (one per binder, by name, with Internal origin so they don't collide
     // with user names). Returns the opened term suitable for inferType when
     // paired with a matching Context built from the same binders.
-    ExpressionPointer openOverLocalBinders(
-        ExpressionPointer term,
-        const std::vector<LocalBinder>& localBinders,
-        size_t count) {
-        for (size_t i = count; i > 0; --i) {
-            term = openBinder(term,
-                              openingNameFor(localBinders, i - 1),
-                              FreeVariableOrigin::Internal);
-        }
-        return term;
-    }
 
     // Inverse of openOverLocalBinders: converts the Internal-origin
     // FreeVariables introduced by opening back into BoundVariables so the
     // term can be embedded in a context with the same binders. Closes
     // outermost-first (the reverse order of opening), so the resulting
     // BoundVariable indices line up.
-    ExpressionPointer closeOverLocalBinders(
-        ExpressionPointer term,
-        const std::vector<LocalBinder>& localBinders,
-        size_t count) {
-        for (size_t i = 0; i < count; ++i) {
-            term = closeBinder(term,
-                                openingNameFor(localBinders, i),
-                                FreeVariableOrigin::Internal);
-        }
-        return term;
-    }
 
     // Build the kernel Context corresponding to `localBinders`: for each
     // binder, open its type over earlier binders and (when the binder is
@@ -25817,36 +25511,6 @@ private:
     // descended into). Used to gate metavariable assignment under
     // binders: we can lift target up to the outer scope only when no
     // such "captured" references are present.
-    bool referencesBoundBelowThreshold(ExpressionPointer expression,
-                                        int threshold,
-                                        int currentDepth = 0) {
-        if (auto* boundVariable =
-                std::get_if<BoundVariable>(&expression->node)) {
-            int effectiveIndex =
-                boundVariable->deBruijnIndex - currentDepth;
-            return effectiveIndex >= 0 && effectiveIndex < threshold;
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            return referencesBoundBelowThreshold(pi->domain, threshold,
-                                                  currentDepth)
-                || referencesBoundBelowThreshold(pi->codomain, threshold,
-                                                  currentDepth + 1);
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            return referencesBoundBelowThreshold(lambda->domain, threshold,
-                                                  currentDepth)
-                || referencesBoundBelowThreshold(lambda->body, threshold,
-                                                  currentDepth + 1);
-        }
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            return referencesBoundBelowThreshold(
-                       application->function, threshold, currentDepth)
-                || referencesBoundBelowThreshold(
-                       application->argument, threshold, currentDepth);
-        }
-        return false;
-    }
 
     // One δ-step on a (possibly applied) Constant-headed expression:
     // unfold the head definition and β-reduce the spine arguments into
