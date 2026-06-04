@@ -4,6 +4,11 @@ Short forms for every Quotient operation, the `construction` intro form, and pat
 
 *(Part of the project conventions; see `CLAUDE.md` for the index.)*
 
+*For the complete machinery (kernel primitives, the auto-prover
+sound-coercion / exact-bridge, the cases the sugar can't yet express, and a
+diagnosis of the bloat with directions for a smaller design), see
+`docs/quotients-reference.md`.*
+
 ## Quotient idioms — use the short forms
 
 The elaborator has type-and-relation inference for every Quotient
