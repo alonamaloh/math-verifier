@@ -64,23 +64,8 @@ theorem Rational.multiply_negate_left_at_representatives
 
 theorem Rational.multiply_negate_left (x y : Rational)
         : (-x) * y = -(x * y) :=
-  Quotient.induct_two(
-      (xArg yArg : Rational) ↦
-          (-xArg) * yArg = -(xArg * yArg),
-      (rep_x rep_y : RationalRepresentative) ↦
-          (cases rep_x {
-             | RationalRepresentative.make(n_x, d_x) =>
-                 (cases rep_y {
-                    | RationalRepresentative.make(n_y, d_y) =>
-                        Rational.multiply_negate_left_at_representatives(
-                            n_x, n_y, d_x, d_y)
-                  } : (-Rational.fraction(n_x, d_x))
-                      * Quotient.mk(rep_y)
-                      = -(Rational.fraction(n_x, d_x)
-                          * Quotient.mk(rep_y)))
-           } : (-(Quotient.mk(rep_x) : Rational)) * Quotient.mk(rep_y)
-               = -(Quotient.mk(rep_x) * Quotient.mk(rep_y))),
-      x, y)
+  by_representatives x as ⟨n_x, d_x⟩, y as ⟨n_y, d_y⟩ =>
+      Rational.multiply_negate_left_at_representatives(n_x, n_y, d_x, d_y)
 
 -- Distribute multiplication over subtraction: (b - a) * c = b*c - a*c.
 theorem Rational.subtract_multiply_distribute (a b c : Rational)
@@ -185,24 +170,15 @@ theorem Rational.halve_less_than_self
 -- IsNonneg (image of a Natural). So |q| is IsNonneg.
 theorem Rational.absolute_value_IsNonneg (q : Rational)
         : Rational.IsNonneg(abs(q)) :=
-  Quotient.induct(
-      (y : Rational) ↦
-          Rational.IsNonneg(abs(y)),
-      (rep : RationalRepresentative) ↦
-          
-          ((cases rep {
-             | RationalRepresentative.make(n, d) =>
-                 -- |q|_at_rep has numerator Integer.absolute_value(n).
-                 -- That's the image of a Natural (= distance(a, b) for n
-                 -- = mk(make(a, b))). So Integer.IsNonneg holds.
-                 rewrite(
-                     Equality.symmetry(
-                         Integer.absolute_value_natural_is_image(n)),
-                     Integer.from_natural_is_nonneg(
-                         Integer.absolute_value_natural(n)))
-           } : Rational.IsNonneg(
-                   abs((Quotient.mk(rep) : Rational))))),
-      q)
+  -- At a representative make(n, d), |q| has numerator
+  -- Integer.absolute_value(n) — the image of a Natural (= distance(a, b)
+  -- for n = mk(make(a, b))), hence IsNonneg.
+  by_representatives q as ⟨n, d⟩ =>
+      rewrite(
+          Equality.symmetry(
+              Integer.absolute_value_natural_is_image(n)),
+          Integer.from_natural_is_nonneg(
+              Integer.absolute_value_natural(n)))
 
 -- 0 ≤ |q|.
 theorem Rational.zero_le_absolute_value (q : Rational)
@@ -338,20 +314,9 @@ theorem Rational.absolute_value_le_succ_natural_at_representative
 theorem Rational.absolute_value_le_succ_natural (q : Rational)
         : ∃ (K : Natural).
             abs(q) ≤ (successor(K) : Rational) :=
-  Quotient.induct(
-      (y : Rational) ↦
-          ∃ (K : Natural).
-              abs(y) ≤ (successor(K) : Rational),
-      (rep : RationalRepresentative) ↦
-          (cases rep {
-             | RationalRepresentative.make(n, d) =>
-                 witness Integer.absolute_value_natural(n) with
-                     Rational.absolute_value_le_succ_natural_at_representative(
-                         n, d)
-           } : ∃ (K : Natural).
-                 abs((Quotient.mk(rep) : Rational))
-                   ≤ (successor(K) : Rational)),
-      q)
+  by_representatives q as ⟨n, d⟩ =>
+      witness Integer.absolute_value_natural(n) with
+          Rational.absolute_value_le_succ_natural_at_representative(n, d)
 
 -- ----------------------------------------------------------------------
 -- General additive monotonicity (left-add by any constant) and
