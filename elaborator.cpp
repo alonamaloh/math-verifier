@@ -20364,6 +20364,28 @@ private:
         if (!abstractionList.empty()) {
             motiveBody =
                 abstractOverBoundVariables(expectedType, abstractionList);
+        } else if (scrutineeLocalIndex < 0 && indexLocalIndices.empty()) {
+            // Expression scrutinee (not a local variable) of a non-indexed
+            // inductive: build a DEPENDENT motive by abstracting the
+            // scrutinee's structural occurrences in the goal, so each arm's
+            // expected type ι-reduces with the constructor substituted for
+            // the scrutinee (e.g. `decide` on `Logic.classical_decidable(P)`
+            // — the yes arm sees `f(yes(_))` reduced). WHNF-aware so a
+            // scrutinee buried behind a δ/ζ-reducible wrapper still matches.
+            // When the goal does NOT mention the scrutinee, abstraction
+            // finds 0 occurrences and this equals the old constant motive
+            // `shift(expectedType, 1)` — so this is purely additive (it only
+            // enables the dependent case, which a constant motive rejects).
+            ExpressionPointer scrutineeReduced = zetaUnfoldLetBinders(
+                scrutinee, localBinders, /*currentDepth=*/0);
+            std::string scrutineeHeadName =
+                applicationHeadConstantName(scrutineeReduced);
+            int occurrences = 0;
+            int whnfFuel = 2048;
+            motiveWalkerCache_.clear();
+            motiveBody = abstractStructuralOccurrenceWithWHNF(
+                expectedType, scrutineeReduced, scrutineeHeadName,
+                /*currentDepth=*/0, occurrences, whnfFuel);
         } else {
             motiveBody = shift(expectedType, 1);
         }
