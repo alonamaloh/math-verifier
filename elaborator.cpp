@@ -10758,6 +10758,63 @@ private:
     // no universe parameters (Integer/Rational/Real/PAdic/… reps); bails
     // otherwise. Only the forward direction (fact `mk a = mk b` for goal
     // `R a b`); a flipped fact is left to the symmetry-flip retry.
+    // Resolve the registered `IsEquivalenceRelation(carrierT, relationR)`
+    // instance, solving any leading instance parameters by unification —
+    // e.g. `IntegerMod.equivalence(m)` for relation `CongruentModulo(m)`, or
+    // `RingModulo.equivalence(c, m)` / `Group.*` cosets. Returns the instance
+    // applied to the solved parameters, or nullptr (no instance / unsolved /
+    // universe-polymorphic instance, which this path doesn't handle).
+    ExpressionPointer resolveEquivalenceInstance(
+            ExpressionPointer carrierT, ExpressionPointer relationR) {
+        std::string carrierName = headConstantName(carrierT);
+        auto entry = environment_.canonicalInstanceRegistry.find(
+            std::make_tuple(std::string("IsEquivalenceRelation"), carrierName));
+        if (entry == environment_.canonicalInstanceRegistry.end()) return nullptr;
+        if (!entry->second.universeParameters.empty()) return nullptr;
+        if (entry->second.parameterCount == 0) {
+            return makeConstant(entry->second.termName, {});
+        }
+        // Open the leading parameter Pis as metavariables.
+        std::set<std::string> parameterMetavariables;
+        std::vector<std::string> parameterNames;
+        ExpressionPointer openedType = entry->second.type;
+        for (int k = 0; k < entry->second.parameterCount; ++k) {
+            auto* pi = std::get_if<Pi>(&openedType->node);
+            if (!pi) return nullptr;
+            std::string fresh = "_eqInstanceParameter_" + std::to_string(k)
+                + "_" + entry->second.termName;
+            parameterMetavariables.insert(fresh);
+            parameterNames.push_back(fresh);
+            openedType = openBinder(pi->codomain, fresh,
+                                     FreeVariableOrigin::Internal);
+        }
+        // openedType = IsEquivalenceRelation(instCarrier, instRelation), the
+        // parameters now metavariables. Solve them against the actual
+        // (carrierT, relationR) — unify the components (avoids touching the
+        // IsEquivalenceRelation head's universe arguments).
+        auto* outer = std::get_if<Application>(&openedType->node);
+        if (!outer) return nullptr;
+        ExpressionPointer instRelation = outer->argument;
+        auto* inner = std::get_if<Application>(&outer->function->node);
+        if (!inner) return nullptr;
+        ExpressionPointer instCarrier = inner->argument;
+        std::map<std::string, ExpressionPointer> assignment;
+        unifyConstructorParameters(instCarrier, carrierT,
+                                    parameterMetavariables, assignment);
+        unifyConstructorParameters(instRelation, relationR,
+                                    parameterMetavariables, assignment);
+        for (const auto& name : parameterNames) {
+            if (!assignment.count(name)) return nullptr;
+        }
+        ExpressionPointer instanceTerm =
+            makeConstant(entry->second.termName, {});
+        for (const auto& name : parameterNames) {
+            instanceTerm = makeApplication(std::move(instanceTerm),
+                                            assignment[name]);
+        }
+        return instanceTerm;
+    }
+
     ExpressionPointer tryQuotientExactBridge(
             ExpressionPointer goalClosed,
             const std::vector<LocalBinder>& localBinders) {
@@ -10840,16 +10897,11 @@ private:
                 makeApplication(relationL, repA), repB);
             if (!isDefinitionallyEqual(environment_, openedContext,
                                        goalWhnf, relationApplied)) continue;
-            // Resolve the carrier's IsEquivalenceRelation instance.
-            std::string carrierName = headConstantName(carrierL);
-            auto entry = environment_.canonicalInstanceRegistry.find(
-                std::make_tuple(std::string("IsEquivalenceRelation"),
-                                carrierName));
-            if (entry == environment_.canonicalInstanceRegistry.end()) continue;
-            if (entry->second.parameterCount != 0) continue;
-            if (!entry->second.universeParameters.empty()) continue;
+            // Resolve the carrier's IsEquivalenceRelation instance (solving
+            // any relation/carrier parameters, e.g. CongruentModulo(m)).
             ExpressionPointer equivalenceInstance =
-                makeConstant(entry->second.termName, {});
+                resolveEquivalenceInstance(carrierL, relationL);
+            if (!equivalenceInstance) continue;
             // Build Quotient.exact.{u}(T, R, equivalence, a, b, h).
             auto closeBack = [&](ExpressionPointer e) {
                 return closeOverLocalBinders(e, localBinders,
@@ -10858,7 +10910,10 @@ private:
             ExpressionPointer exact = makeConstant("Quotient.exact", {levelL});
             exact = makeApplication(std::move(exact), closeBack(carrierL));
             exact = makeApplication(std::move(exact), closeBack(relationL));
-            exact = makeApplication(std::move(exact), equivalenceInstance);
+            // The resolved instance may mention opened local binders (the
+            // solved parameters, e.g. `modulus`); close it like the others.
+            exact = makeApplication(std::move(exact),
+                                     closeBack(equivalenceInstance));
             exact = makeApplication(std::move(exact), closeBack(repA));
             exact = makeApplication(std::move(exact), closeBack(repB));
             exact = makeApplication(std::move(exact), proofExpr);
