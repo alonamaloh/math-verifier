@@ -1272,38 +1272,12 @@ theorem Integer.divides_absolute_value_natural_sum
         (dDividesAbsA : d ∣ Integer.absolute_value_natural(A))
         (dDividesAbsB : d ∣ Integer.absolute_value_natural(B))
         : d ∣ Integer.absolute_value_natural(A + B) :=
-  Quotient.induct_two(
-      IntegerRepresentative, IntegerEquivalent,
-      IntegerRepresentative, IntegerEquivalent,
-      (A' B' : Integer) ↦
-          d ∣ Integer.absolute_value_natural(A')
-            → d ∣ Integer.absolute_value_natural(B')
-            → d ∣ Integer.absolute_value_natural(A' + B'),
-      (rep_A rep_B : IntegerRepresentative) ↦
-        (cases rep_A {
-           | IntegerRepresentative.make(a1, a2) =>
-               (cases rep_B {
-                  | IntegerRepresentative.make(b1, b2) =>
-                      (dDivDistA : d ∣ Natural.distance(a1, a2))
-                               (dDivDistB : d ∣ Natural.distance(b1, b2)) ↦
-                        Natural.divides_distance_sum(
-                            d, a1, a2, b1, b2,
-                            dDivDistA, dDivDistB)
-                } : d ∣ Integer.absolute_value_natural(
-                          Integer.from_difference(a1, a2))
-                    → d ∣ Integer.absolute_value_natural(
-                              Quotient.mk(rep_B))
-                    → d ∣ Integer.absolute_value_natural(
-                              Integer.from_difference(a1, a2)
-                              + Quotient.mk(rep_B)))
-         } : d ∣ Integer.absolute_value_natural(
-                   Quotient.mk(rep_A))
-             → d ∣ Integer.absolute_value_natural(
-                       Quotient.mk(rep_B))
-             → d ∣ Integer.absolute_value_natural(
-                       Quotient.mk(rep_A)
-                       + Quotient.mk(rep_B))),
-      A, B, dDividesAbsA, dDividesAbsB)
+  -- `dDividesAbsA`/`dDividesAbsB` refine to `d ∣ distance(a1, a2)` /
+  -- `d ∣ distance(b1, b2)`; divides_distance_sum closes the goal.
+  cases A refining dDividesAbsA { | IntegerRepresentative.make(a1, a2) =>
+    cases B refining dDividesAbsB { | IntegerRepresentative.make(b1, b2) =>
+      Natural.divides_distance_sum(d, a1, a2, b1, b2,
+          dDividesAbsA, dDividesAbsB) } }
 
 -- x ≤ p * x for p ≥ 1. From p = 1 + monus(p, 1): p * x = x + monus(p, 1)*x,
 -- then less_or_equal_add_right.
@@ -1377,26 +1351,16 @@ theorem Integer.absolute_value_natural_zero_implies_zero
         (x : Integer)
         (eq : Integer.absolute_value_natural(x) = 0)
         : x = Integer.zero :=
-  Quotient.induct(
-      (x' : Integer) ↦
-          Integer.absolute_value_natural(x') = 0 → x' = Integer.zero,
-      (rep : IntegerRepresentative) ↦
-        (cases rep {
-           | IntegerRepresentative.make(a, b) =>
-               (distanceEq : Natural.distance(a, b) = 0) ↦
-                 Quotient.sound(
-                     IntegerRepresentative.make(a, b),
-                     IntegerRepresentative.make(0, 0),
-                     calc a + 0
-                        = a
-                        = b
-                              by Natural.distance_zero_implies_equal
-                        = b + 0)
-         } : Integer.absolute_value_natural(
-                 (Quotient.mk(rep) : Integer)) = 0
-             → (Quotient.mk(rep) : Integer)
-               = Integer.zero),
-      x)(eq)
+  cases x refining eq { | IntegerRepresentative.make(a, b) =>
+    -- `eq` refines to `Natural.distance(a, b) = 0`, which forces a = b.
+    Quotient.sound(
+        IntegerRepresentative.make(a, b),
+        IntegerRepresentative.make(0, 0),
+        calc a + 0
+           = a
+           = b
+                 by Natural.distance_zero_implies_equal
+           = b + 0) }
 
 -- Integer-level p-adic ultrametric: v_p(|A|_Nat) ≤ v_p(|B|_Nat) and
 -- |A + B|_Nat ≥ 1 implies v_p(|A|_Nat) ≤ v_p(|A + B|_Nat).
