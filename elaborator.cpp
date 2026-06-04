@@ -7443,6 +7443,19 @@ private:
             (void)transportBudget;
         }
 
+        // Quotient `exact` bridge — last resort (only reached once the
+        // cheaper strategies miss, so its per-goal scan rarely runs): goal
+        // `R(a, b)` closes from an in-scope `mk a = mk b` fact via
+        // Quotient.exact, so proofs never name it. Placed before symmetryFlip
+        // so a flipped fact (`mk b = mk a`) is caught when symmetryFlip
+        // recurses on the flipped goal `R(b, a)`.
+        {
+            ExpressionPointer attempt = runTactic("quotientExactBridge",
+                [&] { return tryQuotientExactBridge(
+                    goalClosed, localBinders); });
+            if (attempt) return attempt;
+        }
+
         // Symmetry flip — true last resort: `x = y` (or symmetric
         // `R(x, y)`) from a fact stated the other way. Placed last so the
         // bridge (which already rewrites equalities) closes the common
@@ -10731,6 +10744,140 @@ private:
         sound = makeApplication(std::move(sound), closeBack(y));
         sound = makeApplication(std::move(sound), term);
         return sound;
+    }
+
+    // The `exact` bridge — the mirror of tryQuotientSoundForClassEquality.
+    // When the goal is a quotient relation application `R(a, b)` and some
+    // in-scope hypothesis proves `Quotient.mk(a) = Quotient.mk(b)` (the two
+    // classes are equal — possibly written through `construction` forms that
+    // δ-reduce to `mk`), discharge it with
+    // `Quotient.exact.{u}(T, R, <equivalence instance>, a, b, h)` — so the
+    // proof reads "since the classes are equal" and never names the axiom.
+    // Scope (prototype): concrete-carrier quotients, where the carrier's
+    // `IsEquivalenceRelation` instance is registered with no parameters and
+    // no universe parameters (Integer/Rational/Real/PAdic/… reps); bails
+    // otherwise. Only the forward direction (fact `mk a = mk b` for goal
+    // `R a b`); a flipped fact is left to the symmetry-flip retry.
+    ExpressionPointer tryQuotientExactBridge(
+            ExpressionPointer goalClosed,
+            const std::vector<LocalBinder>& localBinders) {
+        if (!environment_.lookup("Quotient.exact")) return nullptr;
+        Context openedContext = buildContextFromLocalBinders(localBinders);
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, localBinders.size());
+        ExpressionPointer goalWhnf =
+            weakHeadNormalForm(environment_, goalOpened);
+        // Cheap gate: the goal must at least be an application (R applied).
+        if (!std::get_if<Application>(&goalWhnf->node)) return nullptr;
+
+        // Peel `Quotient.mk.{u}(T, R, rep)` (three Application layers).
+        auto peelMk = [&](ExpressionPointer endpoint,
+                          ExpressionPointer& carrier, ExpressionPointer& relation,
+                          ExpressionPointer& rep, LevelPointer& level) -> bool {
+            ExpressionPointer e = weakHeadNormalForm(environment_, endpoint);
+            auto* a3 = std::get_if<Application>(&e->node);
+            if (!a3) return false;
+            rep = a3->argument;
+            auto* a2 = std::get_if<Application>(&a3->function->node);
+            if (!a2) return false;
+            relation = a2->argument;
+            auto* a1 = std::get_if<Application>(&a2->function->node);
+            if (!a1) return false;
+            carrier = a1->argument;
+            auto* head = std::get_if<Constant>(&a1->function->node);
+            if (!head || head->name != "Quotient.mk") return false;
+            level = head->universeArguments.empty()
+                ? nullptr : head->universeArguments[0];
+            return true;
+        };
+
+        // Scan LOCAL hypotheses only for an `mk a = mk b` equality (cheap;
+        // the expensive library-equality scan in collectContextEqualities is
+        // pointless here — class equalities are local facts). Mirrors the
+        // local-binder loop in collectContextEqualities.
+        // Peel `Equality(T, lhs, rhs)` with a head check — NO exceptions
+        // (this runs per-binder on most goals; a throwing extractor here is a
+        // measurable hot-loop cost).
+        auto peelEquality = [&](ExpressionPointer hyp,
+                                ExpressionPointer& lhs,
+                                ExpressionPointer& rhs) -> bool {
+            ExpressionPointer e = weakHeadNormalForm(environment_, hyp);
+            auto* a3 = std::get_if<Application>(&e->node);
+            if (!a3) return false;
+            rhs = a3->argument;
+            auto* a2 = std::get_if<Application>(&a3->function->node);
+            if (!a2) return false;
+            lhs = a2->argument;
+            auto* a1 = std::get_if<Application>(&a2->function->node);
+            if (!a1) return false;
+            auto* head = std::get_if<Constant>(&a1->function->node);
+            return head && head->name == "Equality";
+        };
+
+        int N = static_cast<int>(localBinders.size());
+        for (int b = N - 1; b >= 0; --b) {
+            ExpressionPointer hypInScope = liftBoundVariables(
+                localBinders[b].type, N - b, 0);
+            ExpressionPointer eqLhs, eqRhs;
+            if (!peelEquality(hypInScope, eqLhs, eqRhs)) continue;
+            ExpressionPointer proofExpr = makeBoundVariable(N - 1 - b);
+            ExpressionPointer carrierL, relationL, repA;
+            ExpressionPointer carrierR, relationR, repB;
+            LevelPointer levelL = nullptr, levelR = nullptr;
+            if (!peelMk(openOverLocalBinders(eqLhs, localBinders,
+                                              localBinders.size()),
+                        carrierL, relationL, repA, levelL)) continue;
+            if (!peelMk(openOverLocalBinders(eqRhs, localBinders,
+                                              localBinders.size()),
+                        carrierR, relationR, repB, levelR)) continue;
+            if (!levelL) continue;
+            if (!isDefinitionallyEqual(environment_, openedContext,
+                                       carrierL, carrierR)) continue;
+            if (!isDefinitionallyEqual(environment_, openedContext,
+                                       relationL, relationR)) continue;
+            // The goal must be exactly `R(a, b)` for these reps.
+            ExpressionPointer relationApplied = makeApplication(
+                makeApplication(relationL, repA), repB);
+            if (!isDefinitionallyEqual(environment_, openedContext,
+                                       goalWhnf, relationApplied)) continue;
+            // Resolve the carrier's IsEquivalenceRelation instance.
+            std::string carrierName = headConstantName(carrierL);
+            auto entry = environment_.canonicalInstanceRegistry.find(
+                std::make_tuple(std::string("IsEquivalenceRelation"),
+                                carrierName));
+            if (entry == environment_.canonicalInstanceRegistry.end()) continue;
+            if (entry->second.parameterCount != 0) continue;
+            if (!entry->second.universeParameters.empty()) continue;
+            ExpressionPointer equivalenceInstance =
+                makeConstant(entry->second.termName, {});
+            // Build Quotient.exact.{u}(T, R, equivalence, a, b, h).
+            auto closeBack = [&](ExpressionPointer e) {
+                return closeOverLocalBinders(e, localBinders,
+                                              localBinders.size());
+            };
+            ExpressionPointer exact = makeConstant("Quotient.exact", {levelL});
+            exact = makeApplication(std::move(exact), closeBack(carrierL));
+            exact = makeApplication(std::move(exact), closeBack(relationL));
+            exact = makeApplication(std::move(exact), equivalenceInstance);
+            exact = makeApplication(std::move(exact), closeBack(repA));
+            exact = makeApplication(std::move(exact), closeBack(repB));
+            exact = makeApplication(std::move(exact), proofExpr);
+            // Validate the assembled term proves the goal before returning.
+            try {
+                ExpressionPointer inferred = inferType(
+                    environment_, openedContext,
+                    openOverLocalBinders(exact, localBinders,
+                                          localBinders.size()));
+                if (isDefinitionallyEqual(environment_, openedContext,
+                                          inferred, goalWhnf)) {
+                    return exact;
+                }
+            } catch (const TypeError&) {
+                // Assembled term didn't type-check (e.g. wrong instance);
+                // try the next equality.
+            }
+        }
+        return nullptr;
     }
 
     ExpressionPointer tryDiffWrapForEqualityGoal(
