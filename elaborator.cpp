@@ -19980,6 +19980,15 @@ private:
             yesScope.push_back({yesBinder, propositionKernel});
             ExpressionPointer yesBodyElab = elaborateExpression(
                 *decide.yesBody, yesScope, yesArmExpectedType);
+            // Run the same arm-body coercion a `cases` arm gets (the
+            // `decide`-as-`cases-on-Decidable` equivalence): an arm body
+            // off by a single-position congruence / symmetry / bounded
+            // combine from its expected type is bridged via
+            // coerceToExpectedTypeViaDiff. Without this, a `decide` arm
+            // closed strictly less than a `cases` arm — the
+            // capability-matrix gap (Test/coercion_matrix_test).
+            yesBodyElab = coerceToExpectedTypeViaDiff(
+                yesScope, yesBodyElab, yesArmExpectedType);
             yesArm = makeLambda(
                 yesBinder, propositionKernel, yesBodyElab);
 
@@ -19987,6 +19996,8 @@ private:
             noScope.push_back({noBinder, notP});
             ExpressionPointer noBodyElab = elaborateExpression(
                 *decide.noBody, noScope, noArmExpectedType);
+            noBodyElab = coerceToExpectedTypeViaDiff(
+                noScope, noBodyElab, noArmExpectedType);
             noArm = makeLambda(
                 noBinder, notP, noBodyElab);
         }

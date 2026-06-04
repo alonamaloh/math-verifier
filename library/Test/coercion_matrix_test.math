@@ -27,13 +27,12 @@
 --   auto positions (O4 applies):
 --     P2 by-less calc step           P4 bare `claim`
 --
--- THE ONE GAP — P8 `decide` arm body: receives the expected type but is
--- NOT post-coerced (elaborator.cpp elaborateArms ~19981 calls
--- elaborateExpression with the expected type and stops; contrast the
--- `cases` arm at ~3076 which then runs coerceToExpectedTypeViaDiff). So a
--- `decide` arm closes only on exact / defeq type, never via diff / flip /
--- combine. Demonstrated by `coercion_matrix_decide_arm_no_coerce` in the
--- error corpus; the working explicit form is P8_explicit below.
+-- P8 `decide` arm body: now UNIFORM with `cases`. `decide`'s arm bodies
+-- run the same coerceToExpectedTypeViaDiff that `cases` arms do
+-- (elaborator.cpp elaborateArms), so a `decide` arm closes exactly what a
+-- `cases` arm closes — `decide` being constructor-`cases` on
+-- `Logic.Decidable(P)`. (Until 2026-06 this was the one gap: the bespoke
+-- decide path skipped arm coercion. Cells P8_* below pin the fix.)
 
 module Test.coercion_matrix_test
 
@@ -110,12 +109,12 @@ theorem Test.matrix_O4step_P4_claim (a b c : Natural) (h : a = b) (ctx : b = c)
   True.trivial
 }
 
--- ── P8 `decide` arm — the GAP. The bare `h` form does NOT close (see the
--- corpus case coercion_matrix_decide_arm_no_coerce); the arm needs the
--- congruence written explicitly. This is the working explicit form.
-theorem Test.matrix_P8_decide_explicit (a b : Natural) (h : a = b)
+-- ── P8 `decide` arm — now coerces like a `cases` arm (gap closed).
+-- O1 single-position congruence on a bare cited fact:
+theorem Test.matrix_O1_P8_decide (a b : Natural) (h : a = b)
         : successor(a) = successor(b) :=
-  decide a = b {
-    | yes _ => congruenceOf(successor, h)
-    | no _ => congruenceOf(successor, h)
-  }
+  decide a = b { | yes _ => h | no _ => h }
+-- O3 bounded combine (cited h : a = b, context ctx : c = d):
+theorem Test.matrix_O3_P8_decide (a b c d : Natural) (h : a = b) (ctx : c = d)
+        : a + c = b + d :=
+  decide a = b { | yes _ => h | no _ => h }
