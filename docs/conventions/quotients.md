@@ -105,11 +105,17 @@ theorem Rational.zero_not_equal_one : Not(Rational.zero = Rational.one) :=
   }
 ```
 
-Scope: concrete-carrier quotients — those whose carrier has a registered
-`IsEquivalenceRelation` instance with no parameters (Integer / Rational /
-Real / PAdic representatives, …). Parameterised carriers
-(`CongruentModulo(m)`, `SameCoset(G, ·)`) are not yet covered; there, keep the
-explicit `Quotient.exact(T, R, instance, x, y, proof)`.
+Scope: any quotient whose carrier has a **registered** `IsEquivalenceRelation`
+instance — with or without parameters. No-parameter instances cover the
+Integer / Rational / Real / PAdic representatives; parameterised ones are
+resolved by unification (e.g. `IntegerMod.equivalence(m)` for relation
+`CongruentModulo(m)` over the plain `Integer` carrier). Still keep the
+explicit `Quotient.exact(T, R, instance, x, y, proof)` when (a) the carrier
+is itself a complex application with a Ring/CommutativeRing impedance the
+unifier can't bridge (`RingModulo` / `ComplexNumber` embedding —
+`Ring.carrier(CommutativeRing.ring(c))`), or (b) the equivalence is a *local*
+hypothesis rather than a registered instance (the `Group.SameCoset` coset
+proofs).
 
 ### Quotient.lift(f, h, q)
 
