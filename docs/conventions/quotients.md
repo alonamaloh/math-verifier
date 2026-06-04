@@ -149,11 +149,26 @@ the body is `mk(g rep)`) is accepted directly — the elaborator wraps
 `Quotient.sound`. Both a named lemma (`well_defined by Rational.negate_respects`)
 and an inline `(a b) (e) ↦ …` proof work.
 
-Scope (current): **unary**, **bare-name** representative. Apply a
+Scope: **unary or binary**, **bare-name** representatives. Apply a
 representative-level function in the body (`mk(negate_representatives(rep))`),
-as the library does — do not destructure the representative in the
-pattern. Binary operations still write the nested `Quotient.lift` form by
-hand.
+as the library does — do not destructure the representative in the pattern.
+
+A binary operation gives two representatives and two `well_defined` proofs —
+the first- and second-argument respect proofs, in that order — and the
+elaborator synthesises the nested lift (no `Quotient.lift`/`Quotient.sound`
+named):
+
+```math
+definition Integer.add : Integer → Integer → Integer
+  by representatives a, c ↦ Quotient.mk(Integer.add_representatives(a, c))
+  well_defined by Integer.add_respects_first, Integer.add_respects_second
+```
+
+Still hand-written (no sugar yet): a lift over a quotient argument that is
+**not the sole argument** (e.g. `Polynomial.coefficientOf(p, index)` lifts
+over `p` with `index` alongside), and a lift whose definition is `opaque`
+(e.g. `Rational.IsNonneg`, deliberately opaque — see opaque.md). Parameterised
+carriers (`Group.SameCoset(G, ·)`, …) likewise keep the explicit lift.
 
 ### Quotient.induct(motive, atRep, q) — and motive inference
 
