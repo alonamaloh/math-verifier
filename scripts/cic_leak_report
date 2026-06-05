@@ -1,27 +1,36 @@
 #!/usr/bin/env python3
-"""cic_leak_report — the north-star dashboard for PLAN_LESS_CIC_STYLE.md.
+"""cic_leak_report — proof-style linter for the math library.
 
-Scans *user-space* `.math` files (everything not on the foundational-layer
-manifest, see scripts/foundational_layer.txt) for CIC-vocabulary tokens — the
-"leak" of the substrate into surface mathematics — and reports per-category,
-per-file, and total counts.
+Two jobs, reported separately:
 
-The goal of the whole plan is to drive the total to zero. This script makes
-"feels like math" a number instead of a vibe, so the later (riskier) work can
-be measured rather than hoped about.
+  1. CIC LEAKS (the north-star metric for PLAN_LESS_CIC_STYLE.md). Scans
+     *user-space* `.math` files (everything not on the foundational-layer
+     manifest, see scripts/foundational_layer.txt) for CIC-vocabulary tokens
+     — the "leak" of the substrate into surface mathematics. The plan drives
+     this total to zero; `--max N` ratchets it. This is the number that
+     `make leak-ratchet` / `make check` guard.
+
+  2. STYLE ANTI-PATTERNS (advisory). Structural proof smells that aren't
+     substrate vocabulary but still hurt readability — e.g. `claim NAME : T
+     by calc …`, which only restates the calc's endpoints (use `calc … as
+     NAME`, or a bare `calc …`). Reported in their own section and NOT added
+     to the leak total, so the ratchet stays a pure CIC-leak gate.
+
+This makes "feels like math" a number instead of a vibe. (Despite the
+historical filename, the tool now lints more than CIC leaks.)
 
 Usage:
   scripts/cic_leak_report                # human summary, exit 0 always
   scripts/cic_leak_report --by-file      # add a per-file breakdown
   scripts/cic_leak_report --json         # machine-readable totals
-  scripts/cic_leak_report --max N        # exit 1 if total > N (ratchet)
+  scripts/cic_leak_report --max N        # exit 1 if the CIC-leak total > N
 
 Counting notes:
   - Line comments (`-- …` to end of line) are stripped before matching, so a
-    token merely *mentioned* in prose isn't counted as a leak.
+    token merely *mentioned* in prose isn't counted.
   - Test files (library/Test/**) are excluded: they deliberately exercise
     internals and use `sorry`.
-  - Counts are token occurrences, not lines: a line with two `Quotient.` uses
+  - Counts are occurrences, not lines: a line with two `Quotient.` uses
     counts as two.
 """
 import argparse
@@ -58,6 +67,22 @@ CATEGORIES = {
     "universe annotation":     re.compile(r"\.\{|\bType\(\s*[A-Za-z_]"),
 }
 
+# Style anti-patterns: structural proof smells (not substrate vocabulary).
+# Reported separately and NOT counted toward the CIC-leak total/ratchet.
+#
+# claim-by-calc: a `claim` whose proof is itself a `calc` —
+# `claim NAME : T by calc …` (write `calc … as NAME`) or an anonymous
+# `claim T by calc …` (write a bare `calc …`). The calc's endpoints already
+# *are* T, so the `claim … by` wrapper just restates it.
+# The `(?:(?!\bby\b)[^;{}])*?` consumes the claim's TYPE (which has no `by`)
+# up to its proof-introducing `by`, then requires that `by` to be `by calc`.
+# This (a) spans newlines (character class), (b) stops at the statement /
+# block boundary (`;{}`), and (c) does NOT match `claim … by Lemma(… calc …)`
+# (a calc merely nested in an argument — there the first `by` is not `by calc`).
+ANTIPATTERNS = {
+    "claim-by-calc": re.compile(r"\bclaim\b(?:(?!\bby\b)[^;{}])*?\bby\s+\(?\s*calc\b"),
+}
+
 COMMENT_RE = re.compile(r"--.*$")
 
 
@@ -89,7 +114,9 @@ def strip_comments(text):
 def scan_file(path):
     with open(path) as handle:
         body = strip_comments(handle.read())
-    return {name: len(rx.findall(body)) for name, rx in CATEGORIES.items()}
+    leaks = {name: len(rx.findall(body)) for name, rx in CATEGORIES.items()}
+    antipatterns = {name: len(rx.findall(body)) for name, rx in ANTIPATTERNS.items()}
+    return leaks, antipatterns
 
 
 def main():
@@ -105,8 +132,10 @@ def main():
 
     exact, prefixes = load_manifest(MANIFEST)
 
-    per_file = {}      # rel_path -> {category: count}
+    per_file = {}       # rel_path -> {category: count}   (CIC leaks)
+    per_file_anti = {}  # rel_path -> {category: count}   (style anti-patterns)
     category_totals = {name: 0 for name in CATEGORIES}
+    anti_totals = {name: 0 for name in ANTIPATTERNS}
     foundational_count = 0
 
     for dirpath, _dirs, files in os.walk(LIBRARY_ROOT):
@@ -120,13 +149,18 @@ def main():
             if is_foundational(rel, exact, prefixes):
                 foundational_count += 1
                 continue
-            counts = scan_file(full)
-            if sum(counts.values()) > 0:
-                per_file[rel] = counts
-                for name, count in counts.items():
+            leaks, antis = scan_file(full)
+            if sum(leaks.values()) > 0:
+                per_file[rel] = leaks
+                for name, count in leaks.items():
                     category_totals[name] += count
+            if sum(antis.values()) > 0:
+                per_file_anti[rel] = antis
+                for name, count in antis.items():
+                    anti_totals[name] += count
 
     total = sum(category_totals.values())
+    anti_total = sum(anti_totals.values())
 
     if args.json:
         print(json.dumps({
@@ -135,6 +169,12 @@ def main():
             "leaking_files": len(per_file),
             "foundational_files": foundational_count,
             "per_file": {p: {k: v for k, v in c.items() if v} for p, c in per_file.items()},
+            "antipatterns": {
+                "total": anti_total,
+                "by_category": anti_totals,
+                "per_file": {p: {k: v for k, v in c.items() if v}
+                             for p, c in per_file_anti.items()},
+            },
         }, indent=2, ensure_ascii=False))
     else:
         print("CIC leak report (user space — outside the foundational layer)")
@@ -151,6 +191,18 @@ def main():
             for rel, counts in ranked:
                 cats = ", ".join(f"{k}:{v}" for k, v in counts.items() if v)
                 print(f"  {sum(counts.values()):4d}  {rel}  ({cats})")
+
+        print("\nStyle anti-patterns (advisory — NOT counted in the leak total)")
+        print("=" * 62)
+        for name in ANTIPATTERNS:
+            print(f"  {anti_totals[name]:5d}  {name}")
+        print("        hint: `claim NAME : T by calc …`  →  `calc … as NAME`"
+              " (or a bare `calc …`)")
+        if args.by_file and per_file_anti:
+            print("  Per-file:")
+            for rel, counts in sorted(per_file_anti.items(),
+                                      key=lambda kv: sum(kv[1].values()), reverse=True):
+                print(f"  {sum(counts.values()):4d}  {rel}")
 
     if args.max is not None and total > args.max:
         print(f"\nLEAK RATCHET FAILED: total {total} exceeds budget {args.max}",
