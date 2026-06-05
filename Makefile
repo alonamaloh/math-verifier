@@ -14,7 +14,9 @@ SRCS := \
     src/syntax/lexer.cpp src/syntax/parser.cpp \
     src/elaborator/elaborator.cpp src/elaborator/dispatch.cpp \
     src/elaborator/statements.cpp src/elaborator/patterns.cpp \
-    src/elaborator/induction.cpp src/elaborator/levels.cpp \
+    src/elaborator/induction.cpp src/elaborator/cases.cpp \
+    src/elaborator/inference.cpp src/elaborator/desugar_equality.cpp \
+    src/elaborator/levels.cpp \
     src/elaborator/ring.cpp src/elaborator/calc.cpp \
     src/elaborator/prover.cpp src/elaborator/claim.cpp \
     src/elaborator/coercion.cpp src/elaborator/diff_bridges.cpp \
