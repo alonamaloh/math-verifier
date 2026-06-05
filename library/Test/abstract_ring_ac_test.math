@@ -1,0 +1,43 @@
+module Test.abstract_ring_ac_test
+
+import Logic.basics
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_bundle
+
+-- The auto-prover's abstract-ring AC normaliser (proveAbstractRingAC,
+-- fingerprint plan Phase 1). Over an ABSTRACT carrier `Ring.carrier(r)` the
+-- registered-carrier `ring` tactic declines, and these by-less +/·
+-- rearrangements used to fall through to the multi-second context-equality
+-- bridge. They now close by direct AC normalisation: `+` is associative-
+-- commutative in every ring, `·` is associative — and crucially NO
+-- ·-commutativity is assumed (see the multiply_is_not_commuted note below).
+
+-- A sum of products that is BOTH commuted (summands swapped) and internally
+-- reassociated — beyond the single-position congruence walker, so it routes
+-- to the AC normaliser.
+theorem abstract_ring_ac_sum_of_products
+        (r : Ring) (a b c d e f : Ring.carrier(r))
+        : (a * b) * c + (d * e) * f = d * (e * f) + a * (b * c) := {
+  calc (a * b) * c + (d * e) * f
+     = d * (e * f) + a * (b * c);
+}
+
+-- Pure additive commutativity + associativity (four-term shuffle).
+theorem abstract_ring_ac_add_shuffle
+        (r : Ring) (a b c d : Ring.carrier(r))
+        : (a + b) + (c + d) = (d + c) + (b + a) := {
+  calc (a + b) + (c + d)
+     = (d + c) + (b + a);
+}
+
+-- Multiplicative reassociation alone (no reordering), nested three deep.
+-- (The normaliser does NOT sort `·` factors, so a goal needing genuine
+-- ·-commutativity like `a * b = b * a` correctly does not close here — the
+-- factor sequences differ and there is no commutative axiom to appeal to.)
+theorem abstract_ring_ac_multiply_reassociate
+        (r : Ring) (a b c d : Ring.carrier(r))
+        : ((a * b) * c) * d = a * (b * (c * d)) := {
+  calc ((a * b) * c) * d
+     = a * (b * (c * d));
+}

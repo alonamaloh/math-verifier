@@ -525,6 +525,17 @@ ExpressionPointer Elaborator::tryAcRearrangement(
         ExpressionPointer carrierType,
         LevelPointer carrierLevel,
         int line) {
+        // Abstract `Ring.carrier(s)` rearrangements (the fingerprint plan's
+        // Phase 1 win): `+` is AC and `·` associative in every ring, so a
+        // pure sum-of-products rearrangement closes by direct AC
+        // normalisation — no expensive context-equality-bridge search. The
+        // registered-carrier `ring` below declines on this carrier, so try
+        // the abstract normaliser first. It returns nullptr (no throw) when
+        // the carrier isn't an abstract ring or the sides don't match.
+        ExpressionPointer abstractProof = proveAbstractRingAC(
+            localBinders, previousKernel, nextKernel,
+            carrierType, carrierLevel, line);
+        if (abstractProof) return abstractProof;
         ExpressionPointer expectedType = makeApplication(
             makeApplication(
                 makeApplication(

@@ -1159,6 +1159,239 @@ ExpressionPointer Elaborator::proveProductEqualsSorted(
             reassocProof, sortProof);
     }
 
+// ---- Abstract-ring AC normalisation (fingerprint plan, Phase 1) --------
+//
+// proveAbstractRingAC closes a pure +/· rearrangement over an abstract
+// `Ring.carrier(s)` — the gap the registered-carrier `ring` tactic leaves.
+// `+` is associative-commutative in every ring, `·` is associative; we
+// normalise both endpoints to a sum-of-products canonical form (the sum
+// flattened and sorted as a multiset; each product flattened and
+// reassociated but NOT reordered, since a general ring's `·` is not
+// commutative) and, if the forms coincide, chain L = canon = R.
+
+ExpressionPointer Elaborator::canonicalizeRingStructurePrefix(
+        ExpressionPointer e,
+        ExpressionPointer canonicalArg,
+        const Context& context) {
+        auto* app = std::get_if<Application>(&e->node);
+        if (!app) return e;  // leaf / binder: don't descend
+        ExpressionPointer head;
+        std::vector<ExpressionPointer> args;
+        peelSpine(e, head, args);
+        auto* headConstant = std::get_if<Constant>(&head->node);
+        if (headConstant
+            && (headConstant->name == "Ring.add"
+                || headConstant->name == "Ring.multiply")
+            && args.size() == 3) {
+            ExpressionPointer structureSlot = args[0];
+            if (!structurallyEqual(structureSlot, canonicalArg)
+                && isDefinitionallyEqual(
+                       environment_, context, structureSlot, canonicalArg)) {
+                structureSlot = canonicalArg;
+            } else {
+                structureSlot = canonicalizeRingStructurePrefix(
+                    structureSlot, canonicalArg, context);
+            }
+            ExpressionPointer left = canonicalizeRingStructurePrefix(
+                args[1], canonicalArg, context);
+            ExpressionPointer right = canonicalizeRingStructurePrefix(
+                args[2], canonicalArg, context);
+            ExpressionPointer rebuilt = makeApplication(
+                makeApplication(
+                    makeApplication(head, structureSlot), left), right);
+            return rebuilt;
+        }
+        // Generic application: canonicalise both sides.
+        ExpressionPointer fn = canonicalizeRingStructurePrefix(
+            app->function, canonicalArg, context);
+        ExpressionPointer arg = canonicalizeRingStructurePrefix(
+            app->argument, canonicalArg, context);
+        return makeApplication(fn, arg);
+    }
+
+Elaborator::ACNormResult Elaborator::ringACReplaceLeaves(
+        ExpressionPointer e,
+        const std::string& opName,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        ExpressionPointer A, B;
+        if (!matchBinaryRingOp(e, opName, A, B)) {
+            // Maximal non-`opName` subterm: a leaf for THIS operator. Fully
+            // normalise it (descends into the other operator / atoms).
+            return ringACFullNorm(
+                e, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+        }
+        ACNormResult ra = ringACReplaceLeaves(
+            A, opName, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+        ACNormResult rb = ringACReplaceLeaves(
+            B, opName, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+        // e = op(A, B); rebuild as op(A', B') via two one-hole congruences.
+        // Step 1: op(A, B) = op(A', B) under λx. op(x, B).
+        ExpressionPointer Blift = liftBoundVariables(B, 1, 0);
+        ExpressionPointer body1 =
+            buildRingOp(opName, makeBoundVariable(0), Blift);
+        ExpressionPointer lambda1 = makeLambda("_acn_x", carrierType, body1);
+        ExpressionPointer step1 = buildEqualityCongruenceSameCarrier(
+            carrierLevel, carrierType, lambda1, A, ra.canonical, ra.proof);
+        // Step 2: op(A', B) = op(A', B') under λy. op(A', y).
+        ExpressionPointer Alift = liftBoundVariables(ra.canonical, 1, 0);
+        ExpressionPointer body2 =
+            buildRingOp(opName, Alift, makeBoundVariable(0));
+        ExpressionPointer lambda2 = makeLambda("_acn_y", carrierType, body2);
+        ExpressionPointer step2 = buildEqualityCongruenceSameCarrier(
+            carrierLevel, carrierType, lambda2, B, rb.canonical, rb.proof);
+        ExpressionPointer opApB = buildRingOp(opName, ra.canonical, B);
+        ExpressionPointer opApBp =
+            buildRingOp(opName, ra.canonical, rb.canonical);
+        ExpressionPointer proof = buildEqualityTransitivity(
+            carrierLevel, carrierType, e, opApB, opApBp, step1, step2);
+        return ACNormResult{opApBp, proof};
+    }
+
+Elaborator::ACNormResult Elaborator::ringACFullNorm(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        // Normalise at the additive (AC) level: replace every summand by
+        // its own canonical form, then flatten + sort the summand multiset.
+        auto normaliseAtOperator =
+            [&](const RingAxiomNames& axioms, bool commutative) -> ACNormResult {
+            ACNormResult rep = ringACReplaceLeaves(
+                e, axioms.op, addAxioms, mulAxioms,
+                carrierType, carrierLevel, line);
+            std::vector<ExpressionPointer> leaves;
+            if (!flattenRingProduct(rep.canonical, axioms.op, leaves)) {
+                throwElaborate("ring AC: internal flatten failure");
+            }
+            std::vector<ExpressionPointer> ordered = leaves;
+            if (commutative) {
+                std::stable_sort(ordered.begin(), ordered.end(),
+                    [this](ExpressionPointer a, ExpressionPointer b) {
+                        return compareExpressionStructure(a, b) < 0;
+                    });
+            }
+            ExpressionPointer canonical =
+                assembleLeftAssociatedProduct(axioms.op, ordered);
+            // rep.canonical = canonical (reassociate, and for the sum also
+            // sort). proveProductEqualsSorted treats the leaves as atoms,
+            // so the nested canonicalisation we already did is preserved.
+            ExpressionPointer opProof = proveProductEqualsSorted(
+                rep.canonical, leaves, ordered, axioms,
+                carrierType, carrierLevel, line);
+            ExpressionPointer proof = buildEqualityTransitivity(
+                carrierLevel, carrierType, e, rep.canonical, canonical,
+                rep.proof, opProof);
+            return ACNormResult{canonical, proof};
+        };
+        ExpressionPointer A, B;
+        if (matchBinaryRingOp(e, addAxioms.op, A, B)) {
+            return normaliseAtOperator(addAxioms, /*commutative=*/true);
+        }
+        if (matchBinaryRingOp(e, mulAxioms.op, A, B)) {
+            return normaliseAtOperator(mulAxioms, /*commutative=*/false);
+        }
+        // Atom (neither + nor · at this carrier): canonical is itself.
+        return ACNormResult{
+            e, buildReflexivity(carrierLevel, carrierType, e)};
+    }
+
+ExpressionPointer Elaborator::proveAbstractRingAC(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        // Open the goal over the local binders so the carrier index `s` and
+        // the atoms become FREE variables. This keeps the structure prefix
+        // `s` (threaded through every op/law head by ringConst) stable under
+        // the congruence lambdas the proof builders introduce — a
+        // bound-variable prefix would need shifting inside each lambda. The
+        // proof is re-closed before returning (mirrors elaborateRing's
+        // bundled-carrier path).
+        size_t binderCount = localBinders.size();
+        ExpressionPointer carrierOpened =
+            openOverLocalBinders(carrierType, localBinders, binderCount);
+        // The carrier must be the abstract projection `Ring.carrier(s)`.
+        // (CommutativeRing.carrier and concrete carriers already close via
+        // elaborateRing.)
+        auto* carrierApp = std::get_if<Application>(&carrierOpened->node);
+        if (!carrierApp) return nullptr;
+        auto* carrierHead =
+            std::get_if<Constant>(&carrierApp->function->node);
+        if (!carrierHead || carrierHead->name != "Ring.carrier") {
+            return nullptr;
+        }
+        ExpressionPointer structureArg = carrierApp->argument;
+        RingAxiomNames addAxioms{
+            "Ring.add", "Ring.add_associative", "Ring.add_commutative"};
+        // `·` is associative-only over a general ring; no commutative axiom.
+        RingAxiomNames mulAxioms{
+            "Ring.multiply", "Ring.multiply_associative", ""};
+        // The bundle axioms must be in scope (small test modules may not
+        // import Algebra/ring_bundle).
+        for (const std::string& name :
+                {addAxioms.op, addAxioms.associative, addAxioms.commutative,
+                 mulAxioms.op, mulAxioms.associative}) {
+            if (environment_.lookup(name) == nullptr) return nullptr;
+        }
+        RingStructurePrefixGuard prefixGuard(*this, {structureArg});
+        ExpressionPointer leftOpened =
+            openOverLocalBinders(previousKernel, localBinders, binderCount);
+        ExpressionPointer rightOpened =
+            openOverLocalBinders(nextKernel, localBinders, binderCount);
+        // Unify how the ring structure is spelled across both endpoints, so
+        // the strict structure-prefix matcher descends uniformly (the same
+        // `s` can arrive under several defeq projections). The results are
+        // defeq to the originals, and the calc step is checked by defeq.
+        Context openedContext = buildContextFromLocalBinders(localBinders);
+        ExpressionPointer leftCanon = canonicalizeRingStructurePrefix(
+            leftOpened, structureArg, openedContext);
+        ExpressionPointer rightCanon = canonicalizeRingStructurePrefix(
+            rightOpened, structureArg, openedContext);
+        try {
+            ACNormResult nl = ringACFullNorm(
+                leftCanon, addAxioms, mulAxioms,
+                carrierOpened, carrierLevel, line);
+            ACNormResult nr = ringACFullNorm(
+                rightCanon, addAxioms, mulAxioms,
+                carrierOpened, carrierLevel, line);
+            if (!structurallyEqual(nl.canonical, nr.canonical)) {
+                // Sides differ as AC normal forms — not closable this way
+                // (e.g. genuinely unequal, or needs distributivity / an
+                // identity law we don't model). Decline; battery continues.
+                return nullptr;
+            }
+            // L = canon ; R = canon ⇒ L = R via canon = R (symmetry) then
+            // transitivity. nl.canonical and nr.canonical are structurally
+            // equal, so the types line up. Endpoints are the prefix-unified
+            // leftCanon/rightCanon (defeq to the originals).
+            ExpressionPointer canonEqualsRight = buildEqualitySymmetry(
+                carrierLevel, carrierOpened, rightCanon, nr.canonical,
+                nr.proof);
+            ExpressionPointer proofOpened = buildEqualityTransitivity(
+                carrierLevel, carrierOpened, leftCanon, nl.canonical,
+                rightCanon, nl.proof, canonEqualsRight);
+            ExpressionPointer closed = closeOverLocalBinders(
+                proofOpened, localBinders, binderCount);
+            // A calc-step proof must be closed over the local binders; a
+            // stray free variable is a bug (would leak as an unbound
+            // internal variable downstream). Reject defensively.
+            if (containsFreeVariable(closed)) return nullptr;
+            return closed;
+        } catch (const ElaborateError&) {
+            // Internal mismatch in the normaliser (multiset assertion, an
+            // op head we mis-recognised) — decline rather than abort.
+            return nullptr;
+        }
+    }
+
 void Elaborator::ringPolynomialCompact(RingPolynomial& polynomial) {
         for (auto iter = polynomial.begin(); iter != polynomial.end(); ) {
             if (iter->second == 0) {

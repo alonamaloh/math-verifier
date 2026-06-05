@@ -2207,6 +2207,78 @@ private:
         LevelPointer carrierUniverseLevel,
         int line);
 
+    // ---- Abstract-ring AC normalisation (fingerprint plan, Phase 1) ----
+    //
+    // The `ring` tactic above declines on a goal whose carrier is the
+    // *abstract* projection `Ring.carrier(s)` (it needs a registered
+    // commutative carrier; see computeRingScheme). But the worst by-less
+    // auto-prove steps in the library are pure +/· rearrangements over
+    // exactly such carriers — `+` is associative-commutative in EVERY ring
+    // (its additive group is abelian) and `·` is associative in every ring,
+    // so these close by AC-normalisation alone, with NO ·-commutativity.
+    // proveAbstractRingAC builds that proof directly (sum-of-products
+    // normal form: `+` flattened and sorted as a multiset, each `·`-product
+    // flattened and reassociated but NOT reordered), turning the multi-
+    // second context-equality-bridge search into a hash compare. Returns a
+    // closed proof of `previousKernel REL nextKernel` (REL is `=`), or
+    // nullptr if the carrier isn't an abstract `Ring.carrier`, the bundle
+    // axioms aren't in scope, or the two sides don't share a normal form.
+    // Purely additive: a null result leaves the existing battery unchanged.
+    ExpressionPointer proveAbstractRingAC(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line);
+
+    // {canonical form, proof : original = canonical}, the result of
+    // normalising one expression for proveAbstractRingAC.
+    struct ACNormResult {
+        ExpressionPointer canonical;
+        ExpressionPointer proof;
+    };
+
+    // Rewrite every `Ring.add`/`Ring.multiply` in `e` so its leading
+    // structure argument is spelled exactly `canonicalArg`, whenever the
+    // present spelling is definitionally (but not structurally) equal to it.
+    // The same ring `s` can reach a goal under several defeq projections
+    // (e.g. `PrincipalIdealDomain.ring(pid)` vs
+    // `IntegralDomain.ring(PrincipalIdealDomain.domain(pid))`); the strict
+    // structure-prefix matcher would otherwise refuse to descend through the
+    // mismatched spelling and mis-flatten the term. Result is defeq to `e`,
+    // so a proof built over it still discharges the original goal.
+    ExpressionPointer canonicalizeRingStructurePrefix(
+        ExpressionPointer e,
+        ExpressionPointer canonicalArg,
+        const Context& context);
+
+    // Recursively normalise `e` to sum-of-products canonical form, emitting
+    // the proof `e = canonical`. `+` (addAxioms) is treated as AC, `·`
+    // (mulAxioms) as associative-only. Mutually recursive with
+    // ringACReplaceLeaves. Throws ElaborateError on an internal mismatch
+    // (caught by proveAbstractRingAC).
+    ACNormResult ringACFullNorm(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line);
+
+    // Rebuild `e` (an `opName`-tree) with every maximal non-`opName` leaf
+    // replaced by its ringACFullNorm canonical, emitting the congruence
+    // proof `e = rebuilt`. Leaves the operator's own associativity/
+    // commutativity to the caller's proveProductEqualsSorted.
+    ACNormResult ringACReplaceLeaves(
+        ExpressionPointer e,
+        const std::string& opName,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line);
+
     // =====================================================================
     // Ring normaliser — polynomial canonicalisation
     //
