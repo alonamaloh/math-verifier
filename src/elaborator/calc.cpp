@@ -652,6 +652,14 @@ ExpressionPointer Elaborator::elaborateCalc(
                 try {
                     stepProofKernel = autoProveClaim(
                         stepRelationType, localBinders, step.line);
+                } catch (const AutoProverBudgetError&) {
+                    // The auto-prover bailed on effort, not on a genuine
+                    // dead end (kernel_quirks #19). Surface the dedicated
+                    // "exhausted its budget — add `by`" error rather than
+                    // the generic "couldn't close" one.
+                    throwAutoProveCalcStepBudgetExceeded(
+                        previousKernel, nextKernel, "=",
+                        stepRelationType, localBinders);
                 } catch (const ElaborateError&) {
                     stepProofKernel = nullptr;
                 } catch (const TypeError&) {
@@ -677,6 +685,11 @@ ExpressionPointer Elaborator::elaborateCalc(
                 try {
                     stepProofKernel = autoProveClaim(
                         stepRelationType, localBinders, step.line);
+                } catch (const AutoProverBudgetError&) {
+                    throwAutoProveCalcStepBudgetExceeded(
+                        previousKernel, nextKernel,
+                        relationSymbol(step.relation),
+                        stepRelationType, localBinders);
                 } catch (const ElaborateError&) {
                     stepProofKernel = nullptr;
                 }
@@ -1296,9 +1309,51 @@ ExpressionPointer Elaborator::autoProveCalcStep(
         LevelPointer carrierLevel,
         ExpressionPointer stepEqualityType,
         int line, int column) {
-        ExpressionPointer result = autoProveCalcStepRaw(
-            localBinders, previousKernel, nextKernel,
-            carrierType, carrierLevel, stepEqualityType, line, column);
+        // Self-arm the effort budget when this is entered OUTSIDE a
+        // top-level autoProveClaim (e.g. from the redundant-`by` /
+        // redundant-calc-step checks, which call us directly). That way
+        // even those off-by-default diagnostic paths can't hang on an
+        // expensive recursion — they just see the step decline.
+        struct BudgetGuard {
+            Elaborator& e;
+            bool armedHere;
+            ~BudgetGuard() {
+                if (armedHere) {
+                    e.autoProveBudgetActive_ = false;
+                    e.autoProveBudgetTripped_ = false;
+                }
+            }
+        };
+        bool armedHere = false;
+        if (autoProveBudgetLimit_ > 0 && !autoProveBudgetActive_) {
+            autoProveBudgetActive_ = true;
+            autoProveBudgetTripped_ = false;
+            autoProveStepSnapshot_ = kernelStepsSoFar();
+            armedHere = true;
+        }
+        BudgetGuard budgetGuard{*this, armedHere};
+        // The raw step runs a reflexivity conversion check (which can
+        // force δ-unfolding an expensive recursion), a structural diff
+        // walk, and an AC/ring attempt — each non-trivial. Charge the
+        // effort budget so a recursive cascade of calc steps (via
+        // proveApplicationDiff) can't thrash unboundedly; throws
+        // AutoProverBudgetError once exhausted.
+        ExpressionPointer result;
+        try {
+            autoProveSpend(4);
+            result = autoProveCalcStepRaw(
+                localBinders, previousKernel, nextKernel,
+                carrierType, carrierLevel, stepEqualityType, line, column);
+        } catch (const AutoProverBudgetError&) {
+            // If THIS frame armed the budget (a direct caller such as the
+            // redundant-`by` checks), absorb the trip and decline the step
+            // — those diagnostic paths only care whether the auto-prover
+            // closes it, not why it stopped. If an enclosing autoProveClaim
+            // owns the budget, rethrow so the trip reaches the proof-step
+            // dispatch and surfaces the "add `by`" error.
+            if (armedHere) return nullptr;
+            throw;
+        }
         if (!result) return nullptr;
         // A calc-step proof from the auto-prover is built CLOSED over the
         // local binders, so it must contain NO free variables — the local

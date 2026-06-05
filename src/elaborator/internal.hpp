@@ -101,6 +101,17 @@ public:
         statementsOnly_ = statementsOnlyFlag
             && statementsOnlyFlag[0] != '\0'
             && statementsOnlyFlag[0] != '0';
+        // Auto-prover effort budget override (kernel_quirks #19). A
+        // positive integer raises/lowers the work-unit cap; `0` disables
+        // the bound entirely (restores the old unbounded behaviour). An
+        // unparseable / negative value is ignored (keeps the default).
+        if (const char* budgetFlag = std::getenv("MATH_AUTOPROVE_BUDGET")) {
+            char* end = nullptr;
+            long long parsed = std::strtoll(budgetFlag, &end, 10);
+            if (end && *end == '\0' && parsed >= 0) {
+                autoProveBudgetLimit_ = parsed;
+            }
+        }
     }
 
     ~Elaborator() {
@@ -1250,6 +1261,37 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line,
         int transportBudget = 1);
+
+    // The tactic-dispatch body of autoProveClaim. Split out so the
+    // outermost (budget-owning) frame can wrap it in a single try/catch
+    // that enriches a raw AutoProverBudgetError with the goal + search
+    // suggestions. Not called directly anywhere else.
+    ExpressionPointer autoProveClaimTactics(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line,
+        int transportBudget);
+
+    // Raise the auto-prover effort-budget-exceeded error: a clear
+    // "add `by <reason>`" message (with goal + search suggestions),
+    // distinct from the generic "no tactic applied" error so the user
+    // knows the prover bailed on effort rather than concluding the goal
+    // is unreachable. Throws AutoProverBudgetError (not ElaborateError) so
+    // it survives the prover's speculative catches. See autoProveBudget_
+    // (kernel_quirks #19).
+    [[noreturn]] void throwAutoProveBudgetExceeded(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders);
+
+    // Calc-step variant: format the budget-exceeded error against the
+    // step's endpoints (left REL right) and throw it as a positioned
+    // ElaborateError carrying the surrounding calc context.
+    [[noreturn]] void throwAutoProveCalcStepBudgetExceeded(
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        const std::string& relationSymbol,
+        ExpressionPointer stepRelationType,
+        const std::vector<LocalBinder>& localBinders);
 
     // Profiling variant: runs every tactic, records per-attempt
     // outcome (succeeded?, time, winner descriptor where meaningful),
@@ -4262,6 +4304,79 @@ private:
     // proving `y = x` and wrapping in symmetry must not flip back to
     // `x = y`. Allowed only at depth 0.
     int symmetryFlipDepth_ = 0;
+
+    // --- Auto-prover effort budget (kernel_quirks #19) -----------------
+    // Every kernel-level conversion / inference the auto-prover triggers
+    // is bounded by the kernel's own per-call fuel, but NOTHING used to
+    // bound the TOTAL reduction work the prover sets in motion. On a
+    // by-less step whose endpoints mention an expensive-to-normalise user
+    // recursion, the equality battery's reflexivity check and the
+    // recursive bridge / symmetry-flip tactics re-run those heavy
+    // conversions over the whole term, turning a goal the prover
+    // ultimately can't (cheaply) close into a multi-minute spin instead of
+    // a fast, legible "add `by`" failure.
+    //
+    // We bound the prover by the kernel's own unit of work: reduction
+    // STEPS (kernelStepsSoFar()). On the outermost autoProveClaim we
+    // snapshot the step counter; the prover's hot loops then check, via
+    // autoProveSpend()/autoProveBudgetExhausted(), whether the steps
+    // consumed since the snapshot have exceeded the limit. When they have,
+    // a sticky flag is set, every tactic short-circuits to nullptr, the
+    // recursion unwinds fast, and the top-level claim reports the
+    // budget-specific "add `by <reason>`" error. Measuring kernel steps
+    // (rather than a coarse per-candidate count) is what makes the bound
+    // trip on the #19 pathology, where the iteration COUNT is small but
+    // each conversion is enormous.
+    //
+    // The snapshot is taken once per top-level claim and shared by all of
+    // its recursive sub-proofs, so a deep fan-out can't multiply past it.
+    //
+    // Threshold: high enough that every by-less step in the library stays
+    // comfortably within it, low enough that the #19 pathology trips in a
+    // few seconds. Measured (whole-library sweep, MATH_DEBUG_AUTOPROVE_STEPS):
+    // the heaviest legitimate by-less claim consumes ~542k reduction steps;
+    // the typical one a few hundred to a few thousand (mean ~1.9k). The
+    // #19 minimal repro consumes ~1.5M and rising with recursion depth.
+    // 1.2M sits ~2.2x above the heaviest real proof and well below the
+    // pathology. Overridable via MATH_AUTOPROVE_BUDGET (0 disables the
+    // bound entirely; a positive value raises/lowers it).
+    uint64_t autoProveStepSnapshot_ = 0;
+    bool autoProveBudgetActive_ = false;
+    bool autoProveBudgetTripped_ = false;
+
+    // Default budget, in kernel reduction steps. Read once from
+    // MATH_AUTOPROVE_BUDGET (if set and parseable as a non-negative
+    // integer) in the constructor, else this constant.
+    static constexpr long long kDefaultAutoProveBudget = 1200000;
+    long long autoProveBudgetLimit_ = kDefaultAutoProveBudget;
+
+    // Check the effort budget from a prover hot loop. When the kernel
+    // reduction steps consumed since the budget was armed have reached the
+    // limit, latch the sticky trip flag and THROW AutoProverBudgetError —
+    // which, being neither ElaborateError nor TypeError, sails past every
+    // speculative `catch -> nullptr` in the prover and its callers and is
+    // converted, once, into the actionable "add `by`" error at the
+    // proof-step dispatch. Throwing (rather than returning a flag) is what
+    // makes the bail-out immediate and total: a single deep conversion can
+    // overshoot the limit, and we must not run one more candidate over the
+    // expensive term. No-op when no budget is active. The `units` argument
+    // is accepted for call-site readability; the real accounting is the
+    // kernel step delta.
+    void autoProveSpend(long long /*units*/ = 1) {
+        if (!autoProveBudgetActive_) return;
+        if (autoProveBudgetTripped_) {
+            throw AutoProverBudgetError("auto-prover effort budget exceeded");
+        }
+        uint64_t now = kernelStepsSoFar();
+        // Counter is reset (to a smaller value) at kernel public-entry
+        // boundaries; guard the unsigned subtraction against that.
+        uint64_t consumed = now >= autoProveStepSnapshot_
+            ? now - autoProveStepSnapshot_ : now;
+        if (consumed >= static_cast<uint64_t>(autoProveBudgetLimit_)) {
+            autoProveBudgetTripped_ = true;
+            throw AutoProverBudgetError("auto-prover effort budget exceeded");
+        }
+    }
     // Set by tryContextFactMatch (only when profiling is on) to the
     // `source` string of whichever fact closed the goal. Read by
     // autoProveClaim's profiling path immediately after the tactic

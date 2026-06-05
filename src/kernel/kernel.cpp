@@ -257,6 +257,10 @@ void invalidateKernelCaches() {
     // a public-entry boundary (declaration commits, environment mutates).
     inferTypeCache.clear();
 }
+// Public read-only accessor for the per-thread reduction-step counter.
+// Defined here (after the anonymous namespace that declares it) so the
+// auto-prover can express its effort budget in kernel reduction steps.
+uint64_t kernelStepsSoFar() { return kernelStepCounter; }
 namespace {
 
 // Diagnostic counters for the cache, reported under KERNEL_PROFILE.

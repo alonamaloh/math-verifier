@@ -369,6 +369,17 @@ extern uint64_t kernelStepLimit;
 extern uint64_t kernelTraceInterval;
 extern bool kernelProfileEnabled;
 
+// Current value of the per-thread kernel reduction-step counter. It is
+// reset to 0 at every public addAxiom/addDefinition/addInductive entry and
+// incremented once per WHNF/isDefEq/inferType reduction step. The
+// elaborator's auto-prover snapshots this around a top-level claim and
+// bounds the *increase* it causes, so an effort budget can be expressed in
+// the kernel's own unit of work (reduction steps) rather than a coarse
+// per-candidate count — this is what makes the budget trip on a goal whose
+// per-conversion cost (not iteration count) is what blows up. Monotonic
+// within one top-level kernel call.
+uint64_t kernelStepsSoFar();
+
 // Truncate diagnostic expression dumps to this many characters. Bumped from
 // the default of 240 when investigating an issue where the truncated form
 // hides the diverging subterm.

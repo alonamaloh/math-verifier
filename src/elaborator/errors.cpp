@@ -153,6 +153,29 @@ std::string Elaborator::couldNotProveStepHint(
         return goal + hints;
     }
 
+void Elaborator::throwAutoProveCalcStepBudgetExceeded(
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        const std::string& relationSymbol,
+        ExpressionPointer stepRelationType,
+        const std::vector<LocalBinder>& localBinders) {
+        // Mirrors the "couldn't close" calc-step error (same goal + search
+        // suggestions footer) but states the real reason — the auto-prover
+        // hit its effort bound — and steers the user to an explicit `by`,
+        // which lets the kernel check by definitional equality instead of
+        // the prover searching. This is the kernel_quirks #19 fast-fail.
+        throwElaborate(
+            "the auto-prover gave up on this calc step after exhausting its "
+            "effort budget — it explored too far without closing the goal "
+            "(most often because an endpoint mentions a recursive definition "
+            "that is expensive to unfold). Add an explicit `by <reason>` so "
+            "the kernel can check the step by definitional equality instead "
+            "of the prover searching for it. (Raise or disable the bound "
+            "with MATH_AUTOPROVE_BUDGET if the step really should auto-close.)"
+            + couldNotProveStepHint(previousKernel, nextKernel,
+                  relationSymbol, stepRelationType, localBinders));
+    }
+
 void Elaborator::assertClosedOverLocalBinders(
         const ExpressionPointer& term,
         const std::vector<LocalBinder>& localBinders,

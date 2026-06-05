@@ -22,6 +22,18 @@ struct ElaborateError : std::runtime_error {
         : std::runtime_error(message), line(line_), column(column_) {}
 };
 
+// Thrown when the auto-prover exhausts its effort budget (kernel_quirks
+// #19). Deliberately NOT derived from ElaborateError / TypeError so that
+// the many speculative `catch (ElaborateError&)/(TypeError&) -> nullptr`
+// sites inside the prover and its callers do NOT swallow it: a budget
+// trip must abort the whole search and surface the actionable "add `by`"
+// message, never be silently turned into "this tactic missed". It is
+// caught at exactly one place — the by-less proof-step dispatch — and
+// re-issued as a positioned ElaborateError with the surrounding context.
+struct AutoProverBudgetError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
 // Elaborates a single surface expression to a kernel expression in the
 // given environment, with no local binders and no universe parameters in
 // scope. Used by tests; modules call elaborateModule instead.

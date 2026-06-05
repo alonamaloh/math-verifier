@@ -6,6 +6,28 @@
 
 #include "elaborator/internal.hpp"
 
+#include <cstdlib>
+#include <iostream>
+
+namespace {
+// Warn threshold for an expensive-but-successful by-less auto-prove, in
+// kernel reduction steps. Overridable via MATH_AUTOPROVE_WARN (0
+// disables). Default picked from the library's step distribution: well
+// above p99 (~24k) so only genuine outliers fire, well below the hard
+// budget so it surfaces first.
+long long autoProveWarnThresholdValue() {
+    static long long cached = [] {
+        if (const char* w = std::getenv("MATH_AUTOPROVE_WARN")) {
+            char* end = nullptr;
+            long long v = std::strtoll(w, &end, 10);
+            if (end != w && v >= 0) return v;
+        }
+        return 50000LL;
+    }();
+    return cached;
+}
+}  // namespace
+
 ExpressionPointer Elaborator::tryContradiction(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -300,6 +322,11 @@ ExpressionPointer Elaborator::tryContextFactMatch(
         lastContextFactCandidateCount_ = 0;
         int triedCount = 0;
         for (const ContextFact& fact : facts) {
+            // Each candidate runs a structural fill (and possibly a full
+            // hole-inference) — both trigger kernel conversions that can
+            // be costly on goals mentioning expensive recursions. Charge
+            // the budget and stop scanning if it's exhausted.
+            autoProveSpend(1);
             ++triedCount;
             ExpressionPointer result;
             try {
@@ -369,6 +396,11 @@ void Elaborator::collectLibraryEqualitiesAt(
                 lemmaApp = makeApplication(
                     lemmaApp, bindings[i]);
             }
+            // Inferring the matched lemma's instantiated type runs a
+            // conversion that, on a goal mentioning an expensive
+            // recursion, can be the dominant per-candidate cost. Charge
+            // the budget (throws AutoProverBudgetError once exhausted).
+            autoProveSpend(2);
             ExpressionPointer lemmaAppType;
             try {
                 lemmaAppType = inferTypeInLocalContext(
@@ -462,6 +494,11 @@ ExpressionPointer Elaborator::tryContextEqualityBridge(
             //   direction 1: replace lhs in goal with rhs — uses
             //     symm(eq) (transport: motive(rhs) → motive(lhs)).
             for (int direction = 0; direction < 2; ++direction) {
+                // Each direction abstracts an occurrence and recurses into
+                // autoProveClaim on the rewritten goal — the prover's most
+                // expensive per-candidate work (this tactic dominated the
+                // #19 thrash). Charge the budget (throws once exhausted).
+                autoProveSpend(2);
                 ExpressionPointer fromSide =
                     (direction == 0) ? eq.rhs : eq.lhs;
                 ExpressionPointer toSide =
@@ -895,6 +932,84 @@ ExpressionPointer Elaborator::autoProveClaim(
             ~DepthDecrement() { --d; }
         } decrementer{autoProveDepth_};
 
+        // Arm the effort budget on the OUTERMOST claim (depth 0 -> 1) and
+        // disarm it (and reset the trip flag) when that call unwinds, so
+        // each top-level claim gets a fresh budget shared by all of its
+        // recursive sub-proofs. See autoProveBudget_ (kernel_quirks #19).
+        struct BudgetGuard {
+            Elaborator& e;
+            bool armedHere;
+            ~BudgetGuard() {
+                if (armedHere) {
+                    e.autoProveBudgetActive_ = false;
+                    e.autoProveBudgetTripped_ = false;
+                }
+            }
+        };
+        bool armedHere = false;
+        if (autoProveDepth_ == 1 && autoProveBudgetLimit_ > 0
+            && !autoProveBudgetActive_) {
+            autoProveBudgetActive_ = true;
+            autoProveBudgetTripped_ = false;
+            autoProveStepSnapshot_ = kernelStepsSoFar();
+            armedHere = true;
+        }
+        BudgetGuard budgetGuard{*this, armedHere};
+
+        // The budget owner (the outermost armed frame) catches a raw
+        // AutoProverBudgetError thrown by a hot loop deep in the search and
+        // re-issues it with the goal + search suggestions, so every entry
+        // path (calc step, bare `claim`, coercion, …) gets the actionable
+        // "add `by`" message. Inner frames let it propagate untouched.
+        if (armedHere) {
+            ExpressionPointer proof;
+            try {
+                proof = autoProveClaimTactics(
+                    goalClosed, localBinders, line, transportBudget);
+            } catch (const AutoProverBudgetError&) {
+                throwAutoProveBudgetExceeded(goalClosed, localBinders);
+            }
+            // Warning tier: a by-less step that DID close but cost more than
+            // the warn threshold (in kernel reduction steps) is almost
+            // always a hidden computation — an abstract-ring rearrangement
+            // closed by the lemma-index diff matcher, a quotient-arithmetic
+            // defeq, etc. It verifies, so this is a non-fatal nudge to make
+            // it explicit (`by <reason>`), which the kernel then checks
+            // ~instantly. Threshold overridable via MATH_AUTOPROVE_WARN
+            // (0 disables); well below the hard budget so it fires first.
+            if (proof) {
+                uint64_t spent = kernelStepsSoFar() - autoProveStepSnapshot_;
+                long long warnAt = autoProveWarnThresholdValue();
+                if (warnAt > 0 && spent > (uint64_t)warnAt) {
+                    std::cerr << "warning: " << moduleName_ << ":" << line
+                        << ": expensive by-less proof step ("
+                        << spent << " kernel-steps) — the auto-prover closed "
+                        "it by search; add an explicit `by <reason>` so the "
+                        "kernel checks it directly (much faster, and the "
+                        "intent is recorded)\n";
+                }
+            }
+            return proof;
+        }
+        return autoProveClaimTactics(
+            goalClosed, localBinders, line, transportBudget);
+    }
+
+ExpressionPointer Elaborator::autoProveClaimTactics(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line,
+        int transportBudget) {
+        // Charge a baseline unit per claim so a deep recursive fan-out
+        // (context-equality bridge / symmetry-flip recursing into the
+        // prover) is bounded even when each individual call's loops are
+        // short. The equality battery below — which runs autoProveCalcStep
+        // (reflexivity conversion + diff walk + AC) — is the single most
+        // expensive thing a leaf claim does, so a per-claim charge caps
+        // how many such leaves the fan-out can spawn. Throws
+        // AutoProverBudgetError once the kernel-step budget is exhausted.
+        autoProveSpend(1);
+
         if (autoProveProfileEnabled_ && autoProveDepth_ == 1) {
             return autoProveClaimProfiling(
                 goalClosed, localBinders, line, transportBudget);
@@ -927,6 +1042,14 @@ ExpressionPointer Elaborator::autoProveClaim(
                     goalClosed, localBinders, line); });
             if (attempt) return attempt;
         }
+
+        // From here on the tactics are per-call expensive (full library
+        // scans, recursive sub-proofs). Each charges the effort budget in
+        // its hot loop via autoProveSpend(), which throws
+        // AutoProverBudgetError the moment the kernel-step budget is
+        // exhausted — that exception propagates straight to the proof-step
+        // dispatch (it is not an ElaborateError, so the speculative
+        // catches below don't swallow it).
 
         // Context fact match — unified local-hypothesis + library
         // scan. Iterates all in-scope facts (local binders and
@@ -1009,6 +1132,33 @@ ExpressionPointer Elaborator::autoProveClaim(
             "equality lets us rewrite to a provable form — add "
             "`by <lemma>` to specify"
             + searchSuggestions(goalClosed, localBinders));
+    }
+
+void Elaborator::throwAutoProveBudgetExceeded(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders) {
+        std::string goal;
+        try {
+            goal = prettyPrintInLocalScope(goalClosed, localBinders);
+        } catch (...) { goal = "<goal>"; }
+        std::string hints;
+        try {
+            hints = searchSuggestions(goalClosed, localBinders);
+        } catch (...) { hints.clear(); }
+        // Throw the dedicated budget exception (NOT an ElaborateError) so
+        // the rich message likewise survives the speculative catches and
+        // reaches the proof-step dispatch / driver intact.
+        throw AutoProverBudgetError(
+            "claim `" + goal
+            + "`: the auto-prover gave up after exhausting its effort "
+            "budget (it explored too far without closing the goal — most "
+            "often because an endpoint mentions a recursive definition "
+            "that is expensive to unfold). Add an explicit `by <reason>` "
+            "to name the lemma / proof so the kernel can check it by "
+            "definitional equality instead of the prover searching for "
+            "it. (Raise or disable the bound with MATH_AUTOPROVE_BUDGET "
+            "if you believe the step really should auto-close.)"
+            + hints);
     }
 
 ExpressionPointer Elaborator::autoProveClaimProfiling(
