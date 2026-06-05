@@ -1,0 +1,114 @@
+-- GaussianInteger/coordinate_map.math
+--
+-- The coordinate map descends to ℤ[i]: combining additivity with the
+-- modulus-vanishing, `coordinatesOfPolynomial` respects the (x²+1)-
+-- congruence, so it lifts to a genuine function `coordinates : ℤ[i] →
+-- ℤ×ℤ` reading the (re, im) of a Gaussian integer a + bi.
+
+module GaussianInteger.coordinate_map
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.ring_divisibility
+import Integer.basics
+import Integer.addition
+import Integer.ring
+import Integer.algebra
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.instances
+import RingModulo.basics
+import GaussianInteger.basics
+import GaussianInteger.coordinates
+import GaussianInteger.coordinate_homomorphism
+import GaussianInteger.modulus_vanishes
+
+-- ----------------------------------------------------------------------
+-- coordinatesOfPolynomial respects congruence modulo x²+1.
+--
+-- From p − p' = (x²+1)·cofactor we get p = p' + (x²+1)·cofactor, so by
+-- additivity coords(p) = coords(p') ⊕ coords((x²+1)·cofactor) = coords(p').
+theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
+        (p p' : Polynomial(Integer, Integer.zero))
+        (congruent : Ring.CongruentModulo(Integer.polynomial_ring, GaussianInteger.modulus, p, p'))
+        : GaussianInteger.coordinatesOfPolynomial(p)
+          = GaussianInteger.coordinatesOfPolynomial(p') := {
+  obtain ⟨cofactor, differenceEquation⟩ from congruent;
+  -- differenceEquation : p + (−p') = (x²+1)·cofactor.
+  claim pEquation
+      : p = Polynomial.add(Integer.ring_bundle, p',
+            Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor))
+      by calc p
+            = Polynomial.add(Integer.ring_bundle, p, Polynomial.zero(Integer.ring_bundle))
+                  by Equality.symmetry(Polynomial.add_identity_right(Integer.ring_bundle, p))
+            = Polynomial.add(Integer.ring_bundle, p,
+                  Polynomial.add(Integer.ring_bundle, Polynomial.negate(Integer.ring_bundle, p'), p'))
+                  by congruenceOf(
+                         (w : Polynomial(Integer, Integer.zero)) ↦
+                             Polynomial.add(Integer.ring_bundle, p, w),
+                         Equality.symmetry(Polynomial.add_negate_left(Integer.ring_bundle, p')))
+            = Polynomial.add(Integer.ring_bundle,
+                  Polynomial.add(Integer.ring_bundle, p, Polynomial.negate(Integer.ring_bundle, p')), p')
+                  by Equality.symmetry(Polynomial.add_associative(Integer.ring_bundle, p,
+                         Polynomial.negate(Integer.ring_bundle, p'), p'))
+            = Polynomial.add(Integer.ring_bundle,
+                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor), p')
+                  by congruenceOf(
+                         (w : Polynomial(Integer, Integer.zero)) ↦
+                             Polynomial.add(Integer.ring_bundle, w, p'),
+                         differenceEquation)
+            = Polynomial.add(Integer.ring_bundle, p',
+                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor))
+                  by Polynomial.add_commutative(Integer.ring_bundle,
+                         Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor), p');
+  calc GaussianInteger.coordinatesOfPolynomial(p)
+     = GaussianInteger.coordinatesOfPolynomial(
+           Polynomial.add(Integer.ring_bundle, p',
+               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor)))
+           by congruenceOf(GaussianInteger.coordinatesOfPolynomial, pEquation)
+     = Product.make(
+           Product.first(GaussianInteger.coordinatesOfPolynomial(p'))
+               + Product.first(GaussianInteger.coordinatesOfPolynomial(
+                     Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor))),
+           Product.second(GaussianInteger.coordinatesOfPolynomial(p'))
+               + Product.second(GaussianInteger.coordinatesOfPolynomial(
+                     Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor))))
+           by GaussianInteger.coordinatesOfPolynomial_add(p',
+                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor))
+     = Product.make(
+           Product.first(GaussianInteger.coordinatesOfPolynomial(p')) + Integer.zero,
+           Product.second(GaussianInteger.coordinatesOfPolynomial(p')) + Integer.zero)
+           by congruenceOf(
+                  (pair : Pair(Integer, Integer)) ↦
+                      Product.make(
+                          Product.first(GaussianInteger.coordinatesOfPolynomial(p')) + Product.first(pair),
+                          Product.second(GaussianInteger.coordinatesOfPolynomial(p')) + Product.second(pair)),
+                  GaussianInteger.coordinatesOfPolynomial_modulus_multiply(cofactor))
+     = Product.make(
+           Product.first(GaussianInteger.coordinatesOfPolynomial(p')),
+           Product.second(GaussianInteger.coordinatesOfPolynomial(p')))
+           by Product.make_equal(Integer, Integer,
+                  Product.first(GaussianInteger.coordinatesOfPolynomial(p')) + Integer.zero,
+                  Product.first(GaussianInteger.coordinatesOfPolynomial(p')),
+                  Product.second(GaussianInteger.coordinatesOfPolynomial(p')) + Integer.zero,
+                  Product.second(GaussianInteger.coordinatesOfPolynomial(p')),
+                  ring, ring)
+     = GaussianInteger.coordinatesOfPolynomial(p')
+           by Equality.symmetry(
+                  GaussianInteger.product_eta(GaussianInteger.coordinatesOfPolynomial(p')))
+}
+
+-- ----------------------------------------------------------------------
+-- The coordinate map on ℤ[i]: (re, im) of a Gaussian integer.
+definition GaussianInteger.coordinates : GaussianInteger → Pair(Integer, Integer)
+  by representatives p ↦ GaussianInteger.coordinatesOfPolynomial(p)
+  well_defined by GaussianInteger.coordinatesOfPolynomial_respects_congruence
