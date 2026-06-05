@@ -1,0 +1,149 @@
+-- GaussianInteger/coordinates.math
+--
+-- The coordinate bridge out of the quotient: a total function reading the
+-- pair (re, im) of integer coordinates off a Gaussian integer a + bi.
+--
+-- A function OUT of ℤ[i] = ℤ[x]/(x²+1) cannot extract a representative
+-- (the quotient is opaque), so we build it the only sound way: a function
+-- on coefficient lists that respects both quotient relations, then lift.
+-- The recursion uses x·q ≡ i·q, i.e. re(x·q) = −im(q), im(x·q) = re(q):
+--   reim(nil)         = (0, 0)
+--   reim(cons(c, q))  = (c − im(q), re(q))      [the class is c + x·q]
+-- This module lifts it through the polynomial quotient (trailing zeros);
+-- the lift through the (x²+1)-congruence is in the sibling module.
+
+module GaussianInteger.coordinates
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring
+import Algebra.ring_bundle
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Polynomial.basics
+import Polynomial.addition
+import GaussianInteger.basics
+
+-- ----------------------------------------------------------------------
+-- The coordinate recursion on raw coefficient lists.
+
+-- (re, im) of the class of a coefficient list, reading c + x·(rest).
+definition GaussianInteger.coordinatesOfCoefficients
+        : Polynomial.Coefficients(Integer) → Pair(Integer, Integer)
+  | Polynomial.Coefficients.nil => Product.make(Integer.zero, Integer.zero)
+  | Polynomial.Coefficients.cons(c, rest) =>
+      Product.make(
+          c - Product.second(GaussianInteger.coordinatesOfCoefficients(rest)),
+          Product.first(GaussianInteger.coordinatesOfCoefficients(rest)))
+
+-- ----------------------------------------------------------------------
+-- An all-zero coefficient list has coordinates (0, 0).
+theorem GaussianInteger.coordinatesOfCoefficients_all_zero
+        : (a : Polynomial.Coefficients(Integer))
+          → ((i : Natural) → Polynomial.nth(Integer, Integer.zero, a, i) = Integer.zero)
+          → GaussianInteger.coordinatesOfCoefficients(a)
+            = Product.make(Integer.zero, Integer.zero)
+  | Polynomial.Coefficients.nil =>
+      (allZero
+          : (i : Natural) → Polynomial.nth(Integer, Integer.zero,
+                Polynomial.Coefficients.nil(Integer), i) = Integer.zero) ↦
+        reflexivity(Pair(Integer, Integer), Product.make(Integer.zero, Integer.zero))
+  | Polynomial.Coefficients.cons(c, rest) =>
+      (allZero
+          : (i : Natural) → Polynomial.nth(Integer, Integer.zero,
+                Polynomial.Coefficients.cons(Integer, c, rest), i) = Integer.zero) ↦ {
+        claim cIsZero : c = Integer.zero by allZero(0);
+        claim restAllZero
+            : (i : Natural) → Polynomial.nth(Integer, Integer.zero, rest, i) = Integer.zero
+            by (i : Natural) ↦ allZero(successor(i));
+        claim restCoordinates
+            : GaussianInteger.coordinatesOfCoefficients(rest)
+              = Product.make(Integer.zero, Integer.zero)
+            by GaussianInteger.coordinatesOfCoefficients_all_zero(rest, restAllZero);
+        calc GaussianInteger.coordinatesOfCoefficients(
+                 Polynomial.Coefficients.cons(Integer, c, rest))
+           = Product.make(
+                 c - Product.second(Product.make(Integer.zero, Integer.zero)),
+                 Product.first(Product.make(Integer.zero, Integer.zero)))
+                 by congruenceOf(
+                        (pair : Pair(Integer, Integer)) ↦
+                            Product.make(c - Product.second(pair), Product.first(pair)),
+                        restCoordinates)
+           = Product.make(Integer.zero, Integer.zero)
+                 by Product.make_equal(Integer, Integer,
+                        c - Integer.zero, Integer.zero, Integer.zero, Integer.zero,
+                        calc c - Integer.zero = c = Integer.zero by cIsZero,
+                        reflexivity(Integer, Integer.zero))
+      }
+
+-- ----------------------------------------------------------------------
+-- Coordinates respect extensional equality of coefficient lists: two
+-- lists with the same coefficient at every index have equal coordinates.
+-- Each branch returns an explicit term checked against the goal by
+-- definitional unfolding of `coordinatesOfCoefficients` on a `cons`/`nil`.
+theorem GaussianInteger.coordinatesOfCoefficients_respects
+        : (a b : Polynomial.Coefficients(Integer))
+          → Polynomial.ExtensionallyEqual(Integer, Integer.zero, a, b)
+          → GaussianInteger.coordinatesOfCoefficients(a)
+            = GaussianInteger.coordinatesOfCoefficients(b)
+  | Polynomial.Coefficients.nil =>
+      (b : Polynomial.Coefficients(Integer))
+      (extensionallyEqual : Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+          Polynomial.Coefficients.nil(Integer), b)) ↦
+        Equality.symmetry(
+            GaussianInteger.coordinatesOfCoefficients_all_zero(b,
+                (i : Natural) ↦ Equality.symmetry(extensionallyEqual(i))))
+  | Polynomial.Coefficients.cons(c, rest) =>
+      (b : Polynomial.Coefficients(Integer))
+      (extensionallyEqual : Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+          Polynomial.Coefficients.cons(Integer, c, rest), b)) ↦
+        cases b {
+          | Polynomial.Coefficients.nil =>
+              GaussianInteger.coordinatesOfCoefficients_all_zero(
+                  Polynomial.Coefficients.cons(Integer, c, rest),
+                  (i : Natural) ↦ extensionallyEqual(i))
+          | Polynomial.Coefficients.cons(d, restB) => {
+              claim headsEqual : c = d by extensionallyEqual(0);
+              claim tailsExtensionallyEqual
+                  : Polynomial.ExtensionallyEqual(Integer, Integer.zero, rest, restB)
+                  by (i : Natural) ↦ extensionallyEqual(successor(i));
+              claim tailCoordinates
+                  : GaussianInteger.coordinatesOfCoefficients(rest)
+                    = GaussianInteger.coordinatesOfCoefficients(restB)
+                  by GaussianInteger.coordinatesOfCoefficients_respects(rest, restB,
+                         tailsExtensionallyEqual);
+              Product.make_equal(Integer, Integer,
+                  c - Product.second(GaussianInteger.coordinatesOfCoefficients(rest)),
+                  d - Product.second(GaussianInteger.coordinatesOfCoefficients(restB)),
+                  Product.first(GaussianInteger.coordinatesOfCoefficients(rest)),
+                  Product.first(GaussianInteger.coordinatesOfCoefficients(restB)),
+                  calc c - Product.second(GaussianInteger.coordinatesOfCoefficients(rest))
+                     = c - Product.second(GaussianInteger.coordinatesOfCoefficients(restB))
+                           by congruenceOf(
+                                  (pair : Pair(Integer, Integer)) ↦ c - Product.second(pair),
+                                  tailCoordinates)
+                     = d - Product.second(GaussianInteger.coordinatesOfCoefficients(restB))
+                           by congruenceOf(
+                                  (z : Integer) ↦ z - Product.second(
+                                      GaussianInteger.coordinatesOfCoefficients(restB)),
+                                  headsEqual),
+                  congruenceOf(
+                      (pair : Pair(Integer, Integer)) ↦ Product.first(pair),
+                      tailCoordinates))
+            }
+        }
+
+-- ----------------------------------------------------------------------
+-- The coordinate map on ℤ[x] (lifting over the polynomial quotient).
+definition GaussianInteger.coordinatesOfPolynomial
+        : Polynomial(Integer, Integer.zero) → Pair(Integer, Integer)
+  by representatives a ↦ GaussianInteger.coordinatesOfCoefficients(a)
+  well_defined by GaussianInteger.coordinatesOfCoefficients_respects
