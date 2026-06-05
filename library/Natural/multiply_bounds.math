@@ -1,0 +1,128 @@
+-- Natural/multiply_bounds.math
+--
+-- Two arithmetic facts the product rule of counting leans on:
+--   * multiplication is monotone in its right factor, and
+--   * the quotient and remainder of a division are unique.
+-- Both are elementary, but stating them once here keeps the counting
+-- bijection (Set/finite_product.math) free of arithmetic bookkeeping.
+
+module Natural.multiply_bounds
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.subtraction
+import Natural.compare
+import Natural.divide
+
+-- Multiplication is monotone in its right factor: if a ≤ b then c*a ≤ c*b.
+-- Write b as a + s (its excess over a); then c*b = c*a + c*s, which is at
+-- least c*a.
+theorem Natural.multiply_monotone_left (c a b : Natural) (aLeB : a ≤ b) : c * a ≤ c * b := {
+  obtain ⟨excess, bEqual⟩ from Natural.subtraction_witness(a, b, aLeB);
+  calc c * a
+     ≤ c * a + c * excess        by Natural.less_or_equal_add_right
+     = c * (a + excess)          by Natural.multiply_distributes_left_over_add(c, a, excess)
+     = c * b                     by Equality.symmetry(Natural, b, a + excess, bEqual)
+}
+
+-- ----------------------------------------------------------------------
+-- Uniqueness of quotient and remainder.
+
+-- The asymmetric core. If the two divisions agree as
+-- `divisor*qLow + rLow = divisor*qHigh + rHigh` while `qLow < qHigh`,
+-- then the low remainder is forced up to at least `divisor`, contradicting
+-- its bound. Concretely qHigh = qLow + (1 + gap), so
+-- `divisor*qHigh = divisor*qLow + divisor + divisor*gap`; cancelling the
+-- common `divisor*qLow` leaves `rLow = divisor + divisor*gap + rHigh`,
+-- whence `divisor ≤ rLow`, putting `successor(rLow)` strictly below itself.
+theorem Natural.quotient_strict_absurd
+        (divisor quotientLow remainderLow quotientHigh remainderHigh : Natural)
+        (remainderLowBound : successor(remainderLow) ≤ divisor)
+        (strictlyBelow : successor(quotientLow) ≤ quotientHigh)
+        (equation : divisor * quotientLow + remainderLow = divisor * quotientHigh + remainderHigh)
+        : False := {
+  obtain ⟨gap, highEqual⟩ from Natural.subtraction_witness(successor(quotientLow), quotientHigh, strictlyBelow);
+  -- Cancel divisor*quotientLow from the equation, exposing rLow on the left
+  -- and divisor + divisor*gap + rHigh on the right.
+  claim remainderEqual : remainderLow = divisor + divisor * gap + remainderHigh
+      by Natural.add_cancel_left(divisor * quotientLow, remainderLow, divisor + divisor * gap + remainderHigh,
+          calc divisor * quotientLow + remainderLow
+             = divisor * quotientHigh + remainderHigh                                  by equation
+             = divisor * (successor(quotientLow) + gap) + remainderHigh                by highEqual
+             = (divisor * successor(quotientLow) + divisor * gap) + remainderHigh
+                    by Natural.multiply_distributes_left_over_add(divisor, successor(quotientLow), gap)
+             = ((divisor + divisor * quotientLow) + divisor * gap) + remainderHigh
+                    by Natural.multiply_successor(divisor, quotientLow)
+             = divisor * quotientLow + (divisor + divisor * gap + remainderHigh)       by ring);
+  -- So divisor ≤ rLow, hence successor(rLow) ≤ divisor ≤ rLow: impossible.
+  claim divisorBelow : divisor ≤ remainderLow
+      by calc divisor
+            ≤ divisor + (divisor * gap + remainderHigh)
+                  by Natural.less_or_equal_add_right(divisor, divisor * gap + remainderHigh)
+            = divisor + divisor * gap + remainderHigh   by ring
+            = remainderLow                              by Equality.symmetry(Natural,
+                  remainderLow, divisor + divisor * gap + remainderHigh, remainderEqual);
+  claim selfBelow : successor(remainderLow) ≤ remainderLow
+      by calc successor(remainderLow)
+            ≤ divisor          by remainderLowBound
+            ≤ remainderLow     by divisorBelow;
+  absurd(Natural.not_successor_less_or_equal_self(remainderLow, selfBelow))
+}
+
+-- Quotients are unique: same divisor, equal `quotient*divisor + remainder`
+-- with both remainders below the divisor force equal quotients. Compare the
+-- two quotients; either strict order would contradict the matching remainder
+-- bound (the helper above), so they are equal by antisymmetry.
+theorem Natural.quotient_remainder_unique
+        (divisor quotientOne remainderOne quotientTwo remainderTwo : Natural)
+        (remOneBound : successor(remainderOne) ≤ divisor)
+        (remTwoBound : successor(remainderTwo) ≤ divisor)
+        (equation : divisor * quotientOne + remainderOne = divisor * quotientTwo + remainderTwo)
+        : quotientOne = quotientTwo := {
+  -- compare_strict(quotientTwo, quotientOne): the `below` branch is
+  -- quotientTwo < quotientOne (refuted), the `atLeast` branch is exactly
+  -- quotientOne ≤ quotientTwo.
+  claim oneLeTwo : quotientOne ≤ quotientTwo by {
+    cases Natural.compare_strict(quotientTwo, quotientOne) {
+      | Natural.StrictComparison.below(strictlyBelow) =>
+          absurd(Natural.quotient_strict_absurd(divisor, quotientTwo, remainderTwo, quotientOne, remainderOne,
+              remTwoBound, strictlyBelow,
+              Equality.symmetry(Natural,
+                  divisor * quotientOne + remainderOne, divisor * quotientTwo + remainderTwo, equation)))
+      | Natural.StrictComparison.atLeast(atLeast) =>
+          atLeast
+    }
+  };
+  claim twoLeOne : quotientTwo ≤ quotientOne by {
+    cases Natural.compare_strict(quotientOne, quotientTwo) {
+      | Natural.StrictComparison.below(strictlyBelow) =>
+          absurd(Natural.quotient_strict_absurd(divisor, quotientOne, remainderOne, quotientTwo, remainderTwo,
+              remOneBound, strictlyBelow, equation))
+      | Natural.StrictComparison.atLeast(atLeast) =>
+          atLeast
+    }
+  };
+  Natural.le_antisymmetric(quotientOne, quotientTwo, oneLeTwo, twoLeOne)
+}
+
+-- With equal quotients, the remainders are equal too: cancel the common
+-- `divisor*quotient` from the equation.
+theorem Natural.remainder_unique
+        (divisor quotientOne remainderOne quotientTwo remainderTwo : Natural)
+        (remOneBound : successor(remainderOne) ≤ divisor)
+        (remTwoBound : successor(remainderTwo) ≤ divisor)
+        (equation : divisor * quotientOne + remainderOne = divisor * quotientTwo + remainderTwo)
+        : remainderOne = remainderTwo := {
+  claim quotientsEqual : quotientOne = quotientTwo
+      by Natural.quotient_remainder_unique(divisor, quotientOne, remainderOne, quotientTwo, remainderTwo,
+          remOneBound, remTwoBound, equation);
+  Natural.add_cancel_left(divisor * quotientTwo, remainderOne, remainderTwo,
+      calc divisor * quotientTwo + remainderOne
+         = divisor * quotientOne + remainderOne     by Equality.symmetry(Natural,
+               quotientOne, quotientTwo, quotientsEqual)
+         = divisor * quotientTwo + remainderTwo      by equation)
+}
