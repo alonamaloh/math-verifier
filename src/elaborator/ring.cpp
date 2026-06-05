@@ -909,8 +909,12 @@ ExpressionPointer Elaborator::buildRingAssoc(
 ExpressionPointer Elaborator::buildRingCommute(
         const RingAxiomNames& axioms,
         ExpressionPointer a, ExpressionPointer b) {
-        ExpressionPointer call =
-            ringConst(axioms.commutative);
+        // Phase 4: a supplied commutativity witness `(x y) → op(x,y) =
+        // op(y,x)` is applied directly; otherwise the named law (with the
+        // active structure prefix) is used.
+        ExpressionPointer call = axioms.commutativeWitness
+            ? axioms.commutativeWitness
+            : ringConst(axioms.commutative);
         call = makeApplication(std::move(call), std::move(a));
         call = makeApplication(std::move(call), std::move(b));
         return call;
@@ -1191,6 +1195,41 @@ ExpressionPointer Elaborator::proveProductEqualsSorted(
 // flattened and sorted as a multiset; each product flattened and
 // reassociated but NOT reordered, since a general ring's `·` is not
 // commutative) and, if the forms coincide, chain L = canon = R.
+
+ExpressionPointer Elaborator::ringDeriveCommutativityWitness(
+        ExpressionPointer structureArg) {
+        // structureArg is `s` (opened). Recognize `<Bundle>.ring(arg)` and
+        // build the matching commutativity projection.
+        auto* app = std::get_if<Application>(&structureArg->node);
+        if (!app) return nullptr;
+        auto* head = std::get_if<Constant>(&app->function->node);
+        if (!head) return nullptr;
+        ExpressionPointer arg = app->argument;
+        auto build = [&](const std::string& constName,
+                         ExpressionPointer applied) -> ExpressionPointer {
+            if (environment_.lookup(constName) == nullptr) return nullptr;
+            return makeApplication(makeConstant(constName), applied);
+        };
+        if (head->name == "CommutativeRing.ring") {
+            return build("CommutativeRing.commutative", arg);
+        }
+        if (head->name == "IntegralDomain.ring") {
+            return build("IntegralDomain.commutative", arg);
+        }
+        if (head->name == "PrincipalIdealDomain.ring"
+            && environment_.lookup("PrincipalIdealDomain.domain")) {
+            ExpressionPointer domain = makeApplication(
+                makeConstant("PrincipalIdealDomain.domain"), arg);
+            return build("IntegralDomain.commutative", domain);
+        }
+        if (head->name == "EuclideanDomain.ring"
+            && environment_.lookup("EuclideanDomain.domain")) {
+            ExpressionPointer domain = makeApplication(
+                makeConstant("EuclideanDomain.domain"), arg);
+            return build("IntegralDomain.commutative", domain);
+        }
+        return nullptr;
+    }
 
 ExpressionPointer Elaborator::canonicalizeRingStructurePrefix(
         ExpressionPointer e,
@@ -1961,7 +2000,11 @@ Elaborator::ACNormResult Elaborator::ringACFullNorm(
             return normaliseAtOperator(addAxioms, /*commutative=*/true);
         }
         if (matchBinaryRingOp(e, mulAxioms.op, A, B)) {
-            return normaliseAtOperator(mulAxioms, /*commutative=*/false);
+            // Commutative `·` (Phase 4) when a witness was sourced; else
+            // associative-only (a general ring has no ·-commutativity).
+            return normaliseAtOperator(
+                mulAxioms,
+                /*commutative=*/mulAxioms.commutativeWitness != nullptr);
         }
         // Atom (neither + nor · at this carrier): canonical is itself.
         return ACNormResult{
@@ -2017,6 +2060,13 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
         if (environment_.lookup(mulAxioms.op) == nullptr
             || environment_.lookup(mulAxioms.associative) == nullptr) {
             mulAxioms.op.clear();
+        }
+        // Phase 4: if `s` is a commutative bundle, source its commutativity
+        // witness so the `·` level sorts factors (proves a·b = b·a and any
+        // commutative-ring rearrangement). Non-null here ⇒ commutative mode.
+        if (!mulAxioms.op.empty()) {
+            mulAxioms.commutativeWitness =
+                ringDeriveCommutativityWitness(structureArg);
         }
         RingStructurePrefixGuard prefixGuard(*this, {structureArg});
         ExpressionPointer leftOpened =

@@ -2089,6 +2089,13 @@ private:
         std::string op;            // e.g. "Integer.multiply"
         std::string associative;   // e.g. "Integer.multiply_associative"
         std::string commutative;   // e.g. "Integer.multiply_commutative"
+        // Phase 4: a commutativity proof supplied as a TERM rather than a
+        // named law — a function `(x y) → op(x,y) = op(y,x)`. Used for `·`
+        // over an abstract `Ring.carrier(s)` whose commutativity comes from
+        // a bundle witness (CommutativeRing/IntegralDomain), where no
+        // `Ring.multiply_commutative` constant exists. When set,
+        // buildRingCommute applies it instead of `ringConst(commutative)`.
+        ExpressionPointer commutativeWitness = nullptr;
     };
 
     // How `ring` reads a carrier's operations and laws. For a concrete
@@ -2231,6 +2238,19 @@ private:
         ExpressionPointer carrierType,
         LevelPointer carrierLevel,
         int line);
+
+    // Phase 4: derive a multiplicative-commutativity witness for the
+    // abstract ring `structureArg` from its bundle structure — a term of
+    // type `Ring.MultiplyCommutative(structureArg)` (i.e. `(x y) →
+    // multiply(s,x,y) = multiply(s,y,x)`), or nullptr if `s` isn't a
+    // recognized commutative bundle. Known sources: `CommutativeRing.ring(c)`
+    // → `CommutativeRing.commutative(c)`; `IntegralDomain.ring(d)` →
+    // `IntegralDomain.commutative(d)`; `PrincipalIdealDomain.ring(pid)` →
+    // `IntegralDomain.commutative(PrincipalIdealDomain.domain(pid))`. The
+    // candidate is kernel-checked as part of the final proof, so a wrong
+    // guess merely makes proveAbstractRingAC decline.
+    ExpressionPointer ringDeriveCommutativityWitness(
+        ExpressionPointer structureArg);
 
     // {canonical form, proof : original = canonical}, the result of
     // normalising one expression for proveAbstractRingAC.
