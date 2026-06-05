@@ -1,6 +1,7 @@
 # Build and file layout
 
-How to build the library and how `library/` is organised.
+How to build the library, how the C++ sources are organised, and how
+`library/` is organised.
 
 *(Part of the project conventions; see `CLAUDE.md` for the index.)*
 
@@ -9,7 +10,34 @@ How to build the library and how `library/` is organised.
 `make -j 16 library` from the project root. The dep graph is parallel;
 warm rebuilds are sub-second. Always use `-j 16` (don't use bare `make`).
 
-## File organization
+Objects land under `build/obj/` (mirroring `src/`); header dependencies
+are tracked automatically by the compiler (`-MMD -MP` + `-include`), so
+there is no hand-maintained header list in the Makefile.
+
+## C++ source organization
+
+The kernel + elaborator C++ lives under `src/`, in tiers that mirror the
+dependency direction (each tier depends only on the ones above it):
+
+```
+src/
+  kernel/      -- trusted core: expression, level, kernel (typecheck +
+                  WHNF), printer, serialize, hash, subtree_hash
+  syntax/      -- lexer, surface (the surface AST), parser
+  elaborator/  -- surface -> kernel translation:
+                  elaborator (public API) + internal.hpp (the class),
+                  topical slices levels.cpp / ring.cpp / term_utilities,
+                  and lemma_search
+  main.cpp     -- CLI entry point
+```
+
+Includes are path-qualified and resolved via `-Isrc`, e.g. `#include
+"kernel/expression.hpp"` — an include names the tier it comes from. The
+elaborator is being broken out of one large class (`internal.hpp`) into
+out-of-line `.cpp` slices and free-function/engine modules; see the
+`elaborator_split_status` memory.
+
+## Library (math) organization
 
 ```
 library/
