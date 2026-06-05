@@ -34,12 +34,16 @@ import Algebra.associate
 -- Ideals.
 
 -- `member` is an ideal: contains 0, closed under addition, and absorbs
--- multiplication by any ring element.
-definition Ring.IsIdeal (s : Ring) (member : Ring.carrier(s) → Proposition)
-        : Proposition :=
-  member(Ring.zero(s))
-  ∧ ((x y : Ring.carrier(s)) → member(x) → member(y) → member(x + y))
-  ∧ ((r x : Ring.carrier(s)) → member(x) → member(r * x))
+-- multiplication by any ring element. A single-constructor record so the
+-- proof reads `Ring.IsIdeal.make(containsZero, closedUnderAddition,
+-- absorbsMultiplication)` and consumers destructure named fields.
+inductive Ring.IsIdeal (s : Ring) (member : Ring.carrier(s) → Proposition)
+        : Proposition where
+  | Ring.IsIdeal.make
+      : member(Ring.zero(s))
+        → ((x y : Ring.carrier(s)) → member(x) → member(y) → member(x + y))
+        → ((r x : Ring.carrier(s)) → member(x) → member(r * x))
+        → Ring.IsIdeal(s, member)
 
 -- `generator` generates `member`: its multiples are exactly `member`.
 definition Ring.GeneratesIdeal (s : Ring)
@@ -100,7 +104,7 @@ theorem Ring.pairIdeal_is_ideal (s : Ring) (a b : Ring.carrier(s))
              = (r * x) * a + r * (y * b)
              = (r * x) * a + (r * y) * b
       };
-  ⟨containsZero, closedUnderAddition, absorbsMultiplication⟩
+  Ring.IsIdeal.make(containsZero, closedUnderAddition, absorbsMultiplication)
 }
 
 -- ----------------------------------------------------------------------
