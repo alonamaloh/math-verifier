@@ -1,0 +1,407 @@
+-- Algebra/integer_euclidean.math
+--
+-- ℤ as a Euclidean domain (norm = absolute value into ℕ), hence a PID.
+--
+-- Division with remainder is reduced to Natural division by the absolute
+-- value of the divisor. For a NONNEGATIVE dividend that is immediate; for
+-- a negative dividend with a nonzero Natural remainder `rn`, the
+-- remainder is adjusted to `m − rn` and the quotient decremented (the
+-- usual "round toward −∞" fix). The sign of the divisor flips the
+-- quotient. All the integer algebra is `ring`; the remainder-size bound
+-- rides on the Natural division's `r < divisor`.
+
+module Algebra.integer_euclidean
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.subtraction
+import Natural.factorization
+import Natural.division
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.instances
+import Integer.embedding
+import Integer.order
+import Integer.sign
+import Integer.absolute_value
+import Integer.absolute_value_natural
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.integral_domain
+import Algebra.principal_ideal_domain
+import Algebra.euclidean_domain
+import Algebra.integer_domain
+
+-- ----------------------------------------------------------------------
+-- Natural-absolute-value of casts.
+
+theorem Integer.absolute_value_natural_of_natural (k : Natural)
+        : Integer.absolute_value_natural((k : Integer)) = k :=
+  Natural.to_integer.injective(
+      Integer.absolute_value_natural((k : Integer)), k,
+      calc (Integer.absolute_value_natural((k : Integer)) : Integer)
+         = abs((k : Integer))
+               by Equality.symmetry(
+                      Integer.absolute_value_natural_is_image((k : Integer)))
+         = (k : Integer)
+               by Integer.absolute_value_of_natural(k))
+
+theorem Integer.absolute_value_natural_of_negate_natural (k : Natural)
+        : Integer.absolute_value_natural(Integer.negate((k : Integer))) = k :=
+  Natural.to_integer.injective(
+      Integer.absolute_value_natural(Integer.negate((k : Integer))), k,
+      calc (Integer.absolute_value_natural(Integer.negate((k : Integer))) : Integer)
+         = abs(Integer.negate((k : Integer)))
+               by Equality.symmetry(
+                      Integer.absolute_value_natural_is_image(
+                          Integer.negate((k : Integer))))
+         = abs((k : Integer))
+               by Integer.absolute_value_negate((k : Integer))
+         = (k : Integer)
+               by Integer.absolute_value_of_natural(k))
+
+-- ----------------------------------------------------------------------
+-- Helper: 1 ≤ m when its cast (or negated cast) is a nonzero integer.
+
+theorem Integer.positive_natural_of_image_nonzero (m : Natural)
+        (imageNonzero : ¬((m : Integer) = Integer.zero))
+        : 1 ≤ m := {
+  cases Natural.is_zero_or_at_least_one(m) {
+    | Or.introduceLeft(mZero) =>
+        absurd(imageNonzero(
+            calc (m : Integer)
+               = Natural.to_integer(0)
+                     by congruenceOf(Natural.to_integer, mZero)
+               = Integer.zero
+                     by Natural.to_integer.zero_preserves))
+    | Or.introduceRight(positive) => positive
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Division of any integer by a positive Natural modulus.
+
+theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 ≤ m)
+        : ∃ (quotient : Integer). ∃ (remainder : Natural).
+            a = Integer.add(Integer.multiply((m : Integer), quotient),
+                    (remainder : Integer))
+            ∧ successor(remainder) ≤ m := {
+  cases Integer.sign_split(a) {
+    | Or.introduceLeft(aNonneg) => {
+        obtain ⟨j, aIsImage⟩ from aNonneg;
+        obtain ⟨naturalQuotient, naturalRemainder, jEquation, remainderBelow⟩
+            from Natural.divide_with_remainder(m, mPositive, j);
+        -- jEquation : j = naturalQuotient * m + naturalRemainder.
+        claim jCast
+            : (j : Integer)
+              = Integer.add(
+                    Integer.multiply((m : Integer), (naturalQuotient : Integer)),
+                    (naturalRemainder : Integer))
+            by calc (j : Integer)
+                  = ((naturalQuotient * m + naturalRemainder : Natural) : Integer)
+                        by congruenceOf(Natural.to_integer, jEquation)
+                  = Integer.add(
+                        ((naturalQuotient * m : Natural) : Integer),
+                        (naturalRemainder : Integer))
+                        by Natural.to_integer.add_preserves(
+                               naturalQuotient * m, naturalRemainder)
+                  = Integer.add(
+                        Integer.multiply((naturalQuotient : Integer),
+                            (m : Integer)),
+                        (naturalRemainder : Integer))
+                        by congruenceOf(
+                               (z : Integer) ↦
+                                   Integer.add(z, (naturalRemainder : Integer)),
+                               Natural.to_integer.multiply_preserves(
+                                   naturalQuotient, m))
+                  = Integer.add(
+                        Integer.multiply((m : Integer), (naturalQuotient : Integer)),
+                        (naturalRemainder : Integer))
+                        by ring;
+        ⟨(naturalQuotient : Integer), naturalRemainder,
+         ⟨calc a
+             = (j : Integer)
+                   by aIsImage
+             = Integer.add(
+                   Integer.multiply((m : Integer), (naturalQuotient : Integer)),
+                   (naturalRemainder : Integer))
+                   by jCast,
+          remainderBelow⟩⟩
+      }
+    | Or.introduceRight(aNegative) => {
+        obtain ⟨j, aIsNegativeImage⟩ from aNegative;
+        obtain ⟨naturalQuotient, naturalRemainder, jEquation, remainderBelow⟩
+            from Natural.divide_with_remainder(m, mPositive, j);
+        claim jCast
+            : (j : Integer)
+              = Integer.add(
+                    Integer.multiply((m : Integer), (naturalQuotient : Integer)),
+                    (naturalRemainder : Integer))
+            by calc (j : Integer)
+                  = ((naturalQuotient * m + naturalRemainder : Natural) : Integer)
+                        by congruenceOf(Natural.to_integer, jEquation)
+                  = Integer.add(
+                        ((naturalQuotient * m : Natural) : Integer),
+                        (naturalRemainder : Integer))
+                        by Natural.to_integer.add_preserves(
+                               naturalQuotient * m, naturalRemainder)
+                  = Integer.add(
+                        Integer.multiply((naturalQuotient : Integer),
+                            (m : Integer)),
+                        (naturalRemainder : Integer))
+                        by congruenceOf(
+                               (z : Integer) ↦
+                                   Integer.add(z, (naturalRemainder : Integer)),
+                               Natural.to_integer.multiply_preserves(
+                                   naturalQuotient, m))
+                  = Integer.add(
+                        Integer.multiply((m : Integer), (naturalQuotient : Integer)),
+                        (naturalRemainder : Integer))
+                        by ring;
+        decide naturalRemainder = 0 {
+          | yes remainderZero => {
+              -- a = −(naturalQuotient·m) = m·(−naturalQuotient) + 0.
+              ⟨Integer.negate((naturalQuotient : Integer)), 0,
+               ⟨calc a
+                   = Integer.negate((j : Integer))
+                         by aIsNegativeImage
+                   = Integer.negate(
+                         Integer.add(
+                             Integer.multiply((m : Integer),
+                                 (naturalQuotient : Integer)),
+                             (naturalRemainder : Integer)))
+                         by congruenceOf(Integer.negate, jCast)
+                   = Integer.negate(
+                         Integer.add(
+                             Integer.multiply((m : Integer),
+                                 (naturalQuotient : Integer)),
+                             (0 : Integer)))
+                         by congruenceOf(
+                                (z : Integer) ↦
+                                    Integer.negate(
+                                        Integer.add(
+                                            Integer.multiply((m : Integer),
+                                                (naturalQuotient : Integer)), z)),
+                                congruenceOf(Natural.to_integer, remainderZero))
+                   = Integer.add(
+                         Integer.multiply((m : Integer),
+                             Integer.negate((naturalQuotient : Integer))),
+                         (0 : Integer))
+                         by ring,
+                mPositive⟩⟩
+            }
+          | no remainderNonzero => {
+              claim remainderAtMostM : naturalRemainder ≤ m
+                  by Natural.less_or_equal_predecessor_less_or_equal(
+                         naturalRemainder, m, remainderBelow);
+              obtain ⟨gap, mEquation⟩
+                  from Natural.subtraction_witness(naturalRemainder, m,
+                           remainderAtMostM);
+              -- mEquation : m = naturalRemainder + gap.
+              claim oneAtMostRemainder : 1 ≤ naturalRemainder by {
+                cases Natural.is_zero_or_at_least_one(naturalRemainder) {
+                  | Or.introduceLeft(isZero) =>
+                      absurd(remainderNonzero(isZero))
+                  | Or.introduceRight(positive) => positive
+                }
+              };
+              claim mCast
+                  : (m : Integer)
+                    = Integer.add((naturalRemainder : Integer), (gap : Integer))
+                  by calc (m : Integer)
+                        = ((naturalRemainder + gap : Natural) : Integer)
+                              by congruenceOf(Natural.to_integer, mEquation)
+                        = Integer.add((naturalRemainder : Integer), (gap : Integer))
+                              by Natural.to_integer.add_preserves(
+                                     naturalRemainder, gap);
+              claim gapCast
+                  : (gap : Integer)
+                    = Integer.add((m : Integer),
+                          Integer.negate((naturalRemainder : Integer)))
+                  by Equality.symmetry(
+                         calc Integer.add((m : Integer),
+                                  Integer.negate((naturalRemainder : Integer)))
+                            = Integer.add(
+                                  Integer.add((naturalRemainder : Integer),
+                                      (gap : Integer)),
+                                  Integer.negate((naturalRemainder : Integer)))
+                                  by congruenceOf(
+                                         (z : Integer) ↦
+                                             Integer.add(z,
+                                                 Integer.negate(
+                                                     (naturalRemainder : Integer))),
+                                         mCast)
+                            = (gap : Integer)
+                                  by ring);
+              claim gapBelowM : successor(gap) ≤ m
+                  by calc successor(gap)
+                        ≤ gap + naturalRemainder
+                              by Natural.successor_less_or_equal_add_at_least_one(
+                                     gap, naturalRemainder, oneAtMostRemainder)
+                        = naturalRemainder + gap
+                              by Natural.add_commutative(gap, naturalRemainder)
+                        = m
+                              by Equality.symmetry(mEquation);
+              ⟨Integer.negate(
+                   Integer.add((naturalQuotient : Integer), Integer.one)),
+               gap,
+               ⟨calc a
+                   = Integer.negate((j : Integer))
+                         by aIsNegativeImage
+                   = Integer.negate(
+                         Integer.add(
+                             Integer.multiply((m : Integer),
+                                 (naturalQuotient : Integer)),
+                             (naturalRemainder : Integer)))
+                         by congruenceOf(Integer.negate, jCast)
+                   = Integer.add(
+                         Integer.multiply((m : Integer),
+                             Integer.negate(
+                                 Integer.add((naturalQuotient : Integer),
+                                     Integer.one))),
+                         Integer.add((m : Integer),
+                             Integer.negate((naturalRemainder : Integer))))
+                         by ring
+                   = Integer.add(
+                         Integer.multiply((m : Integer),
+                             Integer.negate(
+                                 Integer.add((naturalQuotient : Integer),
+                                     Integer.one))),
+                         (gap : Integer))
+                         by congruenceOf(
+                                (z : Integer) ↦
+                                    Integer.add(
+                                        Integer.multiply((m : Integer),
+                                            Integer.negate(
+                                                Integer.add(
+                                                    (naturalQuotient : Integer),
+                                                    Integer.one))), z),
+                                Equality.symmetry(gapCast)),
+                gapBelowM⟩⟩
+            }
+        }
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Division with remainder for ℤ, bounded by |divisor|.
+
+theorem Integer.has_euclidean_division (a b : Integer)
+        (bNonzero : ¬(b = Integer.zero))
+        : ∃ (quotient : Integer). ∃ (remainder : Integer).
+            a = Integer.add(Integer.multiply(b, quotient), remainder)
+            ∧ (remainder = Integer.zero
+               ∨ Integer.absolute_value_natural(remainder)
+                 < Integer.absolute_value_natural(b)) := {
+  cases Integer.sign_split(b) {
+    | Or.introduceLeft(bNonneg) => {
+        obtain ⟨m, bIsImage⟩ from bNonneg;
+        claim mImageNonzero : ¬((m : Integer) = Integer.zero)
+            by (mImageZero : (m : Integer) = Integer.zero) ↦
+                 bNonzero(calc b = (m : Integer) by bIsImage
+                                 = Integer.zero by mImageZero);
+        claim mPositive : 1 ≤ m
+            by Integer.positive_natural_of_image_nonzero(m, mImageNonzero);
+        obtain ⟨quotient, remainder, aEquation, remainderBelow⟩
+            from Integer.divide_by_positive(a, m, mPositive);
+        ⟨quotient, (remainder : Integer),
+         ⟨calc a
+             = Integer.add(Integer.multiply((m : Integer), quotient),
+                   (remainder : Integer))
+                   by aEquation
+             = Integer.add(Integer.multiply(b, quotient), (remainder : Integer))
+                   by congruenceOf(
+                          (z : Integer) ↦
+                              Integer.add(Integer.multiply(z, quotient),
+                                  (remainder : Integer)),
+                          Equality.symmetry(bIsImage)),
+          Or.introduceRight(
+              rewrite(
+                  Equality.symmetry(
+                      Integer.absolute_value_natural_of_natural(remainder)),
+                  rewrite(
+                      Equality.symmetry(
+                          calc Integer.absolute_value_natural(b)
+                             = Integer.absolute_value_natural((m : Integer))
+                                   by congruenceOf(
+                                          Integer.absolute_value_natural, bIsImage)
+                             = m
+                                   by Integer.absolute_value_natural_of_natural(m)),
+                      remainderBelow)))⟩⟩
+      }
+    | Or.introduceRight(bNegative) => {
+        obtain ⟨m, bIsNegativeImage⟩ from bNegative;
+        claim mImageNonzero : ¬((m : Integer) = Integer.zero)
+            by (mImageZero : (m : Integer) = Integer.zero) ↦
+                 bNonzero(calc b = Integer.negate((m : Integer)) by bIsNegativeImage
+                                 = Integer.negate(Integer.zero)
+                                       by congruenceOf(Integer.negate, mImageZero)
+                                 = Integer.zero by ring);
+        claim mPositive : 1 ≤ m
+            by Integer.positive_natural_of_image_nonzero(m, mImageNonzero);
+        obtain ⟨quotient, remainder, aEquation, remainderBelow⟩
+            from Integer.divide_by_positive(a, m, mPositive);
+        ⟨Integer.negate(quotient), (remainder : Integer),
+         ⟨calc a
+             = Integer.add(Integer.multiply((m : Integer), quotient),
+                   (remainder : Integer))
+                   by aEquation
+             = Integer.add(
+                   Integer.multiply(Integer.negate((m : Integer)),
+                       Integer.negate(quotient)),
+                   (remainder : Integer))
+                   by ring
+             = Integer.add(Integer.multiply(b, Integer.negate(quotient)),
+                   (remainder : Integer))
+                   by congruenceOf(
+                          (z : Integer) ↦
+                              Integer.add(
+                                  Integer.multiply(z, Integer.negate(quotient)),
+                                  (remainder : Integer)),
+                          Equality.symmetry(bIsNegativeImage)),
+          Or.introduceRight(
+              rewrite(
+                  Equality.symmetry(
+                      Integer.absolute_value_natural_of_natural(remainder)),
+                  rewrite(
+                      Equality.symmetry(
+                          calc Integer.absolute_value_natural(b)
+                             = Integer.absolute_value_natural(
+                                   Integer.negate((m : Integer)))
+                                   by congruenceOf(
+                                          Integer.absolute_value_natural,
+                                          bIsNegativeImage)
+                             = m
+                                   by Integer.absolute_value_natural_of_negate_natural(m)),
+                      remainderBelow)))⟩⟩
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- ℤ is a Euclidean domain, hence a principal ideal domain.
+
+theorem Integer.euclidean_division
+        : Ring.HasEuclideanDivision(Integer.ring_bundle,
+              Integer.absolute_value_natural) :=
+  Integer.has_euclidean_division
+
+definition Integer.euclidean_domain : EuclideanDomain :=
+  EuclideanDomain.make(Integer.integral_domain,
+      Integer.absolute_value_natural, Integer.euclidean_division)
+
+definition Integer.principal_ideal_domain : PrincipalIdealDomain :=
+  EuclideanDomain.to_principal_ideal_domain(Integer.euclidean_domain)
