@@ -1,0 +1,322 @@
+-- Natural/prime_factorization_unique.math
+--
+-- The Fundamental Theorem of Arithmetic (Freek #80): every n ≥ 1 is a
+-- product of primes, uniquely up to order.
+--
+-- Factorizations are `List(Natural)`; `listProduct` folds multiplication.
+-- Existence is strong induction on n (peel off a prime divisor and
+-- recurse on the quotient). Uniqueness reuses the polymorphic permutation
+-- machinery (`Lists/permutation.math`): two prime lists with equal
+-- product are *permutations* of each other. Because the only unit of ℕ is
+-- 1 and primes are ≥ 2, "associate" collapses to "equal", so the
+-- permutation is exact — no up-to-units bookkeeping (unlike the general
+-- integral-domain statement in Algebra/unique_factorization.math).
+
+module Natural.prime_factorization_unique
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.cancellation
+import Natural.divisibility
+import Natural.strong_recursion
+import Natural.prime
+import Natural.prime_divides_product
+import Natural.prime_divisor
+import Natural.euclid
+import Natural.factorization
+import Lists.list
+import Lists.permutation
+
+-- ----------------------------------------------------------------------
+-- Product of a list of naturals.
+
+definition Natural.listProduct (list : List(Natural)) : Natural :=
+  List.product(Natural, (a b : Natural) ↦ a * b, 1, list)
+
+theorem Natural.listProduct_empty
+        : Natural.listProduct(List.empty(Natural)) = 1 :=
+  reflexivity(Natural, 1)
+
+theorem Natural.listProduct_prepend (head : Natural) (tail : List(Natural))
+        : Natural.listProduct(List.prepend(Natural, head, tail))
+          = head * Natural.listProduct(tail) :=
+  reflexivity(Natural, head * Natural.listProduct(tail))
+
+theorem Natural.listProduct_permutation_invariant
+        (l1 l2 : List(Natural))
+        (perm : List.Permutation(Natural, l1, l2))
+        : Natural.listProduct(l1) = Natural.listProduct(l2) :=
+  List.Permutation.product_invariant(Natural,
+      (a b : Natural) ↦ a * b, 1,
+      Natural.multiply_associative, Natural.multiply_commutative,
+      l1, l2, perm)
+
+-- ----------------------------------------------------------------------
+-- Two primes, one dividing the other, are equal.
+
+theorem Natural.prime_equals_of_prime_divides (p q : Natural)
+        (pPrime : Natural.is_prime(p)) (qPrime : Natural.is_prime(q))
+        (pDividesQ : p ∣ q)
+        : p = q := {
+  let ⟨_, qDivisorClassification⟩ := qPrime;
+  cases qDivisorClassification(p, pDividesQ) {
+    | Or.introduceLeft(pEqualsOne) =>
+        absurd(Natural.not_two_less_or_equal_one(
+            rewrite(pEqualsOne, Natural.is_prime.at_least_two(p, pPrime))))
+    | Or.introduceRight(pEqualsQ) => pEqualsQ
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Euclid over a list: a prime dividing a prime list's product is a member.
+
+theorem Natural.prime_member_of_divides_product (p : Natural)
+        (pPrime : Natural.is_prime(p))
+        : (list : List(Natural))
+          → ((k : Natural) → List.member(Natural, k, list) → Natural.is_prime(k))
+          → p ∣ Natural.listProduct(list)
+          → List.member(Natural, p, list)
+  | List.empty, allPrime, pDividesProduct => {
+      -- p ∣ 1 forces p = 1, impossible for a prime.
+      claim pDividesOne : p ∣ 1
+          by rewrite(Natural.listProduct_empty, pDividesProduct);
+      absurd(Natural.not_two_less_or_equal_one(
+          rewrite(Natural.divides_one_implies_equals_one(p, pDividesOne),
+              Natural.is_prime.at_least_two(p, pPrime))))
+    }
+  | List.prepend(head, tail), allPrime, pDividesProduct => {
+      claim pDividesHeadTimesTail : p ∣ head * Natural.listProduct(tail)
+          by rewrite(Natural.listProduct_prepend(head, tail), pDividesProduct);
+      cases Natural.prime_divides_product(p, head, Natural.listProduct(tail),
+                pPrime, pDividesHeadTimesTail) {
+        | Or.introduceLeft(pDividesHead) => {
+            claim headPrime : Natural.is_prime(head)
+                by allPrime(head, List.member.here(Natural, head, tail));
+            claim pEqualsHead : p = head
+                by Natural.prime_equals_of_prime_divides(p, head, pPrime,
+                       headPrime, pDividesHead);
+            Equality.transport_proposition(
+                (candidate : Natural) ↦
+                    List.member(Natural, candidate,
+                        List.prepend(Natural, head, tail)),
+                head, p, Equality.symmetry(pEqualsHead),
+                List.member.here(Natural, head, tail))
+          }
+        | Or.introduceRight(pDividesTail) => {
+            claim allPrimeTail
+                : (k : Natural) → List.member(Natural, k, tail) → Natural.is_prime(k)
+                by (k : Natural) (memberTail : List.member(Natural, k, tail)) ↦
+                     allPrime(k, List.member.there(Natural, k, head, tail,
+                         memberTail));
+            List.member.there(Natural, p, head, tail,
+                Natural.prime_member_of_divides_product(p, pPrime, tail,
+                    allPrimeTail, pDividesTail))
+          }
+      }
+    }
+
+-- ----------------------------------------------------------------------
+-- A prime list with product 1 is empty.
+
+theorem Natural.prime_list_product_one_implies_empty
+        : (list : List(Natural))
+          → ((k : Natural) → List.member(Natural, k, list) → Natural.is_prime(k))
+          → Natural.listProduct(list) = 1
+          → list = List.empty(Natural)
+  | List.empty, allPrime, productIsOne =>
+      reflexivity(List(Natural), List.empty(Natural))
+  | List.prepend(head, tail), allPrime, productIsOne => {
+      claim headPrime : Natural.is_prime(head)
+          by allPrime(head, List.member.here(Natural, head, tail));
+      -- head ∣ 1 (= product), so head = 1, contradicting head ≥ 2.
+      claim headDividesOne : head ∣ 1
+          by ⟨Natural.listProduct(tail),
+              calc (1 : Natural)
+                 = Natural.listProduct(List.prepend(Natural, head, tail))
+                       by Equality.symmetry(productIsOne)
+                 = head * Natural.listProduct(tail)
+                       by Natural.listProduct_prepend(head, tail)⟩;
+      absurd(Natural.not_two_less_or_equal_one(
+          rewrite(Natural.divides_one_implies_equals_one(head, headDividesOne),
+              Natural.is_prime.at_least_two(head, headPrime))))
+    }
+
+-- ----------------------------------------------------------------------
+-- Existence: every n ≥ 1 is a product of primes.
+
+theorem Natural.prime_factorization_exists_list (n : Natural) (atLeastOne : 1 ≤ n)
+        : ∃ (list : List(Natural)).
+            ((k : Natural) → List.member(Natural, k, list) → Natural.is_prime(k))
+            ∧ Natural.listProduct(list) = n :=
+  (by_induction on n using Natural.strong_induction with subject, inductionHypothesis {
+     (subjectAtLeastOne : 1 ≤ subject) ↦ {
+       claim by cases {
+         in (subject = 1) as subjectEqualsOne:
+             ⟨List.empty(Natural),
+              ⟨(k : Natural)
+                  (memberEmpty : List.member(Natural, k, List.empty(Natural))) ↦
+                    absurd(List.no_member_empty(Natural, k, memberEmpty)),
+               calc Natural.listProduct(List.empty(Natural)) = 1 = subject⟩⟩
+         in (2 ≤ subject) as subjectAtLeastTwo: {
+             obtain ⟨prime, primeIsPrime, primeDividesSubject⟩
+                 from Natural.has_prime_divisor(subject, subjectAtLeastTwo);
+             obtain ⟨quotient, subjectEqualsPrimeTimesQuotient⟩
+                 from primeDividesSubject;
+             claim primeAtLeastTwo : 2 ≤ prime
+                 by Natural.is_prime.at_least_two(prime, primeIsPrime);
+             claim quotientAtLeastOne : 1 ≤ quotient
+                 by Natural.right_factor_at_least_one(prime, subject, quotient,
+                        subjectAtLeastOne, subjectEqualsPrimeTimesQuotient);
+             claim quotientBelowSubject : successor(quotient) ≤ subject;
+             obtain ⟨tail, allPrimeTail, tailProductEqualsQuotient⟩
+                 from inductionHypothesis(quotient, quotientBelowSubject)(
+                          quotientAtLeastOne);
+             ⟨List.prepend(Natural, prime, tail),
+              ⟨(k : Natural)
+                  (memberProof :
+                      List.member(Natural, k,
+                          List.prepend(Natural, prime, tail))) ↦
+                    cases List.member_prepend_invert(Natural, k, prime, tail,
+                              memberProof) {
+                      | Or.introduceLeft(kEqualsPrime) =>
+                          Equality.transport_proposition(
+                              (candidate : Natural) ↦ Natural.is_prime(candidate),
+                              prime, k, Equality.symmetry(kEqualsPrime),
+                              primeIsPrime)
+                      | Or.introduceRight(memberTail) =>
+                          allPrimeTail(k, memberTail)
+                    },
+               calc Natural.listProduct(List.prepend(Natural, prime, tail))
+                  = prime * Natural.listProduct(tail)
+                        by Natural.listProduct_prepend(prime, tail)
+                  = prime * quotient
+                        by tailProductEqualsQuotient
+                  = subject
+                        by Equality.symmetry(subjectEqualsPrimeTimesQuotient)⟩⟩
+           }
+       }
+     }
+   }
+   : 1 ≤ n
+     → ∃ (list : List(Natural)).
+         ((k : Natural) → List.member(Natural, k, list) → Natural.is_prime(k))
+         ∧ Natural.listProduct(list) = n
+   )(atLeastOne)
+
+-- ----------------------------------------------------------------------
+-- Uniqueness: prime lists with equal product are permutations.
+
+theorem Natural.prime_factorization_unique
+        : (l1 l2 : List(Natural))
+          → ((k : Natural) → List.member(Natural, k, l1) → Natural.is_prime(k))
+          → ((k : Natural) → List.member(Natural, k, l2) → Natural.is_prime(k))
+          → Natural.listProduct(l1) = Natural.listProduct(l2)
+          → List.Permutation(Natural, l1, l2)
+  | List.empty, l2, allPrime1, allPrime2, productEqual => {
+      -- listProduct(l2) = listProduct(empty) = 1, so l2 is empty.
+      claim l2Empty : l2 = List.empty(Natural)
+          by Natural.prime_list_product_one_implies_empty(l2, allPrime2,
+                 calc Natural.listProduct(l2)
+                    = Natural.listProduct(List.empty(Natural))
+                          by Equality.symmetry(productEqual)
+                    = 1
+                          by Natural.listProduct_empty);
+      Equality.transport_proposition(
+          (candidate : List(Natural)) ↦
+              List.Permutation(Natural, List.empty(Natural), candidate),
+          List.empty(Natural), l2, Equality.symmetry(l2Empty),
+          List.Permutation.empty(Natural))
+    }
+  | List.prepend(p, rest1), l2, allPrime1, allPrime2, productEqual => {
+      claim pPrime : Natural.is_prime(p)
+          by allPrime1(p, List.member.here(Natural, p, rest1));
+      -- p divides listProduct(l2), so it is a member of l2.
+      claim pDividesL2 : p ∣ Natural.listProduct(l2)
+          by ⟨Natural.listProduct(rest1),
+              calc Natural.listProduct(l2)
+                 = Natural.listProduct(List.prepend(Natural, p, rest1))
+                       by Equality.symmetry(productEqual)
+                 = p * Natural.listProduct(rest1)
+                       by Natural.listProduct_prepend(p, rest1)⟩;
+      claim pMemberL2 : List.member(Natural, p, l2)
+          by Natural.prime_member_of_divides_product(p, pPrime, l2, allPrime2,
+                 pDividesL2);
+      -- Rotate p to the front of l2.
+      obtain ⟨l2rest, permL2⟩
+          from List.Permutation.extract(Natural, p, l2, pMemberL2);
+      -- Cancel p: listProduct(rest1) = listProduct(l2rest).
+      claim productAfterExtract
+          : Natural.listProduct(l2)
+            = p * Natural.listProduct(l2rest)
+          by calc Natural.listProduct(l2)
+                = Natural.listProduct(List.prepend(Natural, p, l2rest))
+                      by Natural.listProduct_permutation_invariant(l2,
+                             List.prepend(Natural, p, l2rest), permL2)
+                = p * Natural.listProduct(l2rest)
+                      by Natural.listProduct_prepend(p, l2rest);
+      claim restProductsEqual
+          : Natural.listProduct(rest1) = Natural.listProduct(l2rest)
+          by Natural.multiply_cancel_left(p, Natural.listProduct(rest1),
+                 Natural.listProduct(l2rest),
+                 Natural.is_prime.positive(p, pPrime),
+                 calc p * Natural.listProduct(rest1)
+                    = Natural.listProduct(List.prepend(Natural, p, rest1))
+                          by Equality.symmetry(
+                                 Natural.listProduct_prepend(p, rest1))
+                    = Natural.listProduct(l2)
+                          by productEqual
+                    = p * Natural.listProduct(l2rest)
+                          by productAfterExtract);
+      -- Recurse and assemble.
+      claim allPrimeRest1
+          : (k : Natural) → List.member(Natural, k, rest1) → Natural.is_prime(k)
+          by (k : Natural) (memberRest1 : List.member(Natural, k, rest1)) ↦
+               allPrime1(k, List.member.there(Natural, k, p, rest1, memberRest1));
+      claim allPrimeL2rest
+          : (k : Natural) → List.member(Natural, k, l2rest) → Natural.is_prime(k)
+          by (k : Natural) (memberL2rest : List.member(Natural, k, l2rest)) ↦
+               allPrime2(k,
+                   List.Permutation.member_forward(Natural, k,
+                       List.prepend(Natural, p, l2rest), l2,
+                       List.Permutation.symmetric(Natural, l2,
+                           List.prepend(Natural, p, l2rest), permL2),
+                       List.member.there(Natural, k, p, l2rest, memberL2rest)));
+      claim restPermutation : List.Permutation(Natural, rest1, l2rest)
+          by Natural.prime_factorization_unique(rest1, l2rest, allPrimeRest1,
+                 allPrimeL2rest, restProductsEqual);
+      List.Permutation.transitive(Natural,
+          List.prepend(Natural, p, rest1),
+          List.prepend(Natural, p, l2rest),
+          l2,
+          List.Permutation.skip(Natural, p, rest1, l2rest, restPermutation),
+          List.Permutation.symmetric(Natural, l2,
+              List.prepend(Natural, p, l2rest), permL2))
+    }
+
+-- ----------------------------------------------------------------------
+-- The Fundamental Theorem of Arithmetic: existence + uniqueness.
+
+theorem Natural.fundamental_theorem_of_arithmetic (n : Natural) (atLeastOne : 1 ≤ n)
+        : (∃ (list : List(Natural)).
+              ((k : Natural) → List.member(Natural, k, list) → Natural.is_prime(k))
+              ∧ Natural.listProduct(list) = n)
+          ∧ ((l1 l2 : List(Natural))
+                → ((k : Natural) → List.member(Natural, k, l1) → Natural.is_prime(k))
+                → ((k : Natural) → List.member(Natural, k, l2) → Natural.is_prime(k))
+                → Natural.listProduct(l1) = n
+                → Natural.listProduct(l2) = n
+                → List.Permutation(Natural, l1, l2)) :=
+  ⟨Natural.prime_factorization_exists_list(n, atLeastOne),
+   (l1 l2 : List(Natural))
+   (allPrime1 : (k : Natural) → List.member(Natural, k, l1) → Natural.is_prime(k))
+   (allPrime2 : (k : Natural) → List.member(Natural, k, l2) → Natural.is_prime(k))
+   (l1Product : Natural.listProduct(l1) = n)
+   (l2Product : Natural.listProduct(l2) = n) ↦
+     Natural.prime_factorization_unique(l1, l2, allPrime1, allPrime2,
+         calc Natural.listProduct(l1) = n = Natural.listProduct(l2))⟩
