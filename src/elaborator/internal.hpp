@@ -6973,73 +6973,17 @@ private:
     // surface goal δ-unfolds to a `cases scrutinee { … }` body whose
     // scrutinee is the substitution target.
     ExpressionPointer deepWhnfThroughApplications(
-        ExpressionPointer expression) {
-        expression = weakHeadNormalForm(environment_, expression);
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            ExpressionPointer function =
-                deepWhnfThroughApplications(application->function);
-            ExpressionPointer argument =
-                deepWhnfThroughApplications(application->argument);
-            if (function.get() != application->function.get()
-                || argument.get() != application->argument.get()) {
-                return makeApplication(std::move(function),
-                                        std::move(argument));
-            }
-        }
-        return expression;
-    }
+        ExpressionPointer expression);
 
     // True if `expression` syntactically mentions any opaque Definition
     // (a Constant whose name resolves to one), reduction-free. Gates the
     // force-unfolding substitution form so ordinary goals skip it entirely.
-    bool mentionsOpaqueDefinition(const ExpressionPointer& expression) {
-        if (auto* constant = std::get_if<Constant>(&expression->node)) {
-            auto it = environment_.declarations.find(constant->name);
-            if (it != environment_.declarations.end()) {
-                if (auto* def = std::get_if<Definition>(&it->second);
-                    def && def->opacity == Opacity::Opaque) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        if (auto* app = std::get_if<Application>(&expression->node)) {
-            return mentionsOpaqueDefinition(app->function)
-                || mentionsOpaqueDefinition(app->argument);
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            return mentionsOpaqueDefinition(pi->domain)
-                || mentionsOpaqueDefinition(pi->codomain);
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            return mentionsOpaqueDefinition(lambda->domain)
-                || mentionsOpaqueDefinition(lambda->body);
-        }
-        if (auto* let = std::get_if<Let>(&expression->node)) {
-            return mentionsOpaqueDefinition(let->value)
-                || mentionsOpaqueDefinition(let->body);
-        }
-        return false;
-    }
+    bool mentionsOpaqueDefinition(const ExpressionPointer& expression);
 
     // The opaque-headed application at the WHNF of `expression`, or nullptr.
     // (Peels the spine and checks whether the head names an opaque Definition.)
     const Definition* opaqueHeadDefinition(const ExpressionPointer& whnfed,
-                                           const Constant** outConstant) {
-        ExpressionPointer head = whnfed;
-        while (auto* app = std::get_if<Application>(&head->node)) {
-            head = app->function;
-        }
-        auto* constant = std::get_if<Constant>(&head->node);
-        if (!constant) return nullptr;
-        auto it = environment_.declarations.find(constant->name);
-        if (it == environment_.declarations.end()) return nullptr;
-        auto* def = std::get_if<Definition>(&it->second);
-        if (!def || def->opacity != Opacity::Opaque) return nullptr;
-        if (outConstant) *outConstant = constant;
-        return def;
-    }
+                                           const Constant** outConstant);
 
     // WHNF that additionally δ-unfolds opaque definitions remaining at the
     // HEAD (only the head, not recursively into arguments). Exposes the true
@@ -7049,35 +6993,7 @@ private:
     // or destructure a value (anonymous tuple against an opaque expected type),
     // mirroring the kernel's opacity-tolerant inferType/defeq retries.
     ExpressionPointer weakHeadNormalFormForcingOpaqueHead(
-            ExpressionPointer expression, int fuel = 64) {
-        while (fuel-- > 0) {
-            expression = weakHeadNormalForm(environment_, expression);
-            const Constant* constant = nullptr;
-            const Definition* def =
-                opaqueHeadDefinition(expression, &constant);
-            if (!def
-                || def->universeParameters.size()
-                       != constant->universeArguments.size()) {
-                break;
-            }
-            std::vector<ExpressionPointer> args;
-            ExpressionPointer head = expression;
-            while (auto* app = std::get_if<Application>(&head->node)) {
-                args.push_back(app->argument);
-                head = app->function;
-            }
-            std::reverse(args.begin(), args.end());
-            ExpressionPointer body = def->body;
-            if (!def->universeParameters.empty()) {
-                body = substituteUniverseLevels(
-                    body, def->universeParameters,
-                    constant->universeArguments);
-            }
-            for (auto& a : args) body = makeApplication(body, a);
-            expression = std::move(body);
-        }
-        return expression;
-    }
+            ExpressionPointer expression, int fuel = 64);
 
     // Like deepWhnfThroughApplications, but also δ-unfolds an opaque
     // definition that remains at a head after WHNF — manually, by splicing in
@@ -7091,48 +7007,7 @@ private:
     ExpressionPointer deepWhnfForcingOpaque(
             ExpressionPointer expression,
             const std::set<std::string>& protectedDefinitions,
-            int fuel = 64) {
-        if (fuel <= 0) return expression;
-        expression = weakHeadNormalForm(environment_, expression);
-        const Constant* constant = nullptr;
-        if (const Definition* def =
-                opaqueHeadDefinition(expression, &constant);
-            def
-            && protectedDefinitions.find(constant->name)
-                   == protectedDefinitions.end()
-            && def->universeParameters.size()
-                   == constant->universeArguments.size()) {
-            std::vector<ExpressionPointer> args;
-            ExpressionPointer head = expression;
-            while (auto* app = std::get_if<Application>(&head->node)) {
-                args.push_back(app->argument);
-                head = app->function;
-            }
-            std::reverse(args.begin(), args.end());
-            ExpressionPointer body = def->body;
-            if (!def->universeParameters.empty()) {
-                body = substituteUniverseLevels(
-                    body, def->universeParameters,
-                    constant->universeArguments);
-            }
-            for (auto& a : args) body = makeApplication(body, a);
-            return deepWhnfForcingOpaque(
-                std::move(body), protectedDefinitions, fuel - 1);
-        }
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            ExpressionPointer function = deepWhnfForcingOpaque(
-                application->function, protectedDefinitions, fuel - 1);
-            ExpressionPointer argument = deepWhnfForcingOpaque(
-                application->argument, protectedDefinitions, fuel - 1);
-            if (function.get() != application->function.get()
-                || argument.get() != application->argument.get()) {
-                return makeApplication(std::move(function),
-                                        std::move(argument));
-            }
-        }
-        return expression;
-    }
+            int fuel = 64);
 
     // Deep beta-only reduction: rewrites every (λx. body)(arg) redex
     // anywhere in the expression — never δ-unfolds Constants, so
@@ -7141,38 +7016,7 @@ private:
     // type — e.g. `sequenceFunction(λn. …, m)` from Quotient.lift
     // bodies in real-analysis proofs, where the user's stated motive
     // sees the β-reduced form but the inferred type doesn't.
-    ExpressionPointer deepBetaReduce(ExpressionPointer expression) {
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            ExpressionPointer function =
-                deepBetaReduce(application->function);
-            ExpressionPointer argument =
-                deepBetaReduce(application->argument);
-            if (auto* lambda = std::get_if<Lambda>(&function->node)) {
-                return deepBetaReduce(
-                    substitute(lambda->body, 0, argument));
-            }
-            return makeApplication(std::move(function),
-                                    std::move(argument));
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            return makeLambda(lambda->displayHint,
-                deepBetaReduce(lambda->domain),
-                deepBetaReduce(lambda->body));
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            return makePi(pi->displayHint,
-                deepBetaReduce(pi->domain),
-                deepBetaReduce(pi->codomain));
-        }
-        if (auto* let = std::get_if<Let>(&expression->node)) {
-            return makeLet(let->displayHint,
-                deepBetaReduce(let->type),
-                deepBetaReduce(let->value),
-                deepBetaReduce(let->body));
-        }
-        return expression;
-    }
+    ExpressionPointer deepBetaReduce(ExpressionPointer expression);
 
     // Abstract every occurrence of `target` in `expression`, like
     // `abstractStructuralOccurrence`, but WHNF the expression at each
@@ -7206,40 +7050,7 @@ private:
     bool expressionReferencesConstant(
         ExpressionPointer expression,
         const std::string& targetHeadName,
-        std::unordered_set<std::string>& visiting) {
-        if (auto* c = std::get_if<Constant>(&expression->node)) {
-            if (c->name == targetHeadName) return true;
-            return unfoldExposesHead(c->name, targetHeadName, visiting);
-        }
-        if (auto* app =
-                std::get_if<Application>(&expression->node)) {
-            return expressionReferencesConstant(
-                       app->function, targetHeadName, visiting)
-                || expressionReferencesConstant(
-                       app->argument, targetHeadName, visiting);
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            return expressionReferencesConstant(
-                       pi->domain, targetHeadName, visiting)
-                || expressionReferencesConstant(
-                       pi->codomain, targetHeadName, visiting);
-        }
-        if (auto* lam = std::get_if<Lambda>(&expression->node)) {
-            return expressionReferencesConstant(
-                       lam->domain, targetHeadName, visiting)
-                || expressionReferencesConstant(
-                       lam->body, targetHeadName, visiting);
-        }
-        if (auto* letNode = std::get_if<Let>(&expression->node)) {
-            return expressionReferencesConstant(
-                       letNode->type, targetHeadName, visiting)
-                || expressionReferencesConstant(
-                       letNode->value, targetHeadName, visiting)
-                || expressionReferencesConstant(
-                       letNode->body, targetHeadName, visiting);
-        }
-        return false;
-    }
+        std::unordered_set<std::string>& visiting);
 
     // Does WHNF-unfolding `constantName` produce a term that
     // syntactically (transitively, through other transparent
@@ -7256,33 +7067,7 @@ private:
     bool unfoldExposesHead(
         const std::string& constantName,
         const std::string& targetHeadName,
-        std::unordered_set<std::string>& visiting) {
-        if (constantName == targetHeadName) return true;
-        const std::string cacheKey =
-            constantName + "|" + targetHeadName;
-        auto cached = unfoldExposesHeadCache_.find(cacheKey);
-        if (cached != unfoldExposesHeadCache_.end()) {
-            return cached->second;
-        }
-        if (visiting.count(constantName)) return false;
-        visiting.insert(constantName);
-        bool result = false;
-        const Declaration* declaration =
-            environment_.lookup(constantName);
-        if (declaration) {
-            if (auto* def = std::get_if<Definition>(declaration)) {
-                // Opaque definitions can't be δ-unfolded by WHNF, so
-                // their body never gets exposed.
-                if (def->opacity == Opacity::Transparent) {
-                    result = expressionReferencesConstant(
-                        def->body, targetHeadName, visiting);
-                }
-            }
-        }
-        visiting.erase(constantName);
-        unfoldExposesHeadCache_[cacheKey] = result;
-        return result;
-    }
+        std::unordered_set<std::string>& visiting);
 
     ExpressionPointer abstractStructuralOccurrenceWithWHNF(
         ExpressionPointer expression,
@@ -7290,37 +7075,7 @@ private:
         const std::string& targetHeadName,
         int currentDepth,
         int& occurrenceCount,
-        int& whnfFuel) {
-        // Memoization at depth 0 (the dominant case). Keyed by raw
-        // expression pointer — safe because Expression is immutable
-        // and the target is fixed for one decide call. Skips the
-        // recursive walk entirely on cache hit. Cache is cleared at
-        // the start of each elaborateDecide.
-        if (currentDepth == 0) {
-            auto cached = motiveWalkerCache_.find(expression.get());
-            if (cached != motiveWalkerCache_.end()) {
-                occurrenceCount += cached->second.occurrenceDelta;
-                whnfFuel -= cached->second.whnfFuelDelta;
-                return cached->second.result;
-            }
-        }
-        int occurrenceBefore = occurrenceCount;
-        int whnfFuelBefore = whnfFuel;
-        // Inner work — produces the result; the wrapper below caches
-        // it (at depth 0 only) before returning.
-        ExpressionPointer result =
-            abstractStructuralOccurrenceWithWHNF_inner(
-                expression, target, targetHeadName,
-                currentDepth, occurrenceCount, whnfFuel);
-        if (currentDepth == 0) {
-            MotiveWalkerCacheEntry entry;
-            entry.result = result;
-            entry.occurrenceDelta = occurrenceCount - occurrenceBefore;
-            entry.whnfFuelDelta = whnfFuelBefore - whnfFuel;
-            motiveWalkerCache_[expression.get()] = std::move(entry);
-        }
-        return result;
-    }
+        int& whnfFuel);
 
     // Inner implementation. The wrapper above handles depth-0
     // memoization; this function does the actual work.
@@ -7330,165 +7085,7 @@ private:
         const std::string& targetHeadName,
         int currentDepth,
         int& occurrenceCount,
-        int& whnfFuel) {
-        // We can't early-stop after the first match: the motive must
-        // abstract EVERY occurrence so motive(constructor) reduces
-        // uniformly when the kernel ι-reduces in each arm.
-        ExpressionPointer shiftedTarget =
-            currentDepth == 0 ? target : shift(target, currentDepth);
-        // Try structural match on the un-reduced expression first; if it
-        // matches, no need to WHNF (which can be expensive and may not
-        // change the head). For Application-headed expressions whose
-        // head is the target's head (e.g. both are `classical_decidable`
-        // applications), fall back to full definitional equality —
-        // kernel WHNF often leaves the term in an intermediate form
-        // (Let-binders, partial β-substitutions, recursor wrappings)
-        // that doesn't match structurally but IS the same proposition.
-        if (structurallyEqual(expression, shiftedTarget)) {
-            occurrenceCount++;
-            return makeBoundVariable(currentDepth);
-        }
-        if (!targetHeadName.empty()) {
-            std::string thisHeadName =
-                applicationHeadConstantName(expression);
-            if (thisHeadName == targetHeadName) {
-                // Open the local binders so isDefinitionallyEqual can
-                // walk through let-binder ζ-reductions etc. The caller
-                // passed expressions in closed (BoundVariable) form
-                // against this localBinders scope.
-                // (We use a fresh empty context since the comparison
-                // is at depth `currentDepth` and the kernel's defeq
-                // doesn't need extra context for closed expressions —
-                // it can handle BoundVariable refs directly.)
-                Context emptyContext;
-                if (isDefinitionallyEqual(
-                        environment_, emptyContext,
-                        expression, shiftedTarget)) {
-                    occurrenceCount++;
-                    return makeBoundVariable(currentDepth);
-                }
-            }
-        }
-        // For Application nodes, conditionally WHNF: δ-unfolding may
-        // expose the target as a subterm. Only WHNF if the head's
-        // definition transitively references `targetHeadName` —
-        // otherwise we'd waste fuel expanding propositional chains
-        // (Real.LessOrEqual, Set.member, etc.) that can never produce
-        // a `Logic.classical_decidable(…)` subterm.
-        ExpressionPointer working = expression;
-        if (whnfFuel > 0
-            && std::get_if<Application>(&expression->node)) {
-            std::string headName =
-                applicationHeadConstantName(expression);
-            // Always WHNF an Application whose head isn't a Constant —
-            // that's a β-redex (Application of Lambda) and reducing it
-            // is essentially free; if we don't, the head-relevance gate
-            // never gets a chance to fire on the result. For
-            // Constant-headed Applications, only WHNF if the head's
-            // definition transitively references the target's head.
-            bool maybeRelevant = headName.empty();
-            if (!maybeRelevant && !targetHeadName.empty()) {
-                std::unordered_set<std::string> visiting;
-                maybeRelevant = unfoldExposesHead(
-                    headName, targetHeadName, visiting);
-            }
-            if (maybeRelevant) {
-                ExpressionPointer reduced;
-                try {
-                    reduced = weakHeadNormalForm(environment_, expression);
-                } catch (const TypeError&) {
-                    reduced = expression;
-                }
-                if (!structurallyEqual(reduced, expression)) {
-                    whnfFuel--;
-                    working = reduced;
-                    if (structurallyEqual(working, shiftedTarget)) {
-                        occurrenceCount++;
-                        return makeBoundVariable(currentDepth);
-                    }
-                }
-            }
-        }
-        if (auto* boundVariable =
-                std::get_if<BoundVariable>(&working->node)) {
-            int index = boundVariable->deBruijnIndex;
-            if (index >= currentDepth) {
-                return makeBoundVariable(index + 1);
-            }
-            return working;
-        }
-        if (auto* pi = std::get_if<Pi>(&working->node)) {
-            // Skip WHNF in the domain: domains are types (propositions
-            // or sorts), not the user-value path where
-            // `classical_decidable(P)` lives. Use the cheap structural
-            // walker for the domain so any literal occurrence there
-            // still gets abstracted.
-            int before = occurrenceCount;
-            ExpressionPointer newDomain = abstractStructuralOccurrence(
-                pi->domain, target, currentDepth, occurrenceCount);
-            ExpressionPointer newCodomain =
-                abstractStructuralOccurrenceWithWHNF(
-                    pi->codomain, target, targetHeadName,
-                    currentDepth + 1, occurrenceCount, whnfFuel);
-            if (occurrenceCount == before
-                && newDomain.get() == pi->domain.get()
-                && newCodomain.get() == pi->codomain.get()
-                && working.get() == expression.get()) {
-                return expression;
-            }
-            return makePi(pi->displayHint,
-                std::move(newDomain), std::move(newCodomain));
-        }
-        if (auto* lambda = std::get_if<Lambda>(&working->node)) {
-            // Same domain-skip as for Pi.
-            int before = occurrenceCount;
-            ExpressionPointer newDomain = abstractStructuralOccurrence(
-                lambda->domain, target, currentDepth, occurrenceCount);
-            ExpressionPointer newBody =
-                abstractStructuralOccurrenceWithWHNF(
-                    lambda->body, target, targetHeadName,
-                    currentDepth + 1, occurrenceCount, whnfFuel);
-            if (occurrenceCount == before
-                && newDomain.get() == lambda->domain.get()
-                && newBody.get() == lambda->body.get()
-                && working.get() == expression.get()) {
-                return expression;
-            }
-            return makeLambda(lambda->displayHint,
-                std::move(newDomain), std::move(newBody));
-        }
-        if (auto* application =
-                std::get_if<Application>(&working->node)) {
-            int before = occurrenceCount;
-            ExpressionPointer newFn =
-                abstractStructuralOccurrenceWithWHNF(
-                    application->function, target, targetHeadName,
-                    currentDepth, occurrenceCount, whnfFuel);
-            ExpressionPointer newArg =
-                abstractStructuralOccurrenceWithWHNF(
-                    application->argument, target, targetHeadName,
-                    currentDepth, occurrenceCount, whnfFuel);
-            if (occurrenceCount == before
-                && newFn.get() == application->function.get()
-                && newArg.get() == application->argument.get()
-                && working.get() == expression.get()) {
-                return expression;
-            }
-            return makeApplication(
-                std::move(newFn), std::move(newArg));
-        }
-        if (auto* letNode = std::get_if<Let>(&working->node)) {
-            // ζ-substitute the let's value into the body before
-            // recursing — otherwise the body's BV(0) references to the
-            // let-binder don't match the target's literal form.
-            ExpressionPointer substituted = substitute(
-                letNode->body, 0, letNode->value);
-            return abstractStructuralOccurrenceWithWHNF(
-                substituted, target, targetHeadName,
-                currentDepth, occurrenceCount, whnfFuel);
-        }
-        return working;
-    }
+        int& whnfFuel);
 
     // Variant of `abstractStructuralOccurrence` that abstracts a
     // SUBSET of matching occurrences, selected by index (left-to-right
@@ -7517,118 +7114,7 @@ private:
         int targetArity,
         int currentDepth,
         int& occurrenceCount,
-        int& defeqBudget) {
-        ExpressionPointer shiftedTarget =
-            currentDepth == 0 ? target : shift(target, currentDepth);
-        if (structurallyEqual(expression, shiftedTarget)) {
-            occurrenceCount++;
-            return makeBoundVariable(currentDepth);
-        }
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            // Definitional-equality attempt at a same-arity application.
-            if (defeqBudget > 0) {
-                int arity = 0;
-                ExpressionPointer head = expression;
-                while (auto* app =
-                           std::get_if<Application>(&head->node)) {
-                    ++arity;
-                    head = app->function;
-                }
-                if (arity == targetArity) {
-                    --defeqBudget;
-                    Context emptyContext;
-                    bool equal = false;
-                    try {
-                        equal = isDefinitionallyEqual(
-                            environment_, emptyContext,
-                            expression, shiftedTarget);
-                    } catch (const TypeError&) {
-                        equal = false;
-                    }
-                    if (equal) {
-                        occurrenceCount++;
-                        return makeBoundVariable(currentDepth);
-                    }
-                }
-            }
-            int before = occurrenceCount;
-            auto newFn = abstractDefeqOccurrence(
-                application->function, target, targetArity,
-                currentDepth, occurrenceCount, defeqBudget);
-            auto newArg = abstractDefeqOccurrence(
-                application->argument, target, targetArity,
-                currentDepth, occurrenceCount, defeqBudget);
-            if (occurrenceCount == before
-                && newFn.get() == application->function.get()
-                && newArg.get() == application->argument.get()) {
-                return expression;
-            }
-            return makeApplication(std::move(newFn), std::move(newArg));
-        }
-        if (auto* boundVariable =
-                std::get_if<BoundVariable>(&expression->node)) {
-            int index = boundVariable->deBruijnIndex;
-            if (index >= currentDepth) {
-                return makeBoundVariable(index + 1);
-            }
-            return expression;
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            int before = occurrenceCount;
-            auto newDomain = abstractDefeqOccurrence(
-                pi->domain, target, targetArity, currentDepth,
-                occurrenceCount, defeqBudget);
-            auto newCodomain = abstractDefeqOccurrence(
-                pi->codomain, target, targetArity, currentDepth + 1,
-                occurrenceCount, defeqBudget);
-            if (occurrenceCount == before
-                && newDomain.get() == pi->domain.get()
-                && newCodomain.get() == pi->codomain.get()) {
-                return expression;
-            }
-            return makePi(pi->displayHint,
-                std::move(newDomain), std::move(newCodomain));
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            int before = occurrenceCount;
-            auto newDomain = abstractDefeqOccurrence(
-                lambda->domain, target, targetArity, currentDepth,
-                occurrenceCount, defeqBudget);
-            auto newBody = abstractDefeqOccurrence(
-                lambda->body, target, targetArity, currentDepth + 1,
-                occurrenceCount, defeqBudget);
-            if (occurrenceCount == before
-                && newDomain.get() == lambda->domain.get()
-                && newBody.get() == lambda->body.get()) {
-                return expression;
-            }
-            return makeLambda(lambda->displayHint,
-                std::move(newDomain), std::move(newBody));
-        }
-        if (auto* let = std::get_if<Let>(&expression->node)) {
-            int before = occurrenceCount;
-            auto newType = abstractDefeqOccurrence(
-                let->type, target, targetArity, currentDepth,
-                occurrenceCount, defeqBudget);
-            auto newValue = abstractDefeqOccurrence(
-                let->value, target, targetArity, currentDepth,
-                occurrenceCount, defeqBudget);
-            auto newBody = abstractDefeqOccurrence(
-                let->body, target, targetArity, currentDepth + 1,
-                occurrenceCount, defeqBudget);
-            if (occurrenceCount == before
-                && newType.get() == let->type.get()
-                && newValue.get() == let->value.get()
-                && newBody.get() == let->body.get()) {
-                return expression;
-            }
-            return makeLet(let->displayHint,
-                std::move(newType), std::move(newValue),
-                std::move(newBody));
-        }
-        return expression;
-    }
+        int& defeqBudget);
 
     // `rewrite(lemma)` where `lemma : Equality.{u}(T', x, y)` and the
     // current goal is `Equality.{v}(T, A, B)`: builds the proof
@@ -7655,474 +7141,13 @@ private:
         SurfaceExpressionPointer termSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "rewrite (term-level) at line " + std::to_string(line));
-        TimedScope _scope(*this, "desugarRewriteTerm");
-        ExpressionPointer equalityProofKernel = elaborateExpression(
-            *equalityProofSurface, localBinders);
-        ExpressionPointer equalityProofTypeOpened = weakHeadNormalForm(
-            environment_,
-            inferTypeInLocalContext(localBinders, equalityProofKernel));
-        EqualityComponents lemmaComponentsOpened =
-            extractEqualityComponents(
-                equalityProofTypeOpened, "rewrite (equality proof)",
-                line);
-        ExpressionPointer carrierType = closeOverLocalBinders(
-            lemmaComponentsOpened.carrierType,
-            localBinders, localBinders.size());
-        ExpressionPointer leftEndpoint = closeOverLocalBinders(
-            lemmaComponentsOpened.leftEndpoint,
-            localBinders, localBinders.size());
-        ExpressionPointer rightEndpoint = closeOverLocalBinders(
-            lemmaComponentsOpened.rightEndpoint,
-            localBinders, localBinders.size());
-
-        ExpressionPointer termKernel = elaborateExpression(
-            *termSurface, localBinders);
-        // Deliberately DON'T weak-head-normalise term's inferred type
-        // here: definitions like `Rational.LessThan(x, y) :=
-        // And(LessOrEqual(x, y), Not(x = y))` unfold to a Constant
-        // head whose argument appears twice (once on each conjunct),
-        // and `Rational.IsNonneg(Quotient.mk(rep))` unfolds via
-        // `Quotient.lift` so the `Quotient.mk` head disappears.
-        // Either kills the structural-occurrence search. Keeping the
-        // unreduced form gives us the user-visible motive shape, with
-        // the rewrite endpoint exactly where they expect it. If no
-        // match is found at this level we fall back to WHNF — that
-        // covers sites where the term's type is genuinely behind a
-        // definition that must be peeled.
-        ExpressionPointer termTypeUnreduced =
-            inferTypeInLocalContext(localBinders, termKernel);
-        ExpressionPointer termTypeUnreducedClosed = closeOverLocalBinders(
-            termTypeUnreduced, localBinders, localBinders.size());
-
-        // Try six combinations of (term type, left endpoint) ×
-        // (unreduced, head-beta/WHNF, deep-beta) in priority order.
-        // WHNF-ing the left endpoint catches `congruenceOf(λr. P(r),
-        // eq)` whose stated type's lhs is the unreduced beta-redex
-        // `Application(λ, x)` while the term's inferred type carries
-        // the beta-reduced `P(x)`. WHNF-ing the term type catches
-        // definitions like `Rational.IsNonneg(...)` that wrap the
-        // underlying claim. Deep-beta-reducing the term type catches
-        // internal redexes (e.g. `sequenceFunction(λn. …, m)` from
-        // Quotient.lift bodies in real analysis) that WHNF leaves
-        // alone because it only reduces at the head.
-        auto trySearch = [&](const ExpressionPointer& termTypeClosed,
-                             const ExpressionPointer& lhs)
-            -> std::pair<int, ExpressionPointer> {
-            int count = 0;
-            ExpressionPointer body = abstractStructuralOccurrence(
-                termTypeClosed, lhs, /*currentDepth=*/0, count);
-            return {count, std::move(body)};
-        };
-
-        // Beta-only reduction at the spine head. Required for
-        // `congruenceOf(λr. P(r), eq)`: the equality's stated type
-        // carries the unreduced beta-redex `(λr. P(r))(x)` as its
-        // left endpoint, while the term's inferred type has the
-        // beta-reduced `P(x)`. We can't use weakHeadNormalForm here
-        // because that would δ-unfold any subsequent Constant head
-        // (e.g. `Rational.padic_absolute_value`, which is defined as
-        // a `Quotient.lift`) and lose the user-visible shape we want
-        // to match against the term's type.
-        auto betaReduceHead =
-            [](ExpressionPointer e) -> ExpressionPointer {
-            while (std::holds_alternative<Application>(e->node)) {
-                std::vector<ExpressionPointer> args;
-                ExpressionPointer head = e;
-                while (auto* app = std::get_if<Application>(&head->node)) {
-                    args.push_back(app->argument);
-                    head = app->function;
-                }
-                std::reverse(args.begin(), args.end());
-                if (auto* lambda = std::get_if<Lambda>(&head->node)) {
-                    ExpressionPointer reduced =
-                        substitute(lambda->body, 0, args[0]);
-                    for (size_t i = 1; i < args.size(); ++i) {
-                        reduced = makeApplication(reduced, args[i]);
-                    }
-                    e = reduced;
-                } else {
-                    break;
-                }
-            }
-            return e;
-        };
-
-        ExpressionPointer leftEndpointBetaOpened =
-            betaReduceHead(lemmaComponentsOpened.leftEndpoint);
-        ExpressionPointer leftEndpointWhnf = closeOverLocalBinders(
-            leftEndpointBetaOpened, localBinders, localBinders.size());
-
-        // Try each (term form, endpoint form) combo in priority order
-        // and remember each occurrence count for the failure
-        // diagnostic. The body that wins is the FIRST combo that
-        // returns exactly one occurrence — preferring the user's
-        // surface shape (unreduced × unreduced) when possible — so a
-        // success doesn't drift to a more-reduced form than needed.
-        struct ComboAttempt {
-            const char* label;
-            int count = -1;  // -1 = not attempted
-        };
-        ComboAttempt attempts[6] = {
-            {"unreduced term × unreduced endpoint"},
-            {"unreduced term × β-reduced endpoint"},
-            {"WHNF term × unreduced endpoint"},
-            {"WHNF term × β-reduced endpoint"},
-            {"deep-β term × unreduced endpoint"},
-            {"deep-β term × β-reduced endpoint"},
-        };
-        int occurrenceCount = 0;
-        ExpressionPointer abstractedBody;
-        bool found = false;
-
-        auto runAttempt =
-            [&](int slot,
-                const ExpressionPointer& termClosed,
-                const ExpressionPointer& lhs) {
-            if (found) return;
-            auto [count, body] = trySearch(termClosed, lhs);
-            attempts[slot].count = count;
-            if (count == 1) {
-                occurrenceCount = count;
-                abstractedBody = std::move(body);
-                found = true;
-            }
-        };
-
-        runAttempt(0, termTypeUnreducedClosed, leftEndpoint);
-        runAttempt(1, termTypeUnreducedClosed, leftEndpointWhnf);
-
-        ExpressionPointer termTypeWhnfClosed;
-        if (!found) {
-            ExpressionPointer termTypeWhnf = weakHeadNormalForm(
-                environment_, termTypeUnreduced);
-            termTypeWhnfClosed = closeOverLocalBinders(
-                termTypeWhnf, localBinders, localBinders.size());
-            runAttempt(2, termTypeWhnfClosed, leftEndpoint);
-            runAttempt(3, termTypeWhnfClosed, leftEndpointWhnf);
-        }
-
-        ExpressionPointer termTypeDeepBetaClosed;
-        if (!found) {
-            ExpressionPointer termTypeDeepBeta =
-                deepBetaReduce(termTypeUnreduced);
-            termTypeDeepBetaClosed = closeOverLocalBinders(
-                termTypeDeepBeta, localBinders, localBinders.size());
-            runAttempt(4, termTypeDeepBetaClosed, leftEndpoint);
-            runAttempt(5, termTypeDeepBetaClosed, leftEndpointWhnf);
-        }
-
-        // Last resort: a definitional-equality-aware occurrence search.
-        // The six structural combos compare each subterm STRUCTURALLY, so
-        // they miss an endpoint present only up to definitional equality —
-        // the canonical case being a structure projection on a concrete
-        // bundle, `Ring.multiply(Polynomial.ring(r), x, y)`, against the
-        // term's `Polynomial.multiply(r, x, y)`. This walker calls the
-        // kernel's `isDefinitionallyEqual` (bounded; only at same-arity
-        // applications) to dissolve that mismatch — the precise fix for
-        // the bridging-`claim` tax (F1). Still requires EXACTLY ONE
-        // occurrence, so an ambiguous match is rejected, not guessed.
-        if (!found) {
-            int defeqOccurrences = 0;
-            int defeqBudget = 256;
-            int targetArity = 0;
-            ExpressionPointer head = leftEndpoint;
-            while (auto* app = std::get_if<Application>(&head->node)) {
-                ++targetArity;
-                head = app->function;
-            }
-            ExpressionPointer body = abstractDefeqOccurrence(
-                termTypeUnreducedClosed, leftEndpoint, targetArity,
-                /*currentDepth=*/0, defeqOccurrences, defeqBudget);
-            if (defeqOccurrences == 1) {
-                occurrenceCount = 1;
-                abstractedBody = std::move(body);
-                found = true;
-            }
-        }
-
-        // If no combo found exactly one occurrence, build a diagnostic
-        // that breaks down each attempt's count so the user can tell
-        // whether they have a 0-occurrence (mismatch), a >1-occurrence
-        // (ambiguity), or both depending on normalisation level.
-        auto buildFailureBreakdown = [&]() {
-            std::string breakdown;
-            for (const ComboAttempt& a : attempts) {
-                if (a.count < 0) continue;
-                breakdown += "\n      ";
-                breakdown += a.label;
-                breakdown += ": ";
-                if (a.count == 0) {
-                    breakdown += "0 occurrences";
-                } else {
-                    breakdown += std::to_string(a.count) +
-                                 " occurrences";
-                }
-            }
-            return breakdown;
-        };
-
-        // Use the unreduced form for the diagnostic display.
-        ExpressionPointer termTypeOpened = termTypeUnreduced;
-
-        // Multi-occurrence fallback: when the standard "exactly one"
-        // search fails AND the caller provided an expected type, try
-        // subset enumeration. For each (term form, endpoint form)
-        // combo and each non-empty subset of the matching positions,
-        // build the candidate motive and check whether motive(b) is
-        // definitionally equal to the expected type. Use the first
-        // match. Subsets are enumerated in "abstract all → singletons
-        // → pairs+" order so the mathematically-natural choice (all
-        // positions substituted) wins when applicable.
-        if (!found && expectedType) {
-            ExpressionPointer expectedTypeOpened = openOverLocalBinders(
-                expectedType, localBinders, localBinders.size());
-            Context openedContext =
-                buildContextFromLocalBinders(localBinders);
-            struct SearchCombo {
-                ExpressionPointer termClosed;
-                ExpressionPointer lhs;
-            };
-            std::vector<SearchCombo> combosBySlot;
-            combosBySlot.push_back({termTypeUnreducedClosed, leftEndpoint});
-            combosBySlot.push_back({termTypeUnreducedClosed, leftEndpointWhnf});
-            if (termTypeWhnfClosed) {
-                combosBySlot.push_back({termTypeWhnfClosed, leftEndpoint});
-                combosBySlot.push_back({termTypeWhnfClosed, leftEndpointWhnf});
-            } else {
-                combosBySlot.push_back({});
-                combosBySlot.push_back({});
-            }
-            if (termTypeDeepBetaClosed) {
-                combosBySlot.push_back({termTypeDeepBetaClosed, leftEndpoint});
-                combosBySlot.push_back({termTypeDeepBetaClosed, leftEndpointWhnf});
-            } else {
-                combosBySlot.push_back({});
-                combosBySlot.push_back({});
-            }
-            for (int slot = 0; slot < 6 && !found; ++slot) {
-                int count = attempts[slot].count;
-                if (count < 2 || count > 16) continue;
-                const SearchCombo& combo = combosBySlot[slot];
-                if (!combo.termClosed) continue;
-                uint32_t allMask = (1u << count) - 1;
-                std::vector<uint32_t> subsetsToTry;
-                subsetsToTry.push_back(allMask);
-                for (int i = 0; i < count; ++i) {
-                    if ((1u << i) != allMask) {
-                        subsetsToTry.push_back(1u << i);
-                    }
-                }
-                for (uint32_t s = 1; s < allMask; ++s) {
-                    if (__builtin_popcount(s) >= 2) {
-                        subsetsToTry.push_back(s);
-                    }
-                }
-                for (uint32_t mask : subsetsToTry) {
-                    int positionCounter = 0;
-                    ExpressionPointer candidateBody =
-                        abstractStructuralOccurrenceMasked(
-                            combo.termClosed, combo.lhs,
-                            /*currentDepth=*/0, positionCounter, mask);
-                    // motive(b): substitute rightEndpoint for the new
-                    // depth-0 binder in the abstracted body.
-                    ExpressionPointer resultTypeClosed =
-                        substitute(candidateBody, 0, rightEndpoint);
-                    ExpressionPointer resultTypeOpened =
-                        openOverLocalBinders(resultTypeClosed,
-                            localBinders, localBinders.size());
-                    if (isDefinitionallyEqual(environment_, openedContext,
-                            resultTypeOpened, expectedTypeOpened)) {
-                        abstractedBody = std::move(candidateBody);
-                        occurrenceCount = count;
-                        found = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (!found) {
-            // Decide whether the dominant failure mode was "0 occurrences"
-            // or "too many" so the headline matches what the user will
-            // most likely act on.
-            bool sawZeroOnly = true;
-            int maxCount = 0;
-            for (const ComboAttempt& a : attempts) {
-                if (a.count <= 0) continue;
-                sawZeroOnly = false;
-                if (a.count > maxCount) maxCount = a.count;
-            }
-            std::string headline;
-            if (sawZeroOnly) {
-                headline =
-                    "rewrite(eq, term): the equality's left endpoint "
-                    "does not appear in term's type — neither "
-                    "structurally nor up to definitional equality "
-                    "(both were tried) — in (`"
-                    + prettyPrintInLocalScope(termTypeOpened,
-                                                localBinders)
-                    + "`). Check the equation's direction (rewrite uses "
-                      "its LEFT endpoint; wrap in Equality.symmetry to "
-                      "flip), or restate the goal with `change <type>;` "
-                      "to the spelling that exposes the endpoint.";
-            } else {
-                headline =
-                    "rewrite(eq, term): the equality's left endpoint "
-                    "appears "
-                    + std::to_string(maxCount)
-                    + " time(s) in term's type — `rewrite` needs "
-                      "exactly one (or, when the expected type is "
-                      "known, a subset whose substitution matches "
-                      "the expected type). Use explicit "
-                      "Equality.transport_proposition(...) to "
-                      "disambiguate the position. (`"
-                    + prettyPrintInLocalScope(termTypeOpened,
-                                                localBinders)
-                    + "`)";
-            }
-            throwElaborate(headline
-                + "\n  Occurrence search:"
-                + buildFailureBreakdown());
-        }
-        ExpressionPointer motiveLambda = makeLambda(
-            "_rewriteHole", carrierType, std::move(abstractedBody));
-
-        ExpressionPointer call = makeConstant(
-            "Equality.transport_proposition",
-            {lemmaComponentsOpened.carrierUniverseLevel});
-        call = makeApplication(std::move(call), carrierType);
-        call = makeApplication(std::move(call), std::move(motiveLambda));
-        call = makeApplication(std::move(call), std::move(leftEndpoint));
-        call = makeApplication(std::move(call), std::move(rightEndpoint));
-        call = makeApplication(std::move(call),
-                                std::move(equalityProofKernel));
-        call = makeApplication(std::move(call), std::move(termKernel));
-        return call;
-    }
+        int line, int /*column*/);
 
     ExpressionPointer desugarRewrite(
         SurfaceExpressionPointer lemmaSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "rewrite at line " + std::to_string(line));
-        TimedScope _scope(*this, "desugarRewrite");
-        if (!expectedType) {
-            throwElaborate(
-                "rewrite needs an expected type from context — use it "
-                "in a calc step, where the step's `previous = next` "
-                "equality provides the target");
-        }
-        // The 1-arg rewrite wraps via Equality.congruence. If that name
-        // isn't declared (small test modules sometimes omit it), bail
-        // out so the caller can fall through to its own diagnostic,
-        // rather than handing the kernel a term that mentions an
-        // undefined constant.
-        if (!environment_.lookup("Equality.congruence")) {
-            throwElaborate(
-                "rewrite: Equality.congruence is not declared in "
-                "scope; cannot synthesise the calc-step congruence "
-                "wrap");
-        }
-        EqualityComponents goalComponents =
-            extractEqualityComponents(expectedType, "rewrite (goal)", line);
-
-        // Elaborate the lemma; close its inferred type's components back
-        // to BoundVariables so they live in the same scope as
-        // `expectedType` (which arrived in closed form).
-        ExpressionPointer lemmaKernel =
-            elaborateExpression(*lemmaSurface, localBinders);
-        ExpressionPointer lemmaTypeOpened = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, lemmaKernel));
-        EqualityComponents lemmaComponentsOpened =
-            extractEqualityComponents(lemmaTypeOpened, "rewrite (lemma)",
-                                       line);
-        ExpressionPointer lemmaCarrier = closeOverLocalBinders(
-            lemmaComponentsOpened.carrierType,
-            localBinders, localBinders.size());
-        ExpressionPointer lemmaLeft = closeOverLocalBinders(
-            lemmaComponentsOpened.leftEndpoint,
-            localBinders, localBinders.size());
-        ExpressionPointer lemmaRight = closeOverLocalBinders(
-            lemmaComponentsOpened.rightEndpoint,
-            localBinders, localBinders.size());
-
-        // Locate the unique occurrence of `lemmaLeft` inside the goal's
-        // left endpoint, replacing it with BoundVariable(0) and shifting
-        // outer references up by 1. If the forward direction doesn't
-        // find a match, automatically try the reverse direction (as if
-        // the user wrote `rewrite(Equality.symmetry(lemma))`).
-        int occurrenceCount = 0;
-        ExpressionPointer abstractedBody = abstractStructuralOccurrence(
-            goalComponents.leftEndpoint, lemmaLeft,
-            /*currentDepth=*/0, occurrenceCount);
-        bool reversed = false;
-        if (occurrenceCount == 0) {
-            int reverseOccurrenceCount = 0;
-            ExpressionPointer reverseAbstractedBody =
-                abstractStructuralOccurrence(
-                    goalComponents.leftEndpoint, lemmaRight,
-                    /*currentDepth=*/0, reverseOccurrenceCount);
-            if (reverseOccurrenceCount > 0) {
-                occurrenceCount = reverseOccurrenceCount;
-                abstractedBody = std::move(reverseAbstractedBody);
-                reversed = true;
-            } else {
-                throwElaborate(
-                    "rewrite: neither endpoint of the lemma appears "
-                    "(structurally) in the goal's left side");
-            }
-        }
-        if (occurrenceCount > 1) {
-            throwElaborate(
-                "rewrite: the lemma's left endpoint appears "
-                + std::to_string(occurrenceCount)
-                + " times in the goal's left side — use explicit "
-                "`congruenceOf(function (z) => …, lemma)` to "
-                "disambiguate the position");
-        }
-        ExpressionPointer abstractionLambda = makeLambda(
-            "_rewriteHole", lemmaCarrier, abstractedBody);
-
-        // Build `Equality.congruence.{u, v}(lemmaT, goalT, λ,
-        //                                    lemmaLeft, lemmaRight,
-        //                                    lemma)`.
-        // When reversed, swap the endpoints and wrap the lemma in
-        // Equality.symmetry so the resulting term still type-checks.
-        ExpressionPointer effectiveLemma = lemmaKernel;
-        ExpressionPointer effectiveLeft = lemmaLeft;
-        ExpressionPointer effectiveRight = lemmaRight;
-        if (reversed) {
-            ExpressionPointer symmetryCall = makeConstant(
-                "Equality.symmetry",
-                {lemmaComponentsOpened.carrierUniverseLevel});
-            symmetryCall = makeApplication(
-                std::move(symmetryCall), lemmaCarrier);
-            symmetryCall = makeApplication(
-                std::move(symmetryCall), lemmaLeft);
-            symmetryCall = makeApplication(
-                std::move(symmetryCall), lemmaRight);
-            symmetryCall = makeApplication(
-                std::move(symmetryCall), std::move(effectiveLemma));
-            effectiveLemma = std::move(symmetryCall);
-            std::swap(effectiveLeft, effectiveRight);
-        }
-        ExpressionPointer call = makeConstant(
-            "Equality.congruence",
-            {lemmaComponentsOpened.carrierUniverseLevel,
-             goalComponents.carrierUniverseLevel});
-        call = makeApplication(std::move(call), lemmaCarrier);
-        call = makeApplication(std::move(call), goalComponents.carrierType);
-        call = makeApplication(std::move(call), std::move(abstractionLambda));
-        call = makeApplication(std::move(call), std::move(effectiveLeft));
-        call = makeApplication(std::move(call), std::move(effectiveRight));
-        call = makeApplication(std::move(call), std::move(effectiveLemma));
-        return call;
-    }
+        int line, int /*column*/);
 
     // ---- simplify --------------------------------------------------------
     //
@@ -8161,45 +7186,7 @@ private:
         ExpressionPointer pattern,
         ExpressionPointer term,
         int numPatternBinders,
-        std::vector<ExpressionPointer>& bindings) {
-        if (auto* boundVar =
-                std::get_if<BoundVariable>(&pattern->node)) {
-            int idx = boundVar->deBruijnIndex;
-            if (idx < numPatternBinders) {
-                if (bindings[idx]) {
-                    return structurallyEqual(bindings[idx], term);
-                }
-                bindings[idx] = term;
-                return true;
-            }
-            // Reference outside the lemma's universal quantifiers — must
-            // be a literal match against an outer BoundVariable in the
-            // term (after adjusting for the binder offset).
-            auto* termVar =
-                std::get_if<BoundVariable>(&term->node);
-            if (!termVar) return false;
-            return termVar->deBruijnIndex == idx - numPatternBinders;
-        }
-        if (auto* application =
-                std::get_if<Application>(&pattern->node)) {
-            auto* termApp =
-                std::get_if<Application>(&term->node);
-            if (!termApp) return false;
-            return tryFirstOrderMatch(application->function,
-                                       termApp->function,
-                                       numPatternBinders, bindings)
-                && tryFirstOrderMatch(application->argument,
-                                       termApp->argument,
-                                       numPatternBinders, bindings);
-        }
-        if (std::get_if<Constant>(&pattern->node)
-            || std::get_if<Sort>(&pattern->node)
-            || std::get_if<FreeVariable>(&pattern->node)) {
-            return structurallyEqual(pattern, term);
-        }
-        // Pi/Lambda/Let — v1 doesn't match under binders.
-        return false;
-    }
+        std::vector<ExpressionPointer>& bindings);
 
     // Substitute the pattern's metavariables with their matched
     // expressions. `pattern` may reference Bound(0..numPatternBinders-1)
@@ -8209,58 +7196,7 @@ private:
         ExpressionPointer pattern,
         const std::vector<ExpressionPointer>& bindings,
         int numPatternBinders,
-        int currentDepth = 0) {
-        if (auto* boundVar =
-                std::get_if<BoundVariable>(&pattern->node)) {
-            int idx = boundVar->deBruijnIndex;
-            if (idx < currentDepth) {
-                return pattern;  // bound locally inside the pattern
-            }
-            int effective = idx - currentDepth;
-            if (effective < numPatternBinders) {
-                ExpressionPointer binding = bindings[effective];
-                if (currentDepth > 0) {
-                    binding = shift(binding, currentDepth);
-                }
-                return binding;
-            }
-            return makeBoundVariable(
-                idx - numPatternBinders);
-        }
-        if (auto* application =
-                std::get_if<Application>(&pattern->node)) {
-            return makeApplication(
-                instantiatePattern(application->function, bindings,
-                                    numPatternBinders, currentDepth),
-                instantiatePattern(application->argument, bindings,
-                                    numPatternBinders, currentDepth));
-        }
-        if (auto* pi = std::get_if<Pi>(&pattern->node)) {
-            return makePi(pi->displayHint,
-                instantiatePattern(pi->domain, bindings,
-                                    numPatternBinders, currentDepth),
-                instantiatePattern(pi->codomain, bindings,
-                                    numPatternBinders, currentDepth + 1));
-        }
-        if (auto* lambda = std::get_if<Lambda>(&pattern->node)) {
-            return makeLambda(lambda->displayHint,
-                instantiatePattern(lambda->domain, bindings,
-                                    numPatternBinders, currentDepth),
-                instantiatePattern(lambda->body, bindings,
-                                    numPatternBinders, currentDepth + 1));
-        }
-        if (auto* let = std::get_if<Let>(&pattern->node)) {
-            return makeLet(let->displayHint,
-                instantiatePattern(let->type, bindings,
-                                    numPatternBinders, currentDepth),
-                instantiatePattern(let->value, bindings,
-                                    numPatternBinders, currentDepth),
-                instantiatePattern(let->body, bindings,
-                                    numPatternBinders, currentDepth + 1));
-        }
-        // Constant / Sort / FreeVariable — pure leaves.
-        return pattern;
-    }
+        int currentDepth = 0);
 
     // A prepared simplify lemma: its kernel-level reference plus the
     // shape data needed to match-and-apply.
@@ -8283,40 +7219,7 @@ private:
         const std::vector<SimplifyLemma>& lemmas,
         size_t& matchedLemmaIndex,
         std::vector<ExpressionPointer>& bindings,
-        ExpressionPointer& matchedSubterm) {
-        for (size_t i = 0; i < lemmas.size(); ++i) {
-            std::vector<ExpressionPointer> attempt(
-                lemmas[i].numBinders, nullptr);
-            if (tryFirstOrderMatch(lemmas[i].leftPattern, term,
-                                    lemmas[i].numBinders, attempt)) {
-                bool complete = true;
-                for (const auto& b : attempt) {
-                    if (!b) { complete = false; break; }
-                }
-                if (complete) {
-                    matchedLemmaIndex = i;
-                    bindings = std::move(attempt);
-                    matchedSubterm = term;
-                    return true;
-                }
-            }
-        }
-        if (auto* application =
-                std::get_if<Application>(&term->node)) {
-            if (findFirstSimplifyMatch(application->function, lemmas,
-                                         matchedLemmaIndex, bindings,
-                                         matchedSubterm)) {
-                return true;
-            }
-            return findFirstSimplifyMatch(application->argument, lemmas,
-                                            matchedLemmaIndex, bindings,
-                                            matchedSubterm);
-        }
-        // Don't descend into Pi/Lambda/Let bodies in v1 — the captured
-        // binders would make any match references invalid in the outer
-        // proof. Constants/Sorts/Bound/FreeVariable are leaves.
-        return false;
-    }
+        ExpressionPointer& matchedSubterm);
 
     // Prepare the kernel-level proof witness for one rewrite step.
     // `goalCarrier` is the carrier of the calc step's equality; `current`
@@ -8331,218 +7234,13 @@ private:
         ExpressionPointer newCurrent,
         ExpressionPointer goalCarrier,
         LevelPointer goalCarrierUniverseLevel,
-        ExpressionPointer instantiatedRight) {
-        // Instantiated lemma value: lemma applied to each bound argument
-        // in declaration order.
-        ExpressionPointer instantiatedLemma = lemma.lemmaReference;
-        for (int i = lemma.numBinders - 1; i >= 0; --i) {
-            instantiatedLemma = makeApplication(
-                std::move(instantiatedLemma), bindings[i]);
-        }
-        ExpressionPointer instantiatedCarrier =
-            instantiatePattern(lemma.carrier, bindings,
-                                lemma.numBinders);
-        // Abstract the matched subterm out of `current`, building the
-        // motive lambda for Equality.congruence.
-        int occurrenceCount = 0;
-        ExpressionPointer abstractedBody = abstractStructuralOccurrence(
-            current, matchedSubterm, 0, occurrenceCount);
-        if (occurrenceCount == 0) {
-            throw ElaborateError(
-                "simplify: internal — matched subterm not located "
-                "structurally after match");
-        }
-        // Multiple matches: rewrite still produces a valid proof
-        // (Equality.congruence will replace every Bound(0) in the
-        // motive simultaneously), so we don't need to fail here.
-        ExpressionPointer motiveLambda = makeLambda(
-            "_simplifyHole", instantiatedCarrier,
-            std::move(abstractedBody));
-        // Equality.congruence's `x` and `y` are the lemma's endpoints
-        // (matchedSubterm and instantiatedRight). The motive carries
-        // the surrounding context: `motive(x) = matchedSubterm`-shaped
-        // = current; `motive(y) = instantiatedRight`-shaped = newCurrent.
-        ExpressionPointer call = makeConstant(
-            "Equality.congruence",
-            {lemma.carrierUniverseLevel, goalCarrierUniverseLevel});
-        call = makeApplication(std::move(call), instantiatedCarrier);
-        call = makeApplication(std::move(call), goalCarrier);
-        call = makeApplication(std::move(call), std::move(motiveLambda));
-        call = makeApplication(std::move(call), matchedSubterm);
-        call = makeApplication(std::move(call), instantiatedRight);
-        call = makeApplication(std::move(call),
-                                std::move(instantiatedLemma));
-        (void)current;
-        (void)newCurrent;
-        return call;
-    }
+        ExpressionPointer instantiatedRight);
 
     ExpressionPointer desugarSimplify(
         const std::vector<SurfaceExpressionPointer>& lemmaSurfaces,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "simplify at line " + std::to_string(line));
-        if (!expectedType) {
-            throwElaborate(
-                "simplify needs an expected type from context — use it "
-                "in a calc step or as the body of a theorem with a "
-                "declared equality conclusion");
-        }
-        EqualityComponents goal =
-            extractEqualityComponents(expectedType, "simplify (goal)",
-                                       line);
-
-        // Prepare each lemma: elaborate to a kernel reference, close
-        // its inferred type over localBinders (so references to outer
-        // binders end up as BoundVariables — required for matching
-        // against the closed-form goal), peel the Pi chain, then
-        // extract the underlying Equality. Closing first ensures the
-        // Pi binders end up at Bound(0..numBinders-1) (the matcher's
-        // metavariable range) while localBinders refs land at higher
-        // indices, where the matcher treats them as outer references.
-        std::vector<SimplifyLemma> lemmas;
-        lemmas.reserve(lemmaSurfaces.size());
-        for (const auto& lemmaSurface : lemmaSurfaces) {
-            SimplifyLemma prepared;
-            prepared.lemmaReference =
-                elaborateExpression(*lemmaSurface, localBinders);
-            ExpressionPointer lemmaTypeOpened = weakHeadNormalForm(
-                environment_,
-                inferTypeInLocalContext(localBinders,
-                                          prepared.lemmaReference));
-            ExpressionPointer lemmaTypeClosed = closeOverLocalBinders(
-                lemmaTypeOpened, localBinders, localBinders.size());
-            int numBinders = 0;
-            ExpressionPointer cursor = lemmaTypeClosed;
-            while (auto* pi = std::get_if<Pi>(&cursor->node)) {
-                prepared.binderTypes.push_back(pi->domain);
-                cursor = pi->codomain;
-                ++numBinders;
-            }
-            prepared.numBinders = numBinders;
-            EqualityComponents components =
-                extractEqualityComponents(cursor, "simplify (lemma)",
-                                           line);
-            prepared.carrier = components.carrierType;
-            prepared.leftPattern = components.leftEndpoint;
-            prepared.rightPattern = components.rightEndpoint;
-            prepared.carrierUniverseLevel =
-                components.carrierUniverseLevel;
-            lemmas.push_back(std::move(prepared));
-        }
-
-        // Iterate. At each step, look for any matching subterm; on
-        // success, build the rewrite proof step and update the running
-        // `current` value. Stop when `current` is definitionally equal
-        // to the target, or when no lemma fires. `intermediates[i]` is
-        // the running term BEFORE proofSteps[i]; intermediates.back()
-        // is the final term after all steps.
-        ExpressionPointer originalLeft = goal.leftEndpoint;
-        ExpressionPointer current = goal.leftEndpoint;
-        ExpressionPointer target = goal.rightEndpoint;
-        std::vector<ExpressionPointer> proofSteps;
-        std::vector<ExpressionPointer> intermediates;
-        intermediates.push_back(current);
-        const int iterationLimit = 200;
-
-        // Build a context for definitional-equality checks, using the
-        // localBinders (opened over fresh internal FreeVariables).
-        auto checkDefinitionallyEqual =
-            [&](ExpressionPointer left,
-                ExpressionPointer right) -> bool {
-            Context context = buildContextFromLocalBinders(localBinders);
-            ExpressionPointer leftOpened = openOverLocalBinders(
-                left, localBinders, localBinders.size());
-            ExpressionPointer rightOpened = openOverLocalBinders(
-                right, localBinders, localBinders.size());
-            return isDefinitionallyEqual(environment_, context,
-                                          leftOpened, rightOpened);
-        };
-
-        for (int iteration = 0; iteration < iterationLimit; ++iteration) {
-            if (checkDefinitionallyEqual(current, target)) break;
-
-            size_t matchedLemmaIndex = 0;
-            std::vector<ExpressionPointer> bindings;
-            ExpressionPointer matchedSubterm;
-            if (!findFirstSimplifyMatch(current, lemmas,
-                                          matchedLemmaIndex, bindings,
-                                          matchedSubterm)) {
-                throwElaborate(
-                    "simplify: no lemma's left-hand side matches a "
-                    "subterm of the current goal, and the goal is not "
-                    "yet equal to its target — the rule set is "
-                    "insufficient for this step");
-            }
-            const SimplifyLemma& matched = lemmas[matchedLemmaIndex];
-            ExpressionPointer instantiatedRight = instantiatePattern(
-                matched.rightPattern, bindings, matched.numBinders);
-            // Replace the matched subterm with `instantiatedRight`. We
-            // do this structurally — `abstractStructuralOccurrence`
-            // would replace EVERY occurrence; we want the rewrite to
-            // happen at the same set of positions that the proof step
-            // covers (also "every occurrence"), so this is consistent.
-            int occurrenceCount = 0;
-            ExpressionPointer holed = abstractStructuralOccurrence(
-                current, matchedSubterm, 0, occurrenceCount);
-            ExpressionPointer newCurrent =
-                substitute(holed, 0, instantiatedRight);
-            ExpressionPointer step = buildSingleSimplifyStep(
-                matched, bindings, current, matchedSubterm,
-                newCurrent, goal.carrierType,
-                goal.carrierUniverseLevel, instantiatedRight);
-            proofSteps.push_back(std::move(step));
-            current = std::move(newCurrent);
-            intermediates.push_back(current);
-        }
-
-        if (!checkDefinitionallyEqual(current, target)) {
-            throwElaborate(
-                "simplify: hit iteration limit before reaching the "
-                "target; the rule set may be non-confluent (e.g. "
-                "naked commutativity)");
-        }
-
-        // Compose the proof. If no rewrites fired, the LHS was already
-        // definitionally equal to the RHS — emit reflexivity at the
-        // calc step's LHS (well-typed because expectedType is opaque
-        // up to definitional equality).
-        if (proofSteps.empty()) {
-            ExpressionPointer reflexivityCall = makeConstant(
-                "reflexivity",
-                {goal.carrierUniverseLevel});
-            reflexivityCall = makeApplication(
-                std::move(reflexivityCall), goal.carrierType);
-            reflexivityCall = makeApplication(
-                std::move(reflexivityCall), goal.leftEndpoint);
-            return reflexivityCall;
-        }
-        // Chain transitivities left-fold style. We tracked the
-        // intermediate terms as we went, so we don't need to extract
-        // them from the proof types (which would arrive in opened
-        // form and require re-closing). The signature is
-        //   Equality.transitivity.{u} (T : Type u) (x y z : T)
-        //       (xEqY : Equality(T, x, y))
-        //       (yEqZ : Equality(T, y, z))
-        //   : Equality(T, x, z).
-        ExpressionPointer composed = proofSteps[0];
-        for (size_t i = 1; i < proofSteps.size(); ++i) {
-            ExpressionPointer call = makeConstant(
-                "Equality.transitivity",
-                {goal.carrierUniverseLevel});
-            call = makeApplication(std::move(call), goal.carrierType);
-            call = makeApplication(std::move(call), originalLeft);
-            call = makeApplication(std::move(call), intermediates[i]);
-            call = makeApplication(std::move(call),
-                                    intermediates[i + 1]);
-            call = makeApplication(std::move(call), composed);
-            call = makeApplication(std::move(call), proofSteps[i]);
-            composed = std::move(call);
-        }
-        return composed;
-    }
+        int line, int /*column*/);
 
     // ---- absurd ---------------------------------------------------------
     //
@@ -8562,198 +7260,7 @@ private:
         SurfaceExpressionPointer witnessSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "absurd at line " + std::to_string(line));
-        if (!expectedType) {
-            throwElaborate(
-                "absurd needs an expected type from context — use it "
-                "in a position with a known goal");
-        }
-
-        ExpressionPointer witnessKernel =
-            elaborateExpression(*witnessSurface, localBinders);
-        ExpressionPointer witnessTypeOpened = weakHeadNormalForm(
-            environment_,
-            inferTypeInLocalContext(localBinders, witnessKernel));
-        ExpressionPointer witnessType = closeOverLocalBinders(
-            witnessTypeOpened, localBinders, localBinders.size());
-
-        ExpressionPointer falseProof;
-
-        // Shape: witness is already a proof of False.
-        if (auto* constant =
-                std::get_if<Constant>(&witnessType->node)) {
-            if (constant->name == "False") {
-                falseProof = witnessKernel;
-            }
-        }
-
-        // Shape: `LessOrEqual(successor(K), zero)`. The type is built
-        // as `App(App(LessOrEqual, successor(K)), zero)`. Both
-        // endpoints are WHNF'd so that definitional reductions like
-        // `successor(k) + b → successor(k + b)` expose the
-        // constructor.
-        if (!falseProof) {
-            auto* outerApp =
-                std::get_if<Application>(&witnessType->node);
-            if (outerApp) {
-                ExpressionPointer rhsNormalised = weakHeadNormalForm(
-                    environment_, outerApp->argument);
-                auto* zeroConstant = std::get_if<Constant>(
-                    &rhsNormalised->node);
-                bool rhsIsZero = zeroConstant
-                    && zeroConstant->name == "zero";
-                auto* innerApp = std::get_if<Application>(
-                    &outerApp->function->node);
-                if (rhsIsZero && innerApp) {
-                    auto* head = std::get_if<Constant>(
-                        &innerApp->function->node);
-                    if (head && head->name == "LessOrEqual") {
-                        ExpressionPointer lhsNormalised =
-                            weakHeadNormalForm(
-                                environment_, innerApp->argument);
-                        auto* succApp = std::get_if<Application>(
-                            &lhsNormalised->node);
-                        if (succApp) {
-                            auto* succHead = std::get_if<Constant>(
-                                &succApp->function->node);
-                            if (succHead
-                                && succHead->name == "successor") {
-                                ExpressionPointer kValue =
-                                    succApp->argument;
-                                ExpressionPointer call = makeConstant(
-                                    "Natural.not_less_or_equal_successor_zero",
-                                    {});
-                                call = makeApplication(
-                                    std::move(call), kValue);
-                                call = makeApplication(
-                                    std::move(call), witnessKernel);
-                                falseProof = std::move(call);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Shapes: `successor(K) = zero` or `zero = successor(K)` on
-        // `Natural`. We extract via extractEqualityComponents and
-        // dispatch based on which side is `successor(_)`.
-        if (!falseProof) {
-            EqualityComponents components;
-            bool hasComponents = false;
-            try {
-                components = extractEqualityComponents(
-                    witnessType, "absurd", line);
-                hasComponents = true;
-            } catch (const ElaborateError&) {
-                hasComponents = false;
-            }
-            if (hasComponents) {
-                auto* carrierConstant = std::get_if<Constant>(
-                    &components.carrierType->node);
-                bool carrierIsNatural = carrierConstant
-                    && carrierConstant->name == "Natural";
-                auto isSuccessor = [&](ExpressionPointer expression,
-                                       ExpressionPointer& inner)
-                                       -> bool {
-                    ExpressionPointer normalised =
-                        weakHeadNormalForm(environment_, expression);
-                    auto* application = std::get_if<Application>(
-                        &normalised->node);
-                    if (!application) return false;
-                    auto* head = std::get_if<Constant>(
-                        &application->function->node);
-                    if (!head || head->name != "successor") {
-                        return false;
-                    }
-                    inner = application->argument;
-                    return true;
-                };
-                auto isZero = [&](ExpressionPointer expression)
-                                  -> bool {
-                    ExpressionPointer normalised =
-                        weakHeadNormalForm(environment_, expression);
-                    auto* constant = std::get_if<Constant>(
-                        &normalised->node);
-                    return constant && constant->name == "zero";
-                };
-                ExpressionPointer kValue;
-                if (carrierIsNatural
-                    && isSuccessor(components.leftEndpoint, kValue)
-                    && isZero(components.rightEndpoint)) {
-                    ExpressionPointer call = makeConstant(
-                        "Natural.successor_not_zero", {});
-                    call = makeApplication(std::move(call), kValue);
-                    call = makeApplication(std::move(call),
-                                            witnessKernel);
-                    falseProof = std::move(call);
-                } else if (carrierIsNatural
-                    && isZero(components.leftEndpoint)
-                    && isSuccessor(components.rightEndpoint,
-                                    kValue)) {
-                    ExpressionPointer call = makeConstant(
-                        "Natural.zero_not_successor", {});
-                    call = makeApplication(std::move(call), kValue);
-                    call = makeApplication(std::move(call),
-                                            witnessKernel);
-                    falseProof = std::move(call);
-                }
-            }
-        }
-
-        if (!falseProof) {
-            throwElaborate(
-                "absurd: argument's type is not `False` and doesn't "
-                "match a recognized contradiction shape "
-                "(supported: succ(K) ≤ zero, succ(K) = zero, "
-                "zero = succ(K)). Use `False.eliminate_proposition` "
-                "directly if you already have a False proof from "
-                "some other source.");
-        }
-
-        // Dispatch between `False.eliminate_proposition` (for goals in
-        // Proposition) and `False.eliminate.{u}` (for goals in
-        // Type u = Sort u+1). The goal's universe level is the level
-        // of the Sort returned by inferType(expectedType).
-        Context openedContext = buildContextFromLocalBinders(localBinders);
-        ExpressionPointer goalSort = weakHeadNormalForm(
-            environment_,
-            inferType(environment_, openedContext,
-                       openOverLocalBinders(
-                           expectedType, localBinders,
-                           localBinders.size())));
-        auto* sortNode = std::get_if<Sort>(&goalSort->node);
-        if (!sortNode) {
-            throwElaborate(
-                "absurd: internal — goal type's kind isn't a Sort");
-        }
-        std::optional<int> levelConstant =
-            levelAsConstant(sortNode->level);
-
-        if (levelConstant && *levelConstant == 0) {
-            ExpressionPointer call = makeConstant(
-                "False.eliminate_proposition", {});
-            call = makeApplication(std::move(call), expectedType);
-            call = makeApplication(std::move(call),
-                                    std::move(falseProof));
-            return call;
-        }
-        if (!levelConstant) {
-            throwElaborate(
-                "absurd: goal's universe isn't a concrete level — "
-                "v1 only dispatches against Proposition or "
-                "Type N for explicit N");
-        }
-        // Type N case: pass N as the universe arg to False.eliminate.
-        ExpressionPointer call = makeConstant(
-            "False.eliminate",
-            {makeLevelConst(*levelConstant - 1)});
-        call = makeApplication(std::move(call), expectedType);
-        call = makeApplication(std::move(call), std::move(falseProof));
-        return call;
-    }
+        int line, int /*column*/);
 
     // Pick the unique overload candidate that matches the user-supplied
     // argument types. Errors if zero or multiple candidates match.
@@ -8770,93 +7277,7 @@ private:
         const std::vector<SurfaceExpressionPointer>& argumentSurfaces,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int column) {
-        Frame frame(*this,
-            "overload '" + aliasName + "' resolution at line "
-            + std::to_string(line));
-        // Elaborate arguments and infer their head-type names.
-        // When the argument surface is a SurfaceAscription
-        // `(expr : T)`, derive the head name from T directly rather
-        // than from inferType on the elaborated kernel term. The
-        // ascription is the user's explicit label, and inferType
-        // unfolds carrier aliases (e.g. `Real` -> `Quotient(...)`),
-        // which would lose the label needed to pick the carrier-
-        // specific overload. Concretely: `abs((Quotient.mk(rep) :
-        // Real))` would otherwise match the Quotient head (no
-        // candidate) instead of Real.
-        std::vector<ExpressionPointer> argumentKernels;
-        std::vector<std::string> argumentTypeNames;
-        for (const auto& argumentSurface : argumentSurfaces) {
-            ExpressionPointer argumentKernel =
-                elaborateExpression(*argumentSurface, localBinders);
-            argumentKernels.push_back(argumentKernel);
-            std::string typeName;
-            if (auto* ascription = std::get_if<SurfaceAscription>(
-                    &argumentSurface->node)) {
-                ExpressionPointer ascribedType = elaborateExpression(
-                    *ascription->type, localBinders);
-                typeName = headConstantName(ascribedType);
-            } else {
-                ExpressionPointer argumentTypeRaw =
-                    inferTypeInLocalContext(localBinders, argumentKernel);
-                typeName = headConstantName(argumentTypeRaw);
-            }
-            argumentTypeNames.push_back(std::move(typeName));
-        }
-        // Find candidates whose first N parameter-type names match.
-        std::vector<std::string> matches;
-        for (const auto& candidateName : candidateNames) {
-            const Declaration* declaration =
-                environment_.lookup(candidateName);
-            if (!declaration) continue;
-            ExpressionPointer signature = declarationType(*declaration);
-            if (!signatureAcceptsArgumentTypes(signature,
-                                                  argumentTypeNames)) {
-                continue;
-            }
-            matches.push_back(candidateName);
-        }
-        if (matches.empty()) {
-            std::string message =
-                "no overload of '" + aliasName + "' matches arguments "
-                "of types (";
-            for (size_t i = 0; i < argumentTypeNames.size(); ++i) {
-                if (i > 0) message += ", ";
-                message += argumentTypeNames[i];
-            }
-            message += "); candidates:";
-            for (const auto& candidate : candidateNames) {
-                message += "\n  " + candidate;
-            }
-            throwElaborate(message);
-        }
-        if (matches.size() > 1) {
-            std::string message =
-                "ambiguous overload of '" + aliasName
-                + "' on argument types (";
-            for (size_t i = 0; i < argumentTypeNames.size(); ++i) {
-                if (i > 0) message += ", ";
-                message += argumentTypeNames[i];
-            }
-            message += "); multiple candidates match:";
-            for (const auto& match : matches) {
-                message += "\n  " + match;
-            }
-            message += "\nuse the fully-qualified name to disambiguate";
-            throwElaborate(message);
-        }
-        // Build a SurfaceApplication of the chosen candidate and
-        // re-elaborate it — that reuses universe-inference, leading-
-        // argument inference, etc.
-        SurfaceExpressionPointer resolvedHead = makeSurfaceIdentifier(
-            matches[0], /*universeArgs=*/{}, line, column);
-        SurfaceExpressionPointer resolvedCall = makeSurfaceApplication(
-            std::move(resolvedHead),
-            argumentSurfaces,
-            line, column);
-        return elaborateExpression(*resolvedCall, localBinders,
-                                     expectedType);
-    }
+        int line, int column);
 
     // Extract a Constant head name from a type expression. Tries the
     // raw form first (so user-declared type aliases like `Rational`
@@ -8871,45 +7292,9 @@ private:
     // or `Natural.divides`, whose first parameter is a value, not a
     // carrier type — those are threaded explicitly and must NOT be grabbed
     // from an in-scope hypothesis.
-    bool structureHeadIsClass(const std::string& name) {
-        const Declaration* decl = environment_.lookup(name);
-        if (!decl) return false;
-        ExpressionPointer type = declarationType(*decl);
-        if (!type) return false;
-        auto* firstPi = std::get_if<Pi>(&type->node);
-        if (!firstPi) return false;
-        if (!std::get_if<Sort>(&firstPi->domain->node)) return false;
-        ExpressionPointer cursor = type;
-        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
-            cursor = pi->codomain;
-        }
-        auto* sort = std::get_if<Sort>(&cursor->node);
-        if (!sort) return false;
-        auto* level = std::get_if<LevelConst>(&sort->level->node);
-        return level != nullptr && level->value == 0;
-    }
+    bool structureHeadIsClass(const std::string& name);
 
-    std::string headConstantName(ExpressionPointer typeExpression) {
-        ExpressionPointer cursor = typeExpression;
-        while (auto* application =
-                   std::get_if<Application>(&cursor->node)) {
-            cursor = application->function;
-        }
-        if (auto* constant = std::get_if<Constant>(&cursor->node)) {
-            return constant->name;
-        }
-        ExpressionPointer reduced = weakHeadNormalForm(
-            environment_, typeExpression);
-        while (auto* application =
-                   std::get_if<Application>(&reduced->node)) {
-            reduced = weakHeadNormalForm(environment_,
-                                          application->function);
-        }
-        if (auto* constant = std::get_if<Constant>(&reduced->node)) {
-            return constant->name;
-        }
-        return "<unknown>";
-    }
+    std::string headConstantName(ExpressionPointer typeExpression);
 
     // If `type` is `Ring.carrier(bundle)` / `CommutativeRing.carrier(bundle)`
     // and `bundle` WHNF-reduces to a `<Struct>.make(carrier, …)`
@@ -8920,33 +7305,7 @@ private:
     // underlying `Quotient(…)` the way full WHNF would. An abstract
     // `Ring.carrier(s)` has a stuck bundle argument, so this returns
     // nullptr and the dispatch is unchanged.
-    ExpressionPointer carrierProjectionField(ExpressionPointer type) {
-        auto* application = std::get_if<Application>(&type->node);
-        if (!application) return nullptr;
-        auto* projector =
-            std::get_if<Constant>(&application->function->node);
-        if (!projector) return nullptr;
-        if (projector->name != "Ring.carrier"
-            && projector->name != "CommutativeRing.carrier") {
-            return nullptr;
-        }
-        ExpressionPointer bundle = weakHeadNormalForm(
-            environment_, application->argument);
-        std::vector<ExpressionPointer> arguments;
-        ExpressionPointer cursor = bundle;
-        while (auto* inner = std::get_if<Application>(&cursor->node)) {
-            arguments.push_back(inner->argument);
-            cursor = inner->function;
-        }
-        auto* constructor = std::get_if<Constant>(&cursor->node);
-        if (!constructor) return nullptr;
-        if (constructor->name != "Ring.make"
-            && constructor->name != "CommutativeRing.make") {
-            return nullptr;
-        }
-        if (arguments.empty()) return nullptr;
-        return arguments.back();  // first constructor arg = the carrier
-    }
+    ExpressionPointer carrierProjectionField(ExpressionPointer type);
 
     // Walk `signature`'s Pi chain; check that the first N domains have
     // the head-name listed in `argumentTypeNames`. Requires the chain
@@ -8954,18 +7313,7 @@ private:
     // name is not allowed (we want exact-arity calls).
     bool signatureAcceptsArgumentTypes(
         ExpressionPointer signature,
-        const std::vector<std::string>& argumentTypeNames) {
-        ExpressionPointer cursor = signature;
-        for (const auto& expectedName : argumentTypeNames) {
-            cursor = weakHeadNormalForm(environment_, cursor);
-            auto* pi = std::get_if<Pi>(&cursor->node);
-            if (!pi) return false;
-            std::string actualName = headConstantName(pi->domain);
-            if (actualName != expectedName) return false;
-            cursor = pi->codomain;
-        }
-        return true;
-    }
+        const std::vector<std::string>& argumentTypeNames);
 
     // Helper: decompose `expectedType` (or any type expression) as
     // `Quotient(T, R)` and return T, R, and the universe level u such
@@ -8978,25 +7326,7 @@ private:
     };
     bool tryDecomposeQuotient(
         ExpressionPointer typeExpression,
-        QuotientDecomposition& result) {
-        ExpressionPointer cursor = weakHeadNormalForm(
-            environment_, typeExpression);
-        auto* outerApp = std::get_if<Application>(&cursor->node);
-        if (!outerApp) return false;
-        auto* innerApp =
-            std::get_if<Application>(&outerApp->function->node);
-        if (!innerApp) return false;
-        auto* quotientConstant =
-            std::get_if<Constant>(&innerApp->function->node);
-        if (!quotientConstant || quotientConstant->name != "Quotient")
-            return false;
-        if (quotientConstant->universeArguments.size() != 1)
-            return false;
-        result.carrierType = innerApp->argument;
-        result.relation = outerApp->argument;
-        result.universeLevel = quotientConstant->universeArguments[0];
-        return true;
-    }
+        QuotientDecomposition& result);
 
     // `Quotient.mk(rep)` — desugars to `Quotient.mk.{u}(T, R, rep)`,
     // recovering `T` from `rep`'s inferred type and `R` (plus
@@ -9005,45 +7335,7 @@ private:
         SurfaceExpressionPointer representativeSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "Quotient.mk(rep) at line " + std::to_string(line));
-        ExpressionPointer representativeKernel =
-            elaborateExpression(*representativeSurface, localBinders);
-        ExpressionPointer representativeTypeOpened =
-            inferTypeInLocalContext(localBinders, representativeKernel);
-        ExpressionPointer representativeType = closeOverLocalBinders(
-            representativeTypeOpened, localBinders, localBinders.size());
-        LevelPointer universeLevel =
-            typeUniverseOf(localBinders, representativeKernel);
-
-        ExpressionPointer relation;
-        if (expectedType) {
-            QuotientDecomposition decomp;
-            if (tryDecomposeQuotient(expectedType, decomp)) {
-                relation = decomp.relation;
-            }
-        }
-        if (!relation) {
-            throwElaborate(
-                "Quotient.mk(rep): cannot infer the equivalence "
-                "relation `R`. The short form needs an expected type "
-                "of shape `Quotient(T, R)` from context. Common spots "
-                "this fails: operand of unary `-`, immediate body of "
-                "`function (rep) =>` inside `Quotient.lift`, or any "
-                "position with no propagated expected type. Fall back "
-                "to the explicit 3-arg form: `Quotient.mk(T, R, rep)`. "
-                "Needed an expected type of the form "
-                "`Quotient(T, R)` in context");
-        }
-        ExpressionPointer call = makeConstant(
-            "Quotient.mk", {universeLevel});
-        call = makeApplication(std::move(call), representativeType);
-        call = makeApplication(std::move(call), relation);
-        call = makeApplication(std::move(call),
-                                std::move(representativeKernel));
-        return call;
-    }
+        int line, int /*column*/);
 
     // `Quotient.sound(x, y, proof)` — desugars to
     // `Quotient.sound.{u}(T, R, x, y, proof)`. Recovers `T` from `x`'s
@@ -9055,126 +7347,7 @@ private:
         SurfaceExpressionPointer proofSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "Quotient.sound at line " + std::to_string(line));
-        // Prefer pulling `T` and `R` from the expected type. Its
-        // shape (after WHNF/δ-reduction) is
-        // `Equality(Quotient(T, R), mk(T, R, x), mk(T, R, y))`, which
-        // pins down `R` as the user wrote it — important when `R`
-        // δ-reduces (`IntegerEquivalent → λ rep1 rep2. (...)`) and we'd
-        // otherwise infer the reduced form from the proof's type.
-        ExpressionPointer carrierType;
-        ExpressionPointer relation;
-        LevelPointer universeLevel;
-        if (expectedType) {
-            ExpressionPointer expectedOpened = weakHeadNormalForm(
-                environment_, expectedType);
-            // Expect Equality(Q, ..., ...) → extract Q.
-            if (auto* eqOuter =
-                    std::get_if<Application>(&expectedOpened->node)) {
-                if (auto* eqMid =
-                        std::get_if<Application>(
-                            &eqOuter->function->node)) {
-                    if (auto* eqInner =
-                            std::get_if<Application>(
-                                &eqMid->function->node)) {
-                        QuotientDecomposition decomp;
-                        if (tryDecomposeQuotient(eqInner->argument, decomp)) {
-                            // `decomp.*` are sub-expressions of
-                            // `expectedType`, which is already in
-                            // closed-over-localBinders form — use them
-                            // directly (as `desugarQuotientMk` does).
-                            // Re-closing here would shift any
-                            // BoundVariable the relation carries (e.g. the
-                            // `modulus` of a parameterized quotient
-                            // `IntegerMod(modulus)`), leaking a dangling
-                            // index. Non-parameterized relations are bare
-                            // constants, so the old extra close was a
-                            // silent no-op for them.
-                            carrierType = decomp.carrierType;
-                            relation = decomp.relation;
-                            universeLevel = decomp.universeLevel;
-                        }
-                    }
-                }
-            }
-        }
-
-        ExpressionPointer xKernel = elaborateExpression(
-            *xSurface, localBinders);
-        ExpressionPointer yKernel = elaborateExpression(
-            *ySurface, localBinders);
-        // When the relation is already pinned (from the expected type),
-        // elaborate the proof against `R(x, y)` so a user-written lambda
-        // respect proof (e.g. `function (epsilon) => …` for a sequence-
-        // equivalence relation) receives the relation's codomain as its
-        // body's expected type — no `({ … } : …)` ascription needed. When
-        // R is not yet known (the no-expected-type case, where R is
-        // recovered FROM the proof's type below), pass no expected type.
-        ExpressionPointer proofExpectedType =
-            relation
-                ? makeApplication(
-                      makeApplication(relation, xKernel), yKernel)
-                : nullptr;
-        ExpressionPointer proofKernel = elaborateExpression(
-            *proofSurface, localBinders, proofExpectedType);
-
-        if (!carrierType) {
-            ExpressionPointer xTypeOpened =
-                inferTypeInLocalContext(localBinders, xKernel);
-            carrierType = closeOverLocalBinders(
-                xTypeOpened, localBinders, localBinders.size());
-            universeLevel = typeUniverseOf(localBinders, xKernel);
-        }
-        if (!relation) {
-            // Fallback: pull `R` from proof's type as `R(x, y)`. Try the
-            // proof's type AS WRITTEN first — `R` already appears applied
-            // to its two arguments, so `inner->function` is exactly the
-            // relation. Only WHNF as a secondary attempt. WHNF-ing first
-            // would over-unfold a Definition-headed relation (e.g.
-            // `Integer.CongruentModulo(modulus)` → `Integer.divides` →
-            // the underlying `Exists`), recovering the wrong head — which
-            // is what breaks short `Quotient.sound` inside a short
-            // `Quotient.lift` respect handler, where no expected type is
-            // propagated to pin `R`.
-            ExpressionPointer proofTypeOpened =
-                inferTypeInLocalContext(localBinders, proofKernel);
-            auto extractRelation =
-                [&](ExpressionPointer proofType) -> ExpressionPointer {
-                if (auto* outer = std::get_if<Application>(
-                        &proofType->node)) {
-                    if (auto* inner = std::get_if<Application>(
-                            &outer->function->node)) {
-                        return closeOverLocalBinders(
-                            inner->function, localBinders,
-                            localBinders.size());
-                    }
-                }
-                return nullptr;
-            };
-            relation = extractRelation(proofTypeOpened);
-            if (!relation) {
-                relation = extractRelation(weakHeadNormalForm(
-                    environment_, proofTypeOpened));
-            }
-        }
-        if (!relation) {
-            throwElaborate(
-                "Quotient.sound(x, y, proof): cannot infer the "
-                "equivalence relation `R` — provide an expected type "
-                "of the form `Equality(Quotient(T, R), …, …)` or use "
-                "the explicit `Quotient.sound(T, R, x, y, proof)` form");
-        }
-        ExpressionPointer call = makeConstant(
-            "Quotient.sound", {universeLevel});
-        call = makeApplication(std::move(call), carrierType);
-        call = makeApplication(std::move(call), relation);
-        call = makeApplication(std::move(call), std::move(xKernel));
-        call = makeApplication(std::move(call), std::move(yKernel));
-        call = makeApplication(std::move(call), std::move(proofKernel));
-        return call;
-    }
+        int line, int /*column*/);
 
     // `And.eliminate(handler, conjunction)` — short form. Desugars to
     // the verbose `And.eliminate(A, B, Goal, handler, conjunction)`.
@@ -9183,55 +7356,7 @@ private:
         SurfaceExpressionPointer conjSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "And.eliminate at line " + std::to_string(line));
-        if (!expectedType) {
-            throwElaborate(
-                "And.eliminate(handler, conjunction): short form needs "
-                "an expected goal type from context; use the 5-arg "
-                "verbose form when no expected type is available");
-        }
-        ExpressionPointer conjKernel = elaborateExpression(
-            *conjSurface, localBinders);
-        ExpressionPointer conjType = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, conjKernel));
-        auto* outerApp = std::get_if<Application>(&conjType->node);
-        auto* innerApp = outerApp
-            ? std::get_if<Application>(&outerApp->function->node)
-            : nullptr;
-        auto* head = innerApp
-            ? std::get_if<Constant>(&innerApp->function->node)
-            : nullptr;
-        if (!head || head->name != "And") {
-            throwElaborate(
-                "And.eliminate(handler, conjunction): second argument's "
-                "type must be `And(A, B)`, got `"
-                + prettyPrintInLocalScope(conjType, localBinders) + "`");
-        }
-        ExpressionPointer aProp = innerApp->argument;
-        ExpressionPointer bProp = outerApp->argument;
-        // Handler's expected type: A → B → Goal. The Pi binders are
-        // independent of the codomain, so expectedType (already
-        // closed at the call's depth) needs no lifting in the
-        // current Pi-codomain position when the surface elaborator
-        // matches a Lambda against it.
-        ExpressionPointer handlerExpected = makePi("leftProof", aProp,
-            makePi("rightProof", bProp, expectedType));
-        ExpressionPointer handlerKernel = elaborateExpression(
-            *handlerSurface, localBinders, handlerExpected);
-        ExpressionPointer aClosed = closeOverLocalBinders(
-            aProp, localBinders, localBinders.size());
-        ExpressionPointer bClosed = closeOverLocalBinders(
-            bProp, localBinders, localBinders.size());
-        ExpressionPointer call = makeConstant("And.eliminate", {});
-        call = makeApplication(std::move(call), std::move(aClosed));
-        call = makeApplication(std::move(call), std::move(bClosed));
-        call = makeApplication(std::move(call), expectedType);
-        call = makeApplication(std::move(call), std::move(handlerKernel));
-        call = makeApplication(std::move(call), std::move(conjKernel));
-        return call;
-    }
+        int line, int /*column*/);
 
     // `Or.eliminate(handleLeft, handleRight, disjunction)` — short
     // form. Desugars to `Or.eliminate(A, B, Goal, handleLeft,
@@ -9242,56 +7367,7 @@ private:
         SurfaceExpressionPointer disjSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "Or.eliminate at line " + std::to_string(line));
-        if (!expectedType) {
-            throwElaborate(
-                "Or.eliminate(hL, hR, disj): short form needs an "
-                "expected goal type from context; use the 6-arg "
-                "verbose form when no expected type is available");
-        }
-        ExpressionPointer disjKernel = elaborateExpression(
-            *disjSurface, localBinders);
-        ExpressionPointer disjType = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, disjKernel));
-        auto* outerApp = std::get_if<Application>(&disjType->node);
-        auto* innerApp = outerApp
-            ? std::get_if<Application>(&outerApp->function->node)
-            : nullptr;
-        auto* head = innerApp
-            ? std::get_if<Constant>(&innerApp->function->node)
-            : nullptr;
-        if (!head || head->name != "Or") {
-            throwElaborate(
-                "Or.eliminate(hL, hR, disj): third argument's type "
-                "must be `Or(A, B)`, got `"
-                + prettyPrintInLocalScope(disjType, localBinders) + "`");
-        }
-        ExpressionPointer aProp = innerApp->argument;
-        ExpressionPointer bProp = outerApp->argument;
-        // Each handler has type A → Goal / B → Goal.
-        ExpressionPointer handleLeftExpected = makePi("leftProof",
-            aProp, expectedType);
-        ExpressionPointer handleRightExpected = makePi("rightProof",
-            bProp, expectedType);
-        ExpressionPointer handleLeftKernel = elaborateExpression(
-            *handleLeftSurface, localBinders, handleLeftExpected);
-        ExpressionPointer handleRightKernel = elaborateExpression(
-            *handleRightSurface, localBinders, handleRightExpected);
-        ExpressionPointer aClosed = closeOverLocalBinders(
-            aProp, localBinders, localBinders.size());
-        ExpressionPointer bClosed = closeOverLocalBinders(
-            bProp, localBinders, localBinders.size());
-        ExpressionPointer call = makeConstant("Or.eliminate", {});
-        call = makeApplication(std::move(call), std::move(aClosed));
-        call = makeApplication(std::move(call), std::move(bClosed));
-        call = makeApplication(std::move(call), expectedType);
-        call = makeApplication(std::move(call), std::move(handleLeftKernel));
-        call = makeApplication(std::move(call), std::move(handleRightKernel));
-        call = makeApplication(std::move(call), std::move(disjKernel));
-        return call;
-    }
+        int line, int /*column*/);
 
     // `Exists.eliminate(handler, witness)` — short form. Desugars to
     // the verbose `Exists.eliminate(A, P, Goal, handler, witness)` by
@@ -9316,103 +7392,7 @@ private:
         SurfaceExpressionPointer witnessSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "Exists.eliminate at line " + std::to_string(line));
-        if (!expectedType) {
-            throwElaborate(
-                "Exists.eliminate(handler, witness): short form needs "
-                "an expected goal type from context (e.g. inside a "
-                "theorem body); use the 5-arg verbose form "
-                "Exists.eliminate(A, P, Goal, handler, witness) "
-                "when no expected type is available");
-        }
-        ExpressionPointer witnessKernel = elaborateExpression(
-            *witnessSurface, localBinders);
-        ExpressionPointer witnessType = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, witnessKernel));
-        // witnessType should be `App(App(Const("Exists"), A), P)`.
-        auto* outerApp = std::get_if<Application>(&witnessType->node);
-        auto* innerApp = outerApp
-            ? std::get_if<Application>(&outerApp->function->node)
-            : nullptr;
-        auto* head = innerApp
-            ? std::get_if<Constant>(&innerApp->function->node)
-            : nullptr;
-        if (!head || head->name != "Exists") {
-            throwElaborate(
-                "Exists.eliminate(handler, witness): second argument's "
-                "type must be `Exists(A, P)`, got `"
-                + prettyPrintInLocalScope(witnessType, localBinders)
-                + "`");
-        }
-        ExpressionPointer aType = innerApp->argument;
-        ExpressionPointer predicate = outerApp->argument;
-        // Build handler's expected type:
-        //   Pi w : A. Pi _ : (predicate w). expectedType
-        //
-        // `aType` and `predicate` come from inferTypeInLocalContext so
-        // they're in OPENED form (Internal FreeVariables for outer
-        // local binders). `expectedType` is in CLOSED form — its
-        // BoundVariables already index the call-site's locals. As we
-        // embed it inside two new Pi binders (w, _), every BV that
-        // referenced an outer local must shift by 2 so it still points
-        // through past the new binders.
-        ExpressionPointer expectedTypeLifted = liftBoundVariables(
-            expectedType, 2, 0);
-        ExpressionPointer predicateAppliedToW = makeApplication(
-            predicate, makeBoundVariable(0));
-        ExpressionPointer innerPi = makePi("_",
-            std::move(predicateAppliedToW),
-            std::move(expectedTypeLifted));
-        ExpressionPointer handlerExpected = makePi("w",
-            aType, std::move(innerPi));
-        ExpressionPointer handlerKernel = elaborateExpression(
-            *handlerSurface, localBinders, handlerExpected);
-        // Universe argument: Exists's first universe is the carrier's
-        // level. Compute it from A's type.
-        LevelPointer carrierLevel;
-        try {
-            ExpressionPointer aTypeOfType = weakHeadNormalForm(
-                environment_,
-                inferTypeInLocalContext(localBinders, aType));
-            auto* aTypeSort = std::get_if<Sort>(&aTypeOfType->node);
-            if (!aTypeSort) {
-                throwElaborate(
-                    "Exists.eliminate: cannot determine the carrier "
-                    "type's universe");
-            }
-            carrierLevel = predecessorOfSortLevel(aTypeSort->level);
-        } catch (const TypeError&) {
-            throwElaborate(
-                "Exists.eliminate: cannot infer the carrier universe");
-        }
-        // Asymmetric form discipline:
-        //   * `expectedType` is in CLOSED form — the caller computed
-        //     it at the call site's scope and its BoundVariables
-        //     already index the surrounding theorem binders. Use it
-        //     directly. Closing it again would bump every BV by
-        //     `localBinders.size()`, producing dangling indices.
-        //   * `aType` / `predicate` came out of
-        //     `inferTypeInLocalContext` and so are in OPENED form
-        //     (Internal FreeVariables for the same binders). Close
-        //     them to match.
-        //   * `handlerKernel` / `witnessKernel` came back from
-        //     `elaborateExpression`, which produces CLOSED form, so
-        //     they need no transformation.
-        ExpressionPointer aClosed = closeOverLocalBinders(
-            aType, localBinders, localBinders.size());
-        ExpressionPointer pClosed = closeOverLocalBinders(
-            predicate, localBinders, localBinders.size());
-        ExpressionPointer call = makeConstant(
-            "Exists.eliminate", {carrierLevel});
-        call = makeApplication(std::move(call), std::move(aClosed));
-        call = makeApplication(std::move(call), std::move(pClosed));
-        call = makeApplication(std::move(call), expectedType);
-        call = makeApplication(std::move(call), std::move(handlerKernel));
-        call = makeApplication(std::move(call), std::move(witnessKernel));
-        return call;
-    }
+        int line, int /*column*/);
 
     // `Quotient.lift(f, h, q)` — desugars to
     // `Quotient.lift.{u, v}(T, R, U, f, h, q)`. Recovers everything
@@ -9424,194 +7404,10 @@ private:
         SurfaceExpressionPointer qSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "Quotient.lift at line " + std::to_string(line));
-        // Elaborate `q` first to get T from its `Quotient(T, R)` type;
-        // then we can build `T → U` as the expected type for `f`, which
-        // lets the lambda body's `Quotient.mk` etc. back-infer when
-        // they appear in a position whose carrier matches U.
-        ExpressionPointer qKernel = elaborateExpression(
-            *qSurface, localBinders);
-        ExpressionPointer qTypeForT = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, qKernel));
-        QuotientDecomposition decompForT;
-        if (!tryDecomposeQuotient(qTypeForT, decompForT)) {
-            throwElaborate(
-                "Quotient.lift(f, h, q): third argument's type must "
-                "be `Quotient(T, R)`");
-        }
-        ExpressionPointer fExpected = nullptr;
-        if (expectedType) {
-            // Build `T → U` (with U = expectedType) as f's expected type.
-            // `decompForT.carrierType` came out of inferType in OPENED form
-            // (local-binder references are free variables); close it so the
-            // Pi domain matches the closed `expectedType` representation —
-            // otherwise a dependent carrier like `CommutativeRing.carrier(c)`
-            // / `Wrap(n)` would leak its free `c`/`n` into the function the
-            // `Quotient.mk` short form reads its (T, R) from. The codomain
-            // gains the new Pi binder, so lift its bound variables by one.
-            fExpected = makePi(
-                "_",
-                closeOverLocalBinders(
-                    decompForT.carrierType, localBinders, localBinders.size()),
-                liftBoundVariables(expectedType, 1, 0));
-        }
-        ExpressionPointer fKernel = elaborateExpression(
-            *fSurface, localBinders, fExpected);
-        ExpressionPointer fTypeOpened = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, fKernel));
-        auto* fPi = std::get_if<Pi>(&fTypeOpened->node);
-        if (!fPi) {
-            throwElaborate(
-                "Quotient.lift(f, h, q): first argument must be a "
-                "function `T → U`");
-        }
-        ExpressionPointer carrierType = closeOverLocalBinders(
-            fPi->domain, localBinders, localBinders.size());
-        // The lift target `U` must not depend on the argument. When `f`'s
-        // body is a `cases`/recursor, the inferred codomain is the
-        // *unreduced* `motive(rep)`, which syntactically references the
-        // Pi binder even though the motive is constant — WHNF collapses
-        // that spurious application so the closed target type doesn't carry
-        // an escaping bound variable. (A genuinely dependent `f` survives
-        // WHNF still mentioning the binder and fails the lift's own check
-        // below, as it should — `Quotient.lift` only lifts non-dependent
-        // functions.)
-        ExpressionPointer targetType = closeOverLocalBinders(
-            weakHeadNormalForm(environment_, fPi->codomain),
-            localBinders, localBinders.size());
-        // Compute the carrier and target universe levels.
-        LevelPointer uLevel;
-        LevelPointer vLevel;
-        {
-            ExpressionPointer carrierTypeOfType = weakHeadNormalForm(
-                environment_,
-                inferTypeInLocalContext(localBinders, carrierType));
-            auto* sortNode =
-                std::get_if<Sort>(&carrierTypeOfType->node);
-            if (!sortNode) {
-                throwElaborate(
-                    "Quotient.lift: cannot determine carrier universe");
-            }
-            uLevel = predecessorOfSortLevel(sortNode->level);
-            ExpressionPointer targetTypeOfType = weakHeadNormalForm(
-                environment_,
-                inferTypeInLocalContext(localBinders, targetType));
-            auto* targetSortNode =
-                std::get_if<Sort>(&targetTypeOfType->node);
-            if (!targetSortNode) {
-                throwElaborate(
-                    "Quotient.lift: cannot determine target universe");
-            }
-            vLevel = predecessorOfSortLevel(targetSortNode->level);
-        }
-        // R from `q`'s type (already decomposed above).
-        ExpressionPointer relation = closeOverLocalBinders(
-            decompForT.relation, localBinders, localBinders.size());
-        // Compute `h`'s expected respect type — `(x y : T) → R(x, y) →
-        // f(x) = f(y)` — as the next Pi domain of the lift partially
-        // applied to (T, R, U, f). Passing it in lets the lambda-body
-        // coercion fire the equality-of-classes wrap (WS3): a respect
-        // proof returning the bare equivalence `R(f(x_rep), f(y_rep))`
-        // closes the `mk = mk` obligation without naming Quotient.sound.
-        ExpressionPointer hExpected = nullptr;
-        {
-            ExpressionPointer partialCall = makeConstant(
-                "Quotient.lift", {uLevel, vLevel});
-            partialCall = makeApplication(std::move(partialCall), carrierType);
-            partialCall = makeApplication(std::move(partialCall), relation);
-            partialCall = makeApplication(std::move(partialCall), targetType);
-            partialCall = makeApplication(std::move(partialCall), fKernel);
-            try {
-                ExpressionPointer partialType = weakHeadNormalForm(
-                    environment_,
-                    inferTypeInLocalContext(localBinders, partialCall));
-                if (auto* pi = std::get_if<Pi>(&partialType->node)) {
-                    hExpected = closeOverLocalBinders(
-                        pi->domain, localBinders, localBinders.size());
-                }
-            } catch (...) {
-                hExpected = nullptr;
-            }
-        }
-        // Elaborate `h` after we know all the pieces.
-        ExpressionPointer hKernel = elaborateExpression(
-            *hSurface, localBinders, hExpected);
-        // If `h` is a NAMED proof (or any non-lambda) whose type is the
-        // bare-equivalence respect property `(…) → R(f x_rep, f y_rep)`
-        // rather than the `(…) → f x = f y` the lift wants, the direct
-        // elaboration above can't reach the per-leaf class-equality
-        // coercion (it only fires on a lambda body). Eta-expand `h` to the
-        // respect arity and re-elaborate: the application body then sits in
-        // a lambda body and the coercion wraps Quotient.sound. So
-        // `well_defined by <named respects lemma>` works, not just an
-        // inline `(a b) (e) ↦ …` proof.
-        if (hExpected) {
-            bool matches = false;
-            try {
-                ExpressionPointer hTypeOpened = inferTypeInLocalContext(
-                    localBinders, hKernel);
-                ExpressionPointer hExpectedOpened = openOverLocalBinders(
-                    hExpected, localBinders, localBinders.size());
-                Context openedContext =
-                    buildContextFromLocalBinders(localBinders);
-                matches = isDefinitionallyEqual(
-                    environment_, openedContext, hTypeOpened, hExpectedOpened);
-            } catch (...) {
-                matches = true;  // can't tell — leave the direct term
-            }
-            if (!matches) {
-                int respectArity = 0;
-                ExpressionPointer cursor = weakHeadNormalForm(
-                    environment_, hExpected);
-                while (auto* pi = std::get_if<Pi>(&cursor->node)) {
-                    respectArity++;
-                    cursor = pi->codomain;
-                }
-                if (respectArity > 0) {
-                    std::vector<SurfaceExpressionPointer> applicationArguments;
-                    for (int i = 0; i < respectArity; ++i) {
-                        applicationArguments.push_back(makeSurfaceIdentifier(
-                            "_wellDefinedArgument" + std::to_string(i),
-                            {}, line, 0));
-                    }
-                    SurfaceExpressionPointer etaTerm = makeSurfaceApplication(
-                        hSurface, std::move(applicationArguments), line, 0);
-                    // Wrap in NESTED single-name lambdas (not one
-                    // multi-name binder): each peels exactly one Pi, so a
-                    // dependent later domain — `R(x, y)` depending on the
-                    // earlier `x`, `y` — is read correctly after the prior
-                    // binder is substituted.
-                    for (int i = respectArity - 1; i >= 0; --i) {
-                        SurfaceBinder etaBinder;
-                        etaBinder.names = {
-                            "_wellDefinedArgument" + std::to_string(i)};
-                        etaTerm = makeSurfaceLambda(
-                            std::move(etaBinder), std::move(etaTerm), line, 0);
-                    }
-                    hKernel = elaborateExpression(
-                        *etaTerm, localBinders, hExpected);
-                }
-            }
-        }
-        ExpressionPointer call = makeConstant(
-            "Quotient.lift", {uLevel, vLevel});
-        call = makeApplication(std::move(call), carrierType);
-        call = makeApplication(std::move(call), relation);
-        call = makeApplication(std::move(call), targetType);
-        call = makeApplication(std::move(call), std::move(fKernel));
-        call = makeApplication(std::move(call), std::move(hKernel));
-        call = makeApplication(std::move(call), std::move(qKernel));
-        return call;
-    }
+        int line, int /*column*/);
 
     // True when `surface` is the bare `_` placeholder identifier.
-    bool isUnderscorePlaceholder(SurfaceExpressionPointer surface) const {
-        if (!surface) return true;
-        auto* id = std::get_if<SurfaceIdentifier>(&surface->node);
-        return id && id->qualifiedName == "_";
-    }
+    bool isUnderscorePlaceholder(SurfaceExpressionPointer surface) const;
 
     // Synthesize a `Quotient.induct` motive by abstracting `qKernel` in
     // `expectedType`. Returns `Lambda(q' : Quotient(T, R), goal[q ↦ q'])`
@@ -9621,23 +7417,7 @@ private:
         ExpressionPointer expectedType,
         ExpressionPointer qKernel,
         ExpressionPointer qTypeOpenedAsDomain,
-        const std::vector<LocalBinder>& localBinders) {
-        std::string qHeadName = applicationHeadConstantName(qKernel);
-        int occurrences = 0;
-        int whnfFuel = 2048;
-        motiveWalkerCache_.clear();
-        ExpressionPointer motiveBody = abstractStructuralOccurrenceWithWHNF(
-            expectedType, qKernel, qHeadName,
-            /*currentDepth=*/0, occurrences, whnfFuel);
-        if (occurrences == 0) {
-            // Goal doesn't structurally mention `q`. Constant motive: lift
-            // the goal by 1 so BV(0) is reserved for the motive's binder.
-            motiveBody = liftBoundVariables(expectedType, +1, 0);
-        }
-        ExpressionPointer qTypeClosed = closeOverLocalBinders(
-            qTypeOpenedAsDomain, localBinders, localBinders.size());
-        return makeLambda("_quotientTarget", qTypeClosed, motiveBody);
-    }
+        const std::vector<LocalBinder>& localBinders);
 
     // `Quotient.induct(motive, f, q)` — desugars to
     // `Quotient.induct.{u}(T, R, motive, f, q)`. Recovers T, R from
@@ -9651,49 +7431,7 @@ private:
         SurfaceExpressionPointer qSurface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "Quotient.induct at line " + std::to_string(line));
-        bool inferMotive = isUnderscorePlaceholder(motiveSurface);
-        ExpressionPointer qKernel = elaborateExpression(
-            *qSurface, localBinders);
-        ExpressionPointer qTypeOpened = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, qKernel));
-        QuotientDecomposition decomp;
-        if (!tryDecomposeQuotient(qTypeOpened, decomp)) {
-            throwElaborate(
-                "Quotient.induct: q's type must be `Quotient(T, R)`");
-        }
-        ExpressionPointer carrierType = closeOverLocalBinders(
-            decomp.carrierType, localBinders, localBinders.size());
-        ExpressionPointer relation = closeOverLocalBinders(
-            decomp.relation, localBinders, localBinders.size());
-        LevelPointer uLevel = decomp.universeLevel;
-        ExpressionPointer motiveKernel;
-        if (inferMotive) {
-            if (!expectedType) {
-                throwElaborate(
-                    "Quotient.induct with inferred motive (2-arg form or "
-                    "`_` in the motive slot) needs an expected type from "
-                    "context");
-            }
-            motiveKernel = inferQuotientMotive(
-                expectedType, qKernel, qTypeOpened, localBinders);
-        } else {
-            motiveKernel = elaborateExpression(
-                *motiveSurface, localBinders);
-        }
-        ExpressionPointer fKernel = elaborateExpression(
-            *fSurface, localBinders);
-        ExpressionPointer call = makeConstant(
-            "Quotient.induct", {uLevel});
-        call = makeApplication(std::move(call), carrierType);
-        call = makeApplication(std::move(call), relation);
-        call = makeApplication(std::move(call), std::move(motiveKernel));
-        call = makeApplication(std::move(call), std::move(fKernel));
-        call = makeApplication(std::move(call), std::move(qKernel));
-        return call;
-    }
+        int line, int /*column*/);
 
     // Synthesize a `Quotient.induct_two` motive by sequentially
     // abstracting q2 (innermost) and q1 (outermost). Returns
@@ -9707,46 +7445,7 @@ private:
         ExpressionPointer q2Kernel,
         ExpressionPointer q1TypeOpenedAsDomain,
         ExpressionPointer q2TypeOpenedAsDomain,
-        const std::vector<LocalBinder>& localBinders) {
-        // Step 1: abstract q2 → BV(0). LocalBinder BVs lifted by +1.
-        std::string q2HeadName = applicationHeadConstantName(q2Kernel);
-        int occurrences2 = 0;
-        int whnfFuel = 4096;
-        motiveWalkerCache_.clear();
-        ExpressionPointer afterQ2 = abstractStructuralOccurrenceWithWHNF(
-            expectedType, q2Kernel, q2HeadName,
-            /*currentDepth=*/0, occurrences2, whnfFuel);
-        if (occurrences2 == 0) {
-            afterQ2 = liftBoundVariables(expectedType, +1, 0);
-        }
-        // Step 2: wrap in Lambda for q2'.
-        ExpressionPointer q2TypeClosed = closeOverLocalBinders(
-            q2TypeOpenedAsDomain, localBinders, localBinders.size());
-        ExpressionPointer innerLambda = makeLambda(
-            "_quotientTarget2", q2TypeClosed, afterQ2);
-        // Step 3: abstract q1 in the wrapped expression. The walker
-        // descends into the inner Lambda at depth=1; q1 matches there
-        // become BV(1), so after the outer wrap they refer to the outer
-        // binder. The inner-Lambda's BV(0) (q2 abstraction) is below
-        // depth=1, stays at BV(0). LocalBinder BVs (already at +1 from
-        // step 1) are at >= 1 inside, so lifted to +2.
-        std::string q1HeadName = applicationHeadConstantName(q1Kernel);
-        motiveWalkerCache_.clear();
-        int occurrences1 = 0;
-        ExpressionPointer afterQ1 = abstractStructuralOccurrenceWithWHNF(
-            innerLambda, q1Kernel, q1HeadName,
-            /*currentDepth=*/0, occurrences1, whnfFuel);
-        if (occurrences1 == 0) {
-            // q1 doesn't appear in the goal. Lift the entire inner
-            // lambda by 1 above threshold 0 to make room for the outer
-            // binder.
-            afterQ1 = liftBoundVariables(innerLambda, +1, 0);
-        }
-        // Step 4: wrap in Lambda for q1'.
-        ExpressionPointer q1TypeClosed = closeOverLocalBinders(
-            q1TypeOpenedAsDomain, localBinders, localBinders.size());
-        return makeLambda("_quotientTarget1", q1TypeClosed, afterQ1);
-    }
+        const std::vector<LocalBinder>& localBinders);
 
     // `Quotient.induct_two(motive, f, q1, q2)` — recovers T1, R1, T2,
     // R2 from `q1` and `q2`'s types (each of the form `Quotient(Ti, Ri)`)
@@ -9761,64 +7460,7 @@ private:
         SurfaceExpressionPointer q2Surface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "Quotient.induct_two at line " + std::to_string(line));
-        bool inferMotive = isUnderscorePlaceholder(motiveSurface);
-        ExpressionPointer q1Kernel = elaborateExpression(
-            *q1Surface, localBinders);
-        ExpressionPointer q2Kernel = elaborateExpression(
-            *q2Surface, localBinders);
-        ExpressionPointer q1TypeOpened = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, q1Kernel));
-        ExpressionPointer q2TypeOpened = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, q2Kernel));
-        QuotientDecomposition d1, d2;
-        if (!tryDecomposeQuotient(q1TypeOpened, d1)) {
-            throwElaborate(
-                "Quotient.induct_two: q1's type must be `Quotient(T, R)`");
-        }
-        if (!tryDecomposeQuotient(q2TypeOpened, d2)) {
-            throwElaborate(
-                "Quotient.induct_two: q2's type must be `Quotient(T, R)`");
-        }
-        ExpressionPointer carrierType1 = closeOverLocalBinders(
-            d1.carrierType, localBinders, localBinders.size());
-        ExpressionPointer relation1 = closeOverLocalBinders(
-            d1.relation, localBinders, localBinders.size());
-        ExpressionPointer carrierType2 = closeOverLocalBinders(
-            d2.carrierType, localBinders, localBinders.size());
-        ExpressionPointer relation2 = closeOverLocalBinders(
-            d2.relation, localBinders, localBinders.size());
-        ExpressionPointer motiveKernel;
-        if (inferMotive) {
-            if (!expectedType) {
-                throwElaborate(
-                    "Quotient.induct_two with inferred motive (3-arg form "
-                    "or `_` in the motive slot) needs an expected type "
-                    "from context");
-            }
-            motiveKernel = inferQuotientMotiveTwo(
-                expectedType, q1Kernel, q2Kernel,
-                q1TypeOpened, q2TypeOpened, localBinders);
-        } else {
-            motiveKernel = elaborateExpression(
-                *motiveSurface, localBinders);
-        }
-        ExpressionPointer fKernel = elaborateExpression(
-            *fSurface, localBinders);
-        ExpressionPointer call = makeConstant(
-            "Quotient.induct_two", {d1.universeLevel, d2.universeLevel});
-        call = makeApplication(std::move(call), carrierType1);
-        call = makeApplication(std::move(call), relation1);
-        call = makeApplication(std::move(call), carrierType2);
-        call = makeApplication(std::move(call), relation2);
-        call = makeApplication(std::move(call), std::move(motiveKernel));
-        call = makeApplication(std::move(call), std::move(fKernel));
-        call = makeApplication(std::move(call), std::move(q1Kernel));
-        call = makeApplication(std::move(call), std::move(q2Kernel));
-        return call;
-    }
+        int line, int /*column*/);
 
     // `Quotient.induct_three(motive, f, q1, q2, q3)` — recovers T1, R1,
     // T2, R2, T3, R3 from `q1`, `q2`, `q3`'s types and emits
@@ -9837,39 +7479,7 @@ private:
         ExpressionPointer q1TypeOpenedAsDomain,
         ExpressionPointer q2TypeOpenedAsDomain,
         ExpressionPointer q3TypeOpenedAsDomain,
-        const std::vector<LocalBinder>& localBinders) {
-        int whnfFuel = 8192;
-        // q3 (innermost).
-        std::string q3HeadName = applicationHeadConstantName(q3Kernel);
-        int occ3 = 0;
-        motiveWalkerCache_.clear();
-        ExpressionPointer body = abstractStructuralOccurrenceWithWHNF(
-            expectedType, q3Kernel, q3HeadName, 0, occ3, whnfFuel);
-        if (occ3 == 0) body = liftBoundVariables(expectedType, +1, 0);
-        ExpressionPointer q3TypeClosed = closeOverLocalBinders(
-            q3TypeOpenedAsDomain, localBinders, localBinders.size());
-        body = makeLambda("_quotientTarget3", q3TypeClosed, body);
-        // q2.
-        std::string q2HeadName = applicationHeadConstantName(q2Kernel);
-        int occ2 = 0;
-        motiveWalkerCache_.clear();
-        ExpressionPointer afterQ2 = abstractStructuralOccurrenceWithWHNF(
-            body, q2Kernel, q2HeadName, 0, occ2, whnfFuel);
-        if (occ2 == 0) afterQ2 = liftBoundVariables(body, +1, 0);
-        ExpressionPointer q2TypeClosed = closeOverLocalBinders(
-            q2TypeOpenedAsDomain, localBinders, localBinders.size());
-        body = makeLambda("_quotientTarget2", q2TypeClosed, afterQ2);
-        // q1.
-        std::string q1HeadName = applicationHeadConstantName(q1Kernel);
-        int occ1 = 0;
-        motiveWalkerCache_.clear();
-        ExpressionPointer afterQ1 = abstractStructuralOccurrenceWithWHNF(
-            body, q1Kernel, q1HeadName, 0, occ1, whnfFuel);
-        if (occ1 == 0) afterQ1 = liftBoundVariables(body, +1, 0);
-        ExpressionPointer q1TypeClosed = closeOverLocalBinders(
-            q1TypeOpenedAsDomain, localBinders, localBinders.size());
-        return makeLambda("_quotientTarget1", q1TypeClosed, afterQ1);
-    }
+        const std::vector<LocalBinder>& localBinders);
 
     ExpressionPointer desugarQuotientInductThree(
         SurfaceExpressionPointer motiveSurface,
@@ -9879,240 +7489,18 @@ private:
         SurfaceExpressionPointer q3Surface,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line, int /*column*/) {
-        Frame frame(*this,
-            "Quotient.induct_three at line " + std::to_string(line));
-        bool inferMotive = isUnderscorePlaceholder(motiveSurface);
-        ExpressionPointer q1Kernel = elaborateExpression(
-            *q1Surface, localBinders);
-        ExpressionPointer q2Kernel = elaborateExpression(
-            *q2Surface, localBinders);
-        ExpressionPointer q3Kernel = elaborateExpression(
-            *q3Surface, localBinders);
-        ExpressionPointer q1TypeOpened = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, q1Kernel));
-        ExpressionPointer q2TypeOpened = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, q2Kernel));
-        ExpressionPointer q3TypeOpened = weakHeadNormalForm(environment_,
-            inferTypeInLocalContext(localBinders, q3Kernel));
-        QuotientDecomposition d1, d2, d3;
-        if (!tryDecomposeQuotient(q1TypeOpened, d1)) {
-            throwElaborate(
-                "Quotient.induct_three: q1's type must be `Quotient(T, R)`");
-        }
-        if (!tryDecomposeQuotient(q2TypeOpened, d2)) {
-            throwElaborate(
-                "Quotient.induct_three: q2's type must be `Quotient(T, R)`");
-        }
-        if (!tryDecomposeQuotient(q3TypeOpened, d3)) {
-            throwElaborate(
-                "Quotient.induct_three: q3's type must be `Quotient(T, R)`");
-        }
-        ExpressionPointer carrierType1 = closeOverLocalBinders(
-            d1.carrierType, localBinders, localBinders.size());
-        ExpressionPointer relation1 = closeOverLocalBinders(
-            d1.relation, localBinders, localBinders.size());
-        ExpressionPointer carrierType2 = closeOverLocalBinders(
-            d2.carrierType, localBinders, localBinders.size());
-        ExpressionPointer relation2 = closeOverLocalBinders(
-            d2.relation, localBinders, localBinders.size());
-        ExpressionPointer carrierType3 = closeOverLocalBinders(
-            d3.carrierType, localBinders, localBinders.size());
-        ExpressionPointer relation3 = closeOverLocalBinders(
-            d3.relation, localBinders, localBinders.size());
-        ExpressionPointer motiveKernel;
-        if (inferMotive) {
-            if (!expectedType) {
-                throwElaborate(
-                    "Quotient.induct_three with inferred motive (4-arg "
-                    "form or `_` in the motive slot) needs an expected "
-                    "type from context");
-            }
-            motiveKernel = inferQuotientMotiveThree(
-                expectedType, q1Kernel, q2Kernel, q3Kernel,
-                q1TypeOpened, q2TypeOpened, q3TypeOpened, localBinders);
-        } else {
-            motiveKernel = elaborateExpression(
-                *motiveSurface, localBinders);
-        }
-        ExpressionPointer fKernel = elaborateExpression(
-            *fSurface, localBinders);
-        ExpressionPointer call = makeConstant(
-            "Quotient.induct_three",
-            {d1.universeLevel, d2.universeLevel, d3.universeLevel});
-        call = makeApplication(std::move(call), carrierType1);
-        call = makeApplication(std::move(call), relation1);
-        call = makeApplication(std::move(call), carrierType2);
-        call = makeApplication(std::move(call), relation2);
-        call = makeApplication(std::move(call), carrierType3);
-        call = makeApplication(std::move(call), relation3);
-        call = makeApplication(std::move(call), std::move(motiveKernel));
-        call = makeApplication(std::move(call), std::move(fKernel));
-        call = makeApplication(std::move(call), std::move(q1Kernel));
-        call = makeApplication(std::move(call), std::move(q2Kernel));
-        call = makeApplication(std::move(call), std::move(q3Kernel));
-        return call;
-    }
+        int line, int /*column*/);
 
     // Given a `Sort u`-shape level, return the predecessor `u-1`. Used
     // by the quotient desugars to back out the universe parameter from
     // a type's type.
-    LevelPointer predecessorOfSortLevel(LevelPointer sortLevel) {
-        if (auto* successor =
-                std::get_if<LevelSuccessor>(&sortLevel->node)) {
-            return successor->base;
-        }
-        if (auto* constant =
-                std::get_if<LevelConst>(&sortLevel->node)) {
-            if (constant->value >= 1) {
-                return makeLevelConst(constant->value - 1);
-            }
-        }
-        throwElaborate(
-            "internal: cannot derive universe predecessor from sort level");
-        return nullptr;  // unreachable
-    }
+    LevelPointer predecessorOfSortLevel(LevelPointer sortLevel);
 
     ExpressionPointer desugarCongruenceOf(
         SurfaceExpressionPointer functionSurface,
         SurfaceExpressionPointer equalityProofSurface,
         const std::vector<LocalBinder>& localBinders,
-        int line, int column) {
-
-        // Elaborate the equality proof first so we know the domain
-        // type (from its Equality structure); that lets us accept an
-        // untyped lambda for the function argument (bidirectional
-        // elaboration of `fun x => body`).
-        ExpressionPointer equalityProofKernel =
-            elaborateExpression(*equalityProofSurface, localBinders);
-        ExpressionPointer equalityProofType =
-            weakHeadNormalForm(environment_,
-                inferTypeInLocalContext(localBinders,
-                                          equalityProofKernel));
-
-        // Pre-extract the domain type from the proof's Equality type
-        // so we can hand it to an untyped lambda's elaboration. We use
-        // the closed form (BoundVariables for our local binders) so
-        // the lambda we construct slots into the surrounding context
-        // correctly.
-        EqualityComponents proofComponents = extractEqualityComponents(
-            equalityProofType, "congruenceOf", line);
-        ExpressionPointer domainTypeForLambda = closeOverLocalBinders(
-            proofComponents.carrierType,
-            localBinders, localBinders.size());
-
-        // Elaborate the function. If it's an untyped single-binder
-        // lambda, fill the domain from domainTypeForLambda; otherwise
-        // elaborate normally.
-        ExpressionPointer functionKernel;
-        auto* functionSurfaceLambda =
-            std::get_if<SurfaceLambda>(&functionSurface->node);
-        if (functionSurfaceLambda
-            && !functionSurfaceLambda->binder.type
-            && functionSurfaceLambda->binder.names.size() == 1) {
-            std::vector<LocalBinder> extended = localBinders;
-            extended.push_back(
-                {functionSurfaceLambda->binder.names[0],
-                 domainTypeForLambda});
-            ExpressionPointer lambdaBody = elaborateExpression(
-                *functionSurfaceLambda->body, extended);
-            functionKernel =
-                makeLambda(functionSurfaceLambda->binder.names[0],
-                            domainTypeForLambda,
-                            std::move(lambdaBody));
-        } else {
-            functionKernel =
-                elaborateExpression(*functionSurface, localBinders);
-        }
-
-        // The function's type should be a Pi (A → B). Extract A (the
-        // domain) and B (the codomain).
-        ExpressionPointer functionType =
-            weakHeadNormalForm(environment_,
-                inferTypeInLocalContext(localBinders, functionKernel));
-        auto* functionPi = std::get_if<Pi>(&functionType->node);
-        if (!functionPi) {
-            throw ElaborateError(
-                "congruenceOf: first argument must be a function "
-                "(line " + std::to_string(line) + ")");
-        }
-        ExpressionPointer domainType = functionPi->domain;
-        ExpressionPointer codomainType = functionPi->codomain;
-        ExpressionPointer leftEndpoint = proofComponents.leftEndpoint;
-        ExpressionPointer rightEndpoint = proofComponents.rightEndpoint;
-
-        // Compute universe levels for the domain and codomain types.
-        LevelPointer domainUniverseLevel =
-            typeUniverseOf(localBinders, leftEndpoint);
-        // For the codomain universe level, we need the universe of
-        // codomainType. But codomainType lives in a context with one
-        // extra binder (the Pi's binder). We re-infer by elaborating
-        // in extended context. For non-dependent codomains, the level
-        // result has no BoundVariables so it's safe to return as-is.
-        std::vector<LocalBinder> piExtended = localBinders;
-        piExtended.push_back({functionPi->displayHint, functionPi->domain});
-        LevelPointer codomainUniverseLevel;
-        {
-            ExpressionPointer typeOfCodomain =
-                inferTypeInLocalContext(piExtended, codomainType);
-            auto* sortNode = std::get_if<Sort>(&typeOfCodomain->node);
-            if (!sortNode) {
-                throw ElaborateError(
-                    "congruenceOf: cannot determine codomain universe");
-            }
-            LevelPointer sortLevel = sortNode->level;
-            if (auto* successorLevel =
-                    std::get_if<LevelSuccessor>(&sortLevel->node)) {
-                codomainUniverseLevel = successorLevel->base;
-            } else if (auto* constant =
-                            std::get_if<LevelConst>(&sortLevel->node)) {
-                if (constant->value >= 1) {
-                    codomainUniverseLevel =
-                        makeLevelConst(constant->value - 1);
-                } else {
-                    throw ElaborateError(
-                        "congruenceOf: cannot derive universe predecessor");
-                }
-            } else {
-                throw ElaborateError(
-                    "congruenceOf: cannot derive universe predecessor");
-            }
-        }
-
-        // The endpoints and the domain/codomain came out of the
-        // inferred type, which lives in the opened form with
-        // FreeVariables for our local binders. Close them back to
-        // BoundVariables so they make sense in the calling context —
-        // otherwise a stray FreeVariable referring to e.g. a
-        // theorem-level binder leaks into the result term and the
-        // kernel rejects it as an unbound internal variable.
-        ExpressionPointer closedDomainType = closeOverLocalBinders(
-            domainType, localBinders, localBinders.size());
-        ExpressionPointer closedCodomainType = closeOverLocalBinders(
-            codomainType, localBinders, localBinders.size());
-        ExpressionPointer closedLeftEndpoint = closeOverLocalBinders(
-            leftEndpoint, localBinders, localBinders.size());
-        ExpressionPointer closedRightEndpoint = closeOverLocalBinders(
-            rightEndpoint, localBinders, localBinders.size());
-
-        // Build Equality.congruence.{u, v}(A, B, f, x, y, proof).
-        ExpressionPointer call = makeConstant(
-            "Equality.congruence",
-            {domainUniverseLevel, codomainUniverseLevel});
-        call = makeApplication(std::move(call),
-                                std::move(closedDomainType));
-        call = makeApplication(std::move(call),
-                                std::move(closedCodomainType));
-        call = makeApplication(std::move(call), std::move(functionKernel));
-        call = makeApplication(std::move(call),
-                                std::move(closedLeftEndpoint));
-        call = makeApplication(std::move(call),
-                                std::move(closedRightEndpoint));
-        call = makeApplication(std::move(call),
-                                std::move(equalityProofKernel));
-        (void)column;
-        return call;
-    }
+        int line, int column);
 
     // Open the innermost `count` local binders of `term` into FreeVariables
     // (one per binder, by name, with Internal origin so they don't collide
@@ -10161,62 +7549,9 @@ private:
     // `names` (used to detect unresolved leading-inference metavariables).
     bool containsNamedFreeVariable(
         ExpressionPointer expression,
-        const std::set<std::string>& names) {
-        if (auto* freeVariable =
-                std::get_if<FreeVariable>(&expression->node)) {
-            return names.count(freeVariable->name) > 0;
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            return containsNamedFreeVariable(pi->domain, names)
-                || containsNamedFreeVariable(pi->codomain, names);
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            return containsNamedFreeVariable(lambda->domain, names)
-                || containsNamedFreeVariable(lambda->body, names);
-        }
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            return containsNamedFreeVariable(application->function, names)
-                || containsNamedFreeVariable(application->argument, names);
-        }
-        return false;
-    }
+        const std::set<std::string>& names);
 
-    bool containsValueArgumentFreeVar(ExpressionPointer expression) {
-        if (auto* freeVariable =
-                std::get_if<FreeVariable>(&expression->node)) {
-            const std::string& name = freeVariable->name;
-            if (freeVariable->origin != FreeVariableOrigin::Internal) {
-                return false;
-            }
-            static const char* placeholderPrefixes[] = {
-                "_constructorValueArgument_",
-                "_callTrailingArgument_",
-            };
-            for (const char* prefix : placeholderPrefixes) {
-                size_t length = std::char_traits<char>::length(prefix);
-                if (name.size() >= length
-                    && name.compare(0, length, prefix) == 0) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            return containsValueArgumentFreeVar(pi->domain)
-                || containsValueArgumentFreeVar(pi->codomain);
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            return containsValueArgumentFreeVar(lambda->domain)
-                || containsValueArgumentFreeVar(lambda->body);
-        }
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            return containsValueArgumentFreeVar(application->function)
-                || containsValueArgumentFreeVar(application->argument);
-        }
-        return false;
-    }
+    bool containsValueArgumentFreeVar(ExpressionPointer expression);
 
     // Walks `pattern` and `target` in parallel. Whenever pattern is a
     // FreeVariable whose name is in `metavariableNames` (and isn't yet
@@ -10248,41 +7583,7 @@ private:
     // collapsing all the way to `Quotient`. Returns null when the head
     // isn't a transparent definition (axiom / opaque / inductive / not a
     // Constant), i.e. when no δ-step is available.
-    ExpressionPointer unfoldHeadConstantOneStep(ExpressionPointer expr) {
-        std::vector<ExpressionPointer> args;
-        ExpressionPointer head = expr;
-        while (auto* app = std::get_if<Application>(&head->node)) {
-            args.push_back(app->argument);
-            head = app->function;
-        }
-        std::reverse(args.begin(), args.end());
-        auto* constant = std::get_if<Constant>(&head->node);
-        if (!constant) return nullptr;
-        const Declaration* declaration =
-            environment_.lookup(constant->name);
-        if (!declaration) return nullptr;
-        auto* definition = std::get_if<Definition>(declaration);
-        if (!definition) return nullptr;
-        if (definition->opacity == Opacity::Opaque) return nullptr;
-        if (definition->universeParameters.size()
-                != constant->universeArguments.size()) {
-            return nullptr;
-        }
-        ExpressionPointer body = definition->body;
-        if (!body) return nullptr;
-        if (!definition->universeParameters.empty()) {
-            body = substituteUniverseLevels(
-                body, definition->universeParameters,
-                constant->universeArguments);
-        }
-        // β-apply the spine arguments into the unfolded body.
-        for (const auto& argument : args) {
-            auto* lambda = std::get_if<Lambda>(&body->node);
-            if (!lambda) return nullptr;
-            body = substitute(lambda->body, 0, argument);
-        }
-        return body;
-    }
+    ExpressionPointer unfoldHeadConstantOneStep(ExpressionPointer expr);
 
     void unifyConstructorParameters(
         ExpressionPointer pattern,
@@ -10290,270 +7591,19 @@ private:
         const std::set<std::string>& metavariableNames,
         std::map<std::string, ExpressionPointer>& assignment,
         int binderDepth = 0,
-        std::vector<ExpressionPointer>* binderTypeStack = nullptr) {
-        if (auto* freeVariable =
-                std::get_if<FreeVariable>(&pattern->node)) {
-            if (metavariableNames.count(freeVariable->name)
-                && !assignment.count(freeVariable->name)
-                && !containsValueArgumentFreeVar(target)
-                && !referencesBoundBelowThreshold(target, binderDepth)) {
-                // Lift the target up to the outer scope by shifting it
-                // down by `binderDepth`. Safe because we just verified
-                // the target has no references that would be captured.
-                ExpressionPointer lifted = binderDepth == 0
-                    ? target
-                    : shift(target, -binderDepth);
-                assignment[freeVariable->name] = lifted;
-            }
-            return;
-        }
-        if (auto* patternPi = std::get_if<Pi>(&pattern->node)) {
-            if (auto* targetPi = std::get_if<Pi>(&target->node)) {
-                unifyConstructorParameters(
-                    patternPi->domain, targetPi->domain,
-                    metavariableNames, assignment, binderDepth,
-                    binderTypeStack);
-                if (binderTypeStack)
-                    binderTypeStack->push_back(patternPi->domain);
-                unifyConstructorParameters(
-                    patternPi->codomain, targetPi->codomain,
-                    metavariableNames, assignment, binderDepth + 1,
-                    binderTypeStack);
-                if (binderTypeStack) binderTypeStack->pop_back();
-            }
-            return;
-        }
-        if (auto* patternLambda =
-                std::get_if<Lambda>(&pattern->node)) {
-            if (auto* targetLambda =
-                    std::get_if<Lambda>(&target->node)) {
-                unifyConstructorParameters(
-                    patternLambda->domain, targetLambda->domain,
-                    metavariableNames, assignment, binderDepth,
-                    binderTypeStack);
-                if (binderTypeStack)
-                    binderTypeStack->push_back(patternLambda->domain);
-                unifyConstructorParameters(
-                    patternLambda->body, targetLambda->body,
-                    metavariableNames, assignment, binderDepth + 1,
-                    binderTypeStack);
-                if (binderTypeStack) binderTypeStack->pop_back();
-            }
-            return;
-        }
-        if (auto* patternApplication =
-                std::get_if<Application>(&pattern->node)) {
-            ExpressionPointer patternHead = patternApplication->function;
-            while (auto* nestedApp =
-                       std::get_if<Application>(&patternHead->node)) {
-                patternHead = nestedApp->function;
-            }
-            if (auto* headFreeVariable =
-                    std::get_if<FreeVariable>(&patternHead->node)) {
-                if (metavariableNames.count(headFreeVariable->name)) {
-                    // Miller-pattern higher-order unification: if the
-                    // pattern is `metavar(Bound(k))` with k < binderDepth
-                    // (referring to a binder we descended into), and
-                    // the target doesn't reference any DEEPER binders
-                    // (those would also be captured), solve the
-                    // metavariable by abstracting target over Bound(k).
-                    // For now we handle only the unary case — enough for
-                    // motive-style implicit predicates like
-                    // `{P : T → Prop}` in `strong_induction`.
-                    if (binderTypeStack
-                        && !assignment.count(
-                               headFreeVariable->name)) {
-                        auto* singleArgBound =
-                            std::get_if<BoundVariable>(
-                                &patternApplication->argument->node);
-                        if (singleArgBound) {
-                            int k = singleArgBound->deBruijnIndex;
-                            if (k >= 0 && k < binderDepth) {
-                                int captureThreshold = binderDepth;
-                                // Bound(k) IS allowed (we abstract it
-                                // away); reject only other captures.
-                                if (!referencesOtherBoundsBelowThreshold(
-                                        target, captureThreshold, k)
-                                    && !containsValueArgumentFreeVar(
-                                           target)) {
-                                    // Build Lambda(_, T_k, body) where
-                                    // body abstracts over Bound(k).
-                                    // T_k is the binder at depth k
-                                    // from the innermost in the stack.
-                                    int stackPosition =
-                                        static_cast<int>(
-                                            binderTypeStack->size())
-                                        - 1 - k;
-                                    if (stackPosition >= 0
-                                        && !referencesBoundBelowThreshold(
-                                               (*binderTypeStack)
-                                                   [stackPosition],
-                                               stackPosition)) {
-                                        ExpressionPointer kType =
-                                            (*binderTypeStack)
-                                                [stackPosition];
-                                        // The binder type was captured
-                                        // in a scope with `stackPosition`
-                                        // earlier descended binders.
-                                        // Shift down so it lives in
-                                        // the outer scope. The guard
-                                        // above rejects types whose
-                                        // Bound vars reference those
-                                        // earlier descended binders —
-                                        // those can't be expressed in
-                                        // the outer scope.
-                                        ExpressionPointer kTypeOuter =
-                                            stackPosition == 0
-                                                ? kType
-                                                : shift(kType,
-                                                         -stackPosition);
-                                        ExpressionPointer abstracted =
-                                            abstractOverBoundVariable(
-                                                target, k);
-                                        // `abstracted` is in scope
-                                        // {outer + descended binders +
-                                        //  Lambda binder}. We need it
-                                        // in {outer + Lambda binder},
-                                        // which means shifting indices
-                                        // that reference the outer
-                                        // scope (Bound(>=binderDepth+1)
-                                        // after abstraction) down by
-                                        // `binderDepth`, while leaving
-                                        // Bound(0) (the Lambda binder)
-                                        // alone. References to the
-                                        // descended binders themselves
-                                        // (Bound(1..binderDepth)) have
-                                        // been ruled out by the
-                                        // `referencesOtherBoundsBelow…`
-                                        // check above.
-                                        ExpressionPointer body =
-                                            shift(abstracted,
-                                                  -binderDepth,
-                                                  binderDepth + 1);
-                                        ExpressionPointer solution =
-                                            makeLambda(
-                                                "_motiveBinder",
-                                                kTypeOuter,
-                                                body);
-                                        assignment[
-                                            headFreeVariable->name] =
-                                            solution;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    return;
-                }
-            }
-            // Walk the target's function chain to its head (a no-op when
-            // the target is a bare Constant, as for a nullary alias like
-            // `ComplexNumber`).
-            ExpressionPointer targetHead = target;
-            while (auto* nestedApp =
-                       std::get_if<Application>(&targetHead->node)) {
-                targetHead = nestedApp->function;
-            }
-            if (!headsMatch(patternHead, targetHead)) {
-                // The target may be a definition/alias whose head differs
-                // from the pattern's only until unfolded — e.g. pattern
-                // `RingModulo(?s, ?m)` against target `FiniteField(p, f)`
-                // (which δ-reduces to `RingModulo(...)`) or the nullary
-                // alias `ComplexNumber` (a bare Constant that δ-reduces to
-                // `RingModulo(...)`). Unfold the target one δ-step at a time
-                // and retry as soon as a head aligns with the pattern's. A
-                // SINGLE-step unfold (not full WHNF) is essential:
-                // `RingModulo` is itself a definition for `Quotient(…)`, so
-                // WHNF would blow past the `RingModulo` head we want to match
-                // all the way to `Quotient`. The loop is bounded by the
-                // chain of transparent definitions, so it terminates.
-                ExpressionPointer current = target;
-                for (int unfoldStep = 0; unfoldStep < 64; ++unfoldStep) {
-                    ExpressionPointer next =
-                        unfoldHeadConstantOneStep(current);
-                    if (!next) break;
-                    current = next;
-                    ExpressionPointer currentHead = current;
-                    while (auto* nestedApp = std::get_if<Application>(
-                               &currentHead->node)) {
-                        currentHead = nestedApp->function;
-                    }
-                    if (headsMatch(patternHead, currentHead)) {
-                        unifyConstructorParameters(
-                            pattern, current, metavariableNames,
-                            assignment, binderDepth, binderTypeStack);
-                        break;
-                    }
-                }
-                return;
-            }
-            // Heads match: require the target to be an application of the
-            // same arity and recurse pointwise. (A bare-Constant target
-            // with a matching head has no arguments to recurse into.)
-            if (auto* targetApplication =
-                    std::get_if<Application>(&target->node)) {
-                unifyConstructorParameters(
-                    patternApplication->function,
-                    targetApplication->function,
-                    metavariableNames, assignment, binderDepth);
-                unifyConstructorParameters(
-                    patternApplication->argument,
-                    targetApplication->argument,
-                    metavariableNames, assignment, binderDepth);
-            }
-            return;
-        }
-    }
+        std::vector<ExpressionPointer>* binderTypeStack = nullptr);
 
     // Heads match when both are the same Constant (same name + universe
     // arguments), the same BoundVariable index, or the same Sort. A
     // FreeVariable head means a metavariable case — handled separately.
-    bool headsMatch(ExpressionPointer left, ExpressionPointer right) {
-        if (auto* leftConstant = std::get_if<Constant>(&left->node)) {
-            if (auto* rightConstant =
-                    std::get_if<Constant>(&right->node)) {
-                return leftConstant->name == rightConstant->name;
-            }
-            return false;
-        }
-        if (auto* leftBound = std::get_if<BoundVariable>(&left->node)) {
-            if (auto* rightBound =
-                    std::get_if<BoundVariable>(&right->node)) {
-                return leftBound->deBruijnIndex
-                    == rightBound->deBruijnIndex;
-            }
-            return false;
-        }
-        if (std::get_if<Sort>(&left->node)) {
-            return std::get_if<Sort>(&right->node) != nullptr;
-        }
-        if (auto* leftFree = std::get_if<FreeVariable>(&left->node)) {
-            if (auto* rightFree =
-                    std::get_if<FreeVariable>(&right->node)) {
-                return leftFree->name == rightFree->name
-                    && leftFree->origin == rightFree->origin;
-            }
-            return false;
-        }
-        return false;
-    }
+    bool headsMatch(ExpressionPointer left, ExpressionPointer right);
 
     // Calls the kernel's inferType on `term` interpreted under the given
     // local binder stack. Builds a kernel Context with FreeVariables for
     // each binder and opens the term to refer to them.
     ExpressionPointer inferTypeInLocalContext(
         const std::vector<LocalBinder>& localBinders,
-        ExpressionPointer term) {
-        // Precondition: `term` is CLOSED over `localBinders` (see the
-        // representation-convention note above). Catch a violation here —
-        // O(1) — rather than as a "bare BoundVariable" crash inside inferType.
-        assertClosedOverLocalBinders(
-            term, localBinders, "inferTypeInLocalContext input");
-        ExpressionPointer openedTerm = openOverLocalBinders(
-            term, localBinders, localBinders.size());
-        Context context = buildContextFromLocalBinders(localBinders);
-        return inferType(environment_, context, openedTerm);
-    }
+        ExpressionPointer term);
 
     // For a term whose type is in some universe — i.e. the type's type is
     // a Sort N — returns the level u such that the term has type Type(u)
@@ -10562,62 +7612,13 @@ private:
     // LevelSuccessor or a concrete LevelConst).
     LevelPointer typeUniverseOf(
         const std::vector<LocalBinder>& localBinders,
-        ExpressionPointer term) {
-        ExpressionPointer typeOfTerm =
-            inferTypeInLocalContext(localBinders, term);
-        ExpressionPointer typeOfType =
-            inferTypeInLocalContext(localBinders, typeOfTerm);
-        auto* sortNode = std::get_if<Sort>(&typeOfType->node);
-        if (!sortNode) {
-            throw ElaborateError(
-                "internal: expected a Sort when computing universe level");
-        }
-        LevelPointer sortLevel = sortNode->level;
-        if (auto* successorLevel =
-                std::get_if<LevelSuccessor>(&sortLevel->node)) {
-            return successorLevel->base;
-        }
-        if (auto* constant = std::get_if<LevelConst>(&sortLevel->node)) {
-            if (constant->value >= 1) {
-                return makeLevelConst(constant->value - 1);
-            }
-        }
-        throw ElaborateError(
-            "cannot determine universe level for desugaring; the type's "
-            "Sort isn't a syntactic successor — use the explicit "
-            "Equality.{u}(...) form");
-    }
+        ExpressionPointer term);
 
     static const std::vector<std::string>& declarationUniverseParameters(
-        const Declaration& declaration) {
-        static const std::vector<std::string> empty;
-        if (auto* axiom = std::get_if<Axiom>(&declaration))
-            return axiom->universeParameters;
-        if (auto* definition = std::get_if<Definition>(&declaration))
-            return definition->universeParameters;
-        if (auto* inductive = std::get_if<Inductive>(&declaration))
-            return inductive->universeParameters;
-        if (auto* constructor = std::get_if<Constructor>(&declaration))
-            return constructor->universeParameters;
-        if (auto* recursor = std::get_if<Recursor>(&declaration))
-            return recursor->universeParameters;
-        return empty;
-    }
+        const Declaration& declaration);
 
     static ExpressionPointer declarationType(
-        const Declaration& declaration) {
-        if (auto* axiom = std::get_if<Axiom>(&declaration))
-            return axiom->type;
-        if (auto* definition = std::get_if<Definition>(&declaration))
-            return definition->type;
-        if (auto* inductive = std::get_if<Inductive>(&declaration))
-            return inductive->kind;
-        if (auto* constructor = std::get_if<Constructor>(&declaration))
-            return constructor->type;
-        if (auto* recursor = std::get_if<Recursor>(&declaration))
-            return recursor->type;
-        return nullptr;
-    }
+        const Declaration& declaration);
 
     // Unifies a single level expression with a concrete level, collecting
     // assignments for universe-parameter names. The "expected" side comes
@@ -10628,86 +7629,11 @@ private:
     // parameter).
     void unifyLevels(
         LevelPointer expected, LevelPointer actual,
-        std::map<std::string, LevelPointer>& assignment) {
-        if (auto* parameter = std::get_if<LevelParam>(&expected->node)) {
-            auto iterator = assignment.find(parameter->name);
-            if (iterator == assignment.end()) {
-                assignment[parameter->name] = actual;
-            }
-            return;
-        }
-        if (auto* expectedSuccessor =
-                std::get_if<LevelSuccessor>(&expected->node)) {
-            if (auto* actualSuccessor =
-                    std::get_if<LevelSuccessor>(&actual->node)) {
-                unifyLevels(expectedSuccessor->base,
-                             actualSuccessor->base,
-                             assignment);
-                return;
-            }
-            if (auto* actualConstant =
-                    std::get_if<LevelConst>(&actual->node)) {
-                if (actualConstant->value >= 1) {
-                    unifyLevels(expectedSuccessor->base,
-                                 makeLevelConst(actualConstant->value - 1),
-                                 assignment);
-                    return;
-                }
-            }
-        }
-        // Other cases (max, imax, mismatched constants): no assignment.
-    }
+        std::map<std::string, LevelPointer>& assignment);
 
     void unifyTypes(
         ExpressionPointer expected, ExpressionPointer actual,
-        std::map<std::string, LevelPointer>& assignment) {
-        // Walk Pi chains in parallel. We don't try to match Pi domains
-        // (they may contain BoundVariables in the expected side that
-        // don't substitute trivially); the codomain typically carries
-        // the universe info we care about.
-        if (auto* expectedPi = std::get_if<Pi>(&expected->node)) {
-            if (auto* actualPi = std::get_if<Pi>(&actual->node)) {
-                unifyTypes(expectedPi->codomain, actualPi->codomain,
-                            assignment);
-                return;
-            }
-        }
-        auto* expectedSort = std::get_if<Sort>(&expected->node);
-        auto* actualSort = std::get_if<Sort>(&actual->node);
-        if (expectedSort && actualSort) {
-            unifyLevels(expectedSort->level, actualSort->level,
-                         assignment);
-            return;
-        }
-        // Constant heads with universe-arguments lined up (e.g.,
-        // Equality.{u}
-        // applied to a value vs Equality.{0} applied to the same).
-        if (auto* expectedConstant =
-                std::get_if<Constant>(&expected->node)) {
-            if (auto* actualConstant =
-                    std::get_if<Constant>(&actual->node)) {
-                if (expectedConstant->name == actualConstant->name) {
-                    size_t commonCount = std::min(
-                        expectedConstant->universeArguments.size(),
-                        actualConstant->universeArguments.size());
-                    for (size_t i = 0; i < commonCount; ++i) {
-                        unifyLevels(
-                            expectedConstant->universeArguments[i],
-                            actualConstant->universeArguments[i],
-                            assignment);
-                    }
-                }
-            }
-        }
-        if (auto* expectedApplication =
-                std::get_if<Application>(&expected->node)) {
-            if (auto* actualApplication =
-                    std::get_if<Application>(&actual->node)) {
-                unifyTypes(expectedApplication->function,
-                            actualApplication->function, assignment);
-            }
-        }
-    }
+        std::map<std::string, LevelPointer>& assignment);
 
     // Stage 2 universe inference: when the user writes `Equality(A, x, y)`
     // without `.{u}`, look at the declaration's universe parameters and
@@ -10725,104 +7651,9 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int skipLeadingPis = 0,
         const std::string& callSiteName = "",
-        bool errorOnUninferred = false) {
+        bool errorOnUninferred = false);
 
-        const std::vector<std::string>& universeParameters =
-            declarationUniverseParameters(declaration);
-        if (universeParameters.empty()) return {};
-
-        std::map<std::string, LevelPointer> assignment;
-        ExpressionPointer cursor = declarationType(declaration);
-        for (int s = 0; s < skipLeadingPis && cursor != nullptr; ++s) {
-            cursor = weakHeadNormalForm(environment_, cursor);
-            auto* pi = std::get_if<Pi>(&cursor->node);
-            if (!pi) { cursor = nullptr; break; }
-            // Open the binder with a fresh Internal FreeVariable so the
-            // codomain refers to a free name rather than a loose BVar.
-            std::string skipName =
-                "_inferUniverseSkip_" + std::to_string(s);
-            cursor = openBinder(pi->codomain, skipName,
-                                  FreeVariableOrigin::Internal);
-        }
-        for (size_t i = 0;
-             i < valueArguments.size() && cursor != nullptr; ++i) {
-            cursor = weakHeadNormalForm(environment_, cursor);
-            auto* pi = std::get_if<Pi>(&cursor->node);
-            if (!pi) break;
-            if (!valueArguments[i]) {
-                cursor = pi->codomain;
-                continue;
-            }
-            ExpressionPointer expectedDomain =
-                weakHeadNormalForm(environment_, pi->domain);
-            ExpressionPointer actualType;
-            try {
-                actualType = weakHeadNormalForm(environment_,
-                    inferTypeInLocalContext(localBinders,
-                                              valueArguments[i]));
-            } catch (const TypeError&) {
-                cursor = pi->codomain;
-                continue;
-            } catch (const ElaborateError&) {
-                cursor = pi->codomain;
-                continue;
-            }
-            unifyTypes(expectedDomain, actualType, assignment);
-            cursor = pi->codomain;
-        }
-
-        std::vector<LevelPointer> result;
-        int uninferredCount = 0;
-        for (const auto& name : universeParameters) {
-            auto iterator = assignment.find(name);
-            if (iterator != assignment.end()) {
-                result.push_back(iterator->second);
-            } else {
-                ++uninferredCount;
-                result.push_back(makeLevelConst(0));
-            }
-        }
-        // The footgun guard: a universe parameter that the argument
-        // types don't pin down was historically defaulted to level 0
-        // *silently*. That silently fixes a polymorphic level — fine
-        // when 0 happens to be right, but otherwise it surfaces as a
-        // confusing downstream type error (especially now universes are
-        // non-cumulative, where a wrongly-collapsed level is rejected
-        // rather than absorbed). When the caller opts in, report it
-        // clearly at the call site instead, naming the fix: pass the
-        // levels explicitly with `Name.{...}`.
-        if (errorOnUninferred && uninferredCount > 0) {
-            std::string label =
-                callSiteName.empty() ? "this call" : "'" + callSiteName + "'";
-            throwElaborate(
-                "could not infer "
-                + std::to_string(uninferredCount)
-                + (uninferredCount == 1
-                       ? " universe level of "
-                       : " universe levels of ")
-                + label
-                + " from the argument types. Pass the level"
-                + (uninferredCount == 1 ? "" : "s")
-                + " explicitly, e.g. "
-                + (callSiteName.empty() ? "Name" : callSiteName)
-                + ".{0} (or .{u} to keep it polymorphic).");
-        }
-        return result;
-    }
-
-    static size_t universeParameterCount(const Declaration& declaration) {
-        if (auto* axiom = std::get_if<Axiom>(&declaration))
-            return axiom->universeParameters.size();
-        if (auto* definition = std::get_if<Definition>(&declaration))
-            return definition->universeParameters.size();
-        if (auto* inductive = std::get_if<Inductive>(&declaration))
-            return inductive->universeParameters.size();
-        if (auto* constructor = std::get_if<Constructor>(&declaration))
-            return constructor->universeParameters.size();
-        if (auto* recursor = std::get_if<Recursor>(&declaration))
-            return recursor->universeParameters.size();
-        return 0;
-    }
+    static size_t universeParameterCount(const Declaration& declaration);
 
     // ---- universe metavariable state ----
     // Each call to a declaration handler resets these. As elaboration

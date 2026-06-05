@@ -19,6 +19,8 @@ SRCS := \
     src/elaborator/prover.cpp src/elaborator/claim.cpp \
     src/elaborator/coercion.cpp src/elaborator/diff_bridges.cpp \
     src/elaborator/warnings.cpp src/elaborator/lemma_index.cpp \
+    src/elaborator/normalization.cpp src/elaborator/rewrite.cpp \
+    src/elaborator/desugar_eliminators.cpp src/elaborator/unification.cpp \
     src/elaborator/term_utilities.cpp src/elaborator/lemma_search.cpp \
     src/main.cpp
 
