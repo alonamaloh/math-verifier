@@ -13,8 +13,8 @@ SRCS := \
     src/kernel/serialize.cpp src/kernel/hash.cpp \
     src/syntax/lexer.cpp src/syntax/parser.cpp \
     src/elaborator/elaborator.cpp src/elaborator/levels.cpp \
-    src/elaborator/ring.cpp src/elaborator/term_utilities.cpp \
-    src/elaborator/lemma_search.cpp \
+    src/elaborator/ring.cpp src/elaborator/calc.cpp \
+    src/elaborator/term_utilities.cpp src/elaborator/lemma_search.cpp \
     src/main.cpp
 
 OBJS := $(patsubst src/%.cpp,$(OBJDIR)/%.o,$(SRCS))
