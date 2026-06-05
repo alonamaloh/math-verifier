@@ -6,11 +6,15 @@ abstract-ring `ring` normaliser is complete: subtract-unfold → negation-push
 proof-constructing over an abstract `Ring.carrier(s)`. Closes distributivity,
 0/1 identities, and telescoping/inverse-cancellation goals; `Ring.add_four_
 swap`, `Ring.difference_telescope`, `Ring.difference_add_distribute`
-simplified to `:= ring`. Only remaining abstract-ring gaps: double-negation
-(`negate(negate x)=x`, needs `Group.inverse_involution`) and sign-extraction
-from inside a monomial (`negate(x)·y = negate(x·y)`, for `difference_multiply_
-split`). Phase 3 (model-eval fingerprint) and Phase 4 (commutativity witness
-in the ideal tower) remain. Phase 0
+simplified to `:= ring`. The two follow-ups are DONE too: double-negation
+(`Ring.negate_negate` + a `ringPushNegation` case) and sign-extraction
+(`Ring.negate_multiply_left/right` + `ringExtractSigns`/`ringCombineProduct
+Signs`/`ringApplyNegate`); `Ring.negate_difference` and `Ring.difference_
+multiply_split` are now `:= ring` — every difference lemma in
+`ring_difference.math` is a one-liner. **NEXT = Phase 3** (model-eval
+fingerprint), then Phase 4 (commutativity witness in the ideal tower), then
+clean the 9 concrete-carrier warn sites (deferred to last by request).
+Phase 0
 safety net (effort budget + expensive-step warning) is committed. Phase 1's
 core win is committed: `proveAbstractRingAC` (`ring.cpp`) normalises +/·
 rearrangements over an abstract `Ring.carrier(s)` and closes them directly,
