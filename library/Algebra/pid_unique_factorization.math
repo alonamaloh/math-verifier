@@ -1,0 +1,57 @@
+-- Algebra/pid_unique_factorization.math
+--
+-- The uniqueness half of "PID ⇒ UFD", in PID terms: two factorizations
+-- of the same element into irreducibles are permutations of each other up
+-- to associates.
+--
+-- This is the immediate marriage of the two preceding results: in a PID
+-- irreducible ⟹ prime, and lists of primes with equal product are
+-- associate-permutations (true in any integral domain). Converting the
+-- irreducibility hypotheses to primality and invoking the domain-level
+-- uniqueness theorem closes it in three lines.
+
+module Algebra.pid_unique_factorization
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Lists.list
+import Lists.permutation
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.integral_domain
+import Algebra.irreducible
+import Algebra.associate
+import Algebra.factorization_list
+import Algebra.unique_factorization
+import Algebra.principal_ideal_domain
+
+theorem PrincipalIdealDomain.irreducible_factorization_unique
+        (pid : PrincipalIdealDomain)
+        (l1 l2 : List(Ring.carrier(PrincipalIdealDomain.ring(pid))))
+        (allIrreducible1 :
+            (k : Ring.carrier(PrincipalIdealDomain.ring(pid)))
+            → List.member(Ring.carrier(PrincipalIdealDomain.ring(pid)), k, l1)
+            → IntegralDomain.IsIrreducible(PrincipalIdealDomain.domain(pid), k))
+        (allIrreducible2 :
+            (k : Ring.carrier(PrincipalIdealDomain.ring(pid)))
+            → List.member(Ring.carrier(PrincipalIdealDomain.ring(pid)), k, l2)
+            → IntegralDomain.IsIrreducible(PrincipalIdealDomain.domain(pid), k))
+        (productEqual :
+            IntegralDomain.listProduct(PrincipalIdealDomain.domain(pid), l1)
+            = IntegralDomain.listProduct(PrincipalIdealDomain.domain(pid), l2))
+        : ∃ (m : List(Ring.carrier(PrincipalIdealDomain.ring(pid)))).
+            List.Permutation(Ring.carrier(PrincipalIdealDomain.ring(pid)), l2, m)
+            ∧ IntegralDomain.ListAssociate(PrincipalIdealDomain.domain(pid),
+                  l1, m) :=
+  IntegralDomain.prime_factorization_unique(
+      PrincipalIdealDomain.domain(pid), l1, l2,
+      (k : Ring.carrier(PrincipalIdealDomain.ring(pid)))
+      (member : List.member(Ring.carrier(PrincipalIdealDomain.ring(pid)), k, l1)) ↦
+        PrincipalIdealDomain.irreducible_is_prime(pid, k,
+            allIrreducible1(k, member)),
+      (k : Ring.carrier(PrincipalIdealDomain.ring(pid)))
+      (member : List.member(Ring.carrier(PrincipalIdealDomain.ring(pid)), k, l2)) ↦
+        PrincipalIdealDomain.irreducible_is_prime(pid, k,
+            allIrreducible2(k, member)),
+      productEqual)
