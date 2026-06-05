@@ -1,6 +1,7 @@
 # PLAN: Fingerprint-guided auto-prover (kill the blind ring searches)
 
-Status: **Phase 0 + Phase 1 headline DONE** (committed 2026-06-05). Phase 0
+Status: **Phase 0 + Phase 1 headline + Phase 2 increment 1 DONE** (committed
+2026-06-05; see the Phase 2 section for the increment-1/2 split). Phase 0
 safety net (effort budget + expensive-step warning) is committed. Phase 1's
 core win is committed: `proveAbstractRingAC` (`ring.cpp`) normalises +/·
 rearrangements over an abstract `Ring.carrier(s)` and closes them directly,
@@ -277,13 +278,30 @@ New file `src/elaborator/fingerprint.{hpp,cpp}` (or fold into `ring.cpp`):
    10-site worklist — they should close cheaply or surface as "add `by`."
 
 ### Phase 2 — Make `ring`/`field` work on abstract commutative rings
-- Extend `ring.cpp` so the normalizer recognizes the `CommutativeRing.carrier`
-  operators and the abstract `Ring.carrier(s)` projection, sourcing commutativity
-  from the bundle (`CommutativeRing` ⇒ commutative; `Ring` ⇒ associative-only /
-  "non-commutative ring mode" = same normal form **without sorting** factors).
-- This gives `by ring` over abstract commutative rings, and an unsorted general-
-  ring mode that proves associativity-only goals. (Overlaps Phase 1's normalizer;
-  decide whether to unify them.)
+- **Increment 1 DONE** (committed 2026-06-05): surface `ring` now recognizes the
+  abstract `Ring.carrier(s)` projection and routes to `proveAbstractRingAC` (the
+  Phase 1 non-commutative AC normaliser). Previously `ring` keyed its fingerprint
+  on non-existent `<carrier>.add/.multiply` names and wrongly declared such goals
+  FALSE. Now it proves associativity / `+`-commutativity rearrangements over any
+  ring and declines precisely otherwise. Multiplicative reassociation made
+  optional (treat `·`-products as atoms when `Ring.multiply_associative` isn't yet
+  in scope) so it works mid-bootstrap. `Ring.add_four_swap` simplified to `:= ring`.
+  Unify decision: **kept Phase 1's `proveAbstractRingAC` as the single engine**;
+  did NOT retrofit the v2 polynomial normaliser (its commutativity is pervasive —
+  sorted monomial-signature map keys via `std::merge`/`std::sort`, `multiply_
+  commutative` cited at many proof sites — too risky to parameterize).
+- **Increment 2 TODO — distributivity + negation/identity (the big one).** This is
+  a full non-commutative ring normaliser (sum of *ordered* monomials, distribute
+  products of sums, eliminate `0`/`1`, push `negate`/`subtract`). It is what the
+  `ring_difference.math`-style abstract-ring proofs need (`difference_telescope`,
+  `difference_multiply_split`, …). Two routes: (a) extend `proveAbstractRingAC`'s
+  recursive engine with a `ringDistribute` pass (`distributivity_left/right` exist
+  as `Ring.distributivity_left/right(s,x,y,z)`) + negation handling — clean, owned,
+  but ~several hundred lines of proof construction; (b) parameterize v2 by a
+  commutative flag (signature concat-vs-merge, skip the factor-sort proof step) —
+  more reuse but high risk. Recommend (a). NOTE: full COMMUTATIVE power over a
+  `Ring.carrier(s)` that is *secretly* commutative still needs Phase 4 (source the
+  commutativity witness); increment 2 only gets non-commutative-ring identities.
 
 ### Phase 3 — Evaluate-into-a-model fingerprint (distributivity, non-commutative)
 - Generalize `evalRingMod` (scalar, commutative) and add `M_n(F_P)` evaluation
