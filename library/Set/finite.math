@@ -27,6 +27,32 @@ import Natural.strong_recursion
 definition NaturalsBelow (n : Natural) : Type(0) :=
   Subtype(Natural, (k : Natural) ↦ successor(k) ≤ n)
 
+-- The element interface. Working through `make` / `value` / `below` (rather
+-- than the raw `Subtype.make(Natural, (k) ↦ …)` spelling) lets every call
+-- site read as "the value k and the witness that k < n". `n` is implicit —
+-- inferred from the element.
+
+-- Build an element from a value and a proof it lies below n.
+definition NaturalsBelow.make {n : Natural} (value : Natural) (below : successor(value) ≤ n)
+        : NaturalsBelow(n) :=
+  Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ n, value, below)
+
+-- The underlying value of an element.
+definition NaturalsBelow.value {n : Natural} (element : NaturalsBelow(n)) : Natural :=
+  Subtype.value(element)
+
+-- Every element's value lies below n.
+definition NaturalsBelow.below {n : Natural} (element : NaturalsBelow(n))
+        : successor(NaturalsBelow.value(element)) ≤ n :=
+  Subtype.property(element)
+
+-- Extensionality: elements with equal values are equal (the bound proofs
+-- are irrelevant). This is what lets the counting bijections argue purely
+-- about values.
+theorem NaturalsBelow.equal_of_value (n : Natural) (a b : NaturalsBelow(n))
+        (valuesEqual : NaturalsBelow.value(a) = NaturalsBelow.value(b)) : a = b :=
+  Subtype.equal_of_value_equal(Natural, (k : Natural) ↦ successor(k) ≤ n, a, b, valuesEqual)
+
 -- `HasSize(X, n)`: X has exactly n elements — it is the same size as the
 -- canonical n-element type.
 definition HasSize (X : Type(0)) (n : Natural) : Proposition :=
@@ -38,11 +64,11 @@ definition HasSize (X : Type(0)) (n : Natural) : Proposition :=
 theorem NaturalsBelow.has_size (n : Natural) : HasSize(NaturalsBelow(n), n) :=
   Equinumerous.reflexive(NaturalsBelow(n))
 
--- There are no naturals below 0: an element would carry a proof of
+-- There are no naturals below 0: an element's value would be below 0, i.e.
 -- `successor(value) ≤ 0`, which is impossible.
-theorem NaturalsBelow.zero_is_empty : NaturalsBelow(0) → False
-  | Subtype.make(value, belowZero) =>
-      Natural.not_less_or_equal_successor_zero(value, belowZero)
+theorem NaturalsBelow.zero_is_empty (element : NaturalsBelow(0)) : False :=
+  Natural.not_less_or_equal_successor_zero(
+      NaturalsBelow.value(element), NaturalsBelow.below(element))
 
 -- Size is invariant under equinumerosity: if X is the same size as Y and
 -- Y has n elements, so does X. This is transitivity of equinumerosity,
