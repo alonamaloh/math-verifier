@@ -34,45 +34,54 @@ import RingModulo.basics
 -- plain `s : Ring` — they are general divisibility/difference facts and
 -- have nothing to do with the bundle.
 
--- (a + b) − (a' + b') = (a − a') + (b − b'); closed under addition.
+-- (a + b) − (a' + b') = (a − a') + (b − b') = m · qA + m · qB, so the
+-- quotient is qA + qB.
 theorem Ring.CongruentModulo.add_respects (s : Ring)
         (m a a' b b' : Ring.carrier(s))
         (congruentA : Ring.CongruentModulo(s, m, a, a'))
         (congruentB : Ring.CongruentModulo(s, m, b, b'))
-        : Ring.CongruentModulo(s, m, Ring.add(s, a, b), Ring.add(s, a', b')) :=
-  rewrite(Ring.difference_add_distribute(s, a, a', b, b'),
-          Ring.divides_add(s, m,
-              Ring.add(s, a, Ring.negate(s, a')),
-              Ring.add(s, b, Ring.negate(s, b')),
-              congruentA, congruentB))
+        : Ring.CongruentModulo(s, m, a + b, a' + b') := {
+  obtain ⟨quotientA, equationA⟩ from congruentA;
+  obtain ⟨quotientB, equationB⟩ from congruentB;
+  witness quotientA + quotientB with
+      (calc (a + b) - (a' + b')
+          = (a - a') + (b - b')
+          = m * quotientA + m * quotientB
+          = m * (quotientA + quotientB))
+}
 
--- (−a) − (−a') = −(a − a'); closed under negation.
+-- (−a) − (−a') = −(a − a') = m · (−qA); the quotient negates.
 theorem Ring.CongruentModulo.negate_respects (s : Ring)
         (m a a' : Ring.carrier(s))
         (congruentA : Ring.CongruentModulo(s, m, a, a'))
-        : Ring.CongruentModulo(s, m, Ring.negate(s, a), Ring.negate(s, a')) :=
-  rewrite(Ring.negate_add_distribute(s, a, Ring.negate(s, a')),
-          Ring.divides_negate(s, m,
-              Ring.add(s, a, Ring.negate(s, a')), congruentA))
+        : Ring.CongruentModulo(s, m, -a, -a') := {
+  obtain ⟨quotientA, equationA⟩ from congruentA;
+  witness -quotientA with
+      (calc (-a) - (-a')
+          = -(a - a')
+          = -(m * quotientA)
+          = m * (-quotientA))
+}
 
--- a·b − a'·b' = (a − a')·b + a'·(b − b'); closed under addition of the
--- right multiple of (a − a') and the left multiple of (b − b'). The
--- left multiple needs commutativity to expose `m` as a divisor.
+-- a·b − a'·b' = (a − a')·b + a'·(b − b'). Substituting a − a' = m · qA and
+-- b − b' = m · qB and commuting a'·m past m gives the quotient qA·b + a'·qB.
 theorem Ring.CongruentModulo.multiply_respects (s : Ring)
         (commutativity : Ring.MultiplyCommutative(s))
         (m a a' b b' : Ring.carrier(s))
         (congruentA : Ring.CongruentModulo(s, m, a, a'))
         (congruentB : Ring.CongruentModulo(s, m, b, b'))
-        : Ring.CongruentModulo(s, m,
-              Ring.multiply(s, a, b), Ring.multiply(s, a', b')) :=
-  rewrite(Ring.difference_multiply_split(s, a, a', b, b'),
-          Ring.divides_add(s, m,
-              Ring.multiply(s, Ring.add(s, a, Ring.negate(s, a')), b),
-              Ring.multiply(s, a', Ring.add(s, b, Ring.negate(s, b'))),
-              Ring.divides_multiply_right(s, m,
-                  Ring.add(s, a, Ring.negate(s, a')), b, congruentA),
-              Ring.divides_multiply_left(s, commutativity, m,
-                  Ring.add(s, b, Ring.negate(s, b')), a', congruentB)))
+        : Ring.CongruentModulo(s, m, a * b, a' * b') := {
+  obtain ⟨quotientA, equationA⟩ from congruentA;
+  obtain ⟨quotientB, equationB⟩ from congruentB;
+  witness quotientA * b + a' * quotientB with
+      (calc a * b - a' * b'
+          = (a - a') * b + a' * (b - b')
+          = (m * quotientA) * b + a' * (m * quotientB)
+          = m * (quotientA * b) + (a' * m) * quotientB
+          = m * (quotientA * b) + (m * a') * quotientB
+                by commutativity(a', m)
+          = m * (quotientA * b + a' * quotientB))
+}
 
 -- ----------------------------------------------------------------------
 -- The class of a representative. Canonical introduction form.
@@ -169,8 +178,6 @@ theorem RingModulo.modulus_is_zero (c : CommutativeRing) (m : CommutativeRing.ca
       m, Ring.zero(CommutativeRing.ring(c)),
       (⟨Ring.one(CommutativeRing.ring(c)),
         calc Ring.add(CommutativeRing.ring(c), m, Ring.negate(CommutativeRing.ring(c), Ring.zero(CommutativeRing.ring(c))))
-           = Ring.add(CommutativeRing.ring(c), m, Ring.zero(CommutativeRing.ring(c)))
-           = m
            = Ring.multiply(CommutativeRing.ring(c), m, Ring.one(CommutativeRing.ring(c)))⟩
        : Ring.divides(CommutativeRing.ring(c), m,
              Ring.add(CommutativeRing.ring(c), m, Ring.negate(CommutativeRing.ring(c), Ring.zero(CommutativeRing.ring(c)))))))

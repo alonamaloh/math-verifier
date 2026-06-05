@@ -1,20 +1,15 @@
 -- Algebra/ring_difference.math
 --
--- Difference (x − y) rearrangement identities in an arbitrary bundled
--- ring `s`. These are the abstract-ring analogues of the `ring`-tactic
--- rewrites that the concrete-carrier constructions (IntegerMod) get for
--- free: `ring` only fires on a *commutative* ring, but these identities
--- hold in any ring (the additive group is abelian) and are stated over a
--- plain `(s : Ring)`, so a quotient-by-principal-ideal construction can
--- cite them without a commutativity hypothesis. They are proved here once
--- from the bundle's flattened law projections plus the abstract
--- group/ring lemmas.
+-- Negation distributes over a sum in an arbitrary bundled ring `s`:
+-- −(a + b) = (−a) + (−b). This holds in any ring (the additive group is
+-- abelian) and is stated over a plain `(s : Ring)`. It is also the law the
+-- abstract-ring `ring` normaliser cites to push negation inward, so it must
+-- be in scope wherever `ring` is expected to handle subtraction.
 --
--- Written with the `+`/`-`/`*` operators on `Ring.carrier(s)` (the
--- subtraction `x - y` is `Ring.add(s, x, Ring.negate(s, y))`); the calc
--- diff-inference bridges the operator and the add/negate spellings up to
--- definitional equality, so the `by` steps line up without hand-expanding
--- every difference.
+-- (The derived difference rearrangements — telescope, componentwise add,
+-- the multiply split, negate-a-difference — used to live here too; they are
+-- now proved on demand by `ring` over an abstract carrier, so their call
+-- sites construct the divisibility witness directly instead.)
 
 module Algebra.ring_difference
 
@@ -37,29 +32,3 @@ theorem Ring.negate_add_distribute (s : Ring) (a b : Ring.carrier(s))
       Ring.carrier(s), Ring.add, Ring.zero(s), Ring.negate,
       additiveAbelianGroup, a, b)
 }
-
--- Negating a difference flips it: −(g − h) = h − g.
-theorem Ring.negate_difference (s : Ring) (g h : Ring.carrier(s))
-        : Ring.negate(s, g - h) = h - g := ring
-
--- Telescoping cancellation: (g − h) + (h − k) = g − k. The abstract-ring
--- `ring` normaliser unfolds the subtractions, AC-normalises, and cancels the
--- `−h`/`+h` inverse pair.
-theorem Ring.difference_telescope (s : Ring) (g h k : Ring.carrier(s))
-        : (g - h) + (h - k) = g - k := ring
-
--- Differences add componentwise:
--- (a − a') + (b − b') = (a + b) − (a' + b').
-theorem Ring.difference_add_distribute (s : Ring) (a a' b b' : Ring.carrier(s))
-        : (a - a') + (b - b') = (a + b) - (a' + b') := ring
-
--- The multiplication-respects rearrangement, with no commutativity
--- needed: (a − a')·b + a'·(b − b') = a·b − a'·b'. Both products expand by
--- distributivity to a four-term telescope whose middle terms −(a'·b) and
--- a'·b cancel.
--- Both products expand by distributivity to a four-term telescope whose
--- middle terms −(a'·b) and a'·b cancel — all of which the abstract-ring
--- `ring` normaliser now does (distribute, extract signs, cancel inverses).
-theorem Ring.difference_multiply_split (s : Ring) (a a' b b' : Ring.carrier(s))
-        : (a - a') * b + a' * (b - b')
-          = a * b - a' * b' := ring

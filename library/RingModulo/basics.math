@@ -52,31 +52,40 @@ definition RingModulo (c : CommutativeRing) (m : CommutativeRing.carrier(c)) : T
 -- Congruence is an equivalence relation. Each property is one
 -- divisibility closure lemma plus a difference rearrangement.
 
--- Reflexive: x − x = 0 and m divides 0.
+-- Reflexive: x − x = 0 = m · 0, so m divides x − x.
 theorem Ring.CongruentModulo.reflexive (s : Ring) (m x : Ring.carrier(s))
-        : Ring.CongruentModulo(s, m, x, x) :=
-  rewrite(Equality.symmetry(Ring.add_negate_right(s, x)),
-          Ring.divides_zero(s, m))
+        : Ring.CongruentModulo(s, m, x, x) := {
+  witness Ring.zero(s) with
+      (calc x - x
+          = m * Ring.zero(s))
+}
 
--- Symmetric: −(x − y) = y − x, and divisibility is closed under negation.
+-- Symmetric: from x − y = m · q, the negation y − x = m · (−q).
 theorem Ring.CongruentModulo.symmetric (s : Ring) (m x y : Ring.carrier(s))
         (congruent : Ring.CongruentModulo(s, m, x, y))
-        : Ring.CongruentModulo(s, m, y, x) :=
-  rewrite(Ring.negate_difference(s, x, y),
-          Ring.divides_negate(s, m, Ring.add(s, x, Ring.negate(s, y)),
-              congruent))
+        : Ring.CongruentModulo(s, m, y, x) := {
+  obtain ⟨quotient, equation⟩ from congruent;
+  witness -quotient with
+      (calc y - x
+          = -(x - y)
+          = -(m * quotient)
+          = m * (-quotient))
+}
 
--- Transitive: (x − y) + (y − z) = x − z, and divisibility is closed
--- under addition.
+-- Transitive: x − z telescopes to (x − y) + (y − z) = m · qXY + m · qYZ,
+-- so the quotient is qXY + qYZ.
 theorem Ring.CongruentModulo.transitive (s : Ring) (m x y z : Ring.carrier(s))
         (congruentXY : Ring.CongruentModulo(s, m, x, y))
         (congruentYZ : Ring.CongruentModulo(s, m, y, z))
-        : Ring.CongruentModulo(s, m, x, z) :=
-  rewrite(Ring.difference_telescope(s, x, y, z),
-          Ring.divides_add(s, m,
-              Ring.add(s, x, Ring.negate(s, y)),
-              Ring.add(s, y, Ring.negate(s, z)),
-              congruentXY, congruentYZ))
+        : Ring.CongruentModulo(s, m, x, z) := {
+  obtain ⟨quotientXY, equationXY⟩ from congruentXY;
+  obtain ⟨quotientYZ, equationYZ⟩ from congruentYZ;
+  witness quotientXY + quotientYZ with
+      (calc x - z
+          = (x - y) + (y - z)
+          = m * quotientXY + m * quotientYZ
+          = m * (quotientXY + quotientYZ))
+}
 
 -- The congruence bundled as an `IsEquivalenceRelation`.
 definition RingModulo.equivalence (s : Ring) (m : Ring.carrier(s))
