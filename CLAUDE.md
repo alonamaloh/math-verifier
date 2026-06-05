@@ -43,11 +43,16 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   `rewrite(eq, term)`, diff-inferred `by`, and rewrite-under-binder.
 - **algebra-tactics.md** — `ring`, `field`, `linear_combination`, and the
   foundational-vs-derived ring-lemma split.
-- **proof-style.md** — math-like phrasing; `cases`/`by_induction` over
+- **proof-style.md** — math-like phrasing; **what an ideal proof looks
+  like and the raw-CIC tells to avoid** (no `congruenceOf`/
+  `transport_proposition`/raw `Subtype.make`/positional lemma calls —
+  read this BEFORE writing proofs); `cases`/`by_induction` over
   pattern-match; `cases ... with`; `decide`; statement-level sugar
   (`claim`/`goal`/`obtain`/`choose`/`take`/`suppose`/`let`/`note`/
   `change`/`unfold`); `since` (kept hint) and `note … by` (verified
-  comment); and CIC-noise-reduction idioms.
+  comment); CIC-noise-reduction idioms; and the **redundancy-check
+  polishing workflow** (`--check-redundant-by`… + the unused-name cascade
+  and how to settle it).
 - **structures-and-inference.md** — name-bound `convention`s, implicit
   arguments `{x : T}`, canonical `instance` inference, operator
   overloading (including the `·` group operator and postfix `⁻¹`), and

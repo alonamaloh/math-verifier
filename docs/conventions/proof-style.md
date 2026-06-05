@@ -197,6 +197,75 @@ Concretely:
   legible and lets a reader skim the claims to see the shape before
   reading the inner proofs.
 
+### What an ideal proof looks like — and the CIC tells that betray it
+
+Write the proof a mathematician would, then make the kernel accept it —
+NOT the other way around. The single biggest readability failure is
+**raw-CIC style**: the proof typechecks but reads like type theory, not
+mathematics. If you find yourself writing any of the following, stop and
+reach for the math-like form instead:
+
+- **`congruenceOf(…)` / `Equality.congruence(…)` — a raw-CIC stink.**
+  "Apply `f` to both sides of `a = b`" is a one-step `calc` whose
+  justification is the inner equality: the elaborator's *diff-inferred
+  congruence* wraps `f` automatically (see calc-and-rewrite.md).
+  ```
+  -- NOT: congruenceOf((x) ↦ Sum.left(A, B, x), valueEquality)
+  calc Sum.left(A, B, recovered)
+     = Sum.left(A, B, original)   by valueEquality        -- congruence inferred
+  ```
+  Caveat: after a `cases`/`refining` has already reduced the goal, the
+  function application in the goal is *already* the reduced constructor
+  form, while a freshly-written `f(g(x))` is *stuck* (neutral scrutinee).
+  So **start the calc from the reduced form**, not from the original
+  application.
+
+- **`Equality.transport_proposition(…)` to move a fact along an
+  equation** — use a `calc` step or `by substituting <eq>` instead.
+
+- **Raw `Subtype.make(Carrier, (k) ↦ …predicate…, value, proof)` at call
+  sites** — when you carve a type out with a predicate (`Subtype`,
+  `NaturalsBelow(n) := Subtype(Natural, k ↦ k < n)`, …), give it a small
+  **element interface** up front and use *only* that: `Foo.make(value,
+  proof)`, `Foo.value(e)`, a projection for the defining property, and an
+  extensionality lemma `Foo.equal_of_value` (proof-irrelevance collapses
+  the membership proofs, so equality reduces to value-equality). Then every
+  downstream proof argues about *values*, never about the `Subtype`
+  spelling. Writing the interface costs a dozen lines once and removes the
+  CIC spelling from every theorem that follows.
+
+- **Positional multi-argument lemma calls** — `LessOrEqual.transitive(a,
+  b, c, p, q)`, `Lemma(x, y, z, h1, h2)` — are unreadable. Cite the lemma
+  **by name, argument-free**: `by <Lemma>` / `since <Lemma>`, letting
+  goal-driven inference + context-discharge fill the arguments (see
+  structures-and-inference.md, "Citing a lemma by name"). Name the
+  *operative result* (the insight), not the plumbing.
+  - Transitivity / a "`x` is strictly below itself" contradiction reads as
+    an inequality **`≤`-calc**, never a positional `transitive` call:
+    ```
+    claim valueBelowItself : successor(v) ≤ v
+        by calc successor(v) ≤ m by below ≤ v by atLeast;
+    absurd(Natural.not_successor_less_or_equal_self(v, valueBelowItself))
+    ```
+  - Argument-free `by <Lemma>` works for a `≤`/`∣` calc step and any goal
+    that pins the lemma's conclusion. It does **not** work for an `=` calc
+    step (diff-inference needs the lemma *applied*: `by add_successor(m,
+    x)`), nor when a lemma premise is a *derived term* rather than a
+    context hypothesis (the prover can't conjure it) — there, keep that one
+    argument explicit, or pick a premise-free lemma (`successor_positive`
+    over `successor_less_or_equal_successor`).
+
+- **The hole marker is `?`, never `_`** (`_` parses as an identifier).
+  `?` is solved from the expected type in direct-goal position — e.g.
+  `Foo.equal_of_value(n, ?, b, valueProof)` against a goal `a = b` solves
+  `? = a`. It mis-resolves inside a `congruenceOf`/calc-`by` position, so
+  spell those.
+
+The litmus test: a reader should follow the proof as *mathematics* —
+"apply `g` to both sides", "by antisymmetry", "`successor(v) ≤ m ≤ v`,
+absurd" — without parsing CIC bureaucracy. Length spent on named
+mathematical steps is a feature; ceremony is the enemy.
+
 ### Statement-level proof sugar
 
 Inside a `{ … }` proof block, the following statement forms compose
@@ -400,3 +469,66 @@ bridge lemma is almost always a red flag — pattern-matching at make
 inside an `at_make` theorem subsumes it without the auxiliary
 definition. A previous draft of the triangle-inequality proof spent
 200 lines on this pattern; the at-make refactor took 40.
+
+## Polishing with the redundancy checks (and the cascade they trigger)
+
+The kernel has three opt-in diagnostics for trimming dead hints (they are
+NOT part of the normal `make`, which stays clean either way — these are a
+deliberate polishing pass, somewhat expensive, run on *your* files only):
+
+```
+./kernel verify --source <file> --output <…>.mathv --cache-root build --check-redundant-by
+                                                                       --check-redundant-by-non-eq
+                                                                       --check-redundant-calc-steps
+```
+
+`--check-redundant-by` reports both a *redundant-`by`* finding (the
+auto-prover closes the step/claim without the hint) and an *unused-name*
+finding (a binding the prover consumes by type-match, so the name is dead
+weight). `.mark_redundant.py <files>` annotates the calc-step `by` sites
+with marker
+comments; you then **edit by hand and rebuild**, reverting anything that
+turns out to be load-bearing (the checker tests each site in isolation, so
+adjacent steps in a chain can interact). Do NOT write a fully-automated
+rewriter.
+
+**How to resolve each finding — by readability, not by chasing zero:**
+
+- **Redundant `by` on a *calc step* citing a library lemma / tactic**
+  (`by ring`, `by add_successor`, `by multiply_commutative`) → make it
+  **by-less**. The calc already shows the intermediate form; the citation
+  was noise.
+- **Redundant `by` on a *claim* that names the operative lemma** (often
+  with a long positional argument list) → rewrite as argument-free
+  **`since <Lemma>`**. `since` names the insight, drops the clutter, and is
+  *exempt* from the redundant-`by` check (it signals "the author is
+  explaining"). Prefer this over baring the claim, which would read as an
+  unexplained assertion.
+
+**The cascade — expect it, and settle it.** Removing a `by` (or going
+argument-free) makes the auto-prover pick the needed fact out of context by
+*type-match* instead of by name. Two follow-on findings appear:
+
+1. A named intermediate `claim NAME : T by …` whose `NAME` is now only
+   consumed by type-match → flagged **`unused name`**. Fix: **anonymize**
+   it — `claim T by V;` (or bare `claim T;` if its own `by` was also
+   redundant). The fact is still stated and still in context for the
+   type-match; only the dead label goes. Keep a name **only** when it is
+   referenced by name later (a genuine milestone).
+2. A calc step that fed such a claim may itself become redundant → by-less
+   it too.
+
+Re-run the check after editing; the cascade is finite and converges to
+by-less routine steps + anonymous intermediate facts + `since`-cited
+operative lemmas. Stop short of churning when removal would *worsen*
+things: by-less'ing a step that cites an `obtain`/`suppose` binder just
+moves the warning to an "unused binder" (use `as _`, or leave it); and a
+genuinely informative reduction *chain* in a `calc` is worth keeping even
+when the prover could skip it.
+
+**`by` vs `since` vs `note` — the mnemonic.** `by` = the prover needs it.
+`since` = a kept explanation the prover does *not* need (exempt from the
+redundant-`by` check). `note P [by …];` = a verified comment that is **not
+added to the context** — so never use `note` for a fact a later step must
+consume by type-match (it won't be there); use an anonymous `claim` for
+that.
