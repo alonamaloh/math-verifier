@@ -204,31 +204,19 @@ theorem PrincipalIdealDomain.bezout_one_of_irreducible
     | Or.introduceLeft(gIsUnit) => {
         obtain ⟨gInverse, _, gTimesInverse⟩
             from IntegralDomain.unit_inverse_is_unit(d, g, gIsUnit);
-        -- gTimesInverse : g · gInverse = 1. The two single-summand
-        -- reassociations are kept as claims; the auto-prover pulls them
-        -- into the Bézout calc below by type-match.
-        claim reassocX
-            : Ring.multiply(s, Ring.multiply(s, x, p), gInverse)
-              = Ring.multiply(s, Ring.multiply(s, x, gInverse), p)
-            by calc (x * p) * gInverse
-                  = x * (p * gInverse)
-                  = x * (gInverse * p)         by IntegralDomain.commutative(d, p, gInverse)
-                  = (x * gInverse) * p         by Equality.symmetry(Ring.multiply_associative(s, x, gInverse, p));
-        claim reassocY
-            : Ring.multiply(s, Ring.multiply(s, y, a), gInverse)
-              = Ring.multiply(s, Ring.multiply(s, y, gInverse), a)
-            by calc (y * a) * gInverse
-                  = y * (a * gInverse)
-                  = y * (gInverse * a)         by IntegralDomain.commutative(d, a, gInverse)
-                  = (y * gInverse) * a         by Equality.symmetry(Ring.multiply_associative(s, y, gInverse, a));
-        ⟨x * gInverse, y * gInverse,
-         Equality.symmetry(
-             calc Ring.one(s)
-                = g * gInverse
-                = (x * p + y * a) * gInverse
-                = (x * p) * gInverse + (y * a) * gInverse
-                = (x * gInverse) * p + (y * a) * gInverse
-                = (x * gInverse) * p + (y * gInverse) * a)⟩
+        -- gTimesInverse : g · gInverse = 1. Left-multiply the gcd identity
+        -- g = x·p + y·a by g⁻¹: (g⁻¹·x)·p + (g⁻¹·y)·a = g⁻¹·(x·p + y·a) =
+        -- g⁻¹·g = 1. (Left-multiplying avoids commuting g⁻¹ past p and a.)
+        ⟨gInverse * x, gInverse * y,
+         calc (gInverse * x) * p + (gInverse * y) * a
+            = gInverse * (x * p) + gInverse * (y * a)
+            = gInverse * (x * p + y * a)
+                  by Equality.symmetry(
+                         Ring.distributivity_left(s, gInverse, x * p, y * a))
+            = gInverse * g
+            = g * gInverse
+                  by IntegralDomain.commutative(d, gInverse, g)
+            = Ring.one(s)⟩
       }
   }
 }
