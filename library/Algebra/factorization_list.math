@@ -1,0 +1,173 @@
+-- Algebra/factorization_list.math
+--
+-- The list-level scaffolding for unique factorization in an integral
+-- domain: the product of a list of ring elements, the elementwise
+-- "associate" relation on lists, Euclid's lemma over a list (a prime
+-- dividing a product divides a member), and the base fact that a list of
+-- primes whose product is a unit must be empty.
+--
+-- Factorizations are modelled as `List(Ring.carrier(s))`; `listProduct`
+-- folds the ring multiplication over them. Uniqueness (next module)
+-- concludes a permutation of one list matches the other elementwise up to
+-- associates — `ListAssociate` is that elementwise relation.
+
+module Algebra.factorization_list
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Lists.list
+import Lists.permutation
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_divisibility
+import Algebra.commutative_ring_bundle
+import Algebra.integral_domain
+import Algebra.irreducible
+import Algebra.associate
+
+-- ----------------------------------------------------------------------
+-- Product of a list of ring elements.
+
+definition IntegralDomain.listProduct (d : IntegralDomain)
+        (l : List(Ring.carrier(IntegralDomain.ring(d))))
+        : Ring.carrier(IntegralDomain.ring(d)) :=
+  List.product(Ring.carrier(IntegralDomain.ring(d)),
+      (x y : Ring.carrier(IntegralDomain.ring(d))) ↦
+          Ring.multiply(IntegralDomain.ring(d), x, y),
+      Ring.one(IntegralDomain.ring(d)), l)
+
+-- Reduction lemmas (definitional, named for use in calc).
+theorem IntegralDomain.listProduct_empty (d : IntegralDomain)
+        : IntegralDomain.listProduct(d,
+              List.empty(Ring.carrier(IntegralDomain.ring(d))))
+          = Ring.one(IntegralDomain.ring(d)) :=
+  reflexivity(Ring.carrier(IntegralDomain.ring(d)),
+      Ring.one(IntegralDomain.ring(d)))
+
+theorem IntegralDomain.listProduct_prepend (d : IntegralDomain)
+        (head : Ring.carrier(IntegralDomain.ring(d)))
+        (tail : List(Ring.carrier(IntegralDomain.ring(d))))
+        : IntegralDomain.listProduct(d,
+              List.prepend(Ring.carrier(IntegralDomain.ring(d)), head, tail))
+          = Ring.multiply(IntegralDomain.ring(d), head,
+                IntegralDomain.listProduct(d, tail)) :=
+  reflexivity(Ring.carrier(IntegralDomain.ring(d)),
+      Ring.multiply(IntegralDomain.ring(d), head,
+          IntegralDomain.listProduct(d, tail)))
+
+-- ----------------------------------------------------------------------
+-- Elementwise associate relation on lists.
+
+inductive IntegralDomain.ListAssociate (d : IntegralDomain)
+        : List(Ring.carrier(IntegralDomain.ring(d)))
+          → List(Ring.carrier(IntegralDomain.ring(d)))
+          → Proposition where
+  | IntegralDomain.ListAssociate.empty
+      : IntegralDomain.ListAssociate(d,
+            List.empty(Ring.carrier(IntegralDomain.ring(d))),
+            List.empty(Ring.carrier(IntegralDomain.ring(d))))
+  | IntegralDomain.ListAssociate.cons
+      : (x y : Ring.carrier(IntegralDomain.ring(d)))
+        → IntegralDomain.Associate(d, x, y)
+        → (l1 l2 : List(Ring.carrier(IntegralDomain.ring(d))))
+        → IntegralDomain.ListAssociate(d, l1, l2)
+        → IntegralDomain.ListAssociate(d,
+              List.prepend(Ring.carrier(IntegralDomain.ring(d)), x, l1),
+              List.prepend(Ring.carrier(IntegralDomain.ring(d)), y, l2))
+
+-- ----------------------------------------------------------------------
+-- Euclid's lemma over a list: a prime dividing a list's product divides
+-- one of the list's members.
+
+theorem IntegralDomain.prime_divides_listProduct_member (d : IntegralDomain)
+        (p : Ring.carrier(IntegralDomain.ring(d)))
+        (primality : IntegralDomain.IsPrimeElement(d, p))
+        : (l : List(Ring.carrier(IntegralDomain.ring(d))))
+          → Ring.divides(IntegralDomain.ring(d), p,
+                IntegralDomain.listProduct(d, l))
+          → ∃ (q : Ring.carrier(IntegralDomain.ring(d))).
+              List.member(Ring.carrier(IntegralDomain.ring(d)), q, l)
+              ∧ Ring.divides(IntegralDomain.ring(d), p, q)
+  | List.empty =>
+      (pDividesOne :
+          Ring.divides(IntegralDomain.ring(d), p,
+              IntegralDomain.listProduct(d,
+                  List.empty(Ring.carrier(IntegralDomain.ring(d)))))) ↦ {
+        let ⟨_, pNotUnit, _⟩ := primality;
+        -- listProduct(empty) = 1, so pDividesOne says p is a unit.
+        absurd(pNotUnit(pDividesOne))
+      }
+  | List.prepend(head, tail) =>
+      (pDividesProduct :
+          Ring.divides(IntegralDomain.ring(d), p,
+              IntegralDomain.listProduct(d,
+                  List.prepend(Ring.carrier(IntegralDomain.ring(d)),
+                      head, tail)))) ↦ {
+        let ⟨_, _, primeDivides⟩ := primality;
+        -- listProduct(prepend(head,tail)) = head · listProduct(tail).
+        cases primeDivides(head, IntegralDomain.listProduct(d, tail),
+                  pDividesProduct) {
+          | Or.introduceLeft(pDividesHead) =>
+              ⟨head,
+               List.member.here(Ring.carrier(IntegralDomain.ring(d)),
+                   head, tail),
+               pDividesHead⟩
+          | Or.introduceRight(pDividesTail) => {
+              obtain ⟨q, qMember, pDividesQ⟩
+                  from IntegralDomain.prime_divides_listProduct_member(d, p,
+                           primality, tail, pDividesTail);
+              ⟨q,
+               List.member.there(Ring.carrier(IntegralDomain.ring(d)),
+                   q, head, tail, qMember),
+               pDividesQ⟩
+            }
+        }
+      }
+
+-- ----------------------------------------------------------------------
+-- A list of primes whose product is a unit is empty. (If it had a head
+-- `h`, then `h` would divide the unit product, hence divide 1, making `h`
+-- a unit — contradicting that a prime is not a unit.)
+theorem IntegralDomain.prime_list_unit_product_empty (d : IntegralDomain)
+        (l : List(Ring.carrier(IntegralDomain.ring(d))))
+        (allPrime : (k : Ring.carrier(IntegralDomain.ring(d)))
+                    → List.member(Ring.carrier(IntegralDomain.ring(d)), k, l)
+                    → IntegralDomain.IsPrimeElement(d, k))
+        (productIsUnit
+            : Ring.IsUnit(IntegralDomain.ring(d),
+                  IntegralDomain.listProduct(d, l)))
+        : l = List.empty(Ring.carrier(IntegralDomain.ring(d))) := {
+  let s : Ring := IntegralDomain.ring(d);
+  cases l {
+    | List.empty => reflexivity(List(Ring.carrier(s)),
+                        List.empty(Ring.carrier(s)))
+    | List.prepend(head, tail) => {
+        -- head is prime (it is a member), and head divides the unit
+        -- product, so head divides 1 — a unit — contradiction.
+        claim headIsPrime : IntegralDomain.IsPrimeElement(d, head)
+            by allPrime(head,
+                   List.member.here(Ring.carrier(s), head, tail));
+        let ⟨_, headNotUnit, _⟩ := headIsPrime;
+        obtain ⟨unitInverse, oneEqualsProductInverse⟩ from productIsUnit;
+        -- oneEqualsProductInverse : 1 = listProduct(prepend(head,tail)) · unitInverse
+        --                             = head · (listProduct(tail) · unitInverse).
+        claim headIsUnit : Ring.IsUnit(s, head)
+            by ⟨IntegralDomain.listProduct(d, tail) * unitInverse,
+                calc Ring.one(s)
+                   = IntegralDomain.listProduct(d,
+                         List.prepend(Ring.carrier(s), head, tail))
+                         * unitInverse
+                   = (head * IntegralDomain.listProduct(d, tail)) * unitInverse
+                   = head * (IntegralDomain.listProduct(d, tail) * unitInverse)
+                         by Ring.multiply_associative(s, head,
+                                IntegralDomain.listProduct(d, tail),
+                                unitInverse)⟩;
+        absurd(headNotUnit(headIsUnit))
+      }
+  }
+}
