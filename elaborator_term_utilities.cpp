@@ -548,3 +548,59 @@ ExpressionPointer substituteFreeVariables(
     return expression;
 }
 
+
+ExpressionPointer buildEqualityTransitivity( LevelPointer universeLevel, ExpressionPointer carrierType, ExpressionPointer A, ExpressionPointer B, ExpressionPointer C, ExpressionPointer p1, ExpressionPointer p2) {
+    ExpressionPointer call = makeConstant(
+        "Equality.transitivity", {universeLevel});
+    call = makeApplication(std::move(call), std::move(carrierType));
+    call = makeApplication(std::move(call), std::move(A));
+    call = makeApplication(std::move(call), std::move(B));
+    call = makeApplication(std::move(call), std::move(C));
+    call = makeApplication(std::move(call), std::move(p1));
+    call = makeApplication(std::move(call), std::move(p2));
+    return call;
+}
+
+ExpressionPointer buildEqualitySymmetry( LevelPointer universeLevel, ExpressionPointer carrierType, ExpressionPointer A, ExpressionPointer B, ExpressionPointer p) {
+    ExpressionPointer call = makeConstant(
+        "Equality.symmetry", {universeLevel});
+    call = makeApplication(std::move(call), std::move(carrierType));
+    call = makeApplication(std::move(call), std::move(A));
+    call = makeApplication(std::move(call), std::move(B));
+    call = makeApplication(std::move(call), std::move(p));
+    return call;
+}
+
+ExpressionPointer buildEqualityCongruenceSameCarrier( LevelPointer universeLevel, ExpressionPointer carrierType, ExpressionPointer lambda, ExpressionPointer x, ExpressionPointer y, ExpressionPointer p) {
+    ExpressionPointer call = makeConstant(
+        "Equality.congruence",
+        {universeLevel, universeLevel});
+    call = makeApplication(std::move(call), carrierType);
+    call = makeApplication(std::move(call), carrierType);
+    call = makeApplication(std::move(call), std::move(lambda));
+    call = makeApplication(std::move(call), std::move(x));
+    call = makeApplication(std::move(call), std::move(y));
+    call = makeApplication(std::move(call), std::move(p));
+    return call;
+}
+
+ExpressionPointer buildEqualityCongruence( LevelPointer sourceUniverseLevel, ExpressionPointer sourceCarrierType, LevelPointer targetUniverseLevel, ExpressionPointer targetCarrierType, ExpressionPointer lambda, ExpressionPointer x, ExpressionPointer y, ExpressionPointer p) {
+    ExpressionPointer call = makeConstant(
+        "Equality.congruence",
+        {sourceUniverseLevel, targetUniverseLevel});
+    call = makeApplication(std::move(call), sourceCarrierType);
+    call = makeApplication(std::move(call), targetCarrierType);
+    call = makeApplication(std::move(call), std::move(lambda));
+    call = makeApplication(std::move(call), std::move(x));
+    call = makeApplication(std::move(call), std::move(y));
+    call = makeApplication(std::move(call), std::move(p));
+    return call;
+}
+
+ExpressionPointer buildReflexivity( LevelPointer universeLevel, ExpressionPointer carrierType, ExpressionPointer x) {
+    ExpressionPointer call = makeConstant(
+        "reflexivity", {universeLevel});
+    call = makeApplication(std::move(call), std::move(carrierType));
+    call = makeApplication(std::move(call), std::move(x));
+    return call;
+}

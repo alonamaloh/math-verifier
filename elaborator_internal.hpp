@@ -13285,80 +13285,16 @@ private:
     }
 
     // Build `Equality.transitivity.{u}(T, A, B, C, p1, p2)`.
-    ExpressionPointer buildEqualityTransitivity(
-        LevelPointer universeLevel,
-        ExpressionPointer carrierType,
-        ExpressionPointer A, ExpressionPointer B, ExpressionPointer C,
-        ExpressionPointer p1, ExpressionPointer p2) {
-        ExpressionPointer call = makeConstant(
-            "Equality.transitivity", {universeLevel});
-        call = makeApplication(std::move(call), std::move(carrierType));
-        call = makeApplication(std::move(call), std::move(A));
-        call = makeApplication(std::move(call), std::move(B));
-        call = makeApplication(std::move(call), std::move(C));
-        call = makeApplication(std::move(call), std::move(p1));
-        call = makeApplication(std::move(call), std::move(p2));
-        return call;
-    }
 
     // Build `Equality.symmetry.{u}(T, A, B, p)` where p : A = B.
-    ExpressionPointer buildEqualitySymmetry(
-        LevelPointer universeLevel,
-        ExpressionPointer carrierType,
-        ExpressionPointer A, ExpressionPointer B,
-        ExpressionPointer p) {
-        ExpressionPointer call = makeConstant(
-            "Equality.symmetry", {universeLevel});
-        call = makeApplication(std::move(call), std::move(carrierType));
-        call = makeApplication(std::move(call), std::move(A));
-        call = makeApplication(std::move(call), std::move(B));
-        call = makeApplication(std::move(call), std::move(p));
-        return call;
-    }
 
     // Build `Equality.congruence.{u, u}(T, T, λ : T → T, x, y, p)`
     // where p : x = y; returns proof of λ(x) = λ(y). Carrier and
     // codomain types are the same here (we only use it for ring-level
     // congruence).
-    ExpressionPointer buildEqualityCongruenceSameCarrier(
-        LevelPointer universeLevel,
-        ExpressionPointer carrierType,
-        ExpressionPointer lambda,
-        ExpressionPointer x, ExpressionPointer y,
-        ExpressionPointer p) {
-        ExpressionPointer call = makeConstant(
-            "Equality.congruence",
-            {universeLevel, universeLevel});
-        call = makeApplication(std::move(call), carrierType);
-        call = makeApplication(std::move(call), carrierType);
-        call = makeApplication(std::move(call), std::move(lambda));
-        call = makeApplication(std::move(call), std::move(x));
-        call = makeApplication(std::move(call), std::move(y));
-        call = makeApplication(std::move(call), std::move(p));
-        return call;
-    }
 
     // Cross-carrier variant: lambda goes from sourceCarrier to
     // targetCarrier. Used when pushing a coercion through congruence.
-    ExpressionPointer buildEqualityCongruence(
-        LevelPointer sourceUniverseLevel,
-        ExpressionPointer sourceCarrierType,
-        LevelPointer targetUniverseLevel,
-        ExpressionPointer targetCarrierType,
-        ExpressionPointer lambda,
-        ExpressionPointer x, ExpressionPointer y,
-        ExpressionPointer p) {
-        ExpressionPointer call = makeConstant(
-            "Equality.congruence",
-            {sourceUniverseLevel, targetUniverseLevel});
-        call = makeApplication(std::move(call), sourceCarrierType);
-        call = makeApplication(std::move(call), targetCarrierType);
-        call = makeApplication(std::move(call), std::move(lambda));
-        call = makeApplication(std::move(call), std::move(x));
-        call = makeApplication(std::move(call), std::move(y));
-        call = makeApplication(std::move(call), std::move(p));
-        return call;
-    }
 
     // Build `<axioms.associative>(P, a, b) : (P op a) op b =
     // P op (a op b)`.
@@ -13385,16 +13321,6 @@ private:
     }
 
     // Build `reflexivity.{u}(T, x) : x = x`.
-    ExpressionPointer buildReflexivity(
-        LevelPointer universeLevel,
-        ExpressionPointer carrierType,
-        ExpressionPointer x) {
-        ExpressionPointer call = makeConstant(
-            "reflexivity", {universeLevel});
-        call = makeApplication(std::move(call), std::move(carrierType));
-        call = makeApplication(std::move(call), std::move(x));
-        return call;
-    }
 
     // Build a proof : left_assoc(factors_with_swap) = left_assoc(factors).
     // Reading direction matches insertion-sort's chained proof: each
