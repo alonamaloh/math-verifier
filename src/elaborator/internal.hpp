@@ -139,173 +139,7 @@ public:
     //   2. Aggregates — per-tactic hit-rate vs. order; per-source
     //      distribution for contextFactMatch wins; local-binder-depth
     //      histogram; top library lemmas.
-    void emitAutoProverProfile() {
-        if (autoProveRows_.empty()) return;
-        // Headline: time spent on losing tactic attempts vs the
-        // winning one. Answers "how much would an oracle save?" —
-        // the losing figure is the theoretical upper bound on the
-        // savings from a (context, goal) → winning-tactic cache.
-        //
-        // NOTE: under profiling we keep running every tactic even
-        // after one wins (to capture independent hit rates), but
-        // normal operation short-circuits at the first success. So
-        // "losing" here means failed attempts that ran BEFORE the
-        // winner — those are the real waste. Attempts AFTER the
-        // winner are profiling-only artefacts and excluded.
-        long long losingUs = 0;
-        long long winningUs = 0;
-        long long claimsWithWinner = 0;
-        long long claimsWithoutWinner = 0;
-        for (const AutoProveRow& row : autoProveRows_) {
-            bool hasWinner = !row.winningTactic.empty();
-            if (hasWinner) ++claimsWithWinner;
-            else ++claimsWithoutWinner;
-            if (!hasWinner) {
-                // Every attempt was a real loser (claim unresolved).
-                for (const AutoProveAttempt& attempt : row.attempts) {
-                    losingUs += attempt.micros;
-                }
-                continue;
-            }
-            for (const AutoProveAttempt& attempt : row.attempts) {
-                if (attempt.tacticName == row.winningTactic
-                    && attempt.succeeded) {
-                    winningUs += attempt.micros;
-                    break;  // stop at the winner — rest are artefacts
-                }
-                losingUs += attempt.micros;
-            }
-        }
-        long long totalUs = losingUs + winningUs;
-        double losingPct = totalUs > 0
-            ? 100.0 * losingUs / totalUs : 0.0;
-        std::cerr << "[autoprove-summary] " << moduleName_
-                  << " claims=" << (claimsWithWinner + claimsWithoutWinner)
-                  << " (closed=" << claimsWithWinner
-                  << ", unresolved=" << claimsWithoutWinner << ")"
-                  << " losing=" << (losingUs / 1000) << "ms"
-                  << " winning=" << (winningUs / 1000) << "ms"
-                  << " total=" << (totalUs / 1000) << "ms"
-                  << " losing_share=" << (int)losingPct << "%"
-                  << " (oracle could skip the losing share)\n";
-        std::cerr << "[autoprove] " << moduleName_
-                  << " — per-claim rows (TSV: "
-                  << "file:line\tgoal_head\tgoal_size\twinner\t"
-                  << "tactic\tok\tus\twin_source\tcand)\n";
-        for (const AutoProveRow& row : autoProveRows_) {
-            for (const AutoProveAttempt& attempt : row.attempts) {
-                std::cerr << "[autoprove-row]\t"
-                          << row.moduleName << ":" << row.line << "\t"
-                          << row.goalHead << "\t"
-                          << row.goalSize << "\t"
-                          << row.winningTactic << "\t"
-                          << attempt.tacticName << "\t"
-                          << (attempt.succeeded ? "1" : "0") << "\t"
-                          << attempt.micros << "\t"
-                          << attempt.winner << "\t"
-                          << attempt.candidatesTried
-                          << "\n";
-            }
-        }
-        // Aggregate: per-tactic independent hit-rates and timings.
-        // These are decoupled from ordering — each tactic was tried
-        // on every outermost claim site regardless of earlier wins.
-        struct TacticAgg {
-            long long inv = 0;
-            long long ok = 0;
-            long long totalUs = 0;
-            long long winTotalUs = 0;
-            long long winCount = 0;  // chosen as overall winner
-        };
-        std::unordered_map<std::string, TacticAgg> perTactic;
-        std::unordered_map<std::string, long long> winnerSourceCounts;
-        std::unordered_map<std::string, long long> winnerLibraryCounts;
-        // Local-binder-depth histogram: distance from end (the most
-        // recent binder is depth 0). For "library X" winners we
-        // bucket under "library" overall and break out top names.
-        std::unordered_map<int, long long> localDepthHistogram;
-        for (const AutoProveRow& row : autoProveRows_) {
-            for (const AutoProveAttempt& attempt : row.attempts) {
-                auto& agg = perTactic[attempt.tacticName];
-                ++agg.inv;
-                agg.totalUs += attempt.micros;
-                if (attempt.succeeded) ++agg.ok;
-                if (attempt.tacticName == row.winningTactic) {
-                    agg.winTotalUs += attempt.micros;
-                    ++agg.winCount;
-                    if (attempt.tacticName == "contextFactMatch"
-                        && !attempt.winner.empty()) {
-                        // attempt.winner is e.g.
-                        //  "local binder kEqualsPredecessor"
-                        //  "library Natural.le_through_max_left"
-                        if (attempt.winner.rfind("local binder ", 0) == 0) {
-                            ++winnerSourceCounts["local"];
-                            // Depth from end isn't recorded yet — for now
-                            // bucket as "local"; depth tracking is a
-                            // straightforward follow-on (collectContextFacts
-                            // walks N-1..0; we'd record the index).
-                        } else if (attempt.winner.rfind("library ", 0) == 0) {
-                            ++winnerSourceCounts["library"];
-                            std::string lemmaName =
-                                attempt.winner.substr(strlen("library "));
-                            ++winnerLibraryCounts[lemmaName];
-                        } else {
-                            ++winnerSourceCounts["other"];
-                        }
-                    }
-                }
-            }
-        }
-        (void)localDepthHistogram;
-        std::vector<std::pair<std::string, TacticAgg>> tacticRows(
-            perTactic.begin(), perTactic.end());
-        std::sort(tacticRows.begin(), tacticRows.end(),
-            [](const auto& a, const auto& b) {
-                return a.second.totalUs > b.second.totalUs;
-            });
-        std::cerr << "[autoprove] aggregate — per-tactic"
-                  << " (tactic / inv / ok / hit_rate / "
-                  << "avg_us / total_ms / wins / win_avg_us)\n";
-        for (const auto& r : tacticRows) {
-            double rate = r.second.inv > 0
-                ? 100.0 * r.second.ok / r.second.inv : 0.0;
-            double avgUs = r.second.inv > 0
-                ? (double)r.second.totalUs / r.second.inv : 0.0;
-            double winAvgUs = r.second.winCount > 0
-                ? (double)r.second.winTotalUs / r.second.winCount : 0.0;
-            std::cerr << "  " << r.first
-                      << ": inv=" << r.second.inv
-                      << " ok=" << r.second.ok
-                      << " rate=" << (int)rate << "%"
-                      << " avg=" << (int)avgUs << " us"
-                      << " total=" << (r.second.totalUs / 1000) << " ms"
-                      << " wins=" << r.second.winCount
-                      << " win_avg=" << (int)winAvgUs << " us\n";
-        }
-        // Source-category breakdown for contextFactMatch.
-        if (!winnerSourceCounts.empty()) {
-            std::cerr << "[autoprove] aggregate — contextFactMatch"
-                      << " winner source (local vs library)\n";
-            for (const auto& kv : winnerSourceCounts) {
-                std::cerr << "  " << kv.first << ": " << kv.second << "\n";
-            }
-        }
-        if (!winnerLibraryCounts.empty()) {
-            std::vector<std::pair<std::string, long long>> libRows(
-                winnerLibraryCounts.begin(), winnerLibraryCounts.end());
-            std::sort(libRows.begin(), libRows.end(),
-                [](const auto& a, const auto& b) {
-                    return a.second > b.second;
-                });
-            std::cerr << "[autoprove] aggregate — top library "
-                      << "lemmas chosen by contextFactMatch\n";
-            int count = 0;
-            for (const auto& r : libRows) {
-                std::cerr << "  " << r.second << "\t" << r.first << "\n";
-                if (++count >= 20) break;
-            }
-        }
-    }
+    void emitAutoProverProfile();
 
     // Run a strategy and track its timing + success rate. The
     // strategy must return ExpressionPointer (nullptr on miss). When
@@ -358,23 +192,19 @@ public:
     // also tried with the auto-prover; if the auto-prover closes the
     // step on its own, a warning fires. Drives the
     // `--check-redundant-by` CLI flag.
-    void setReportRedundantBy(bool flag) { reportRedundantBy_ = flag; }
+    void setReportRedundantBy(bool flag);
 
     // Injects the lazy whole-library snapshot used to enrich failing-proof
     // errors with unimported-lemma suggestions. See elaborateModule.
     void setLibrarySearchProvider(
-        std::function<const LibrarySearchIndex*()> provider) {
-        librarySearchProvider_ = std::move(provider);
-    }
+        std::function<const LibrarySearchIndex*()> provider);
 
     // When true, the redundant-by check also fires on non-equality
     // calc steps (≤/</≥/>). Off by default because for large files
     // it can be expensive (the per-step lemma-index lookup iterates
     // all environment declarations). Drives the
     // `--check-redundant-by-non-eq` CLI flag.
-    void setReportRedundantByNonEq(bool flag) {
-        reportRedundantByNonEq_ = flag;
-    }
+    void setReportRedundantByNonEq(bool flag);
 
     // When true, after elaborating a calc chain, check each internal
     // step's endpoint to see whether the auto-prover could close the
@@ -383,116 +213,23 @@ public:
     // intermediate. Off by default — the per-step auto-prover
     // attempts are expensive on long chains. Drives the
     // `--check-redundant-calc-steps` CLI flag.
-    void setReportRedundantCalcSteps(bool flag) {
-        reportRedundantCalcSteps_ = flag;
-    }
+    void setReportRedundantCalcSteps(bool flag);
 
-    void runModule(const SurfaceModule& module) {
-        moduleName_ = module.moduleName;
-        // Seed the rewrite-lemma index from theorems loaded via .mathv
-        // dependencies. New theorems added during this module's
-        // elaboration get registered incrementally in
-        // elaborateDefinition / elaboratePatternMatchDefinition.
-        seedAlgebraicRegistryFromEnvironment();
-        // Opt-in: enable the kernel's structural-hash WHNF cache for
-        // the duration of this module. Big win on files where the
-        // elaborator hands the kernel many freshly-allocated but
-        // structurally-identical subexpressions (Real/supremum.math
-        // is the canonical example).
-        const char* cacheFlag = std::getenv("MATH_KERNEL_CACHE");
-        bool enableKernelCache = cacheFlag && cacheFlag[0] != '\0'
-            && cacheFlag[0] != '0';
-        bool previousKernelCache = kernelCacheEnabled;
-        if (enableKernelCache) kernelCacheEnabled = true;
-        const char* hcFlag = std::getenv("MATH_HASH_CONS");
-        bool enableHashCons = hcFlag && hcFlag[0] != '\0'
-            && hcFlag[0] != '0';
-        bool previousHashCons = g_hashConsEnabled;
-        if (enableHashCons) g_hashConsEnabled = true;
-        const char* kpFlag = std::getenv("MATH_KERNEL_PROFILE");
-        bool enableKernelProfile = kpFlag && kpFlag[0] != '\0'
-            && kpFlag[0] != '0';
-        bool previousKernelProfile = kernelProfileEnabled;
-        if (enableKernelProfile) kernelProfileEnabled = true;
-        const char* timeFlag = std::getenv("MATH_TIME_DECLARATIONS");
-        bool timeDeclarations = timeFlag && timeFlag[0] != '\0'
-            && timeFlag[0] != '0';
-        for (const auto& statement : module.statements) {
-            if (timeDeclarations) {
-                auto t0 = std::chrono::steady_clock::now();
-                elaborateTopStatement(statement);
-                auto t1 = std::chrono::steady_clock::now();
-                long long elapsedMs =
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        t1 - t0).count();
-                // Emit only non-trivial timings to keep noise low.
-                if (elapsedMs >= 50) {
-                    std::string label = topStatementLabel(statement);
-                    std::cerr << "[time] " << moduleName_
-                              << " " << label
-                              << ": " << elapsedMs << " ms\n";
-                }
-            } else {
-                elaborateTopStatement(statement);
-            }
-        }
-        if (enableKernelCache) kernelCacheEnabled = previousKernelCache;
-        if (enableKernelProfile) kernelProfileEnabled = previousKernelProfile;
-        if (enableHashCons) g_hashConsEnabled = previousHashCons;
-        if (timeDeclarations || tacticTimingEnabled_) {
-            struct rusage ru;
-            if (getrusage(RUSAGE_SELF, &ru) == 0) {
-                // On macOS ru_maxrss is bytes; on Linux it's kilobytes.
-                // Normalize to MB; on macOS this is bytes/1048576, on
-                // Linux it's kbytes/1024 — same arithmetic.
-#if defined(__APPLE__)
-                long long mb = ru.ru_maxrss / (1024 * 1024);
-#else
-                long long mb = ru.ru_maxrss / 1024;
-#endif
-                std::cerr << "[memory] " << moduleName_
-                          << " peak RSS=" << mb << " MB\n";
-            }
-        }
-    }
+    void runModule(const SurfaceModule& module);
 
     // Extract a short identifier from a top-level statement for
     // use in timing diagnostics. Falls back to "?" if the statement
     // kind doesn't have a name field.
     std::string topStatementLabel(
-        const SurfaceTopStatement& statement) {
-        if (auto* d = std::get_if<SurfaceDefinitionDeclaration>(&statement)) {
-            return d->name;
-        }
-        if (auto* a = std::get_if<SurfaceAxiomDeclaration>(&statement)) {
-            return a->name;
-        }
-        if (auto* i = std::get_if<SurfaceInductiveDeclaration>(&statement)) {
-            return i->name;
-        }
-        if (auto* imp = std::get_if<SurfaceImportDeclaration>(&statement)) {
-            return std::string("import ") + imp->moduleName;
-        }
-        return "?";
-    }
+        const SurfaceTopStatement& statement);
 
     // Walk the pre-loaded environment and run shape detection on
     // every Definition's declared type. We restrict to Definitions
     // (not Axioms) since theorems serialise as Definitions with a
     // proof body.
-    void seedAlgebraicRegistryFromEnvironment() {
-        for (const auto& entry : environment_.declarations) {
-            const std::string& name = entry.first;
-            const auto& declaration = entry.second;
-            if (auto* def = std::get_if<Definition>(&declaration)) {
-                registerAlgebraicShape(name, def->type);
-            }
-        }
-    }
+    void seedAlgebraicRegistryFromEnvironment();
 
-    ExpressionPointer runExpression(const SurfaceExpression& expression) {
-        return elaborateExpression(expression, {});
-    }
+    ExpressionPointer runExpression(const SurfaceExpression& expression);
 
 private:
     // -------- diagnostic context stack --------
@@ -564,48 +301,10 @@ private:
     // into the Natural_recursor chain). We only reduce
     // `App(Lambda(x, T, body), arg)` patterns at any depth.
     ExpressionPointer betaNormalizeForDisplay(
-        ExpressionPointer expression) const {
-        if (auto* pi = std::get_if<Pi>(&expression->node)) {
-            return makePi(pi->displayHint,
-                betaNormalizeForDisplay(pi->domain),
-                betaNormalizeForDisplay(pi->codomain));
-        }
-        if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
-            return makeLambda(lambda->displayHint,
-                betaNormalizeForDisplay(lambda->domain),
-                betaNormalizeForDisplay(lambda->body));
-        }
-        if (auto* application =
-                std::get_if<Application>(&expression->node)) {
-            ExpressionPointer fn = betaNormalizeForDisplay(
-                application->function);
-            ExpressionPointer arg = betaNormalizeForDisplay(
-                application->argument);
-            if (auto* lambda = std::get_if<Lambda>(&fn->node)) {
-                ExpressionPointer reduced = substitute(
-                    lambda->body, 0, arg);
-                return betaNormalizeForDisplay(reduced);
-            }
-            return makeApplication(fn, arg);
-        }
-        return expression;
-    }
+        ExpressionPointer expression) const;
 
     std::string prettyPrintForDisplay(
-        ExpressionPointer expression) const {
-        std::string raw =
-            prettyPrint(betaNormalizeForDisplay(expression));
-        // The printer prefixes Internal-origin FreeVariables with '@'
-        // so that any leak into user output is visible. In error
-        // messages we deliberately open binders into named FreeVars,
-        // so the `@` markers are noise; strip them.
-        std::string stripped;
-        stripped.reserve(raw.size());
-        for (char character : raw) {
-            if (character != '@') stripped.push_back(character);
-        }
-        return stripped;
-    }
+        ExpressionPointer expression) const;
 
     // Pretty-print an expression that lives in a local-binder scope.
     // Opens each binder as a named FreeVariable so the printer shows
@@ -616,25 +315,10 @@ private:
     std::string prettyPrintInLocalScope(
         ExpressionPointer expression,
         const std::vector<LocalBinder>& localBinders,
-        size_t count) const {
-        // Open with User-origin so the printer doesn't mark the
-        // resulting FreeVariables with `@` (which is reserved for
-        // signalling that an Internal-origin variable leaked).
-        // Beta-normalise too so the printed form has no left-over
-        // redexes (motive applications, etc.).
-        ExpressionPointer opened = expression;
-        for (size_t i = count; i > 0; --i) {
-            opened = openBinder(opened, localBinders[i - 1].name,
-                                 FreeVariableOrigin::User);
-        }
-        return prettyPrint(betaNormalizeForDisplay(opened));
-    }
+        size_t count) const;
     std::string prettyPrintInLocalScope(
         ExpressionPointer expression,
-        const std::vector<LocalBinder>& localBinders) const {
-        return prettyPrintInLocalScope(expression, localBinders,
-                                         localBinders.size());
-    }
+        const std::vector<LocalBinder>& localBinders) const;
 
     // E1 surface #1: turn a failed auto-prove into a list of candidate
     // lemmas whose CONCLUSION matches the goal's shape (the same engine
@@ -647,61 +331,7 @@ private:
     std::string searchSuggestions(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
-        size_t limit = 5) const {
-        try {
-            ExpressionPointer goalOpened = goalClosed;
-            for (size_t i = localBinders.size(); i > 0; --i) {
-                goalOpened = openBinder(goalOpened,
-                                        localBinders[i - 1].name,
-                                        FreeVariableOrigin::User);
-            }
-            // Search the WHOLE library when a snapshot is available (the
-            // verify-with-cache path), so a lemma that isn't imported yet
-            // still surfaces — tagged with the import to add. Without the
-            // snapshot (tests / legacy verify), search the in-scope
-            // environment alone. A hit is "in scope" iff it is already a
-            // declaration in environment_; otherwise we cite its module.
-            const LibrarySearchIndex* index =
-                librarySearchProvider_ ? librarySearchProvider_() : nullptr;
-            static const std::set<std::string> noExclusions;
-            const Environment& searchEnvironment =
-                index ? index->environment : environment_;
-            const std::set<std::string>& excluded =
-                index ? index->excludedNames : noExclusions;
-            std::string head;
-            std::vector<LemmaSearchHit> hits = computeGoalHits(
-                searchEnvironment, goalOpened, head, excluded);
-            if (hits.empty()) return "";
-            std::string out =
-                "\n  search by conclusion shape — candidates "
-                "(cite one as `by <lemma>(…)`):";
-            size_t shown = std::min(limit, hits.size());
-            for (size_t i = 0; i < shown; ++i) {
-                out += "\n    " + hits[i].name + " : "
-                     + hits[i].signature;
-                if (!hits[i].needs.empty()) {
-                    out += "   [needs: ";
-                    for (size_t j = 0; j < hits[i].needs.size(); ++j) {
-                        if (j) out += ", ";
-                        out += prettyPrint(hits[i].needs[j]);
-                    }
-                    out += "]";
-                }
-                // Tag lemmas that are not yet in scope with the import.
-                if (index && !environment_.lookup(hits[i].name)) {
-                    auto moduleIterator =
-                        index->nameToModule.find(hits[i].name);
-                    if (moduleIterator != index->nameToModule.end()) {
-                        out += "\n        (needs import "
-                             + moduleIterator->second + ")";
-                    }
-                }
-            }
-            return out;
-        } catch (...) {
-            return "";
-        }
-    }
+        size_t limit = 5) const;
 
     // Tail for a "couldn't prove this step" error: the step goal
     // (LHS rel RHS) followed by library-lemma candidates keyed by the
@@ -713,20 +343,7 @@ private:
         ExpressionPointer nextKernel,
         const std::string& relationSymbol,
         ExpressionPointer stepRelationType,
-        const std::vector<LocalBinder>& localBinders) const {
-        std::string goal;
-        try {
-            goal = "\n    goal: "
-                 + prettyPrintInLocalScope(previousKernel, localBinders)
-                 + " " + relationSymbol + " "
-                 + prettyPrintInLocalScope(nextKernel, localBinders);
-        } catch (...) { goal.clear(); }
-        std::string hints;
-        try {
-            hints = searchSuggestions(stepRelationType, localBinders);
-        } catch (...) { hints.clear(); }
-        return goal + hints;
-    }
+        const std::vector<LocalBinder>& localBinders) const;
 
     // ---- Term representation convention (read before touching the helpers
     //      that move terms between scopes) ----
@@ -759,77 +376,13 @@ private:
     void assertClosedOverLocalBinders(
         const ExpressionPointer& term,
         const std::vector<LocalBinder>& localBinders,
-        const char* where) const {
-        int n = static_cast<int>(localBinders.size());
-        if (term->maxFreeBoundVariable >= n) {
-            throw TypeError(
-                std::string("internal: ") + where
-                + " produced a term that is not closed over its local binders"
-                  " (maxFreeBoundVariable="
-                + std::to_string(term->maxFreeBoundVariable)
-                + ", local binders=" + std::to_string(n)
-                + ") — a bound variable escapes the local scope");
-        }
-    }
+        const char* where) const;
 
     // Const version of openOverLocalBinders (the existing one in this
     // class is non-const because it shares the helper used during
     // mutating elaboration).
 
-    std::string formatErrorWithContext(const std::string& message) const {
-        if (contextFrames_.empty()) return message;
-        std::string result;
-        // Most-recent frame first (innermost work), then progressively
-        // outer frames. Each frame on its own line indented under the
-        // last so the breadcrumb reads top-to-bottom from outer cause
-        // to inner failure. For frames carrying a context snapshot
-        // and/or a goal, dump those one indent deeper.
-        for (auto iterator = contextFrames_.rbegin();
-             iterator != contextFrames_.rend(); ++iterator) {
-            result += iterator->description;
-            result += "\n";
-            // Context dump (suppressed when the snapshot is empty —
-            // top-level frames before any binder is pushed don't add
-            // anything by saying "(no binders)").
-            if (!iterator->contextSnapshot.empty()) {
-                result += "    context:\n";
-                for (size_t i = 0;
-                     i < iterator->contextSnapshot.size(); ++i) {
-                    const auto& binder = iterator->contextSnapshot[i];
-                    // Type may reference earlier binders (de Bruijn);
-                    // open those names so the printout reads as the
-                    // user wrote them.
-                    std::string printedType;
-                    try {
-                        printedType = prettyPrintInLocalScope(
-                            binder.type, iterator->contextSnapshot, i);
-                    } catch (...) {
-                        // Pretty-printing must never amplify the
-                        // primary error. Fall back to a marker.
-                        printedType = "<un-printable>";
-                    }
-                    result += "      " + binder.name + " : "
-                            + printedType + "\n";
-                }
-            }
-            // Goal dump (only when supplied — most internal frames
-            // don't have a meaningful local goal to report).
-            if (iterator->expectedType) {
-                std::string printedGoal;
-                try {
-                    printedGoal = prettyPrintInLocalScope(
-                        iterator->expectedType,
-                        iterator->contextSnapshot);
-                } catch (...) {
-                    printedGoal = "<un-printable>";
-                }
-                result += "    goal: " + printedGoal + "\n";
-            }
-            result += "  ";
-        }
-        result += message;
-        return result;
-    }
+    std::string formatErrorWithContext(const std::string& message) const;
 
     [[noreturn]] void throwElaborate(const std::string& message) const {
         // Pick up the most recent (innermost) frame that has a known
@@ -918,15 +471,7 @@ private:
     // The innermost context frame that carries a source position (the calc
     // step / argument / theorem currently being elaborated), or {0,0}.
     // Same walk throwElaborate uses to anchor kernel errors.
-    std::pair<int, int> innermostFramePosition() const {
-        for (auto iter = contextFrames_.rbegin();
-             iter != contextFrames_.rend(); ++iter) {
-            if (iter->line != 0) {
-                return {iter->line, iter->column};
-            }
-        }
-        return {0, 0};
-    }
+    std::pair<int, int> innermostFramePosition() const;
 
     // WS1 (PLAN_LESS_CIC_STYLE.md): make the elaborator authoritative at
     // the definition-finalization boundary. `addDefinition` (the kernel)
@@ -945,43 +490,7 @@ private:
             const ExpressionPointer& declaredType,
             const ExpressionPointer& body,
             const char* noun,
-            const char* bodyNoun) {
-        if (environment_.declarations.count(name)) {
-            throwElaborate(std::string("a declaration named '") + name
-                + "' already exists");
-        }
-        // The declared type must itself be a type (live in some `Sort`).
-        ExpressionPointer declaredKind;
-        try {
-            declaredKind = weakHeadNormalForm(
-                environment_, inferType(environment_, {}, declaredType));
-        } catch (const TypeError& kernelError) {
-            rethrowKernelError(kernelError);
-        }
-        if (!std::holds_alternative<Sort>(declaredKind->node)) {
-            throwElaborate(std::string("the declared type of ") + noun + " '"
-                + name + "' is not itself a type: `"
-                + prettyPrintForDisplay(declaredType)
-                + "` has type `" + prettyPrintForDisplay(declaredKind)
-                + "`, which is not a proposition or a type");
-        }
-        // The body must have the declared type.
-        ExpressionPointer inferredBodyType;
-        try {
-            inferredBodyType = inferType(environment_, {}, body);
-        } catch (const TypeError& kernelError) {
-            rethrowKernelError(kernelError);
-        }
-        if (!isDefinitionallyEqual(environment_, {}, inferredBodyType,
-                                   declaredType)) {
-            throwElaborate(std::string("the ") + bodyNoun + " of " + noun
-                + " '" + name + "' does not have its declared type\n"
-                "    declared type:        "
-                + prettyPrintForDisplay(declaredType) + "\n"
-                "    but this " + bodyNoun + " has type: "
-                + prettyPrintForDisplay(inferredBodyType));
-        }
-    }
+            const char* bodyNoun);
 
     // -------- top-level statements --------
 

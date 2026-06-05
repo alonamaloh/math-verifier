@@ -12,7 +12,8 @@ SRCS := \
     src/kernel/level.cpp src/kernel/kernel.cpp src/kernel/printer.cpp \
     src/kernel/serialize.cpp src/kernel/hash.cpp \
     src/syntax/lexer.cpp src/syntax/parser.cpp \
-    src/elaborator/elaborator.cpp src/elaborator/dispatch.cpp \
+    src/elaborator/elaborator.cpp src/elaborator/driver.cpp \
+    src/elaborator/errors.cpp src/elaborator/dispatch.cpp \
     src/elaborator/statements.cpp src/elaborator/patterns.cpp \
     src/elaborator/induction.cpp src/elaborator/cases.cpp \
     src/elaborator/inference.cpp src/elaborator/desugar_equality.cpp \
