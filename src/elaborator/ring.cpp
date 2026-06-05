@@ -1605,6 +1605,24 @@ Elaborator::ACNormResult Elaborator::ringPushNegation(
             ExpressionPointer congr = buildEqualityCongruenceSameCarrier(
                 carrierLevel, carrierType, lambda, inner, ri.canonical,
                 ri.proof);
+            ExpressionPointer doubleInner;
+            if (matchUnaryRingNegate(ri.canonical, "Ring.negate", doubleInner)
+                && environment_.lookup("Ring.negate_negate")) {
+                // negate(negate(z)) = z; then push z further.
+                ExpressionPointer nn = makeApplication(
+                    ringConst("Ring.negate_negate"), doubleInner);
+                ACNormResult pushed = ringPushNegation(
+                    doubleInner, addAxioms, mulAxioms, carrierType,
+                    carrierLevel, line);
+                // e = negate(inner') [congr] = z [nn] = pushed [pushed.proof].
+                ExpressionPointer nnThenPush = buildEqualityTransitivity(
+                    carrierLevel, carrierType, negInnerP, doubleInner,
+                    pushed.canonical, nn, pushed.proof);
+                ExpressionPointer proof = buildEqualityTransitivity(
+                    carrierLevel, carrierType, e, negInnerP, pushed.canonical,
+                    congr, nnThenPush);
+                return ACNormResult{pushed.canonical, proof};
+            }
             ExpressionPointer X, Y;
             if (matchBinaryRingOp(ri.canonical, addAxioms.op, X, Y)
                 && environment_.lookup("Ring.negate_add_distribute")) {
