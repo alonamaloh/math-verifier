@@ -255,6 +255,17 @@ reach for the math-like form instead:
     argument explicit, or pick a premise-free lemma (`successor_positive`
     over `successor_less_or_equal_successor`).
 
+- **Universe annotations (`Sum.{0,0,0}(…)`, `Product.{0,0}(…)`) are
+  noise.** `Sum`/`Product` are universe-polymorphic and can't infer their
+  levels at `Type(0)`. Use the `Type(0)` aliases **`DisjointUnion(A, B)`**
+  (`Logic.sum`) and **`Pair(A, B)`** (`Logic.product`) for the *type*
+  positions, and write the constructors **bare** — `Sum.left(value)`,
+  `Sum.right(value)`, `Product.make(a, b)` — they infer their levels and
+  component types from the expected type. The one spot that needs help is a
+  `calc` *head* (no expected type): give it a one-line ascription
+  `calc (Sum.left(…) : DisjointUnion(A, B)) = …`. `cases`/patterns over the
+  aliases work unchanged (they unfold to `Sum`/`Product`).
+
 - **The hole marker is `?`, never `_`** (`_` parses as an identifier).
   `?` is solved from the expected type in direct-goal position — e.g.
   `Foo.equal_of_value(n, ?, b, valueProof)` against a goal `a = b` solves
