@@ -1,0 +1,245 @@
+-- Set/finite_sum.math
+--
+-- The sum rule of counting: |X ⊎ Y| = |X| + |Y|. Its heart is an explicit
+-- bijection between the disjoint union of two yardsticks and a single
+-- yardstick — `NaturalsBelow(m) ⊎ NaturalsBelow(n) ≅ NaturalsBelow(m+n)`
+-- — laying {0,…,m-1} and {0,…,n-1} end to end, the right block shifted up
+-- by m. The inverse decides, for each k below m+n, which block it landed
+-- in; that decision is `Natural.compare_strict` (a Type-valued comparison,
+-- since the inverse is data).
+
+module Set.finite_sum
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Set.subtype
+import Set.equinumerous
+import Set.finite
+import Natural.basics
+import Natural.order
+import Natural.arithmetic
+import Natural.monus
+import Natural.divide
+import Natural.add_order
+import Natural.strong_recursion
+import Natural.compare
+
+-- If m ≤ k, then k splits as m plus its excess over m. (`le_implies_monus_zero`
+-- feeds `monus_zero_implies_decompose`.)
+theorem NaturalsBelow.decompose_at_least (m k : Natural) (atLeast : m ≤ k)
+        : k = m + Natural.monus(k, m) :=
+  Natural.monus_zero_implies_decompose(m, k,
+      Natural.le_implies_monus_zero(k, m, atLeast))
+
+-- Lay the two blocks end to end: a left element keeps its value (still
+-- below m, hence below m+n); a right element is shifted up by m.
+definition NaturalsBelow.sum_into (m n : Natural)
+        : Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n)) → NaturalsBelow(m + n)
+  | Sum.left(element) =>
+      Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ m + n,
+          Subtype.value(element),
+          LessOrEqual.transitive(
+              successor(Subtype.value(element)), m, m + n,
+              Natural.less_or_equal_add_right(m, n),
+              Subtype.property(element)))
+  | Sum.right(element) =>
+      Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ m + n,
+          m + Subtype.value(element),
+          Equality.transport_proposition(
+              (z : Natural) ↦ z ≤ m + n,
+              m + successor(Subtype.value(element)),
+              successor(m + Subtype.value(element)),
+              Natural.add_successor(m, Subtype.value(element)),
+              Natural.add_left_monotone(m, successor(Subtype.value(element)), n,
+                  Subtype.property(element))))
+
+-- The inverse: compare k against m. Below m → left block, keeping k. At
+-- least m → right block, value k - m (its excess), with the bound pulled
+-- back across "add m on the left" by cancellation.
+definition NaturalsBelow.sum_out_of (m n : Natural)
+        : NaturalsBelow(m + n) → Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n))
+  | Subtype.make(value, belowSum) =>
+      cases Natural.compare_strict(value, m) {
+        | Natural.StrictComparison.below(strictlyBelow) =>
+            Sum.left.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n),
+                Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ m,
+                    value, strictlyBelow))
+        | Natural.StrictComparison.atLeast(atLeast) =>
+            Sum.right.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n),
+                Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ n,
+                    Natural.monus(value, m),
+                    Natural.add_left_le_cancel(m, successor(Natural.monus(value, m)), n,
+                        Equality.transport_proposition(
+                            (z : Natural) ↦ z ≤ m + n,
+                            successor(value),
+                            m + successor(Natural.monus(value, m)),
+                            Equality.symmetry(Natural,
+                                m + successor(Natural.monus(value, m)),
+                                successor(value),
+                                calc m + successor(Natural.monus(value, m))
+                                   = successor(m + Natural.monus(value, m))
+                                       by Natural.add_successor(m, Natural.monus(value, m))
+                                   = successor(value)
+                                       by NaturalsBelow.decompose_at_least(m, value, atLeast)),
+                            belowSum))))
+      }
+
+-- Round trip, sum side: out_of recovers the summand that into placed.
+theorem NaturalsBelow.sum_round_trip_left (m n : Natural)
+        : (s : Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n)))
+          → NaturalsBelow.sum_out_of(m, n, NaturalsBelow.sum_into(m, n, s)) = s :=
+  (s : Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n))) ↦
+    cases s {
+      | Sum.left(element) =>
+          cases Natural.compare_strict(Subtype.value(element), m) {
+            | Natural.StrictComparison.below(strictlyBelow) =>
+                congruenceOf(
+                    (sub : NaturalsBelow(m)) ↦
+                        Sum.left.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n), sub),
+                    Subtype.equal_of_value_equal(Natural, (k : Natural) ↦ successor(k) ≤ m,
+                        Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ m,
+                            Subtype.value(element), strictlyBelow),
+                        element,
+                        reflexivity(Natural, Subtype.value(element))))
+            | Natural.StrictComparison.atLeast(atLeast) =>
+                absurd(Natural.not_successor_less_or_equal_self(Subtype.value(element),
+                    LessOrEqual.transitive(
+                        successor(Subtype.value(element)), m, Subtype.value(element),
+                        atLeast, Subtype.property(element))))
+          }
+      | Sum.right(element) =>
+          cases Natural.compare_strict(m + Subtype.value(element), m) {
+            | Natural.StrictComparison.below(strictlyBelow) =>
+                absurd(Natural.not_successor_less_or_equal_self(m + Subtype.value(element),
+                    LessOrEqual.transitive(
+                        successor(m + Subtype.value(element)), m, m + Subtype.value(element),
+                        Natural.less_or_equal_add_right(m, Subtype.value(element)), strictlyBelow)))
+            | Natural.StrictComparison.atLeast(atLeast) =>
+                congruenceOf(
+                    (sub : NaturalsBelow(n)) ↦
+                        Sum.right.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n), sub),
+                    Subtype.equal_of_value_equal(Natural, (k : Natural) ↦ successor(k) ≤ n,
+                        Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ n,
+                            Natural.monus(m + Subtype.value(element), m),
+                            Natural.add_left_le_cancel(m,
+                                successor(Natural.monus(m + Subtype.value(element), m)), n,
+                                Equality.transport_proposition(
+                                    (z : Natural) ↦ z ≤ m + n,
+                                    successor(m + Subtype.value(element)),
+                                    m + successor(Natural.monus(m + Subtype.value(element), m)),
+                                    Equality.symmetry(Natural,
+                                        m + successor(Natural.monus(m + Subtype.value(element), m)),
+                                        successor(m + Subtype.value(element)),
+                                        calc m + successor(Natural.monus(m + Subtype.value(element), m))
+                                           = successor(m + Natural.monus(m + Subtype.value(element), m))
+                                               by Natural.add_successor(m, Natural.monus(m + Subtype.value(element), m))
+                                           = successor(m + Subtype.value(element))
+                                               by NaturalsBelow.decompose_at_least(m, m + Subtype.value(element),
+                                                   Natural.less_or_equal_add_right(m, Subtype.value(element)))),
+                                    Equality.transport_proposition(
+                                        (z : Natural) ↦ z ≤ m + n,
+                                        m + successor(Subtype.value(element)),
+                                        successor(m + Subtype.value(element)),
+                                        Natural.add_successor(m, Subtype.value(element)),
+                                        Natural.add_left_monotone(m, successor(Subtype.value(element)), n,
+                                            Subtype.property(element)))))),
+                        element,
+                        Natural.monus_add_cancel(m, Subtype.value(element))))
+          }
+    }
+
+-- Round trip, yardstick side: into reassembles whatever out_of split. The
+-- below branch holds definitionally (proof irrelevance); the atLeast branch
+-- needs that m + (value - m) = value.
+theorem NaturalsBelow.sum_round_trip_right (m n : Natural)
+        : (t : NaturalsBelow(m + n))
+          → NaturalsBelow.sum_into(m, n, NaturalsBelow.sum_out_of(m, n, t)) = t :=
+  (t : NaturalsBelow(m + n)) ↦
+    cases t {
+      | Subtype.make(value, belowSum) =>
+          cases Natural.compare_strict(value, m) {
+            | Natural.StrictComparison.below(strictlyBelow) =>
+                reflexivity(NaturalsBelow(m + n),
+                    Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ m + n, value, belowSum))
+            | Natural.StrictComparison.atLeast(atLeast) =>
+                Subtype.equal_of_value_equal(Natural, (k : Natural) ↦ successor(k) ≤ m + n,
+                    Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ m + n,
+                        m + Natural.monus(value, m),
+                        Equality.transport_proposition(
+                            (z : Natural) ↦ z ≤ m + n,
+                            successor(value),
+                            successor(m + Natural.monus(value, m)),
+                            congruenceOf(successor, NaturalsBelow.decompose_at_least(m, value, atLeast)),
+                            belowSum)),
+                    Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ m + n, value, belowSum),
+                    Equality.symmetry(Natural, value, m + Natural.monus(value, m),
+                        NaturalsBelow.decompose_at_least(m, value, atLeast)))
+          }
+    }
+
+-- The two yardsticks laid end to end form one: NaturalsBelow(m) ⊎
+-- NaturalsBelow(n) is the same size as NaturalsBelow(m+n).
+theorem NaturalsBelow.sum_equinumerous (m n : Natural)
+        : Equinumerous(Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m + n)) :=
+  ⟨NaturalsBelow.sum_into(m, n),
+   ⟨NaturalsBelow.sum_out_of(m, n),
+    And.introduction(
+        NaturalsBelow.sum_round_trip_left(m, n),
+        NaturalsBelow.sum_round_trip_right(m, n))⟩⟩
+
+-- Disjoint union respects sameness of size: replacing each side by an
+-- equinumerous type gives an equinumerous union. Pure plumbing — map each
+-- summand through its component bijection, with no arithmetic.
+theorem Equinumerous.sum_congruence (A A' B B' : Type(0))
+        (firstSame : Equinumerous(A, A')) (secondSame : Equinumerous(B, B'))
+        : Equinumerous(Sum.{0,0,0}(A, B), Sum.{0,0,0}(A', B')) := {
+  obtain ⟨forwardA, forwardATail⟩ from firstSame;
+  obtain ⟨backwardA, inverseA⟩ from forwardATail;
+  obtain ⟨forwardB, forwardBTail⟩ from secondSame;
+  obtain ⟨backwardB, inverseB⟩ from forwardBTail;
+  let leftA : (x : A) → backwardA(forwardA(x)) = x :=
+      And.left((x : A) → backwardA(forwardA(x)) = x, (y : A') → forwardA(backwardA(y)) = y, inverseA);
+  let rightA : (y : A') → forwardA(backwardA(y)) = y :=
+      And.right((x : A) → backwardA(forwardA(x)) = x, (y : A') → forwardA(backwardA(y)) = y, inverseA);
+  let leftB : (x : B) → backwardB(forwardB(x)) = x :=
+      And.left((x : B) → backwardB(forwardB(x)) = x, (y : B') → forwardB(backwardB(y)) = y, inverseB);
+  let rightB : (y : B') → forwardB(backwardB(y)) = y :=
+      And.right((x : B) → backwardB(forwardB(x)) = x, (y : B') → forwardB(backwardB(y)) = y, inverseB);
+  ⟨(s : Sum.{0,0,0}(A, B)) ↦
+       cases s {
+         | Sum.left(a)  => Sum.left.{0,0,0}(A', B', forwardA(a))
+         | Sum.right(b) => Sum.right.{0,0,0}(A', B', forwardB(b))
+       },
+   ⟨(s : Sum.{0,0,0}(A', B')) ↦
+        cases s {
+          | Sum.left(a)  => Sum.left.{0,0,0}(A, B, backwardA(a))
+          | Sum.right(b) => Sum.right.{0,0,0}(A, B, backwardB(b))
+        },
+    And.introduction(
+        (s : Sum.{0,0,0}(A, B)) ↦
+            cases s {
+              | Sum.left(a) =>
+                  congruenceOf((x : A) ↦ Sum.left.{0,0,0}(A, B, x), leftA(a))
+              | Sum.right(b) =>
+                  congruenceOf((x : B) ↦ Sum.right.{0,0,0}(A, B, x), leftB(b))
+            },
+        (s : Sum.{0,0,0}(A', B')) ↦
+            cases s {
+              | Sum.left(a) =>
+                  congruenceOf((y : A') ↦ Sum.left.{0,0,0}(A', B', y), rightA(a))
+              | Sum.right(b) =>
+                  congruenceOf((y : B') ↦ Sum.right.{0,0,0}(A', B', y), rightB(b))
+            })⟩⟩
+}
+
+-- The sum rule: the disjoint union of a size-m type and a size-n type has
+-- size m + n. Compose the componentwise bijection with the end-to-end one.
+theorem HasSize.sum (X Y : Type(0)) (m n : Natural)
+        (sizeX : HasSize(X, m)) (sizeY : HasSize(Y, n))
+        : HasSize(Sum.{0,0,0}(X, Y), m + n) :=
+  Equinumerous.transitive(
+      Sum.{0,0,0}(X, Y), Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m + n),
+      Equinumerous.sum_congruence(X, NaturalsBelow(m), Y, NaturalsBelow(n), sizeX, sizeY),
+      NaturalsBelow.sum_equinumerous(m, n))

@@ -1,0 +1,52 @@
+-- Natural/add_order.math
+--
+-- Addition is monotone in (and cancellable from) its left summand with
+-- respect to ≤. These two facts are the arithmetic backbone of the
+-- disjoint-union counting bijection (Set.finite_sum): the right block of
+-- {0,…,m+n-1} is shifted up by m, so bounding and unbounding its elements
+-- is exactly "add m on the left, preserving / cancelling ≤".
+
+module Natural.add_order
+
+import Natural.basics
+import Natural.order
+import Natural.arithmetic
+import Natural.strong_recursion
+
+-- Adding a fixed left summand preserves ≤. Induction on that summand;
+-- successor(a) + x ≡ successor(a + x) reduces definitionally, so each step
+-- is one application of `successor_less_or_equal_successor`.
+theorem Natural.add_left_monotone
+        : (a x y : Natural) → x ≤ y → a + x ≤ a + y
+  | zero, x, y, lessOrEqual =>
+      lessOrEqual
+  | successor(predecessorA), x, y, lessOrEqual =>
+      Natural.successor_less_or_equal_successor(
+          predecessorA + x, predecessorA + y,
+          Natural.add_left_monotone(predecessorA, x, y, lessOrEqual))
+
+-- Adding a fixed left summand reflects ≤: it can be cancelled. Same
+-- induction, peeling a successor off each side with
+-- `less_or_equal_successor_successor_descend`.
+theorem Natural.add_left_le_cancel
+        : (a x y : Natural) → a + x ≤ a + y → x ≤ y
+  | zero, x, y, lessOrEqual =>
+      lessOrEqual
+  | successor(predecessorA), x, y, lessOrEqual =>
+      Natural.add_left_le_cancel(predecessorA, x, y,
+          Natural.less_or_equal_successor_successor_descend(
+              predecessorA + x, predecessorA + y, lessOrEqual))
+
+-- Strict order is irreflexive: no n satisfies successor(n) ≤ n. The
+-- workhorse contradiction whenever a value is claimed to lie strictly
+-- below itself (e.g. the wrong branch of a comparison in a bijection
+-- round-trip). Induction peels a successor off each side; the base case
+-- is `successor(0) ≤ 0`, refuted by `not_less_or_equal_successor_zero`.
+theorem Natural.not_successor_less_or_equal_self
+        : (n : Natural) → successor(n) ≤ n → False
+  | zero, successorLessOrEqual =>
+      Natural.not_less_or_equal_successor_zero(0, successorLessOrEqual)
+  | successor(predecessor), successorLessOrEqual =>
+      Natural.not_successor_less_or_equal_self(predecessor,
+          Natural.less_or_equal_successor_successor_descend(
+              successor(predecessor), predecessor, successorLessOrEqual))
