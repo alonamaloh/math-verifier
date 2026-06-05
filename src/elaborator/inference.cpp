@@ -477,8 +477,18 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
         // before it is emitted, or the kernel sees an unbound internal
         // variable (`weak(Rational.LessThan.weaken(h))`). Forward-derived
         // values are already closed and contain no such FreeVariable, so
-        // they are left untouched (closing them would over-shift their
-        // BoundVariables). The two never mix in one value.
+        // they are left untouched. A value can also be MIXED: when a
+        // backward-inferred metavariable (opened: local-binder
+        // FreeVariables — e.g. the `predicate` of an `∃` taken from an
+        // opened expectedType) is combined with a forward-elaborated
+        // trailing argument (closed: BoundVariables — e.g. the `∃`'s
+        // witness), the resulting value carries BOTH spellings of local
+        // binders. Closing such a value directly would shift its already-
+        // closed BoundVariables (closeOverLocalBinders shifts
+        // unconditionally) and corrupt them. So we first OPEN it fully
+        // (turning the closed local-binder BoundVariables back into
+        // FreeVariables) and THEN close — a round-trip that normalises
+        // opened, closed, and mixed alike to a single closed form.
         std::set<std::string> localBinderOpeningNames;
         for (size_t b = 0; b < localBinders.size(); ++b) {
             localBinderOpeningNames.insert(openingNameFor(localBinders, b));
@@ -495,8 +505,15 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
                 if (containsNamedFreeVariable(value,
                                               localBinderOpeningNames)) {
                     value = closeOverLocalBinders(
-                        value, localBinders, localBinders.size());
+                        openOverLocalBinders(
+                            value, localBinders, localBinders.size()),
+                        localBinders, localBinders.size());
                 }
+                // Invariant: an emitted leading value is CLOSED over the
+                // local binders. The open-then-close above normalises any
+                // mix; assert we never emit a value that still escapes.
+                assertClosedOverLocalBinders(
+                    value, localBinders, "inferLeadingArguments leading value");
                 assigned.push_back({name, value});
                 result.leadingValues.push_back(value);
             }

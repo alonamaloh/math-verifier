@@ -1,0 +1,45 @@
+-- Regression test: anonymous nested tuple `⟨w, ⟨a, b⟩⟩` as a witness for
+-- `∃ x. A(x) ∧ B(x)`, applied to a `¬∃` hypothesis under `take`/`suppose`
+-- binders.
+--
+-- This used to crash the elaborator with an internal "a bound variable
+-- escapes the local scope" error: applying a function whose type comes
+-- from `inferTypeInLocalContext` handed the anonymous-tuple elaboration an
+-- OPENED expected type, so the `∃`'s `predicate` metavariable was inferred
+-- in opened form and then mixed with the CLOSED witness — corrupting the
+-- de Bruijn indices when the inner `And.introduction`'s leading values
+-- were closed for emission. Fixed by normalising a mixed leading value via
+-- an open-then-close round-trip in `inferLeadingArguments`.
+
+module Test.nested_exists_and_tuple_test
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Natural.basics
+import Natural.peano
+import Natural.order
+
+-- The minimal trigger: ∃ with a conjunction body, witness built as a
+-- nested anonymous tuple, fed to a ¬∃ hypothesis.
+theorem none_below_pointwise (predicate : Natural → Proposition)
+        (q : Natural → Proposition)
+        (noneBelow : ¬∃ (smaller : Natural). q(smaller) ∧ predicate(smaller))
+        : (k : Natural) → q(k) → ¬predicate(k) := {
+  take k : Natural;
+  suppose q(k) as qAtK;
+  suppose predicate(k) as predicateAtK;
+  noneBelow(⟨k, ⟨qAtK, predicateAtK⟩⟩)
+}
+
+-- The same shape with the conjunction's left component an ordering fact,
+-- as it appears in the least-number principle.
+theorem none_strictly_below (predicate : Natural → Proposition) (bound : Natural)
+        (noneBelow :
+            ¬∃ (smaller : Natural). smaller < bound ∧ predicate(smaller))
+        : (k : Natural) → k < bound → ¬predicate(k) := {
+  take k : Natural;
+  suppose k < bound as kBelowBound;
+  suppose predicate(k) as predicateAtK;
+  noneBelow(⟨k, ⟨kBelowBound, predicateAtK⟩⟩)
+}
