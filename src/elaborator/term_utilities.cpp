@@ -1,6 +1,25 @@
 // Definitions of the pure term-surgery utilities declared in the header.
 #include "elaborator/term_utilities.hpp"
 
+std::string headConstantName(const Environment& environment,
+                             ExpressionPointer typeExpression) {
+    ExpressionPointer cursor = typeExpression;
+    while (auto* application = std::get_if<Application>(&cursor->node)) {
+        cursor = application->function;
+    }
+    if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+        return constant->name;
+    }
+    ExpressionPointer reduced = weakHeadNormalForm(environment, typeExpression);
+    while (auto* application = std::get_if<Application>(&reduced->node)) {
+        reduced = weakHeadNormalForm(environment, application->function);
+    }
+    if (auto* constant = std::get_if<Constant>(&reduced->node)) {
+        return constant->name;
+    }
+    return "<unknown>";
+}
+
 ExpressionPointer abstractOverBoundVariables(
     ExpressionPointer expression,
     const std::vector<int>& indices) {

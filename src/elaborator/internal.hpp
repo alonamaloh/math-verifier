@@ -3851,7 +3851,11 @@ private:
     // from an in-scope hypothesis.
     bool structureHeadIsClass(const std::string& name);
 
-    std::string headConstantName(ExpressionPointer typeExpression);
+    // Thin forwarder to the free function (term_utilities); keeps the many
+    // `headConstantName(t)` call sites in the class unchanged.
+    std::string headConstantName(ExpressionPointer typeExpression) {
+        return ::headConstantName(environment_, typeExpression);
+    }
 
     // If `type` is `Ring.carrier(bundle)` / `CommutativeRing.carrier(bundle)`
     // and `bundle` WHNF-reduces to a `<Struct>.make(carrier, …)`

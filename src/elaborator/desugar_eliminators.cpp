@@ -315,28 +315,6 @@ bool Elaborator::structureHeadIsClass(const std::string& name) {
         return level != nullptr && level->value == 0;
     }
 
-std::string Elaborator::headConstantName(ExpressionPointer typeExpression) {
-        ExpressionPointer cursor = typeExpression;
-        while (auto* application =
-                   std::get_if<Application>(&cursor->node)) {
-            cursor = application->function;
-        }
-        if (auto* constant = std::get_if<Constant>(&cursor->node)) {
-            return constant->name;
-        }
-        ExpressionPointer reduced = weakHeadNormalForm(
-            environment_, typeExpression);
-        while (auto* application =
-                   std::get_if<Application>(&reduced->node)) {
-            reduced = weakHeadNormalForm(environment_,
-                                          application->function);
-        }
-        if (auto* constant = std::get_if<Constant>(&reduced->node)) {
-            return constant->name;
-        }
-        return "<unknown>";
-    }
-
 ExpressionPointer Elaborator::carrierProjectionField(ExpressionPointer type) {
         auto* application = std::get_if<Application>(&type->node);
         if (!application) return nullptr;

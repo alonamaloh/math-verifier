@@ -4,13 +4,16 @@
 // abstraction, opening/closing over the local-binder context, and
 // free-variable / bound-variable queries.
 //
-// These are FREE FUNCTIONS: they touch no Elaborator state (not even the
-// environment). They operate solely on their arguments plus the kernel's
-// own free functions (shift, structurallyEqual, open/closeBinder, make*).
-// Extracted from the Elaborator class so they stand alone, are independently
-// testable, and don't drag the class's state into scope. Call sites are
-// unchanged — the unqualified calls bind to these once the (identically
-// signed) members were removed.
+// These are FREE FUNCTIONS: they touch no Elaborator state. Most are pure
+// term surgery (no environment at all); a few read-only queries take the
+// kernel `Environment` explicitly (e.g. headConstantName, which weak-head-
+// normalises). They operate solely on their arguments plus the kernel's own
+// free functions (shift, structurallyEqual, weakHeadNormalForm, open/
+// closeBinder, make*). Extracted from the Elaborator class so they stand
+// alone, are independently testable, and don't drag the class's state into
+// scope. Call sites are unchanged — the unqualified calls bind to these once
+// the (identically signed) members were removed, or via a thin forwarding
+// member for the env-taking ones.
 
 #include "kernel/expression.hpp"
 #include "kernel/kernel.hpp"
@@ -67,6 +70,16 @@ inline std::string openingNameFor(
     }
     return original;
 }
+
+// ---- read-only Environment queries (defs in .cpp) ----
+
+// The head constant name of a (possibly applied, possibly redex) type:
+// strip Application spines; if that doesn't reach a Constant, weak-head-
+// normalise and strip again. Returns "<unknown>" if there is no Constant
+// head. Free over the kernel Environment (the elaborator keeps a thin
+// forwarding member so its many call sites stay `headConstantName(t)`).
+std::string headConstantName(const Environment& environment,
+                             ExpressionPointer typeExpression);
 
 // ---- de Bruijn / local-binder term utilities (defs in .cpp) ----
 
