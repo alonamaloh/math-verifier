@@ -1,0 +1,672 @@
+// Out-of-line Elaborator method definitions: diff-based proof bridges (under-binder, cited+context, user-proof, AC) + pattern match
+//
+// Part of the elaborator split (see internal.hpp): the class is
+// declared in the header; each elaborator/*.cpp defines a topical
+// slice of its methods as `Elaborator::method(...)`.
+
+#include "elaborator/internal.hpp"
+
+ExpressionPointer Elaborator::tryDiffWrapForEqualityGoal(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer hintTerm,
+        ExpressionPointer hintType,
+        ExpressionPointer goalClosed) {
+        ExpressionPointer goalOpened = openOverLocalBinders(
+            goalClosed, localBinders, localBinders.size());
+        ExpressionPointer goalWhnf = weakHeadNormalForm(
+            environment_, goalOpened);
+        EqualityComponents goalComps;
+        try {
+            goalComps = extractEqualityComponents(
+                goalWhnf, "diff-wrap goal", 0);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+        ExpressionPointer previousKernel = closeOverLocalBinders(
+            goalComps.leftEndpoint, localBinders,
+            localBinders.size());
+        ExpressionPointer nextKernel = closeOverLocalBinders(
+            goalComps.rightEndpoint, localBinders,
+            localBinders.size());
+        try {
+            return tryDiffApplyUserProof(
+                localBinders, previousKernel, nextKernel,
+                hintTerm, hintType, 0, 0);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        } catch (const TypeError&) {
+            return nullptr;
+        }
+    }
+
+bool Elaborator::isPointwiseEqualityType(ExpressionPointer type) {
+        ExpressionPointer cursor = weakHeadNormalForm(environment_, type);
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            cursor = weakHeadNormalForm(environment_, pi->codomain);
+        }
+        while (auto* application =
+                   std::get_if<Application>(&cursor->node)) {
+            cursor = application->function;
+        }
+        auto* head = std::get_if<Constant>(&cursor->node);
+        return head && head->name == "Equality";
+    }
+
+ExpressionPointer Elaborator::tryUnderBinderStep(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previous, ExpressionPointer next,
+        const SurfaceExpression& proofSurface, int line, int column) {
+        (void)line; (void)column;
+        // Only fire when the `by` proof is syntactically a lambda — the
+        // under-binder form IS `function (i) => <pointwise proof>`. An
+        // ordinary lemma proof is left to the normal path.
+        if (!std::get_if<SurfaceLambda>(&proofSurface.node)) {
+            return nullptr;
+        }
+        // Peel `Head(arg0, …, argN)` → (head name, args outermost-first).
+        auto peelApplication = [&](ExpressionPointer expression,
+                                   std::vector<ExpressionPointer>& args)
+                -> std::string {
+            ExpressionPointer cursor = expression;
+            while (auto* application =
+                       std::get_if<Application>(&cursor->node)) {
+                args.push_back(application->argument);
+                cursor = application->function;
+            }
+            std::reverse(args.begin(), args.end());
+            auto* head = std::get_if<Constant>(&cursor->node);
+            return head ? head->name : std::string();
+        };
+        std::vector<ExpressionPointer> argsLeft, argsRight;
+        std::string headLeft = peelApplication(previous, argsLeft);
+        std::string headRight = peelApplication(next, argsRight);
+        if (headLeft.empty() || headLeft != headRight) return nullptr;
+        if (argsLeft.size() != argsRight.size() || argsLeft.empty()) {
+            return nullptr;
+        }
+        // Exactly one differing argument position, and both sides there are
+        // lambdas (the binder body).
+        int diffPosition = -1;
+        for (size_t i = 0; i < argsLeft.size(); ++i) {
+            if (!structurallyEqual(argsLeft[i], argsRight[i])) {
+                if (diffPosition >= 0) return nullptr;  // more than one diff
+                diffPosition = static_cast<int>(i);
+            }
+        }
+        if (diffPosition < 0) return nullptr;  // identical (reflexivity)
+        // The differing argument is the binder body (`f` vs `g`) — it need
+        // not be a literal lambda (an abstract function variable is fine);
+        // the lemma lookup + pointwise elaboration + final type-check below
+        // reject anything that isn't genuinely a congruence-under-binder.
+        ExpressionPointer summandF = argsLeft[diffPosition];
+        ExpressionPointer summandG = argsRight[diffPosition];
+
+        // Try each congruence lemma registered for this function head via
+        // `congruence_under_binder <F> := <L>;`.
+        auto registryEntry =
+            environment_.congruenceUnderBinderRegistry.find(headLeft);
+        if (registryEntry == environment_.congruenceUnderBinderRegistry.end()) {
+            return nullptr;
+        }
+        for (const std::string& lemmaName : registryEntry->second) {
+            if (!environment_.lookup(lemmaName)) continue;
+            try {
+                // Apply to: shared prefix (args before the binder) + f + g.
+                ExpressionPointer partial = makeConstant(lemmaName);
+                for (int i = 0; i < diffPosition; ++i) {
+                    partial = makeApplication(std::move(partial), argsLeft[i]);
+                }
+                partial = makeApplication(std::move(partial), summandF);
+                partial = makeApplication(std::move(partial), summandG);
+                // Fill remaining binders: the user's lambda for the unique
+                // pointwise-equality binder, shared suffix args for the rest.
+                size_t suffixIndex = static_cast<size_t>(diffPosition) + 1;
+                bool lambdaUsed = false;
+                for (int guard = 0; guard < 16; ++guard) {
+                    ExpressionPointer partialType = weakHeadNormalForm(
+                        environment_,
+                        inferTypeInLocalContext(localBinders, partial));
+                    auto* pi = std::get_if<Pi>(&partialType->node);
+                    if (!pi) break;  // fully applied
+                    if (!lambdaUsed
+                        && isPointwiseEqualityType(pi->domain)) {
+                        ExpressionPointer expected = closeOverLocalBinders(
+                            pi->domain, localBinders, localBinders.size());
+                        ExpressionPointer proof = elaborateExpression(
+                            proofSurface, localBinders, expected);
+                        partial = makeApplication(std::move(partial), proof);
+                        lambdaUsed = true;
+                    } else if (suffixIndex < argsLeft.size()) {
+                        partial = makeApplication(std::move(partial),
+                                                   argsLeft[suffixIndex++]);
+                    } else {
+                        break;  // cannot fill
+                    }
+                }
+                if (!lambdaUsed) continue;
+                // Validate: a fully-applied, well-typed proof.
+                ExpressionPointer resultType =
+                    inferTypeInLocalContext(localBinders, partial);
+                if (std::get_if<Pi>(&weakHeadNormalForm(
+                        environment_, resultType)->node)) {
+                    continue;  // still under-applied
+                }
+                return partial;
+            } catch (const ElaborateError&) {
+                continue;
+            } catch (const TypeError&) {
+                continue;
+            }
+        }
+        return nullptr;
+    }
+
+ExpressionPointer Elaborator::tryCombineCitedWithContext(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer userProof,
+        ExpressionPointer userLeft,
+        ExpressionPointer userRight,
+        ExpressionPointer userCarrier,
+        LevelPointer userCarrierLevel,
+        int line, int column) {
+        if (environment_.lookup("Equality.congruence") == nullptr
+            || environment_.lookup("Equality.transitivity") == nullptr) {
+            return nullptr;
+        }
+        auto carrierTypeOf = [&](const ExpressionPointer& expr) {
+            return closeOverLocalBinders(
+                inferTypeInLocalContext(localBinders, expr),
+                localBinders, localBinders.size());
+        };
+        // The cited proof oriented `from = to`. `forward` uses it as-is
+        // (from = userLeft); otherwise wrap with `Equality.symmetry`
+        // (from = userRight).
+        auto orientedProof = [&](bool forward) -> ExpressionPointer {
+            if (forward) return userProof;
+            ExpressionPointer sym = makeConstant(
+                "Equality.symmetry", {userCarrierLevel});
+            sym = makeApplication(std::move(sym), userCarrier);
+            sym = makeApplication(std::move(sym), userLeft);
+            sym = makeApplication(std::move(sym), userRight);
+            sym = makeApplication(std::move(sym), userProof);
+            return sym;
+        };
+        // Flip a proof `proof : x = y` into `y = x` at the endpoint type.
+        auto symmetrize = [&](const ExpressionPointer& x,
+                              const ExpressionPointer& y,
+                              ExpressionPointer proof) -> ExpressionPointer {
+            LevelPointer level = typeUniverseOf(localBinders, x);
+            ExpressionPointer s = makeConstant(
+                "Equality.symmetry", {level});
+            s = makeApplication(std::move(s), carrierTypeOf(x));
+            s = makeApplication(std::move(s), x);
+            s = makeApplication(std::move(s), y);
+            s = makeApplication(std::move(s), std::move(proof));
+            return s;
+        };
+        // Rewrite `endpoint` by congruence: abstract every occurrence of
+        // `from`, substitute `to`, and wrap with `Equality.congruence`.
+        // Returns {proof : endpoint = rewritten, rewritten} or {nullptr,
+        // nullptr} if `from` does not occur.
+        struct Rewritten {
+            ExpressionPointer proof;
+            ExpressionPointer result;
+        };
+        auto rewriteEndpoint =
+            [&](const ExpressionPointer& endpoint,
+                const ExpressionPointer& from, const ExpressionPointer& to,
+                ExpressionPointer citedProof) -> Rewritten {
+            int occurrences = 0;
+            ExpressionPointer motiveBody = abstractStructuralOccurrence(
+                endpoint, from, 0, occurrences);
+            if (occurrences == 0) return {nullptr, nullptr};
+            ExpressionPointer rewritten = substitute(motiveBody, 0, to);
+            try {
+                ExpressionPointer outerType = carrierTypeOf(endpoint);
+                LevelPointer outerLevel = typeUniverseOf(
+                    localBinders, endpoint);
+                ExpressionPointer motive = makeLambda(
+                    "_combine_z", userCarrier, std::move(motiveBody));
+                ExpressionPointer call = makeConstant(
+                    "Equality.congruence", {userCarrierLevel, outerLevel});
+                call = makeApplication(std::move(call), userCarrier);
+                call = makeApplication(std::move(call), std::move(outerType));
+                call = makeApplication(std::move(call), std::move(motive));
+                call = makeApplication(std::move(call), from);
+                call = makeApplication(std::move(call), to);
+                call = makeApplication(std::move(call), std::move(citedProof));
+                return {std::move(call), std::move(rewritten)};
+            } catch (const TypeError&) {
+                return {nullptr, nullptr};
+            } catch (const ElaborateError&) {
+                return {nullptr, nullptr};
+            }
+        };
+        // Join `prev = mid` (p) and `mid = next` (q) by transitivity.
+        auto transitivityJoin =
+            [&](const ExpressionPointer& prev, const ExpressionPointer& mid,
+                const ExpressionPointer& next, ExpressionPointer p,
+                ExpressionPointer q) -> ExpressionPointer {
+            try {
+                LevelPointer level = typeUniverseOf(localBinders, prev);
+                ExpressionPointer trans = makeConstant(
+                    "Equality.transitivity", {level});
+                trans = makeApplication(std::move(trans), carrierTypeOf(prev));
+                trans = makeApplication(std::move(trans), prev);
+                trans = makeApplication(std::move(trans), mid);
+                trans = makeApplication(std::move(trans), next);
+                trans = makeApplication(std::move(trans), std::move(p));
+                trans = makeApplication(std::move(trans), std::move(q));
+                return trans;
+            } catch (const TypeError&) {
+                return nullptr;
+            } catch (const ElaborateError&) {
+                return nullptr;
+            }
+        };
+        auto eqType = [&](const ExpressionPointer& x,
+                          const ExpressionPointer& y) {
+            LevelPointer level = typeUniverseOf(localBinders, x);
+            ExpressionPointer e = makeConstant("Equality", {level});
+            e = makeApplication(std::move(e), carrierTypeOf(x));
+            e = makeApplication(std::move(e), x);
+            e = makeApplication(std::move(e), y);
+            return e;
+        };
+        auto closeResidual =
+            [&](const ExpressionPointer& a,
+                const ExpressionPointer& b) -> ExpressionPointer {
+            return autoProveCalcStep(
+                localBinders, a, b, carrierTypeOf(a),
+                typeUniverseOf(localBinders, a), eqType(a, b), line, column);
+        };
+        // Four attempts: rewrite the PREVIOUS endpoint (then auto-prove
+        // `mid = next`) or the NEXT endpoint (auto-prove `prev = mid`),
+        // each rewriting in the forward (userLeft → userRight) or flipped
+        // direction. First residual the auto-prover closes from context wins.
+        struct Attempt { bool onPrevious; bool forward; };
+        const Attempt attempts[] = {
+            {true, true}, {true, false}, {false, true}, {false, false}};
+        for (const Attempt& attempt : attempts) {
+            const ExpressionPointer& from =
+                attempt.forward ? userLeft : userRight;
+            const ExpressionPointer& to =
+                attempt.forward ? userRight : userLeft;
+            if (attempt.onPrevious) {
+                Rewritten rw = rewriteEndpoint(
+                    previousKernel, from, to, orientedProof(attempt.forward));
+                if (!rw.proof) continue;
+                ExpressionPointer residual =
+                    closeResidual(rw.result, nextKernel);
+                if (!residual) continue;
+                ExpressionPointer joined = transitivityJoin(
+                    previousKernel, rw.result, nextKernel,
+                    std::move(rw.proof), std::move(residual));
+                if (joined && !containsFreeVariable(joined)) return joined;
+            } else {
+                Rewritten rw = rewriteEndpoint(
+                    nextKernel, from, to, orientedProof(attempt.forward));
+                if (!rw.proof) continue;
+                // rw.proof : nextKernel = mid; flip to mid = nextKernel.
+                ExpressionPointer midToNext =
+                    symmetrize(nextKernel, rw.result, std::move(rw.proof));
+                ExpressionPointer residual =
+                    closeResidual(previousKernel, rw.result);
+                if (!residual) continue;
+                ExpressionPointer joined = transitivityJoin(
+                    previousKernel, rw.result, nextKernel,
+                    std::move(residual), std::move(midToNext));
+                if (joined && !containsFreeVariable(joined)) return joined;
+            }
+        }
+        return nullptr;
+    }
+
+ExpressionPointer Elaborator::tryDiffApplyUserProof(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer userProof,
+        ExpressionPointer userProofType,
+        int line, int column) {
+        (void)column;
+        (void)line;
+        // The diff-inference fallback wraps with Equality.congruence;
+        // refuse the attempt if that name isn't declared, otherwise we'd
+        // hand the kernel a term referencing an undefined constant and
+        // the eventual addDefinition would report it without any calc-
+        // step attribution context (the calc-step frame is long gone by
+        // then). Returning nullptr here lets the caller fall through to
+        // its normal "type mismatch" error path, which fires inside the
+        // calc-step Frame and reports the line of the offending step.
+        if (!environment_.lookup("Equality.congruence")) {
+            return nullptr;
+        }
+        // Extract (carrierLevel, T, a, b) from userProofType.
+        ExpressionPointer userTypeWhnf = weakHeadNormalForm(
+            environment_, userProofType);
+        EqualityComponents components;
+        try {
+            components = extractEqualityComponents(
+                userTypeWhnf, "calc step diff", line);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+        ExpressionPointer userLeft = components.leftEndpoint;
+        ExpressionPointer userRight = components.rightEndpoint;
+        ExpressionPointer userCarrier = components.carrierType;
+        LevelPointer userCarrierLevel = components.carrierUniverseLevel;
+        // Representation contract (WS5/WS8). This helper has two callers that
+        // pass `userProofType` in DIFFERENT representations: the theorem-body
+        // coercion path passes it CLOSED over the local binders (de Bruijn
+        // indices), while the calc-step path passes it OPENED (the binders as
+        // named Internal FreeVariables). The symmetric-flip branch below
+        // builds `Equality.symmetry(carrier, x, y, proof)` directly from these
+        // endpoints — correct only when they are CLOSED, else the opened
+        // `@a`/`@e` free variables leak into the proof term and it is rejected
+        // as malformed (the calc-step case that kept its explicit symmetry).
+        // Normalize to CLOSED here so both callers behave identically; the
+        // `openOverLocalBinders` comparisons below re-open as needed.
+        auto closeIfOpened = [&](const ExpressionPointer& e) {
+            return containsFreeVariable(e)
+                ? closeOverLocalBinders(e, localBinders, localBinders.size())
+                : e;
+        };
+        userLeft = closeIfOpened(userLeft);
+        userRight = closeIfOpened(userRight);
+        userCarrier = closeIfOpened(userCarrier);
+        // ζ-unfold local let-binders (consistent with autoProveCalcStep).
+        previousKernel = zetaUnfoldLetBinders(previousKernel, localBinders);
+        nextKernel = zetaUnfoldLetBinders(nextKernel, localBinders);
+        Context openedContext = buildContextFromLocalBinders(localBinders);
+        // Lockstep walk: descend via App nodes, at each level check
+        // if the user proof matches (forward or symmetric).
+        std::vector<CalcCongruencePathStep> pathStepsOutsideIn;
+        ExpressionPointer leftCursor = previousKernel;
+        ExpressionPointer rightCursor = nextKernel;
+        ExpressionPointer innerProof = nullptr;
+        ExpressionPointer userLeftOpened = openOverLocalBinders(
+            userLeft, localBinders, localBinders.size());
+        ExpressionPointer userRightOpened = openOverLocalBinders(
+            userRight, localBinders, localBinders.size());
+        while (true) {
+            ExpressionPointer leftOpened = openOverLocalBinders(
+                leftCursor, localBinders, localBinders.size());
+            ExpressionPointer rightOpened = openOverLocalBinders(
+                rightCursor, localBinders, localBinders.size());
+            bool forwardMatch =
+                isDefinitionallyEqual(environment_, openedContext,
+                                       leftOpened, userLeftOpened)
+                && isDefinitionallyEqual(environment_, openedContext,
+                                          rightOpened, userRightOpened);
+            if (forwardMatch) {
+                innerProof = userProof;
+                break;
+            }
+            bool symmetricMatch =
+                isDefinitionallyEqual(environment_, openedContext,
+                                       leftOpened, userRightOpened)
+                && isDefinitionallyEqual(environment_, openedContext,
+                                          rightOpened, userLeftOpened);
+            if (symmetricMatch) {
+                // The cursor endpoints are the user proof's endpoints
+                // SWAPPED, so wrap with Equality.symmetry. userCarrier /
+                // userLeft / userRight are already CLOSED over the local
+                // binders — extractEqualityComponents read them off the
+                // closed userProofType, and the `*Opened` values above are
+                // separate opened copies used only for the defeq probe — so
+                // they must NOT be closed again (doing so double-shifts the
+                // local-hypothesis BoundVariables out of scope: the historic
+                // symmetry-flip "bare BoundVariable" bug). With
+                // userProof : userLeft = userRight,
+                // symmetry(A, userLeft, userRight, userProof) : userRight =
+                // userLeft — matching the swapped cursor endpoints.
+                ExpressionPointer symmetryCall = makeConstant(
+                    "Equality.symmetry", {userCarrierLevel});
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall), userCarrier);
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall), userLeft);
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall), userRight);
+                symmetryCall = makeApplication(
+                    std::move(symmetryCall), userProof);
+                innerProof = std::move(symmetryCall);
+                break;
+            }
+            // Descend through Application nodes. If structural compare
+            // bails (neither function nor argument structurally equal),
+            // retry once after WHNF — unfolds Definition heads (e.g.
+            // `Rational.subtract` → `+`/`negate`) and exposes reduced
+            // App spines (`Natural.add(successor(_), _)` → `successor(
+            // Natural.add(_, _))`). The reconstruction below uses the
+            // post-WHNF saved sides; the resulting proof type is
+            // definitionally equal to the original calc-step type, so
+            // the caller's coercion accepts it.
+            auto descendOrWhnf = [&]() -> bool {
+                auto* leftApp =
+                    std::get_if<Application>(&leftCursor->node);
+                auto* rightApp =
+                    std::get_if<Application>(&rightCursor->node);
+                if (leftApp && rightApp) {
+                    bool functionEqual = structurallyEqual(
+                        leftApp->function, rightApp->function);
+                    bool argumentEqual = structurallyEqual(
+                        leftApp->argument, rightApp->argument);
+                    if (functionEqual && argumentEqual) return false;
+                    if (functionEqual) {
+                        pathStepsOutsideIn.push_back(
+                            {CalcCongruencePathStep::Kind::Arg,
+                             leftApp->function});
+                        leftCursor = leftApp->argument;
+                        rightCursor = rightApp->argument;
+                        return true;
+                    }
+                    if (argumentEqual) {
+                        pathStepsOutsideIn.push_back(
+                            {CalcCongruencePathStep::Kind::Fn,
+                             leftApp->argument});
+                        leftCursor = leftApp->function;
+                        rightCursor = rightApp->function;
+                        return true;
+                    }
+                }
+                ExpressionPointer leftWhnf = weakHeadNormalForm(
+                    environment_, leftCursor);
+                ExpressionPointer rightWhnf = weakHeadNormalForm(
+                    environment_, rightCursor);
+                bool leftChanged =
+                    !structurallyEqual(leftWhnf, leftCursor);
+                bool rightChanged =
+                    !structurallyEqual(rightWhnf, rightCursor);
+                if (!leftChanged && !rightChanged) return false;
+                leftCursor = leftWhnf;
+                rightCursor = rightWhnf;
+                return true;
+            };
+            if (!descendOrWhnf()) break;
+        }
+        if (!innerProof) {
+            // The single-position descent found no slot. Fall back to
+            // bounded combining: rewrite one endpoint by the cited fact
+            // and let the auto-prover close the residual from context.
+            return tryCombineCitedWithContext(
+                localBinders, previousKernel, nextKernel, userProof,
+                userLeft, userRight, userCarrier, userCarrierLevel,
+                line, column);
+        }
+        // Wrap from innermost out with Equality.congruence (shared with
+        // autoProveCalcStepRaw via wrapCongruenceChainOutsideIn).
+        ExpressionPointer currentProof = wrapCongruenceChainOutsideIn(
+            localBinders, pathStepsOutsideIn, leftCursor, rightCursor,
+            innerProof);
+        if (!currentProof) return nullptr;
+        // Output contract (WS5/WS8): the symmetric-match + nested-congruence
+        // wrapping above can, on some flips, build a term with an escaped
+        // Internal FreeVariable (e.g. an opened-but-not-reclosed endpoint).
+        // A calc-step proof is supposed to be CLOSED over the local binders
+        // (those appear as de Bruijn indices), so any free variable is a
+        // bug; left unchecked it surfaces downstream as a "kernel: unbound
+        // internal variable" leak. (inferTypeInLocalContext does NOT catch
+        // it — opening over the local binders re-supplies a same-named free
+        // variable, so the ill-formed term type-checks here yet fails later
+        // in a different context.) Reject it so the caller falls through to
+        // its surface "type mismatch" path.
+        if (containsFreeVariable(currentProof)) return nullptr;
+        return currentProof;
+    }
+
+ExpressionPointer Elaborator::tryAcRearrangement(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        ExpressionPointer expectedType = makeApplication(
+            makeApplication(
+                makeApplication(
+                    makeConstant("Equality", {carrierLevel}),
+                    carrierType),
+                previousKernel),
+            nextKernel);
+        try {
+            return elaborateRing(localBinders, expectedType, line, 0);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        } catch (const TypeError&) {
+            return nullptr;
+        }
+    }
+
+bool Elaborator::matchAgainstPattern(
+        ExpressionPointer pattern,
+        ExpressionPointer subject,
+        int binderCount,
+        std::vector<ExpressionPointer>& bindings,
+        int piDepth) {
+        if (auto* patternBV =
+                std::get_if<BoundVariable>(&pattern->node)) {
+            int idx = patternBV->deBruijnIndex;
+            if (idx >= piDepth && idx < piDepth + binderCount) {
+                int slot = idx - piDepth;
+                // The subject must live in the OUTER scope (no
+                // references to the piDepth local Pi binders); else
+                // the binding would be unground when the lemma is
+                // applied. Detect and bail.
+                if (piDepth > 0
+                    && referencesAnyBoundInRange(
+                           subject, 0, piDepth)) {
+                    return false;
+                }
+                // Shift the subject down by piDepth so it lives in
+                // the same scope as the other bindings (the
+                // lemma-application context).
+                ExpressionPointer shiftedSubject = piDepth > 0
+                    ? liftBoundVariables(subject, -piDepth, 0)
+                    : subject;
+                if (!bindings[slot]) {
+                    bindings[slot] = shiftedSubject;
+                    return true;
+                }
+                return structurallyEqual(
+                    bindings[slot], shiftedSubject);
+            }
+            // idx < piDepth: descended Pi binder; idx >=
+            // piDepth + binderCount: outer-scope binder. Either
+            // way, subject must be the same BV index.
+            auto* s = std::get_if<BoundVariable>(&subject->node);
+            return s && s->deBruijnIndex == idx;
+        }
+        if (pattern->node.index() != subject->node.index()) {
+            // Kind mismatch — try WHNF on the subject. A δ-defined
+            // head (e.g. `Integer.LessOrEqual` unfolding to an
+            // `Exists`) might expose the shape the pattern wants.
+            ExpressionPointer subjectWhnf = weakHeadNormalForm(
+                environment_, subject);
+            if (subjectWhnf.get() != subject.get()) {
+                return matchAgainstPattern(
+                    pattern, subjectWhnf,
+                    binderCount, bindings, piDepth);
+            }
+            return false;
+        }
+        if (auto* p = std::get_if<BoundVariable>(&pattern->node)) {
+            (void)p;
+            // Handled above; this branch is for the
+            // (pattern is non-BV but subject is BV) reject case.
+            return false;
+        }
+        if (auto* p = std::get_if<FreeVariable>(&pattern->node)) {
+            auto* s = std::get_if<FreeVariable>(&subject->node);
+            return p->name == s->name && p->origin == s->origin;
+        }
+        if (auto* p = std::get_if<Sort>(&pattern->node)) {
+            auto* s = std::get_if<Sort>(&subject->node);
+            return levelsDefinitionallyEqual(p->level, s->level);
+        }
+        if (auto* p = std::get_if<Application>(&pattern->node)) {
+            auto* s = std::get_if<Application>(&subject->node);
+            if (s) {
+                // Structural attempt — bindings is scratch; save in
+                // case we need to retry after WHNF.
+                std::vector<ExpressionPointer> savedBindings =
+                    bindings;
+                if (matchAgainstPattern(
+                        p->function, s->function,
+                        binderCount, bindings, piDepth)
+                    && matchAgainstPattern(
+                        p->argument, s->argument,
+                        binderCount, bindings, piDepth)) {
+                    return true;
+                }
+                bindings = savedBindings;
+            }
+            // Structural failed (or subject kinds disagreed). Try
+            // WHNF on the subject: a δ/ι-reducing head (e.g.
+            // `successor(p) * q` → `q + p*q`) might expose the App
+            // shape the pattern needs. Bail if WHNF is a no-op.
+            ExpressionPointer subjectWhnf = weakHeadNormalForm(
+                environment_, subject);
+            if (subjectWhnf.get() != subject.get()) {
+                return matchAgainstPattern(
+                    pattern, subjectWhnf,
+                    binderCount, bindings, piDepth);
+            }
+            return false;
+        }
+        if (auto* p = std::get_if<Constant>(&pattern->node)) {
+            auto* s = std::get_if<Constant>(&subject->node);
+            if (p->name != s->name) return false;
+            if (p->universeArguments.size()
+                    != s->universeArguments.size()) {
+                return false;
+            }
+            for (size_t i = 0; i < p->universeArguments.size(); ++i) {
+                if (!levelsDefinitionallyEqual(
+                        p->universeArguments[i],
+                        s->universeArguments[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (auto* p = std::get_if<Pi>(&pattern->node)) {
+            auto* s = std::get_if<Pi>(&subject->node);
+            // The Pi binder itself is a local fresh variable in both
+            // pattern and subject; recurse into domain at the same
+            // piDepth (the binder isn't visible from its own domain)
+            // and into codomain at piDepth + 1.
+            return matchAgainstPattern(p->domain, s->domain,
+                                          binderCount, bindings, piDepth)
+                && matchAgainstPattern(p->codomain, s->codomain,
+                                          binderCount, bindings,
+                                          piDepth + 1);
+        }
+        // Lambda / Let are rare in lemma LHSs and need extra binder
+        // bookkeeping; bail conservatively.
+        return false;
+    }
+

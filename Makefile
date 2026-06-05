@@ -14,6 +14,9 @@ SRCS := \
     src/syntax/lexer.cpp src/syntax/parser.cpp \
     src/elaborator/elaborator.cpp src/elaborator/levels.cpp \
     src/elaborator/ring.cpp src/elaborator/calc.cpp \
+    src/elaborator/prover.cpp src/elaborator/claim.cpp \
+    src/elaborator/coercion.cpp src/elaborator/diff_bridges.cpp \
+    src/elaborator/warnings.cpp src/elaborator/lemma_index.cpp \
     src/elaborator/term_utilities.cpp src/elaborator/lemma_search.cpp \
     src/main.cpp
 
