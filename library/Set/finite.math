@@ -1,0 +1,73 @@
+-- Set/finite.math
+--
+-- The yardstick for counting. `NaturalsBelow(n)` is the canonical type
+-- with n elements — the naturals {0, 1, …, n-1} — and `HasSize(X, n)`
+-- says X has exactly n elements by exhibiting it as equinumerous to that
+-- yardstick. Since equinumerosity is an equivalence relation
+-- (Set.equinumerous), size is automatically invariant under "same size":
+-- transporting a size along an equinumerosity is just transitivity.
+--
+-- This file pins down the base case n = 0 from both sides — a type has
+-- size 0 exactly when it is empty — which is where every inductive
+-- counting argument bottoms out.
+
+module Set.finite
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.subtype
+import Set.equinumerous
+import Natural.basics
+import Natural.order
+import Natural.strong_recursion
+
+-- `NaturalsBelow(n)`: the naturals strictly below n. An element is a value
+-- `k` together with a proof that `successor(k) ≤ n`, i.e. `k < n`.
+definition NaturalsBelow (n : Natural) : Type(0) :=
+  Subtype(Natural, (k : Natural) ↦ successor(k) ≤ n)
+
+-- `HasSize(X, n)`: X has exactly n elements — it is the same size as the
+-- canonical n-element type.
+definition HasSize (X : Type(0)) (n : Natural) : Proposition :=
+  Equinumerous(X, NaturalsBelow(n))
+
+-- The yardstick has the size it measures: `NaturalsBelow(n)` has size n,
+-- by reflexivity of equinumerosity. A sanity check that the definition
+-- says what it should.
+theorem NaturalsBelow.has_size (n : Natural) : HasSize(NaturalsBelow(n), n) :=
+  Equinumerous.reflexive(NaturalsBelow(n))
+
+-- There are no naturals below 0: an element would carry a proof of
+-- `successor(value) ≤ 0`, which is impossible.
+theorem NaturalsBelow.zero_is_empty : NaturalsBelow(0) → False
+  | Subtype.make(value, belowZero) =>
+      Natural.not_less_or_equal_successor_zero(value, belowZero)
+
+-- Size is invariant under equinumerosity: if X is the same size as Y and
+-- Y has n elements, so does X. This is transitivity of equinumerosity,
+-- and it is the whole payoff of defining size through an equivalence
+-- relation — "same size" really does transport the count.
+theorem HasSize.transport (X Y : Type(0)) (n : Natural)
+        (sameSize : Equinumerous(X, Y)) (hasSize : HasSize(Y, n))
+        : HasSize(X, n) :=
+  Equinumerous.transitive(X, Y, NaturalsBelow(n), sameSize, hasSize)
+
+-- A type of size 0 is empty: a size-0 witness gives a map X → NaturalsBelow(0),
+-- and the latter has no elements.
+theorem HasSize.zero_is_empty (X : Type(0))
+        (hasSizeZero : HasSize(X, 0)) : X → False := {
+  obtain ⟨intoYardstick, tail⟩ from hasSizeZero;
+  obtain ⟨outOfYardstick, inverse⟩ from tail;
+  (element : X) ↦ NaturalsBelow.zero_is_empty(intoYardstick(element))
+}
+
+-- Conversely, an empty type has size 0. Both directions of the bijection,
+-- and both inverse laws, are vacuous: every input is contradictory.
+theorem HasSize.empty_has_size_zero (X : Type(0))
+        (empty : X → False) : HasSize(X, 0) :=
+  ⟨(element : X) ↦ absurd(empty(element)),
+   ⟨(element : NaturalsBelow(0)) ↦ absurd(NaturalsBelow.zero_is_empty(element)),
+    And.introduction(
+        (element : X) ↦ absurd(empty(element)),
+        (element : NaturalsBelow(0)) ↦ absurd(NaturalsBelow.zero_is_empty(element)))⟩⟩
