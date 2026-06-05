@@ -39,7 +39,7 @@ import Algebra.commutative_ring_bundle
 -- factors is zero.
 definition Ring.HasNoZeroDivisors (s : Ring) : Proposition :=
   (x y : Ring.carrier(s))
-    → Ring.multiply(s, x, y) = Ring.zero(s)
+    → x * y = Ring.zero(s)
     → x = Ring.zero(s) ∨ y = Ring.zero(s)
 
 -- ----------------------------------------------------------------------
@@ -91,16 +91,15 @@ definition IntegralDomain.no_zero_divisors (d : IntegralDomain)
 -- a·(x − y) = a·x − a·y. Distributivity on the left plus pushing the
 -- negation through the product.
 theorem Ring.multiply_difference_left (s : Ring) (a x y : Ring.carrier(s))
-        : Ring.multiply(s, a, x - y)
-          = Ring.multiply(s, a, x) - Ring.multiply(s, a, y) :=
-  calc Ring.multiply(s, a, x - y)
-     = Ring.multiply(s, a, x) + Ring.multiply(s, a, Ring.negate(s, y))
+        : a * (x - y) = a * x - a * y :=
+  calc a * (x - y)
+     = a * x + a * (-y)
            by Ring.distributivity_left
-     = Ring.multiply(s, a, x) + Ring.negate(s, Ring.multiply(s, a, y))
+     = a * x + -(a * y)
            by Ring.multiply_negate_right(
                   Ring.carrier(s), Ring.add, Ring.zero(s), Ring.negate,
                   Ring.multiply, Ring.one(s), Ring.is_ring(s), a, y)
-     = Ring.multiply(s, a, x) - Ring.multiply(s, a, y)
+     = a * x - a * y
 
 -- If x − y = 0 then x = y. A specialisation of the linear-combination
 -- cancellation lemma (the trivial combination 0 = 0).
@@ -123,15 +122,14 @@ theorem Ring.equal_of_difference_zero (s : Ring) (x y : Ring.carrier(s))
 theorem IntegralDomain.multiply_cancel_left (d : IntegralDomain)
         (a x y : Ring.carrier(IntegralDomain.ring(d)))
         (aNonzero : ¬(a = Ring.zero(IntegralDomain.ring(d))))
-        (equation : Ring.multiply(IntegralDomain.ring(d), a, x)
-                  = Ring.multiply(IntegralDomain.ring(d), a, y))
+        (equation : a * x = a * y)
         : x = y := {
   let s : Ring := IntegralDomain.ring(d);
   claim productDifferenceZero
-      : Ring.multiply(s, a, x - y) = Ring.zero(s)
-      by calc Ring.multiply(s, a, x - y)
-            = Ring.multiply(s, a, x) - Ring.multiply(s, a, y)
-            = Ring.multiply(s, a, y) - Ring.multiply(s, a, y)
+      : a * (x - y) = Ring.zero(s)
+      by calc a * (x - y)
+            = a * x - a * y
+            = a * y - a * y
             = Ring.zero(s);
   claim factorIsZero : a = Ring.zero(s) ∨ (x - y) = Ring.zero(s)
       by IntegralDomain.no_zero_divisors(d, a, x - y, productDifferenceZero);
