@@ -1395,6 +1395,112 @@ Elaborator::ACNormResult Elaborator::ringDistribute(
             e, buildReflexivity(carrierLevel, carrierType, e)};
     }
 
+ExpressionPointer Elaborator::unfoldRingSubtract(ExpressionPointer e) {
+        ExpressionPointer a, b;
+        if (matchBinaryRingOp(e, "Ring.subtract", a, b)) {
+            ExpressionPointer a2 = unfoldRingSubtract(a);
+            ExpressionPointer b2 = unfoldRingSubtract(b);
+            ExpressionPointer negB =
+                makeApplication(ringConst("Ring.negate"), b2);
+            return buildRingOp("Ring.add", a2, negB);
+        }
+        if (auto* app = std::get_if<Application>(&e->node)) {
+            ExpressionPointer fn = unfoldRingSubtract(app->function);
+            ExpressionPointer arg = unfoldRingSubtract(app->argument);
+            return makeApplication(fn, arg);
+        }
+        return e;
+    }
+
+Elaborator::ACNormResult Elaborator::ringUnfoldSubtract(
+        ExpressionPointer e,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel) {
+        ExpressionPointer unfolded = unfoldRingSubtract(e);
+        // `Ring.subtract(a,b)` is DEFINED as `Ring.add(a, negate(b))`, so the
+        // rewrite is definitional: reflexivity proves `e = unfolded` (checked
+        // by the kernel up to defeq).
+        return ACNormResult{
+            unfolded, buildReflexivity(carrierLevel, carrierType, e)};
+    }
+
+Elaborator::ACNormResult Elaborator::ringPushNegation(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        ExpressionPointer A, B;
+        if (matchBinaryRingOp(e, addAxioms.op, A, B)) {
+            ACNormResult ra = ringPushNegation(
+                A, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ACNormResult rb = ringPushNegation(
+                B, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer rebuilt =
+                buildRingOp(addAxioms.op, ra.canonical, rb.canonical);
+            ExpressionPointer proof = buildBinaryOpCongruence(
+                addAxioms.op, A, ra.canonical, ra.proof,
+                B, rb.canonical, rb.proof, carrierType, carrierLevel);
+            return ACNormResult{rebuilt, proof};
+        }
+        if (!mulAxioms.op.empty() && matchBinaryRingOp(e, mulAxioms.op, A, B)) {
+            ACNormResult ra = ringPushNegation(
+                A, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ACNormResult rb = ringPushNegation(
+                B, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer rebuilt =
+                buildRingOp(mulAxioms.op, ra.canonical, rb.canonical);
+            ExpressionPointer proof = buildBinaryOpCongruence(
+                mulAxioms.op, A, ra.canonical, ra.proof,
+                B, rb.canonical, rb.proof, carrierType, carrierLevel);
+            return ACNormResult{rebuilt, proof};
+        }
+        ExpressionPointer inner;
+        if (matchUnaryRingNegate(e, "Ring.negate", inner)) {
+            ACNormResult ri = ringPushNegation(
+                inner, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            // negate(inner) = negate(inner') via λz. negate(z).
+            ExpressionPointer body = makeApplication(
+                ringConst("Ring.negate"), makeBoundVariable(0));
+            ExpressionPointer lambda = makeLambda("_neg_z", carrierType, body);
+            ExpressionPointer negInnerP =
+                makeApplication(ringConst("Ring.negate"), ri.canonical);
+            ExpressionPointer congr = buildEqualityCongruenceSameCarrier(
+                carrierLevel, carrierType, lambda, inner, ri.canonical,
+                ri.proof);
+            ExpressionPointer X, Y;
+            if (matchBinaryRingOp(ri.canonical, addAxioms.op, X, Y)
+                && environment_.lookup("Ring.negate_add_distribute")) {
+                // negate(X+Y) = negate(X) + negate(Y); then push the result.
+                ExpressionPointer distrib =
+                    ringConst("Ring.negate_add_distribute");
+                distrib = makeApplication(distrib, X);
+                distrib = makeApplication(distrib, Y);
+                ExpressionPointer negX =
+                    makeApplication(ringConst("Ring.negate"), X);
+                ExpressionPointer negY =
+                    makeApplication(ringConst("Ring.negate"), Y);
+                ExpressionPointer sumNeg = buildRingOp(addAxioms.op, negX, negY);
+                ACNormResult pushed = ringPushNegation(
+                    sumNeg, addAxioms, mulAxioms, carrierType, carrierLevel,
+                    line);
+                // e = negate(inner') [congr] = negate(X+Y) ; = sumNeg [distrib]
+                //   = pushed [pushed.proof].
+                ExpressionPointer distribThenPush = buildEqualityTransitivity(
+                    carrierLevel, carrierType, negInnerP, sumNeg,
+                    pushed.canonical, distrib, pushed.proof);
+                ExpressionPointer proof = buildEqualityTransitivity(
+                    carrierLevel, carrierType, e, negInnerP, pushed.canonical,
+                    congr, distribThenPush);
+                return ACNormResult{pushed.canonical, proof};
+            }
+            return ACNormResult{negInnerP, congr};
+        }
+        return ACNormResult{
+            e, buildReflexivity(carrierLevel, carrierType, e)};
+    }
+
 Elaborator::ACNormResult Elaborator::ringSimplifyIdentities(
         ExpressionPointer e,
         const RingAxiomNames& addAxioms,
@@ -1638,6 +1744,12 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
                         proof, step.proof);
                     cur = step.canonical;
                 };
+                // subtract → add(·, negate ·) (definitional), then push
+                // negation inward over sums, then distribute, simplify
+                // identities, and AC-normalise.
+                chain(ringUnfoldSubtract(cur, carrierOpened, carrierLevel));
+                chain(ringPushNegation(cur, addAxioms, mulAxioms,
+                    carrierOpened, carrierLevel, line));
                 if (canDistribute) {
                     chain(ringDistribute(cur, addAxioms, mulAxioms,
                         carrierOpened, carrierLevel, line));

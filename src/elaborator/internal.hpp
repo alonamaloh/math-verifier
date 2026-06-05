@@ -2261,6 +2261,31 @@ private:
         LevelPointer carrierLevel,
         int line);
 
+    // Rewrite every `Ring.subtract(a,b)` in `e` to `Ring.add(a, negate(b))`
+    // (its definition — so `e` and the result are definitionally equal, and
+    // the proof is a single reflexivity). Lets the AC/negation passes see
+    // subtraction as addition-of-a-negation. Returns {unfolded, refl}.
+    ACNormResult ringUnfoldSubtract(
+        ExpressionPointer e,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel);
+    // Pure structural rewrite backing ringUnfoldSubtract (no proof).
+    ExpressionPointer unfoldRingSubtract(ExpressionPointer e);
+
+    // Push `Ring.negate` inward over sums: `negate(a+b) → negate(a)+negate(b)`
+    // (via `Ring.negate_add_distribute`), bottom-up, so every surviving
+    // `negate` wraps a non-sum (a product/atom — i.e. a signed monomial).
+    // Emits the proof `e = pushed`. Double negation is left as-is (declines
+    // the rare goals that need `negate(negate x) = x`). Run after
+    // ringUnfoldSubtract, before ringDistribute.
+    ACNormResult ringPushNegation(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line);
+
     // Identity elimination (fingerprint plan Phase 2, increment 2b): rewrite
     // `e` bottom-up dropping additive `0` (`x+0`,`0+x`), multiplicative `1`
     // (`x·1`,`1·x`), annihilating `0`-products (`x·0`,`0·x`), and `-0`.
