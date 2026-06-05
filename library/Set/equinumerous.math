@@ -1,0 +1,116 @@
+-- Set/equinumerous.math
+--
+-- "A and B have the same size" — equinumerosity — is the heart of
+-- cardinality. The textbook definition is "there is a bijection A → B",
+-- but in CIC a bare bijection is awkward as the *primitive*: surjectivity
+-- is an existential in Proposition, so its witness cannot be eliminated
+-- back into data, and the inverse function it promises cannot be
+-- constructed. That blocks the symmetry of "same size".
+--
+-- So we take the constructive primitive instead: an explicit two-sided
+-- inverse pair (f, g). It carries the inverse as data, so symmetry is just
+-- swapping f and g, and transitivity is composing. We still bridge to the
+-- established vocabulary — an inverse pair yields a bijective f — so
+-- nothing is lost against `Logic.functions`.
+
+module Set.equinumerous
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Logic.functions
+
+-- `g` is a two-sided inverse of `f`: it undoes `f` on the left (on inputs)
+-- and `f` undoes it on the right (on outputs).
+definition Function.IsInverse (A B : Type(0)) (f : A → B) (g : B → A) : Proposition :=
+  ((x : A) → g(f(x)) = x) ∧ ((y : B) → f(g(y)) = y)
+
+-- Being an inverse pair is symmetric in (f, g): swap the two halves.
+theorem Function.inverse_swap (A B : Type(0)) (f : A → B) (g : B → A)
+        : Function.IsInverse(A, B, f, g) → Function.IsInverse(B, A, g, f)
+  | And.introduction(leftInverse, rightInverse) =>
+      And.introduction(rightInverse, leftInverse)
+
+-- The identity is its own inverse.
+theorem Function.identity_is_inverse (A : Type(0))
+        : Function.IsInverse(A, A, (x : A) ↦ x, (x : A) ↦ x) :=
+  And.introduction(
+      (x : A) ↦ reflexivity(A, x),
+      (y : A) ↦ reflexivity(A, y))
+
+-- Inverses compose: if g inverts f and k inverts h, then g∘k inverts h∘f.
+-- This is the engine of transitivity for equinumerosity.
+theorem Function.compose_inverse (A B C : Type(0))
+        (f : A → B) (g : B → A) (h : B → C) (k : C → B)
+        : Function.IsInverse(A, B, f, g)
+          → Function.IsInverse(B, C, h, k)
+          → Function.IsInverse(A, C, (x : A) ↦ h(f(x)), (z : C) ↦ g(k(z)))
+  | And.introduction(leftInverseFG, rightInverseFG),
+    And.introduction(leftInverseHK, rightInverseHK) =>
+      And.introduction(
+          (x : A) ↦ calc g(k(h(f(x))))
+                       = g(f(x))      by leftInverseHK(f(x))
+                       = x            by leftInverseFG(x),
+          (z : C) ↦ calc h(f(g(k(z))))
+                       = h(k(z))      by rightInverseFG(k(z))
+                       = z            by rightInverseHK(z))
+
+-- An inverse pair makes f injective: equal images give equal inputs once
+-- you apply g to both sides.
+theorem Function.inverse_is_injective (A B : Type(0)) (f : A → B) (g : B → A)
+        : Function.IsInverse(A, B, f, g) → Function.IsInjective(A, B, f)
+  | And.introduction(leftInverse, rightInverse) =>
+      (x y : A) (equalImages : f(x) = f(y)) ↦
+        calc x
+            = g(f(x))     by leftInverse(x)
+            = g(f(y))     by equalImages
+            = y           by leftInverse(y)
+
+-- An inverse pair makes f surjective: g(y) is a preimage of y.
+theorem Function.inverse_is_surjective (A B : Type(0)) (f : A → B) (g : B → A)
+        : Function.IsInverse(A, B, f, g) → Function.IsSurjective(A, B, f)
+  | And.introduction(leftInverse, rightInverse) =>
+      (y : B) ↦ ⟨g(y), rightInverse(y)⟩
+
+-- The bridge to the established vocabulary: an inverse pair makes f
+-- bijective.
+theorem Function.inverse_is_bijective (A B : Type(0)) (f : A → B) (g : B → A)
+        (inverse : Function.IsInverse(A, B, f, g))
+        : Function.IsBijective(A, B, f) :=
+  And.introduction(
+      Function.inverse_is_injective(A, B, f, g, inverse),
+      Function.inverse_is_surjective(A, B, f, g, inverse))
+
+-- ----------------------------------------------------------------------
+-- Equinumerosity: A and B have the same size when some pair (f, g) are
+-- mutual inverses. Carrying the inverse explicitly (rather than asserting
+-- a bijection) is what makes this an equivalence relation constructively.
+
+definition Equinumerous (A B : Type(0)) : Proposition :=
+  ∃ (f : A → B). ∃ (g : B → A). Function.IsInverse(A, B, f, g)
+
+-- Reflexive: every type is equinumerous to itself via the identity.
+theorem Equinumerous.reflexive (A : Type(0)) : Equinumerous(A, A) :=
+  ⟨(x : A) ↦ x, ⟨(x : A) ↦ x, Function.identity_is_inverse(A)⟩⟩
+
+-- Symmetric: swap the inverse pair.
+theorem Equinumerous.symmetric (A B : Type(0))
+        (equinumerous : Equinumerous(A, B)) : Equinumerous(B, A) := {
+  obtain ⟨f, inverseAndForward⟩ from equinumerous;
+  obtain ⟨g, inverse⟩ from inverseAndForward;
+  ⟨g, ⟨f, Function.inverse_swap(A, B, f, g, inverse)⟩⟩
+}
+
+-- Transitive: compose the inverse pairs.
+theorem Equinumerous.transitive (A B C : Type(0))
+        (firstEquinumerous : Equinumerous(A, B))
+        (secondEquinumerous : Equinumerous(B, C))
+        : Equinumerous(A, C) := {
+  obtain ⟨f, firstTail⟩ from firstEquinumerous;
+  obtain ⟨g, fgInverse⟩ from firstTail;
+  obtain ⟨h, secondTail⟩ from secondEquinumerous;
+  obtain ⟨k, hkInverse⟩ from secondTail;
+  ⟨(x : A) ↦ h(f(x)),
+   ⟨(z : C) ↦ g(k(z)),
+    Function.compose_inverse(A, B, C, f, g, h, k, fgInverse, hkInverse)⟩⟩
+}
