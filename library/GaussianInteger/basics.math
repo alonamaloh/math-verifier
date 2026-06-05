@@ -1,0 +1,87 @@
+-- GaussianInteger/basics.math
+--
+-- The Gaussian integers as ℤ[x]/(x²+1):
+--   GaussianInteger := RingModulo(Integer.ring, x²+1).
+-- This is a commutative ring for free (RingModulo over the commutative
+-- ring ℤ), exactly as ℂ = ℝ[x]/(x²+1) and F_{p^k} = F_p[x]/(f) are built.
+--
+-- Unlike ℂ (where ℝ is a field, so ℝ[x] is a PID and the quotient is a
+-- field) and F_{p^k} (same, over F_p), the base ring ℤ is NOT a field.
+-- So ℤ[i] is only an integral domain — but a Euclidean one, with norm
+-- N(a + bi) = a² + b². That extra structure (the canonical degree-<2
+-- representative, the norm, division with remainder) is built on top of
+-- this construction in the sibling modules; here we only assemble the
+-- ring. The imaginary unit i is the class of x, with i² = −1.
+
+module GaussianInteger.basics
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.integral_domain
+import Algebra.integer_domain
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.commutative
+import Polynomial.instances
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+
+-- The polynomial x (the monomial 1·x¹) over ℤ.
+definition GaussianInteger.x
+        : Polynomial(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle)) :=
+  Polynomial.monomial(Integer.ring_bundle, Integer.one, 1)
+
+-- The modulus x²+1, written so that x·x + 1 is its literal form (this is
+-- what makes i²+1 = 0 hold up to the quotient relation).
+definition GaussianInteger.modulus
+        : Polynomial(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle)) :=
+  Polynomial.add(Integer.ring_bundle,
+      Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, GaussianInteger.x),
+      Polynomial.one(Integer.ring_bundle))
+
+-- ℤ[x], the polynomials over ℤ, as a bundled ring — the base ring of the
+-- quotient — and its commutativity proof.
+definition Integer.polynomial_ring : Ring :=
+  Polynomial.ring(Integer.ring_bundle)
+
+definition Integer.polynomial_ring_commutative
+        : Ring.MultiplyCommutative(Integer.polynomial_ring) :=
+  Polynomial.multiply_commutative(Integer.ring_bundle,
+      Integer.multiply_commutative_for_bundle)
+
+-- ℤ[x] as a bundled commutative ring — the base of the quotient. The
+-- bundle carries commutativity, so the quotient's `*` recovers it from
+-- the operand type.
+definition Integer.polynomial_commutative_ring : CommutativeRing :=
+  CommutativeRing.make(Integer.polynomial_ring, Integer.polynomial_ring_commutative)
+
+-- The Gaussian integers: ℤ[x] modulo (x²+1).
+definition GaussianInteger : Type(0) :=
+  RingModulo(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+
+-- ℤ[i] is a commutative ring (inherited from ℤ[x] being commutative).
+theorem GaussianInteger.is_commutative_ring
+        : IsCommutativeRing(
+              GaussianInteger,
+              RingModulo.add,
+              RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus),
+              RingModulo.negate,
+              RingModulo.multiply,
+              RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)) :=
+  RingModulo.is_commutative_ring(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
