@@ -1,0 +1,39 @@
+-- Set/finite_pigeonhole.math
+--
+-- The pigeonhole principle and the well-definedness of size. An injective
+-- map between yardsticks cannot shrink: NaturalsBelow(m) ↪ NaturalsBelow(n)
+-- forces m ≤ n. The proof is by induction on n; the inductive step takes an
+-- injection out of NaturalsBelow(1+k) and produces one out of
+-- NaturalsBelow(k) by "redirecting" the one input that could collide.
+-- Antisymmetry then gives uniqueness of size: a type has at most one size.
+
+module Set.finite_pigeonhole
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Set.subtype
+import Set.equinumerous
+import Set.finite
+import Natural.basics
+import Natural.order
+import Natural.add_order
+import Natural.strong_recursion
+import Natural.compare
+
+-- The inclusion NaturalsBelow(k) ↪ NaturalsBelow(successor(k)): keep the
+-- value, loosen the bound by one.
+theorem NaturalsBelow.value_below_successor (k : Natural) (element : NaturalsBelow(k))
+        : successor(NaturalsBelow.value(element)) ≤ successor(k) :=
+  calc successor(NaturalsBelow.value(element))
+     ≤ k              by NaturalsBelow.below
+     ≤ successor(k)   by Natural.le_successor
+
+definition NaturalsBelow.inclusion (k : Natural) (element : NaturalsBelow(k))
+        : NaturalsBelow(successor(k)) :=
+  NaturalsBelow.make(NaturalsBelow.value(element),
+      NaturalsBelow.value_below_successor(k, element))
+
+-- The top element of NaturalsBelow(successor(k)): value k.
+definition NaturalsBelow.top (k : Natural) : NaturalsBelow(successor(k)) :=
+  NaturalsBelow.make(k, LessOrEqual.reflexivity(successor(k)))
