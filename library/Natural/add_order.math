@@ -1,16 +1,28 @@
 -- Natural/add_order.math
 --
--- Addition is monotone in (and cancellable from) its left summand with
--- respect to ≤. These two facts are the arithmetic backbone of the
--- disjoint-union counting bijection (Set.finite_sum): the right block of
--- {0,…,m+n-1} is shifted up by m, so bounding and unbounding its elements
--- is exactly "add m on the left, preserving / cancelling ≤".
+-- General additive + ordering helper facts on Natural that sit above the
+-- core Natural files. Addition is monotone in (and cancellable from) its
+-- left summand with respect to ≤. These facts are the arithmetic backbone
+-- of the disjoint-union counting bijection (Set.finite_sum): the right
+-- block of {0,…,m+n-1} is shifted up by m, so bounding and unbounding its
+-- elements is exactly "add m on the left, preserving / cancelling ≤". The
+-- remaining lemmas (successor/≠ splits, the monus/add cancel law, the
+-- ≤-via-subtraction-witness facts) are general-purpose helpers used by the
+-- polynomial division algorithm and the p-adic valuation.
 
 module Natural.add_order
 
+import Logic.basics
+import Logic.exists
+import Equality.basics
 import Natural.basics
+import Natural.peano
 import Natural.order
+import Natural.subtraction
 import Natural.arithmetic
+import Natural.monus
+import Natural.divide
+import Natural.decide
 import Natural.strong_recursion
 
 -- Adding a fixed left summand preserves ≤. Induction on that summand;
@@ -50,3 +62,76 @@ theorem Natural.not_successor_less_or_equal_self
       Natural.not_successor_less_or_equal_self(predecessor,
           Natural.less_or_equal_successor_successor_descend(
               successor(predecessor), predecessor, successorLessOrEqual))
+
+-- x ≠ successor(x + c): a number is never its own successor-plus-more.
+theorem Natural.not_equal_successor_add
+        : (x c : Natural) → ¬(x = successor(x + c))
+  | zero, c =>
+      Natural.zero_not_successor(0 + c)
+  | successor(k), c =>
+      (equation : successor(k) = successor(successor(k) + c)) ↦
+          Natural.not_equal_successor_add(k, c,
+              Natural.successor_injective(k, successor(k + c), equation))
+
+-- j ≤ successor(m) and j ≠ successor(m) force j ≤ m.
+theorem Natural.less_or_equal_successor_not_equal (j m : Natural)
+        (lessOrEqual : j ≤ successor(m))
+        (notEqual : ¬(j = successor(m)))
+        : j ≤ m := {
+  obtain ⟨c, equation⟩
+      from Natural.subtraction_witness(j, successor(m), lessOrEqual);
+  cases c refining equation {
+    | zero =>
+        absurd(notEqual(Equality.symmetry(
+            calc successor(m)
+               = j + 0
+               = j)))
+    | successor(cPredecessor) => {
+        claim mEquation : m = j + cPredecessor
+            by Natural.successor_injective(m, j + cPredecessor,
+                   calc successor(m)
+                      = j + successor(cPredecessor)
+                      = successor(j + cPredecessor));
+        claim by substituting Equality.symmetry(mEquation)
+      }
+  }
+}
+
+-- Cancel a right addend through monus: (a + b) − b = a.
+theorem Natural.monus_add_cancel_right (a b : Natural)
+        : Natural.monus(a + b, b) = a :=
+  calc Natural.monus(a + b, b)
+     = Natural.monus(b + a, b)
+     = a
+
+-- a ≤ b + a (a appears on the right).
+theorem Natural.less_or_equal_add_left (a b : Natural) : a ≤ b + a :=
+  claim by substituting Natural.add_commutative(a, b)
+
+-- a ≤ i and i ≠ a force successor(a) ≤ i.
+theorem Natural.less_or_equal_not_equal_successor (a i : Natural)
+        (lessOrEqual : a ≤ i) (notEqual : ¬(i = a))
+        : successor(a) ≤ i := {
+  obtain ⟨c, equation⟩ from Natural.subtraction_witness(a, i, lessOrEqual);
+  cases c refining equation {
+    | zero =>
+        absurd(notEqual(calc i = a + 0 = a))
+    | successor(cPredecessor) =>
+        rewrite(Equality.symmetry(
+                    calc i
+                       = a + successor(cPredecessor)
+                       = successor(a + cPredecessor)),
+                Natural.successor_less_or_equal_successor(a, a + cPredecessor,
+                    Natural.less_or_equal_add_right(a, cPredecessor)))
+  }
+}
+
+-- a ≤ c gives a + b ≤ c + b, and b ≤ d gives a + b ≤ a + d.
+theorem Natural.le_add_preserves_left (a c b : Natural) (aLeC : a ≤ c)
+        : a + b ≤ c + b := {
+  let ⟨r, cEqAplusR⟩ := Natural.subtraction_witness(a, c, aLeC);
+  calc a + b
+     ≤ (a + b) + r
+     = (a + r) + b
+     = c + b
+}
