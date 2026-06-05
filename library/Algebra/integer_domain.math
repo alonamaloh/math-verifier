@@ -1,0 +1,210 @@
+-- Algebra/integer_domain.math
+--
+-- ℤ as a bundled integral domain. Bundles the existing
+-- `Integer.is_commutative_ring` into the `Ring`/`CommutativeRing`/
+-- `IntegralDomain` hierarchy, proving the two extra facts a domain needs:
+-- `1 ≠ 0` and no zero divisors.
+--
+-- No-zero-divisors goes through `Integer.multiply_cancel_right_by_natural_-
+-- successor`: a nonzero `y` is, up to sign, a positive Natural cast
+-- `(successor k : Integer)`, and `x · (successor k) = 0 = 0 · (successor k)`
+-- cancels to `x = 0`. The sign and negation juggling is all `ring`.
+
+module Algebra.integer_domain
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.subtraction
+import Natural.factorization
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.instances
+import Integer.embedding
+import Integer.order
+import Integer.sign
+import Integer.cancellation
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Algebra.integral_domain
+
+-- ----------------------------------------------------------------------
+-- Bundling.
+
+definition Integer.ring_bundle : Ring :=
+  Ring.make(Integer, Integer.add, Integer.zero, Integer.negate,
+      Integer.multiply, Integer.one, Integer.is_ring)
+
+theorem Integer.multiply_commutative_for_bundle
+        : Ring.MultiplyCommutative(Integer.ring_bundle) := {
+  let ⟨_, commutativity⟩ := Integer.is_commutative_ring;
+  commutativity
+}
+
+definition Integer.commutative_ring_bundle : CommutativeRing :=
+  CommutativeRing.make(Integer.ring_bundle,
+      Integer.multiply_commutative_for_bundle)
+
+-- ----------------------------------------------------------------------
+-- 1 ≠ 0.
+
+theorem Integer.one_not_zero : ¬(Integer.one = Integer.zero) := {
+  suppose Integer.one = Integer.zero as oneEqualsZero;
+  claim castsEqual
+      : Natural.to_integer(successor(0)) = Natural.to_integer(0)
+      by calc Natural.to_integer(successor(0))
+            = Integer.one
+                  by Natural.to_integer.one_preserves
+            = Integer.zero
+                  by oneEqualsZero
+            = Natural.to_integer(0)
+                  by Equality.symmetry(Natural.to_integer.zero_preserves);
+  absurd(Natural.zero_not_successor(0,
+      Equality.symmetry(
+          Natural.to_integer.injective(successor(0), 0, castsEqual))))
+}
+
+-- ----------------------------------------------------------------------
+-- No zero divisors.
+
+theorem Integer.multiply_eq_zero_implies (x y : Integer)
+        (productZero : Integer.multiply(x, y) = Integer.zero)
+        : x = Integer.zero ∨ y = Integer.zero := {
+  decide y = Integer.zero {
+    | yes yIsZero => okay
+    | no yNonzero => {
+        claim xIsZero : x = Integer.zero by {
+          cases Integer.sign_split(y) {
+            | Or.introduceLeft(yNonneg) => {
+                obtain ⟨n, yIsImage⟩ from yNonneg;
+                -- y = (n : Integer); n ≠ 0 (else y = 0).
+                claim nNonzero : ¬(n = 0) by {
+                  suppose n = 0 as nZero;
+                  absurd(yNonzero(
+                      calc y
+                         = Natural.to_integer(n)
+                               by yIsImage
+                         = Natural.to_integer(0)
+                               by congruenceOf(Natural.to_integer, nZero)
+                         = Integer.zero
+                               by Natural.to_integer.zero_preserves))
+                };
+                claim oneAtMostN : 1 ≤ n by {
+                  cases Natural.is_zero_or_at_least_one(n) {
+                    | Or.introduceLeft(nZero) => absurd(nNonzero(nZero))
+                    | Or.introduceRight(positive) => positive
+                  }
+                };
+                obtain ⟨predecessor, nEqualsSuccessor⟩
+                    from Natural.subtraction_witness(1, n, oneAtMostN);
+                -- nEqualsSuccessor : n = 1 + predecessor = successor(predecessor).
+                claim productCancellable
+                    : Integer.multiply(x, (successor(predecessor) : Integer))
+                      = Integer.multiply(Integer.zero,
+                            (successor(predecessor) : Integer))
+                    by calc Integer.multiply(x, (successor(predecessor) : Integer))
+                          = Integer.multiply(x, Natural.to_integer(n))
+                                by congruenceOf(
+                                       (m : Natural) ↦
+                                           Integer.multiply(x, Natural.to_integer(m)),
+                                       Equality.symmetry(nEqualsSuccessor))
+                          = Integer.multiply(x, y)
+                                by congruenceOf(
+                                       (z : Integer) ↦ Integer.multiply(x, z),
+                                       Equality.symmetry(yIsImage))
+                          = Integer.zero
+                                by productZero
+                          = Integer.multiply(Integer.zero,
+                                (successor(predecessor) : Integer))
+                                by ring;
+                Integer.multiply_cancel_right_by_natural_successor(
+                    x, Integer.zero, predecessor, productCancellable)
+              }
+            | Or.introduceRight(yNegative) => {
+                obtain ⟨n, yIsNegativeImage⟩ from yNegative;
+                -- y = -(n : Integer); n ≠ 0 (else y = 0).
+                claim nNonzero : ¬(n = 0) by {
+                  suppose n = 0 as nZero;
+                  absurd(yNonzero(
+                      calc y
+                         = Integer.negate(Natural.to_integer(n))
+                               by yIsNegativeImage
+                         = Integer.negate(Natural.to_integer(0))
+                               by congruenceOf(
+                                      (m : Natural) ↦
+                                          Integer.negate(Natural.to_integer(m)),
+                                      nZero)
+                         = Integer.zero
+                               by ring))
+                };
+                claim oneAtMostN : 1 ≤ n by {
+                  cases Natural.is_zero_or_at_least_one(n) {
+                    | Or.introduceLeft(nZero) => absurd(nNonzero(nZero))
+                    | Or.introduceRight(positive) => positive
+                  }
+                };
+                obtain ⟨predecessor, nEqualsSuccessor⟩
+                    from Natural.subtraction_witness(1, n, oneAtMostN);
+                claim productCancellable
+                    : Integer.multiply(x, (successor(predecessor) : Integer))
+                      = Integer.multiply(Integer.zero,
+                            (successor(predecessor) : Integer))
+                    by calc Integer.multiply(x, (successor(predecessor) : Integer))
+                          = Integer.multiply(x, Natural.to_integer(n))
+                                by congruenceOf(
+                                       (m : Natural) ↦
+                                           Integer.multiply(x, Natural.to_integer(m)),
+                                       Equality.symmetry(nEqualsSuccessor))
+                          = Integer.multiply(x, Integer.negate(y))
+                                by congruenceOf(
+                                       (z : Integer) ↦ Integer.multiply(x, z),
+                                       calc Natural.to_integer(n)
+                                          = Integer.negate(
+                                                Integer.negate(Natural.to_integer(n)))
+                                                by ring
+                                          = Integer.negate(y)
+                                                by congruenceOf(Integer.negate,
+                                                       Equality.symmetry(
+                                                           yIsNegativeImage)))
+                          = Integer.multiply(Integer.zero,
+                                (successor(predecessor) : Integer))
+                                by calc Integer.multiply(x, Integer.negate(y))
+                                      = Integer.negate(Integer.multiply(x, y))
+                                            by ring
+                                      = Integer.negate(Integer.zero)
+                                            by congruenceOf(Integer.negate,
+                                                   productZero)
+                                      = Integer.multiply(Integer.zero,
+                                            (successor(predecessor) : Integer))
+                                            by ring;
+                Integer.multiply_cancel_right_by_natural_successor(
+                    x, Integer.zero, predecessor, productCancellable)
+              }
+          }
+        };
+        Or.introduceLeft(xIsZero)
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- ℤ as an integral domain.
+
+theorem Integer.bundle_has_no_zero_divisors
+        : Ring.HasNoZeroDivisors(Integer.ring_bundle) :=
+  Integer.multiply_eq_zero_implies
+
+definition Integer.integral_domain : IntegralDomain :=
+  IntegralDomain.make(Integer.commutative_ring_bundle, Integer.one_not_zero,
+      Integer.bundle_has_no_zero_divisors)
