@@ -2261,6 +2261,21 @@ private:
         LevelPointer carrierLevel,
         int line);
 
+    // Identity elimination (fingerprint plan Phase 2, increment 2b): rewrite
+    // `e` bottom-up dropping additive `0` (`x+0`,`0+x`), multiplicative `1`
+    // (`x·1`,`1·x`), annihilating `0`-products (`x·0`,`0·x`), and `-0`.
+    // Binary/unary-structural (one law per node), emitting `e = simplified`.
+    // Each rewrite is skipped if its law isn't in scope. Run AFTER
+    // ringDistribute (so distribution can't re-expose a dropped identity)
+    // and BEFORE ringACFullNorm.
+    ACNormResult ringSimplifyIdentities(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line);
+
     // Expand `X · Y` where X and Y already contain no `Ring.add` inside any
     // `Ring.multiply` (but may themselves be top-level sums): returns a sum
     // of products with the proof `X · Y = expanded`. Distributes the left

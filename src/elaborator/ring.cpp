@@ -1395,6 +1395,114 @@ Elaborator::ACNormResult Elaborator::ringDistribute(
             e, buildReflexivity(carrierLevel, carrierType, e)};
     }
 
+Elaborator::ACNormResult Elaborator::ringSimplifyIdentities(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        const std::string zeroName = "Ring.zero";
+        const std::string oneName = "Ring.one";
+        const std::string negateName = "Ring.negate";
+        // Apply a unary law `lawName(operand) : lhs = rhs` to rewrite the
+        // already-simplified `lhs` to `rhs`, chaining the child-
+        // simplification proof `congr : e = lhs`.
+        auto applyLaw = [&](const std::string& lawName,
+                            ExpressionPointer operand, ExpressionPointer lhs,
+                            ExpressionPointer rhs, ExpressionPointer congr)
+                -> ExpressionPointer {
+            ExpressionPointer law = ringConst(lawName);
+            law = makeApplication(law, operand);
+            return buildEqualityTransitivity(
+                carrierLevel, carrierType, e, lhs, rhs, congr, law);
+        };
+        ExpressionPointer A, B;
+        if (matchBinaryRingOp(e, addAxioms.op, A, B)) {
+            ACNormResult ra = ringSimplifyIdentities(
+                A, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ACNormResult rb = ringSimplifyIdentities(
+                B, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer sum =
+                buildRingOp(addAxioms.op, ra.canonical, rb.canonical);
+            ExpressionPointer congr = buildBinaryOpCongruence(
+                addAxioms.op, A, ra.canonical, ra.proof,
+                B, rb.canonical, rb.proof, carrierType, carrierLevel);
+            if (matchRingZero(ra.canonical, zeroName)
+                && environment_.lookup("Ring.zero_add")) {
+                return ACNormResult{rb.canonical, applyLaw(
+                    "Ring.zero_add", rb.canonical, sum, rb.canonical, congr)};
+            }
+            if (matchRingZero(rb.canonical, zeroName)
+                && environment_.lookup("Ring.add_zero")) {
+                return ACNormResult{ra.canonical, applyLaw(
+                    "Ring.add_zero", ra.canonical, sum, ra.canonical, congr)};
+            }
+            return ACNormResult{sum, congr};
+        }
+        if (!mulAxioms.op.empty() && matchBinaryRingOp(e, mulAxioms.op, A, B)) {
+            ACNormResult ra = ringSimplifyIdentities(
+                A, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ACNormResult rb = ringSimplifyIdentities(
+                B, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer product =
+                buildRingOp(mulAxioms.op, ra.canonical, rb.canonical);
+            ExpressionPointer congr = buildBinaryOpCongruence(
+                mulAxioms.op, A, ra.canonical, ra.proof,
+                B, rb.canonical, rb.proof, carrierType, carrierLevel);
+            // Annihilation first (a `0` factor wins over a `1` factor).
+            if (matchRingZero(ra.canonical, zeroName)
+                && environment_.lookup("Ring.zero_multiply_left")) {
+                return ACNormResult{ra.canonical, applyLaw(
+                    "Ring.zero_multiply_left", rb.canonical, product,
+                    ra.canonical, congr)};
+            }
+            if (matchRingZero(rb.canonical, zeroName)
+                && environment_.lookup("Ring.multiply_zero_right")) {
+                return ACNormResult{rb.canonical, applyLaw(
+                    "Ring.multiply_zero_right", ra.canonical, product,
+                    rb.canonical, congr)};
+            }
+            if (matchRingOne(ra.canonical, oneName)
+                && environment_.lookup("Ring.one_multiply")) {
+                return ACNormResult{rb.canonical, applyLaw(
+                    "Ring.one_multiply", rb.canonical, product,
+                    rb.canonical, congr)};
+            }
+            if (matchRingOne(rb.canonical, oneName)
+                && environment_.lookup("Ring.multiply_one")) {
+                return ACNormResult{ra.canonical, applyLaw(
+                    "Ring.multiply_one", ra.canonical, product,
+                    ra.canonical, congr)};
+            }
+            return ACNormResult{product, congr};
+        }
+        ExpressionPointer inner;
+        if (matchUnaryRingNegate(e, negateName, inner)) {
+            ACNormResult ri = ringSimplifyIdentities(
+                inner, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            // negate(inner) = negate(inner') via λz. negate(z).
+            ExpressionPointer body = makeApplication(
+                ringConst(negateName), makeBoundVariable(0));
+            ExpressionPointer lambda = makeLambda("_id_z", carrierType, body);
+            ExpressionPointer negInnerP =
+                makeApplication(ringConst(negateName), ri.canonical);
+            ExpressionPointer congr = buildEqualityCongruenceSameCarrier(
+                carrierLevel, carrierType, lambda, inner, ri.canonical,
+                ri.proof);
+            if (matchRingZero(ri.canonical, zeroName)
+                && environment_.lookup("Ring.negate_zero")) {
+                ExpressionPointer law = ringConst("Ring.negate_zero");
+                return ACNormResult{ri.canonical, buildEqualityTransitivity(
+                    carrierLevel, carrierType, e, negInnerP, ri.canonical,
+                    congr, law)};
+            }
+            return ACNormResult{negInnerP, congr};
+        }
+        return ACNormResult{
+            e, buildReflexivity(carrierLevel, carrierType, e)};
+    }
+
 Elaborator::ACNormResult Elaborator::ringACFullNorm(
         ExpressionPointer e,
         const RingAxiomNames& addAxioms,
@@ -1516,20 +1624,29 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
             && environment_.lookup("Ring.distributivity_left") != nullptr
             && environment_.lookup("Ring.distributivity_right") != nullptr;
         try {
-            // Fully normalise: distribute (products of sums → sums of
-            // products), then AC-normalise the resulting sum of products.
+            // Fully normalise, chaining each stage's proof:
+            //   distribute (products of sums → sums of products)
+            //   → simplify identities (drop 0/1, annihilate ·0)
+            //   → AC-normalise the resulting sum of products.
             auto normalise = [&](ExpressionPointer e) -> ACNormResult {
-                if (!canDistribute) {
-                    return ringACFullNorm(e, addAxioms, mulAxioms,
-                        carrierOpened, carrierLevel, line);
+                ExpressionPointer cur = e;
+                ExpressionPointer proof =
+                    buildReflexivity(carrierLevel, carrierOpened, e);
+                auto chain = [&](const ACNormResult& step) {
+                    proof = buildEqualityTransitivity(
+                        carrierLevel, carrierOpened, e, cur, step.canonical,
+                        proof, step.proof);
+                    cur = step.canonical;
+                };
+                if (canDistribute) {
+                    chain(ringDistribute(cur, addAxioms, mulAxioms,
+                        carrierOpened, carrierLevel, line));
                 }
-                ACNormResult dist = ringDistribute(e, addAxioms, mulAxioms,
-                    carrierOpened, carrierLevel, line);
-                ACNormResult norm = ringACFullNorm(dist.canonical,
-                    addAxioms, mulAxioms, carrierOpened, carrierLevel, line);
-                return ACNormResult{norm.canonical, buildEqualityTransitivity(
-                    carrierLevel, carrierOpened, e, dist.canonical,
-                    norm.canonical, dist.proof, norm.proof)};
+                chain(ringSimplifyIdentities(cur, addAxioms, mulAxioms,
+                    carrierOpened, carrierLevel, line));
+                chain(ringACFullNorm(cur, addAxioms, mulAxioms,
+                    carrierOpened, carrierLevel, line));
+                return ACNormResult{cur, proof};
             };
             ACNormResult nl = normalise(leftCanon);
             ACNormResult nr = normalise(rightCanon);
