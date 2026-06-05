@@ -1,0 +1,135 @@
+-- Algebra/irreducible.math
+--
+-- Irreducible and prime elements of an integral domain, and the easy
+-- half of their relationship: in any integral domain a prime element is
+-- irreducible. (The converse — irreducible ⟹ prime — needs the PID
+-- hypothesis and lives in the ideals/PID development.)
+--
+--   * `u` is a unit when it divides 1.
+--   * `p` is irreducible when it is a nonzero non-unit whose only
+--     factorizations `p = a·b` have a unit factor.
+--   * `p` is prime when it is a nonzero non-unit and `p ∣ a·b` forces
+--     `p ∣ a` or `p ∣ b`.
+--
+-- All three are stated over a bundled `IntegralDomain d`, reading the
+-- operations off `IntegralDomain.ring(d)` so the `*` operator (on
+-- `Ring.carrier`) and `Ring.divides` apply directly.
+
+module Algebra.irreducible
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_divisibility
+import Algebra.commutative_ring_bundle
+import Algebra.integral_domain
+
+-- ----------------------------------------------------------------------
+-- Irreducible and prime elements.
+
+-- `p` is irreducible: nonzero, not a unit, and every factorization is
+-- trivial (one of the factors is a unit).
+definition IntegralDomain.IsIrreducible (d : IntegralDomain)
+        (p : Ring.carrier(IntegralDomain.ring(d))) : Proposition :=
+  ¬(p = Ring.zero(IntegralDomain.ring(d)))
+  ∧ ¬(Ring.IsUnit(IntegralDomain.ring(d), p))
+  ∧ ((a b : Ring.carrier(IntegralDomain.ring(d)))
+        → p = a * b
+        → Ring.IsUnit(IntegralDomain.ring(d), a)
+          ∨ Ring.IsUnit(IntegralDomain.ring(d), b))
+
+-- `p` is a prime element: nonzero, not a unit, and whenever it divides a
+-- product it divides one of the factors.
+definition IntegralDomain.IsPrimeElement (d : IntegralDomain)
+        (p : Ring.carrier(IntegralDomain.ring(d))) : Proposition :=
+  ¬(p = Ring.zero(IntegralDomain.ring(d)))
+  ∧ ¬(Ring.IsUnit(IntegralDomain.ring(d), p))
+  ∧ ((a b : Ring.carrier(IntegralDomain.ring(d)))
+        → Ring.divides(IntegralDomain.ring(d), p, a * b)
+        → Ring.divides(IntegralDomain.ring(d), p, a)
+          ∨ Ring.divides(IntegralDomain.ring(d), p, b))
+
+-- ----------------------------------------------------------------------
+-- A divisor of 1 is a unit (this is just unfolding `Ring.IsUnit`, but the
+-- named lemma reads better at call sites): if 1 = b·c then b is a unit.
+theorem IntegralDomain.unit_of_one_equals_product (d : IntegralDomain)
+        (b c : Ring.carrier(IntegralDomain.ring(d)))
+        (oneEquation : Ring.one(IntegralDomain.ring(d)) = b * c)
+        : Ring.IsUnit(IntegralDomain.ring(d), b) :=
+  ⟨c, oneEquation⟩
+
+-- ----------------------------------------------------------------------
+-- Prime ⟹ irreducible in an integral domain.
+--
+-- Let p be prime and p = a·b. Then p ∣ a·b, so p ∣ a or p ∣ b. In the
+-- first case a = p·c, so p·1 = p = a·b = p·(c·b); cancelling p (nonzero)
+-- gives 1 = c·b = b·c, hence b is a unit. The second case is symmetric.
+theorem IntegralDomain.prime_element_is_irreducible (d : IntegralDomain)
+        (p : Ring.carrier(IntegralDomain.ring(d)))
+        (primality : IntegralDomain.IsPrimeElement(d, p))
+        : IntegralDomain.IsIrreducible(d, p) := {
+  let s : Ring := IntegralDomain.ring(d);
+  let ⟨pNotZero, pNotUnit, primeDivides⟩ := primality;
+  ⟨pNotZero, pNotUnit,
+   (a b : Ring.carrier(s)) (pEqualsProduct : p = a * b) ↦ {
+      claim pDividesProduct : Ring.divides(s, p, a * b)
+          by ⟨Ring.one(s),
+              calc a * b
+                 = p
+                 = Ring.multiply(s, p, Ring.one(s))⟩;
+      cases primeDivides(a, b, pDividesProduct) {
+        | Or.introduceLeft(pDividesA) => {
+            obtain ⟨c, aEqualsPc⟩ from pDividesA;
+            -- aEqualsPc : a = p·c.
+            claim oneEqualsCb : Ring.one(s) = c * b
+                by IntegralDomain.multiply_cancel_left(d, p,
+                       Ring.one(s), c * b, pNotZero,
+                       calc Ring.multiply(s, p, Ring.one(s))
+                          = p
+                          = a * b
+                          = (p * c) * b
+                          = p * (c * b)
+                               by Ring.multiply_associative(s, p, c, b));
+            -- b is a unit: 1 = c·b = b·c.
+            Or.introduceRight(
+                IntegralDomain.unit_of_one_equals_product(d, b, c,
+                    calc Ring.one(s)
+                       = c * b
+                       = b * c
+                            by IntegralDomain.commutative(d, c, b)))
+          }
+        | Or.introduceRight(pDividesB) => {
+            obtain ⟨c, bEqualsPc⟩ from pDividesB;
+            -- bEqualsPc : b = p·c.
+            claim oneEqualsCa : Ring.one(s) = c * a
+                by IntegralDomain.multiply_cancel_left(d, p,
+                       Ring.one(s), c * a, pNotZero,
+                       calc Ring.multiply(s, p, Ring.one(s))
+                          = p
+                          = a * b
+                          = a * (p * c)
+                          = (a * p) * c
+                               by Equality.symmetry(
+                                      Ring.multiply_associative(s, a, p, c))
+                          = (p * a) * c
+                               by IntegralDomain.commutative(d, a, p)
+                          = p * (a * c)
+                               by Ring.multiply_associative(s, p, a, c)
+                          = p * (c * a)
+                               by IntegralDomain.commutative(d, a, c));
+            Or.introduceLeft(
+                IntegralDomain.unit_of_one_equals_product(d, a, c,
+                    calc Ring.one(s)
+                       = c * a
+                       = a * c
+                            by IntegralDomain.commutative(d, c, a)))
+          }
+      }
+   }⟩
+}
