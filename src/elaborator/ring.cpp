@@ -1232,6 +1232,33 @@ ExpressionPointer Elaborator::canonicalizeRingStructurePrefix(
         return makeApplication(fn, arg);
     }
 
+ExpressionPointer Elaborator::buildBinaryOpCongruence(
+        const std::string& opName,
+        ExpressionPointer A, ExpressionPointer Aprime, ExpressionPointer proofA,
+        ExpressionPointer B, ExpressionPointer Bprime, ExpressionPointer proofB,
+        ExpressionPointer carrierType, LevelPointer carrierLevel) {
+        // op(A, B) = op(A', B') via two one-hole congruences.
+        // Step 1: op(A, B) = op(A', B) under λx. op(x, B).
+        ExpressionPointer Blift = liftBoundVariables(B, 1, 0);
+        ExpressionPointer body1 =
+            buildRingOp(opName, makeBoundVariable(0), Blift);
+        ExpressionPointer lambda1 = makeLambda("_acn_x", carrierType, body1);
+        ExpressionPointer step1 = buildEqualityCongruenceSameCarrier(
+            carrierLevel, carrierType, lambda1, A, Aprime, proofA);
+        // Step 2: op(A', B) = op(A', B') under λy. op(A', y).
+        ExpressionPointer Alift = liftBoundVariables(Aprime, 1, 0);
+        ExpressionPointer body2 =
+            buildRingOp(opName, Alift, makeBoundVariable(0));
+        ExpressionPointer lambda2 = makeLambda("_acn_y", carrierType, body2);
+        ExpressionPointer step2 = buildEqualityCongruenceSameCarrier(
+            carrierLevel, carrierType, lambda2, B, Bprime, proofB);
+        ExpressionPointer opApB = buildRingOp(opName, Aprime, B);
+        ExpressionPointer opAB = buildRingOp(opName, A, B);
+        ExpressionPointer opApBp = buildRingOp(opName, Aprime, Bprime);
+        return buildEqualityTransitivity(
+            carrierLevel, carrierType, opAB, opApB, opApBp, step1, step2);
+    }
+
 Elaborator::ACNormResult Elaborator::ringACReplaceLeaves(
         ExpressionPointer e,
         const std::string& opName,
@@ -1251,27 +1278,121 @@ Elaborator::ACNormResult Elaborator::ringACReplaceLeaves(
             A, opName, addAxioms, mulAxioms, carrierType, carrierLevel, line);
         ACNormResult rb = ringACReplaceLeaves(
             B, opName, addAxioms, mulAxioms, carrierType, carrierLevel, line);
-        // e = op(A, B); rebuild as op(A', B') via two one-hole congruences.
-        // Step 1: op(A, B) = op(A', B) under λx. op(x, B).
-        ExpressionPointer Blift = liftBoundVariables(B, 1, 0);
-        ExpressionPointer body1 =
-            buildRingOp(opName, makeBoundVariable(0), Blift);
-        ExpressionPointer lambda1 = makeLambda("_acn_x", carrierType, body1);
-        ExpressionPointer step1 = buildEqualityCongruenceSameCarrier(
-            carrierLevel, carrierType, lambda1, A, ra.canonical, ra.proof);
-        // Step 2: op(A', B) = op(A', B') under λy. op(A', y).
-        ExpressionPointer Alift = liftBoundVariables(ra.canonical, 1, 0);
-        ExpressionPointer body2 =
-            buildRingOp(opName, Alift, makeBoundVariable(0));
-        ExpressionPointer lambda2 = makeLambda("_acn_y", carrierType, body2);
-        ExpressionPointer step2 = buildEqualityCongruenceSameCarrier(
-            carrierLevel, carrierType, lambda2, B, rb.canonical, rb.proof);
-        ExpressionPointer opApB = buildRingOp(opName, ra.canonical, B);
         ExpressionPointer opApBp =
             buildRingOp(opName, ra.canonical, rb.canonical);
-        ExpressionPointer proof = buildEqualityTransitivity(
-            carrierLevel, carrierType, e, opApB, opApBp, step1, step2);
+        ExpressionPointer proof = buildBinaryOpCongruence(
+            opName, A, ra.canonical, ra.proof, B, rb.canonical, rb.proof,
+            carrierType, carrierLevel);
         return ACNormResult{opApBp, proof};
+    }
+
+Elaborator::ACNormResult Elaborator::expandRingProductOfSums(
+        ExpressionPointer X,
+        ExpressionPointer Y,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        ExpressionPointer X1, X2;
+        if (matchBinaryRingOp(X, addAxioms.op, X1, X2)) {
+            // (X1 + X2) · Y = X1·Y + X2·Y   (distributivity_right)
+            ExpressionPointer distrib = ringConst("Ring.distributivity_right");
+            distrib = makeApplication(distrib, X1);
+            distrib = makeApplication(distrib, X2);
+            distrib = makeApplication(distrib, Y);
+            ExpressionPointer x1y = buildRingOp(mulAxioms.op, X1, Y);
+            ExpressionPointer x2y = buildRingOp(mulAxioms.op, X2, Y);
+            ACNormResult e1 = expandRingProductOfSums(
+                X1, Y, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ACNormResult e2 = expandRingProductOfSums(
+                X2, Y, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer congr = buildBinaryOpCongruence(
+                addAxioms.op, x1y, e1.canonical, e1.proof,
+                x2y, e2.canonical, e2.proof, carrierType, carrierLevel);
+            ExpressionPointer expanded =
+                buildRingOp(addAxioms.op, e1.canonical, e2.canonical);
+            ExpressionPointer mulXY = buildRingOp(mulAxioms.op, X, Y);
+            ExpressionPointer sumX1Y_X2Y = buildRingOp(addAxioms.op, x1y, x2y);
+            ExpressionPointer proof = buildEqualityTransitivity(
+                carrierLevel, carrierType, mulXY, sumX1Y_X2Y, expanded,
+                distrib, congr);
+            return ACNormResult{expanded, proof};
+        }
+        ExpressionPointer Y1, Y2;
+        if (matchBinaryRingOp(Y, addAxioms.op, Y1, Y2)) {
+            // X is NOT a sum here; X · (Y1 + Y2) = X·Y1 + X·Y2  (distrib_left)
+            ExpressionPointer distrib = ringConst("Ring.distributivity_left");
+            distrib = makeApplication(distrib, X);
+            distrib = makeApplication(distrib, Y1);
+            distrib = makeApplication(distrib, Y2);
+            ExpressionPointer xy1 = buildRingOp(mulAxioms.op, X, Y1);
+            ExpressionPointer xy2 = buildRingOp(mulAxioms.op, X, Y2);
+            ACNormResult e1 = expandRingProductOfSums(
+                X, Y1, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ACNormResult e2 = expandRingProductOfSums(
+                X, Y2, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer congr = buildBinaryOpCongruence(
+                addAxioms.op, xy1, e1.canonical, e1.proof,
+                xy2, e2.canonical, e2.proof, carrierType, carrierLevel);
+            ExpressionPointer expanded =
+                buildRingOp(addAxioms.op, e1.canonical, e2.canonical);
+            ExpressionPointer mulXY = buildRingOp(mulAxioms.op, X, Y);
+            ExpressionPointer sumXY1_XY2 = buildRingOp(addAxioms.op, xy1, xy2);
+            ExpressionPointer proof = buildEqualityTransitivity(
+                carrierLevel, carrierType, mulXY, sumXY1_XY2, expanded,
+                distrib, congr);
+            return ACNormResult{expanded, proof};
+        }
+        // Neither side a sum: X · Y is already a product of products.
+        ExpressionPointer mulXY = buildRingOp(mulAxioms.op, X, Y);
+        return ACNormResult{
+            mulXY, buildReflexivity(carrierLevel, carrierType, mulXY)};
+    }
+
+Elaborator::ACNormResult Elaborator::ringDistribute(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        ExpressionPointer A, B;
+        if (matchBinaryRingOp(e, addAxioms.op, A, B)) {
+            ACNormResult da = ringDistribute(
+                A, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ACNormResult db = ringDistribute(
+                B, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer rebuilt =
+                buildRingOp(addAxioms.op, da.canonical, db.canonical);
+            ExpressionPointer proof = buildBinaryOpCongruence(
+                addAxioms.op, A, da.canonical, da.proof,
+                B, db.canonical, db.proof, carrierType, carrierLevel);
+            return ACNormResult{rebuilt, proof};
+        }
+        if (!mulAxioms.op.empty() && matchBinaryRingOp(e, mulAxioms.op, A, B)) {
+            ACNormResult da = ringDistribute(
+                A, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ACNormResult db = ringDistribute(
+                B, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            // e = A·B = da·db (congruence) = expanded (distributivity).
+            ExpressionPointer mulDaDb =
+                buildRingOp(mulAxioms.op, da.canonical, db.canonical);
+            ExpressionPointer congr = buildBinaryOpCongruence(
+                mulAxioms.op, A, da.canonical, da.proof,
+                B, db.canonical, db.proof, carrierType, carrierLevel);
+            ACNormResult ex = expandRingProductOfSums(
+                da.canonical, db.canonical, addAxioms, mulAxioms,
+                carrierType, carrierLevel, line);
+            ExpressionPointer mulAB = buildRingOp(mulAxioms.op, A, B);
+            ExpressionPointer proof = buildEqualityTransitivity(
+                carrierLevel, carrierType, mulAB, mulDaDb, ex.canonical,
+                congr, ex.proof);
+            return ACNormResult{ex.canonical, proof};
+        }
+        // Atom (or `·` disabled): nothing to distribute.
+        return ACNormResult{
+            e, buildReflexivity(carrierLevel, carrierType, e)};
     }
 
 Elaborator::ACNormResult Elaborator::ringACFullNorm(
@@ -1388,13 +1509,30 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
             leftOpened, structureArg, openedContext);
         ExpressionPointer rightCanon = canonicalizeRingStructurePrefix(
             rightOpened, structureArg, openedContext);
+        // Distributivity is OPTIONAL too: only expand products of sums when
+        // both distributivity laws are in scope. Otherwise products of sums
+        // stay as opaque atoms (sound; just no distributive power).
+        const bool canDistribute = !mulAxioms.op.empty()
+            && environment_.lookup("Ring.distributivity_left") != nullptr
+            && environment_.lookup("Ring.distributivity_right") != nullptr;
         try {
-            ACNormResult nl = ringACFullNorm(
-                leftCanon, addAxioms, mulAxioms,
-                carrierOpened, carrierLevel, line);
-            ACNormResult nr = ringACFullNorm(
-                rightCanon, addAxioms, mulAxioms,
-                carrierOpened, carrierLevel, line);
+            // Fully normalise: distribute (products of sums → sums of
+            // products), then AC-normalise the resulting sum of products.
+            auto normalise = [&](ExpressionPointer e) -> ACNormResult {
+                if (!canDistribute) {
+                    return ringACFullNorm(e, addAxioms, mulAxioms,
+                        carrierOpened, carrierLevel, line);
+                }
+                ACNormResult dist = ringDistribute(e, addAxioms, mulAxioms,
+                    carrierOpened, carrierLevel, line);
+                ACNormResult norm = ringACFullNorm(dist.canonical,
+                    addAxioms, mulAxioms, carrierOpened, carrierLevel, line);
+                return ACNormResult{norm.canonical, buildEqualityTransitivity(
+                    carrierLevel, carrierOpened, e, dist.canonical,
+                    norm.canonical, dist.proof, norm.proof)};
+            };
+            ACNormResult nl = normalise(leftCanon);
+            ACNormResult nr = normalise(rightCanon);
             if (!structurallyEqual(nl.canonical, nr.canonical)) {
                 // Sides differ as AC normal forms — not closable this way
                 // (e.g. genuinely unequal, or needs distributivity / an

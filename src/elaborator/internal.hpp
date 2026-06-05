@@ -2239,6 +2239,42 @@ private:
         ExpressionPointer proof;
     };
 
+    // Proof of `op(A, B) = op(Aprime, Bprime)` from `proofA : A = Aprime`
+    // and `proofB : B = Bprime`, via two one-hole congruences. Shared by the
+    // AC normaliser's leaf-replacement and the distributivity pass.
+    ExpressionPointer buildBinaryOpCongruence(
+        const std::string& opName,
+        ExpressionPointer A, ExpressionPointer Aprime, ExpressionPointer proofA,
+        ExpressionPointer B, ExpressionPointer Bprime, ExpressionPointer proofB,
+        ExpressionPointer carrierType, LevelPointer carrierLevel);
+
+    // Distributivity pass (fingerprint plan Phase 2, increment 2a): rewrite
+    // `e` so no `Ring.add` sits inside a `Ring.multiply` — every product of
+    // sums is expanded to a sum of products via `Ring.distributivity_left/
+    // right`. Emits the proof `e = eDistributed`. Run before ringACFullNorm,
+    // which then AC-normalises the resulting sum of products.
+    ACNormResult ringDistribute(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line);
+
+    // Expand `X · Y` where X and Y already contain no `Ring.add` inside any
+    // `Ring.multiply` (but may themselves be top-level sums): returns a sum
+    // of products with the proof `X · Y = expanded`. Distributes the left
+    // sum first (distributivity_right), then each left term over the right
+    // sum (distributivity_left).
+    ACNormResult expandRingProductOfSums(
+        ExpressionPointer X,
+        ExpressionPointer Y,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line);
+
     // Rewrite every `Ring.add`/`Ring.multiply` in `e` so its leading
     // structure argument is spelled exactly `canonicalArg`, whenever the
     // present spelling is definitionally (but not structurally) equal to it.
