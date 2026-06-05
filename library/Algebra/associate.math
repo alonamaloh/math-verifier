@@ -1,0 +1,149 @@
+-- Algebra/associate.math
+--
+-- Units and the associate relation in an integral domain. Two elements
+-- are *associates* when they differ by a unit factor (b = a·u). In a
+-- domain this is the right notion of "the same up to invertible scaling"
+-- — and unique factorization is unique only up to associates and order
+-- (in ℤ, the sign ambiguity; in k[x], a nonzero constant).
+--
+-- Contents:
+--   * unit lemmas: a unit's inverse is a unit, units are closed under
+--     products;
+--   * `Associate` is reflexive / symmetric / transitive;
+--   * an irreducible divided by a non-unit is its associate — the bridge
+--     the uniqueness proof uses to match a prime against a factor.
+
+module Algebra.associate
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_divisibility
+import Algebra.commutative_ring_bundle
+import Algebra.integral_domain
+import Algebra.irreducible
+
+-- ----------------------------------------------------------------------
+-- Unit lemmas.
+
+-- A unit's inverse is itself a unit. From `1 = u·v` (commuting to
+-- `1 = v·u`) we read `v ∣ 1`.
+theorem IntegralDomain.unit_inverse_is_unit (d : IntegralDomain)
+        (u : Ring.carrier(IntegralDomain.ring(d)))
+        (uIsUnit : Ring.IsUnit(IntegralDomain.ring(d), u))
+        : ∃ (v : Ring.carrier(IntegralDomain.ring(d))).
+            Ring.IsUnit(IntegralDomain.ring(d), v)
+            ∧ Ring.multiply(IntegralDomain.ring(d), u, v)
+              = Ring.one(IntegralDomain.ring(d)) := {
+  let s : Ring := IntegralDomain.ring(d);
+  obtain ⟨v, oneEqualsProduct⟩ from uIsUnit;
+  -- oneEqualsProduct : 1 = u·v.
+  ⟨v,
+   ⟨u, calc Ring.one(s) = u * v = v * u
+                            by IntegralDomain.commutative(d, u, v)⟩,
+   Equality.symmetry(oneEqualsProduct)⟩
+}
+
+-- Units are closed under multiplication: if u, w are units so is u·w.
+theorem IntegralDomain.unit_product (d : IntegralDomain)
+        (u w : Ring.carrier(IntegralDomain.ring(d)))
+        (uIsUnit : Ring.IsUnit(IntegralDomain.ring(d), u))
+        (wIsUnit : Ring.IsUnit(IntegralDomain.ring(d), w))
+        : Ring.IsUnit(IntegralDomain.ring(d), u * w) := {
+  let s : Ring := IntegralDomain.ring(d);
+  obtain ⟨uInverse, oneEqualsUproduct⟩ from uIsUnit;
+  obtain ⟨wInverse, oneEqualsWproduct⟩ from wIsUnit;
+  claim productEqualsOne
+      : (u * w) * (wInverse * uInverse) = Ring.one(s)
+      by calc (u * w) * (wInverse * uInverse)
+            = u * (w * (wInverse * uInverse))
+                  by Ring.multiply_associative(s, u, w, wInverse * uInverse)
+            = u * ((w * wInverse) * uInverse)
+                  by Equality.symmetry(
+                         Ring.multiply_associative(s, w, wInverse, uInverse))
+            = u * (Ring.one(s) * uInverse)
+                  by Equality.symmetry(oneEqualsWproduct)
+            = u * uInverse
+                  by Ring.one_multiply(s, uInverse)
+            = Ring.one(s)
+                  by Equality.symmetry(oneEqualsUproduct);
+  ⟨wInverse * uInverse, Equality.symmetry(productEqualsOne)⟩
+}
+
+-- ----------------------------------------------------------------------
+-- The associate relation: b = a·u for some unit u.
+
+definition IntegralDomain.Associate (d : IntegralDomain)
+        (a b : Ring.carrier(IntegralDomain.ring(d))) : Proposition :=
+  ∃ (u : Ring.carrier(IntegralDomain.ring(d))).
+      Ring.IsUnit(IntegralDomain.ring(d), u)
+      ∧ b = a * u
+
+-- Reflexive: a = a·1 and 1 is a unit.
+theorem IntegralDomain.associate_reflexive (d : IntegralDomain)
+        (a : Ring.carrier(IntegralDomain.ring(d)))
+        : IntegralDomain.Associate(d, a, a) :=
+  ⟨Ring.one(IntegralDomain.ring(d)),
+   Ring.one_is_unit(IntegralDomain.ring(d)),
+   Equality.symmetry(Ring.multiply_one(IntegralDomain.ring(d), a))⟩
+
+-- Symmetric: if b = a·u with u a unit (inverse v), then a = b·v.
+theorem IntegralDomain.associate_symmetric (d : IntegralDomain)
+        (a b : Ring.carrier(IntegralDomain.ring(d)))
+        (associated : IntegralDomain.Associate(d, a, b))
+        : IntegralDomain.Associate(d, b, a) := {
+  let s : Ring := IntegralDomain.ring(d);
+  obtain ⟨u, uIsUnit, bEqualsAu⟩ from associated;
+  obtain ⟨v, vIsUnit, uvEqualsOne⟩
+      from IntegralDomain.unit_inverse_is_unit(d, u, uIsUnit);
+  -- bEqualsAu : b = a·u; uvEqualsOne : u·v = 1.
+  ⟨v, vIsUnit,
+   calc a
+      = a * Ring.one(s)        by Equality.symmetry(Ring.multiply_one(s, a))
+      = a * (u * v)            by Equality.symmetry(uvEqualsOne)
+      = (a * u) * v            by Equality.symmetry(Ring.multiply_associative(s, a, u, v))
+      = b * v⟩
+}
+
+-- Transitive: associate is closed under composing unit factors.
+theorem IntegralDomain.associate_transitive (d : IntegralDomain)
+        (a b c : Ring.carrier(IntegralDomain.ring(d)))
+        (associatedAB : IntegralDomain.Associate(d, a, b))
+        (associatedBC : IntegralDomain.Associate(d, b, c))
+        : IntegralDomain.Associate(d, a, c) := {
+  let s : Ring := IntegralDomain.ring(d);
+  obtain ⟨u, uIsUnit, bEqualsAu⟩ from associatedAB;
+  obtain ⟨w, wIsUnit, cEqualsBw⟩ from associatedBC;
+  ⟨u * w, IntegralDomain.unit_product(d, u, w, uIsUnit, wIsUnit),
+   calc c
+      = b * w           by cEqualsBw
+      = (a * u) * w      by bEqualsAu
+      = a * (u * w)      by Ring.multiply_associative(s, a, u, w)⟩
+}
+
+-- ----------------------------------------------------------------------
+-- The bridge to factorization: a non-unit dividing an irreducible is its
+-- associate. If q is irreducible and p ∣ q (q = p·c), then by
+-- irreducibility p or c is a unit; p is not a unit, so c is, making p and
+-- q associates.
+theorem IntegralDomain.associate_of_divides_irreducible (d : IntegralDomain)
+        (p q : Ring.carrier(IntegralDomain.ring(d)))
+        (qIrreducible : IntegralDomain.IsIrreducible(d, q))
+        (pNotUnit : ¬(Ring.IsUnit(IntegralDomain.ring(d), p)))
+        (pDividesQ : Ring.divides(IntegralDomain.ring(d), p, q))
+        : IntegralDomain.Associate(d, p, q) := {
+  let s : Ring := IntegralDomain.ring(d);
+  let ⟨_, _, factorClause⟩ := qIrreducible;
+  obtain ⟨c, qEqualsPc⟩ from pDividesQ;
+  -- qEqualsPc : q = p·c.
+  cases factorClause(p, c, qEqualsPc) {
+    | Or.introduceLeft(pIsUnit) => absurd(pNotUnit(pIsUnit))
+    | Or.introduceRight(cIsUnit) => ⟨c, cIsUnit, qEqualsPc⟩
+  }
+}
