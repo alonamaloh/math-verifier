@@ -1,0 +1,101 @@
+-- Lists/list.math
+--
+-- Universe-monomorphic (Type) polymorphic lists, with membership and a
+-- fold-product parameterised by the element type's multiplication and
+-- unit. `NaturalList` (in Lists/basics.math) is the older Natural-only
+-- list kept for Euclid; this module is the element-polymorphic version
+-- the abstract factorization development needs (lists of ring elements).
+--
+-- The product takes the binary operation and identity explicitly rather
+-- than a bundled monoid, so it applies uniformly to `Ring.multiply(s)` /
+-- `Ring.one(s)` for any ring `s` without dragging the bundle through the
+-- list layer.
+
+module Lists.list
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+
+-- Linked list over an arbitrary element type.
+inductive List (A : Type(0)) : Type(0) where
+  | List.empty : List(A)
+  | List.prepend : A → List(A) → List(A)
+
+-- Membership: `element` occurs in the list (as head, or in the tail).
+inductive List.member (A : Type(0)) (element : A) : List(A) → Proposition where
+  | List.member.here
+      : (rest : List(A))
+        → List.member(A, element, List.prepend(element, rest))
+  | List.member.there
+      : (head : A) → (rest : List(A))
+        → List.member(A, element, rest)
+        → List.member(A, element, List.prepend(head, rest))
+
+-- Fold-product: empty ↦ one, prepend(head, tail) ↦ head · product(tail).
+definition List.product (A : Type(0)) (multiply : A → A → A) (one : A)
+        : List(A) → A
+  | List.empty            => one
+  | List.prepend(head, tail) => multiply(head, List.product(A, multiply, one, tail))
+
+-- ----------------------------------------------------------------------
+-- Head/tail extractors and `prepend` injectivity. As with `NaturalList`,
+-- the definitional reduction on `prepend` is what gives injectivity by
+-- `congruenceOf`.
+
+definition List.head_or (A : Type(0)) (default : A) : List(A) → A
+  | List.empty            => default
+  | List.prepend(head, _) => head
+
+definition List.tail_or (A : Type(0)) (default : List(A)) : List(A) → List(A)
+  | List.empty            => default
+  | List.prepend(_, tail) => tail
+
+theorem List.prepend_injective_head (A : Type(0)) (head1 head2 : A)
+        (tail1 tail2 : List(A))
+        (equality : List.prepend(A, head1, tail1) = List.prepend(A, head2, tail2))
+        : head1 = head2 :=
+  congruenceOf(List.head_or(A, head1), equality)
+
+theorem List.prepend_injective_tail (A : Type(0)) (head1 head2 : A)
+        (tail1 tail2 : List(A))
+        (equality : List.prepend(A, head1, tail1) = List.prepend(A, head2, tail2))
+        : tail1 = tail2 :=
+  congruenceOf(List.tail_or(A, tail1), equality)
+
+-- ----------------------------------------------------------------------
+-- Membership inversion. To case-analyse `member(element, prepend(head,
+-- tail))` we keep the list a free variable plus an equality witness
+-- (matching `member` against a concrete `prepend` is not allowed), then
+-- read off each branch by `prepend` injectivity.
+
+theorem List.member_invert_general (A : Type(0)) (element : A) (list : List(A))
+        : List.member(A, element, list)
+          → (head : A) → (tail : List(A))
+          → list = List.prepend(A, head, tail)
+          → element = head ∨ List.member(A, element, tail)
+  | List.member.here(rest) =>
+      (head : A) (tail : List(A))
+      (listEquality :
+          List.prepend(A, element, rest) = List.prepend(A, head, tail)) ↦
+        Or.introduceLeft(
+            List.prepend_injective_head(A, element, head, rest, tail,
+                listEquality))
+  | List.member.there(listHead, listTail, sub) =>
+      (head : A) (tail : List(A))
+      (listEquality :
+          List.prepend(A, listHead, listTail) = List.prepend(A, head, tail)) ↦ {
+        claim tailEquality : listTail = tail
+            by List.prepend_injective_tail(A, listHead, head, listTail, tail,
+                   listEquality);
+        Or.introduceRight(rewrite(tailEquality, sub))
+      }
+
+-- Inversion at a concrete `prepend`: a member of `prepend(head, tail)` is
+-- either the head or a member of the tail.
+theorem List.member_prepend_invert (A : Type(0)) (element head : A)
+        (tail : List(A))
+        (mem : List.member(A, element, List.prepend(A, head, tail)))
+        : element = head ∨ List.member(A, element, tail) :=
+  List.member_invert_general(A, element, List.prepend(A, head, tail), mem,
+      head, tail, reflexivity(List(A), List.prepend(A, head, tail)))

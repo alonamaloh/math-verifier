@@ -1,0 +1,196 @@
+-- Lists/permutation.math
+--
+-- Permutations of polymorphic lists: the multiset core behind unique
+-- factorization. Two lists are permutations when one rearranges into the
+-- other. Defined inductively (à la Coq's `Permutation`) by the four
+-- generators empty / skip-head / swap-two / transitivity.
+--
+-- The payload lemmas:
+--   * reflexive, symmetric  — permutation is an equivalence (transitivity
+--     is a constructor);
+--   * product_invariant     — a commutative-associative fold-product is
+--     unchanged by a permutation (the reason permutations matter for
+--     factorization);
+--   * member_forward        — membership transports across a permutation;
+--   * extract               — a member can be rotated to the front,
+--     leaving a permutation of the remainder.
+--
+-- `extract` + `member_forward` + `product_invariant` are exactly what the
+-- "two factorizations are permutations" argument consumes.
+
+module Lists.permutation
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Lists.list
+
+-- ----------------------------------------------------------------------
+-- The permutation relation.
+
+inductive List.Permutation (A : Type(0)) : List(A) → List(A) → Proposition where
+  | List.Permutation.empty
+      : List.Permutation(A, List.empty(A), List.empty(A))
+  | List.Permutation.skip
+      : (x : A) → (l1 l2 : List(A))
+        → List.Permutation(A, l1, l2)
+        → List.Permutation(A, List.prepend(A, x, l1), List.prepend(A, x, l2))
+  | List.Permutation.swap
+      : (x y : A) → (l : List(A))
+        → List.Permutation(A,
+              List.prepend(A, x, List.prepend(A, y, l)),
+              List.prepend(A, y, List.prepend(A, x, l)))
+  | List.Permutation.transitive
+      : (l1 l2 l3 : List(A))
+        → List.Permutation(A, l1, l2)
+        → List.Permutation(A, l2, l3)
+        → List.Permutation(A, l1, l3)
+
+-- ----------------------------------------------------------------------
+-- Equivalence structure.
+
+-- Every list is a permutation of itself.
+theorem List.Permutation.reflexive (A : Type(0))
+        : (l : List(A)) → List.Permutation(A, l, l)
+  | List.empty => List.Permutation.empty(A)
+  | List.prepend(head, tail) =>
+      List.Permutation.skip(A, head, tail, tail,
+          List.Permutation.reflexive(A, tail))
+
+-- Permutation is symmetric: invert each generator.
+theorem List.Permutation.symmetric (A : Type(0)) (l1 l2 : List(A))
+        : List.Permutation(A, l1, l2) → List.Permutation(A, l2, l1)
+  | List.Permutation.empty => List.Permutation.empty(A)
+  | List.Permutation.skip(x, a, b, perm) =>
+      List.Permutation.skip(A, x, b, a,
+          List.Permutation.symmetric(A, a, b, perm))
+  | List.Permutation.swap(x, y, l) => List.Permutation.swap(A, y, x, l)
+  | List.Permutation.transitive(a, b, c, p, q) =>
+      List.Permutation.transitive(A, c, b, a,
+          List.Permutation.symmetric(A, b, c, q),
+          List.Permutation.symmetric(A, a, b, p))
+
+-- ----------------------------------------------------------------------
+-- Product invariance: a commutative-associative fold-product does not
+-- see the order of the list.
+
+theorem List.Permutation.product_invariant (A : Type(0))
+        (multiply : A → A → A) (one : A)
+        (associativity
+            : (x y z : A) → multiply(multiply(x, y), z) = multiply(x, multiply(y, z)))
+        (commutativity : (x y : A) → multiply(x, y) = multiply(y, x))
+        (l1 l2 : List(A))
+        : List.Permutation(A, l1, l2)
+          → List.product(A, multiply, one, l1)
+            = List.product(A, multiply, one, l2)
+  | List.Permutation.empty => reflexivity(A, one)
+  | List.Permutation.skip(x, a, b, perm) =>
+      calc List.product(A, multiply, one, List.prepend(A, x, a))
+         = multiply(x, List.product(A, multiply, one, a))
+         = multiply(x, List.product(A, multiply, one, b))
+               by List.Permutation.product_invariant(A, multiply, one,
+                      associativity, commutativity, a, b, perm)
+         = List.product(A, multiply, one, List.prepend(A, x, b))
+  | List.Permutation.swap(x, y, l) =>
+      calc List.product(A, multiply, one,
+               List.prepend(A, x, List.prepend(A, y, l)))
+         = multiply(x, multiply(y, List.product(A, multiply, one, l)))
+         = multiply(multiply(x, y), List.product(A, multiply, one, l))
+               by Equality.symmetry(
+                      associativity(x, y, List.product(A, multiply, one, l)))
+         = multiply(multiply(y, x), List.product(A, multiply, one, l))
+               by commutativity(x, y)
+         = multiply(y, multiply(x, List.product(A, multiply, one, l)))
+               by associativity(y, x, List.product(A, multiply, one, l))
+         = List.product(A, multiply, one,
+               List.prepend(A, y, List.prepend(A, x, l)))
+  | List.Permutation.transitive(a, b, c, p, q) =>
+      calc List.product(A, multiply, one, a)
+         = List.product(A, multiply, one, b)
+               by List.Permutation.product_invariant(A, multiply, one,
+                      associativity, commutativity, a, b, p)
+         = List.product(A, multiply, one, c)
+               by List.Permutation.product_invariant(A, multiply, one,
+                      associativity, commutativity, b, c, q)
+
+-- ----------------------------------------------------------------------
+-- Membership transports forward across a permutation.
+
+theorem List.Permutation.member_forward (A : Type(0)) (element : A)
+        (l1 l2 : List(A))
+        : List.Permutation(A, l1, l2)
+          → List.member(A, element, l1)
+          → List.member(A, element, l2)
+  | List.Permutation.empty =>
+      (mem : List.member(A, element, List.empty(A))) ↦ mem
+  | List.Permutation.skip(x, a, b, perm) =>
+      (mem : List.member(A, element, List.prepend(A, x, a))) ↦
+        cases List.member_prepend_invert(A, element, x, a, mem) {
+          | Or.introduceLeft(elementEqualsX) =>
+              -- element = x: it is the (shared) head of prepend(x, b).
+              Equality.transport_proposition(
+                  (t : A) ↦ List.member(A, t, List.prepend(A, x, b)),
+                  x, element, Equality.symmetry(elementEqualsX),
+                  List.member.here(A, x, b))
+          | Or.introduceRight(memberInA) =>
+              List.member.there(A, element, x, b,
+                  List.Permutation.member_forward(A, element, a, b, perm,
+                      memberInA))
+        }
+  | List.Permutation.swap(x, y, l) =>
+      (mem : List.member(A, element,
+                 List.prepend(A, x, List.prepend(A, y, l)))) ↦
+        cases List.member_prepend_invert(A, element, x,
+                  List.prepend(A, y, l), mem) {
+          | Or.introduceLeft(elementEqualsX) =>
+              -- element = x: in prepend(y, prepend(x, l)) it sits one deep.
+              Equality.transport_proposition(
+                  (t : A) ↦ List.member(A, t,
+                      List.prepend(A, y, List.prepend(A, x, l))),
+                  x, element, Equality.symmetry(elementEqualsX),
+                  List.member.there(A, x, y, List.prepend(A, x, l),
+                      List.member.here(A, x, l)))
+          | Or.introduceRight(memberInYL) =>
+              cases List.member_prepend_invert(A, element, y, l, memberInYL) {
+                | Or.introduceLeft(elementEqualsY) =>
+                    -- element = y: it is the head of prepend(y, prepend(x, l)).
+                    Equality.transport_proposition(
+                        (t : A) ↦ List.member(A, t,
+                            List.prepend(A, y, List.prepend(A, x, l))),
+                        y, element, Equality.symmetry(elementEqualsY),
+                        List.member.here(A, y, List.prepend(A, x, l)))
+                | Or.introduceRight(memberInL) =>
+                    List.member.there(A, element, y, List.prepend(A, x, l),
+                        List.member.there(A, element, x, l, memberInL))
+              }
+        }
+  | List.Permutation.transitive(a, b, c, p, q) =>
+      (mem : List.member(A, element, a)) ↦
+        List.Permutation.member_forward(A, element, b, c, q,
+            List.Permutation.member_forward(A, element, a, b, p, mem))
+
+-- ----------------------------------------------------------------------
+-- Extract a member to the front.
+
+-- If `element` occurs in `l`, then `l` is a permutation of
+-- `prepend(element, rest)` for some remainder `rest`.
+theorem List.Permutation.extract (A : Type(0)) (element : A) (l : List(A))
+        : List.member(A, element, l)
+          → ∃ (rest : List(A)).
+              List.Permutation(A, l, List.prepend(A, element, rest))
+  | List.member.here(rest) =>
+      ⟨rest, List.Permutation.reflexive(A, List.prepend(A, element, rest))⟩
+  | List.member.there(head, tail, sub) => {
+      obtain ⟨tailRest, perm⟩
+          from List.Permutation.extract(A, element, tail, sub);
+      -- perm : Permutation(tail, prepend(element, tailRest)). Skip `head`
+      -- over it, then swap `head` past `element` to reach the front.
+      witness List.prepend(A, head, tailRest) with
+        List.Permutation.transitive(A,
+            List.prepend(A, head, tail),
+            List.prepend(A, head, List.prepend(A, element, tailRest)),
+            List.prepend(A, element, List.prepend(A, head, tailRest)),
+            List.Permutation.skip(A, head, tail,
+                List.prepend(A, element, tailRest), perm),
+            List.Permutation.swap(A, head, element, tailRest))
+    }
