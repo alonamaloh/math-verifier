@@ -1,0 +1,263 @@
+-- Set/finite_product.math
+--
+-- The product rule of counting: |X × Y| = |X|·|Y|. Its heart is an
+-- explicit bijection between the product of two yardsticks and a single
+-- yardstick — `NaturalsBelow(m) × NaturalsBelow(n) ≅ NaturalsBelow(m·n)`
+-- — pairing (i, j) with the single index `n·i + j`, the row-major
+-- layout of an m-by-n grid. The inverse recovers (i, j) by Euclidean
+-- division: i is the quotient `divide(n, k)` and j the remainder
+-- `modulo(n, k)`. Uniqueness of quotient/remainder closes the round trip.
+
+module Set.finite_product
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Equality.basics
+import Set.subtype
+import Set.equinumerous
+import Set.finite
+import Natural.basics
+import Natural.order
+import Natural.arithmetic
+import Natural.add_order
+import Natural.divide
+import Natural.compare
+import Natural.strong_recursion
+import Natural.multiply_bounds
+
+-- ----------------------------------------------------------------------
+-- Product respects sameness of size: replacing each factor by an
+-- equinumerous type gives an equinumerous product. Map each component
+-- through its bijection; the two inverse laws follow componentwise.
+theorem Equinumerous.product_congruence (A A' B B' : Type(0))
+        (firstSame : Equinumerous(A, A')) (secondSame : Equinumerous(B, B'))
+        : Equinumerous(Product.{0,0}(A, B), Product.{0,0}(A', B')) := {
+  obtain ⟨forwardA, forwardATail⟩ from firstSame;
+  obtain ⟨backwardA, inverseA⟩ from forwardATail;
+  obtain ⟨forwardB, forwardBTail⟩ from secondSame;
+  obtain ⟨backwardB, inverseB⟩ from forwardBTail;
+  obtain ⟨leftA, rightA⟩ from inverseA;
+  obtain ⟨leftB, rightB⟩ from inverseB;
+  ⟨(p : Product.{0,0}(A, B)) ↦
+       Product.make.{0,0}(A', B', forwardA(Product.first(p)), forwardB(Product.second(p))),
+   ⟨(p : Product.{0,0}(A', B')) ↦
+        Product.make.{0,0}(A, B, backwardA(Product.first(p)), backwardB(Product.second(p))),
+    And.introduction(
+        (p : Product.{0,0}(A, B)) ↦
+            -- backward(forward(make a b)) = make(backwardA(forwardA a), backwardB(forwardB b)) = make a b.
+            cases p {
+              | Product.make(a, b) =>
+                  calc Product.make.{0,0}(A, B, backwardA(forwardA(a)), backwardB(forwardB(b)))
+                     = Product.make.{0,0}(A, B, a, b)
+                          by Product.make_equal(A, B,
+                                 backwardA(forwardA(a)), a, backwardB(forwardB(b)), b,
+                                 leftA(a), leftB(b))
+            },
+        (p : Product.{0,0}(A', B')) ↦
+            cases p {
+              | Product.make(a, b) =>
+                  calc Product.make.{0,0}(A', B', forwardA(backwardA(a)), forwardB(backwardB(b)))
+                     = Product.make.{0,0}(A', B', a, b)
+                          by Product.make_equal(A', B',
+                                 forwardA(backwardA(a)), a, forwardB(backwardB(b)), b,
+                                 rightA(a), rightB(b))
+            })⟩⟩
+}
+
+-- ----------------------------------------------------------------------
+-- The core bijection, by cases on n (the divisor must be positive).
+
+-- The forward index n·i + j of a grid cell stays below m·n. Reading the
+-- chain: successor(n·i + j) = n·i + successor(j) ≤ n·i + n = n·successor(i)
+-- ≤ n·m = m·n, using successor(j) ≤ n (the second component's bound) and
+-- successor(i) ≤ m (the first component's bound).
+theorem NaturalsBelow.product_index_bound (m n i j : Natural)
+        (belowM : successor(i) ≤ m) (belowN : successor(j) ≤ n)
+        : successor(n * i + j) ≤ m * n :=
+  calc successor(n * i + j)
+     = n * i + successor(j)     by Natural.add_successor(n * i, j)
+     ≤ n * i + n                by Natural.add_left_monotone(n * i, successor(j), n, belowN)
+     = n + n * i                by ring
+     = n * successor(i)         by Equality.symmetry(Natural, n * successor(i), n + n * i,
+                                       Natural.multiply_successor(n, i))
+     ≤ n * m                    by Natural.multiply_monotone_left(n, successor(i), m, belowM)
+     = m * n                    by Natural.multiply_commutative(n, m)
+
+-- The quotient `divide(n, k)` of an index below m·n is itself below m: it is
+-- the row of the cell. From the decomposition n·q + r = k we read q ≤ k, so
+-- n·q < n·m; were m ≤ q we would get n·m ≤ n·q, putting successor(n·q) below
+-- itself. (n is the divisor, so it must be positive.)
+theorem NaturalsBelow.product_quotient_bound (m n k : Natural)
+        (oneLeN : successor(0) ≤ n) (belowProduct : successor(k) ≤ m * n)
+        : successor(Natural.divide(n, k)) ≤ m := {
+  claim decompose : n * Natural.divide(n, k) + Natural.modulo(n, k) = k
+      by Natural.divide_modulo_decompose(n, k);
+  -- n·q ≤ n·q + r = k.
+  claim quotientLeK : n * Natural.divide(n, k) ≤ k
+      by calc n * Natural.divide(n, k)
+            ≤ n * Natural.divide(n, k) + Natural.modulo(n, k)   by Natural.less_or_equal_add_right
+            = k                                                 by decompose;
+  -- Hence n·q < n·m.
+  claim quotientStrict : successor(n * Natural.divide(n, k)) ≤ n * m
+      by calc successor(n * Natural.divide(n, k))
+            ≤ successor(k)   by Natural.successor_less_or_equal_successor(n * Natural.divide(n, k), k, quotientLeK)
+            ≤ m * n          by belowProduct
+            = n * m          by Natural.multiply_commutative(m, n);
+  cases Natural.compare_strict(Natural.divide(n, k), m) {
+    | Natural.StrictComparison.below(strictlyBelow) =>
+        strictlyBelow
+    | Natural.StrictComparison.atLeast(atLeast) => {
+        -- m ≤ q forces n·m ≤ n·q, so successor(n·q) ≤ n·m ≤ n·q: impossible.
+        claim selfBelow : successor(n * Natural.divide(n, k)) ≤ n * Natural.divide(n, k)
+            by calc successor(n * Natural.divide(n, k))
+                  ≤ n * m                      by quotientStrict
+                  ≤ n * Natural.divide(n, k)   by Natural.multiply_monotone_left(n, m, Natural.divide(n, k), atLeast);
+        absurd(Natural.not_successor_less_or_equal_self(n * Natural.divide(n, k), selfBelow))
+      }
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The two directions, for a positive divisor n.
+
+-- Row-major: the cell (i, j) of an m-by-n grid maps to index n·i + j.
+definition NaturalsBelow.product_into (m n : Natural) (oneLeN : successor(0) ≤ n)
+        : Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n)) → NaturalsBelow(m * n) :=
+  (p : Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n))) ↦
+    NaturalsBelow.make(
+        n * NaturalsBelow.value(Product.first(p)) + NaturalsBelow.value(Product.second(p)),
+        NaturalsBelow.product_index_bound(m, n,
+            NaturalsBelow.value(Product.first(p)), NaturalsBelow.value(Product.second(p)),
+            NaturalsBelow.below(Product.first(p)), NaturalsBelow.below(Product.second(p))))
+
+-- The inverse: divide by n. The quotient is the row, the remainder the column.
+definition NaturalsBelow.product_out_of (m n : Natural) (oneLeN : successor(0) ≤ n)
+        : NaturalsBelow(m * n) → Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n)) :=
+  (k : NaturalsBelow(m * n)) ↦
+    Product.make.{0,0}(NaturalsBelow(m), NaturalsBelow(n),
+        NaturalsBelow.make(Natural.divide(n, NaturalsBelow.value(k)),
+            NaturalsBelow.product_quotient_bound(m, n, NaturalsBelow.value(k), oneLeN, NaturalsBelow.below(k))),
+        NaturalsBelow.make(Natural.modulo(n, NaturalsBelow.value(k)),
+            Natural.modulo_bound(n, NaturalsBelow.value(k), oneLeN)))
+
+-- ----------------------------------------------------------------------
+-- The two inverse laws.
+
+-- out_of recovers the cell that into placed. After `cases p`, the index is
+-- n·i + j with i = value(first), j = value(second); dividing it by n returns
+-- the quotient i and remainder j (uniqueness of quotient/remainder), so the
+-- recovered pair has the same components.
+theorem NaturalsBelow.product_round_trip_left (m n : Natural) (oneLeN : successor(0) ≤ n)
+        (p : Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n)))
+        : NaturalsBelow.product_out_of(m, n, oneLeN, NaturalsBelow.product_into(m, n, oneLeN, p)) = p :=
+  cases p {
+    | Product.make(first, second) => {
+        claim decompose
+            : n * Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second))
+                  + Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second))
+              = n * NaturalsBelow.value(first) + NaturalsBelow.value(second)
+            by Natural.divide_modulo_decompose(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second));
+        claim quotientIsFirst
+            : Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second))
+              = NaturalsBelow.value(first)
+            by Natural.quotient_remainder_unique(n,
+                   Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
+                   Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
+                   NaturalsBelow.value(first), NaturalsBelow.value(second),
+                   Natural.modulo_bound(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN),
+                   NaturalsBelow.below(second), decompose);
+        claim remainderIsSecond
+            : Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second))
+              = NaturalsBelow.value(second)
+            by Natural.remainder_unique(n,
+                   Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
+                   Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
+                   NaturalsBelow.value(first), NaturalsBelow.value(second),
+                   Natural.modulo_bound(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN),
+                   NaturalsBelow.below(second), decompose);
+        Product.make_equal(NaturalsBelow(m), NaturalsBelow(n),
+            NaturalsBelow.make(Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
+                NaturalsBelow.product_quotient_bound(m, n,
+                    n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN,
+                    NaturalsBelow.product_index_bound(m, n,
+                        NaturalsBelow.value(first), NaturalsBelow.value(second),
+                        NaturalsBelow.below(first), NaturalsBelow.below(second)))),
+            first,
+            NaturalsBelow.make(Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
+                Natural.modulo_bound(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN)),
+            second,
+            NaturalsBelow.equal_of_value(m,
+                NaturalsBelow.make(Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
+                    NaturalsBelow.product_quotient_bound(m, n,
+                        n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN,
+                        NaturalsBelow.product_index_bound(m, n,
+                            NaturalsBelow.value(first), NaturalsBelow.value(second),
+                            NaturalsBelow.below(first), NaturalsBelow.below(second)))),
+                first, quotientIsFirst),
+            NaturalsBelow.equal_of_value(n,
+                NaturalsBelow.make(Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
+                    Natural.modulo_bound(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN)),
+                second, remainderIsSecond))
+      }
+  }
+
+-- into reassembles whatever out_of split. out_of(k) has row divide(n, value k)
+-- and column modulo(n, value k); into sends them back to the single index
+-- n·divide(n, value k) + modulo(n, value k), which is value k exactly — that
+-- is the division identity.
+theorem NaturalsBelow.product_round_trip_right (m n : Natural) (oneLeN : successor(0) ≤ n)
+        (k : NaturalsBelow(m * n))
+        : NaturalsBelow.product_into(m, n, oneLeN, NaturalsBelow.product_out_of(m, n, oneLeN, k)) = k :=
+  NaturalsBelow.equal_of_value(m * n, ?, k,
+      Natural.divide_modulo_decompose(n, NaturalsBelow.value(k)))
+
+-- ----------------------------------------------------------------------
+-- The grid bijection, then the product rule.
+
+-- The product of two yardsticks is one yardstick. Split on n: with n = 0 the
+-- product is empty (no second component) and so is the target NaturalsBelow(m·0);
+-- with n positive the row-major map and Euclidean division are inverse.
+theorem NaturalsBelow.product_equinumerous (m n : Natural)
+        : Equinumerous(Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m * n)) :=
+  cases n {
+    | zero => {
+        -- Both sides are empty: the product has no second component, and
+        -- NaturalsBelow(m·0) is NaturalsBelow(0) since m·0 = 0.
+        claim productEmpty : Product.{0,0}(NaturalsBelow(m), NaturalsBelow(0)) → False
+            by (p : Product.{0,0}(NaturalsBelow(m), NaturalsBelow(0))) ↦
+                NaturalsBelow.zero_is_empty(Product.second(p));
+        claim targetEmpty : NaturalsBelow(m * 0) → False
+            by (e : NaturalsBelow(m * 0)) ↦ {
+              claim belowZero : successor(NaturalsBelow.value(e)) ≤ 0
+                  by calc successor(NaturalsBelow.value(e))
+                        ≤ m * 0   by NaturalsBelow.below(e)
+                        = 0       by Natural.multiply_zero(m);
+              Natural.not_less_or_equal_successor_zero(NaturalsBelow.value(e), belowZero)
+            };
+        Equinumerous.transitive(
+            Product.{0,0}(NaturalsBelow(m), NaturalsBelow(0)), NaturalsBelow(0), NaturalsBelow(m * 0),
+            HasSize.empty_has_size_zero(Product.{0,0}(NaturalsBelow(m), NaturalsBelow(0)), productEmpty),
+            Equinumerous.symmetric(NaturalsBelow(m * 0), NaturalsBelow(0),
+                HasSize.empty_has_size_zero(NaturalsBelow(m * 0), targetEmpty)))
+      }
+    | successor(predecessorN) => {
+        claim oneLeN : successor(0) ≤ successor(predecessorN)
+            by Natural.successor_less_or_equal_successor(0, predecessorN, Natural.zero_least(predecessorN));
+        ⟨NaturalsBelow.product_into(m, successor(predecessorN), oneLeN),
+         ⟨NaturalsBelow.product_out_of(m, successor(predecessorN), oneLeN),
+          And.introduction(
+              NaturalsBelow.product_round_trip_left(m, successor(predecessorN), oneLeN),
+              NaturalsBelow.product_round_trip_right(m, successor(predecessorN), oneLeN))⟩⟩
+      }
+  }
+
+-- The product rule: a size-m type and a size-n type have a size-(m·n) product.
+-- Compose the componentwise bijection with the grid bijection.
+theorem HasSize.product (X Y : Type(0)) (m n : Natural)
+        (sizeX : HasSize(X, m)) (sizeY : HasSize(Y, n))
+        : HasSize(Product.{0,0}(X, Y), m * n) :=
+  Equinumerous.transitive(
+      Product.{0,0}(X, Y), Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m * n),
+      Equinumerous.product_congruence(X, NaturalsBelow(m), Y, NaturalsBelow(n), sizeX, sizeY),
+      NaturalsBelow.product_equinumerous(m, n))
