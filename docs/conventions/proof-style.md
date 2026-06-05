@@ -220,6 +220,15 @@ reach for the math-like form instead:
   So **start the calc from the reduced form**, not from the original
   application.
 
+- **`Equality.symmetry(…)` to flip an equation is usually unnecessary.**
+  A `calc` `=` step's diff-inference already tries both orientations, so a
+  *reversed* step needs only `by <lemma/hypothesis>` — `by bEquation`, not
+  `by Equality.symmetry(bEquation)` — and the binder stays referenced. When
+  the reversed equation is needed in *argument* position (no calc step to
+  flip — e.g. feeding `equal_of_value` or another lemma), wrap it in a
+  one-step `calc B = A by <proofOfAeqB>` rather than calling
+  `Equality.symmetry`.
+
 - **`Equality.transport_proposition(…)` to move a fact along an
   equation** — use a `calc` step or `by substituting <eq>` instead.
 
