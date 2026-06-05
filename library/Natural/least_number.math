@@ -1,0 +1,76 @@
+-- Natural/least_number.math
+--
+-- The least-number principle (well-ordering of ℕ): any predicate that
+-- holds somewhere holds at a least point. The argument is strong
+-- induction on the witness: at `n`, either some smaller point already
+-- satisfies the predicate — recurse there — or none does, and then `n`
+-- itself is the minimum.
+--
+-- This is the well-ordering primitive behind "a nonempty ideal has an
+-- element of minimal Euclidean norm", i.e. the Euclidean ⇒ PID step.
+
+module Natural.least_number
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.division
+import Natural.strong_recursion
+
+-- A minimal witness: a point where the predicate holds with nothing
+-- below it doing so.
+theorem Natural.least_witness_minimal (predicate : Natural → Proposition)
+        : (n : Natural) → predicate(n)
+          → ∃ (minimum : Natural).
+              predicate(minimum)
+              ∧ ((k : Natural) → k < minimum → ¬predicate(k)) := {
+  take n : Natural;
+  by_strong_induction on n with subject, inductionHypothesis {
+    suppose predicate(subject) as predicateAtSubject;
+    -- Is there a witness strictly below `subject`?
+    decide ∃ (smaller : Natural). smaller < subject ∧ predicate(smaller) {
+      | yes someSmaller => {
+          -- Recurse on that smaller witness; its minimum serves here too.
+          obtain ⟨smaller, smallerBelowSubject, predicateAtSmaller⟩
+              from someSmaller;
+          inductionHypothesis(smaller, smallerBelowSubject, predicateAtSmaller)
+        }
+      | no noneSmaller => {
+          -- Nothing below `subject` satisfies the predicate, so it is least.
+          claim subjectIsMinimal : (k : Natural) → k < subject → ¬predicate(k) by {
+            take k : Natural;
+            suppose k < subject as kBelowSubject;
+            suppose predicate(k) as predicateAtK;
+            noneSmaller(⟨k, ⟨kBelowSubject, predicateAtK⟩⟩)
+          };
+          ⟨subject, ⟨predicateAtSubject, subjectIsMinimal⟩⟩
+        }
+    }
+  }
+}
+
+-- The least-number principle proper: a least point in the `≤` sense.
+-- Anything strictly below the minimal witness would contradict
+-- minimality, so by trichotomy the minimum is ≤ every other witness.
+theorem Natural.least_witness (predicate : Natural → Proposition)
+        (n : Natural) (witnessAtN : predicate(n))
+        : ∃ (minimum : Natural).
+            predicate(minimum) ∧ ((k : Natural) → predicate(k) → minimum ≤ k) := {
+  obtain ⟨minimum, predicateAtMinimum, nothingBelow⟩
+      from Natural.least_witness_minimal(predicate, n, witnessAtN);
+  claim minimumIsLeast : (k : Natural) → predicate(k) → minimum ≤ k by {
+    take k : Natural;
+    suppose predicate(k) as predicateAtK;
+    -- k < minimum would contradict minimality, so minimum ≤ k.
+    cases Natural.trichotomy(k, minimum) {
+      | Or.introduceLeft(kBelowMinimum) =>
+          absurd(nothingBelow(k, kBelowMinimum, predicateAtK))
+      | Or.introduceRight(minimumAtMostK) => minimumAtMostK
+    }
+  };
+  ⟨minimum, ⟨predicateAtMinimum, minimumIsLeast⟩⟩
+}
