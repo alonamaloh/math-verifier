@@ -32,7 +32,7 @@ import Lists.basics
 theorem Natural.is_zero_or_at_least_one
         : (k : Natural) → k = 0 ∨ 1 ≤ k
   | zero                    => okay
-  | successor(kPredecessor) => okay
+  | successor(kPredecessor) => Natural.successor_positive(kPredecessor)
 
 -- 1 ≤ n splits into n = 1 ∨ 2 ≤ n. Pattern-match on n: zero
 -- contradicts the hypothesis, successor(predN) re-splits via
@@ -43,8 +43,13 @@ theorem Natural.equals_one_or_at_least_two
       absurd(oneLessOrEqualZero)
   | successor(nPredecessor), _ =>
       claim by cases {
-        in (nPredecessor = 0):   okay
-        in (1 ≤ nPredecessor):   okay
+        in (nPredecessor = 0) as predecessorIsZero:
+            -- n = successor(0) = 1, the left disjunct.
+            calc successor(nPredecessor) = 1
+        in (1 ≤ nPredecessor) as predecessorPositive:
+            -- 1 ≤ nPredecessor lifts to 2 ≤ successor(nPredecessor), the right.
+            Natural.successor_less_or_equal_successor(
+                1, nPredecessor, predecessorPositive)
       }
 
 -- If 1 ≤ n and n = p * q, then 1 ≤ q. By cases on q: q = 0 forces
