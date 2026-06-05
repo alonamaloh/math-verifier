@@ -1,0 +1,134 @@
+-- GaussianInteger/coordinate_homomorphism.math
+--
+-- The coordinate map is a ℤ-module homomorphism: it carries polynomial
+-- addition to componentwise integer addition on the (re, im) pair. This
+-- is the first half of what makes it descend through the (x²+1)-
+-- congruence (the other half is that it kills multiples of x²+1).
+--
+-- Proved at the coefficient-list level by induction, then lifted to ℤ[x].
+
+module GaussianInteger.coordinate_homomorphism
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring
+import Algebra.ring_bundle
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Polynomial.basics
+import Polynomial.addition
+import GaussianInteger.basics
+import GaussianInteger.coordinates
+
+-- ----------------------------------------------------------------------
+-- A pair equals the pairing of its projections.
+theorem GaussianInteger.product_eta (a : Pair(Integer, Integer))
+        : a = Product.make(Product.first(a), Product.second(a)) :=
+  cases a { | Product.make(x, y) =>
+    reflexivity(Pair(Integer, Integer), Product.make(x, y)) }
+
+-- ----------------------------------------------------------------------
+-- Additivity on coefficient lists: coordinates of a sum are the
+-- componentwise sums of the coordinates.
+theorem GaussianInteger.coordinatesOfCoefficients_add
+        : (a b : Polynomial.Coefficients(Integer))
+          → GaussianInteger.coordinatesOfCoefficients(Polynomial.Coefficients.add(Integer.ring_bundle, a, b))
+            = Product.make(
+                  Product.first(GaussianInteger.coordinatesOfCoefficients(a))
+                      + Product.first(GaussianInteger.coordinatesOfCoefficients(b)),
+                  Product.second(GaussianInteger.coordinatesOfCoefficients(a))
+                      + Product.second(GaussianInteger.coordinatesOfCoefficients(b)))
+  | Polynomial.Coefficients.nil =>
+      (b : Polynomial.Coefficients(Integer)) ↦
+        -- add(nil, b) = b; coords(nil) = (0, 0); 0 + x = x.
+        calc GaussianInteger.coordinatesOfCoefficients(b)
+           = Product.make(
+                 Product.first(GaussianInteger.coordinatesOfCoefficients(b)),
+                 Product.second(GaussianInteger.coordinatesOfCoefficients(b)))
+                 by GaussianInteger.product_eta(GaussianInteger.coordinatesOfCoefficients(b))
+           = Product.make(
+                 Integer.zero + Product.first(GaussianInteger.coordinatesOfCoefficients(b)),
+                 Integer.zero + Product.second(GaussianInteger.coordinatesOfCoefficients(b)))
+                 by Product.make_equal(Integer, Integer,
+                        Product.first(GaussianInteger.coordinatesOfCoefficients(b)),
+                        Integer.zero + Product.first(GaussianInteger.coordinatesOfCoefficients(b)),
+                        Product.second(GaussianInteger.coordinatesOfCoefficients(b)),
+                        Integer.zero + Product.second(GaussianInteger.coordinatesOfCoefficients(b)),
+                        ring, ring)
+  | Polynomial.Coefficients.cons(a, restA) =>
+      (b : Polynomial.Coefficients(Integer)) ↦
+        cases b {
+          | Polynomial.Coefficients.nil =>
+              -- add(cons, nil) = cons; coords(nil) = (0, 0); x + 0 = x.
+              calc GaussianInteger.coordinatesOfCoefficients(
+                       Polynomial.Coefficients.cons(Integer, a, restA))
+                 = Product.make(
+                       Product.first(GaussianInteger.coordinatesOfCoefficients(
+                           Polynomial.Coefficients.cons(Integer, a, restA))),
+                       Product.second(GaussianInteger.coordinatesOfCoefficients(
+                           Polynomial.Coefficients.cons(Integer, a, restA))))
+                     by GaussianInteger.product_eta(
+                            GaussianInteger.coordinatesOfCoefficients(
+                                Polynomial.Coefficients.cons(Integer, a, restA)))
+                 = Product.make(
+                       Product.first(GaussianInteger.coordinatesOfCoefficients(
+                           Polynomial.Coefficients.cons(Integer, a, restA))) + Integer.zero,
+                       Product.second(GaussianInteger.coordinatesOfCoefficients(
+                           Polynomial.Coefficients.cons(Integer, a, restA))) + Integer.zero)
+                     by Product.make_equal(Integer, Integer,
+                            Product.first(GaussianInteger.coordinatesOfCoefficients(
+                                Polynomial.Coefficients.cons(Integer, a, restA))),
+                            Product.first(GaussianInteger.coordinatesOfCoefficients(
+                                Polynomial.Coefficients.cons(Integer, a, restA))) + Integer.zero,
+                            Product.second(GaussianInteger.coordinatesOfCoefficients(
+                                Polynomial.Coefficients.cons(Integer, a, restA))),
+                            Product.second(GaussianInteger.coordinatesOfCoefficients(
+                                Polynomial.Coefficients.cons(Integer, a, restA))) + Integer.zero,
+                            ring, ring)
+          | Polynomial.Coefficients.cons(bb, restB) => {
+              claim ih
+                  : GaussianInteger.coordinatesOfCoefficients(
+                        Polynomial.Coefficients.add(Integer.ring_bundle, restA, restB))
+                    = Product.make(
+                          Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
+                              + Product.first(GaussianInteger.coordinatesOfCoefficients(restB)),
+                          Product.second(GaussianInteger.coordinatesOfCoefficients(restA))
+                              + Product.second(GaussianInteger.coordinatesOfCoefficients(restB)))
+                  by GaussianInteger.coordinatesOfCoefficients_add(restA, restB);
+              -- The goal LHS unfolds (add then coordinates on a cons) to
+              --   make((a+bb) − second(coords(add restA restB)), first(coords(add restA restB))).
+              Product.make_equal(Integer, Integer,
+                  (a + bb)
+                      - Product.second(GaussianInteger.coordinatesOfCoefficients(
+                            Polynomial.Coefficients.add(Integer.ring_bundle, restA, restB))),
+                  (a - Product.second(GaussianInteger.coordinatesOfCoefficients(restA)))
+                      + (bb - Product.second(GaussianInteger.coordinatesOfCoefficients(restB))),
+                  Product.first(GaussianInteger.coordinatesOfCoefficients(
+                      Polynomial.Coefficients.add(Integer.ring_bundle, restA, restB))),
+                  Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
+                      + Product.first(GaussianInteger.coordinatesOfCoefficients(restB)),
+                  calc (a + bb)
+                           - Product.second(GaussianInteger.coordinatesOfCoefficients(
+                                 Polynomial.Coefficients.add(Integer.ring_bundle, restA, restB)))
+                     = (a + bb)
+                           - (Product.second(GaussianInteger.coordinatesOfCoefficients(restA))
+                              + Product.second(GaussianInteger.coordinatesOfCoefficients(restB)))
+                           by congruenceOf(
+                                  (pair : Pair(Integer, Integer)) ↦ (a + bb) - Product.second(pair),
+                                  ih)
+                     = (a - Product.second(GaussianInteger.coordinatesOfCoefficients(restA)))
+                           + (bb - Product.second(GaussianInteger.coordinatesOfCoefficients(restB)))
+                           by ring,
+                  congruenceOf(
+                      (pair : Pair(Integer, Integer)) ↦ Product.first(pair),
+                      ih))
+            }
+        }
