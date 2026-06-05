@@ -2307,6 +2307,40 @@ private:
         const std::vector<ExpressionPointer>& tail,
         ExpressionPointer carrierType);
 
+    // Sign extraction (fingerprint plan Phase 2 follow-up): pull every
+    // `Ring.negate` out of a product to the monomial's head
+    // (`negate(a)·b → negate(a·b)`, `a·negate(b) → negate(a·b)`, via
+    // `Ring.negate_multiply_left/right`) and collapse the resulting double
+    // negations (`negate_negate`), so each monomial becomes `M` or
+    // `negate(M)` with `M` negate-free. Lets inverse cancellation see
+    // `negate(a'·b)` against `a'·b`. Emits `e = extracted`. Run after
+    // ringDistribute, before ringSimplifyIdentities. Gated on its laws.
+    ACNormResult ringExtractSigns(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line);
+
+    // Combine the signs of `X · Y` where each of X, Y is `M` or
+    // `negate(M)`: returns the product with the net sign at the head and the
+    // proof `X · Y = result`.
+    ACNormResult ringCombineProductSigns(
+        ExpressionPointer X,
+        ExpressionPointer Y,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line);
+
+    // `negate(R)` with double-negation collapsed: if `R = negate(z)` returns
+    // {z, negate_negate proof}, else {negate(R), reflexivity}.
+    ACNormResult ringApplyNegate(
+        ExpressionPointer R,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel);
+
     // Identity elimination (fingerprint plan Phase 2, increment 2b): rewrite
     // `e` bottom-up dropping additive `0` (`x+0`,`0+x`), multiplicative `1`
     // (`x·1`,`1·x`), annihilating `0`-products (`x·0`,`0·x`), and `-0`.

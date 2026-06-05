@@ -1655,6 +1655,161 @@ Elaborator::ACNormResult Elaborator::ringPushNegation(
             e, buildReflexivity(carrierLevel, carrierType, e)};
     }
 
+Elaborator::ACNormResult Elaborator::ringApplyNegate(
+        ExpressionPointer R,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel) {
+        ExpressionPointer z;
+        if (matchUnaryRingNegate(R, "Ring.negate", z)
+            && environment_.lookup("Ring.negate_negate")) {
+            // negate(negate(z)) = z.
+            ExpressionPointer nn =
+                makeApplication(ringConst("Ring.negate_negate"), z);
+            return ACNormResult{z, nn};
+        }
+        ExpressionPointer negR =
+            makeApplication(ringConst("Ring.negate"), R);
+        return ACNormResult{
+            negR, buildReflexivity(carrierLevel, carrierType, negR)};
+    }
+
+Elaborator::ACNormResult Elaborator::ringCombineProductSigns(
+        ExpressionPointer X,
+        ExpressionPointer Y,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        auto negCongruence = [&](ExpressionPointer from, ExpressionPointer to,
+                                 ExpressionPointer p) -> ExpressionPointer {
+            ExpressionPointer body = makeApplication(
+                ringConst("Ring.negate"), makeBoundVariable(0));
+            ExpressionPointer lambda =
+                makeLambda("_sign_z", carrierType, body);
+            return buildEqualityCongruenceSameCarrier(
+                carrierLevel, carrierType, lambda, from, to, p);
+        };
+        ExpressionPointer Xi;
+        if (matchUnaryRingNegate(X, "Ring.negate", Xi)
+            && environment_.lookup("Ring.negate_multiply_left")) {
+            // mul(negate(Xi), Y) = negate(mul(Xi, Y)).
+            ExpressionPointer law = ringConst("Ring.negate_multiply_left");
+            law = makeApplication(makeApplication(law, Xi), Y);
+            ACNormResult inner = ringCombineProductSigns(
+                Xi, Y, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer mulXiY = buildRingOp(mulAxioms.op, Xi, Y);
+            ExpressionPointer negMulXiY =
+                makeApplication(ringConst("Ring.negate"), mulXiY);
+            ExpressionPointer negInner =
+                makeApplication(ringConst("Ring.negate"), inner.canonical);
+            ExpressionPointer negCong =
+                negCongruence(mulXiY, inner.canonical, inner.proof);
+            ACNormResult coll = ringApplyNegate(
+                inner.canonical, carrierType, carrierLevel);
+            ExpressionPointer mulXY = buildRingOp(mulAxioms.op, X, Y);
+            ExpressionPointer tail = buildEqualityTransitivity(
+                carrierLevel, carrierType, negMulXiY, negInner,
+                coll.canonical, negCong, coll.proof);
+            ExpressionPointer proof = buildEqualityTransitivity(
+                carrierLevel, carrierType, mulXY, negMulXiY, coll.canonical,
+                law, tail);
+            return ACNormResult{coll.canonical, proof};
+        }
+        ExpressionPointer Yi;
+        if (matchUnaryRingNegate(Y, "Ring.negate", Yi)
+            && environment_.lookup("Ring.negate_multiply_right")) {
+            // mul(X, negate(Yi)) = negate(mul(X, Yi)).  (X is negate-free.)
+            ExpressionPointer law = ringConst("Ring.negate_multiply_right");
+            law = makeApplication(makeApplication(law, X), Yi);
+            ACNormResult inner = ringCombineProductSigns(
+                X, Yi, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer mulXYi = buildRingOp(mulAxioms.op, X, Yi);
+            ExpressionPointer negMulXYi =
+                makeApplication(ringConst("Ring.negate"), mulXYi);
+            ExpressionPointer negInner =
+                makeApplication(ringConst("Ring.negate"), inner.canonical);
+            ExpressionPointer negCong =
+                negCongruence(mulXYi, inner.canonical, inner.proof);
+            ACNormResult coll = ringApplyNegate(
+                inner.canonical, carrierType, carrierLevel);
+            ExpressionPointer mulXY = buildRingOp(mulAxioms.op, X, Y);
+            ExpressionPointer tail = buildEqualityTransitivity(
+                carrierLevel, carrierType, negMulXYi, negInner,
+                coll.canonical, negCong, coll.proof);
+            ExpressionPointer proof = buildEqualityTransitivity(
+                carrierLevel, carrierType, mulXY, negMulXYi, coll.canonical,
+                law, tail);
+            return ACNormResult{coll.canonical, proof};
+        }
+        // Both negate-free: a clean product.
+        ExpressionPointer mulXY = buildRingOp(mulAxioms.op, X, Y);
+        return ACNormResult{
+            mulXY, buildReflexivity(carrierLevel, carrierType, mulXY)};
+    }
+
+Elaborator::ACNormResult Elaborator::ringExtractSigns(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        const RingAxiomNames& mulAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        ExpressionPointer A, B;
+        if (matchBinaryRingOp(e, addAxioms.op, A, B)) {
+            ACNormResult ra = ringExtractSigns(
+                A, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ACNormResult rb = ringExtractSigns(
+                B, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer rebuilt =
+                buildRingOp(addAxioms.op, ra.canonical, rb.canonical);
+            ExpressionPointer proof = buildBinaryOpCongruence(
+                addAxioms.op, A, ra.canonical, ra.proof,
+                B, rb.canonical, rb.proof, carrierType, carrierLevel);
+            return ACNormResult{rebuilt, proof};
+        }
+        if (!mulAxioms.op.empty() && matchBinaryRingOp(e, mulAxioms.op, A, B)) {
+            ACNormResult ra = ringExtractSigns(
+                A, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ACNormResult rb = ringExtractSigns(
+                B, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer congr = buildBinaryOpCongruence(
+                mulAxioms.op, A, ra.canonical, ra.proof,
+                B, rb.canonical, rb.proof, carrierType, carrierLevel);
+            ACNormResult comb = ringCombineProductSigns(
+                ra.canonical, rb.canonical, mulAxioms, carrierType,
+                carrierLevel, line);
+            ExpressionPointer mulAB2 =
+                buildRingOp(mulAxioms.op, ra.canonical, rb.canonical);
+            ExpressionPointer mulAB = buildRingOp(mulAxioms.op, A, B);
+            ExpressionPointer proof = buildEqualityTransitivity(
+                carrierLevel, carrierType, mulAB, mulAB2, comb.canonical,
+                congr, comb.proof);
+            return ACNormResult{comb.canonical, proof};
+        }
+        ExpressionPointer inner;
+        if (matchUnaryRingNegate(e, "Ring.negate", inner)) {
+            ACNormResult ri = ringExtractSigns(
+                inner, addAxioms, mulAxioms, carrierType, carrierLevel, line);
+            ExpressionPointer body = makeApplication(
+                ringConst("Ring.negate"), makeBoundVariable(0));
+            ExpressionPointer lambda =
+                makeLambda("_sign_z", carrierType, body);
+            ExpressionPointer congr = buildEqualityCongruenceSameCarrier(
+                carrierLevel, carrierType, lambda, inner, ri.canonical,
+                ri.proof);
+            ExpressionPointer negInnerP =
+                makeApplication(ringConst("Ring.negate"), ri.canonical);
+            ACNormResult coll = ringApplyNegate(
+                ri.canonical, carrierType, carrierLevel);
+            ExpressionPointer proof = buildEqualityTransitivity(
+                carrierLevel, carrierType, e, negInnerP, coll.canonical,
+                congr, coll.proof);
+            return ACNormResult{coll.canonical, proof};
+        }
+        return ACNormResult{
+            e, buildReflexivity(carrierLevel, carrierType, e)};
+    }
+
 Elaborator::ACNormResult Elaborator::ringSimplifyIdentities(
         ExpressionPointer e,
         const RingAxiomNames& addAxioms,
@@ -1883,6 +2038,12 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
         const bool canDistribute = !mulAxioms.op.empty()
             && environment_.lookup("Ring.distributivity_left") != nullptr
             && environment_.lookup("Ring.distributivity_right") != nullptr;
+        // Sign extraction needs the negate-multiply laws (+ negate_negate
+        // for collapsing); off ⇒ negations stay inside monomials.
+        const bool canExtractSigns = !mulAxioms.op.empty()
+            && environment_.lookup("Ring.negate_multiply_left") != nullptr
+            && environment_.lookup("Ring.negate_multiply_right") != nullptr
+            && environment_.lookup("Ring.negate_negate") != nullptr;
         try {
             // Fully normalise, chaining each stage's proof:
             //   distribute (products of sums → sums of products)
@@ -1906,6 +2067,12 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
                     carrierOpened, carrierLevel, line));
                 if (canDistribute) {
                     chain(ringDistribute(cur, addAxioms, mulAxioms,
+                        carrierOpened, carrierLevel, line));
+                }
+                // Pull negation out of products to the monomial head, so a
+                // sign can later cancel (negate(a)·b → negate(a·b)).
+                if (canExtractSigns) {
+                    chain(ringExtractSigns(cur, addAxioms, mulAxioms,
                         carrierOpened, carrierLevel, line));
                 }
                 chain(ringSimplifyIdentities(cur, addAxioms, mulAxioms,
