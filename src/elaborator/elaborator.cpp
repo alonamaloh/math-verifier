@@ -1,4 +1,4 @@
-#include "elaborator_internal.hpp"
+#include "elaborator/internal.hpp"
 
 ExpressionPointer elaborateExpression(const SurfaceExpression& expression,
                                        const Environment& environment) {

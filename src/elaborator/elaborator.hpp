@@ -1,10 +1,10 @@
 #pragma once
 
-#include "expression.hpp"
-#include "kernel.hpp"
-#include "lemma_search.hpp"
-#include "level.hpp"
-#include "surface.hpp"
+#include "kernel/expression.hpp"
+#include "kernel/kernel.hpp"
+#include "elaborator/lemma_search.hpp"
+#include "kernel/level.hpp"
+#include "syntax/surface.hpp"
 
 #include <functional>
 #include <stdexcept>

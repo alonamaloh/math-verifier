@@ -1,6 +1,6 @@
 #pragma once
 
-#include "expression.hpp"
+#include "kernel/expression.hpp"
 
 #include <cstdint>
 #include <map>

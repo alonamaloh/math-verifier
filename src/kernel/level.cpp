@@ -1,5 +1,5 @@
-#include "level.hpp"
-#include "subtree_hash.hpp"
+#include "kernel/level.hpp"
+#include "kernel/subtree_hash.hpp"
 
 #include <algorithm>
 #include <sstream>

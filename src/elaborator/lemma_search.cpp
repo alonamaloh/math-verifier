@@ -1,6 +1,6 @@
-#include "lemma_search.hpp"
+#include "elaborator/lemma_search.hpp"
 
-#include "printer.hpp"
+#include "kernel/printer.hpp"
 
 #include <algorithm>
 #include <map>

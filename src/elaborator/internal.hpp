@@ -14,11 +14,11 @@
 // NOT in an anonymous namespace: the class needs external linkage so its
 // methods can be defined in different .cpp files and linked together.
 
-#include "elaborator.hpp"
-#include "elaborator_term_utilities.hpp"  // LocalBinder + pure term helpers
-#include "lemma_search.hpp"
-#include "printer.hpp"
-#include "subtree_hash.hpp"
+#include "elaborator/elaborator.hpp"
+#include "elaborator/term_utilities.hpp"  // LocalBinder + pure term helpers
+#include "elaborator/lemma_search.hpp"
+#include "kernel/printer.hpp"
+#include "kernel/subtree_hash.hpp"
 
 #include <chrono>
 #include <cstdlib>

@@ -1,5 +1,5 @@
-#include "kernel.hpp"
-#include "printer.hpp"
+#include "kernel/kernel.hpp"
+#include "kernel/printer.hpp"
 
 #include <algorithm>
 #include <cstdio>

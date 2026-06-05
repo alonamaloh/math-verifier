@@ -4,7 +4,7 @@
 // declared in the header; each elaborator_*.cpp defines a topical slice of
 // its methods as `Elaborator::method(...)`.
 
-#include "elaborator_internal.hpp"
+#include "elaborator/internal.hpp"
 
 LevelPointer Elaborator::elaborateLevel(const SurfaceLevel& level) {
     if (auto* numeric = std::get_if<SurfaceLevelNumeric>(&level.node)) {

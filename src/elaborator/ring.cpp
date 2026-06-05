@@ -7,7 +7,7 @@
 // (`field`), the `linear_combination` tactic, and their shared polynomial /
 // proof-term machinery.
 
-#include "elaborator_internal.hpp"
+#include "elaborator/internal.hpp"
 
 // ---- Numerical fast-fail fingerprints (GF(2^64 - 59)) --------------------
 //

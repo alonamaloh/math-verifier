@@ -1,7 +1,7 @@
 #pragma once
 
-#include "lexer.hpp"
-#include "surface.hpp"
+#include "syntax/lexer.hpp"
+#include "syntax/surface.hpp"
 
 #include <stdexcept>
 #include <vector>

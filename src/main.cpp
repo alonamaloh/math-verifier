@@ -1,13 +1,13 @@
-#include "elaborator.hpp"
-#include "expression.hpp"
-#include "hash.hpp"
-#include "kernel.hpp"
-#include "lemma_search.hpp"
-#include "lexer.hpp"
-#include "parser.hpp"
-#include "printer.hpp"
-#include "serialize.hpp"
-#include "surface.hpp"
+#include "elaborator/elaborator.hpp"
+#include "kernel/expression.hpp"
+#include "kernel/hash.hpp"
+#include "kernel/kernel.hpp"
+#include "elaborator/lemma_search.hpp"
+#include "syntax/lexer.hpp"
+#include "syntax/parser.hpp"
+#include "kernel/printer.hpp"
+#include "kernel/serialize.hpp"
+#include "syntax/surface.hpp"
 
 #include <cstdlib>
 #include <filesystem>

@@ -12,9 +12,9 @@
 // unchanged — the unqualified calls bind to these once the (identically
 // signed) members were removed.
 
-#include "expression.hpp"
-#include "kernel.hpp"
-#include "level.hpp"
+#include "kernel/expression.hpp"
+#include "kernel/kernel.hpp"
+#include "kernel/level.hpp"
 
 #include <cstdint>
 #include <map>

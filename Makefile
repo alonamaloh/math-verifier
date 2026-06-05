@@ -1,6 +1,23 @@
 CXX = clang++
-CXXFLAGS = -std=c++20 -Wall -Wextra -Werror -O3 -g
-OBJS = level.o kernel.o printer.o lexer.o parser.o elaborator.o elaborator_levels.o elaborator_ring.o elaborator_term_utilities.o hash.o serialize.o lemma_search.o main.o
+CXXFLAGS = -std=c++20 -Wall -Wextra -Werror -O3 -g -Isrc -MMD -MP
+
+OBJDIR := build/obj
+
+# C++ sources, grouped by tier (kernel <- syntax <- elaborator). Object
+# files mirror the source tree under build/obj/; header dependencies are
+# tracked automatically via the compiler's -MMD -MP output (the .d files
+# -included at the bottom of the build section), so there is no
+# hand-maintained header list to drift.
+SRCS := \
+    src/kernel/level.cpp src/kernel/kernel.cpp src/kernel/printer.cpp \
+    src/kernel/serialize.cpp src/kernel/hash.cpp \
+    src/syntax/lexer.cpp src/syntax/parser.cpp \
+    src/elaborator/elaborator.cpp src/elaborator/levels.cpp \
+    src/elaborator/ring.cpp src/elaborator/term_utilities.cpp \
+    src/elaborator/lemma_search.cpp \
+    src/main.cpp
+
+OBJS := $(patsubst src/%.cpp,$(OBJDIR)/%.o,$(SRCS))
 
 # mimalloc — small-object allocator that's faster than the system
 # malloc on node-heavy workloads (substitute/makeApplication create
@@ -17,49 +34,14 @@ endif
 kernel: $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS_MIMALLOC)
 
-level.o: level.cpp level.hpp
+$(OBJDIR)/%.o: src/%.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-kernel.o: kernel.cpp kernel.hpp expression.hpp level.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-printer.o: printer.cpp printer.hpp expression.hpp level.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-lexer.o: lexer.cpp lexer.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-parser.o: parser.cpp parser.hpp surface.hpp lexer.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-ELABORATOR_HDRS = elaborator_internal.hpp elaborator.hpp surface.hpp kernel.hpp expression.hpp level.hpp lemma_search.hpp printer.hpp subtree_hash.hpp
-
-elaborator.o: elaborator.cpp $(ELABORATOR_HDRS)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-elaborator_levels.o: elaborator_levels.cpp $(ELABORATOR_HDRS)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-elaborator_ring.o: elaborator_ring.cpp $(ELABORATOR_HDRS)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-elaborator_term_utilities.o: elaborator_term_utilities.cpp elaborator_term_utilities.hpp expression.hpp kernel.hpp level.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-hash.o: hash.cpp hash.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-serialize.o: serialize.cpp serialize.hpp expression.hpp kernel.hpp level.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-lemma_search.o: lemma_search.cpp lemma_search.hpp expression.hpp kernel.hpp level.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-main.o: main.cpp expression.hpp kernel.hpp printer.hpp level.hpp lexer.hpp surface.hpp parser.hpp elaborator.hpp hash.hpp serialize.hpp lemma_search.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+-include $(OBJS:.o=.d)
 
 clean:
-	rm -f kernel $(OBJS)
+	rm -rf $(OBJDIR) kernel
 
 .PHONY: clean
 
@@ -69,14 +51,14 @@ clean:
 # "can't find <header>" / c++20-syntax diagnostics. We strip -Werror
 # from CXXFLAGS so clangd reports rather than hard-errors. Regenerate
 # after adding/removing a .cpp.
-CDB_FLAGS := $(filter-out -Werror,$(CXXFLAGS))
+CDB_FLAGS := $(filter-out -Werror -MMD -MP,$(CXXFLAGS))
 
 compile_commands.json:
 	@printf '[\n' > $@
-	@first=1; for f in $(OBJS:.o=.cpp); do \
+	@first=1; for f in $(SRCS); do \
 		if [ $$first -eq 0 ]; then printf ',\n' >> $@; fi; first=0; \
-		printf '  { "directory": "%s", "file": "%s", "command": "%s -c %s -o %s" }' \
-			"$(CURDIR)" "$$f" "$(CXX) $(CDB_FLAGS)" "$$f" "$${f%.cpp}.o" >> $@; \
+		printf '  { "directory": "%s", "file": "%s", "command": "%s -c %s" }' \
+			"$(CURDIR)" "$$f" "$(CXX) $(CDB_FLAGS)" "$$f" >> $@; \
 	done
 	@printf '\n]\n' >> $@
 	@echo "wrote $@"

@@ -1,4 +1,4 @@
-#include "hash.hpp"
+#include "kernel/hash.hpp"
 
 uint64_t fnv1aHash(std::string_view bytes) {
     // FNV-1a 64-bit offset basis and prime.

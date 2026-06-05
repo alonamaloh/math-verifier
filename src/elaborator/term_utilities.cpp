@@ -1,5 +1,5 @@
 // Definitions of the pure term-surgery utilities declared in the header.
-#include "elaborator_term_utilities.hpp"
+#include "elaborator/term_utilities.hpp"
 
 ExpressionPointer abstractOverBoundVariables(
     ExpressionPointer expression,

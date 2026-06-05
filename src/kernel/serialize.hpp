@@ -1,8 +1,8 @@
 #pragma once
 
-#include "expression.hpp"
-#include "kernel.hpp"
-#include "level.hpp"
+#include "kernel/expression.hpp"
+#include "kernel/kernel.hpp"
+#include "kernel/level.hpp"
 
 #include <cstdint>
 #include <stdexcept>

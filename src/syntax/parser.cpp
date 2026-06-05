@@ -1,4 +1,4 @@
-#include "parser.hpp"
+#include "syntax/parser.hpp"
 
 #include <optional>
 #include <string>

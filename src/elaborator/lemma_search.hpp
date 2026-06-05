@@ -8,8 +8,8 @@
 // error messages (elaborator.cpp), so both deliver the same ranked
 // candidates from one implementation.
 
-#include "expression.hpp"
-#include "kernel.hpp"
+#include "kernel/expression.hpp"
+#include "kernel/kernel.hpp"
 
 #include <map>
 #include <set>
