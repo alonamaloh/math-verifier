@@ -153,52 +153,35 @@ theorem NaturalsBelow.product_round_trip_left (m n : Natural) (oneLeN : successo
         : NaturalsBelow.product_out_of(m, n, oneLeN, NaturalsBelow.product_into(m, n, oneLeN, p)) = p :=
   cases p {
     | Product.make(first, second) => {
-        claim decompose
-            : n * Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second))
-                  + Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second))
-              = n * NaturalsBelow.value(first) + NaturalsBelow.value(second)
-            by Natural.divide_modulo_decompose(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second));
-        claim quotientIsFirst
-            : Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second))
-              = NaturalsBelow.value(first)
+        -- Abbreviate the single index n·i + j and the bound it carries.
+        let index : Natural := n * NaturalsBelow.value(first) + NaturalsBelow.value(second);
+        let indexBound : successor(index) ≤ m * n :=
+            NaturalsBelow.product_index_bound(m, n,
+                NaturalsBelow.value(first), NaturalsBelow.value(second),
+                NaturalsBelow.below(first), NaturalsBelow.below(second));
+        -- Dividing the index by n recovers quotient i and remainder j.
+        claim decompose : n * Natural.divide(n, index) + Natural.modulo(n, index) = index
+            by Natural.divide_modulo_decompose(n, index);
+        claim quotientIsFirst : Natural.divide(n, index) = NaturalsBelow.value(first)
             by Natural.quotient_remainder_unique(n,
-                   Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
-                   Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
+                   Natural.divide(n, index), Natural.modulo(n, index),
                    NaturalsBelow.value(first), NaturalsBelow.value(second),
-                   Natural.modulo_bound(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN),
-                   NaturalsBelow.below(second), decompose);
-        claim remainderIsSecond
-            : Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second))
-              = NaturalsBelow.value(second)
+                   Natural.modulo_bound(n, index, oneLeN), NaturalsBelow.below(second), decompose);
+        claim remainderIsSecond : Natural.modulo(n, index) = NaturalsBelow.value(second)
             by Natural.remainder_unique(n,
-                   Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
-                   Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
+                   Natural.divide(n, index), Natural.modulo(n, index),
                    NaturalsBelow.value(first), NaturalsBelow.value(second),
-                   Natural.modulo_bound(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN),
-                   NaturalsBelow.below(second), decompose);
+                   Natural.modulo_bound(n, index, oneLeN), NaturalsBelow.below(second), decompose);
+        -- So the recovered cell ⟨divide(n,index), modulo(n,index)⟩ is ⟨first, second⟩.
+        let recoveredFirst : NaturalsBelow(m) :=
+            NaturalsBelow.make(Natural.divide(n, index),
+                NaturalsBelow.product_quotient_bound(m, n, index, oneLeN, indexBound));
+        let recoveredSecond : NaturalsBelow(n) :=
+            NaturalsBelow.make(Natural.modulo(n, index), Natural.modulo_bound(n, index, oneLeN));
         Product.make_equal(NaturalsBelow(m), NaturalsBelow(n),
-            NaturalsBelow.make(Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
-                NaturalsBelow.product_quotient_bound(m, n,
-                    n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN,
-                    NaturalsBelow.product_index_bound(m, n,
-                        NaturalsBelow.value(first), NaturalsBelow.value(second),
-                        NaturalsBelow.below(first), NaturalsBelow.below(second)))),
-            first,
-            NaturalsBelow.make(Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
-                Natural.modulo_bound(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN)),
-            second,
-            NaturalsBelow.equal_of_value(m,
-                NaturalsBelow.make(Natural.divide(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
-                    NaturalsBelow.product_quotient_bound(m, n,
-                        n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN,
-                        NaturalsBelow.product_index_bound(m, n,
-                            NaturalsBelow.value(first), NaturalsBelow.value(second),
-                            NaturalsBelow.below(first), NaturalsBelow.below(second)))),
-                first, quotientIsFirst),
-            NaturalsBelow.equal_of_value(n,
-                NaturalsBelow.make(Natural.modulo(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second)),
-                    Natural.modulo_bound(n, n * NaturalsBelow.value(first) + NaturalsBelow.value(second), oneLeN)),
-                second, remainderIsSecond))
+            recoveredFirst, first, recoveredSecond, second,
+            NaturalsBelow.equal_of_value(m, recoveredFirst, first, quotientIsFirst),
+            NaturalsBelow.equal_of_value(n, recoveredSecond, second, remainderIsSecond))
       }
   }
 
