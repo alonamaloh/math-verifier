@@ -28,14 +28,13 @@ import Algebra.ring
 import Algebra.ring_bundle
 import Algebra.ring_lemmas
 import Algebra.ring_divisibility
+import Algebra.ideal
 import Algebra.commutative_ring_bundle
 import Algebra.integral_domain
 import Algebra.principal_ideal_domain
 
 -- ----------------------------------------------------------------------
--- Two ring/ideal helpers.
-
--- (a + r) − a = r.
+-- A ring helper for the principality argument: (a + r) − a = r.
 theorem Ring.add_subtract_self_left (s : Ring) (a r : Ring.carrier(s))
         : (a + r) - a = r :=
   calc (a + r) - a
@@ -44,37 +43,6 @@ theorem Ring.add_subtract_self_left (s : Ring) (a r : Ring.carrier(s))
      = r + Ring.zero(s)
            by Ring.add_negate_right(s, a)
      = r
-
--- An ideal is closed under negation: −y = (−1)·y, and ideals absorb
--- multiplication.
-theorem Ring.ideal_member_negate (s : Ring)
-        (member : Ring.carrier(s) → Proposition)
-        (isIdeal : Ring.IsIdeal(s, member))
-        (y : Ring.carrier(s)) (memberY : member(y))
-        : member(-y) := {
-  let ⟨_, _, absorbsMultiplication⟩ := isIdeal;
-  claim negationIsScaling
-      : (-Ring.one(s)) * y = -y
-      by calc (-Ring.one(s)) * y
-            = -(Ring.one(s) * y)
-                  by Ring.multiply_negate_left(Ring.carrier(s), Ring.add,
-                         Ring.zero(s), Ring.negate, Ring.multiply, Ring.one(s),
-                         Ring.is_ring(s), Ring.one(s), y)
-            = -y;
-  rewrite(negationIsScaling,
-      absorbsMultiplication(-Ring.one(s), y, memberY))
-}
-
--- An ideal is closed under subtraction.
-theorem Ring.ideal_member_subtract (s : Ring)
-        (member : Ring.carrier(s) → Proposition)
-        (isIdeal : Ring.IsIdeal(s, member))
-        (x y : Ring.carrier(s)) (memberX : member(x)) (memberY : member(y))
-        : member(x - y) := {
-  let ⟨_, closedUnderAddition, _⟩ := isIdeal;
-  closedUnderAddition(x, -y, memberX,
-      Ring.ideal_member_negate(s, member, isIdeal, y, memberY))
-}
 
 -- ----------------------------------------------------------------------
 -- Euclidean division and the bundle.
