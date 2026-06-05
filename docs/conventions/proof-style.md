@@ -229,6 +229,19 @@ reach for the math-like form instead:
   one-step `calc B = A by <proofOfAeqB>` rather than calling
   `Equality.symmetry`.
 
+- **`claim NAME : a = c by calc a = … = c` is ceremony** — the calc's
+  endpoints already *are* `a = c`, so the `claim NAME : <type> by` wrapper
+  just restates it. Bind the calc's result directly:
+  ```
+  -- NOT: claim quotientLeK : n * q ≤ k by calc n * q ≤ n * q + r = k;
+  calc n * q ≤ n * q + r = k   as quotientLeK;
+  ```
+  Use `calc … as NAME;` when the result is referenced later by name, and a
+  bare `calc …;` when it's only consumed by type-match (see calc-and-
+  rewrite.md, "`calc … as NAME;` and bare `calc …;` at statement position").
+  And when the calc *is* the whole proof, it is the proof — write `:= calc
+  …` / return the `calc`, never `claim <goal> by calc …`.
+
 - **`Equality.transport_proposition(…)` to move a fact along an
   equation** — use a `calc` step or `by substituting <eq>` instead.
 
