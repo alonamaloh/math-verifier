@@ -653,6 +653,29 @@ ExpressionPointer Elaborator::elaborateRing(
         EqualityComponents goal =
             extractEqualityComponents(expectedType, "ring", line);
         std::string carrierName = headConstantName(goal.carrierType);
+        // Abstract plain-`Ring.carrier(s)` carrier (fingerprint plan Phase
+        // 2). The registered-carrier normaliser below needs multiplicative
+        // commutativity (which a general `Ring` lacks) and keys its
+        // fingerprint on `<carrier>.add/.multiply` names that don't exist
+        // for this projection — so it would wrongly declare the goal false.
+        // Route to the non-commutative AC normaliser, which proves the
+        // associativity/`+`-commutativity rearrangements that hold in EVERY
+        // ring. (Distributivity and `·`-commutativity still need a
+        // CommutativeRing carrier or an explicit proof.)
+        if (carrierName == "Ring.carrier") {
+            ExpressionPointer proof = proveAbstractRingAC(
+                localBinders, goal.leftEndpoint, goal.rightEndpoint,
+                goal.carrierType, goal.carrierUniverseLevel, line);
+            if (proof) return proof;
+            throwElaborate(
+                "`ring` over an abstract `Ring.carrier(s)` closes only "
+                "associativity / `+`-commutativity rearrangements (a general "
+                "ring has no `·`-commutativity, and `ring` cannot see a "
+                "runtime commutativity fact). This goal is not such a "
+                "rearrangement — use a `CommutativeRing.carrier` carrier for "
+                "full commutative-ring power, or cite the ring laws "
+                "explicitly.");
+        }
         // How operations/laws are named for this carrier, and the leading
         // structure argument they carry (`[s]` for a bundled-ring carrier
         // `Ring.carrier(s)`, empty for a concrete carrier). Installed for
@@ -1334,12 +1357,22 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
         // `·` is associative-only over a general ring; no commutative axiom.
         RingAxiomNames mulAxioms{
             "Ring.multiply", "Ring.multiply_associative", ""};
-        // The bundle axioms must be in scope (small test modules may not
+        // The additive AC axioms are the minimum (they drive every reduction
+        // here). Bail if they aren't in scope (small test modules may not
         // import Algebra/ring_bundle).
         for (const std::string& name :
-                {addAxioms.op, addAxioms.associative, addAxioms.commutative,
-                 mulAxioms.op, mulAxioms.associative}) {
+                {addAxioms.op, addAxioms.associative, addAxioms.commutative}) {
             if (environment_.lookup(name) == nullptr) return nullptr;
+        }
+        // Multiplicative reassociation is OPTIONAL: when `Ring.multiply` or
+        // its associativity law isn't yet in scope (e.g. a lemma proved
+        // mid-bootstrap, before `Ring.multiply_associative` is declared),
+        // disable the `·` level by clearing its operator name — `·`-products
+        // are then treated as opaque atoms (still sound; just no internal
+        // reassociation). Empty op never matches a real constant head.
+        if (environment_.lookup(mulAxioms.op) == nullptr
+            || environment_.lookup(mulAxioms.associative) == nullptr) {
+            mulAxioms.op.clear();
         }
         RingStructurePrefixGuard prefixGuard(*this, {structureArg});
         ExpressionPointer leftOpened =
