@@ -1,0 +1,67 @@
+-- Natural/compare.math
+--
+-- A Type-valued strict comparison. `Natural.decide` already decides `≤`,
+-- but it lands in the Proposition-level `Or`, which CIC forbids from
+-- driving a Type-valued construction (no large elimination out of Prop).
+-- When we need the comparison to *build data* — most importantly the
+-- inverse of a counting bijection, which must send each k either into the
+-- left block (k < m) or the right block (m ≤ k) — we need a Type-valued
+-- answer. `Sum` won't serve: its components must be Types, but ours are
+-- the Propositions `k < m` and `m ≤ k`. So we use a small inductive that
+-- *lives* in Type (hence eliminates into Type) yet *carries* the
+-- Proposition-valued evidence.
+
+module Natural.compare
+
+import Natural.basics
+import Natural.order
+
+-- The outcome of comparing k against m: either k is strictly below m, or
+-- m is at most k. The type lives in `Type(0)`, so a function may branch on
+-- it; each constructor carries the deciding inequality.
+inductive Natural.StrictComparison (k m : Natural) : Type(0) where
+  | Natural.StrictComparison.below   : successor(k) ≤ m → Natural.StrictComparison(k, m)
+  | Natural.StrictComparison.atLeast : m ≤ k → Natural.StrictComparison(k, m)
+
+-- Base row: compare 0 against m. `1 ≤ m` when m is a successor, `m ≤ 0`
+-- when m is zero.
+definition Natural.compare_strict_zero_against
+        : (m : Natural) → Natural.StrictComparison(0, m)
+  | zero =>
+      Natural.StrictComparison.atLeast(0, 0, LessOrEqual.reflexivity(0))
+  | successor(predecessorM) =>
+      Natural.StrictComparison.below(0, successor(predecessorM),
+          Natural.successor_positive(predecessorM))
+
+-- Inductive row: compare successor(predecessorK) against m, given the
+-- comparison of predecessorK against every m. Zero is below every
+-- successor; otherwise peel one successor off each side and recurse.
+definition Natural.compare_strict_successor_against
+        (predecessorK : Natural)
+        (comparePredecessor
+            : (m : Natural) → Natural.StrictComparison(predecessorK, m))
+        : (m : Natural) → Natural.StrictComparison(successor(predecessorK), m)
+  | zero =>
+      Natural.StrictComparison.atLeast(successor(predecessorK), 0,
+          Natural.zero_least(successor(predecessorK)))
+  | successor(predecessorM) =>
+      cases comparePredecessor(predecessorM) {
+        | Natural.StrictComparison.below(strictlyBelow) =>
+            Natural.StrictComparison.below(successor(predecessorK), successor(predecessorM),
+                Natural.successor_less_or_equal_successor(
+                    successor(predecessorK), predecessorM, strictlyBelow))
+        | Natural.StrictComparison.atLeast(atLeast) =>
+            Natural.StrictComparison.atLeast(successor(predecessorK), successor(predecessorM),
+                Natural.successor_less_or_equal_successor(
+                    predecessorM, predecessorK, atLeast))
+      }
+
+-- `compare_strict(k, m)` : either `k < m` (as `successor(k) ≤ m`) or
+-- `m ≤ k`, delivered as data a function can branch on.
+definition Natural.compare_strict
+        : (k m : Natural) → Natural.StrictComparison(k, m)
+  | zero, m =>
+      Natural.compare_strict_zero_against(m)
+  | successor(predecessorK), m =>
+      Natural.compare_strict_successor_against(
+          predecessorK, Natural.compare_strict(predecessorK), m)
