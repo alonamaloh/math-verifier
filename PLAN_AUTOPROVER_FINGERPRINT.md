@@ -1,9 +1,25 @@
 # PLAN: Fingerprint-guided auto-prover (kill the blind ring searches)
 
-Status: design agreed, not yet implemented. Picks up from a session that
-diagnosed why a handful of by-less proof steps cost the auto-prover up to
-~956,000 kernel reduction steps each. This document is self-contained; read
-it cold and start at Phase 0.
+Status: **Phase 0 + Phase 1 headline DONE** (committed 2026-06-05). Phase 0
+safety net (effort budget + expensive-step warning) is committed. Phase 1's
+core win is committed: `proveAbstractRingAC` (`ring.cpp`) normalises +/·
+rearrangements over an abstract `Ring.carrier(s)` and closes them directly,
+**eliminating the 955,691-step worst case** (`principal_ideal_domain:153`).
+It is wired additively into `tryAcRearrangement` (before `elaborateRing`), so
+a non-match leaves the existing battery untouched. Approach taken vs. plan:
+used **exact AC normal-form comparison** (`structurallyEqual` on the canonical
+forms) rather than a hashed uint128 color — more precise, and the color is
+only a perf optimisation for scale (not yet needed). The recursive-search
+**gating** (§3.5b, Phase 1 step 5) was deliberately NOT done: the additive
+route removed the headline thrash without the regression risk gating carries.
+Remaining warn sites (9) are over concrete numeric carriers — hidden-
+computation steps that want an explicit `by`, not AC rearrangements. NEXT:
+Phase 2 (extend `ring`/`field` to abstract commutative rings; overlaps the
+new normaliser — decide whether to unify) or address the 9 sites with `by`.
+
+Picks up from a session that diagnosed why a handful of by-less proof steps
+cost the auto-prover up to ~956,000 kernel reduction steps each. This
+document is self-contained; read it cold and start at Phase 0.
 
 Related code: `src/elaborator/{prover,calc,ring,diff_bridges,internal}.cpp/.hpp`,
 `src/kernel/kernel.cpp/.hpp`. Related memory: `kernel_quirks` #17/#18/#19.
