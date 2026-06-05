@@ -32,33 +32,33 @@ import Natural.multiply_bounds
 -- through its bijection; the two inverse laws follow componentwise.
 theorem Equinumerous.product_congruence (A A' B B' : Type(0))
         (firstSame : Equinumerous(A, A')) (secondSame : Equinumerous(B, B'))
-        : Equinumerous(Product.{0,0}(A, B), Product.{0,0}(A', B')) := {
+        : Equinumerous(Pair(A, B), Pair(A', B')) := {
   obtain ⟨forwardA, forwardATail⟩ from firstSame;
   obtain ⟨backwardA, inverseA⟩ from forwardATail;
   obtain ⟨forwardB, forwardBTail⟩ from secondSame;
   obtain ⟨backwardB, inverseB⟩ from forwardBTail;
   obtain ⟨leftA, rightA⟩ from inverseA;
   obtain ⟨leftB, rightB⟩ from inverseB;
-  ⟨(p : Product.{0,0}(A, B)) ↦
-       Product.make.{0,0}(A', B', forwardA(Product.first(p)), forwardB(Product.second(p))),
-   ⟨(p : Product.{0,0}(A', B')) ↦
-        Product.make.{0,0}(A, B, backwardA(Product.first(p)), backwardB(Product.second(p))),
+  ⟨(p : Pair(A, B)) ↦
+       Product.make(forwardA(Product.first(p)), forwardB(Product.second(p))),
+   ⟨(p : Pair(A', B')) ↦
+        Product.make(backwardA(Product.first(p)), backwardB(Product.second(p))),
     And.introduction(
-        (p : Product.{0,0}(A, B)) ↦
+        (p : Pair(A, B)) ↦
             -- backward(forward(make a b)) = make(backwardA(forwardA a), backwardB(forwardB b)) = make a b.
             cases p {
               | Product.make(a, b) =>
-                  calc Product.make.{0,0}(A, B, backwardA(forwardA(a)), backwardB(forwardB(b)))
-                     = Product.make.{0,0}(A, B, a, b)
+                  calc Product.make(backwardA(forwardA(a)), backwardB(forwardB(b)))
+                     = Product.make(a, b)
                           by Product.make_equal(A, B,
                                  backwardA(forwardA(a)), a, backwardB(forwardB(b)), b,
                                  leftA(a), leftB(b))
             },
-        (p : Product.{0,0}(A', B')) ↦
+        (p : Pair(A', B')) ↦
             cases p {
               | Product.make(a, b) =>
-                  calc Product.make.{0,0}(A', B', forwardA(backwardA(a)), forwardB(backwardB(b)))
-                     = Product.make.{0,0}(A', B', a, b)
+                  calc Product.make(forwardA(backwardA(a)), forwardB(backwardB(b)))
+                     = Product.make(a, b)
                           by Product.make_equal(A', B',
                                  forwardA(backwardA(a)), a, forwardB(backwardB(b)), b,
                                  rightA(a), rightB(b))
@@ -122,8 +122,8 @@ theorem NaturalsBelow.product_quotient_bound (m n k : Natural)
 
 -- Row-major: the cell (i, j) of an m-by-n grid maps to index n·i + j.
 definition NaturalsBelow.product_into (m n : Natural) (oneLeN : successor(0) ≤ n)
-        : Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n)) → NaturalsBelow(m * n) :=
-  (p : Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n))) ↦
+        : Pair(NaturalsBelow(m), NaturalsBelow(n)) → NaturalsBelow(m * n) :=
+  (p : Pair(NaturalsBelow(m), NaturalsBelow(n))) ↦
     NaturalsBelow.make(
         n * NaturalsBelow.value(Product.first(p)) + NaturalsBelow.value(Product.second(p)),
         NaturalsBelow.product_index_bound(m, n,
@@ -132,10 +132,9 @@ definition NaturalsBelow.product_into (m n : Natural) (oneLeN : successor(0) ≤
 
 -- The inverse: divide by n. The quotient is the row, the remainder the column.
 definition NaturalsBelow.product_out_of (m n : Natural) (oneLeN : successor(0) ≤ n)
-        : NaturalsBelow(m * n) → Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n)) :=
+        : NaturalsBelow(m * n) → Pair(NaturalsBelow(m), NaturalsBelow(n)) :=
   (k : NaturalsBelow(m * n)) ↦
-    Product.make.{0,0}(NaturalsBelow(m), NaturalsBelow(n),
-        NaturalsBelow.make(Natural.divide(n, NaturalsBelow.value(k)),
+    Product.make(NaturalsBelow.make(Natural.divide(n, NaturalsBelow.value(k)),
             NaturalsBelow.product_quotient_bound(m, n, NaturalsBelow.value(k), oneLeN, NaturalsBelow.below(k))),
         NaturalsBelow.make(Natural.modulo(n, NaturalsBelow.value(k)),
             Natural.modulo_bound(n, NaturalsBelow.value(k), oneLeN)))
@@ -148,7 +147,7 @@ definition NaturalsBelow.product_out_of (m n : Natural) (oneLeN : successor(0) �
 -- the quotient i and remainder j (uniqueness of quotient/remainder), so the
 -- recovered pair has the same components.
 theorem NaturalsBelow.product_round_trip_left (m n : Natural) (oneLeN : successor(0) ≤ n)
-        (p : Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n)))
+        (p : Pair(NaturalsBelow(m), NaturalsBelow(n)))
         : NaturalsBelow.product_out_of(m, n, oneLeN, NaturalsBelow.product_into(m, n, oneLeN, p)) = p :=
   cases p {
     | Product.make(first, second) => {
@@ -201,13 +200,13 @@ theorem NaturalsBelow.product_round_trip_right (m n : Natural) (oneLeN : success
 -- product is empty (no second component) and so is the target NaturalsBelow(m·0);
 -- with n positive the row-major map and Euclidean division are inverse.
 theorem NaturalsBelow.product_equinumerous (m n : Natural)
-        : Equinumerous(Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m * n)) :=
+        : Equinumerous(Pair(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m * n)) :=
   cases n {
     | zero => {
         -- Both sides are empty: the product has no second component, and
         -- NaturalsBelow(m·0) is NaturalsBelow(0) since m·0 = 0.
-        claim productEmpty : Product.{0,0}(NaturalsBelow(m), NaturalsBelow(0)) → False
-            by (p : Product.{0,0}(NaturalsBelow(m), NaturalsBelow(0))) ↦
+        claim productEmpty : Pair(NaturalsBelow(m), NaturalsBelow(0)) → False
+            by (p : Pair(NaturalsBelow(m), NaturalsBelow(0))) ↦
                 NaturalsBelow.zero_is_empty(Product.second(p));
         claim targetEmpty : NaturalsBelow(m * 0) → False
             by (e : NaturalsBelow(m * 0)) ↦ {
@@ -218,8 +217,8 @@ theorem NaturalsBelow.product_equinumerous (m n : Natural)
               Natural.not_less_or_equal_successor_zero(NaturalsBelow.value(e), belowZero)
             };
         Equinumerous.transitive(
-            Product.{0,0}(NaturalsBelow(m), NaturalsBelow(0)), NaturalsBelow(0), NaturalsBelow(m * 0),
-            HasSize.empty_has_size_zero(Product.{0,0}(NaturalsBelow(m), NaturalsBelow(0)), productEmpty),
+            Pair(NaturalsBelow(m), NaturalsBelow(0)), NaturalsBelow(0), NaturalsBelow(m * 0),
+            HasSize.empty_has_size_zero(Pair(NaturalsBelow(m), NaturalsBelow(0)), productEmpty),
             Equinumerous.symmetric(NaturalsBelow(m * 0), NaturalsBelow(0),
                 HasSize.empty_has_size_zero(NaturalsBelow(m * 0), targetEmpty)))
       }
@@ -238,8 +237,8 @@ theorem NaturalsBelow.product_equinumerous (m n : Natural)
 -- Compose the componentwise bijection with the grid bijection.
 theorem HasSize.product (X Y : Type(0)) (m n : Natural)
         (sizeX : HasSize(X, m)) (sizeY : HasSize(Y, n))
-        : HasSize(Product.{0,0}(X, Y), m * n) :=
+        : HasSize(Pair(X, Y), m * n) :=
   Equinumerous.transitive(
-      Product.{0,0}(X, Y), Product.{0,0}(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m * n),
+      Pair(X, Y), Pair(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m * n),
       Equinumerous.product_congruence(X, NaturalsBelow(m), Y, NaturalsBelow(n), sizeX, sizeY),
       NaturalsBelow.product_equinumerous(m, n))

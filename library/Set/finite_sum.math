@@ -70,7 +70,7 @@ theorem NaturalsBelow.below_unshifts (m n value : Natural)
 
 -- Lay the two blocks end to end.
 definition NaturalsBelow.sum_into (m n : Natural)
-        : Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n)) → NaturalsBelow(m + n)
+        : DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)) → NaturalsBelow(m + n)
   | Sum.left(element) =>
       NaturalsBelow.make(NaturalsBelow.value(element),
           NaturalsBelow.below_extends(m, n, NaturalsBelow.value(element), NaturalsBelow.below(element)))
@@ -81,15 +81,13 @@ definition NaturalsBelow.sum_into (m n : Natural)
 -- The inverse: compare the value against m. Below m → the left block,
 -- keeping the value. At least m → the right block, value shifted down by m.
 definition NaturalsBelow.sum_out_of (m n : Natural)
-        : NaturalsBelow(m + n) → Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n)) :=
+        : NaturalsBelow(m + n) → DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)) :=
   (element : NaturalsBelow(m + n)) ↦
     cases Natural.compare_strict(NaturalsBelow.value(element), m) {
       | Natural.StrictComparison.below(strictlyBelow) =>
-          Sum.left.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n),
-              NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow))
+          Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow))
       | Natural.StrictComparison.atLeast(atLeast) =>
-          Sum.right.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n),
-              NaturalsBelow.make(Natural.monus(NaturalsBelow.value(element), m),
+          Sum.right(NaturalsBelow.make(Natural.monus(NaturalsBelow.value(element), m),
                   NaturalsBelow.below_unshifts(m, n, NaturalsBelow.value(element),
                       atLeast, NaturalsBelow.below(element))))
     }
@@ -100,7 +98,7 @@ definition NaturalsBelow.sum_out_of (m n : Natural)
 
 -- out_of recovers the summand into placed.
 theorem NaturalsBelow.sum_round_trip_left (m n : Natural)
-        (s : Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n)))
+        (s : DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)))
         : NaturalsBelow.sum_out_of(m, n, NaturalsBelow.sum_into(m, n, s)) = s :=
   cases s {
     | Sum.left(element) =>
@@ -108,9 +106,9 @@ theorem NaturalsBelow.sum_round_trip_left (m n : Natural)
           -- The value really is below m, so out_of returns it to the left;
           -- and ⟨value, _⟩ is element, since their values agree.
           | Natural.StrictComparison.below(strictlyBelow) =>
-              calc Sum.left.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n),
-                       NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow))
-                 = Sum.left.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n), element)
+              calc (Sum.left(NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow))
+                        : DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)))
+                 = Sum.left(element)
                       by NaturalsBelow.equal_of_value(m,
                              NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow), element,
                              reflexivity(Natural, NaturalsBelow.value(element)))
@@ -136,12 +134,12 @@ theorem NaturalsBelow.sum_round_trip_left (m n : Natural)
           -- The shifted value, brought back down by m, is element again,
           -- since (m + value) − m = value.
           | Natural.StrictComparison.atLeast(atLeast) =>
-              calc Sum.right.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n),
-                       NaturalsBelow.make(Natural.monus(m + NaturalsBelow.value(element), m),
+              calc (Sum.right(NaturalsBelow.make(Natural.monus(m + NaturalsBelow.value(element), m),
                            NaturalsBelow.below_unshifts(m, n, m + NaturalsBelow.value(element), atLeast,
                                NaturalsBelow.below_shifts(m, n, NaturalsBelow.value(element),
                                    NaturalsBelow.below(element)))))
-                 = Sum.right.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n), element)
+                        : DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)))
+                 = Sum.right(element)
                       by NaturalsBelow.equal_of_value(n,
                              NaturalsBelow.make(Natural.monus(m + NaturalsBelow.value(element), m),
                                  NaturalsBelow.below_unshifts(m, n, m + NaturalsBelow.value(element), atLeast,
@@ -170,7 +168,7 @@ theorem NaturalsBelow.sum_round_trip_right (m n : Natural)
 
 -- The two yardsticks laid end to end form one.
 theorem NaturalsBelow.sum_equinumerous (m n : Natural)
-        : Equinumerous(Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m + n)) :=
+        : Equinumerous(DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m + n)) :=
   ⟨NaturalsBelow.sum_into(m, n),
    ⟨NaturalsBelow.sum_out_of(m, n),
     And.introduction(
@@ -184,42 +182,42 @@ theorem NaturalsBelow.sum_equinumerous (m n : Natural)
 -- equinumerous union: map each summand through its component bijection.
 theorem Equinumerous.sum_congruence (A A' B B' : Type(0))
         (firstSame : Equinumerous(A, A')) (secondSame : Equinumerous(B, B'))
-        : Equinumerous(Sum.{0,0,0}(A, B), Sum.{0,0,0}(A', B')) := {
+        : Equinumerous(DisjointUnion(A, B), DisjointUnion(A', B')) := {
   obtain ⟨forwardA, forwardATail⟩ from firstSame;
   obtain ⟨backwardA, inverseA⟩ from forwardATail;
   obtain ⟨forwardB, forwardBTail⟩ from secondSame;
   obtain ⟨backwardB, inverseB⟩ from forwardBTail;
   obtain ⟨leftA, rightA⟩ from inverseA;
   obtain ⟨leftB, rightB⟩ from inverseB;
-  ⟨(s : Sum.{0,0,0}(A, B)) ↦
+  ⟨(s : DisjointUnion(A, B)) ↦
        cases s {
-         | Sum.left(a)  => Sum.left.{0,0,0}(A', B', forwardA(a))
-         | Sum.right(b) => Sum.right.{0,0,0}(A', B', forwardB(b))
+         | Sum.left(a)  => Sum.left(forwardA(a))
+         | Sum.right(b) => Sum.right(forwardB(b))
        },
-   ⟨(s : Sum.{0,0,0}(A', B')) ↦
+   ⟨(s : DisjointUnion(A', B')) ↦
         cases s {
-          | Sum.left(a)  => Sum.left.{0,0,0}(A, B, backwardA(a))
-          | Sum.right(b) => Sum.right.{0,0,0}(A, B, backwardB(b))
+          | Sum.left(a)  => Sum.left(backwardA(a))
+          | Sum.right(b) => Sum.right(backwardB(b))
         },
     And.introduction(
-        (s : Sum.{0,0,0}(A, B)) ↦
+        (s : DisjointUnion(A, B)) ↦
             cases s {
               -- backward(forward(left a)) = left(backwardA(forwardA a)) = left a.
               | Sum.left(a)  =>
-                  calc Sum.left.{0,0,0}(A, B, backwardA(forwardA(a)))
-                     = Sum.left.{0,0,0}(A, B, a)   by leftA(a)
+                  calc (Sum.left(backwardA(forwardA(a))) : DisjointUnion(A, B))
+                     = Sum.left(a)   by leftA(a)
               | Sum.right(b) =>
-                  calc Sum.right.{0,0,0}(A, B, backwardB(forwardB(b)))
-                     = Sum.right.{0,0,0}(A, B, b)   by leftB(b)
+                  calc (Sum.right(backwardB(forwardB(b))) : DisjointUnion(A, B))
+                     = Sum.right(b)   by leftB(b)
             },
-        (s : Sum.{0,0,0}(A', B')) ↦
+        (s : DisjointUnion(A', B')) ↦
             cases s {
               | Sum.left(a)  =>
-                  calc Sum.left.{0,0,0}(A', B', forwardA(backwardA(a)))
-                     = Sum.left.{0,0,0}(A', B', a)   by rightA(a)
+                  calc (Sum.left(forwardA(backwardA(a))) : DisjointUnion(A', B'))
+                     = Sum.left(a)   by rightA(a)
               | Sum.right(b) =>
-                  calc Sum.right.{0,0,0}(A', B', forwardB(backwardB(b)))
-                     = Sum.right.{0,0,0}(A', B', b)   by rightB(b)
+                  calc (Sum.right(forwardB(backwardB(b))) : DisjointUnion(A', B'))
+                     = Sum.right(b)   by rightB(b)
             })⟩⟩
 }
 
@@ -227,8 +225,8 @@ theorem Equinumerous.sum_congruence (A A' B B' : Type(0))
 -- Compose the componentwise bijection with the end-to-end one.
 theorem HasSize.sum (X Y : Type(0)) (m n : Natural)
         (sizeX : HasSize(X, m)) (sizeY : HasSize(Y, n))
-        : HasSize(Sum.{0,0,0}(X, Y), m + n) :=
+        : HasSize(DisjointUnion(X, Y), m + n) :=
   Equinumerous.transitive(
-      Sum.{0,0,0}(X, Y), Sum.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m + n),
+      DisjointUnion(X, Y), DisjointUnion(NaturalsBelow(m), NaturalsBelow(n)), NaturalsBelow(m + n),
       Equinumerous.sum_congruence(X, NaturalsBelow(m), Y, NaturalsBelow(n), sizeX, sizeY),
       NaturalsBelow.sum_equinumerous(m, n))
