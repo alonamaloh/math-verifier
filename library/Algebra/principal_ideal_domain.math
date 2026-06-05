@@ -56,37 +56,52 @@ definition Ring.pairIdealMember (s : Ring) (a b z : Ring.carrier(s))
   ∃ (x : Ring.carrier(s)). ∃ (y : Ring.carrier(s)). z = x * a + y * b
 
 theorem Ring.pairIdeal_is_ideal (s : Ring) (a b : Ring.carrier(s))
-        : Ring.IsIdeal(s, Ring.pairIdealMember(s, a, b)) :=
-  ⟨-- 0 = 0·a + 0·b
-   ⟨Ring.zero(s), Ring.zero(s),
-    calc Ring.zero(s)
-       = Ring.add(s, Ring.zero(s), Ring.zero(s))
-       = Ring.add(s, Ring.multiply(s, Ring.zero(s), a), Ring.zero(s))
-       = Ring.add(s, Ring.multiply(s, Ring.zero(s), a),
-             Ring.multiply(s, Ring.zero(s), b))⟩,
-   -- closure under addition: combine coefficients.
-   (x y : Ring.carrier(s))
-   (xMember : Ring.pairIdealMember(s, a, b, x))
-   (yMember : Ring.pairIdealMember(s, a, b, y)) ↦ {
-      obtain ⟨x1, y1, xEquation⟩ from xMember;
-      obtain ⟨x2, y2, yEquation⟩ from yMember;
-      ⟨x1 + x2, y1 + y2,
-       calc x + y
-          = (x1 * a + y1 * b) + (x2 * a + y2 * b)
-          = (x1 * a + x2 * a) + (y1 * b + y2 * b)
-          = (x1 + x2) * a + (y1 + y2) * b⟩
-   },
-   -- absorption: r·(x·a + y·b) = (r·x)·a + (r·y)·b.
-   (r z : Ring.carrier(s))
-   (zMember : Ring.pairIdealMember(s, a, b, z)) ↦ {
-      obtain ⟨x, y, zEquation⟩ from zMember;
-      ⟨r * x, r * y,
-       calc r * z
-          = r * (x * a + y * b)
-          = r * (x * a) + r * (y * b)
-          = (r * x) * a + r * (y * b)
-          = (r * x) * a + (r * y) * b⟩
-   }⟩
+        : Ring.IsIdeal(s, Ring.pairIdealMember(s, a, b)) := {
+  -- Zero is the trivial combination 0·a + 0·b.
+  claim containsZero : Ring.pairIdealMember(s, a, b, Ring.zero(s))
+      by witness Ring.zero(s) with witness Ring.zero(s) with
+           calc Ring.zero(s)
+              = Ring.zero(s) + Ring.zero(s)
+              = Ring.zero(s) * a + Ring.zero(s)
+              = Ring.zero(s) * a + Ring.zero(s) * b;
+  -- A sum of two combinations adds coefficientwise.
+  claim closedUnderAddition
+      : (x y : Ring.carrier(s))
+        → Ring.pairIdealMember(s, a, b, x)
+        → Ring.pairIdealMember(s, a, b, y)
+        → Ring.pairIdealMember(s, a, b, x + y)
+      by {
+        take x : Ring.carrier(s);
+        take y : Ring.carrier(s);
+        suppose Ring.pairIdealMember(s, a, b, x) as xMember;
+        suppose Ring.pairIdealMember(s, a, b, y) as yMember;
+        obtain ⟨x1, y1, xEquation⟩ from xMember;
+        obtain ⟨x2, y2, yEquation⟩ from yMember;
+        witness x1 + x2 with witness y1 + y2 with
+          calc x + y
+             = (x1 * a + y1 * b) + (x2 * a + y2 * b)
+             = (x1 * a + x2 * a) + (y1 * b + y2 * b)
+             = (x1 + x2) * a + (y1 + y2) * b
+      };
+  -- Multiplying a combination by r scales both coefficients.
+  claim absorbsMultiplication
+      : (r z : Ring.carrier(s))
+        → Ring.pairIdealMember(s, a, b, z)
+        → Ring.pairIdealMember(s, a, b, r * z)
+      by {
+        take r : Ring.carrier(s);
+        take z : Ring.carrier(s);
+        suppose Ring.pairIdealMember(s, a, b, z) as zMember;
+        obtain ⟨x, y, zEquation⟩ from zMember;
+        witness r * x with witness r * y with
+          calc r * z
+             = r * (x * a + y * b)
+             = r * (x * a) + r * (y * b)
+             = (r * x) * a + r * (y * b)
+             = (r * x) * a + (r * y) * b
+      };
+  ⟨containsZero, closedUnderAddition, absorbsMultiplication⟩
+}
 
 -- ----------------------------------------------------------------------
 -- The principal-ideal-domain bundle.
