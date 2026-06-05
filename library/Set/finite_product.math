@@ -93,25 +93,22 @@ theorem NaturalsBelow.product_quotient_bound (m n k : Natural)
   claim n * Natural.divide(n, k) + Natural.modulo(n, k) = k
       since Natural.divide_modulo_decompose;
   -- n·q ≤ n·q + r = k.
-  claim quotientLeK : n * Natural.divide(n, k) ≤ k
-      by calc n * Natural.divide(n, k)
+  calc n * Natural.divide(n, k)
             ≤ n * Natural.divide(n, k) + Natural.modulo(n, k)   by Natural.less_or_equal_add_right
-            = k;
+            = k as quotientLeK;
   -- Hence n·q < n·m.
-  claim quotientStrict : successor(n * Natural.divide(n, k)) ≤ n * m
-      by calc successor(n * Natural.divide(n, k))
+  calc successor(n * Natural.divide(n, k))
             ≤ successor(k)   by Natural.successor_less_or_equal_successor(n * Natural.divide(n, k), k, quotientLeK)
             ≤ m * n          by belowProduct
-            = n * m;
+            = n * m as quotientStrict;
   cases Natural.compare_strict(Natural.divide(n, k), m) {
     | Natural.StrictComparison.below(strictlyBelow) =>
         strictlyBelow
     | Natural.StrictComparison.atLeast(atLeast) => {
         -- m ≤ q forces n·m ≤ n·q, so successor(n·q) ≤ n·m ≤ n·q: impossible.
-        claim selfBelow : successor(n * Natural.divide(n, k)) ≤ n * Natural.divide(n, k)
-            by calc successor(n * Natural.divide(n, k))
+        calc successor(n * Natural.divide(n, k))
                   ≤ n * m                      by quotientStrict
-                  ≤ n * Natural.divide(n, k)   by Natural.multiply_monotone_left(n, m, Natural.divide(n, k), atLeast);
+                  ≤ n * Natural.divide(n, k)   by Natural.multiply_monotone_left(n, m, Natural.divide(n, k), atLeast) as selfBelow;
         absurd(Natural.not_successor_less_or_equal_self(n * Natural.divide(n, k), selfBelow))
       }
   }
@@ -210,10 +207,9 @@ theorem NaturalsBelow.product_equinumerous (m n : Natural)
                 NaturalsBelow.zero_is_empty(Product.second(p));
         claim targetEmpty : NaturalsBelow(m * 0) → False
             by (e : NaturalsBelow(m * 0)) ↦ {
-              claim belowZero : successor(NaturalsBelow.value(e)) ≤ 0
-                  by calc successor(NaturalsBelow.value(e))
+              calc successor(NaturalsBelow.value(e))
                         ≤ m * 0   by NaturalsBelow.below(e)
-                        = 0;
+                        = 0 as belowZero;
               Natural.not_less_or_equal_successor_zero(NaturalsBelow.value(e), belowZero)
             };
         Equinumerous.transitive(
