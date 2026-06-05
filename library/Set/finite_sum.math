@@ -105,41 +105,50 @@ theorem NaturalsBelow.sum_round_trip_left (m n : Natural)
   cases s {
     | Sum.left(element) =>
         cases Natural.compare_strict(NaturalsBelow.value(element), m) {
-          -- The value really is below m, so out_of returns it to the left.
+          -- The value really is below m, so out_of returns it to the left;
+          -- and ⟨value, _⟩ is element, since their values agree.
           | Natural.StrictComparison.below(strictlyBelow) =>
-              congruenceOf(
-                  (summand : NaturalsBelow(m)) ↦
-                      Sum.left.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n), summand),
-                  NaturalsBelow.equal_of_value(m,
-                      NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow), element,
-                      reflexivity(Natural, NaturalsBelow.value(element))))
-          -- m ≤ value contradicts value < m.
-          | Natural.StrictComparison.atLeast(atLeast) =>
-              absurd(Natural.not_successor_less_or_equal_self(NaturalsBelow.value(element),
-                  LessOrEqual.transitive(
-                      successor(NaturalsBelow.value(element)), m, NaturalsBelow.value(element),
-                      atLeast, NaturalsBelow.below(element))))
+              calc Sum.left.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n),
+                       NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow))
+                 = Sum.left.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n), element)
+                      by NaturalsBelow.equal_of_value(m,
+                             NaturalsBelow.make(NaturalsBelow.value(element), strictlyBelow), element,
+                             reflexivity(Natural, NaturalsBelow.value(element)))
+          -- m ≤ value would put value strictly below itself.
+          | Natural.StrictComparison.atLeast(atLeast) => {
+              claim valueBelowItself : successor(NaturalsBelow.value(element)) ≤ NaturalsBelow.value(element)
+                  by calc successor(NaturalsBelow.value(element))
+                        ≤ m                              by NaturalsBelow.below
+                        ≤ NaturalsBelow.value(element)   by atLeast;
+              absurd(Natural.not_successor_less_or_equal_self(NaturalsBelow.value(element), valueBelowItself))
+            }
         }
     | Sum.right(element) =>
         cases Natural.compare_strict(m + NaturalsBelow.value(element), m) {
-          -- m + value < m is impossible, since m ≤ m + value.
-          | Natural.StrictComparison.below(strictlyBelow) =>
-              absurd(Natural.not_successor_less_or_equal_self(m + NaturalsBelow.value(element),
-                  LessOrEqual.transitive(
-                      successor(m + NaturalsBelow.value(element)), m, m + NaturalsBelow.value(element),
-                      Natural.less_or_equal_add_right(m, NaturalsBelow.value(element)), strictlyBelow)))
-          -- The shifted value, brought back down by m, is the original.
+          -- m + value < m would put m + value strictly below itself.
+          | Natural.StrictComparison.below(strictlyBelow) => {
+              claim valueBelowItself : successor(m + NaturalsBelow.value(element)) ≤ m + NaturalsBelow.value(element)
+                  by calc successor(m + NaturalsBelow.value(element))
+                        ≤ m                                 by strictlyBelow
+                        ≤ m + NaturalsBelow.value(element)   by Natural.less_or_equal_add_right;
+              absurd(Natural.not_successor_less_or_equal_self(m + NaturalsBelow.value(element), valueBelowItself))
+            }
+          -- The shifted value, brought back down by m, is element again,
+          -- since (m + value) − m = value.
           | Natural.StrictComparison.atLeast(atLeast) =>
-              congruenceOf(
-                  (summand : NaturalsBelow(n)) ↦
-                      Sum.right.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n), summand),
-                  NaturalsBelow.equal_of_value(n,
-                      NaturalsBelow.make(Natural.monus(m + NaturalsBelow.value(element), m),
-                          NaturalsBelow.below_unshifts(m, n, m + NaturalsBelow.value(element), atLeast,
-                              NaturalsBelow.below_shifts(m, n, NaturalsBelow.value(element),
-                                  NaturalsBelow.below(element)))),
-                      element,
-                      Natural.monus_add_cancel(m, NaturalsBelow.value(element))))
+              calc Sum.right.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n),
+                       NaturalsBelow.make(Natural.monus(m + NaturalsBelow.value(element), m),
+                           NaturalsBelow.below_unshifts(m, n, m + NaturalsBelow.value(element), atLeast,
+                               NaturalsBelow.below_shifts(m, n, NaturalsBelow.value(element),
+                                   NaturalsBelow.below(element)))))
+                 = Sum.right.{0,0,0}(NaturalsBelow(m), NaturalsBelow(n), element)
+                      by NaturalsBelow.equal_of_value(n,
+                             NaturalsBelow.make(Natural.monus(m + NaturalsBelow.value(element), m),
+                                 NaturalsBelow.below_unshifts(m, n, m + NaturalsBelow.value(element), atLeast,
+                                     NaturalsBelow.below_shifts(m, n, NaturalsBelow.value(element),
+                                         NaturalsBelow.below(element)))),
+                             element,
+                             Natural.monus_add_cancel(m, NaturalsBelow.value(element)))
         }
   }
 
@@ -195,13 +204,22 @@ theorem Equinumerous.sum_congruence (A A' B B' : Type(0))
     And.introduction(
         (s : Sum.{0,0,0}(A, B)) ↦
             cases s {
-              | Sum.left(a)  => congruenceOf((x : A) ↦ Sum.left.{0,0,0}(A, B, x), leftA(a))
-              | Sum.right(b) => congruenceOf((x : B) ↦ Sum.right.{0,0,0}(A, B, x), leftB(b))
+              -- backward(forward(left a)) = left(backwardA(forwardA a)) = left a.
+              | Sum.left(a)  =>
+                  calc Sum.left.{0,0,0}(A, B, backwardA(forwardA(a)))
+                     = Sum.left.{0,0,0}(A, B, a)   by leftA(a)
+              | Sum.right(b) =>
+                  calc Sum.right.{0,0,0}(A, B, backwardB(forwardB(b)))
+                     = Sum.right.{0,0,0}(A, B, b)   by leftB(b)
             },
         (s : Sum.{0,0,0}(A', B')) ↦
             cases s {
-              | Sum.left(a)  => congruenceOf((y : A') ↦ Sum.left.{0,0,0}(A', B', y), rightA(a))
-              | Sum.right(b) => congruenceOf((y : B') ↦ Sum.right.{0,0,0}(A', B', y), rightB(b))
+              | Sum.left(a)  =>
+                  calc Sum.left.{0,0,0}(A', B', forwardA(backwardA(a)))
+                     = Sum.left.{0,0,0}(A', B', a)   by rightA(a)
+              | Sum.right(b) =>
+                  calc Sum.right.{0,0,0}(A', B', forwardB(backwardB(b)))
+                     = Sum.right.{0,0,0}(A', B', b)   by rightB(b)
             })⟩⟩
 }
 
