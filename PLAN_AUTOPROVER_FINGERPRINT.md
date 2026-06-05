@@ -11,9 +11,33 @@ simplified to `:= ring`. The two follow-ups are DONE too: double-negation
 (`Ring.negate_multiply_left/right` + `ringExtractSigns`/`ringCombineProduct
 Signs`/`ringApplyNegate`); `Ring.negate_difference` and `Ring.difference_
 multiply_split` are now `:= ring` — every difference lemma in
-`ring_difference.math` is a one-liner. **NEXT = Phase 3** (model-eval
-fingerprint), then Phase 4 (commutativity witness in the ideal tower), then
-clean the 9 concrete-carrier warn sites (deferred to last by request).
+`ring_difference.math` is a one-liner.
+
+**Phase 3 SKIPPED (subsumed):** the model-eval fingerprint is a probabilistic
+identity test for "equal in the free ring from the ring axioms" — but
+proveAbstractRingAC is now an EXACT, complete decision procedure for exactly
+that, so the matrix/scalar model strictly loses to it. As a *gate* it's also
+no help: a hard veto is unsound (the searches it would gate legitimately use
+context hypotheses a goal-only fingerprint ignores), and as a candidate-prune
+the bridge already prunes by exact structural occurrence (`prover.cpp:506`),
+which is finer than a congruent color. (Grounded analysis, agreed to skip.)
+
+**Phase 4 DONE (commutativity from a bundle witness):** proveAbstractRingAC
+sources a `Ring.MultiplyCommutative(s)` witness from the carrier's bundle
+(`ringDeriveCommutativityWitness`: CommutativeRing.ring/IntegralDomain.ring/
+PrincipalIdealDomain.ring/EuclideanDomain.ring → the matching `.commutative`
+projection) and, when found, runs `·` in commutative mode (sorts factors) via
+a `commutativeWitness` term threaded through `RingAxiomNames`/buildRingCommute.
+ζ-unfolds let-binders so `let s := IntegralDomain.ring(d)` is seen through.
+Sound: a plain `(r : Ring)` has no witness, so a·b=b·a correctly declines.
+Dropped the explicit `by IntegralDomain.commutative(d,…)` citations across
+associate/irreducible/principal_ideal_domain/euclidean_domain/unique_
+factorization (multi-step reassoc+swap chains collapse to one `ring` step).
+
+**NEXT = clean the 9 concrete-carrier warn sites** (deferred to last by
+request). Optional: local-hypothesis commutativity witness (would close
+RingModulo.multiply_respects' lone `by commutativity`); a library-wide
+collapse of calc chains Phase 4 newly made redundant.
 Phase 0
 safety net (effort budget + expensive-step warning) is committed. Phase 1's
 core win is committed: `proveAbstractRingAC` (`ring.cpp`) normalises +/·
