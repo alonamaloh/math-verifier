@@ -417,14 +417,10 @@ theorem Rational.multiply_positive_at_representatives
                     : Rational.zero
                       = Rational.fraction((successor(k_x) : Integer), d_x)
                           * Rational.fraction((successor(k_y) : Integer), d_y)) ↦
-         -- Product at rep: make(succ(k_x)·succ(k_y) : I, d_y + d_x·succ(d_y)).
-         -- Quotient.exact gives: 0 · succ(d_y + d_x·succ(d_y))
-         --   = (succ(k_x)·succ(k_y) : I) · succ(zero).
-         -- LHS = 0 (Integer.multiply_zero_left). RHS = (succ(k_x)·succ(k_y) : I)
-         --   (Integer.multiply_identity_right).
-         -- So 0 = (succ(k_x)·succ(k_y) : I) at Integer.
-         -- Then Quotient.exact at Integer: 0 + 0 = 0 + succ(k_x)·succ(k_y).
-         -- I.e., succ(k_x)·succ(k_y) = 0 (Natural). False.
+         -- The product is, definitionally, the single fraction
+         -- (succ(k_x)·succ(k_y)) / (d_y + d_x·succ(d_y)); cross-multiplying
+         -- `0 = num/denom` gives num·1 = 0·(denom+1), so succ(k_x)·succ(k_y)
+         -- = 0 at Integer, hence at Natural — false.
          Natural.successor_not_zero(
              k_x + successor(k_x) * k_y,
              -- succ(k_x) * succ(k_y) = succ(k_x + succ(k_x) · k_y) at Natural
@@ -446,12 +442,20 @@ theorem Rational.multiply_positive_at_representatives
                                       * (successor(k_y) : Integer)
                                       * (successor(0) : Integer)
                                 -- `zeroEqProduct` says the product class is
-                                -- Rational.zero; equal classes ⇒ equivalent
-                                -- representatives, i.e. this cross-multiplied
-                                -- equation (auto: exact-bridge via symmetry).
+                                -- Rational.zero; Quotient.exact recovers the
+                                -- equivalent representatives — this cross-
+                                -- multiplied equation.
                                 = Integer.zero * (successor(d_y + d_x
                                                            * successor(d_y))
                                                       : Integer)
+                                      by Quotient.exact(
+                                             RationalRepresentative.make(
+                                                 (successor(k_x) : Integer)
+                                                     * (successor(k_y) : Integer),
+                                                 d_y + d_x * successor(d_y)),
+                                             RationalRepresentative.make(
+                                                 Integer.zero, zero),
+                                             Equality.symmetry(zeroEqProduct))
                                 = Integer.zero));
   And.introduction(
       Rational.LessOrEqual_zero_of_IsNonneg(
