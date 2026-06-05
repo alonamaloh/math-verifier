@@ -62,30 +62,27 @@ theorem NaturalsBelow.pigeonhole_top_value_below (k n' : Natural)
         : successor(NaturalsBelow.value(f(NaturalsBelow.top(k)))) ≤ n' := {
   let imageValue : Natural := NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)));
   let topValue : Natural := NaturalsBelow.value(f(NaturalsBelow.top(k)));
-  claim imageValueBelow : imageValue ≤ n'
+  claim imageValue ≤ n'
       by Natural.less_or_equal_successor_successor_descend(
              imageValue, n', NaturalsBelow.below(f(NaturalsBelow.inclusion(k, i))));
-  claim imageValueIsN : imageValue = n'
-      since Natural.le_antisymmetric;
+  -- imageValue is both ≤ n' and (atLeast) ≥ n', so it equals n'.
+  claim imageValue = n' since Natural.le_antisymmetric;
   claim topValueBelow : topValue ≤ n'
       by Natural.less_or_equal_successor_successor_descend(
              topValue, n', NaturalsBelow.below(f(NaturalsBelow.top(k))));
   -- n' ≠ topValue: otherwise top and inclusion i collide under f.
   claim notEqual : ¬(n' = topValue) by {
-    suppose n' = topValue as nEqualsTop;
-    claim valuesEqual : topValue = imageValue
-        by calc topValue
-              = n'
-              = imageValue;
+    suppose n' = topValue as _;
+    -- topValue = n' = imageValue, so f(top) and f(incl i) share a value,
+    -- hence are equal; injectivity forces top = incl i, i.e. k = value i.
+    claim topValue = imageValue;
     claim imagesEqual : f(NaturalsBelow.top(k)) = f(NaturalsBelow.inclusion(k, i))
         since NaturalsBelow.equal_of_value;
-    claim pointsEqual : NaturalsBelow.top(k) = NaturalsBelow.inclusion(k, i)
+    claim NaturalsBelow.top(k) = NaturalsBelow.inclusion(k, i)
         by inj(NaturalsBelow.top(k), NaturalsBelow.inclusion(k, i), imagesEqual);
-    -- Read off values: value(top) ≡ k and value(inclusion i) ≡ value i.
-    claim kEqualsValue : k = NaturalsBelow.value(i)
+    claim k = NaturalsBelow.value(i)
         by calc NaturalsBelow.value(NaturalsBelow.top(k))
               = NaturalsBelow.value(NaturalsBelow.inclusion(k, i));
-    -- But value i < k = value i, so this would put value i strictly below itself.
     claim belowSelf : successor(NaturalsBelow.value(i)) ≤ NaturalsBelow.value(i)
         by calc successor(NaturalsBelow.value(i))
               ≤ k                       by NaturalsBelow.below(i)
@@ -163,7 +160,7 @@ theorem NaturalsBelow.pigeonhole_inclusion_image_injective (k n' : Natural)
         (i j : NaturalsBelow(k))
         (imagesEqual : f(NaturalsBelow.inclusion(k, i)) = f(NaturalsBelow.inclusion(k, j)))
         : i = j := {
-  claim inclusionsEqual : NaturalsBelow.inclusion(k, i) = NaturalsBelow.inclusion(k, j)
+  claim NaturalsBelow.inclusion(k, i) = NaturalsBelow.inclusion(k, j)
       by inj(NaturalsBelow.inclusion(k, i), NaturalsBelow.inclusion(k, j), imagesEqual);
   -- value(inclusion i) ≡ value i and value(inclusion j) ≡ value j.
   claim valuesEqual : NaturalsBelow.value(i) = NaturalsBelow.value(j)
@@ -182,10 +179,10 @@ theorem NaturalsBelow.pigeonhole_inclusion_not_top (k n' : Natural)
         (i : NaturalsBelow(k))
         (imagesEqual : f(NaturalsBelow.inclusion(k, i)) = f(NaturalsBelow.top(k)))
         : False := {
-  claim pointsEqual : NaturalsBelow.inclusion(k, i) = NaturalsBelow.top(k)
+  claim NaturalsBelow.inclusion(k, i) = NaturalsBelow.top(k)
       by inj(NaturalsBelow.inclusion(k, i), NaturalsBelow.top(k), imagesEqual);
   -- value(inclusion i) ≡ value i and value(top) ≡ k.
-  claim valueEqualsK : NaturalsBelow.value(i) = k
+  claim NaturalsBelow.value(i) = k
       by calc NaturalsBelow.value(NaturalsBelow.inclusion(k, i))
             = NaturalsBelow.value(NaturalsBelow.top(k));
   claim belowSelf : successor(NaturalsBelow.value(i)) ≤ NaturalsBelow.value(i)
@@ -209,12 +206,9 @@ theorem NaturalsBelow.pigeonhole_redirect_injective (k n' : Natural)
   (i j : NaturalsBelow(k))
   (equalRedirect : NaturalsBelow.pigeonhole_redirect(k, n', f, inj, i)
                      = NaturalsBelow.pigeonhole_redirect(k, n', f, inj, j)) ↦ {
-  -- The two redirects have equal underlying values (read off the equality).
-  claim valueRedirectsEqual
-      : NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, i))
-          = NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, j))
-      by calc NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, i))
-            = NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, j));
+  -- The two redirects have equal underlying values (read off equalRedirect).
+  claim NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, i))
+          = NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, j));
   -- Branch on how each image compares to n'; the reduction lemmas read off
   -- each redirect's value in the matching branch.
   cases Natural.compare_strict(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), n') {
@@ -222,8 +216,7 @@ theorem NaturalsBelow.pigeonhole_redirect_injective (k n' : Natural)
         cases Natural.compare_strict(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j))), n') {
           | Natural.StrictComparison.below(strictlyBelowJ) => {
               -- Both stayed below n': both redirects are the images.
-              claim valuesEqual
-                  : NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)))
+              claim NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)))
                       = NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j)))
                   by calc NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)))
                         = NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, i))
@@ -236,8 +229,7 @@ theorem NaturalsBelow.pigeonhole_redirect_injective (k n' : Natural)
             }
           | Natural.StrictComparison.atLeast(atLeastJ) => {
               -- i stayed below, j redirected to the top: impossible.
-              claim valueImageEqualsTop
-                  : NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)))
+              claim NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)))
                       = NaturalsBelow.value(f(NaturalsBelow.top(k)))
                   by calc NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)))
                         = NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, i))
@@ -253,8 +245,7 @@ theorem NaturalsBelow.pigeonhole_redirect_injective (k n' : Natural)
         cases Natural.compare_strict(NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j))), n') {
           | Natural.StrictComparison.below(strictlyBelowJ) => {
               -- j stayed below, i redirected to the top: impossible.
-              claim valueImageEqualsTop
-                  : NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j)))
+              claim NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j)))
                       = NaturalsBelow.value(f(NaturalsBelow.top(k)))
                   by calc NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j)))
                         = NaturalsBelow.value(NaturalsBelow.pigeonhole_redirect(k, n', f, inj, j))
@@ -268,24 +259,21 @@ theorem NaturalsBelow.pigeonhole_redirect_injective (k n' : Natural)
           | Natural.StrictComparison.atLeast(atLeastJ) => {
               -- Both at least n': each image value equals n', so the images
               -- agree directly (the redirect equality is unneeded here).
-              claim imageValueIIsN
-                  : NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))) = n'
+              claim NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))) = n'
                   by Natural.le_antisymmetric(
                          NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), n',
                          Natural.less_or_equal_successor_successor_descend(
                              NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i))), n',
                              NaturalsBelow.below(f(NaturalsBelow.inclusion(k, i)))),
                          atLeastI);
-              claim imageValueJIsN
-                  : NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j))) = n'
+              claim NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j))) = n'
                   by Natural.le_antisymmetric(
                          NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j))), n',
                          Natural.less_or_equal_successor_successor_descend(
                              NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j))), n',
                              NaturalsBelow.below(f(NaturalsBelow.inclusion(k, j)))),
                          atLeastJ);
-              claim valuesEqual
-                  : NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)))
+              claim NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)))
                       = NaturalsBelow.value(f(NaturalsBelow.inclusion(k, j)))
                   by calc NaturalsBelow.value(f(NaturalsBelow.inclusion(k, i)))
                         = n'
@@ -326,12 +314,13 @@ theorem NaturalsBelow.injective_domain_le_codomain
       cases m refining f, inj {
         | zero => Natural.zero_least(successor(n'))
         | successor(k) => {
-            -- Redirect f to an injection out of NaturalsBelow(k), recurse.
-            claim recursion : k ≤ n'
+            -- Redirect f to an injection out of NaturalsBelow(k), recurse;
+            -- k ≤ n' then lifts to successor(k) ≤ successor(n').
+            claim k ≤ n'
                 by NaturalsBelow.injective_domain_le_codomain(n', k,
                        NaturalsBelow.pigeonhole_redirect(k, n', f, inj),
                        NaturalsBelow.pigeonhole_redirect_injective(k, n', f, inj));
-            claim successor(k) ≤ successor(n') by Natural.successor_less_or_equal_successor
+            claim successor(k) ≤ successor(n') since Natural.successor_less_or_equal_successor
           }
       }
 
@@ -344,7 +333,7 @@ theorem NaturalsBelow.no_injection_when_smaller (m n : Natural)
         (inj : Function.IsInjective(NaturalsBelow(m), NaturalsBelow(n), f))
         : False := {
   claim domainLeCodomain : m ≤ n
-      by NaturalsBelow.injective_domain_le_codomain(n, m, f, inj);
+      since NaturalsBelow.injective_domain_le_codomain;
   Natural.not_successor_less_or_equal_self(n,
       calc successor(n)
          ≤ m   by smaller
