@@ -135,3 +135,34 @@ theorem Natural.le_add_preserves_left (a c b : Natural) (aLeC : a ≤ c)
      = (a + r) + b
      = c + b
 }
+
+-- A sum of naturals that vanishes forces its left summand to vanish.
+-- Split on c: at zero the claim is immediate; at successor(p) the sum is
+-- successor(p + d), which cannot equal zero.
+theorem Natural.add_eq_zero_implies_left_zero
+        : (c d : Natural) → c + d = 0 → c = 0
+  | zero, d, sumIsZero =>
+      reflexivity(0)
+  | successor(p), d, sumIsZero =>
+      absurd(Natural.zero_not_successor(p + d, Equality.symmetry(sumIsZero)))
+
+-- Antisymmetry of ≤: if a ≤ b and b ≤ a then a = b. Each inequality gives
+-- a witness — b = a + c and a = b + d — so a = a + (c + d); cancelling a
+-- forces c + d = 0, hence c = 0, and then b = a + c = a.
+theorem Natural.le_antisymmetric (a b : Natural) (aLeB : a ≤ b) (bLeA : b ≤ a)
+        : a = b := {
+  obtain ⟨c, bEquation⟩ from Natural.subtraction_witness(a, b, aLeB);
+  obtain ⟨d, aEquation⟩ from Natural.subtraction_witness(b, a, bLeA);
+  claim sumIsZero : c + d = 0
+      by Natural.add_cancel_left(a, c + d, 0,
+             calc a + (c + d)
+                = (a + c) + d   by Equality.symmetry(Natural.add_associative(a, c, d))
+                = b + d         by (calc a + c = b by Equality.symmetry(bEquation))
+                = a             by Equality.symmetry(aEquation)
+                = a + 0         by Equality.symmetry(Natural.add_zero(a)));
+  claim cIsZero : c = 0 by Natural.add_eq_zero_implies_left_zero(c, d, sumIsZero);
+  calc a
+     = a + 0   by Equality.symmetry(Natural.add_zero(a))
+     = a + c   by (calc 0 = c by Equality.symmetry(cIsZero))
+     = b       by Equality.symmetry(bEquation)
+}
