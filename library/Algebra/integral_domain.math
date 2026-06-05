@@ -1,0 +1,158 @@
+-- Algebra/integral_domain.math
+--
+-- An *integral domain*: a commutative ring with `1 ≠ 0` and no zero
+-- divisors. This is the base structure for the factorization tower
+-- (integral domain → principal ideal domain → unique factorization
+-- domain). Bundled like `CommutativeRing` so a generic factorization
+-- argument threads one `d : IntegralDomain` instead of the carrier,
+-- operations, and a pile of law proofs.
+--
+-- The headline derived fact is `IntegralDomain.multiply_cancel_left`:
+-- with no zero divisors, a nonzero factor cancels. Cancellation is what
+-- makes "factorization is unique up to units and order" meaningful — it
+-- is used pervasively downstream.
+--
+-- `Ring.IsUnit` (an element dividing `1`) also lives here; it needs no
+-- domain hypothesis but belongs with the divisibility vocabulary that
+-- the factorization development is built from.
+
+module Algebra.integral_domain
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Algebra.monoid
+import Algebra.group
+import Algebra.group_lemmas
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.ring_difference
+import Algebra.ring_divisibility
+import Algebra.commutative_ring_bundle
+
+-- ----------------------------------------------------------------------
+-- No zero divisors.
+
+-- A ring has no zero divisors when a product is zero only if one of the
+-- factors is zero.
+definition Ring.HasNoZeroDivisors (s : Ring) : Proposition :=
+  (x y : Ring.carrier(s))
+    → Ring.multiply(s, x, y) = Ring.zero(s)
+    → x = Ring.zero(s) ∨ y = Ring.zero(s)
+
+-- ----------------------------------------------------------------------
+-- The integral-domain bundle.
+
+-- A commutative ring with `1 ≠ 0` and no zero divisors. Lives in
+-- Type(1) because it carries a `CommutativeRing` (itself in Type(1)).
+inductive IntegralDomain : Type(1) where
+  | IntegralDomain.make
+      : (commutativeRing : CommutativeRing)
+        → ¬(Ring.one(CommutativeRing.ring(commutativeRing))
+              = Ring.zero(CommutativeRing.ring(commutativeRing)))
+        → Ring.HasNoZeroDivisors(CommutativeRing.ring(commutativeRing))
+        → IntegralDomain
+
+-- ----------------------------------------------------------------------
+-- Field projections. `ring`, `carrier`, and `commutative` factor through
+-- the bundled `CommutativeRing`; `nontrivial` and `no_zero_divisors`
+-- read the two extra fields off the constructor.
+
+definition IntegralDomain.commutativeRing : IntegralDomain → CommutativeRing
+  | IntegralDomain.make(commutativeRing, nontrivial, noZeroDivisors) =>
+      commutativeRing
+
+definition IntegralDomain.ring (d : IntegralDomain) : Ring :=
+  CommutativeRing.ring(IntegralDomain.commutativeRing(d))
+
+definition IntegralDomain.carrier (d : IntegralDomain) : Type(0) :=
+  Ring.carrier(IntegralDomain.ring(d))
+
+definition IntegralDomain.commutative (d : IntegralDomain)
+        : Ring.MultiplyCommutative(IntegralDomain.ring(d)) :=
+  CommutativeRing.commutative(IntegralDomain.commutativeRing(d))
+
+definition IntegralDomain.nontrivial (d : IntegralDomain)
+        : ¬(Ring.one(IntegralDomain.ring(d))
+              = Ring.zero(IntegralDomain.ring(d))) :=
+  cases d { | IntegralDomain.make(commutativeRing, nontrivial, noZeroDivisors) =>
+    nontrivial }
+
+definition IntegralDomain.no_zero_divisors (d : IntegralDomain)
+        : Ring.HasNoZeroDivisors(IntegralDomain.ring(d)) :=
+  cases d { | IntegralDomain.make(commutativeRing, nontrivial, noZeroDivisors) =>
+    noZeroDivisors }
+
+-- ----------------------------------------------------------------------
+-- Difference-and-zero helpers over a plain ring.
+
+-- a·(x − y) = a·x − a·y. Distributivity on the left plus pushing the
+-- negation through the product.
+theorem Ring.multiply_difference_left (s : Ring) (a x y : Ring.carrier(s))
+        : Ring.multiply(s, a, x - y)
+          = Ring.multiply(s, a, x) - Ring.multiply(s, a, y) :=
+  calc Ring.multiply(s, a, x - y)
+     = Ring.multiply(s, a, x) + Ring.multiply(s, a, Ring.negate(s, y))
+           by Ring.distributivity_left
+     = Ring.multiply(s, a, x) + Ring.negate(s, Ring.multiply(s, a, y))
+           by Ring.multiply_negate_right(
+                  Ring.carrier(s), Ring.add, Ring.zero(s), Ring.negate,
+                  Ring.multiply, Ring.one(s), Ring.is_ring(s), a, y)
+     = Ring.multiply(s, a, x) - Ring.multiply(s, a, y)
+
+-- If x − y = 0 then x = y. A specialisation of the linear-combination
+-- cancellation lemma (the trivial combination 0 = 0).
+theorem Ring.equal_of_difference_zero (s : Ring) (x y : Ring.carrier(s))
+        (differenceZero : x - y = Ring.zero(s))
+        : x = y :=
+  Ring.equal_of_linear_combination(
+      Ring.carrier(s), Ring.add, Ring.zero(s), Ring.negate, Ring.multiply,
+      Ring.one(s), Ring.is_ring(s), x, y, Ring.zero(s), Ring.zero(s),
+      reflexivity(Ring.carrier(s), Ring.zero(s)),
+      calc x - y
+         = Ring.zero(s)
+         = Ring.zero(s) - Ring.zero(s))
+
+-- ----------------------------------------------------------------------
+-- Cancellation in a domain.
+
+-- Left cancellation: a ≠ 0 and a·x = a·y force x = y. From the equation,
+-- a·(x − y) = 0; no zero divisors plus a ≠ 0 give x − y = 0, hence x = y.
+theorem IntegralDomain.multiply_cancel_left (d : IntegralDomain)
+        (a x y : Ring.carrier(IntegralDomain.ring(d)))
+        (aNonzero : ¬(a = Ring.zero(IntegralDomain.ring(d))))
+        (equation : Ring.multiply(IntegralDomain.ring(d), a, x)
+                  = Ring.multiply(IntegralDomain.ring(d), a, y))
+        : x = y := {
+  let s : Ring := IntegralDomain.ring(d);
+  claim productDifferenceZero
+      : Ring.multiply(s, a, x - y) = Ring.zero(s)
+      by calc Ring.multiply(s, a, x - y)
+            = Ring.multiply(s, a, x) - Ring.multiply(s, a, y)
+                  by Ring.multiply_difference_left(s, a, x, y)
+            = Ring.multiply(s, a, y) - Ring.multiply(s, a, y)
+                  by equation
+            = Ring.zero(s);
+  claim factorIsZero : a = Ring.zero(s) ∨ (x - y) = Ring.zero(s)
+      by IntegralDomain.no_zero_divisors(d, a, x - y, productDifferenceZero);
+  claim by cases {
+    in (a = Ring.zero(s)) as aIsZero:
+        absurd(aNonzero(aIsZero))
+    in ((x - y) = Ring.zero(s)) as differenceZero:
+        Ring.equal_of_difference_zero(s, x, y, differenceZero)
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Units.
+
+-- A unit is an element that divides 1, i.e. has a multiplicative
+-- inverse. Stated over a plain ring (no domain hypothesis needed).
+definition Ring.IsUnit (s : Ring) (u : Ring.carrier(s)) : Proposition :=
+  Ring.divides(s, u, Ring.one(s))
+
+-- 1 is a unit (it divides itself).
+theorem Ring.one_is_unit (s : Ring) : Ring.IsUnit(s, Ring.one(s)) :=
+  Ring.divides_reflexive(s, Ring.one(s))
