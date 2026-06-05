@@ -2286,6 +2286,27 @@ private:
         LevelPointer carrierLevel,
         int line);
 
+    // Additive-inverse cancellation (fingerprint plan Phase 2, increment 2c):
+    // in an AC-normalised sum, repeatedly cancel a summand against its
+    // negation (`M + negate(M) → 0`). Each round permutes the pair to the
+    // front (proveProductEqualsSorted, using `+`-commutativity), cancels via
+    // `Ring.add_negate_left/right`, and drops the resulting `0` via
+    // `Ring.zero_add`. Emits `e = cancelled`. Gated on those laws being in
+    // scope. Run AFTER ringACFullNorm.
+    ACNormResult ringCancelInverses(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line);
+
+    // λz. assembleLeftAssociatedProduct(opName, [z] ++ tail) — the left-assoc
+    // fold with a hole at the head. `tail` is lifted under the new binder.
+    ExpressionPointer buildLeftAssocFoldLambda(
+        const std::string& opName,
+        const std::vector<ExpressionPointer>& tail,
+        ExpressionPointer carrierType);
+
     // Identity elimination (fingerprint plan Phase 2, increment 2b): rewrite
     // `e` bottom-up dropping additive `0` (`x+0`,`0+x`), multiplicative `1`
     // (`x·1`,`1·x`), annihilating `0`-products (`x·0`,`0·x`), and `-0`.

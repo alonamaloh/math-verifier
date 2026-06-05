@@ -1395,6 +1395,142 @@ Elaborator::ACNormResult Elaborator::ringDistribute(
             e, buildReflexivity(carrierLevel, carrierType, e)};
     }
 
+ExpressionPointer Elaborator::buildLeftAssocFoldLambda(
+        const std::string& opName,
+        const std::vector<ExpressionPointer>& tail,
+        ExpressionPointer carrierType) {
+        ExpressionPointer body = makeBoundVariable(0);
+        for (const auto& t : tail) {
+            body = buildRingOp(opName, body, liftBoundVariables(t, 1, 0));
+        }
+        return makeLambda("_canc_z", carrierType, body);
+    }
+
+Elaborator::ACNormResult Elaborator::ringCancelInverses(
+        ExpressionPointer e,
+        const RingAxiomNames& addAxioms,
+        ExpressionPointer carrierType,
+        LevelPointer carrierLevel,
+        int line) {
+        if (environment_.lookup("Ring.add_negate_left") == nullptr
+            || environment_.lookup("Ring.add_negate_right") == nullptr
+            || environment_.lookup("Ring.zero_add") == nullptr) {
+            return ACNormResult{
+                e, buildReflexivity(carrierLevel, carrierType, e)};
+        }
+        std::vector<ExpressionPointer> summands;
+        if (!flattenRingProduct(e, addAxioms.op, summands)
+            || summands.size() < 2) {
+            return ACNormResult{
+                e, buildReflexivity(carrierLevel, carrierType, e)};
+        }
+        // Is one of x,y the additive negation of the other?  Returns the
+        // proof builder choice via `leftIsNegated` (x = negate(y)).
+        auto inversePair = [&](ExpressionPointer x, ExpressionPointer y,
+                               bool& leftIsNegated) -> bool {
+            ExpressionPointer inner;
+            if (matchUnaryRingNegate(x, "Ring.negate", inner)
+                && structurallyEqual(inner, y)) {
+                leftIsNegated = true; return true;
+            }
+            if (matchUnaryRingNegate(y, "Ring.negate", inner)
+                && structurallyEqual(inner, x)) {
+                leftIsNegated = false; return true;
+            }
+            return false;
+        };
+        for (size_t i = 0; i < summands.size(); ++i) {
+            for (size_t j = i + 1; j < summands.size(); ++j) {
+                bool leftIsNegated = false;
+                if (!inversePair(summands[i], summands[j], leftIsNegated)) {
+                    continue;
+                }
+                ExpressionPointer p = summands[i];
+                ExpressionPointer q = summands[j];
+                std::vector<ExpressionPointer> rest;
+                for (size_t k = 0; k < summands.size(); ++k) {
+                    if (k != i && k != j) rest.push_back(summands[k]);
+                }
+                // Permute so the cancelling pair leads: [p, q, rest...].
+                std::vector<ExpressionPointer> target;
+                target.push_back(p);
+                target.push_back(q);
+                for (const auto& r : rest) target.push_back(r);
+                ExpressionPointer permProof = proveProductEqualsSorted(
+                    e, summands, target, addAxioms, carrierType,
+                    carrierLevel, line);  // e = leftAssoc(target)
+                ExpressionPointer pairSum = buildRingOp(addAxioms.op, p, q);
+                ExpressionPointer zero = ringConst("Ring.zero");
+                // pairProof : p + q = 0.
+                ExpressionPointer pairProof;
+                if (leftIsNegated) {  // p = negate(q): negate(q)+q = 0
+                    pairProof = makeApplication(
+                        ringConst("Ring.add_negate_left"), q);
+                } else {              // q = negate(p): p+negate(p) = 0
+                    pairProof = makeApplication(
+                        ringConst("Ring.add_negate_right"), p);
+                }
+                ExpressionPointer leftAssocTarget =
+                    assembleLeftAssociatedProduct(addAxioms.op, target);
+                ACNormResult reduced;
+                if (rest.empty()) {
+                    // leftAssoc([p,q]) = pairSum; pairProof : pairSum = 0.
+                    reduced = ACNormResult{zero, pairProof};
+                } else {
+                    // step1: pairSum → 0 under λz. foldLeft([z]++rest).
+                    ExpressionPointer foldLambda = buildLeftAssocFoldLambda(
+                        addAxioms.op, rest, carrierType);
+                    std::vector<ExpressionPointer> zeroThenRest;
+                    zeroThenRest.push_back(zero);
+                    for (const auto& r : rest) zeroThenRest.push_back(r);
+                    ExpressionPointer zeroForm = assembleLeftAssociatedProduct(
+                        addAxioms.op, zeroThenRest);
+                    ExpressionPointer step1 =
+                        buildEqualityCongruenceSameCarrier(
+                            carrierLevel, carrierType, foldLambda,
+                            pairSum, zero, pairProof);
+                    // step2: drop the leading zero: (0 + rest0) → rest0.
+                    ExpressionPointer zeroAdd = makeApplication(
+                        ringConst("Ring.zero_add"), rest[0]);
+                    ExpressionPointer reducedForm =
+                        assembleLeftAssociatedProduct(addAxioms.op, rest);
+                    ExpressionPointer step2;
+                    if (rest.size() == 1) {
+                        step2 = zeroAdd;  // zeroForm == 0 + rest0 directly
+                    } else {
+                        std::vector<ExpressionPointer> tail(
+                            rest.begin() + 1, rest.end());
+                        ExpressionPointer tailLambda =
+                            buildLeftAssocFoldLambda(
+                                addAxioms.op, tail, carrierType);
+                        ExpressionPointer zeroPlusRest0 =
+                            buildRingOp(addAxioms.op, zero, rest[0]);
+                        step2 = buildEqualityCongruenceSameCarrier(
+                            carrierLevel, carrierType, tailLambda,
+                            zeroPlusRest0, rest[0], zeroAdd);
+                    }
+                    ExpressionPointer reduceProof = buildEqualityTransitivity(
+                        carrierLevel, carrierType, leftAssocTarget, zeroForm,
+                        reducedForm, step1, step2);
+                    reduced = ACNormResult{reducedForm, reduceProof};
+                }
+                // e = leftAssoc(target) = reduced ; then recurse on reduced.
+                ExpressionPointer eToReduced = buildEqualityTransitivity(
+                    carrierLevel, carrierType, e, leftAssocTarget,
+                    reduced.canonical, permProof, reduced.proof);
+                ACNormResult rec = ringCancelInverses(
+                    reduced.canonical, addAxioms, carrierType, carrierLevel,
+                    line);
+                ExpressionPointer proof = buildEqualityTransitivity(
+                    carrierLevel, carrierType, e, reduced.canonical,
+                    rec.canonical, eToReduced, rec.proof);
+                return ACNormResult{rec.canonical, proof};
+            }
+        }
+        return ACNormResult{
+            e, buildReflexivity(carrierLevel, carrierType, e)};
+    }
+
 ExpressionPointer Elaborator::unfoldRingSubtract(ExpressionPointer e) {
         ExpressionPointer a, b;
         if (matchBinaryRingOp(e, "Ring.subtract", a, b)) {
@@ -1757,6 +1893,10 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
                 chain(ringSimplifyIdentities(cur, addAxioms, mulAxioms,
                     carrierOpened, carrierLevel, line));
                 chain(ringACFullNorm(cur, addAxioms, mulAxioms,
+                    carrierOpened, carrierLevel, line));
+                // Cancel additive-inverse pairs (M + negate(M) → 0); the
+                // result stays sorted (a subsequence of the sorted sum).
+                chain(ringCancelInverses(cur, addAxioms,
                     carrierOpened, carrierLevel, line));
                 return ACNormResult{cur, proof};
             };
