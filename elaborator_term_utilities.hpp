@@ -17,6 +17,7 @@
 #include "level.hpp"
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -106,4 +107,40 @@ ExpressionPointer abstractStructuralOccurrence(
     ExpressionPointer target,
     int currentDepth,
     int& occurrenceCount);
+
+
+// ---- more pure term helpers (defs in .cpp) ----
+
+ExpressionPointer liftBoundVariables(
+    ExpressionPointer expression, int increment, int threshold);
+
+int countLeadingPis(ExpressionPointer type);
+
+size_t countExpressionNodes(ExpressionPointer e);
+
+std::string applicationHeadConstantName(
+    ExpressionPointer expression);
+
+ExpressionPointer zetaUnfoldLetBinders(
+    ExpressionPointer expression,
+    const std::vector<LocalBinder>& localBinders,
+    int currentDepth);
+
+Context buildContextFromLocalBinders(
+    const std::vector<LocalBinder>& localBinders);
+
+ExpressionPointer substituteBoundVariable(
+    ExpressionPointer body, ExpressionPointer argument, int target);
+
+
+// ---- let-binder zeta-unfolding + free-variable substitution ----
+
+ExpressionPointer zetaUnfoldLetBinders(
+    ExpressionPointer term,
+    const std::vector<LocalBinder>& localBinders);
+
+ExpressionPointer substituteFreeVariables(
+    ExpressionPointer expression,
+    const std::map<std::string, ExpressionPointer>& assignment,
+    int binderDepth = 0);
 

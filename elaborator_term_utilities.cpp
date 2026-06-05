@@ -289,3 +289,262 @@ ExpressionPointer abstractStructuralOccurrence(
     return expression;
 }
 
+
+ExpressionPointer liftBoundVariables(
+    ExpressionPointer expression, int increment, int threshold) {
+    if (auto* bv =
+            std::get_if<BoundVariable>(&expression->node)) {
+        if (bv->deBruijnIndex >= threshold) {
+            return makeBoundVariable(
+                bv->deBruijnIndex + increment);
+        }
+        return expression;
+    }
+    if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        return makePi(pi->displayHint,
+            liftBoundVariables(pi->domain, increment, threshold),
+            liftBoundVariables(pi->codomain, increment,
+                                 threshold + 1));
+    }
+    if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        return makeLambda(lambda->displayHint,
+            liftBoundVariables(lambda->domain, increment, threshold),
+            liftBoundVariables(lambda->body, increment,
+                                 threshold + 1));
+    }
+    if (auto* app = std::get_if<Application>(&expression->node)) {
+        return makeApplication(
+            liftBoundVariables(app->function, increment, threshold),
+            liftBoundVariables(app->argument, increment, threshold));
+    }
+    return expression;
+}
+
+int countLeadingPis(ExpressionPointer type) {
+    int count = 0;
+    ExpressionPointer cursor = type;
+    while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+        ++count;
+        cursor = pi->codomain;
+    }
+    return count;
+}
+
+size_t countExpressionNodes(ExpressionPointer e) {
+    size_t total = 1;
+    if (auto* app = std::get_if<Application>(&e->node)) {
+        total += countExpressionNodes(app->function);
+        total += countExpressionNodes(app->argument);
+    } else if (auto* pi = std::get_if<Pi>(&e->node)) {
+        total += countExpressionNodes(pi->domain);
+        total += countExpressionNodes(pi->codomain);
+    } else if (auto* lambda = std::get_if<Lambda>(&e->node)) {
+        total += countExpressionNodes(lambda->domain);
+        total += countExpressionNodes(lambda->body);
+    } else if (auto* let = std::get_if<Let>(&e->node)) {
+        total += countExpressionNodes(let->type);
+        total += countExpressionNodes(let->value);
+        total += countExpressionNodes(let->body);
+    }
+    return total;
+}
+
+std::string applicationHeadConstantName(
+    ExpressionPointer expression) {
+    ExpressionPointer cursor = expression;
+    while (auto* app = std::get_if<Application>(&cursor->node)) {
+        cursor = app->function;
+    }
+    if (auto* c = std::get_if<Constant>(&cursor->node)) {
+        return c->name;
+    }
+    return std::string();
+}
+
+ExpressionPointer zetaUnfoldLetBinders(
+    ExpressionPointer expression,
+    const std::vector<LocalBinder>& localBinders,
+    int currentDepth) {
+    if (auto* boundVariable =
+            std::get_if<BoundVariable>(&expression->node)) {
+        int index = boundVariable->deBruijnIndex;
+        if (index >= currentDepth) {
+            int localOffset = index - currentDepth;
+            int arrayIndex =
+                static_cast<int>(localBinders.size()) - 1 - localOffset;
+            if (arrayIndex >= 0
+                && arrayIndex
+                   < static_cast<int>(localBinders.size())
+                && localBinders[arrayIndex].value) {
+                // The let's value was elaborated in a scope that
+                // contained the localBinders BELOW it (indices 0
+                // ..arrayIndex-1) but not the ones ABOVE it. Shift
+                // its BVs up by the number of binders above it
+                // plus the current in-expression depth to land in
+                // our scope. Recursively unfold the value too so
+                // chained let-bindings collapse fully.
+                // The let's value V was elaborated in a smaller
+                // scope (the binders below it, size = arrayIndex).
+                // Lift V to interpret its BVs in the current
+                // localBinders scope; recursively unfold any
+                // chained let-references it contains; then shift
+                // for the in-expression depth.
+                int bindersIntroducedSince =
+                    static_cast<int>(localBinders.size())
+                    - arrayIndex;
+                ExpressionPointer valueInCurrentScope = shift(
+                    localBinders[arrayIndex].value,
+                    bindersIntroducedSince);
+                ExpressionPointer unfolded = zetaUnfoldLetBinders(
+                    valueInCurrentScope, localBinders,
+                    /*currentDepth=*/0);
+                return shift(unfolded, currentDepth);
+            }
+        }
+        return expression;
+    }
+    if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        return makePi(pi->displayHint,
+            zetaUnfoldLetBinders(pi->domain, localBinders, currentDepth),
+            zetaUnfoldLetBinders(pi->codomain, localBinders,
+                                  currentDepth + 1));
+    }
+    if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        return makeLambda(lambda->displayHint,
+            zetaUnfoldLetBinders(lambda->domain, localBinders,
+                                  currentDepth),
+            zetaUnfoldLetBinders(lambda->body, localBinders,
+                                  currentDepth + 1));
+    }
+    if (auto* application =
+            std::get_if<Application>(&expression->node)) {
+        return makeApplication(
+            zetaUnfoldLetBinders(application->function, localBinders,
+                                  currentDepth),
+            zetaUnfoldLetBinders(application->argument, localBinders,
+                                  currentDepth));
+    }
+    if (auto* letNode = std::get_if<Let>(&expression->node)) {
+        return makeLet(letNode->displayHint,
+            zetaUnfoldLetBinders(letNode->type, localBinders,
+                                  currentDepth),
+            zetaUnfoldLetBinders(letNode->value, localBinders,
+                                  currentDepth),
+            zetaUnfoldLetBinders(letNode->body, localBinders,
+                                  currentDepth + 1));
+    }
+    return expression;
+}
+
+Context buildContextFromLocalBinders(
+    const std::vector<LocalBinder>& localBinders) {
+    Context result;
+    result.reserve(localBinders.size());
+    for (size_t i = 0; i < localBinders.size(); ++i) {
+        ExpressionPointer openedType = openOverLocalBinders(
+            localBinders[i].type, localBinders, i);
+        ExpressionPointer openedValue = nullptr;
+        if (localBinders[i].value) {
+            openedValue = openOverLocalBinders(
+                localBinders[i].value, localBinders, i);
+        }
+        result.push_back({openingNameFor(localBinders, i), openedType,
+                          FreeVariableOrigin::Internal, openedValue});
+    }
+    return result;
+}
+
+ExpressionPointer substituteBoundVariable(
+    ExpressionPointer body, ExpressionPointer argument, int target) {
+    if (auto* bv = std::get_if<BoundVariable>(&body->node)) {
+        if (bv->deBruijnIndex == target) {
+            return argument;
+        }
+        if (bv->deBruijnIndex > target) {
+            return makeBoundVariable(bv->deBruijnIndex - 1);
+        }
+        return body;
+    }
+    if (auto* app = std::get_if<Application>(&body->node)) {
+        return makeApplication(
+            substituteBoundVariable(app->function, argument, target),
+            substituteBoundVariable(app->argument, argument, target));
+    }
+    if (auto* lam = std::get_if<Lambda>(&body->node)) {
+        // Walk under the binder.
+        // Lift `argument` by 1 because the body inside the lambda
+        // has one more binding.
+        ExpressionPointer argLifted =
+            liftBoundVariables(argument, 1, 0);
+        return makeLambda(lam->displayHint,
+            substituteBoundVariable(lam->domain, argument, target),
+            substituteBoundVariable(lam->body, argLifted, target + 1));
+    }
+    if (auto* pi = std::get_if<Pi>(&body->node)) {
+        ExpressionPointer argLifted =
+            liftBoundVariables(argument, 1, 0);
+        return makePi(pi->displayHint,
+            substituteBoundVariable(pi->domain, argument, target),
+            substituteBoundVariable(pi->codomain, argLifted, target + 1));
+    }
+    return body;
+}
+
+
+ExpressionPointer zetaUnfoldLetBinders(
+    ExpressionPointer term,
+    const std::vector<LocalBinder>& localBinders) {
+    std::map<std::string, ExpressionPointer> assignment;
+    for (size_t i = 0; i < localBinders.size(); ++i) {
+        if (localBinders[i].value) {
+            assignment[openingNameFor(localBinders, i)] =
+                openOverLocalBinders(
+                    localBinders[i].value, localBinders, i);
+        }
+    }
+    if (assignment.empty()) return term;
+    ExpressionPointer opened = openOverLocalBinders(
+        term, localBinders, localBinders.size());
+    ExpressionPointer substituted =
+        substituteFreeVariables(opened, assignment);
+    return closeOverLocalBinders(
+        substituted, localBinders, localBinders.size());
+}
+
+ExpressionPointer substituteFreeVariables(
+    ExpressionPointer expression,
+    const std::map<std::string, ExpressionPointer>& assignment,
+    int binderDepth) {
+    if (auto* freeVariable =
+            std::get_if<FreeVariable>(&expression->node)) {
+        auto iterator = assignment.find(freeVariable->name);
+        if (iterator != assignment.end()) {
+            return shift(iterator->second, binderDepth);
+        }
+        return expression;
+    }
+    if (auto* pi = std::get_if<Pi>(&expression->node)) {
+        return makePi(pi->displayHint,
+            substituteFreeVariables(pi->domain, assignment,
+                                      binderDepth),
+            substituteFreeVariables(pi->codomain, assignment,
+                                      binderDepth + 1));
+    }
+    if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+        return makeLambda(lambda->displayHint,
+            substituteFreeVariables(lambda->domain, assignment,
+                                      binderDepth),
+            substituteFreeVariables(lambda->body, assignment,
+                                      binderDepth + 1));
+    }
+    if (auto* application =
+            std::get_if<Application>(&expression->node)) {
+        return makeApplication(
+            substituteFreeVariables(application->function, assignment,
+                                      binderDepth),
+            substituteFreeVariables(application->argument, assignment,
+                                      binderDepth));
+    }
+    return expression;
+}
+
