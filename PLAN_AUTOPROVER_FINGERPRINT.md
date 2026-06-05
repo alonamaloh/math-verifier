@@ -34,8 +34,17 @@ Dropped the explicit `by IntegralDomain.commutative(d,…)` citations across
 associate/irreducible/principal_ideal_domain/euclidean_domain/unique_
 factorization (multi-step reassoc+swap chains collapse to one `ring` step).
 
-**NEXT = clean the 9 concrete-carrier warn sites** (deferred to last by
-request). Optional: local-hypothesis commutativity witness (would close
+**ALL 8 EXPENSIVE WARN SITES CLEANED.** Textbook-shaped translations, no
+`ring` involvement (they're hidden computations, not ring goals): name the
+quotient representatives in the claim so the exact-bridge matches directly
+(Integer.sign 421K->3K, Rational.reciprocal_function 315K->8K); state the
+disjunct (Natural.factorization); `by Natural.power_positive` (PAdic);
+explicit calc rung (Natural.prime_divides_product); and for the product-of-
+fractions case (Rational.order_multiplication) cite `Quotient.exact` so the
+multiply-lift reduction runs once in the kernel check, not per search
+candidate. Library now warning-free at the default 50K threshold.
+
+Optional remaining: local-hypothesis commutativity witness (would close
 RingModulo.multiply_respects' lone `by commutativity`); a library-wide
 collapse of calc chains Phase 4 newly made redundant.
 Phase 0
