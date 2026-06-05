@@ -66,6 +66,28 @@ std::vector<LemmaSearchHit> computeGoalHits(
 // mentions-these-symbols mode (Coq `Search`). Lemmas whose statement
 // mentions every name in `wanted`, ranked by specificity (fewer total
 // constants first). `excludedNames` as above.
+//
+// A wanted token matches a constant either exactly (`Natural.monus`) or by
+// the constant-name SUFFIX after the last `.` (`monus` matches
+// `Natural.monus`). A token that matches several fully-qualified constants
+// is satisfied if a lemma mentions ANY of them.
 std::vector<LemmaSearchHit> computeMentionHits(
+    const Environment& environment, const std::vector<std::string>& wanted,
+    const std::set<std::string>& excludedNames = {});
+
+// How one `--mentions` token relates to the constants known to the
+// library: whether it was recognized at all, and — when it was not — the
+// closest known fully-qualified constant names to suggest in a diagnostic.
+struct MentionTokenReport {
+    std::string token;
+    bool recognized = false;             // matched some constant (exact or suffix)
+    std::vector<std::string> suggestions;  // nearest names when unrecognized
+};
+
+// Classify every `--mentions` token against the constants that occur in
+// searchable declarations of `environment`. Lets the CLI tell "name not
+// recognized" apart from "name recognized but no single lemma mentions all
+// of them". `excludedNames` as above.
+std::vector<MentionTokenReport> classifyMentionTokens(
     const Environment& environment, const std::vector<std::string>& wanted,
     const std::set<std::string>& excludedNames = {});

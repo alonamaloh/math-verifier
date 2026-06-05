@@ -5798,8 +5798,18 @@ int searchByGoal(const Environment& environment,
     std::vector<LemmaSearchHit> hits =
         computeGoalHits(environment, goalType, goalHead, excludedNames);
     if (goalHead.empty()) {
-        std::cerr << "search: goal conclusion has no Constant head "
-                     "(nothing to index on)\n";
+        std::cerr << "search: goal conclusion has no constant head to index "
+                     "on.\n"
+                     "  The conclusion (after stripping leading binders and "
+                     "unfolding definitions)\n"
+                     "  reduces to something headed by a binder or a free "
+                     "variable rather than a\n"
+                     "  named constant. If you wrote `Not(P)`, that is already "
+                     "unfolded to `P → False`\n"
+                     "  for you, so this usually means the conclusion is a bare "
+                     "variable. Try phrasing\n"
+                     "  the goal so its conclusion is headed by a named "
+                     "constant or `… → False`.\n";
         return 1;
     }
     if (hits.empty()) {
@@ -5822,10 +5832,43 @@ int searchByMentions(const Environment& environment,
                      const std::map<std::string, std::string>& nameToSource,
                      const std::set<std::string>& excludedNames,
                      const std::vector<std::string>& wanted, size_t cap) {
+    // First separate "you typed a name the library has never heard of" from
+    // "every name is real, but no single lemma mentions all of them at once".
+    // The old code conflated the two and printed the same misleading
+    // "nothing found" for both — most often when a name was simply not
+    // fully qualified.
+    std::vector<MentionTokenReport> reports =
+        classifyMentionTokens(environment, wanted, excludedNames);
+    bool anyUnrecognized = false;
+    for (const auto& report : reports) {
+        if (!report.recognized) {
+            anyUnrecognized = true;
+            std::cerr << "search: unrecognized symbol `" << report.token
+                      << "` (no library constant matches it";
+            if (!report.suggestions.empty()) {
+                std::cerr << "; did you mean ";
+                for (size_t i = 0; i < report.suggestions.size(); ++i) {
+                    if (i > 0) std::cerr << ", ";
+                    std::cerr << "`" << report.suggestions[i] << "`";
+                }
+                std::cerr << "?";
+            }
+            std::cerr << ")\n";
+        }
+    }
+    if (anyUnrecognized) {
+        std::cerr << "  Tip: --mentions accepts either a fully-qualified name "
+                     "(Natural.monus) or just\n"
+                     "  the final segment (monus). Names are matched against "
+                     "the constant-name suffix.\n";
+        return 1;
+    }
+
     std::vector<LemmaSearchHit> hits =
         computeMentionHits(environment, wanted, excludedNames);
     if (hits.empty()) {
-        std::cout << "no lemmas mention all of the given symbols.\n";
+        std::cout << "every symbol is recognized, but no single lemma mentions "
+                     "all of them together.\n";
         return 0;
     }
     size_t shown = std::min(cap, hits.size());
@@ -5838,6 +5881,57 @@ int searchByMentions(const Environment& environment,
     return 0;
 }
 
+// Full usage for the `search` subcommand, written to `stream` (std::cout
+// for an explicit --help, std::cerr on the error path). Documents both
+// modes with copy-pasteable examples, the name-qualification rule, and the
+// shared flags.
+void printSearchUsage(std::ostream& stream) {
+    stream <<
+        "kernel search — find library lemmas by shape or by mentioned "
+        "constants.\n"
+        "\n"
+        "Usage:\n"
+        "  kernel search [--cache-root DIR] [--limit N] --goal \"TYPE\"\n"
+        "  kernel search [--cache-root DIR] [--limit N] --mentions a,b,c\n"
+        "\n"
+        "Modes (provide exactly one):\n"
+        "  --goal \"TYPE\"   PRIMARY, most useful mode. Find lemmas whose "
+        "CONCLUSION\n"
+        "                   first-order-matches TYPE. Write the goal's free "
+        "variables as\n"
+        "                   leading binders; results are ranked by how few "
+        "hypotheses\n"
+        "                   ([needs: …]) remain after applying the lemma. A "
+        "`Not(P)`\n"
+        "                   conclusion is unfolded to `P → False` for you, so "
+        "either form\n"
+        "                   works.\n"
+        "                     kernel search --goal \"(a b : Natural) → a + b "
+        "= b + a\"\n"
+        "                     kernel search --goal \"(n : Natural) → "
+        "Not(n = n)\"\n"
+        "\n"
+        "  --mentions a,b,c Find lemmas whose statement mentions ALL the named "
+        "constants\n"
+        "                   (like Coq's Search). Each name may be "
+        "fully-qualified\n"
+        "                   (Natural.monus) or just the final segment after the "
+        "last dot\n"
+        "                   (monus, which matches Natural.monus). An "
+        "unrecognized name is\n"
+        "                   reported with the closest known constants.\n"
+        "                     kernel search --mentions Natural.monus,Natural.add\n"
+        "                     kernel search --mentions monus,add\n"
+        "\n"
+        "Flags:\n"
+        "  --cache-root DIR The built-library cache to search (default: "
+        "`build`).\n"
+        "  --limit N        Show at most N results (default: 20). The total "
+        "match count\n"
+        "                   is always reported.\n"
+        "  --help, -h       Show this message.\n";
+}
+
 // `kernel search --cache-root DIR (--goal "TYPE" | --mentions a,b,c)`.
 int runSearch(int argc, char* argv[]) {
     std::string cacheRoot = "build";
@@ -5848,6 +5942,10 @@ int runSearch(int argc, char* argv[]) {
         State::None;
     for (int i = 2; i < argc; ++i) {
         std::string argument = argv[i];
+        if (argument == "--help" || argument == "-h") {
+            printSearchUsage(std::cout);
+            return 0;
+        }
         if (argument == "--cache-root") { state = State::CacheRoot; continue; }
         if (argument == "--goal")       { state = State::Goal; continue; }
         if (argument == "--mentions")   { state = State::Mentions; continue; }
@@ -5859,14 +5957,22 @@ int runSearch(int argc, char* argv[]) {
             case State::Cap:       cap = std::stoul(argument); break;
             case State::None:
                 std::cerr << "search: unexpected argument " << argument
-                          << "\n";
+                          << "\n\n";
+                printSearchUsage(std::cerr);
                 return 1;
         }
         state = State::None;
     }
+    // No mode given (the bare `kernel search`) — show the full usage rather
+    // than a one-line scold, so the user sees both modes and their examples.
+    if (goalText.empty() && mentionsText.empty()) {
+        printSearchUsage(std::cerr);
+        return 1;
+    }
     if (goalText.empty() == mentionsText.empty()) {
         std::cerr << "search: provide exactly one of --goal \"TYPE\" or "
-                     "--mentions a,b,c\n";
+                     "--mentions a,b,c\n\n";
+        printSearchUsage(std::cerr);
         return 1;
     }
     kernelCacheEnabled = true;
@@ -6240,7 +6346,10 @@ int main(int argc, char* argv[]) {
                   << "                      leading binders, e.g.\n"
                   << "                      \"(a c b : Natural) -> a + b <= c + b\").\n"
                   << "                      --mentions: lemmas whose statement\n"
-                  << "                      mentions all the named constants.\n"
+                  << "                      mentions all the named constants\n"
+                  << "                      (fully-qualified or final segment).\n"
+                  << "                      Run `kernel search --help` for the\n"
+                  << "                      full mode-by-mode reference.\n"
                   << "                      Default --cache-root is `build`.\n";
         return 0;
     }

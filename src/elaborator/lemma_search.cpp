@@ -33,11 +33,22 @@ struct PeeledType {
 // `origin`. Binder names come from the Pi display hints, deduped so the
 // opened term is unambiguous. The stored domains reference earlier
 // binders by their opened names.
-PeeledType peelLeadingPis(ExpressionPointer type,
+//
+// Each step is weak-head normalized first, so a conclusion that only
+// becomes an arrow after unfolding a definition — most importantly
+// `Not(proposition)`, which reduces to `proposition → False` — keeps
+// peeling instead of stalling on the unreduced Constant head. This lets a
+// `--goal "… → Not(P)"` query index on `False` (the true head of the
+// unfolded conclusion) and match library lemmas that conclude `… → False`.
+PeeledType peelLeadingPis(const Environment& environment,
+                          ExpressionPointer type,
                           FreeVariableOrigin origin) {
     PeeledType result;
     std::set<std::string> used;
-    while (auto* pi = std::get_if<Pi>(&type->node)) {
+    while (true) {
+        ExpressionPointer normalized = weakHeadNormalForm(environment, type);
+        auto* pi = std::get_if<Pi>(&normalized->node);
+        if (!pi) break;
         std::string base = pi->displayHint.empty() ? "x" : pi->displayHint;
         std::string name = base;
         int suffix = 1;
@@ -306,7 +317,8 @@ void collectConstantNames(ExpressionPointer expression,
 std::vector<LemmaSearchHit> computeGoalHits(
     const Environment& environment, ExpressionPointer goalType,
     std::string& goalHead, const std::set<std::string>& excludedNames) {
-    PeeledType goal = peelLeadingPis(goalType, FreeVariableOrigin::User);
+    PeeledType goal =
+        peelLeadingPis(environment, goalType, FreeVariableOrigin::User);
     goalHead = searchHeadName(environment, goal.conclusion);
     std::vector<LemmaSearchHit> hits;
     if (goalHead.empty()) return hits;
@@ -315,7 +327,7 @@ std::vector<LemmaSearchHit> computeGoalHits(
         ExpressionPointer type = searchableDeclarationType(declaration);
         if (!type) continue;
         PeeledType lemma =
-            peelLeadingPis(type, FreeVariableOrigin::Internal);
+            peelLeadingPis(environment, type, FreeVariableOrigin::Internal);
         if (searchHeadName(environment, lemma.conclusion) != goalHead) {
             continue;
         }
@@ -365,6 +377,51 @@ std::vector<LemmaSearchHit> computeGoalHits(
     return hits;
 }
 
+namespace {
+
+// The part of a fully-qualified constant name after the last `.`
+// (`monus` for `Natural.monus`; the whole name when unqualified).
+std::string constantNameSuffix(const std::string& name) {
+    size_t dot = name.rfind('.');
+    return dot == std::string::npos ? name : name.substr(dot + 1);
+}
+
+// Does the wanted token match this constant name — either exactly, or as
+// the suffix after the last `.`? `monus` matches `Natural.monus`;
+// `Natural.monus` matches only itself.
+bool tokenMatchesConstant(const std::string& token,
+                          const std::string& constantName) {
+    return token == constantName
+        || token == constantNameSuffix(constantName);
+}
+
+// Case-insensitive Levenshtein-style distance is overkill here; a cheap
+// "does either contain the other, else equal-length differing characters"
+// score lets us surface a near-miss for a misspelled or wrong-namespace
+// token. Lower is closer; the suffix is what users actually type.
+size_t tokenDistance(const std::string& token, const std::string& candidate) {
+    if (token == candidate) return 0;
+    if (candidate.find(token) != std::string::npos
+        || token.find(candidate) != std::string::npos) {
+        // Substring match: rank by how much longer the candidate is.
+        return 1 + (candidate.size() > token.size()
+                        ? candidate.size() - token.size()
+                        : token.size() - candidate.size());
+    }
+    // Fall back to a character-difference count over the shared prefix
+    // length plus the length gap — enough to order obvious typos.
+    size_t shared = std::min(token.size(), candidate.size());
+    size_t differing = 0;
+    for (size_t i = 0; i < shared; ++i) {
+        if (token[i] != candidate[i]) ++differing;
+    }
+    return 1000 + differing
+         + (token.size() > candidate.size() ? token.size() - candidate.size()
+                                            : candidate.size() - token.size());
+}
+
+}  // namespace
+
 std::vector<LemmaSearchHit> computeMentionHits(
     const Environment& environment, const std::vector<std::string>& wanted,
     const std::set<std::string>& excludedNames) {
@@ -376,8 +433,15 @@ std::vector<LemmaSearchHit> computeMentionHits(
         std::set<std::string> constants;
         collectConstantNames(type, constants);
         bool all = true;
-        for (const auto& symbol : wanted) {
-            if (!constants.count(symbol)) { all = false; break; }
+        for (const auto& token : wanted) {
+            bool matched = false;
+            for (const auto& constantName : constants) {
+                if (tokenMatchesConstant(token, constantName)) {
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) { all = false; break; }
         }
         if (!all) continue;
         LemmaSearchHit hit;
@@ -394,4 +458,47 @@ std::vector<LemmaSearchHit> computeMentionHits(
                   return a.name < b.name;
               });
     return hits;
+}
+
+std::vector<MentionTokenReport> classifyMentionTokens(
+    const Environment& environment, const std::vector<std::string>& wanted,
+    const std::set<std::string>& excludedNames) {
+    // Gather every constant name that occurs in a searchable declaration —
+    // these are the names a `--mentions` token could possibly match.
+    std::set<std::string> knownConstants;
+    for (const auto& [name, declaration] : environment.declarations) {
+        if (excludedNames.count(name)) continue;
+        ExpressionPointer type = searchableDeclarationType(declaration);
+        if (!type) continue;
+        collectConstantNames(type, knownConstants);
+    }
+
+    std::vector<MentionTokenReport> reports;
+    for (const auto& token : wanted) {
+        MentionTokenReport report;
+        report.token = token;
+        for (const auto& constantName : knownConstants) {
+            if (tokenMatchesConstant(token, constantName)) {
+                report.recognized = true;
+                break;
+            }
+        }
+        if (!report.recognized) {
+            // Surface the few closest known names so the user can correct a
+            // typo or supply the right namespace.
+            std::vector<std::pair<size_t, std::string>> ranked;
+            for (const auto& constantName : knownConstants) {
+                size_t distance = std::min(
+                    tokenDistance(token, constantName),
+                    tokenDistance(token, constantNameSuffix(constantName)));
+                ranked.push_back({distance, constantName});
+            }
+            std::sort(ranked.begin(), ranked.end());
+            for (size_t i = 0; i < ranked.size() && i < 5; ++i) {
+                report.suggestions.push_back(ranked[i].second);
+            }
+        }
+        reports.push_back(std::move(report));
+    }
+    return reports;
 }
