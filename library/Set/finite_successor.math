@@ -1,0 +1,55 @@
+-- Set/finite_successor.math
+--
+-- The recursive backbone of counting and the smallest nontrivial size.
+-- Because `1 + n` reduces to `successor(n)` in the kernel, the sum rule at
+-- m = 1 already says NaturalsBelow(1) ⊎ NaturalsBelow(n) ≅
+-- NaturalsBelow(successor(n)): adjoining one point to an n-element type
+-- yields an (n+1)-element type. That is the step every inductive counting
+-- argument runs on. Alongside it we pin down NaturalsBelow(1) itself — a
+-- single point — which is the base those inductions start from.
+
+module Set.finite_successor
+
+import Logic.basics
+import Logic.sum
+import Equality.basics
+import Set.subtype
+import Set.equinumerous
+import Set.finite
+import Set.finite_sum
+import Natural.basics
+import Natural.order
+import Natural.strong_recursion
+
+-- Only 0 lies below 1: from successor(k) ≤ 1 (= successor(0)), peel the
+-- successor to get k ≤ 0, which forces k = 0.
+theorem NaturalsBelow.below_one_is_zero (k : Natural)
+        (belowOne : successor(k) ≤ 1) : k = 0 :=
+  Natural.less_or_equal_zero_implies_equals_zero(k,
+      Natural.less_or_equal_successor_successor_descend(k, 0, belowOne))
+
+-- NaturalsBelow(1) is inhabited: 0 is its single point.
+definition NaturalsBelow.one_point : NaturalsBelow(1) :=
+  Subtype.make(Natural, (k : Natural) ↦ successor(k) ≤ 1,
+      0, LessOrEqual.reflexivity(1))
+
+-- NaturalsBelow(1) is a subsingleton: any two elements are equal, since
+-- both have value 0.
+theorem NaturalsBelow.one_subsingleton (a b : NaturalsBelow(1)) : a = b :=
+  Subtype.equal_of_value_equal(Natural, (k : Natural) ↦ successor(k) ≤ 1, a, b,
+      calc Subtype.value(a)
+         = 0                by NaturalsBelow.below_one_is_zero(Subtype.value(a), Subtype.property(a))
+         = Subtype.value(b) by NaturalsBelow.below_one_is_zero(Subtype.value(b), Subtype.property(b)))
+
+-- The successor decomposition: NaturalsBelow(1) ⊎ NaturalsBelow(n) is the
+-- same size as NaturalsBelow(successor(n)). This is the sum bijection at
+-- m = 1, using that `1 + n` and `successor(n)` are definitionally equal.
+theorem NaturalsBelow.successor_equinumerous (n : Natural)
+        : Equinumerous(Sum.{0,0,0}(NaturalsBelow(1), NaturalsBelow(n)), NaturalsBelow(successor(n))) :=
+  NaturalsBelow.sum_equinumerous(1, n)
+
+-- Counting, one element at a time: adjoining a fresh point to a size-n
+-- type gives a size-(n+1) type.
+theorem HasSize.successor (X : Type(0)) (n : Natural) (sizeX : HasSize(X, n))
+        : HasSize(Sum.{0,0,0}(NaturalsBelow(1), X), successor(n)) :=
+  HasSize.sum(NaturalsBelow(1), X, 1, n, NaturalsBelow.has_size(1), sizeX)
