@@ -78,3 +78,137 @@ theorem GaussianInteger.coordinatesOfPolynomial_times_x
              Product.first(GaussianInteger.coordinatesOfCoefficients(k)))
              by GaussianInteger.coordinatesOfCoefficients_shift(k)
   }
+
+-- ----------------------------------------------------------------------
+-- Additivity lifted to ℤ[x] (polynomial add lifts coefficient-list add).
+theorem GaussianInteger.coordinatesOfPolynomial_add
+        (p q : Polynomial(Integer, Integer.zero))
+        : GaussianInteger.coordinatesOfPolynomial(Polynomial.add(Integer.ring_bundle, p, q))
+          = Product.make(
+                Product.first(GaussianInteger.coordinatesOfPolynomial(p))
+                    + Product.first(GaussianInteger.coordinatesOfPolynomial(q)),
+                Product.second(GaussianInteger.coordinatesOfPolynomial(p))
+                    + Product.second(GaussianInteger.coordinatesOfPolynomial(q))) :=
+  cases p { | a =>
+    cases q { | b =>
+      GaussianInteger.coordinatesOfCoefficients_add(a, b)
+    }
+  }
+
+-- ----------------------------------------------------------------------
+-- Multiplying by x twice negates both coordinates: coords(x·(x·q)) = −coords(q).
+theorem GaussianInteger.coordinatesOfPolynomial_times_x_squared
+        (q : Polynomial(Integer, Integer.zero))
+        : GaussianInteger.coordinatesOfPolynomial(
+              Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
+                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)))
+          = Product.make(
+                Integer.negate(Product.first(GaussianInteger.coordinatesOfPolynomial(q))),
+                Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(q)))) :=
+  calc GaussianInteger.coordinatesOfPolynomial(
+           Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
+               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)))
+     = Product.make(
+           Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(
+               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)))),
+           Product.first(GaussianInteger.coordinatesOfPolynomial(
+               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q))))
+           by GaussianInteger.coordinatesOfPolynomial_times_x(
+                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q))
+     = Product.make(
+           Integer.negate(Product.first(GaussianInteger.coordinatesOfPolynomial(q))),
+           Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(q))))
+           by congruenceOf(
+                  (pair : Pair(Integer, Integer)) ↦
+                      Product.make(Integer.negate(Product.second(pair)), Product.first(pair)),
+                  GaussianInteger.coordinatesOfPolynomial_times_x(q))
+
+-- ----------------------------------------------------------------------
+-- (x²+1)·q = x·(x·q) + q, by distributivity / associativity / 1·q = q.
+theorem GaussianInteger.multiply_modulus
+        (q : Polynomial(Integer, Integer.zero))
+        : Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, q)
+          = Polynomial.add(Integer.ring_bundle,
+                Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
+                    Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
+                q) :=
+  calc Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, q)
+     = Polynomial.add(Integer.ring_bundle,
+           Polynomial.multiply(Integer.ring_bundle,
+               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, GaussianInteger.x), q),
+           Polynomial.multiply(Integer.ring_bundle, Polynomial.one(Integer.ring_bundle), q))
+           by Polynomial.multiply_distributivity_right(Integer.ring_bundle,
+                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, GaussianInteger.x),
+                  Polynomial.one(Integer.ring_bundle), q)
+     = Polynomial.add(Integer.ring_bundle,
+           Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
+               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
+           Polynomial.multiply(Integer.ring_bundle, Polynomial.one(Integer.ring_bundle), q))
+           by congruenceOf(
+                  (w : Polynomial(Integer, Integer.zero)) ↦
+                      Polynomial.add(Integer.ring_bundle, w,
+                          Polynomial.multiply(Integer.ring_bundle, Polynomial.one(Integer.ring_bundle), q)),
+                  Polynomial.multiply_associative(Integer.ring_bundle,
+                      GaussianInteger.x, GaussianInteger.x, q))
+     = Polynomial.add(Integer.ring_bundle,
+           Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
+               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
+           q)
+           by congruenceOf(
+                  (w : Polynomial(Integer, Integer.zero)) ↦
+                      Polynomial.add(Integer.ring_bundle,
+                          Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
+                              Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
+                          w),
+                  Polynomial.multiply_one_left(Integer.ring_bundle, q))
+
+-- ----------------------------------------------------------------------
+-- The payoff: coords((x²+1)·q) = (0, 0).
+theorem GaussianInteger.coordinatesOfPolynomial_modulus_multiply
+        (q : Polynomial(Integer, Integer.zero))
+        : GaussianInteger.coordinatesOfPolynomial(
+              Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, q))
+          = Product.make(Integer.zero, Integer.zero) :=
+  calc GaussianInteger.coordinatesOfPolynomial(
+           Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, q))
+     = GaussianInteger.coordinatesOfPolynomial(
+           Polynomial.add(Integer.ring_bundle,
+               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
+                   Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
+               q))
+           by congruenceOf(
+                  GaussianInteger.coordinatesOfPolynomial,
+                  GaussianInteger.multiply_modulus(q))
+     = Product.make(
+           Product.first(GaussianInteger.coordinatesOfPolynomial(
+               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
+                   Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q))))
+               + Product.first(GaussianInteger.coordinatesOfPolynomial(q)),
+           Product.second(GaussianInteger.coordinatesOfPolynomial(
+               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
+                   Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q))))
+               + Product.second(GaussianInteger.coordinatesOfPolynomial(q)))
+           by GaussianInteger.coordinatesOfPolynomial_add(
+                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
+                      Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
+                  q)
+     = Product.make(
+           Integer.negate(Product.first(GaussianInteger.coordinatesOfPolynomial(q)))
+               + Product.first(GaussianInteger.coordinatesOfPolynomial(q)),
+           Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(q)))
+               + Product.second(GaussianInteger.coordinatesOfPolynomial(q)))
+           by congruenceOf(
+                  (pair : Pair(Integer, Integer)) ↦
+                      Product.make(
+                          Product.first(pair) + Product.first(GaussianInteger.coordinatesOfPolynomial(q)),
+                          Product.second(pair) + Product.second(GaussianInteger.coordinatesOfPolynomial(q))),
+                  GaussianInteger.coordinatesOfPolynomial_times_x_squared(q))
+     = Product.make(Integer.zero, Integer.zero)
+           by Product.make_equal(Integer, Integer,
+                  Integer.negate(Product.first(GaussianInteger.coordinatesOfPolynomial(q)))
+                      + Product.first(GaussianInteger.coordinatesOfPolynomial(q)),
+                  Integer.zero,
+                  Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(q)))
+                      + Product.second(GaussianInteger.coordinatesOfPolynomial(q)),
+                  Integer.zero,
+                  ring, ring)
