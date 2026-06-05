@@ -1,0 +1,80 @@
+-- GaussianInteger/modulus_vanishes.math
+--
+-- The coordinate map kills multiples of the modulus x²+1 — the second
+-- half (with additivity) of what makes it descend through the (x²+1)-
+-- congruence. The engine is `coords(x·p)`: multiplying by x rotates the
+-- coordinates, (re, im) ↦ (−im, re). Multiplying by x twice negates, so
+-- coords((x²+1)·q) = coords(x²·q) ⊕ coords(q) = −coords(q) ⊕ coords(q) = 0.
+
+module GaussianInteger.modulus_vanishes
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring
+import Algebra.ring_bundle
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.monomial
+import GaussianInteger.basics
+import GaussianInteger.coordinates
+import GaussianInteger.coordinate_homomorphism
+
+-- ----------------------------------------------------------------------
+-- Multiplying by x rotates the coordinates: coords(x·p) = (−im p, re p).
+--
+-- x's coefficient list is shift([1]); so multiply(x, k) is extensionally
+-- shift(multiply([1], k)) ~ shift(k), and `coords` transports through the
+-- equivalence (coordinatesOfCoefficients_respects) to coords(shift k).
+theorem GaussianInteger.coordinatesOfPolynomial_times_x
+        (p : Polynomial(Integer, Integer.zero))
+        : GaussianInteger.coordinatesOfPolynomial(
+              Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, p))
+          = Product.make(
+                Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(p))),
+                Product.first(GaussianInteger.coordinatesOfPolynomial(p))) :=
+  cases p { | k =>
+    calc GaussianInteger.coordinatesOfCoefficients(
+             Polynomial.Coefficients.multiply(Integer.ring_bundle,
+                 Polynomial.Coefficients.monomial(Integer.ring_bundle, Integer.one, 1), k))
+       = GaussianInteger.coordinatesOfCoefficients(
+             Polynomial.Coefficients.shift(Integer.ring_bundle, k))
+             by GaussianInteger.coordinatesOfCoefficients_respects(
+                    Polynomial.Coefficients.multiply(Integer.ring_bundle,
+                        Polynomial.Coefficients.monomial(Integer.ring_bundle, Integer.one, 1), k),
+                    Polynomial.Coefficients.shift(Integer.ring_bundle, k),
+                    Polynomial.ExtensionallyEqual.transitive(Integer, Integer.zero,
+                        Polynomial.Coefficients.multiply(Integer.ring_bundle,
+                            Polynomial.Coefficients.shift(Integer.ring_bundle,
+                                Polynomial.Coefficients.cons(Integer, Integer.one,
+                                    Polynomial.Coefficients.nil(Integer))), k),
+                        Polynomial.Coefficients.shift(Integer.ring_bundle,
+                            Polynomial.Coefficients.multiply(Integer.ring_bundle,
+                                Polynomial.Coefficients.cons(Integer, Integer.one,
+                                    Polynomial.Coefficients.nil(Integer)), k)),
+                        Polynomial.Coefficients.shift(Integer.ring_bundle, k),
+                        Polynomial.Coefficients.shift_multiply(Integer.ring_bundle,
+                            Polynomial.Coefficients.cons(Integer, Integer.one,
+                                Polynomial.Coefficients.nil(Integer)), k),
+                        Polynomial.Coefficients.shift_respects(Integer.ring_bundle,
+                            Polynomial.Coefficients.multiply(Integer.ring_bundle,
+                                Polynomial.Coefficients.cons(Integer, Integer.one,
+                                    Polynomial.Coefficients.nil(Integer)), k),
+                            k,
+                            Polynomial.Coefficients.multiply_one_left(Integer.ring_bundle, k))))
+       = Product.make(
+             Integer.negate(Product.second(GaussianInteger.coordinatesOfCoefficients(k))),
+             Product.first(GaussianInteger.coordinatesOfCoefficients(k)))
+             by GaussianInteger.coordinatesOfCoefficients_shift(k)
+  }
