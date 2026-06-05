@@ -61,12 +61,9 @@ theorem Ring.pairIdeal_is_ideal (s : Ring) (a b : Ring.carrier(s))
    ⟨Ring.zero(s), Ring.zero(s),
     calc Ring.zero(s)
        = Ring.add(s, Ring.zero(s), Ring.zero(s))
-             by Equality.symmetry(Ring.add_zero(s, Ring.zero(s)))
        = Ring.add(s, Ring.multiply(s, Ring.zero(s), a), Ring.zero(s))
-             by Equality.symmetry(Ring.zero_multiply_left(s, a))
        = Ring.add(s, Ring.multiply(s, Ring.zero(s), a),
-             Ring.multiply(s, Ring.zero(s), b))
-             by Equality.symmetry(Ring.zero_multiply_left(s, b))⟩,
+             Ring.multiply(s, Ring.zero(s), b))⟩,
    -- closure under addition: combine coefficients.
    (x y : Ring.carrier(s))
    (xMember : Ring.pairIdealMember(s, a, b, x))
@@ -76,11 +73,8 @@ theorem Ring.pairIdeal_is_ideal (s : Ring) (a b : Ring.carrier(s))
       ⟨x1 + x2, y1 + y2,
        calc x + y
           = (x1 * a + y1 * b) + (x2 * a + y2 * b)
-                by xEquation
           = (x1 * a + x2 * a) + (y1 * b + y2 * b)
-                by Ring.add_four_swap(s, x1 * a, y1 * b, x2 * a, y2 * b)
-          = (x1 + x2) * a + (y1 + y2) * b
-                by Ring.distributivity_right(s, x1, x2, a)⟩
+          = (x1 + x2) * a + (y1 + y2) * b⟩
    },
    -- absorption: r·(x·a + y·b) = (r·x)·a + (r·y)·b.
    (r z : Ring.carrier(s))
@@ -89,13 +83,9 @@ theorem Ring.pairIdeal_is_ideal (s : Ring) (a b : Ring.carrier(s))
       ⟨r * x, r * y,
        calc r * z
           = r * (x * a + y * b)
-                by zEquation
           = r * (x * a) + r * (y * b)
-                by Ring.distributivity_left(s, r, x * a, y * b)
           = (r * x) * a + r * (y * b)
-                by Equality.symmetry(Ring.multiply_associative(s, r, x, a))
-          = (r * x) * a + (r * y) * b
-                by Equality.symmetry(Ring.multiply_associative(s, r, y, b))⟩
+          = (r * x) * a + (r * y) * b⟩
    }⟩
 
 -- ----------------------------------------------------------------------
@@ -148,22 +138,16 @@ theorem PrincipalIdealDomain.bezout (pid : PrincipalIdealDomain)
       by ⟨Ring.one(s), Ring.zero(s),
           calc a
              = Ring.add(s, a, Ring.zero(s))
-                   by Equality.symmetry(Ring.add_zero(s, a))
              = Ring.add(s, a, Ring.multiply(s, Ring.zero(s), b))
-                   by Equality.symmetry(Ring.zero_multiply_left(s, b))
              = Ring.add(s, Ring.multiply(s, Ring.one(s), a),
-                   Ring.multiply(s, Ring.zero(s), b))
-                   by Equality.symmetry(Ring.one_multiply(s, a))⟩;
+                   Ring.multiply(s, Ring.zero(s), b))⟩;
   claim bMember : Ring.pairIdealMember(s, a, b, b)
       by ⟨Ring.zero(s), Ring.one(s),
           calc b
              = Ring.add(s, Ring.zero(s), b)
-                   by Equality.symmetry(Ring.zero_add(s, b))
              = Ring.add(s, Ring.multiply(s, Ring.zero(s), a), b)
-                   by Equality.symmetry(Ring.zero_multiply_left(s, a))
              = Ring.add(s, Ring.multiply(s, Ring.zero(s), a),
-                   Ring.multiply(s, Ring.one(s), b))
-                   by Equality.symmetry(Ring.one_multiply(s, b))⟩;
+                   Ring.multiply(s, Ring.one(s), b))⟩;
   -- d lies in the ideal (it divides itself), giving the combination.
   claim dMember : Ring.pairIdealMember(s, a, b, d)
       by backwardGenerates(d, Ring.divides_reflexive(s, d));
@@ -205,44 +189,46 @@ theorem PrincipalIdealDomain.bezout_one_of_irreducible
         obtain ⟨k, aEqualsGk⟩ from gDividesA;
         claim gEqualsPeInverse : g = p * eInverse
             by calc g
-                  = g * Ring.one(s)            by Equality.symmetry(Ring.multiply_one(s, g))
-                  = g * (e * eInverse)         by Equality.symmetry(eTimesInverse)
-                  = (g * e) * eInverse         by Equality.symmetry(Ring.multiply_associative(s, g, e, eInverse))
-                  = p * eInverse               by Equality.symmetry(pEqualsGe);
+                  = g * Ring.one(s)
+                  = g * (e * eInverse)
+                  = (g * e) * eInverse
+                  = p * eInverse;
         claim pDividesA : Ring.divides(s, p, a)
             by ⟨eInverse * k,
                 calc a
-                   = g * k                     by aEqualsGk
-                   = (p * eInverse) * k        by gEqualsPeInverse
+                   = g * k
+                   = (p * eInverse) * k
                    = p * (eInverse * k)        by Ring.multiply_associative(s, p, eInverse, k)⟩;
         absurd(notDividesA(pDividesA))
       }
     | Or.introduceLeft(gIsUnit) => {
         obtain ⟨gInverse, _, gTimesInverse⟩
             from IntegralDomain.unit_inverse_is_unit(d, g, gIsUnit);
-        -- gTimesInverse : g · gInverse = 1.
+        -- gTimesInverse : g · gInverse = 1. The two single-summand
+        -- reassociations are kept as claims; the auto-prover pulls them
+        -- into the Bézout calc below by type-match.
         claim reassocX
             : Ring.multiply(s, Ring.multiply(s, x, p), gInverse)
               = Ring.multiply(s, Ring.multiply(s, x, gInverse), p)
             by calc (x * p) * gInverse
-                  = x * (p * gInverse)         by Ring.multiply_associative(s, x, p, gInverse)
+                  = x * (p * gInverse)
                   = x * (gInverse * p)         by IntegralDomain.commutative(d, p, gInverse)
                   = (x * gInverse) * p         by Equality.symmetry(Ring.multiply_associative(s, x, gInverse, p));
         claim reassocY
             : Ring.multiply(s, Ring.multiply(s, y, a), gInverse)
               = Ring.multiply(s, Ring.multiply(s, y, gInverse), a)
             by calc (y * a) * gInverse
-                  = y * (a * gInverse)         by Ring.multiply_associative(s, y, a, gInverse)
+                  = y * (a * gInverse)
                   = y * (gInverse * a)         by IntegralDomain.commutative(d, a, gInverse)
                   = (y * gInverse) * a         by Equality.symmetry(Ring.multiply_associative(s, y, gInverse, a));
         ⟨x * gInverse, y * gInverse,
          Equality.symmetry(
              calc Ring.one(s)
-                = g * gInverse                                   by Equality.symmetry(gTimesInverse)
-                = (x * p + y * a) * gInverse                     by gEquation
-                = (x * p) * gInverse + (y * a) * gInverse        by Ring.distributivity_right(s, x * p, y * a, gInverse)
-                = (x * gInverse) * p + (y * a) * gInverse        by reassocX
-                = (x * gInverse) * p + (y * gInverse) * a        by reassocY)⟩
+                = g * gInverse
+                = (x * p + y * a) * gInverse
+                = (x * p) * gInverse + (y * a) * gInverse
+                = (x * gInverse) * p + (y * a) * gInverse
+                = (x * gInverse) * p + (y * gInverse) * a)⟩
       }
   }
 }
@@ -287,11 +273,8 @@ theorem PrincipalIdealDomain.irreducible_divides_factor
         claim bEqualsSum : b = (x * p) * b + (y * a) * b
             by calc b
                   = Ring.multiply(s, Ring.one(s), b)
-                        by Equality.symmetry(Ring.one_multiply(s, b))
                   = (x * p + y * a) * b
-                        by Equality.symmetry(bezoutOne)
-                  = (x * p) * b + (y * a) * b
-                        by Ring.distributivity_right(s, x * p, y * a, b);
+                  = (x * p) * b + (y * a) * b;
         Or.introduceRight(
             Equality.transport_proposition(
                 (t : Ring.carrier(s)) ↦ Ring.divides(s, p, t),
