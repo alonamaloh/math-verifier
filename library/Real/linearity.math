@@ -81,8 +81,8 @@ theorem Real.cauchy_sign_eventually_positive_branch
         : (m : Natural) → signIndex ≤ m
           → lowerBound ≤ sequence(m) :=
   (m : Natural) (mGeSignIndex : signIndex ≤ m) ↦ {
-    claim apartnessAtM
-          : lowerBound ≤ abs(sequence(m))
+    claim
+          lowerBound ≤ abs(sequence(m))
       by apartnessTail(m, mGeSignIndex);
     claim cauchyAtM
           : abs(sequence(m) - sequence(signIndex))
@@ -100,8 +100,8 @@ theorem Real.cauchy_sign_eventually_positive_branch
     -- Add sequence(signIndex) to both sides of the strict inequality:
     -- seq(signIndex) + (-lowerBound) < seq(signIndex) + (seq(m) -
     -- seq(signIndex)) — and ring simplifies both sides.
-    claim seqMLowerBound
-          : sequence(signIndex) - lowerBound < sequence(m)
+    claim
+          sequence(signIndex) - lowerBound < sequence(m)
       by calc sequence(signIndex) - lowerBound
             = sequence(signIndex) + -lowerBound
             < sequence(signIndex) + (sequence(m) - sequence(signIndex))
@@ -109,17 +109,9 @@ theorem Real.cauchy_sign_eventually_positive_branch
     -- seq(signIndex) - lowerBound ≥ 0 (from the hypothesis lowerBound
     -- ≤ seq(signIndex)).
     claim signIndexMinusBoundNonneg
-          : Rational.zero ≤ sequence(signIndex) - lowerBound
-      by rewrite(
-             Rational.add_negate_right(lowerBound),
-             Rational.add_preserves_LessOrEqual(
-                 lowerBound, sequence(signIndex), -lowerBound,
-                 seqAtSignIndexBound));
+          : Rational.zero ≤ sequence(signIndex) - lowerBound;
     -- Chain: 0 ≤ seq(signIndex) - lowerBound < seq(m).
-    claim seqAtMPositive : Rational.zero < sequence(m)
-      by calc Rational.zero
-            ≤ sequence(signIndex) - lowerBound
-            < sequence(m);
+    claim seqAtMPositive : Rational.zero < sequence(m);
     -- IsNonneg(seq(m)) — used to identify |seq(m)| with seq(m).
     claim Rational.IsNonneg(sequence(m))
       by Rational.IsNonneg_of_LessOrEqual_zero(
@@ -170,8 +162,8 @@ theorem Real.cauchy_sign_eventually_negative_branch
     -- Add seq(signIndex) to both sides: seq(signIndex) + (seq(m) -
     -- seq(signIndex)) < seq(signIndex) + lowerBound — LHS simplifies
     -- to seq(m).
-    claim seqAtMUpper
-          : sequence(m) < sequence(signIndex) + lowerBound
+    claim
+          sequence(m) < sequence(signIndex) + lowerBound
       by rewrite(
              (ring : sequence(signIndex) + (sequence(m) - sequence(signIndex))
                      = sequence(m)),
@@ -182,18 +174,15 @@ theorem Real.cauchy_sign_eventually_negative_branch
                  diffUpperBound));
     -- seq(signIndex) + lowerBound ≤ -lowerBound + lowerBound = 0
     -- (from the hypothesis seq(signIndex) ≤ -lowerBound).
-    claim seqAtSignIndexPlusBoundNonpos
-          : sequence(signIndex) + lowerBound ≤ Rational.zero
+    claim
+          sequence(signIndex) + lowerBound ≤ Rational.zero
       by rewrite(
              Rational.add_negate_left(lowerBound),
              Rational.add_preserves_LessOrEqual(
                  sequence(signIndex), -lowerBound, lowerBound,
                  seqAtSignIndexBound));
     -- Chain: seq(m) < seq(signIndex) + lowerBound ≤ 0.
-    claim seqAtMNegative : sequence(m) < Rational.zero
-      by calc sequence(m)
-            < sequence(signIndex) + lowerBound
-            ≤ Rational.zero;
+    claim seqAtMNegative : sequence(m) < Rational.zero;
     -- IsNonneg(-seq(m)). seq(m) ≤ 0 unfolds to IsNonneg(0 - seq(m));
     -- 0 - seq(m) = -seq(m) by ring; rewrite gives IsNonneg(-seq(m)).
     claim seqAtMLeqZero : sequence(m) ≤ Rational.zero
@@ -203,8 +192,8 @@ theorem Real.cauchy_sign_eventually_negative_branch
              (ring : Rational.zero - sequence(m) = -sequence(m)),
              seqAtMLeqZero);
     -- |seq(m)| = -seq(m), so apartness gives lowerBound ≤ -seq(m).
-    claim boundLeqNegSeq
-          : lowerBound ≤ -sequence(m)
+    claim
+          lowerBound ≤ -sequence(m)
       by rewrite(
              Rational.absolute_value_when_negate_nonneg(
                  sequence(m), negSeqAtMIsNonneg),
@@ -266,11 +255,7 @@ theorem Real.cauchy_sign_eventually
             → lowerBound
               ≤ abs(
                     CauchyRationalSequence.sequenceFunction(
-                        sequence, m))
-      by (m : Natural) (mGeSign : signIndex ≤ m) ↦
-           apartness(m,
-                     Natural.le_through_max_left(
-                         apartnessIndex, cauchyIndex, m, mGeSign));
+                        sequence, m));
     -- Cauchy modulus restricted similarly.
     claim cauchyTail
           : (m : Natural) → signIndex ≤ m
@@ -278,15 +263,7 @@ theorem Real.cauchy_sign_eventually
             → abs(
                   CauchyRationalSequence.sequenceFunction(sequence, m)
                   - CauchyRationalSequence.sequenceFunction(sequence, n))
-                < lowerBound
-      by (m : Natural) (mGeSign : signIndex ≤ m)
-                  (n : Natural) (nGeSign : signIndex ≤ n) ↦
-           cauchyAt(m,
-                    Natural.le_through_max_right(
-                        apartnessIndex, cauchyIndex, m, mGeSign),
-                    n,
-                    Natural.le_through_max_right(
-                        apartnessIndex, cauchyIndex, n, nGeSign));
+                < lowerBound;
     -- Case-split on the sign of seq(signIndex). Either it's ≥ 0
     -- (positive branch) or its negation is (negative branch).
     witness lowerBound with And.introduction(
@@ -383,17 +360,7 @@ theorem Real.IsNonneg_or_negate_IsNonneg
                       : Not(CauchyEquivalent(
                                 rep,
                                 Rational.to_cauchy_constant(
-                                    Rational.zero)))
-                  by (equiv
-                                   : CauchyEquivalent(
-                                         rep,
-                                         Rational.to_cauchy_constant(
-                                             Rational.zero))) ↦
-                       xNotEqZero(
-                           Quotient.sound(rep,
-                                           Rational.to_cauchy_constant(
-                                               Rational.zero),
-                                           equiv));
+                                    Rational.zero)));
                 obtain ⟨lowerBound, lowerAndSignData⟩
                     from Real.cauchy_sign_eventually(
                              rep, notEquivalentToZero);
@@ -429,8 +396,8 @@ theorem Real.IsNonneg_or_negate_IsNonneg
                                          (mGeSign : signIndex ≤ m) ↦ {
                                   -- seq(m) ≤ -lowerBound, so -seq(m) ≥
                                   -- lowerBound. Use LessOrEqual.negate.
-                                  claim negSeqLowerBound
-                                        : lowerBound
+                                  claim
+                                        lowerBound
                                           ≤ -CauchyRationalSequence.sequenceFunction(
                                                  rep, m)
                                     by rewrite(
