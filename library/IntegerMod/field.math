@@ -84,18 +84,11 @@ theorem IntegerMod.zero_not_one (p : Natural)
         (primality : Natural.is_prime(p))
         : ¬(IntegerMod.zero(p) = IntegerMod.one(p)) :=
   (zeroEqualsOne : IntegerMod.zero(p) = IntegerMod.one(p)) ↦ {
-    claim congruent : Integer.CongruentModulo(p, Integer.zero, Integer.one)
-        by IntegerMod.congruent_of_make_equal(p, Integer.zero, Integer.one,
-               zeroEqualsOne);
+    claim congruent : Integer.CongruentModulo(p, Integer.zero, Integer.one);
     -- congruent : p | (0 − 1); negate to get p | 1.
-    claim pDividesOne : Integer.divides((p : Integer), Integer.one)
-        by rewrite((ring : -(Integer.zero - Integer.one) = Integer.one),
-               Integer.divides_negate((p : Integer),
-                   Integer.zero - Integer.one, congruent));
-    claim pDividesNaturalOne : Natural.divides(p, 1)
-        by Integer.natural_divides_of_integer_divides(p, 1, pDividesOne);
-    claim pEqualsOne : p = 1
-        by Natural.divides_one_implies_equals_one(p, pDividesNaturalOne);
+    claim pDividesOne : Integer.divides((p : Integer), Integer.one);
+    claim pDividesNaturalOne : Natural.divides(p, 1);
+    claim pEqualsOne : p = 1;
     Natural.not_two_less_or_equal_one(
         rewrite(pEqualsOne, Natural.is_prime.at_least_two(p, primality)))
   }
@@ -129,7 +122,6 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
             IntegerMod.inverse_from_witness(p, a, bezoutY,
                 ⟨-bezoutX,
                  calc a * bezoutY - Integer.one
-                    = (k : Integer) * bezoutY - Integer.one
                     = (k : Integer) * bezoutY
                           - ((p : Integer) * bezoutX + (k : Integer) * bezoutY)
                     = (p : Integer) * -bezoutX⟩)
@@ -137,12 +129,7 @@ theorem IntegerMod.invertible_at_representative (p : Natural) (a : Integer)
     in (∃ (k : Natural). a = -(k : Integer)) as negative: {
         obtain ⟨k, aEqualsNegativeK⟩ from negative;
         -- p ∤ a transfers to p ∤ k: p | k would give p | −(k : Integer) = a.
-        claim notDividesK : ¬ Natural.divides(p, k)
-            by (pDividesK : Natural.divides(p, k)) ↦
-                 notDivides(
-                     rewrite(Equality.symmetry(aEqualsNegativeK),
-                         Integer.divides_negate((p : Integer), (k : Integer),
-                             Integer.divides_of_natural_divides(p, k, pDividesK))));
+        claim notDividesK : ¬ Natural.divides(p, k);
         obtain ⟨bezoutX, bezoutY, bezoutEquation⟩
             from Natural.bezout_one_when_prime_coprime(p, k, primality,
                      notDividesK);
@@ -169,13 +156,7 @@ theorem IntegerMod.nonzero_invertible (p : Natural)
           → ∃ (y : IntegerMod(p)). x * y = IntegerMod.one(p) :=
   cases x { | a =>
       (notZero : ¬(IntegerMod.make(p, a) = IntegerMod.zero(p))) ↦ {
-        claim notDivides : ¬ Integer.divides((p : Integer), a)
-            by (pDividesA : Integer.divides((p : Integer), a)) ↦
-                 notZero(
-                     Quotient.sound(
-                         Integer, Integer.CongruentModulo(p),
-                         a, Integer.zero,
-                         rewrite((ring : a = a - Integer.zero), pDividesA)));
+        claim notDivides : ¬ Integer.divides((p : Integer), a);
         IntegerMod.invertible_at_representative(p, a, primality, notDivides)
       } }
 
