@@ -842,6 +842,55 @@ ExpressionPointer Elaborator::elaborateCalc(
                     }
                 }
             }
+            // Orientation retry. A citation whose conclusion has a bare
+            // metavariable on one side — e.g. argument-free `since x + 0 = x`
+            // on a REVERSED step `p = p + 0` — infers its arguments against
+            // the goal and binds that side to the wrong endpoint, proving the
+            // wrong equation. If the proof still doesn't match, re-elaborate
+            // it against the SWAPPED step equality (which infers the
+            // arguments correctly) and let the diff layer reapply the
+            // symmetry. Only fires on an otherwise-failing equality step, and
+            // only commits if the reoriented proof actually closes it — so it
+            // can never turn a passing step into a wrong one.
+            if (step.stepProof
+                && step.relation == CalcRelation::Equality
+                && !isDefinitionallyEqual(environment_, stepContext,
+                                            stepProofType,
+                                            stepRelationTypeOpened)) {
+                ExpressionPointer swappedRelation;
+                if (auto* appB = std::get_if<Application>(
+                        &stepRelationType->node)) {
+                    if (auto* appA = std::get_if<Application>(
+                            &appB->function->node)) {
+                        swappedRelation = makeApplication(
+                            makeApplication(appA->function, appB->argument),
+                            appA->argument);
+                    }
+                }
+                if (swappedRelation) {
+                    try {
+                        ExpressionPointer altProof = elaborateExpression(
+                            *step.stepProof, localBinders, swappedRelation);
+                        ExpressionPointer altType =
+                            inferTypeInLocalContext(localBinders, altProof);
+                        ExpressionPointer diffAlt = tryDiffApplyUserProof(
+                            localBinders, previousKernel, nextKernel,
+                            altProof, altType, step.line, step.column);
+                        if (diffAlt) {
+                            ExpressionPointer diffAltType =
+                                inferTypeInLocalContext(localBinders, diffAlt);
+                            if (isDefinitionallyEqual(environment_,
+                                    stepContext, diffAltType,
+                                    stepRelationTypeOpened)) {
+                                stepProofKernel = diffAlt;
+                                stepProofType = diffAltType;
+                            }
+                        }
+                    } catch (const ElaborateError&) {
+                    } catch (const TypeError&) {
+                    }
+                }
+            }
             if (!isDefinitionallyEqual(environment_, stepContext,
                                         stepProofType,
                                         stepRelationTypeOpened)) {
