@@ -84,18 +84,9 @@ theorem IntegralDomain.prime_factorization_unique_helper (d : IntegralDomain)
                   = IntegralDomain.listProduct(d, l2)) ↦ {
         let s : Ring := IntegralDomain.ring(d);
         -- listProduct(l2) = u, hence a unit; so l2 is empty.
-        claim listProductEqualsU : IntegralDomain.listProduct(d, l2) = u
-            by calc IntegralDomain.listProduct(d, l2)
-                  = u * Ring.one(s)
-                  = u;
-        claim productIsUnit : Ring.IsUnit(s, IntegralDomain.listProduct(d, l2))
-            by Equality.transport_proposition(
-                   (t : Ring.carrier(s)) ↦ Ring.IsUnit(s, t),
-                   u, IntegralDomain.listProduct(d, l2),
-                   Equality.symmetry(listProductEqualsU), uUnit);
-        claim l2Empty : l2 = List.empty(Ring.carrier(s))
-            by IntegralDomain.prime_list_unit_product_empty(d, l2, allPrime2,
-                   productIsUnit);
+        claim listProductEqualsU : IntegralDomain.listProduct(d, l2) = u;
+        claim productIsUnit : Ring.IsUnit(s, IntegralDomain.listProduct(d, l2));
+        claim l2Empty : l2 = List.empty(Ring.carrier(s));
         ⟨List.empty(Ring.carrier(s)),
          Equality.transport_proposition(
              (t : List(Ring.carrier(s))) ↦
@@ -142,8 +133,7 @@ theorem IntegralDomain.prime_factorization_unique_helper (d : IntegralDomain)
                      l2, p1DividesL2);
         claim qPrime : IntegralDomain.IsPrimeElement(d, q)
             by allPrime2(q, qMember);
-        claim qIrreducible : IntegralDomain.IsIrreducible(d, q)
-            by IntegralDomain.prime_element_is_irreducible(d, q, qPrime);
+        claim qIrreducible : IntegralDomain.IsIrreducible(d, q);
         obtain ⟨c, cUnit, qEqualsP1c⟩
             from IntegralDomain.associate_of_divides_irreducible(d, p1, q,
                      qIrreducible, p1NotUnit, p1DividesQ);
@@ -154,29 +144,23 @@ theorem IntegralDomain.prime_factorization_unique_helper (d : IntegralDomain)
             from List.Permutation.extract(Ring.carrier(s), q, l2, qMember);
         let restProduct2 : Ring.carrier(s) := IntegralDomain.listProduct(d, l2rest);
         -- ∏ l2 = q · ∏ l2rest = p1 · (c · ∏ l2rest).
-        claim l2ProductForm
-            : IntegralDomain.listProduct(d, l2)
+        claim IntegralDomain.listProduct(d, l2)
               = p1 * (c * restProduct2)
             by calc IntegralDomain.listProduct(d, l2)
                   = IntegralDomain.listProduct(d,
                         List.prepend(Ring.carrier(s), q, l2rest))
-                        by IntegralDomain.listProduct_permutation_invariant(d,
-                               l2, List.prepend(Ring.carrier(s), q, l2rest), permL2)
                   = q * restProduct2
                   = (p1 * c) * restProduct2
                   = p1 * (c * restProduct2);
 
         -- Cancel p1: u · ∏ rest1 = c · ∏ l2rest.
-        claim cancelled
-            : u * restProduct = c * restProduct2
+        claim u * restProduct = c * restProduct2
             by IntegralDomain.multiply_cancel_left(d, p1,
                    u * restProduct,
                    c * restProduct2,
                    p1NotZero,
                    calc p1 * (u * restProduct)
                       = u * (p1 * restProduct)
-                      = u * IntegralDomain.listProduct(d,
-                            List.prepend(Ring.carrier(s), p1, rest1))
                       = IntegralDomain.listProduct(d, l2)
                       = p1 * (c * restProduct2));
 
@@ -184,9 +168,8 @@ theorem IntegralDomain.prime_factorization_unique_helper (d : IntegralDomain)
         obtain ⟨cInverse, cInverseUnit, cTimesInverse⟩
             from IntegralDomain.unit_inverse_is_unit(d, c, cUnit);
         -- cTimesInverse : c · cInverse = 1.
-        claim uPrimeUnit : Ring.IsUnit(s, cInverse * u)
-            by IntegralDomain.unit_product(d, cInverse, u, cInverseUnit, uUnit);
-        claim cInverseTimesC : cInverse * c = Ring.one(s)
+        claim uPrimeUnit : Ring.IsUnit(s, cInverse * u);
+        claim cInverse * c = Ring.one(s)
             by calc cInverse * c
                   = c * cInverse
                   = Ring.one(s);
