@@ -34,61 +34,60 @@ import GaussianInteger.coordinate_homomorphism
 -- ----------------------------------------------------------------------
 -- Multiplying by x rotates the coordinates: coords(x·p) = (−im p, re p).
 --
--- x's coefficient list is shift([1]); so multiply(x, k) is extensionally
--- shift(multiply([1], k)) ~ shift(k), and `coords` transports through the
--- equivalence (coordinatesOfCoefficients_respects) to coords(shift k).
+-- x's coefficient list is shift([1]), so multiplying by x is, up to the
+-- equivalence, a shift: x·k ~ shift(1·k) ~ shift(k). `coords` transports
+-- through the equivalence (coordinatesOfCoefficients_respects), and a
+-- shift rotates the coordinates (coordinatesOfCoefficients_shift).
 theorem GaussianInteger.coordinatesOfPolynomial_times_x
         (p : Polynomial(Integer, Integer.zero))
-        : GaussianInteger.coordinatesOfPolynomial(
-              Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, p))
+        : coords(GaussianInteger.x * p)
           = Product.make(
-                Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(p))),
-                Product.first(GaussianInteger.coordinatesOfPolynomial(p))) :=
-  cases p { | k =>
-    calc GaussianInteger.coordinatesOfCoefficients(
-             Polynomial.Coefficients.multiply(Integer.ring_bundle,
-                 Polynomial.Coefficients.monomial(Integer.ring_bundle, Integer.one, 1), k))
-       = GaussianInteger.coordinatesOfCoefficients(
-             Polynomial.Coefficients.shift(Integer.ring_bundle, k))
-             by GaussianInteger.coordinatesOfCoefficients_respects(
-                    Polynomial.Coefficients.multiply(Integer.ring_bundle,
-                        Polynomial.Coefficients.monomial(Integer.ring_bundle, Integer.one, 1), k),
-                    Polynomial.Coefficients.shift(Integer.ring_bundle, k),
-                    Polynomial.ExtensionallyEqual.transitive(Integer, Integer.zero,
-                        Polynomial.Coefficients.multiply(Integer.ring_bundle,
-                            Polynomial.Coefficients.shift(Integer.ring_bundle,
-                                Polynomial.Coefficients.cons(Integer, Integer.one,
-                                    Polynomial.Coefficients.nil(Integer))), k),
-                        Polynomial.Coefficients.shift(Integer.ring_bundle,
-                            Polynomial.Coefficients.multiply(Integer.ring_bundle,
-                                Polynomial.Coefficients.cons(Integer, Integer.one,
-                                    Polynomial.Coefficients.nil(Integer)), k)),
-                        Polynomial.Coefficients.shift(Integer.ring_bundle, k),
-                        Polynomial.Coefficients.shift_multiply(Integer.ring_bundle,
-                            Polynomial.Coefficients.cons(Integer, Integer.one,
-                                Polynomial.Coefficients.nil(Integer)), k),
-                        Polynomial.Coefficients.shift_respects(Integer.ring_bundle,
-                            Polynomial.Coefficients.multiply(Integer.ring_bundle,
-                                Polynomial.Coefficients.cons(Integer, Integer.one,
-                                    Polynomial.Coefficients.nil(Integer)), k),
-                            k,
-                            Polynomial.Coefficients.multiply_one_left(Integer.ring_bundle, k))))
+                -Product.second(coords(p)),
+                Product.first(coords(p))) :=
+  cases p { | k => {
+    let one : Polynomial.Coefficients(Integer) :=
+        Polynomial.Coefficients.cons(Integer, Integer.one,
+            Polynomial.Coefficients.nil(Integer));
+    -- The two coefficient-level equivalences behind "x· is a shift".
+    claim oneTimesK
+        : Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+              Polynomial.Coefficients.multiply(Integer.ring_bundle, one, k), k)
+        by Polynomial.Coefficients.multiply_one_left(Integer.ring_bundle, k);
+    claim shiftedProduct
+        : Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+              Polynomial.Coefficients.multiply(Integer.ring_bundle,
+                  Polynomial.Coefficients.shift(Integer.ring_bundle, one), k),
+              Polynomial.Coefficients.shift(Integer.ring_bundle,
+                  Polynomial.Coefficients.multiply(Integer.ring_bundle, one, k)))
+        by Polynomial.Coefficients.shift_multiply;
+    claim shiftedOneTimesK
+        : Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+              Polynomial.Coefficients.shift(Integer.ring_bundle,
+                  Polynomial.Coefficients.multiply(Integer.ring_bundle, one, k)),
+              Polynomial.Coefficients.shift(Integer.ring_bundle, k))
+        by Polynomial.Coefficients.shift_respects;
+    -- Transport `coords` along each equivalence in turn, then rotate.
+    calc coords(Polynomial.Coefficients.multiply(Integer.ring_bundle,
+                 Polynomial.Coefficients.shift(Integer.ring_bundle, one), k))
+       = coords(Polynomial.Coefficients.shift(Integer.ring_bundle,
+                 Polynomial.Coefficients.multiply(Integer.ring_bundle, one, k)))
+             by GaussianInteger.coordinatesOfCoefficients_respects
+       = coords(Polynomial.Coefficients.shift(Integer.ring_bundle, k))
+             by GaussianInteger.coordinatesOfCoefficients_respects
        = Product.make(
-             Integer.negate(Product.second(GaussianInteger.coordinatesOfCoefficients(k))),
-             Product.first(GaussianInteger.coordinatesOfCoefficients(k)))
-             by GaussianInteger.coordinatesOfCoefficients_shift(k)
-  }
+             -Product.second(coords(k)),
+             Product.first(coords(k)))
+             by GaussianInteger.coordinatesOfCoefficients_shift
+  } }
 
 -- ----------------------------------------------------------------------
 -- Additivity lifted to ℤ[x] (polynomial add lifts coefficient-list add).
 theorem GaussianInteger.coordinatesOfPolynomial_add
         (p q : Polynomial(Integer, Integer.zero))
-        : GaussianInteger.coordinatesOfPolynomial(Polynomial.add(Integer.ring_bundle, p, q))
+        : coords(p + q)
           = Product.make(
-                Product.first(GaussianInteger.coordinatesOfPolynomial(p))
-                    + Product.first(GaussianInteger.coordinatesOfPolynomial(q)),
-                Product.second(GaussianInteger.coordinatesOfPolynomial(p))
-                    + Product.second(GaussianInteger.coordinatesOfPolynomial(q))) :=
+                Product.first(coords(p)) + Product.first(coords(q)),
+                Product.second(coords(p)) + Product.second(coords(q))) :=
   cases p { | a =>
     cases q { | b =>
       GaussianInteger.coordinatesOfCoefficients_add(a, b)
@@ -99,116 +98,73 @@ theorem GaussianInteger.coordinatesOfPolynomial_add
 -- Multiplying by x twice negates both coordinates: coords(x·(x·q)) = −coords(q).
 theorem GaussianInteger.coordinatesOfPolynomial_times_x_squared
         (q : Polynomial(Integer, Integer.zero))
-        : GaussianInteger.coordinatesOfPolynomial(
-              Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
-                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)))
+        : coords(GaussianInteger.x * (GaussianInteger.x * q))
           = Product.make(
-                Integer.negate(Product.first(GaussianInteger.coordinatesOfPolynomial(q))),
-                Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(q)))) :=
-  calc GaussianInteger.coordinatesOfPolynomial(
-           Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
-               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)))
+                -Product.first(coords(q)),
+                -Product.second(coords(q))) :=
+  calc coords(GaussianInteger.x * (GaussianInteger.x * q))
      = Product.make(
-           Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(
-               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)))),
-           Product.first(GaussianInteger.coordinatesOfPolynomial(
-               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q))))
-           by GaussianInteger.coordinatesOfPolynomial_times_x(
-                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q))
+           -Product.second(coords(GaussianInteger.x * q)),
+           Product.first(coords(GaussianInteger.x * q)))
+           by GaussianInteger.coordinatesOfPolynomial_times_x
      = Product.make(
-           Integer.negate(Product.first(GaussianInteger.coordinatesOfPolynomial(q))),
-           Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(q))))
-           by congruenceOf(
-                  (pair : Pair(Integer, Integer)) ↦
-                      Product.make(Integer.negate(Product.second(pair)), Product.first(pair)),
-                  GaussianInteger.coordinatesOfPolynomial_times_x(q))
+           -Product.first(coords(q)),
+           -Product.second(coords(q)))
+           by {
+             -- substitute the single-x rotation coords(x·q) = (−im q, re q)
+             -- into each coordinate
+             claim -Product.second(coords(GaussianInteger.x * q)) = -Product.first(coords(q))
+                 by substituting GaussianInteger.coordinatesOfPolynomial_times_x(q);
+             claim Product.first(coords(GaussianInteger.x * q)) = -Product.second(coords(q))
+                 by substituting GaussianInteger.coordinatesOfPolynomial_times_x(q);
+             done
+           }
 
 -- ----------------------------------------------------------------------
 -- (x²+1)·q = x·(x·q) + q, by distributivity / associativity / 1·q = q.
 theorem GaussianInteger.multiply_modulus
         (q : Polynomial(Integer, Integer.zero))
-        : Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, q)
-          = Polynomial.add(Integer.ring_bundle,
-                Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
-                    Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
-                q) :=
-  calc Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, q)
-     = Polynomial.add(Integer.ring_bundle,
-           Polynomial.multiply(Integer.ring_bundle,
-               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, GaussianInteger.x), q),
-           Polynomial.multiply(Integer.ring_bundle, Polynomial.one(Integer.ring_bundle), q))
-           by Polynomial.multiply_distributivity_right(Integer.ring_bundle,
-                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, GaussianInteger.x),
-                  Polynomial.one(Integer.ring_bundle), q)
-     = Polynomial.add(Integer.ring_bundle,
-           Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
-               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
-           Polynomial.multiply(Integer.ring_bundle, Polynomial.one(Integer.ring_bundle), q))
-           by congruenceOf(
-                  (w : Polynomial(Integer, Integer.zero)) ↦
-                      Polynomial.add(Integer.ring_bundle, w,
-                          Polynomial.multiply(Integer.ring_bundle, Polynomial.one(Integer.ring_bundle), q)),
-                  Polynomial.multiply_associative(Integer.ring_bundle,
-                      GaussianInteger.x, GaussianInteger.x, q))
-     = Polynomial.add(Integer.ring_bundle,
-           Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
-               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
-           q)
-           by congruenceOf(
-                  (w : Polynomial(Integer, Integer.zero)) ↦
-                      Polynomial.add(Integer.ring_bundle,
-                          Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
-                              Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
-                          w),
-                  Polynomial.multiply_one_left(Integer.ring_bundle, q))
+        : GaussianInteger.modulus * q
+          = GaussianInteger.x * (GaussianInteger.x * q) + q :=
+  calc GaussianInteger.modulus * q
+     = GaussianInteger.x * GaussianInteger.x * q + Polynomial.one(Integer.ring_bundle) * q
+           by Polynomial.multiply_distributivity_right
+     = GaussianInteger.x * (GaussianInteger.x * q) + Polynomial.one(Integer.ring_bundle) * q
+           by Polynomial.multiply_associative
+     = GaussianInteger.x * (GaussianInteger.x * q) + q
+           by Polynomial.multiply_one_left
 
 -- ----------------------------------------------------------------------
 -- The payoff: coords((x²+1)·q) = (0, 0).
 theorem GaussianInteger.coordinatesOfPolynomial_modulus_multiply
         (q : Polynomial(Integer, Integer.zero))
-        : GaussianInteger.coordinatesOfPolynomial(
-              Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, q))
+        : coords(GaussianInteger.modulus * q)
           = Product.make(Integer.zero, Integer.zero) :=
-  calc GaussianInteger.coordinatesOfPolynomial(
-           Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, q))
-     = GaussianInteger.coordinatesOfPolynomial(
-           Polynomial.add(Integer.ring_bundle,
-               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
-                   Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
-               q))
-           by congruenceOf(
-                  GaussianInteger.coordinatesOfPolynomial,
-                  GaussianInteger.multiply_modulus(q))
+  calc coords(GaussianInteger.modulus * q)
+     = coords(GaussianInteger.x * (GaussianInteger.x * q) + q)
+           by GaussianInteger.multiply_modulus
      = Product.make(
-           Product.first(GaussianInteger.coordinatesOfPolynomial(
-               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
-                   Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q))))
-               + Product.first(GaussianInteger.coordinatesOfPolynomial(q)),
-           Product.second(GaussianInteger.coordinatesOfPolynomial(
-               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
-                   Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q))))
-               + Product.second(GaussianInteger.coordinatesOfPolynomial(q)))
-           by GaussianInteger.coordinatesOfPolynomial_add(
-                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x,
-                      Polynomial.multiply(Integer.ring_bundle, GaussianInteger.x, q)),
-                  q)
+           Product.first(coords(GaussianInteger.x * (GaussianInteger.x * q))) + Product.first(coords(q)),
+           Product.second(coords(GaussianInteger.x * (GaussianInteger.x * q))) + Product.second(coords(q)))
+           by GaussianInteger.coordinatesOfPolynomial_add
      = Product.make(
-           Integer.negate(Product.first(GaussianInteger.coordinatesOfPolynomial(q)))
-               + Product.first(GaussianInteger.coordinatesOfPolynomial(q)),
-           Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(q)))
-               + Product.second(GaussianInteger.coordinatesOfPolynomial(q)))
-           by congruenceOf(
-                  (pair : Pair(Integer, Integer)) ↦
-                      Product.make(
-                          Product.first(pair) + Product.first(GaussianInteger.coordinatesOfPolynomial(q)),
-                          Product.second(pair) + Product.second(GaussianInteger.coordinatesOfPolynomial(q))),
-                  GaussianInteger.coordinatesOfPolynomial_times_x_squared(q))
+           -Product.first(coords(q)) + Product.first(coords(q)),
+           -Product.second(coords(q)) + Product.second(coords(q)))
+           by {
+             -- substitute the double-x rotation coords(x·(x·q)) = (−re q, −im q)
+             -- into each coordinate
+             claim Product.first(coords(GaussianInteger.x * (GaussianInteger.x * q))) + Product.first(coords(q))
+                 = -Product.first(coords(q)) + Product.first(coords(q))
+                 by substituting GaussianInteger.coordinatesOfPolynomial_times_x_squared(q);
+             claim Product.second(coords(GaussianInteger.x * (GaussianInteger.x * q))) + Product.second(coords(q))
+                 = -Product.second(coords(q)) + Product.second(coords(q))
+                 by substituting GaussianInteger.coordinatesOfPolynomial_times_x_squared(q);
+             done
+           }
      = Product.make(Integer.zero, Integer.zero)
-           by Product.make_equal(Integer, Integer,
-                  Integer.negate(Product.first(GaussianInteger.coordinatesOfPolynomial(q)))
-                      + Product.first(GaussianInteger.coordinatesOfPolynomial(q)),
-                  Integer.zero,
-                  Integer.negate(Product.second(GaussianInteger.coordinatesOfPolynomial(q)))
-                      + Product.second(GaussianInteger.coordinatesOfPolynomial(q)),
-                  Integer.zero,
-                  ring, ring)
+           by {
+             -- each coordinate is −a + a = 0
+             claim -Product.first(coords(q)) + Product.first(coords(q)) = Integer.zero;
+             claim -Product.second(coords(q)) + Product.second(coords(q)) = Integer.zero;
+             done
+           }

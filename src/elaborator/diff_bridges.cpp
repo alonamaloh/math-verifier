@@ -548,14 +548,59 @@ ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
         } catch (const ElaborateError&) {
             return nullptr;
         }
-        // Descend `previous`/`next` to the innermost differing subterm: the
-        // maximal shared application context, peeled one matching component
-        // at a time. That subterm is where the cited lemma's equation lives.
+        // Walk `previous`/`next` down their shared application context. At
+        // EACH differing level — outermost first — try to solve the lemma's
+        // arguments by unifying its conclusion endpoints against that level's
+        // `(fromTerm, toTerm)`. The first level that fully solves is where the
+        // cited lemma's equation lives. Trying outermost-first matters: a
+        // structural descent that always peels the single differing child
+        // overshoots when a lemma matches a whole subterm whose head differs
+        // but which happens to share a trailing argument with its counterpart
+        // (e.g. `modulus·q` vs `x·(x·q) + q`, both ending in `q`).
         ExpressionPointer fromTerm =
             zetaUnfoldLetBinders(previousKernel, localBinders);
         ExpressionPointer toTerm =
             zetaUnfoldLetBinders(nextKernel, localBinders);
         while (true) {
+            // Try the lemma at the current level, both orientations (it may
+            // prove `subterm = other` or `other = subterm`).
+            for (int orientation = 0; orientation < 2; ++orientation) {
+                ExpressionPointer patternLeft = orientation == 0
+                    ? conclusion.leftEndpoint : conclusion.rightEndpoint;
+                ExpressionPointer patternRight = orientation == 0
+                    ? conclusion.rightEndpoint : conclusion.leftEndpoint;
+                std::map<std::string, ExpressionPointer> assignment;
+                unifyConstructorParameters(patternLeft, fromTerm,
+                                              metavariableNames, assignment);
+                unifyConstructorParameters(patternRight, toTerm,
+                                              metavariableNames, assignment);
+                bool allSolved = true;
+                for (const auto& name : argumentNames) {
+                    if (!assignment.count(name)) { allSolved = false; break; }
+                }
+                if (!allSolved) continue;
+                // Apply the lemma to the solved arguments and hand the now-
+                // concrete proof to the ordinary diff bridge for the
+                // congruence (and possible symmetry) wrapping.
+                ExpressionPointer applied = bareLemma;
+                for (const auto& name : argumentNames) {
+                    applied = makeApplication(applied, assignment[name]);
+                }
+                ExpressionPointer appliedType;
+                try {
+                    appliedType =
+                        inferTypeInLocalContext(localBinders, applied);
+                } catch (const TypeError&) {
+                    continue;
+                } catch (const ElaborateError&) {
+                    continue;
+                }
+                ExpressionPointer wrapped = tryDiffApplyUserProof(
+                    localBinders, previousKernel, nextKernel,
+                    applied, appliedType, line, column);
+                if (wrapped) return wrapped;
+            }
+            // Not here: peel one matching component and retry deeper.
             auto* leftApp = std::get_if<Application>(&fromTerm->node);
             auto* rightApp = std::get_if<Application>(&toTerm->node);
             if (!leftApp || !rightApp) break;
@@ -574,45 +619,6 @@ ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
                 continue;
             }
             break;
-        }
-        // Solve the lemma's arguments by unifying its conclusion endpoints
-        // against the subterm diff, trying both orientations (the lemma may
-        // prove `subterm = other` or `other = subterm`).
-        for (int orientation = 0; orientation < 2; ++orientation) {
-            ExpressionPointer patternLeft = orientation == 0
-                ? conclusion.leftEndpoint : conclusion.rightEndpoint;
-            ExpressionPointer patternRight = orientation == 0
-                ? conclusion.rightEndpoint : conclusion.leftEndpoint;
-            std::map<std::string, ExpressionPointer> assignment;
-            unifyConstructorParameters(patternLeft, fromTerm,
-                                          metavariableNames, assignment);
-            unifyConstructorParameters(patternRight, toTerm,
-                                          metavariableNames, assignment);
-            bool allSolved = true;
-            for (const auto& name : argumentNames) {
-                if (!assignment.count(name)) { allSolved = false; break; }
-            }
-            if (!allSolved) continue;
-            // Apply the lemma to the solved arguments and hand the now-
-            // concrete proof to the ordinary diff bridge for the congruence
-            // (and possible symmetry) wrapping.
-            ExpressionPointer applied = bareLemma;
-            for (const auto& name : argumentNames) {
-                applied = makeApplication(applied, assignment[name]);
-            }
-            ExpressionPointer appliedType;
-            try {
-                appliedType =
-                    inferTypeInLocalContext(localBinders, applied);
-            } catch (const TypeError&) {
-                continue;
-            } catch (const ElaborateError&) {
-                continue;
-            }
-            ExpressionPointer wrapped = tryDiffApplyUserProof(
-                localBinders, previousKernel, nextKernel,
-                applied, appliedType, line, column);
-            if (wrapped) return wrapped;
         }
         return nullptr;
     }
