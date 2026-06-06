@@ -72,13 +72,15 @@ theorem Rational.square_IsNonneg (q : Rational)
   cases Rational.IsNonneg_or_negate_IsNonneg(q) {
     | Or.introduceLeft(qIsNonneg) =>
         Rational.IsNonneg.multiply(q, q, qIsNonneg, qIsNonneg)
-    | Or.introduceRight(negateQIsNonneg) =>
-        rewrite(
-            Ring.negate_multiply_negate(Rational, Rational.add, Rational.zero,
-                Rational.negate, Rational.multiply, Rational.one, Rational.is_ring,
-                q, q),
+    | Or.introduceRight(negateQIsNonneg) => {
+        -- (−q)·(−q) = q·q, and the left side is a product of nonnegatives.
+        claim squareEquation
+            : Rational.multiply(Rational.negate(q), Rational.negate(q))
+              = Rational.multiply(q, q) by ring;
+        rewrite(squareEquation,
             Rational.IsNonneg.multiply(Rational.negate(q), Rational.negate(q),
                 negateQIsNonneg, negateQIsNonneg))
+      }
   }
 
 -- A Real square is nonnegative: at a representative the squared sequence
@@ -113,9 +115,10 @@ theorem Real.negate_one_not_IsNonneg
     claim oneIsNonneg : Real.IsNonneg(Real.one)
         by rewrite(Real.multiply_one(Real.one), Real.square_IsNonneg(Real.one));
     Real.zero_not_equal_one(
-        Equality.symmetry(
-            Real.IsNonneg_and_negate_IsNonneg_implies_zero(Real.one, oneIsNonneg,
-                negateOneIsNonneg)))
+        calc Real.zero
+           = Real.one
+               since Real.IsNonneg_and_negate_IsNonneg_implies_zero(Real.one,
+                         oneIsNonneg, negateOneIsNonneg))
   }
 
 -- Hence −1 has no real square root: no t with t² = −1.
