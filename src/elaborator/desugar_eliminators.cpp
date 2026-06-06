@@ -225,24 +225,34 @@ ExpressionPointer Elaborator::resolveOverloadedCall(
         // candidate) instead of Real.
         std::vector<ExpressionPointer> argumentKernels;
         std::vector<std::string> argumentTypeNames;
+        std::vector<ExpressionPointer> argumentTypesClosed;
         for (const auto& argumentSurface : argumentSurfaces) {
             ExpressionPointer argumentKernel =
                 elaborateExpression(*argumentSurface, localBinders);
             argumentKernels.push_back(argumentKernel);
             std::string typeName;
+            ExpressionPointer typeClosed;
             if (auto* ascription = std::get_if<SurfaceAscription>(
                     &argumentSurface->node)) {
                 ExpressionPointer ascribedType = elaborateExpression(
                     *ascription->type, localBinders);
                 typeName = headConstantName(ascribedType);
+                typeClosed = closeOverLocalBinders(
+                    ascribedType, localBinders, localBinders.size());
             } else {
                 ExpressionPointer argumentTypeRaw =
                     inferTypeInLocalContext(localBinders, argumentKernel);
                 typeName = headConstantName(argumentTypeRaw);
+                typeClosed = closeOverLocalBinders(
+                    argumentTypeRaw, localBinders, localBinders.size());
             }
             argumentTypeNames.push_back(std::move(typeName));
+            argumentTypesClosed.push_back(std::move(typeClosed));
         }
-        // Find candidates whose first N parameter-type names match.
+        // Find candidates whose first N parameter types accept the
+        // arguments — by head-constant name first (fast, exact), then by
+        // definitional equality (so a type-alias parameter accepts an
+        // argument of the unfolded type, matching what a direct call does).
         std::vector<std::string> matches;
         for (const auto& candidateName : candidateNames) {
             const Declaration* declaration =
@@ -250,7 +260,9 @@ ExpressionPointer Elaborator::resolveOverloadedCall(
             if (!declaration) continue;
             ExpressionPointer signature = declarationType(*declaration);
             if (!signatureAcceptsArgumentTypes(signature,
-                                                  argumentTypeNames)) {
+                                                  argumentTypeNames)
+                && !signatureAcceptsArgumentTypesDefeq(
+                       signature, argumentTypesClosed)) {
                 continue;
             }
             matches.push_back(candidateName);
@@ -353,6 +365,29 @@ bool Elaborator::signatureAcceptsArgumentTypes(
             if (!pi) return false;
             std::string actualName = headConstantName(pi->domain);
             if (actualName != expectedName) return false;
+            cursor = pi->codomain;
+        }
+        return true;
+    }
+
+bool Elaborator::signatureAcceptsArgumentTypesDefeq(
+        ExpressionPointer signature,
+        const std::vector<ExpressionPointer>& argumentTypesClosed) {
+        Context emptyContext;
+        ExpressionPointer cursor = signature;
+        for (const auto& argumentType : argumentTypesClosed) {
+            cursor = weakHeadNormalForm(environment_, cursor);
+            auto* pi = std::get_if<Pi>(&cursor->node);
+            if (!pi) return false;
+            if (!argumentType) return false;
+            if (!isDefinitionallyEqual(environment_, emptyContext,
+                                         pi->domain, argumentType)) {
+                return false;
+            }
+            // The parameter type may be dependent (a later domain mentions
+            // this binder). Substitute the argument's type in for it so the
+            // remaining comparisons stay well-formed. For the common non-
+            // dependent overloads this is a no-op.
             cursor = pi->codomain;
         }
         return true;

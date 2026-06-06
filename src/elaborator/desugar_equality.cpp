@@ -167,6 +167,42 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 }
             }
         }
+        // Alias fallback: the operand type may be a definition that
+        // abbreviates a registered type — e.g. `GaussianInteger :=
+        // RingModulo(…)`, `ComplexNumber := RingModulo(…)`. Unfold each
+        // operand type's head one δ-step at a time, collecting the heads it
+        // passes through, and retry the registry over those. A SINGLE-step
+        // unfold (not full WHNF) is essential: `RingModulo` is itself a
+        // definition for `Quotient(…)`, so WHNF would blow past the
+        // `RingModulo` registration all the way to `Quotient`. We try the
+        // raw head first (already done above), then successive unfoldings,
+        // so an alias dispatches exactly like the type it names.
+        if (targetFunction.empty()) {
+            auto collectHeads = [&](ExpressionPointer typeExpr) {
+                std::vector<std::string> heads;
+                ExpressionPointer current = typeExpr;
+                for (int step = 0; step < 64; ++step) {
+                    current = unfoldHeadConstantOneStep(current);
+                    if (!current) break;
+                    std::string head = headConstantName(current);
+                    if (!head.empty()) heads.push_back(head);
+                }
+                return heads;
+            };
+            std::vector<std::string> leftHeads = collectHeads(leftTypeRaw);
+            std::vector<std::string> rightHeads = collectHeads(rightTypeRaw);
+            leftHeads.insert(leftHeads.begin(), operandTypeName);
+            rightHeads.insert(rightHeads.begin(), rightTypeName);
+            for (const auto& lh : leftHeads) {
+                if (!targetFunction.empty()) break;
+                for (const auto& rh : rightHeads) {
+                    if (lh.empty() || rh.empty()) continue;
+                    std::string reg = environment_.lookupOperator(
+                        operatorSymbol, lh, rh);
+                    if (!reg.empty()) { targetFunction = reg; break; }
+                }
+            }
+        }
         // Final registry fallback: WHNF the operand types to expose a
         // CONCRETE carrier head. A value whose type is a bundle projection
         // over a concrete ring — `Ring.carrier(Real.polynomial_ring)` (from
@@ -279,16 +315,36 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                 if (cursor) {
                     if (auto* firstExplicit =
                             std::get_if<Pi>(&cursor->node)) {
-                        if (matchAgainstPattern(
-                                firstExplicit->domain, leftTypeClosed,
-                                implicitCount, implicitBindings)) {
-                            inferredByUnification = true;
-                            for (const auto& binding : implicitBindings) {
-                                if (!binding) {
-                                    inferredByUnification = false;
-                                    break;
+                        // Match the dispatch function's first-explicit-arg
+                        // type template against the LEFT operand's type. When
+                        // that type is an alias whose head differs from the
+                        // template's (e.g. operand `GaussianInteger` vs
+                        // template `RingModulo(?c, ?m)`), retry against
+                        // successive one-step δ-unfoldings so the implicits
+                        // (`{c}{m}`) are recovered from the type the alias
+                        // abbreviates. Single-step so we stop at `RingModulo`
+                        // rather than blowing past it to `Quotient`.
+                        ExpressionPointer leftCandidate = leftTypeClosed;
+                        for (int step = 0; step < 64 && !inferredByUnification;
+                             ++step) {
+                            std::fill(implicitBindings.begin(),
+                                      implicitBindings.end(), nullptr);
+                            if (matchAgainstPattern(
+                                    firstExplicit->domain, leftCandidate,
+                                    implicitCount, implicitBindings)) {
+                                inferredByUnification = true;
+                                for (const auto& binding : implicitBindings) {
+                                    if (!binding) {
+                                        inferredByUnification = false;
+                                        break;
+                                    }
                                 }
                             }
+                            if (inferredByUnification) break;
+                            ExpressionPointer next =
+                                unfoldHeadConstantOneStep(leftCandidate);
+                            if (!next) break;
+                            leftCandidate = next;
                         }
                     }
                 }

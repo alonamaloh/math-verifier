@@ -1,0 +1,43 @@
+-- Regression: a type ALIAS over a registered type dispatches operators
+-- and resolves overloads exactly like the type it abbreviates.
+--
+-- `ComplexNumber := RingModulo(Real.ring[x], x²+1)`. A value of type
+-- `ComplexNumber` has raw head `ComplexNumber`, but the PRODUCT `z * w`
+-- has the raw head `RingModulo` (the result type of `RingModulo.multiply`).
+-- Three elaborator paths must see through the alias:
+--   (1) binary operator dispatch — `z * w` resolves to RingModulo.multiply
+--       even though `*` is registered on `RingModulo`, not `ComplexNumber`;
+--   (2) implicit-argument inference — the `{c}{m}` of RingModulo.multiply
+--       are recovered by unfolding `ComplexNumber` to `RingModulo(c, m)`;
+--   (3) overload resolution — an overload whose parameter is the alias
+--       `ComplexNumber` accepts an argument whose raw type is `RingModulo`
+--       (the `z * w` result), matched by definitional equality.
+
+module Test.operator_alias_unfold_test
+
+import Logic.basics
+import Equality.basics
+import Real.basics
+import Real.ring
+import Real.instances
+import Polynomial.basics
+import Polynomial.instances
+import ComplexNumber.basics
+
+-- (1)+(2): `*` on two ComplexNumber operands dispatches and fills implicits.
+theorem alias_operator_multiply (z w : ComplexNumber)
+        : z * w = z * w :=
+  reflexivity(ComplexNumber, z * w)
+
+-- A pair of overloads so resolution must discriminate by argument type.
+definition Test.identityComplex (z : ComplexNumber) : ComplexNumber := z
+definition Test.identityReal (r : Real) : Real := r
+overload aliasIdentity := Test.identityComplex
+overload aliasIdentity := Test.identityReal
+
+-- (3): the argument `z * w` has raw type `RingModulo(...)`, but overload
+-- resolution still picks `identityComplex` (parameter `ComplexNumber`) by
+-- defeq — a direct call would accept it, and now so does the overload.
+theorem alias_overload_on_product (z w : ComplexNumber)
+        : aliasIdentity(z * w) = z * w :=
+  reflexivity(ComplexNumber, z * w)

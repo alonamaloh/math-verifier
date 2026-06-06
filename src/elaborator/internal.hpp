@@ -4157,6 +4157,19 @@ private:
         ExpressionPointer signature,
         const std::vector<std::string>& argumentTypeNames);
 
+    // Defeq fallback for overload resolution: like
+    // `signatureAcceptsArgumentTypes` but compares each parameter type to
+    // the argument's (closed) type via `isDefinitionallyEqual` rather than
+    // by head-constant name. Lets an overload whose parameter is a type
+    // ALIAS (`coordinates : GaussianInteger → …`) accept an argument whose
+    // raw type is the type the alias unfolds to (`RingModulo(…)`, e.g. the
+    // result of `z * w`) — the same match a direct application makes. Only
+    // consulted when the name-based check fails, so it can only widen
+    // acceptance, never change an existing resolution.
+    bool signatureAcceptsArgumentTypesDefeq(
+        ExpressionPointer signature,
+        const std::vector<ExpressionPointer>& argumentTypesClosed);
+
     // Helper: decompose `expectedType` (or any type expression) as
     // `Quotient(T, R)` and return T, R, and the universe level u such
     // that T : Type(u). Returns nullopt if the expression isn't a
