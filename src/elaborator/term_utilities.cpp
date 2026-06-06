@@ -171,14 +171,17 @@ ExpressionPointer abstractStructuralOccurrenceMasked(
         if (thisIndex < 32 && (mask & (1u << thisIndex))) {
             return makeBoundVariable(currentDepth);
         }
-        // Not selected: keep the occurrence as the original
-        // expression. BVs inside the original still need shifting
-        // by the surrounding lambda we'll add, but `shift` handles
-        // that — except here the expression IS the target itself,
-        // which is closed in the outer scope; no further BV shift
-        // needed since `target` is closed (it lives in the user's
-        // scope, not inside any newly-introduced lambda).
-        return expression;
+        // Not selected: keep the occurrence, but its bound variables must
+        // still be shifted +1 (cutoff = currentDepth) to make room for the
+        // motive lambda we are introducing — exactly as the plain-BV and
+        // recursive cases below do. The target is NOT necessarily closed:
+        // when it mentions outer binders (e.g. `gaussianProduct(coords z,
+        // coords w)` with `z`, `w` bound), leaving it unshifted strands
+        // those indices one level too shallow, and the later
+        // `substitute(.., 0, toSide)` (which decrements every BV > 0) then
+        // mangles them (z→w, w→…). Shifting here keeps every occurrence in
+        // the same de Bruijn frame.
+        return shift(expression, 1, currentDepth);
     }
     if (auto* boundVariable =
             std::get_if<BoundVariable>(&expression->node)) {

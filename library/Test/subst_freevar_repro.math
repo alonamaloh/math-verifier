@@ -1,0 +1,60 @@
+-- Regression: `by substituting <eq>` when the equation's RHS (the term
+-- substituted IN) itself mentions bound variables, and the rewrite target
+-- occurs several times.
+--
+-- The substitution bridge searches subsets of the occurrences (Phase 1).
+-- `abstractStructuralOccurrenceMasked` used to return a NON-selected
+-- occurrence of the target unshifted, on the false assumption that the
+-- target is closed. When the target carries bound variables (here the
+-- coordinates of `z`, `w`), those indices were left one level too shallow;
+-- the subsequent `substitute(.., 0, toSide)` then decremented them, turning
+-- `gaussianProduct(coords z, coords w)` into the ill-typed
+-- `gaussianProduct(coords w, coords eq)` (eq is a proof!). The mangled
+-- masked goals sent the auto-prover into an expensive search that blew the
+-- effort budget before the full-rewrite mask could close the step.
+
+module Test.subst_freevar_repro
+
+import Logic.basics
+import Logic.product
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.ring
+import Integer.algebra
+import GaussianInteger.basics
+import GaussianInteger.coordinates
+import GaussianInteger.coordinate_map
+import GaussianInteger.coordinate_multiplicative
+import GaussianInteger.norm
+
+-- Sanity: simple two-occurrence rewrite whose RHS mentions the binders.
+theorem subst_simple_freevar (z w : Natural) (eq : z * w = w * z)
+        : (z * w) + (z * w) = (w * z) + (w * z) :=
+  calc (z * w) + (z * w)
+     = (w * z) + (w * z)   by substituting eq
+
+-- The real reproducer: `eq` a local claim whose RHS is the nested
+-- `gaussianProduct(coords z, coords w)`, and the target `coords(z·w)`
+-- occurs four times. Must close at the default auto-prover budget.
+theorem subst_nested_freevar_multioccurrence (z w : GaussianInteger)
+        : Product.first(coords(z * w)) * Product.first(coords(z * w))
+          + Product.second(coords(z * w)) * Product.second(coords(z * w))
+          = Product.first(GaussianInteger.gaussianProduct(coords(z), coords(w)))
+                * Product.first(GaussianInteger.gaussianProduct(coords(z), coords(w)))
+            + Product.second(GaussianInteger.gaussianProduct(coords(z), coords(w)))
+                * Product.second(GaussianInteger.gaussianProduct(coords(z), coords(w))) := {
+  claim eq : coords(z * w) = GaussianInteger.gaussianProduct(coords(z), coords(w))
+      by GaussianInteger.coordinates_multiply;
+  calc Product.first(coords(z * w)) * Product.first(coords(z * w))
+       + Product.second(coords(z * w)) * Product.second(coords(z * w))
+     = Product.first(GaussianInteger.gaussianProduct(coords(z), coords(w)))
+           * Product.first(GaussianInteger.gaussianProduct(coords(z), coords(w)))
+       + Product.second(GaussianInteger.gaussianProduct(coords(z), coords(w)))
+           * Product.second(GaussianInteger.gaussianProduct(coords(z), coords(w)))
+         by substituting eq
+}
