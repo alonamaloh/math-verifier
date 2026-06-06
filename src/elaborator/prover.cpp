@@ -28,6 +28,18 @@ long long autoProveWarnThresholdValue() {
 }
 }  // namespace
 
+long long Elaborator::autoProveWarnThreshold() {
+    return autoProveWarnThresholdValue();
+}
+
+bool Elaborator::redundancyReproofIsCheap(uint64_t stepsBefore) {
+    long long threshold = autoProveWarnThreshold();
+    if (threshold <= 0) return true;  // cost gate disabled
+    uint64_t now = kernelStepsSoFar();
+    uint64_t consumed = now >= stepsBefore ? now - stepsBefore : now;
+    return consumed <= static_cast<uint64_t>(threshold);
+}
+
 ExpressionPointer Elaborator::tryContradiction(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,

@@ -4646,6 +4646,18 @@ private:
     bool reportRedundantBy_ = false;
     bool reportRedundantByNonEq_ = false;
     bool reportRedundantCalcSteps_ = false;
+    // The kernel-step budget below which a speculative redundancy auto-prove
+    // counts as "cheap enough to drop the hint". Tied to the expensive-step
+    // warn threshold (MATH_AUTOPROVE_WARN): a `by`/calc-step whose by-less
+    // re-proof would itself trip the warning is load-bearing for SPEED, not
+    // just correctness, so the redundancy checks must NOT flag it (else they
+    // tell you to delete the very hints that keep proofs fast). Returns the
+    // threshold; 0 means the cost gate is disabled (flag on any closure).
+    long long autoProveWarnThreshold();
+    // True iff a speculative redundancy auto-prove that just ran (its kernel-
+    // step delta measured via kernelStepsSoFar() around the call) is cheap
+    // enough to flag the hint as redundant.
+    bool redundancyReproofIsCheap(uint64_t stepsBefore);
     // Records, for the most recent `inferCallWithHoles` call, every PROOF
     // hole that was discharged from an in-scope hypothesis rather than the
     // goal: (depth = de Bruijn distance from innermost binder, 0 = the

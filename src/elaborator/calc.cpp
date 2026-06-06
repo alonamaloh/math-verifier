@@ -453,6 +453,7 @@ ExpressionPointer Elaborator::elaborateCalc(
                             || reportRedundantByNonEq_);
                     if (checkThisStep) {
                         ExpressionPointer autoAttempt;
+                        uint64_t stepsBefore = kernelStepsSoFar();
                         try {
                             if (step.relation == CalcRelation::Equality) {
                                 autoAttempt = autoProveCalcStep(
@@ -477,12 +478,12 @@ ExpressionPointer Elaborator::elaborateCalc(
                         } catch (const TypeError&) {
                             autoAttempt = nullptr;
                         }
-                        if (autoAttempt) {
+                        if (autoAttempt && redundancyReproofIsCheap(stepsBefore)) {
                             std::cerr << "warning: " << moduleName_
                                 << ":" << step.line << ":" << step.column
                                 << ": redundant `by` on calc step — "
                                 "auto-prover closes it without help\n";
-                        } else {
+                        } else if (!autoAttempt) {
                           if (step.relation == CalcRelation::Equality) {
                             // Auto-prover couldn't close on its own, but
                             // maybe the user wrote `by congruenceOf(λ, L)`
@@ -889,6 +890,7 @@ ExpressionPointer Elaborator::elaborateCalc(
                         endpointKernels[k - 1]),
                     endpointKernels[k + 1]);
                 ExpressionPointer autoAttempt;
+                uint64_t stepsBefore = kernelStepsSoFar();
                 try {
                     autoAttempt = autoProveCalcStep(
                         localBinders,
@@ -902,7 +904,9 @@ ExpressionPointer Elaborator::elaborateCalc(
                 } catch (const TypeError&) {
                     autoAttempt = nullptr;
                 }
-                if (autoAttempt) {
+                // Only flag if collapsing keeps the combined step CHEAP — a
+                // costly re-proof means the intermediate is pulling its weight.
+                if (autoAttempt && redundancyReproofIsCheap(stepsBefore)) {
                     // The redundant ENDPOINT is endpointKernels[k] — it's
                     // the target of steps[k-1] and is written on that
                     // step's line. Removing that line collapses steps
