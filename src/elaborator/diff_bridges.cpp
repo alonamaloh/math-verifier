@@ -530,12 +530,18 @@ ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
         // endpoints mention those metavariables).
         std::set<std::string> metavariableNames;
         std::vector<std::string> argumentNames;
+        // The type of each argument binder, in terms of the earlier
+        // `_diffLemmaArg_` metavariables — used to discharge propositional
+        // side conditions (binders that don't appear in the conclusion, e.g.
+        // an `i ≠ 0` hypothesis) from the local context after unification.
+        std::vector<ExpressionPointer> argumentTypes;
         ExpressionPointer cursor = bareLemmaType;
         int index = 0;
         while (auto* pi = std::get_if<Pi>(&cursor->node)) {
             std::string fresh = "_diffLemmaArg_" + std::to_string(index++);
             metavariableNames.insert(fresh);
             argumentNames.push_back(fresh);
+            argumentTypes.push_back(pi->domain);
             cursor = openBinder(pi->codomain, fresh,
                                  FreeVariableOrigin::Internal);
         }
@@ -574,6 +580,52 @@ ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
                                               metavariableNames, assignment);
                 unifyConstructorParameters(patternRight, toTerm,
                                               metavariableNames, assignment);
+                // Discharge any argument the conclusion didn't pin — a
+                // propositional side condition (e.g. `i ≠ 0`) — by searching
+                // the local hypotheses for a proof of its (now-instantiated)
+                // type. Mirrors the lemma-index precondition discharge, so an
+                // argument-free citation works on a congruence step whose
+                // lemma carries hypotheses, not just bare equalities.
+                {
+                    Context openedContext =
+                        buildContextFromLocalBinders(localBinders);
+                    for (size_t a = 0; a < argumentNames.size(); ++a) {
+                        if (assignment.count(argumentNames[a])) continue;
+                        ExpressionPointer slotType = substituteFreeVariables(
+                            argumentTypes[a], assignment, 0);
+                        ExpressionPointer slotTypeOpened = openOverLocalBinders(
+                            slotType, localBinders, localBinders.size());
+                        ExpressionPointer slotTypeNormalised;
+                        try {
+                            slotTypeNormalised = weakHeadNormalForm(
+                                environment_, slotTypeOpened);
+                        } catch (const TypeError&) { continue; }
+                        if (!typeIsProposition(openedContext,
+                                                 slotTypeNormalised)) {
+                            continue;
+                        }
+                        for (int j =
+                                 static_cast<int>(localBinders.size()) - 1;
+                             j >= 0; --j) {
+                            ExpressionPointer candidateType =
+                                openOverLocalBinders(
+                                    localBinders[j].type, localBinders, j);
+                            bool eq;
+                            try {
+                                eq = isDefinitionallyEqual(environment_,
+                                    openedContext, candidateType,
+                                    slotTypeNormalised);
+                            } catch (const TypeError&) { eq = false; }
+                            if (eq) {
+                                assignment[argumentNames[a]] =
+                                    makeBoundVariable(
+                                        static_cast<int>(localBinders.size())
+                                        - 1 - j);
+                                break;
+                            }
+                        }
+                    }
+                }
                 bool allSolved = true;
                 for (const auto& name : argumentNames) {
                     if (!assignment.count(name)) { allSolved = false; break; }

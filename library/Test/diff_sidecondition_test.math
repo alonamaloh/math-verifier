@@ -1,0 +1,31 @@
+-- Argument-free citation on a CONGRUENCE step whose lemma carries a
+-- SIDE CONDITION (a hypothesis not mentioned in the conclusion).
+--
+-- `tryApplyBareLemmaToDiff` solves the conclusion-determined arguments by
+-- unifying against the differing subterm, then discharges any remaining
+-- propositional argument from the local hypotheses — so `by <lemma>` works
+-- when the lemma has a precondition, not just a bare equality. The cited
+-- equality is `a + b = b + a` (not definitional), so the lemma genuinely
+-- has to fire; on an explicit `by` step the diff bridge is the only thing
+-- that can close it.
+
+module Test.diff_sidecondition_test
+
+import Logic.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Equality.basics
+
+-- A non-definitional equality carrying an (unused) side condition.
+theorem Test.conditional_commute (a b : Natural) (distinct : Not (a = b))
+        : a + b = b + a :=
+  Natural.add_commutative(a, b)
+
+-- Congruence under `successor`: the subterm pins `a`, `b`, and the side
+-- condition `a ≠ b` is discharged from `distinct` in scope. Argument-free.
+theorem Test.conditional_commute_under_successor
+        (a b : Natural) (distinct : Not (a = b))
+        : successor(a + b) = successor(b + a) :=
+  calc successor(a + b)
+     = successor(b + a)   by Test.conditional_commute

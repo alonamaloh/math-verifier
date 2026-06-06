@@ -35,6 +35,7 @@ import Polynomial.instances
 import Polynomial.degree
 import Polynomial.multiply_coefficient
 import Polynomial.monomial
+import Polynomial.units
 import RingModulo.basics
 import RingModulo.operations
 import RingModulo.ring
@@ -51,61 +52,61 @@ definition ComplexNumber.i : ComplexNumber :=
 -- zero in the quotient. (Holds by the modulus's definition reducing
 -- through the lifts; the proof is just `modulus_is_zero`.)
 theorem ComplexNumber.i_squared_plus_one
-        : RingModulo.add(RingModulo.multiply(ComplexNumber.i, ComplexNumber.i),
-              RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus))
+        : ComplexNumber.i * ComplexNumber.i
+              + RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus)
           = RingModulo.zero(Real.polynomial_commutative_ring, Complex.modulus) :=
   RingModulo.modulus_is_zero(Real.polynomial_commutative_ring, Complex.modulus)
 
--- i² = −1.
+-- i² = −1: the unique additive inverse of 1, since i² + 1 = 0. (`ring`
+-- can't see through the RingModulo bundle, so the cancellation goes
+-- through the additive-group uniqueness lemma; named arguments keep the
+-- group structure it operates over legible.)
 theorem ComplexNumber.i_squared
-        : RingModulo.multiply(ComplexNumber.i, ComplexNumber.i)
-          = RingModulo.negate(
-              RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus)) :=
+        : ComplexNumber.i * ComplexNumber.i
+          = - RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus) :=
   Group.left_inverse_unique(
-      ComplexNumber,
-      RingModulo.add,
-      RingModulo.zero(Real.polynomial_commutative_ring, Complex.modulus),
-      RingModulo.negate,
-      RingModulo.add_is_group(Real.polynomial_commutative_ring, Complex.modulus),
-      RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus),
-      RingModulo.multiply(ComplexNumber.i, ComplexNumber.i),
-      ComplexNumber.i_squared_plus_one)
+      carrier := ComplexNumber,
+      operation := RingModulo.add,
+      identity := RingModulo.zero(Real.polynomial_commutative_ring, Complex.modulus),
+      inverse := RingModulo.negate,
+      groupProof := RingModulo.add_is_group(Real.polynomial_commutative_ring, Complex.modulus),
+      a := RingModulo.one(Real.polynomial_commutative_ring, Complex.modulus),
+      b := ComplexNumber.i * ComplexNumber.i,
+      combineHypothesis := ComplexNumber.i_squared_plus_one)
 
 -- ----------------------------------------------------------------------
 -- Constant-polynomial lemmas (the algebra behind the embedding).
 
--- The constant polynomials add coefficientwise.
+-- The constant polynomials add coefficientwise. At index 0 both sides read
+-- a + b; at any other index both are 0 (the monomials are off-degree).
+-- (The coefficient bookkeeping mixes `Ring.add(Real.ring, …)` from
+-- `coefficientOf_add` with surface `Real.add`, so the off-degree citations
+-- keep their explicit arguments — the dual spelling defeats argument-free
+-- congruence inference.)
 theorem Complex.constant_add (a b : Real)
-        : Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
-              Polynomial.monomial(Real.ring, b, 0))
-          = Polynomial.monomial(Real.ring, Real.add(a, b), 0) :=
+        : Polynomial.monomial(Real.ring, a, 0) + Polynomial.monomial(Real.ring, b, 0)
+          = Polynomial.monomial(Real.ring, a + b, 0) :=
   Polynomial.equal_of_coefficientOf_equal(Real.ring,
-      Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
-          Polynomial.monomial(Real.ring, b, 0)),
-      Polynomial.monomial(Real.ring, Real.add(a, b), 0),
+      Polynomial.monomial(Real.ring, a, 0) + Polynomial.monomial(Real.ring, b, 0),
+      Polynomial.monomial(Real.ring, a + b, 0),
       (i : Natural) ↦
         decide i = 0 {
           | yes indexZero =>
               calc Polynomial.coefficientOf(Real.ring,
-                       Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
-                           Polynomial.monomial(Real.ring, b, 0)), i)
+                       Polynomial.monomial(Real.ring, a, 0) + Polynomial.monomial(Real.ring, b, 0), i)
                  = Polynomial.coefficientOf(Real.ring,
-                       Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
-                           Polynomial.monomial(Real.ring, b, 0)), 0)
+                       Polynomial.monomial(Real.ring, a, 0) + Polynomial.monomial(Real.ring, b, 0), 0)
                  = Real.add(
                        Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a, 0), 0),
                        Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), 0))
                  = Real.add(a,
                        Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), 0))
-                 = Real.add(a, b)
-                 = Polynomial.coefficientOf(Real.ring,
-                       Polynomial.monomial(Real.ring, Real.add(a, b), 0), 0)
-                 = Polynomial.coefficientOf(Real.ring,
-                       Polynomial.monomial(Real.ring, Real.add(a, b), 0), i)
+                 = a + b
+                 = Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a + b, 0), 0)
+                 = Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a + b, 0), i)
           | no indexNotZero =>
               calc Polynomial.coefficientOf(Real.ring,
-                       Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
-                           Polynomial.monomial(Real.ring, b, 0)), i)
+                       Polynomial.monomial(Real.ring, a, 0) + Polynomial.monomial(Real.ring, b, 0), i)
                  = Real.add(
                        Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a, 0), i),
                        Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), i))
@@ -116,62 +117,16 @@ theorem Complex.constant_add (a b : Real)
                  = Real.add(Real.zero, Real.zero)
                        by Polynomial.coefficientOf_monomial_off(Real.ring, b, 0, i, indexNotZero)
                  = Real.zero
-                 = Polynomial.coefficientOf(Real.ring,
-                       Polynomial.monomial(Real.ring, Real.add(a, b), 0), i)
-                       by Polynomial.coefficientOf_monomial_off(Real.ring, Real.add(a, b), 0, i,
-                              indexNotZero)
+                 = Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, a + b, 0), i)
+                       by Polynomial.coefficientOf_monomial_off(Real.ring, a + b, 0, i, indexNotZero)
         })
 
--- The constant polynomials multiply coefficientwise.
+-- The constant polynomials multiply coefficientwise — exactly the general
+-- degree-0 monomial product.
 theorem Complex.constant_multiply (a b : Real)
-        : Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
-              Polynomial.monomial(Real.ring, b, 0))
-          = Polynomial.monomial(Real.ring, Real.multiply(a, b), 0) :=
-  Polynomial.equal_of_coefficientOf_equal(Real.ring,
-      Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
-          Polynomial.monomial(Real.ring, b, 0)),
-      Polynomial.monomial(Real.ring, Real.multiply(a, b), 0),
-      (i : Natural) ↦
-        decide i = 0 {
-          | yes indexZero =>
-              calc Polynomial.coefficientOf(Real.ring,
-                       Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
-                           Polynomial.monomial(Real.ring, b, 0)), i)
-                 = Polynomial.coefficientOf(Real.ring,
-                       Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
-                           Polynomial.monomial(Real.ring, b, 0)), 0)
-                 = Real.multiply(a,
-                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0),
-                           Natural.monus(0, 0)))
-                       by Polynomial.coefficientOf_monomial_multiply(Real.ring, a,
-                              Polynomial.monomial(Real.ring, b, 0), 0, 0, Natural.zero_least(0))
-                 = Real.multiply(a,
-                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), 0))
-                 = Real.multiply(a, b)
-                 = Polynomial.coefficientOf(Real.ring,
-                       Polynomial.monomial(Real.ring, Real.multiply(a, b), 0), 0)
-                 = Polynomial.coefficientOf(Real.ring,
-                       Polynomial.monomial(Real.ring, Real.multiply(a, b), 0), i)
-          | no indexNotZero =>
-              calc Polynomial.coefficientOf(Real.ring,
-                       Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
-                           Polynomial.monomial(Real.ring, b, 0)), i)
-                 = Real.multiply(a,
-                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0),
-                           Natural.monus(i, 0)))
-                       by Polynomial.coefficientOf_monomial_multiply(Real.ring, a,
-                              Polynomial.monomial(Real.ring, b, 0), 0, i, Natural.zero_least(i))
-                 = Real.multiply(a,
-                       Polynomial.coefficientOf(Real.ring, Polynomial.monomial(Real.ring, b, 0), i))
-                 = Real.multiply(a, Real.zero)
-                       by Polynomial.coefficientOf_monomial_off(Real.ring, b, 0, i, indexNotZero)
-                 = Real.zero
-                       by Ring.multiply_zero_right(Real.ring, a)
-                 = Polynomial.coefficientOf(Real.ring,
-                       Polynomial.monomial(Real.ring, Real.multiply(a, b), 0), i)
-                       by Polynomial.coefficientOf_monomial_off(Real.ring, Real.multiply(a, b),
-                              0, i, indexNotZero)
-        })
+        : Polynomial.monomial(Real.ring, a, 0) * Polynomial.monomial(Real.ring, b, 0)
+          = Polynomial.monomial(Real.ring, a * b, 0) :=
+  Polynomial.monomial_zero_multiply(Real.ring, a, b)
 
 -- The constant polynomial 0 is the zero polynomial.
 theorem Complex.constant_zero
@@ -212,23 +167,32 @@ theorem ComplexNumber.from_real_zero
           = RingModulo.zero(Real.polynomial_commutative_ring, Complex.modulus) :=
   Complex.constant_zero
 
--- Preserves addition.
+-- Preserves addition. Both sides are the class of a constant polynomial:
+-- the constants add coefficientwise (constant_add), and the class of a sum
+-- is the sum of the classes (definitionally, since RingModulo.add acts on
+-- representatives).
 theorem ComplexNumber.from_real_add (a b : Real)
-        : ComplexNumber.from_real(Real.add(a, b))
-          = RingModulo.add(ComplexNumber.from_real(a), ComplexNumber.from_real(b)) :=
-  Equality.symmetry(
-      congruenceOf(
-          (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) ↦
-              RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus, p),
-          Complex.constant_add(a, b)))
+        : ComplexNumber.from_real(a + b)
+          = ComplexNumber.from_real(a) + ComplexNumber.from_real(b) :=
+  calc ComplexNumber.from_real(a + b)
+     = RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus,
+           Polynomial.monomial(Real.ring, a + b, 0))
+     = RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus,
+           Polynomial.add(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+               Polynomial.monomial(Real.ring, b, 0)))
+           by Complex.constant_add
+     = ComplexNumber.from_real(a) + ComplexNumber.from_real(b)
 
--- Preserves multiplication.
+-- Preserves multiplication (same shape: constant_multiply, then class of a
+-- product is the product of the classes).
 theorem ComplexNumber.from_real_multiply (a b : Real)
-        : ComplexNumber.from_real(Real.multiply(a, b))
-          = RingModulo.multiply(
-              ComplexNumber.from_real(a), ComplexNumber.from_real(b)) :=
-  Equality.symmetry(
-      congruenceOf(
-          (p : Polynomial(Ring.carrier(Real.ring), Ring.zero(Real.ring))) ↦
-              RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus, p),
-          Complex.constant_multiply(a, b)))
+        : ComplexNumber.from_real(a * b)
+          = ComplexNumber.from_real(a) * ComplexNumber.from_real(b) :=
+  calc ComplexNumber.from_real(a * b)
+     = RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus,
+           Polynomial.monomial(Real.ring, a * b, 0))
+     = RingModulo.make(Real.polynomial_commutative_ring, Complex.modulus,
+           Polynomial.multiply(Real.ring, Polynomial.monomial(Real.ring, a, 0),
+               Polynomial.monomial(Real.ring, b, 0)))
+           by Complex.constant_multiply
+     = ComplexNumber.from_real(a) * ComplexNumber.from_real(b)
