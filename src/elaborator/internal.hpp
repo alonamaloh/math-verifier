@@ -4655,6 +4655,12 @@ private:
     // threshold; 0 means the cost gate is disabled (use the default budget).
     long long autoProveWarnThreshold();
 
+    // Dedicated (stricter) effort cap for the redundancy checks' speculative
+    // re-proof: a hint is flagged redundant only when removing it leaves a
+    // near-free re-proof. Default 10K kernel-steps; MATH_REDUNDANT_BUDGET
+    // overrides (0 disables → fall back to the default auto-prove budget).
+    long long redundancyBudget();
+
     // RAII: lower the auto-prover effort budget to the redundancy threshold
     // for the duration of a speculative redundancy re-proof, restoring it on
     // scope exit. This both makes the *check itself* cheap (the re-proof
@@ -4668,7 +4674,7 @@ private:
         long long saved;
         RedundancyBudgetGuard(Elaborator& e)
             : elaborator(e), saved(e.autoProveBudgetLimit_) {
-            long long cap = e.autoProveWarnThreshold();
+            long long cap = e.redundancyBudget();
             if (cap > 0) e.autoProveBudgetLimit_ = cap;
         }
         ~RedundancyBudgetGuard() {
