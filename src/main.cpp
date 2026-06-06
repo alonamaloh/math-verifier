@@ -6406,9 +6406,10 @@ int main(int argc, char* argv[]) {
                   << "                           for a slow one. 0 = use the default\n"
                   << "                           auto-prove budget.\n"
                   << "  MATH_AUTOPROVE_BUDGET=N  kernel-step budget for the\n"
-                  << "                           auto-prover (guards runaway searches;\n"
-                  << "                           a step over budget errors with a hint\n"
-                  << "                           to add an explicit `by`).\n"
+                  << "                           auto-prover (default 1200000; guards\n"
+                  << "                           runaway searches — a step over budget\n"
+                  << "                           errors with a hint to add an explicit\n"
+                  << "                           `by`). 0 disables the bound.\n"
                   << "  MATH_STATEMENTS_ONLY=1   stage 1 of a two-stage build: check\n"
                   << "                           and cache interfaces only, skipping\n"
                   << "                           proof bodies.\n";
