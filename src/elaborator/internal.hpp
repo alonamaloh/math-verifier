@@ -4652,12 +4652,29 @@ private:
     // re-proof would itself trip the warning is load-bearing for SPEED, not
     // just correctness, so the redundancy checks must NOT flag it (else they
     // tell you to delete the very hints that keep proofs fast). Returns the
-    // threshold; 0 means the cost gate is disabled (flag on any closure).
+    // threshold; 0 means the cost gate is disabled (use the default budget).
     long long autoProveWarnThreshold();
-    // True iff a speculative redundancy auto-prove that just ran (its kernel-
-    // step delta measured via kernelStepsSoFar() around the call) is cheap
-    // enough to flag the hint as redundant.
-    bool redundancyReproofIsCheap(uint64_t stepsBefore);
+
+    // RAII: lower the auto-prover effort budget to the redundancy threshold
+    // for the duration of a speculative redundancy re-proof, restoring it on
+    // scope exit. This both makes the *check itself* cheap (the re-proof
+    // bails early instead of running the full search) and is exactly the
+    // "removable only if the by-less re-proof stays cheap" criterion — a
+    // re-proof that would exceed the threshold trips the budget and yields
+    // no proof, so the hint is (correctly) left in place. A zero threshold
+    // leaves the budget untouched (cost gate disabled).
+    struct RedundancyBudgetGuard {
+        Elaborator& elaborator;
+        long long saved;
+        RedundancyBudgetGuard(Elaborator& e)
+            : elaborator(e), saved(e.autoProveBudgetLimit_) {
+            long long cap = e.autoProveWarnThreshold();
+            if (cap > 0) e.autoProveBudgetLimit_ = cap;
+        }
+        ~RedundancyBudgetGuard() {
+            elaborator.autoProveBudgetLimit_ = saved;
+        }
+    };
     // Records, for the most recent `inferCallWithHoles` call, every PROOF
     // hole that was discharged from an in-scope hypothesis rather than the
     // goal: (depth = de Bruijn distance from innermost binder, 0 = the

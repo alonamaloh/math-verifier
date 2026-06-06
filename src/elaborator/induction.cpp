@@ -477,23 +477,22 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         // intentional explanation — exempt it from the check.
         if (reportRedundantBy_ && !claim.byIsExplanation) {
             ExpressionPointer autoAttempt;
-            uint64_t stepsBefore = kernelStepsSoFar();
-            try {
-                autoAttempt = autoProveClaim(
-                    goalClosed, localBinders, line);
-            } catch (const ElaborateError&) {
-                autoAttempt = nullptr;
-            } catch (const TypeError&) {
-                autoAttempt = nullptr;
-            } catch (const AutoProverBudgetError&) {
-                // By-less re-proof blew the effort budget — definitely not
-                // cheap, so the hint stays. (autoProveClaim re-throws this.)
-                autoAttempt = nullptr;
+            {
+                // Cap the budget so the re-proof bails early; exceeding it
+                // (the hint is load-bearing for speed) yields no proof.
+                RedundancyBudgetGuard budgetGuard(*this);
+                try {
+                    autoAttempt = autoProveClaim(
+                        goalClosed, localBinders, line);
+                } catch (const ElaborateError&) {
+                    autoAttempt = nullptr;
+                } catch (const TypeError&) {
+                    autoAttempt = nullptr;
+                } catch (const AutoProverBudgetError&) {
+                    autoAttempt = nullptr;
+                }
             }
-            // Only flag if the by-less re-proof is also CHEAP — otherwise the
-            // hint is keeping the proof fast and must stay (see
-            // autoProveWarnThreshold).
-            if (autoAttempt && redundancyReproofIsCheap(stepsBefore)) {
+            if (autoAttempt) {
                 std::cerr << "warning: " << moduleName_
                     << ":" << line
                     << ": redundant `by` on `claim` — auto-prover"
