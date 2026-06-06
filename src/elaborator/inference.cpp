@@ -1251,8 +1251,18 @@ ExpressionPointer Elaborator::elaborateLambda(
         // because the elaborator may reference a binder on the
         // user's behalf — e.g. the bare-proposition-as-proof
         // coercion finds hypotheses by type, not by name.
+        //
+        // Suppress entirely when the body hosts an auto-prover
+        // invocation (a by-less calc step, `note`, structured claim,
+        // …): such a step can discharge a goal by *type-matching* the
+        // supposed hypothesis, consuming it without ever naming it in
+        // surface syntax. Without this guard a `suppose H; … calc … =
+        // <goal needing H> …` falsely reports H as droppable — and
+        // dropping it breaks the proof. Mirrors the same guard on
+        // `choose ... such that` (induction.cpp).
         if (lambda.fromStatementIntro
-            && lambda.binder.names.size() == 1) {
+            && lambda.binder.names.size() == 1
+            && !surfaceContainsAutoProverInvocation(*lambda.body)) {
             warnIfSurfaceNameUnused(
                 lambda.binder.names[0], *lambda.body,
                 lambda.body->line, lambda.body->column,
