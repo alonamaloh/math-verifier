@@ -43,68 +43,47 @@ theorem GaussianInteger.coordinatesOfPolynomial_respects_congruence
         : GaussianInteger.coordinatesOfPolynomial(p)
           = GaussianInteger.coordinatesOfPolynomial(p') := {
   obtain ⟨cofactor, differenceEquation⟩ from congruent;
-  -- differenceEquation : p + (−p') = (x²+1)·cofactor.
-  claim pEquation
-      : p = Polynomial.add(Integer.ring_bundle, p',
-            Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor))
+  -- differenceEquation : p + (−p') = (x²+1)·cofactor. Rearrange to
+  -- p = p' + (x²+1)·cofactor (a group rearrangement; the reversed steps
+  -- name the law they undo).
+  claim pEquation : p = p' + GaussianInteger.modulus * cofactor
       by calc p
-            = Polynomial.add(Integer.ring_bundle, p, Polynomial.zero(Integer.ring_bundle))
-                  by Equality.symmetry(Polynomial.add_identity_right(Integer.ring_bundle, p))
-            = Polynomial.add(Integer.ring_bundle, p,
-                  Polynomial.add(Integer.ring_bundle, Polynomial.negate(Integer.ring_bundle, p'), p'))
-                  by congruenceOf(
-                         (w : Polynomial(Integer, Integer.zero)) ↦
-                             Polynomial.add(Integer.ring_bundle, p, w),
-                         Equality.symmetry(Polynomial.add_negate_left(Integer.ring_bundle, p')))
-            = Polynomial.add(Integer.ring_bundle,
-                  Polynomial.add(Integer.ring_bundle, p, Polynomial.negate(Integer.ring_bundle, p')), p')
-                  by Equality.symmetry(Polynomial.add_associative(Integer.ring_bundle, p,
-                         Polynomial.negate(Integer.ring_bundle, p'), p'))
-            = Polynomial.add(Integer.ring_bundle,
-                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor), p')
-                  by congruenceOf(
-                         (w : Polynomial(Integer, Integer.zero)) ↦
-                             Polynomial.add(Integer.ring_bundle, w, p'),
-                         differenceEquation)
-            = Polynomial.add(Integer.ring_bundle, p',
-                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor))
-                  by Polynomial.add_commutative(Integer.ring_bundle,
-                         Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor), p');
-  calc GaussianInteger.coordinatesOfPolynomial(p)
-     = GaussianInteger.coordinatesOfPolynomial(
-           Polynomial.add(Integer.ring_bundle, p',
-               Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor)))
-           by congruenceOf(GaussianInteger.coordinatesOfPolynomial, pEquation)
+            = p + Polynomial.zero(Integer.ring_bundle)
+                  since Polynomial.add_identity_right(Integer.ring_bundle, p)
+            = p + ((-p') + p')
+                  since Polynomial.add_negate_left(Integer.ring_bundle, p')
+            = (p + (-p')) + p'
+                  since Polynomial.add_associative(Integer.ring_bundle, p, -p', p')
+            = GaussianInteger.modulus * cofactor + p'
+                  since differenceEquation
+            = p' + GaussianInteger.modulus * cofactor
+                  since Polynomial.add_commutative(Integer.ring_bundle,
+                         GaussianInteger.modulus * cofactor, p');
+  -- coords of the (x²+1)-multiple vanish.
+  claim modCoordinates
+      : coords(GaussianInteger.modulus * cofactor) = Product.make(Integer.zero, Integer.zero)
+      since GaussianInteger.coordinatesOfPolynomial_modulus_multiply(cofactor);
+  -- coords(p) = coords(p' + (x²+1)·cofactor) = coords(p') ⊕ (0,0) = coords(p').
+  calc coords(p)
+     = coords(p' + GaussianInteger.modulus * cofactor)
+           since pEquation
      = Product.make(
-           Product.first(GaussianInteger.coordinatesOfPolynomial(p'))
-               + Product.first(GaussianInteger.coordinatesOfPolynomial(
-                     Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor))),
-           Product.second(GaussianInteger.coordinatesOfPolynomial(p'))
-               + Product.second(GaussianInteger.coordinatesOfPolynomial(
-                     Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor))))
-           by GaussianInteger.coordinatesOfPolynomial_add(p',
-                  Polynomial.multiply(Integer.ring_bundle, GaussianInteger.modulus, cofactor))
-     = Product.make(
-           Product.first(GaussianInteger.coordinatesOfPolynomial(p')) + Integer.zero,
-           Product.second(GaussianInteger.coordinatesOfPolynomial(p')) + Integer.zero)
-           by congruenceOf(
-                  (pair : Pair(Integer, Integer)) ↦
-                      Product.make(
-                          Product.first(GaussianInteger.coordinatesOfPolynomial(p')) + Product.first(pair),
-                          Product.second(GaussianInteger.coordinatesOfPolynomial(p')) + Product.second(pair)),
-                  GaussianInteger.coordinatesOfPolynomial_modulus_multiply(cofactor))
-     = Product.make(
-           Product.first(GaussianInteger.coordinatesOfPolynomial(p')),
-           Product.second(GaussianInteger.coordinatesOfPolynomial(p')))
-           by Product.make_equal(Integer, Integer,
-                  Product.first(GaussianInteger.coordinatesOfPolynomial(p')) + Integer.zero,
-                  Product.first(GaussianInteger.coordinatesOfPolynomial(p')),
-                  Product.second(GaussianInteger.coordinatesOfPolynomial(p')) + Integer.zero,
-                  Product.second(GaussianInteger.coordinatesOfPolynomial(p')),
-                  ring, ring)
-     = GaussianInteger.coordinatesOfPolynomial(p')
-           by Equality.symmetry(
-                  GaussianInteger.product_eta(GaussianInteger.coordinatesOfPolynomial(p')))
+           Product.first(coords(p')) + Product.first(coords(GaussianInteger.modulus * cofactor)),
+           Product.second(coords(p')) + Product.second(coords(GaussianInteger.modulus * cofactor)))
+           since GaussianInteger.coordinatesOfPolynomial_add(p', GaussianInteger.modulus * cofactor)
+     = Product.make(Product.first(coords(p')), Product.second(coords(p')))
+           by {
+             -- each coordinate gains 0 from the vanishing multiple
+             calc Product.first(coords(p')) + Product.first(coords(GaussianInteger.modulus * cofactor))
+                = Product.first(coords(p')) + Integer.zero   by modCoordinates
+                = Product.first(coords(p'));
+             calc Product.second(coords(p')) + Product.second(coords(GaussianInteger.modulus * cofactor))
+                = Product.second(coords(p')) + Integer.zero   by modCoordinates
+                = Product.second(coords(p'));
+             done
+           }
+     = coords(p')
+           since GaussianInteger.product_eta(coords(p'))
 }
 
 -- ----------------------------------------------------------------------
