@@ -2683,15 +2683,98 @@ private:
         return clauses;
     }
 
+    // Shared parser for the structured-hint forms that follow `by` —
+    // `cases { … }` / `cases on E …`, `substitution`, `substituting <eq>`,
+    // `induction on E …`. Assumes `by` has already been consumed and the
+    // next token is the hint keyword. Returns a `SurfaceStructuredClaim`
+    // carrying the right flags and the supplied `proposition` (null for a
+    // calc step, where the relation type is the expected type), or nullptr
+    // when the next token is NOT one of these keywords (the caller then
+    // parses a plain proof expression). `eqAtAdditiveLevel` parses the
+    // `substituting` equality at the calc-safe `parseAdditive` precedence
+    // so a following calc separator (`=`/`≤`/…) ends the step instead of
+    // being swallowed; claims (delimited by `;`) pass false.
+    //
+    // One source of truth shared by `parseStructuredClaimTail` (claims)
+    // and `parseCalcStepProof` (calc steps), so `claim P by H` and a calc
+    // step `= P by H` accept the exact same hint grammar.
+    SurfaceExpressionPointer tryParseStructuredByHint(
+        Token claimToken, const SurfaceExpressionPointer& proposition,
+        bool eqAtAdditiveLevel) {
+        if (peek().kind == TokenKind::KeywordCases) {
+            Token casesToken = consumeAny();  // 'cases'
+            if (peek().kind == TokenKind::KeywordOn) {
+                SurfaceExpressionPointer byHint =
+                    parseClaimByCasesOnScrutinee(casesToken);
+                return makeSurfaceStructuredClaim(
+                    proposition, /*label=*/"",
+                    std::move(byHint), /*byCases=*/false, {},
+                    claimToken.line, claimToken.column,
+                    /*byInduction=*/true, /*bySubstitution=*/false);
+            }
+            std::vector<SurfaceStructuredClaimArm> arms;
+            expect(TokenKind::LeftBrace, "after 'by cases'");
+            while (peek().kind == TokenKind::KeywordIn
+                   || peek().kind == TokenKind::KeywordCase) {
+                arms.push_back(parseStructuredClaimArm());
+            }
+            expect(TokenKind::RightBrace, "ending 'by cases' arms block");
+            return makeSurfaceStructuredClaim(
+                proposition, /*label=*/"",
+                /*byHint=*/nullptr, /*byCases=*/true, std::move(arms),
+                claimToken.line, claimToken.column,
+                /*byInduction=*/false, /*bySubstitution=*/false);
+        }
+        if (peek().kind == TokenKind::KeywordSubstitution) {
+            consumeAny();  // 'substitution'
+            return makeSurfaceStructuredClaim(
+                proposition, /*label=*/"",
+                /*byHint=*/nullptr, /*byCases=*/false, {},
+                claimToken.line, claimToken.column,
+                /*byInduction=*/false, /*bySubstitution=*/true);
+        }
+        if (peek().kind == TokenKind::KeywordSubstituting) {
+            consumeAny();  // 'substituting'
+            SurfaceExpressionPointer eq = eqAtAdditiveLevel
+                ? parseAdditive() : parseExpression();
+            return makeSurfaceStructuredClaim(
+                proposition, /*label=*/"",
+                std::move(eq), /*byCases=*/false, {},
+                claimToken.line, claimToken.column,
+                /*byInduction=*/false, /*bySubstitution=*/true);
+        }
+        if (peek().kind == TokenKind::KeywordInduction) {
+            SurfaceExpressionPointer byHint = parseClaimByInduction();
+            return makeSurfaceStructuredClaim(
+                proposition, /*label=*/"",
+                std::move(byHint), /*byCases=*/false, {},
+                claimToken.line, claimToken.column,
+                /*byInduction=*/true, /*bySubstitution=*/false);
+        }
+        return nullptr;
+    }
+
     // Calc-step proof bodies are parsed at a precedence below `=` so the
     // next calc-separator token (`=`, `≤`, `<`, `≥`, `>`) starts the
     // next calc step rather than being consumed as part of this step's
     // proof. `function`/`let` are still allowed at the top of a step
     // proof; users who need a top-level `→`, `∧`, `∨`, `=`, or any
     // inequality inside a step proof must parenthesise.
+    //
+    // The structured-hint keywords (`cases`/`substituting`/`induction`/…)
+    // are parsed by the same `tryParseStructuredByHint` a `claim` uses, so
+    // a calc step `= P by substituting <eq>` works exactly like
+    // `claim P by substituting <eq>` (both route to elaborateStructuredClaim
+    // with the goal as expected type).
     SurfaceExpressionPointer parseCalcStepProof() {
         if (peek().kind == TokenKind::KeywordLet)      return parseLet();
         if (looksLikeMapsToLambda()) return parseMapsToLambda();
+        Token hintToken = peek();
+        if (SurfaceExpressionPointer structured = tryParseStructuredByHint(
+                hintToken, /*proposition=*/nullptr,
+                /*eqAtAdditiveLevel=*/true)) {
+            return structured;
+        }
         return parseAdditive();
     }
 
@@ -2839,53 +2922,20 @@ private:
             byIsExplanation = true;
         } else if (peek().kind == TokenKind::KeywordBy) {
             consumeAny();  // 'by'
-            if (peek().kind == TokenKind::KeywordCases) {
-                Token casesToken = consumeAny();  // 'cases'
-                // Two flavours:
-                //   `by cases { case A: … case B: … }`           —
-                //       propositional case-split on a disjunction.
-                //   `by cases on E [refining …] { case zero: … }` —
-                //       structural case-split on a constructor (same
-                //       desugaring as `claim P by induction on E …`
-                //       without an IH binder).
-                if (peek().kind == TokenKind::KeywordOn) {
-                    byHint = parseClaimByCasesOnScrutinee(casesToken);
-                    byInduction = true;
-                } else {
-                    byCases = true;
-                    expect(TokenKind::LeftBrace, "after 'by cases'");
-                    while (peek().kind == TokenKind::KeywordIn
-                           || peek().kind == TokenKind::KeywordCase) {
-                        arms.push_back(parseStructuredClaimArm());
-                    }
-                    expect(TokenKind::RightBrace,
-                           "ending 'by cases' arms block");
-                }
-            } else if (peek().kind == TokenKind::KeywordSubstitution) {
-                // `claim P by substitution` — auto-find equality +
-                // body via the unified equality bridge.
-                consumeAny();  // 'substitution'
-                bySubstitution = true;
-            } else if (peek().kind == TokenKind::KeywordSubstituting) {
-                // `claim P by substituting <eqExpression>` — narrow
-                // the bridge to the supplied equality.
-                consumeAny();  // 'substituting'
-                byHint = parseExpression();
-                bySubstitution = true;
-            } else if (peek().kind == TokenKind::KeywordInduction) {
-                // `claim P by induction on E [with ih] [refining …]
-                // { case zero: …  case successor(k): … }` —
-                // structural induction with the claim's proposition
-                // as expected type. Parser packages the same
-                // SurfaceCases the standalone `by_induction on E …`
-                // form produces; elaborator dispatches by passing
-                // `proposition` as the expectedType when byInduction
-                // is set.
-                byHint = parseClaimByInduction();
-                byInduction = true;
-            } else {
-                byHint = parseRecallingWrap(parseExpression());
+            // Structured-hint keywords (`cases { … }` / `cases on E …`,
+            // `substitution`, `substituting <eq>`, `induction on E …`)
+            // are parsed by the shared `tryParseStructuredByHint` — the
+            // same one a calc step uses, so the two forms can never drift.
+            // It takes `proposition` by const-ref (copies it into the node
+            // it builds), so the fallthrough plain path below still owns it.
+            if (SurfaceExpressionPointer structured =
+                    tryParseStructuredByHint(
+                        claimToken, proposition,
+                        /*eqAtAdditiveLevel=*/false)) {
+                return structured;
             }
+            // Plain `by <proof>`.
+            byHint = parseRecallingWrap(parseExpression());
         }
         return makeSurfaceStructuredClaim(
             std::move(proposition), /*label=*/"",
