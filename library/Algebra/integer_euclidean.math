@@ -60,8 +60,6 @@ theorem Integer.absolute_value_natural_of_negate_natural (k : Natural)
   Natural.to_integer.injective(
       Integer.absolute_value_natural(-(k : Integer)), k,
       calc (Integer.absolute_value_natural(-(k : Integer)) : Integer)
-         = abs(-(k : Integer))
-         = abs((k : Integer))
          = (k : Integer))
 
 -- ----------------------------------------------------------------------
@@ -93,8 +91,7 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
         obtain ⟨naturalQuotient, naturalRemainder, jEquation, remainderBelow⟩
             from Natural.divide_with_remainder(m, mPositive, j);
         -- jEquation : j = naturalQuotient * m + naturalRemainder.
-        claim jCast
-            : (j : Integer)
+        claim (j : Integer)
               = (m : Integer) * (naturalQuotient : Integer) + (naturalRemainder : Integer)
             by calc (j : Integer)
                   = ((naturalQuotient * m + naturalRemainder : Natural) : Integer)
@@ -111,8 +108,7 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
         obtain ⟨j, aIsNegativeImage⟩ from aNegative;
         obtain ⟨naturalQuotient, naturalRemainder, jEquation, remainderBelow⟩
             from Natural.divide_with_remainder(m, mPositive, j);
-        claim jCast
-            : (j : Integer)
+        claim (j : Integer)
               = (m : Integer) * (naturalQuotient : Integer) + (naturalRemainder : Integer)
             by calc (j : Integer)
                   = ((naturalQuotient * m + naturalRemainder : Natural) : Integer)
@@ -128,41 +124,20 @@ theorem Integer.divide_by_positive (a : Integer) (m : Natural) (mPositive : 1 �
                    = -((m : Integer) * (naturalQuotient : Integer)
                          + (naturalRemainder : Integer))
                    = -((m : Integer) * (naturalQuotient : Integer) + (0 : Integer))
-                         by congruenceOf(
-                                (z : Integer) ↦
-                                    -((m : Integer) * (naturalQuotient : Integer) + z),
-                                congruenceOf(Natural.to_integer, remainderZero))
+                         by remainderZero
                    = (m : Integer) * (-(naturalQuotient : Integer)) + (0 : Integer),
                 mPositive⟩⟩
             }
           | no remainderNonzero => {
-              claim remainderAtMostM : naturalRemainder ≤ m
-                  by Natural.less_or_equal_predecessor_less_or_equal(
-                         naturalRemainder, m, remainderBelow);
+              claim remainderAtMostM : naturalRemainder ≤ m;
               obtain ⟨gap, mEquation⟩
                   from Natural.subtraction_witness(naturalRemainder, m,
                            remainderAtMostM);
               -- mEquation : m = naturalRemainder + gap.
-              claim oneAtMostRemainder : 1 ≤ naturalRemainder by {
-                cases Natural.is_zero_or_at_least_one(naturalRemainder) {
-                  | Or.introduceLeft(isZero) =>
-                      absurd(remainderNonzero(isZero))
-                  | Or.introduceRight(positive) => positive
-                }
-              };
-              claim mCast
-                  : (m : Integer) = (naturalRemainder : Integer) + (gap : Integer)
-                  by calc (m : Integer)
-                        = ((naturalRemainder + gap : Natural) : Integer)
-                        = (naturalRemainder : Integer) + (gap : Integer);
-              claim gapCast
-                  : (gap : Integer)
-                    = (m : Integer) + (-(naturalRemainder : Integer))
-                  by Equality.symmetry(
-                         calc (m : Integer) + (-(naturalRemainder : Integer))
-                            = ((naturalRemainder : Integer) + (gap : Integer))
-                                  + (-(naturalRemainder : Integer))
-                            = (gap : Integer));
+              claim oneAtMostRemainder : 1 ≤ naturalRemainder;
+              claim (m : Integer) = (naturalRemainder : Integer) + (gap : Integer);
+              claim (gap : Integer)
+                    = (m : Integer) + (-(naturalRemainder : Integer));
               claim gapBelowM : successor(gap) ≤ m
                   by calc successor(gap)
                         ≤ gap + naturalRemainder
