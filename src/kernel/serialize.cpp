@@ -13,7 +13,7 @@ constexpr uint32_t cacheMagic = 0x5648544DU;   // "MTHV" little-endian.
 // sections at the tail of the file. Files written by version 1 readers
 // are not accepted; on cache-version mismatch the kernel rebuilds.
 // Version 5 adds the congruence-under-binder registry section.
-constexpr uint32_t cacheVersion = 5;
+constexpr uint32_t cacheVersion = 6;
 
 // ----------------------------------------------------------------------
 // Low-level primitives. We assume little-endian (the platforms we
@@ -437,6 +437,13 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
         writer.writeString(entry.termName);
         writer.writeU32(static_cast<uint32_t>(entry.parameterCount));
     }
+    writer.writeU32(
+        static_cast<uint32_t>(contents.bundleRegistrations.size()));
+    for (const auto& entry : contents.bundleRegistrations) {
+        writer.writeString(entry.structureName);
+        writer.writeString(entry.carrierName);
+        writer.writeString(entry.termName);
+    }
     if (!output) {
         throw SerializationError("write failed (final flush): " + path);
     }
@@ -535,6 +542,15 @@ CacheContents readCacheFile(const std::string& path) {
         entry.termName = reader.readString();
         entry.parameterCount = static_cast<int>(reader.readU32());
         contents.instanceRegistrations.push_back(std::move(entry));
+    }
+    uint32_t bundleCount = reader.readU32();
+    contents.bundleRegistrations.reserve(bundleCount);
+    for (uint32_t i = 0; i < bundleCount; ++i) {
+        CachedBundleRegistration entry;
+        entry.structureName = reader.readString();
+        entry.carrierName = reader.readString();
+        entry.termName = reader.readString();
+        contents.bundleRegistrations.push_back(std::move(entry));
     }
     return contents;
 }

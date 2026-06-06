@@ -90,6 +90,16 @@ struct CachedInstanceRegistration {
     int parameterCount;
 };
 
+// Canonical structure-BUNDLE registry entry added by this file:
+// `(structure, carrier head) → bundle term`, e.g.
+// `(Ring, Integer) → Integer.ring_bundle`. Lets `{r : Ring}` resolve from
+// a concrete carrier (see Environment::canonicalBundleRegistry).
+struct CachedBundleRegistration {
+    std::string structureName;
+    std::string carrierName;
+    std::string termName;
+};
+
 // The full contents of a .mathv file, prior to (de)serialization.
 struct CacheContents {
     std::string sourcePath;
@@ -111,6 +121,8 @@ struct CacheContents {
     std::vector<CachedCoercionRegistration> coercionRegistrations;
     // Canonical-instance-registry entries added by this file.
     std::vector<CachedInstanceRegistration> instanceRegistrations;
+    // Canonical structure-bundle-registry entries added by this file.
+    std::vector<CachedBundleRegistration> bundleRegistrations;
 };
 
 // Write `contents` to `path`. Throws SerializationError on I/O failure.

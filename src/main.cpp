@@ -5022,6 +5022,10 @@ void loadCacheRecursive(Environment& environment,
         environment.canonicalInstanceRegistry[std::make_tuple(
             entry.structureName, entry.carrierName)] = std::move(instance);
     }
+    for (const auto& entry : contents.bundleRegistrations) {
+        environment.canonicalBundleRegistry[std::make_tuple(
+            entry.structureName, entry.carrierName)] = entry.termName;
+    }
     alreadyLoaded.insert(cachePath);
 }
 
@@ -5275,6 +5279,10 @@ int verifyWithCache(const std::string& sourcePath,
     for (const auto& [key, _] : environment.canonicalInstanceRegistry) {
         instancesBefore.insert(key);
     }
+    std::set<std::tuple<std::string, std::string>> bundlesBefore;
+    for (const auto& [key, _] : environment.canonicalBundleRegistry) {
+        bundlesBefore.insert(key);
+    }
 
     // A lazy whole-library snapshot for failing-proof suggestions: built
     // (once) only if a proof actually fails, so successful builds — the
@@ -5431,6 +5439,15 @@ int verifyWithCache(const std::string& sourcePath,
             entry.termName = instance.termName;
             entry.parameterCount = instance.parameterCount;
             cache.instanceRegistrations.push_back(std::move(entry));
+        }
+    }
+    for (const auto& [key, termName] : environment.canonicalBundleRegistry) {
+        if (!bundlesBefore.count(key)) {
+            CachedBundleRegistration entry;
+            entry.structureName = std::get<0>(key);
+            entry.carrierName = std::get<1>(key);
+            entry.termName = termName;
+            cache.bundleRegistrations.push_back(std::move(entry));
         }
     }
 
@@ -6196,9 +6213,18 @@ int main(int argc, char* argv[]) {
         std::string outputCachePath;
         std::string cacheRoot;
         std::vector<std::string> dependencyCachePaths;
-        bool reportRedundantBy = false;
-        bool reportRedundantByNonEq = false;
-        bool reportRedundantCalcSteps = false;
+        // The three redundancy diagnostics can be turned on for a whole
+        // build at once (e.g. `MATH_CHECK_REDUNDANT=1 make -B library`)
+        // rather than passing the per-file CLI flags. The env var seeds the
+        // defaults; the explicit `--check-redundant-*` flags still force them
+        // on individually. `0`/empty leaves them off.
+        bool redundantEnvOn = [] {
+            const char* v = std::getenv("MATH_CHECK_REDUNDANT");
+            return v && v[0] != '\0' && v[0] != '0';
+        }();
+        bool reportRedundantBy = redundantEnvOn;
+        bool reportRedundantByNonEq = redundantEnvOn;
+        bool reportRedundantCalcSteps = redundantEnvOn;
         bool writeInterface = true;
         enum class State { None, Source, Output, Deps, CacheRoot } state = State::None;
         for (int i = 2; i < argc; ++i) {

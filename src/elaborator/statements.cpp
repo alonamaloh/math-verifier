@@ -126,12 +126,17 @@ void Elaborator::elaborateInstanceDeclaration(
         // `<Structure>.carrier(<bundle>)`.
         if (reversedArguments.empty() && structureName != "<unknown>"
             && environment_.lookup(structureName + ".carrier") != nullptr) {
-            ExpressionPointer carrierApplied = makeApplication(
-                makeConstant(structureName + ".carrier"),
-                makeConstant(declaration.name));
-            ExpressionPointer carrier =
-                weakHeadNormalForm(environment_, carrierApplied);
-            std::string carrierName = headConstantName(carrier);
+            // Read the carrier as the bundle's `make`-constructor carrier
+            // field (via carrierProjectionField) — NOT by WHNF-reducing
+            // `<S>.carrier(bundle)`, which would blow past the carrier (e.g.
+            // `Integer`) into its own definition body (`Quotient(…)`). We
+            // want the carrier's head exactly as it appears in types, so the
+            // resolution hooks (which read the raw head) match this key.
+            ExpressionPointer carrierField = carrierProjectionField(
+                makeApplication(makeConstant(structureName + ".carrier"),
+                                makeConstant(declaration.name)));
+            std::string carrierName = carrierField
+                ? headConstantName(carrierField) : std::string("<unknown>");
             if (carrierName == "<unknown>") {
                 throwElaborate(
                     "instance '" + declaration.name + "': could not "

@@ -269,8 +269,11 @@ void Elaborator::unifyConstructorParameters(
                     && !assignment.count(argumentFreeVariable->name)) {
                     std::string structure = projectionName.substr(
                         0, projectionName.size() - suffix.size());
-                    std::string carrierHead = headConstantName(
-                        weakHeadNormalForm(environment_, target));
+                    // Raw head — a defined carrier (`Integer`) WHNF-reduces
+                    // to its `Quotient(…)` body, which is not how it is
+                    // registered (the registry keys on the carrier as it
+                    // appears in types).
+                    std::string carrierHead = headConstantName(target);
                     auto entry = environment_.canonicalBundleRegistry.find(
                         std::make_tuple(structure, carrierHead));
                     if (entry != environment_.canonicalBundleRegistry.end()) {
