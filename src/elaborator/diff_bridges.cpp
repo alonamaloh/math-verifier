@@ -558,6 +558,85 @@ bool Elaborator::matchAgainstPattern(
         int binderCount,
         std::vector<ExpressionPointer>& bindings,
         int piDepth) {
+        // Canonical-bundle resolution: pattern `<Structure>.carrier(BV(slot))`
+        // against a concrete carrier `subject`. Bind `slot` to the canonical
+        // bundle registered for `(Structure, head subject)` — letting an
+        // implicit `{r : Ring}` be recovered from a concrete `Integer` /
+        // `Polynomial(Integer, …)` operand during operator dispatch. Uses the
+        // RAW subject head (a defined carrier like `Integer` WHNF-reduces to
+        // its `Quotient(…)` body, which is not how it is registered). This
+        // resolves only the unique registered bundle for a carrier — it never
+        // coerces a value — and the kernel re-checks the assembled call.
+        if (auto* patternApp = std::get_if<Application>(&pattern->node)) {
+            if (auto* projection =
+                    std::get_if<Constant>(&patternApp->function->node)) {
+                auto* argumentBV = std::get_if<BoundVariable>(
+                    &patternApp->argument->node);
+                if (argumentBV
+                    && argumentBV->deBruijnIndex >= piDepth
+                    && argumentBV->deBruijnIndex < piDepth + binderCount) {
+                    int slot = argumentBV->deBruijnIndex - piDepth;
+                    const std::string suffix = ".carrier";
+                    bool isCarrier = projection->name.size() > suffix.size()
+                        && projection->name.compare(
+                               projection->name.size() - suffix.size(),
+                               suffix.size(), suffix) == 0;
+                    // (1) `<S>.carrier(BV(slot))` with the slot still
+                    //     unsolved: resolve it to the canonical bundle for
+                    //     the concrete subject carrier.
+                    if (isCarrier && !bindings[slot]) {
+                        std::string structure = projection->name.substr(
+                            0, projection->name.size() - suffix.size());
+                        auto entry =
+                            environment_.canonicalBundleRegistry.find(
+                                std::make_tuple(structure,
+                                    headConstantName(subject)));
+                        if (entry
+                            != environment_.canonicalBundleRegistry.end()) {
+                            bindings[slot] = makeConstant(entry->second);
+                            return true;
+                        }
+                    }
+                    // (2) Any OTHER projection of an already-bound slot —
+                    //     `Ring.zero(r)`, `Ring.one(r)`, … once `r` is
+                    //     resolved. Substitute the bundle and accept the
+                    //     slot if the projection is definitionally the
+                    //     subject (e.g. `Ring.zero(Integer.ring_bundle) ≡
+                    //     Integer.zero`). This is what lets the sibling
+                    //     carrier/zero arguments of `Polynomial(…, …)` both
+                    //     match after the carrier fixes the ring. Gated on
+                    //     the slot being bound to a REGISTERED canonical
+                    //     bundle, so it is completely inert (no behaviour
+                    //     change) until/unless a bundle is registered — and
+                    //     only ever relaxes matching for canonical-resolved
+                    //     slots, never general structural matching.
+                    else if (bindings[slot]) {
+                        auto* boundConstant = std::get_if<Constant>(
+                            &bindings[slot]->node);
+                        bool boundIsCanonicalBundle = false;
+                        if (boundConstant) {
+                            for (const auto& registryEntry
+                                 : environment_.canonicalBundleRegistry) {
+                                if (registryEntry.second
+                                    == boundConstant->name) {
+                                    boundIsCanonicalBundle = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (boundIsCanonicalBundle) {
+                            ExpressionPointer substituted = makeApplication(
+                                makeConstant(projection->name),
+                                bindings[slot]);
+                            if (isDefinitionallyEqual(environment_,
+                                    Context{}, substituted, subject)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         if (auto* patternBV =
                 std::get_if<BoundVariable>(&pattern->node)) {
             int idx = patternBV->deBruijnIndex;

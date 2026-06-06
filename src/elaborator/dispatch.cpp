@@ -1470,9 +1470,19 @@ ExpressionPointer Elaborator::elaborateExpression(
                         + "': no `<T>.negate` in scope (line "
                         + std::to_string(expression.line) + ")");
                 }
-                ExpressionPointer call = makeConstant(negateFunction);
-                return makeApplication(std::move(call),
-                                        std::move(operandKernel));
+                // Re-elaborate as a plain call `negateFunction(operand)` so
+                // standard implicit-argument inference fills any leading
+                // implicits — e.g. `Polynomial.negate {r} : C(r) → C(r)` gets
+                // `{r}` from the operand's type via canonical-bundle
+                // resolution. Mirrors the postfix `⁻¹` path below.
+                (void)operandKernel;
+                SurfaceExpressionPointer negateCall = makeSurfaceApplication(
+                    makeSurfaceIdentifier(negateFunction, {},
+                        expression.line, expression.column),
+                    std::vector<SurfaceExpressionPointer>{unary->operand},
+                    expression.line, expression.column);
+                return elaborateExpression(
+                    *negateCall, localBinders, expectedType);
             }
             // Registered POSTFIX operators (e.g. `x⁻¹`). Dispatch on the
             // operand's type head against the operator registry's

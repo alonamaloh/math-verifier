@@ -240,6 +240,48 @@ void Elaborator::unifyConstructorParameters(
                     return;
                 }
             }
+            // Canonical-bundle resolution: the pattern is
+            // `<Structure>.carrier(?m)` — the metavariable is the
+            // projection's ARGUMENT, not its head — and the target is a
+            // concrete carrier type `T`. Solve `?m` to the canonical bundle
+            // registered for `(Structure, head T)`, so an implicit
+            // `{r : Ring}` is recoverable from a concrete `Integer` /
+            // `Polynomial(Integer, …)` operand. This never coerces a value;
+            // it only supplies the unique structure bundle for a carrier,
+            // and the kernel re-checks the whole application afterwards, so a
+            // mis-registration cannot slip through.
+            if (auto* headConstant =
+                    std::get_if<Constant>(&patternHead->node)) {
+                const std::string& projectionName = headConstant->name;
+                const std::string suffix = ".carrier";
+                bool isCarrierProjection =
+                    projectionName.size() > suffix.size()
+                    && projectionName.compare(
+                           projectionName.size() - suffix.size(),
+                           suffix.size(), suffix) == 0;
+                auto* argumentFreeVariable = std::get_if<FreeVariable>(
+                    &patternApplication->argument->node);
+                bool singleArgument = std::holds_alternative<Constant>(
+                    patternApplication->function->node);
+                if (isCarrierProjection && singleArgument
+                    && argumentFreeVariable
+                    && metavariableNames.count(argumentFreeVariable->name)
+                    && !assignment.count(argumentFreeVariable->name)) {
+                    std::string structure = projectionName.substr(
+                        0, projectionName.size() - suffix.size());
+                    std::string carrierHead = headConstantName(
+                        weakHeadNormalForm(environment_, target));
+                    auto entry = environment_.canonicalBundleRegistry.find(
+                        std::make_tuple(structure, carrierHead));
+                    if (entry != environment_.canonicalBundleRegistry.end()) {
+                        assignment[argumentFreeVariable->name] =
+                            makeConstant(entry->second);
+                        return;
+                    }
+                    // Not registered: fall through to the normal matching
+                    // below (no behaviour change when nothing is registered).
+                }
+            }
             // Walk the target's function chain to its head (a no-op when
             // the target is a bare Constant, as for a nullary alias like
             // `ComplexNumber`).

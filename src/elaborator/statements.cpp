@@ -116,6 +116,41 @@ void Elaborator::elaborateInstanceDeclaration(
             reversedArguments.push_back(application->argument);
             cursor = application->function;
         }
+        // Bundle form: `instance Integer.ring_bundle`, whose type is a bare
+        // structure bundle (`Ring`) — not a predicate `IsGroup(Carrier, …)`.
+        // Register it as the canonical bundle for its carrier so that an
+        // implicit `{r : Ring}` can be solved from a concrete carrier type
+        // (the bundled analogue of typeclass resolution). Detected by: no
+        // structure-application arguments AND a `<Structure>.carrier`
+        // projection in scope. The carrier is read by reducing
+        // `<Structure>.carrier(<bundle>)`.
+        if (reversedArguments.empty() && structureName != "<unknown>"
+            && environment_.lookup(structureName + ".carrier") != nullptr) {
+            ExpressionPointer carrierApplied = makeApplication(
+                makeConstant(structureName + ".carrier"),
+                makeConstant(declaration.name));
+            ExpressionPointer carrier =
+                weakHeadNormalForm(environment_, carrierApplied);
+            std::string carrierName = headConstantName(carrier);
+            if (carrierName == "<unknown>") {
+                throwElaborate(
+                    "instance '" + declaration.name + "': could not "
+                    "determine the carrier of its bundle type '"
+                    + structureName + "'");
+            }
+            auto key = std::make_tuple(structureName, carrierName);
+            auto existing = environment_.canonicalBundleRegistry.find(key);
+            if (existing != environment_.canonicalBundleRegistry.end()
+                && existing->second != declaration.name) {
+                throwElaborate(
+                    "instance ambiguity: (" + structureName + ", "
+                    + carrierName + ") already has canonical bundle '"
+                    + existing->second + "'; refusing to also register '"
+                    + declaration.name + "' (reject-on-ambiguity)");
+            }
+            environment_.canonicalBundleRegistry[key] = declaration.name;
+            return;
+        }
         if (structureName == "<unknown>" || reversedArguments.empty()) {
             throwElaborate(
                 "instance '" + declaration.name + "': its type is not a "

@@ -151,6 +151,16 @@ struct Environment {
     std::map<std::tuple<std::string, std::string>, CanonicalInstance>
         canonicalInstanceRegistry;
 
+    // Canonical structure BUNDLE for a carrier type: `(structure, carrier
+    // head) → bundle term name`, e.g. `(Ring, Integer) → Integer.ring_bundle`.
+    // Lets an implicit `{r : Ring}` be solved from a concrete carrier when
+    // unification is stuck on `Ring.carrier(?r) ≡ Integer` — the bundled-ring
+    // analogue of resolving a typeclass instance from the type. Populated by
+    // `instance <bundle>` (a bare-bundle-typed instance, vs. the predicate
+    // form). Surface-elaborator concern; the kernel never reads it.
+    std::map<std::tuple<std::string, std::string>, std::string>
+        canonicalBundleRegistry;
+
     const Declaration* lookup(const std::string& name) const {
         auto iterator = declarations.find(name);
         return iterator == declarations.end() ? nullptr : &iterator->second;
