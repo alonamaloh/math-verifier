@@ -36,13 +36,7 @@ import Algebra.principal_ideal_domain
 -- ----------------------------------------------------------------------
 -- A ring helper for the principality argument: (a + r) − a = r.
 theorem Ring.add_subtract_self_left (s : Ring) (a r : Ring.carrier(s))
-        : (a + r) - a = r :=
-  calc (a + r) - a
-     = (r + a) - a
-     = r + (a - a)
-     = r + Ring.zero(s)
-           by Ring.add_negate_right(s, a)
-     = r
+        : (a + r) - a = r := ring
 
 -- ----------------------------------------------------------------------
 -- Euclidean division and the bundle.
@@ -94,7 +88,7 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
   let norm : Ring.carrier(s) → Natural := EuclideanDomain.norm(euclidean);
   -- Re-type the ideal at `s` so its projections are spelled with `s`
   -- (matching the ring operations below; avoids ζ-mismatches in rewrite).
-  claim isIdealAtRing : Ring.IsIdeal(s, member) by isIdeal;
+  claim isIdealAtRing : Ring.IsIdeal(s, member);
   let ⟨containsZero, closedUnderAddition, absorbsMultiplication⟩ := isIdealAtRing;
   decide ∃ (candidate : Ring.carrier(s)).
              member(candidate) ∧ ¬(candidate = Ring.zero(s)) {
@@ -111,8 +105,7 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
                          ⟨nonzeroDistinct, reflexivity(Natural, norm(nonzero))⟩⟩⟩);
         claim leastIsNormExplicit
             : ∃ (x : Ring.carrier(s)).
-                member(x) ∧ ¬(x = Ring.zero(s)) ∧ norm(x) = leastNorm
-            by leastIsNorm;
+                member(x) ∧ ¬(x = Ring.zero(s)) ∧ norm(x) = leastNorm;
         obtain ⟨generator, memberGenerator, generatorDistinct, generatorNorm⟩
             from leastIsNormExplicit;
         -- generator: member, nonzero, norm(generator) = leastNorm.
@@ -139,9 +132,6 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
               : remainder = x - generator * quotient
               by calc remainder
                     = (generator * quotient + remainder) - generator * quotient
-                          by Equality.symmetry(
-                                 Ring.add_subtract_self_left(s,
-                                     generator * quotient, remainder))
                     = x - generator * quotient;
           claim memberRemainder : member(remainder)
               by rewrite(Equality.symmetry(remainderIsDifference),
@@ -205,7 +195,7 @@ theorem EuclideanDomain.ideal_is_principal (euclidean : EuclideanDomain)
           take x : Ring.carrier(s);
           suppose member(x) as memberX;
           -- x must be zero (no nonzero member exists), and 0 ∣ 0.
-          claim xIsZero : x = Ring.zero(s) by {
+          claim x = Ring.zero(s) by {
             decide x = Ring.zero(s) {
               | yes xZero => xZero
               | no xNonzero =>
