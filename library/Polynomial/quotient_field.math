@@ -59,15 +59,14 @@ theorem Polynomial.quotient_inverse_from_witness (r : Ring)
         (f g h : Polynomial(Ring.carrier(r), Ring.zero(r)))
         (witnessDivides
             : Ring.divides(Polynomial.ring(r), f,
-                  Polynomial.add(r, Polynomial.multiply(r, g, h),
-                      Polynomial.negate(r, Polynomial.one(r)))))
+                  ((g * h) + (- Polynomial.one(r)))))
         : RingModulo.multiply(
               RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, g),
               RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, h))
           = RingModulo.one(Polynomial.commutative_ring(r, commutativity), f) :=
   Quotient.sound(
       Ring.carrier(Polynomial.ring(r)), Ring.CongruentModulo(Polynomial.ring(r), f),
-      Polynomial.multiply(r, g, h), Polynomial.one(r), witnessDivides)
+      (g * h), Polynomial.one(r), witnessDivides)
 
 -- Equal classes are congruent representatives.
 theorem Polynomial.quotient_congruent_of_make_equal (r : Ring)
@@ -97,15 +96,15 @@ theorem Polynomial.quotient_zero_not_one (r : Ring)
     -- [1] = [0] (symmetric), so f | (1 − 0) = 1, i.e. f is a unit.
     claim congruentOneZero
         : Ring.divides(Polynomial.ring(r), f,
-              Polynomial.add(r, Polynomial.one(r), Polynomial.negate(r, Polynomial.zero(r))))
+              (Polynomial.one(r) + (- Polynomial.zero(r))))
         by Polynomial.quotient_congruent_of_make_equal(r, commutativity, f,
                Polynomial.one(r), Polynomial.zero(r), Equality.symmetry(zeroEqualsOne));
     -- congruentOneZero : f | (one + (−zero)); simplify the difference to one.
     claim differenceIsOne
-        : Polynomial.add(r, Polynomial.one(r), Polynomial.negate(r, Polynomial.zero(r)))
+        : (Polynomial.one(r) + (- Polynomial.zero(r)))
           = Polynomial.one(r)
-        by calc Polynomial.add(r, Polynomial.one(r), Polynomial.negate(r, Polynomial.zero(r)))
-              = Polynomial.add(r, Polynomial.one(r), Polynomial.zero(r))
+        by calc (Polynomial.one(r) + (- Polynomial.zero(r)))
+              = (Polynomial.one(r) + Polynomial.zero(r))
               = Polynomial.one(r);
     fNotUnit(rewrite(differenceIsOne, congruentOneZero))
   }
@@ -136,9 +135,8 @@ theorem Polynomial.quotient_invertible_at_representative (r : Ring)
                          Ring.CongruentModulo(Polynomial.ring(r), f),
                          g, Polynomial.zero(r),
                          rewrite(Equality.symmetry(
-                                     calc Polynomial.add(r, g,
-                                              Polynomial.negate(r, Polynomial.zero(r)))
-                                        = Polynomial.add(r, g, Polynomial.zero(r))
+                                     calc (g + (- Polynomial.zero(r)))
+                                        = (g + Polynomial.zero(r))
                                         = g),
                                  fDividesG)));
         obtain ⟨coefficientF, coefficientG, bezoutEquation⟩
@@ -148,32 +146,19 @@ theorem Polynomial.quotient_invertible_at_representative (r : Ring)
         -- The class of coefficientG inverts the class of g: f | (g·coefficientG − 1).
         ⟨RingModulo.make(Polynomial.commutative_ring(r, commutativity), f, coefficientG),
          Polynomial.quotient_inverse_from_witness(r, commutativity, f, g, coefficientG,
-             ⟨Polynomial.negate(r, coefficientF),
-              calc Polynomial.add(r, Polynomial.multiply(r, g, coefficientG),
-                       Polynomial.negate(r, Polynomial.one(r)))
-                 = Polynomial.add(r, Polynomial.multiply(r, coefficientG, g),
-                       Polynomial.negate(r, Polynomial.one(r)))
-                 = Polynomial.add(r, Polynomial.multiply(r, coefficientG, g),
-                       Polynomial.negate(r,
-                           Polynomial.add(r, Polynomial.multiply(r, coefficientF, f),
-                               Polynomial.multiply(r, coefficientG, g))))
-                 = Polynomial.add(r, Polynomial.multiply(r, coefficientG, g),
-                       Polynomial.add(r,
-                           Polynomial.negate(r, Polynomial.multiply(r, coefficientF, f)),
-                           Polynomial.negate(r, Polynomial.multiply(r, coefficientG, g))))
+             ⟨(- coefficientF),
+              calc ((g * coefficientG) + (- Polynomial.one(r)))
+                 = ((coefficientG * g) + (- Polynomial.one(r)))
+                 = ((coefficientG * g) + (- ((coefficientF * f) + (coefficientG * g))))
+                 = ((coefficientG * g) + ((- (coefficientF * f)) + (- (coefficientG * g))))
                        by Ring.negate_add_distribute(Polynomial.ring(r),
-                              Polynomial.multiply(r, coefficientF, f),
-                              Polynomial.multiply(r, coefficientG, g))
-                 = Polynomial.add(r,
-                       Polynomial.negate(r, Polynomial.multiply(r, coefficientF, f)),
-                       Polynomial.add(r, Polynomial.multiply(r, coefficientG, g),
-                           Polynomial.negate(r, Polynomial.multiply(r, coefficientG, g))))
-                 = Polynomial.add(r,
-                       Polynomial.negate(r, Polynomial.multiply(r, coefficientF, f)),
-                       Polynomial.zero(r))
-                 = Polynomial.negate(r, Polynomial.multiply(r, coefficientF, f))
-                 = Polynomial.multiply(r, Polynomial.negate(r, coefficientF), f)
-                 = Polynomial.multiply(r, f, Polynomial.negate(r, coefficientF))⟩)⟩
+                              (coefficientF * f),
+                              (coefficientG * g))
+                 = ((- (coefficientF * f)) + ((coefficientG * g) + (- (coefficientG * g))))
+                 = ((- (coefficientF * f)) + Polynomial.zero(r))
+                 = (- (coefficientF * f))
+                 = ((- coefficientF) * f)
+                 = (f * (- coefficientF))⟩)⟩
 }
 
 -- Every nonzero class is invertible: induct to a representative.

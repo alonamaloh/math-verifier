@@ -105,19 +105,19 @@ theorem Polynomial.divide_by_excess (r : Ring)
         : (dividend : Polynomial(Ring.carrier(r), Ring.zero(r)))
           → Polynomial.DegreeLessThan(r, dividend, degreeF + e)
           → ∃ (quotient remainder : Polynomial(Ring.carrier(r), Ring.zero(r))).
-              dividend = Polynomial.add(r, Polynomial.multiply(r, quotient, f), remainder)
+              dividend = ((quotient * f) + remainder)
               ∧ Polynomial.DegreeLessThan(r, remainder, degreeF) :=
   by_induction on e with IH {
     case zero:
       (dividend : Polynomial(Ring.carrier(r), Ring.zero(r)))
                (dividendBound : Polynomial.DegreeLessThan(r, dividend, degreeF + 0)) ↦ {
         claim multiplyZero
-            : Polynomial.multiply(r, Polynomial.zero(r), f) = Polynomial.zero(r)
+            : (Polynomial.zero(r) * f) = Polynomial.zero(r)
             by Ring.zero_multiply_left(Polynomial.ring(r), f);
         ⟨Polynomial.zero(r), dividend,
          Equality.symmetry(
-             calc Polynomial.add(r, Polynomial.multiply(r, Polynomial.zero(r), f), dividend)
-                = Polynomial.add(r, Polynomial.zero(r), dividend)
+             calc ((Polynomial.zero(r) * f) + dividend)
+                = (Polynomial.zero(r) + dividend)
                 = dividend),
          rewrite(Natural.add_zero(degreeF), dividendBound)⟩
       }
@@ -134,9 +134,9 @@ theorem Polynomial.divide_by_excess (r : Ring)
             Polynomial.monomial(r, (leadingCoefficient * leadingInverseValue),
                 ePredecessor);
         let stepProduct : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
-            Polynomial.multiply(r, quotientStep, f);
+            (quotientStep * f);
         let residual : Polynomial(Ring.carrier(r), Ring.zero(r)) :=
-            Polynomial.add(r, dividend, Polynomial.negate(r, stepProduct));
+            (dividend + (- stepProduct));
 
         -- The inverse from the other side (the ring is commutative).
         claim inverseLeadingEquation
@@ -200,7 +200,7 @@ theorem Polynomial.divide_by_excess (r : Ring)
             : Polynomial.DegreeLessThan(r, residual, degreeF + ePredecessor)
             by (i : Natural) (topLessOrEqual : degreeF + ePredecessor ≤ i) ↦
                 calc Polynomial.coefficientOf(residual, i)
-                   = (Polynomial.coefficientOf(dividend, i) + Polynomial.coefficientOf(Polynomial.negate(r, stepProduct), i))
+                   = (Polynomial.coefficientOf(dividend, i) + Polynomial.coefficientOf((- stepProduct), i))
                          by Polynomial.coefficientOf_add
                    = (Polynomial.coefficientOf(dividend, i) + (- Polynomial.coefficientOf(stepProduct, i)))
                    = (Polynomial.coefficientOf(dividend, i) + (- Polynomial.coefficientOf(dividend, i)))
@@ -210,29 +210,20 @@ theorem Polynomial.divide_by_excess (r : Ring)
         obtain ⟨quotientRest, remainderRest, restEquation, remainderRestBound⟩
             from IH(residual, residualBound);
 
-        claim reconstruct : Polynomial.add(r, stepProduct, residual) = dividend
-            by calc Polynomial.add(r, stepProduct,
-                        Polynomial.add(r, dividend, Polynomial.negate(r, stepProduct)))
-                  = Polynomial.add(r, Polynomial.add(r, stepProduct, dividend),
-                        Polynomial.negate(r, stepProduct))
-                  = Polynomial.add(r, Polynomial.add(r, dividend, stepProduct),
-                        Polynomial.negate(r, stepProduct))
-                  = Polynomial.add(r, dividend,
-                        Polynomial.add(r, stepProduct, Polynomial.negate(r, stepProduct)))
-                  = Polynomial.add(r, dividend, Polynomial.zero(r))
+        claim reconstruct : (stepProduct + residual) = dividend
+            by calc (stepProduct + (dividend + (- stepProduct)))
+                  = ((stepProduct + dividend) + (- stepProduct))
+                  = ((dividend + stepProduct) + (- stepProduct))
+                  = (dividend + (stepProduct + (- stepProduct)))
+                  = (dividend + Polynomial.zero(r))
                   = dividend;
 
-        ⟨Polynomial.add(r, quotientStep, quotientRest), remainderRest,
+        ⟨(quotientStep + quotientRest), remainderRest,
          calc dividend
-            = Polynomial.add(r, stepProduct, residual)
-            = Polynomial.add(r, stepProduct,
-                  Polynomial.add(r, Polynomial.multiply(r, quotientRest, f), remainderRest))
-            = Polynomial.add(r,
-                  Polynomial.add(r, stepProduct, Polynomial.multiply(r, quotientRest, f)),
-                  remainderRest)
-            = Polynomial.add(r,
-                  Polynomial.multiply(r, Polynomial.add(r, quotientStep, quotientRest), f),
-                  remainderRest)
+            = (stepProduct + residual)
+            = (stepProduct + ((quotientRest * f) + remainderRest))
+            = ((stepProduct + (quotientRest * f)) + remainderRest)
+            = (((quotientStep + quotientRest) * f) + remainderRest)
                   by Polynomial.multiply_distributivity_right(r,
                          quotientStep, quotientRest, f),
          remainderRestBound⟩
@@ -254,7 +245,7 @@ theorem Polynomial.division_with_remainder (r : Ring)
                 (Polynomial.coefficientOf(f, degreeF) * inverse) = Ring.one(r))
         (g : Polynomial(Ring.carrier(r), Ring.zero(r)))
         : ∃ (quotient remainder : Polynomial(Ring.carrier(r), Ring.zero(r))).
-            g = Polynomial.add(r, Polynomial.multiply(r, quotient, f), remainder)
+            g = ((quotient * f) + remainder)
             ∧ Polynomial.DegreeLessThan(r, remainder, degreeF) := {
   obtain ⟨leadingInverseValue, leadingInverseEquation⟩ from leadingInverse;
   obtain ⟨bound, gBound⟩ from Polynomial.exists_degree_bound(r, g);
