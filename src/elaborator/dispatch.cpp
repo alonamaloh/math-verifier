@@ -390,8 +390,33 @@ ExpressionPointer Elaborator::elaborateExpression(
                                 std::move(holeArgs),
                                 expression.line, expression.column);
                         try {
-                            return elaborateExpression(
+                            ExpressionPointer holeCall = elaborateExpression(
                                 *call, localBinders, expectedType);
+                            // The hole solver can pin a metavariable from a
+                            // PARTIAL structural match — e.g. unifying the
+                            // lemma's conclusion `(-x)+x = 0` against a goal
+                            // `p+0 = p+((-x)+x)` solves `x := 0` from the
+                            // goal's left endpoint while silently ignoring the
+                            // `(-x)` vs `p` mismatch, producing a fully-applied
+                            // but WRONG proof. That wrong proof would then mask
+                            // the congruence-step diff bridge (which wants the
+                            // lemma left unapplied). Only accept the inferred
+                            // call when its type actually proves the goal;
+                            // otherwise fall through to the bare constant so
+                            // the diff layer can match the lemma to a subterm.
+                            ExpressionPointer holeCallType =
+                                inferTypeInLocalContext(localBinders, holeCall);
+                            ExpressionPointer goalOpened = openOverLocalBinders(
+                                expectedType, localBinders,
+                                localBinders.size());
+                            Context goalContext =
+                                buildContextFromLocalBinders(localBinders);
+                            if (isDefinitionallyEqual(environment_, goalContext,
+                                                       holeCallType,
+                                                       goalOpened)) {
+                                return holeCall;
+                            }
+                            // else: fall through to the bare constant
                         } catch (const ElaborateError&) {
                             // fall through to the bare constant
                         } catch (const TypeError&) {

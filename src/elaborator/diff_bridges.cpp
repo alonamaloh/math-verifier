@@ -518,6 +518,105 @@ ExpressionPointer Elaborator::tryDiffApplyUserProof(
         return currentProof;
     }
 
+ExpressionPointer Elaborator::tryApplyBareLemmaToDiff(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer bareLemma,
+        ExpressionPointer bareLemmaType,
+        int line, int column) {
+        // Open every leading Pi of the lemma as a fresh metavariable; what
+        // remains is the conclusion (expected to be an equality whose
+        // endpoints mention those metavariables).
+        std::set<std::string> metavariableNames;
+        std::vector<std::string> argumentNames;
+        ExpressionPointer cursor = bareLemmaType;
+        int index = 0;
+        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+            std::string fresh = "_diffLemmaArg_" + std::to_string(index++);
+            metavariableNames.insert(fresh);
+            argumentNames.push_back(fresh);
+            cursor = openBinder(pi->codomain, fresh,
+                                 FreeVariableOrigin::Internal);
+        }
+        if (argumentNames.empty()) return nullptr;
+        EqualityComponents conclusion;
+        try {
+            conclusion = extractEqualityComponents(
+                weakHeadNormalForm(environment_, cursor),
+                "argument-free citation diff", line);
+        } catch (const ElaborateError&) {
+            return nullptr;
+        }
+        // Descend `previous`/`next` to the innermost differing subterm: the
+        // maximal shared application context, peeled one matching component
+        // at a time. That subterm is where the cited lemma's equation lives.
+        ExpressionPointer fromTerm =
+            zetaUnfoldLetBinders(previousKernel, localBinders);
+        ExpressionPointer toTerm =
+            zetaUnfoldLetBinders(nextKernel, localBinders);
+        while (true) {
+            auto* leftApp = std::get_if<Application>(&fromTerm->node);
+            auto* rightApp = std::get_if<Application>(&toTerm->node);
+            if (!leftApp || !rightApp) break;
+            bool functionEqual = structurallyEqual(
+                leftApp->function, rightApp->function);
+            bool argumentEqual = structurallyEqual(
+                leftApp->argument, rightApp->argument);
+            if (functionEqual && !argumentEqual) {
+                fromTerm = leftApp->argument;
+                toTerm = rightApp->argument;
+                continue;
+            }
+            if (argumentEqual && !functionEqual) {
+                fromTerm = leftApp->function;
+                toTerm = rightApp->function;
+                continue;
+            }
+            break;
+        }
+        // Solve the lemma's arguments by unifying its conclusion endpoints
+        // against the subterm diff, trying both orientations (the lemma may
+        // prove `subterm = other` or `other = subterm`).
+        for (int orientation = 0; orientation < 2; ++orientation) {
+            ExpressionPointer patternLeft = orientation == 0
+                ? conclusion.leftEndpoint : conclusion.rightEndpoint;
+            ExpressionPointer patternRight = orientation == 0
+                ? conclusion.rightEndpoint : conclusion.leftEndpoint;
+            std::map<std::string, ExpressionPointer> assignment;
+            unifyConstructorParameters(patternLeft, fromTerm,
+                                          metavariableNames, assignment);
+            unifyConstructorParameters(patternRight, toTerm,
+                                          metavariableNames, assignment);
+            bool allSolved = true;
+            for (const auto& name : argumentNames) {
+                if (!assignment.count(name)) { allSolved = false; break; }
+            }
+            if (!allSolved) continue;
+            // Apply the lemma to the solved arguments and hand the now-
+            // concrete proof to the ordinary diff bridge for the congruence
+            // (and possible symmetry) wrapping.
+            ExpressionPointer applied = bareLemma;
+            for (const auto& name : argumentNames) {
+                applied = makeApplication(applied, assignment[name]);
+            }
+            ExpressionPointer appliedType;
+            try {
+                appliedType =
+                    inferTypeInLocalContext(localBinders, applied);
+            } catch (const TypeError&) {
+                continue;
+            } catch (const ElaborateError&) {
+                continue;
+            }
+            ExpressionPointer wrapped = tryDiffApplyUserProof(
+                localBinders, previousKernel, nextKernel,
+                applied, appliedType, line, column);
+            if (wrapped) return wrapped;
+        }
+        return nullptr;
+    }
+
 ExpressionPointer Elaborator::tryAcRearrangement(
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer previousKernel,

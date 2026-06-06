@@ -1744,6 +1744,22 @@ private:
         ExpressionPointer userProofType,
         int line, int column);
 
+    // Argument-free citation on a CONGRUENCE calc step: the cited lemma is
+    // un-applied (a Pi-typed `bareLemma`) and its equation matches a SUBTERM
+    // of the step (not the whole equality), so its arguments must be solved
+    // from the diff. Descends `previous`/`next` to the differing subterm,
+    // unifies the lemma's conclusion against it (either orientation) to fill
+    // the arguments, then delegates to `tryDiffApplyUserProof` for the
+    // congruence/symmetry wrapping. Returns nullptr if the arguments can't
+    // be recovered.
+    ExpressionPointer tryApplyBareLemmaToDiff(
+        const std::vector<LocalBinder>& localBinders,
+        ExpressionPointer previousKernel,
+        ExpressionPointer nextKernel,
+        ExpressionPointer bareLemma,
+        ExpressionPointer bareLemmaType,
+        int line, int column);
+
     // Phase-2 fallback: invoke the existing `ring` proof emitter on
     // the goal `Equality(carrier, previous, next)`. Handles
     // multi-position AC rearrangement that the single-position

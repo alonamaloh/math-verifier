@@ -842,6 +842,48 @@ ExpressionPointer Elaborator::elaborateCalc(
                     }
                 }
             }
+            // Argument-free citation on a CONGRUENCE step: the cited lemma
+            // matches a SUBTERM of the step, not the whole equality, so its
+            // arguments can't be recovered by unifying against the goal — the
+            // bare constant survives elaboration with its Pi type intact. Here
+            // we descend the (previous, next) diff to the innermost differing
+            // subterm, solve the lemma's arguments against that subterm, and
+            // let the diff bridge wrap the result in the congruence. Lets the
+            // user write `since add_negate_left` on `p + 0 = p + ((-p')+p')`
+            // instead of spelling out `add_negate_left(ring, p')`.
+            if (step.stepProof
+                && step.relation == CalcRelation::Equality
+                && std::holds_alternative<Pi>(stepProofType->node)
+                && !isDefinitionallyEqual(environment_, stepContext,
+                                            stepProofType,
+                                            stepRelationTypeOpened)) {
+                ExpressionPointer bareAttempt;
+                try {
+                    bareAttempt = tryApplyBareLemmaToDiff(
+                        localBinders, previousKernel, nextKernel,
+                        stepProofKernel, stepProofType,
+                        step.line, step.column);
+                } catch (const ElaborateError&) {
+                    bareAttempt = nullptr;
+                } catch (const TypeError&) {
+                    bareAttempt = nullptr;
+                }
+                if (bareAttempt) {
+                    try {
+                        ExpressionPointer bareAttemptType =
+                            inferTypeInLocalContext(localBinders,
+                                bareAttempt);
+                        if (isDefinitionallyEqual(environment_, stepContext,
+                                                    bareAttemptType,
+                                                    stepRelationTypeOpened)) {
+                            stepProofKernel = bareAttempt;
+                            stepProofType = bareAttemptType;
+                        }
+                    } catch (const TypeError&) {
+                    } catch (const ElaborateError&) {
+                    }
+                }
+            }
             // Orientation retry. A citation whose conclusion has a bare
             // metavariable on one side — e.g. argument-free `since x + 0 = x`
             // on a REVERSED step `p = p + 0` — infers its arguments against
