@@ -30,10 +30,8 @@ theorem Polynomial.Sum.zero (r : Ring) (n : Natural)
     case zero: reflexivity(Ring.carrier(r), Ring.zero(r))
     case successor(k):
         calc Polynomial.Sum(r, (i : Natural) ↦ Ring.zero(r), successor(k))
-           = Ring.add(r,
-                 Polynomial.Sum(r, (i : Natural) ↦ Ring.zero(r), k),
-                 Ring.zero(r))
-           = Ring.add(r, Ring.zero(r), Ring.zero(r))
+           = (Polynomial.Sum(r, (i : Natural) ↦ Ring.zero(r), k) + Ring.zero(r))
+           = (Ring.zero(r) + Ring.zero(r))
            = Ring.zero(r)
   }
 
@@ -47,9 +45,9 @@ theorem Polynomial.Sum.extensional (r : Ring)
     case zero: pointwise(0)
     case successor(k):
         calc Polynomial.Sum(r, f, successor(k))
-           = Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k)))
-           = Ring.add(r, Polynomial.Sum(r, g, k), f(successor(k)))
-           = Ring.add(r, Polynomial.Sum(r, g, k), g(successor(k)))   by pointwise(successor(k))
+           = (Polynomial.Sum(r, f, k) + f(successor(k)))
+           = (Polynomial.Sum(r, g, k) + f(successor(k)))
+           = (Polynomial.Sum(r, g, k) + g(successor(k)))   by pointwise(successor(k))
            = Polynomial.Sum(r, g, successor(k))
   }
 
@@ -64,82 +62,60 @@ congruence_under_binder Polynomial.Sum := Polynomial.Sum.extensional
 theorem Polynomial.Sum.shift (r : Ring) (f : Natural → Ring.carrier(r))
         (n : Natural)
         : Polynomial.Sum(r, f, successor(n))
-          = Ring.add(r, f(0),
-                Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), n)) :=
+          = (f(0) + Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), n)) :=
   by_induction on n with IH {
     case zero:
-        reflexivity(Ring.carrier(r), Ring.add(r, f(0), f(successor(0))))
+        reflexivity(Ring.carrier(r), (f(0) + f(successor(0))))
     case successor(k):
         calc Polynomial.Sum(r, f, successor(successor(k)))
-           = Ring.add(r, Polynomial.Sum(r, f, successor(k)), f(successor(successor(k))))
-           = Ring.add(r,
-                 Ring.add(r, f(0),
-                     Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), k)),
-                 f(successor(successor(k))))
-           = Ring.add(r, f(0),
-                 Ring.add(r,
-                     Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), k),
-                     f(successor(successor(k)))))
-           = Ring.add(r, f(0),
-                 Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), successor(k)))
+           = (Polynomial.Sum(r, f, successor(k)) + f(successor(successor(k))))
+           = ((f(0) + Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), k)) + f(successor(successor(k))))
+           = (f(0) + (Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), k) + f(successor(successor(k)))))
+           = (f(0) + Polynomial.Sum(r, (j : Natural) ↦ f(successor(j)), successor(k)))
   }
 
 -- Σ (f+g) = Σ f + Σ g. The successor step rearranges with the
 -- four-term swap on the bundle.
 theorem Polynomial.Sum.add (r : Ring) (f g : Natural → Ring.carrier(r))
         (n : Natural)
-        : Polynomial.Sum(r, (i : Natural) ↦ Ring.add(r, f(i), g(i)), n)
-          = Ring.add(r, Polynomial.Sum(r, f, n), Polynomial.Sum(r, g, n)) :=
+        : Polynomial.Sum(r, (i : Natural) ↦ (f(i) + g(i)), n)
+          = (Polynomial.Sum(r, f, n) + Polynomial.Sum(r, g, n)) :=
   by_induction on n with IH {
-    case zero: reflexivity(Ring.carrier(r), Ring.add(r, f(0), g(0)))
+    case zero: reflexivity(Ring.carrier(r), (f(0) + g(0)))
     case successor(k):
-        calc Polynomial.Sum(r, (i : Natural) ↦ Ring.add(r, f(i), g(i)), successor(k))
-           = Ring.add(r,
-                 Polynomial.Sum(r, (i : Natural) ↦ Ring.add(r, f(i), g(i)), k),
-                 Ring.add(r, f(successor(k)), g(successor(k))))
-           = Ring.add(r,
-                 Ring.add(r, Polynomial.Sum(r, f, k), Polynomial.Sum(r, g, k)),
-                 Ring.add(r, f(successor(k)), g(successor(k))))
-           = Ring.add(r,
-                 Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k))),
-                 Ring.add(r, Polynomial.Sum(r, g, k), g(successor(k))))
-           = Ring.add(r, Polynomial.Sum(r, f, successor(k)), Polynomial.Sum(r, g, successor(k)))
+        calc Polynomial.Sum(r, (i : Natural) ↦ (f(i) + g(i)), successor(k))
+           = (Polynomial.Sum(r, (i : Natural) ↦ (f(i) + g(i)), k) + (f(successor(k)) + g(successor(k))))
+           = ((Polynomial.Sum(r, f, k) + Polynomial.Sum(r, g, k)) + (f(successor(k)) + g(successor(k))))
+           = ((Polynomial.Sum(r, f, k) + f(successor(k))) + (Polynomial.Sum(r, g, k) + g(successor(k))))
+           = (Polynomial.Sum(r, f, successor(k)) + Polynomial.Sum(r, g, successor(k)))
   }
 
 -- Pull a left constant through the sum: c · Σ f = Σ (c · f).
 theorem Polynomial.Sum.scale_left (r : Ring) (c : Ring.carrier(r))
         (f : Natural → Ring.carrier(r)) (n : Natural)
-        : Ring.multiply(r, c, Polynomial.Sum(r, f, n))
-          = Polynomial.Sum(r, (i : Natural) ↦ Ring.multiply(r, c, f(i)), n) :=
+        : (c * Polynomial.Sum(r, f, n))
+          = Polynomial.Sum(r, (i : Natural) ↦ (c * f(i)), n) :=
   by_induction on n with IH {
-    case zero: reflexivity(Ring.carrier(r), Ring.multiply(r, c, f(0)))
+    case zero: reflexivity(Ring.carrier(r), (c * f(0)))
     case successor(k):
-        calc Ring.multiply(r, c, Polynomial.Sum(r, f, successor(k)))
-           = Ring.multiply(r, c, Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k))))
-           = Ring.add(r,
-                 Ring.multiply(r, c, Polynomial.Sum(r, f, k)),
-                 Ring.multiply(r, c, f(successor(k))))
-           = Ring.add(r,
-                 Polynomial.Sum(r, (i : Natural) ↦ Ring.multiply(r, c, f(i)), k),
-                 Ring.multiply(r, c, f(successor(k))))
-           = Polynomial.Sum(r, (i : Natural) ↦ Ring.multiply(r, c, f(i)), successor(k))
+        calc (c * Polynomial.Sum(r, f, successor(k)))
+           = (c * (Polynomial.Sum(r, f, k) + f(successor(k))))
+           = ((c * Polynomial.Sum(r, f, k)) + (c * f(successor(k))))
+           = (Polynomial.Sum(r, (i : Natural) ↦ (c * f(i)), k) + (c * f(successor(k))))
+           = Polynomial.Sum(r, (i : Natural) ↦ (c * f(i)), successor(k))
   }
 
 -- Pull a right constant through the sum: (Σ f) · c = Σ (f · c).
 theorem Polynomial.Sum.scale_right (r : Ring)
         (f : Natural → Ring.carrier(r)) (c : Ring.carrier(r)) (n : Natural)
-        : Ring.multiply(r, Polynomial.Sum(r, f, n), c)
-          = Polynomial.Sum(r, (i : Natural) ↦ Ring.multiply(r, f(i), c), n) :=
+        : (Polynomial.Sum(r, f, n) * c)
+          = Polynomial.Sum(r, (i : Natural) ↦ (f(i) * c), n) :=
   by_induction on n with IH {
-    case zero: reflexivity(Ring.carrier(r), Ring.multiply(r, f(0), c))
+    case zero: reflexivity(Ring.carrier(r), (f(0) * c))
     case successor(k):
-        calc Ring.multiply(r, Polynomial.Sum(r, f, successor(k)), c)
-           = Ring.multiply(r, Ring.add(r, Polynomial.Sum(r, f, k), f(successor(k))), c)
-           = Ring.add(r,
-                 Ring.multiply(r, Polynomial.Sum(r, f, k), c),
-                 Ring.multiply(r, f(successor(k)), c))
-           = Ring.add(r,
-                 Polynomial.Sum(r, (i : Natural) ↦ Ring.multiply(r, f(i), c), k),
-                 Ring.multiply(r, f(successor(k)), c))
-           = Polynomial.Sum(r, (i : Natural) ↦ Ring.multiply(r, f(i), c), successor(k))
+        calc (Polynomial.Sum(r, f, successor(k)) * c)
+           = ((Polynomial.Sum(r, f, k) + f(successor(k))) * c)
+           = ((Polynomial.Sum(r, f, k) * c) + (f(successor(k)) * c))
+           = (Polynomial.Sum(r, (i : Natural) ↦ (f(i) * c), k) + (f(successor(k)) * c))
+           = Polynomial.Sum(r, (i : Natural) ↦ (f(i) * c), successor(k))
   }

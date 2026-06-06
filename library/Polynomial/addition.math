@@ -41,7 +41,7 @@ definition Polynomial.Coefficients.add (r : Ring)
             Polynomial.Coefficients.cons(Ring.carrier(r), a, restA)
         | Polynomial.Coefficients.cons(b, restB) =>
             Polynomial.Coefficients.cons(Ring.carrier(r),
-                Ring.add(r, a, b),
+                (a + b),
                 Polynomial.Coefficients.add(r, restA, restB))
       }
 
@@ -55,9 +55,7 @@ theorem Polynomial.nth_add (r : Ring)
         : (p q : Polynomial.Coefficients(Ring.carrier(r)))
           → (index : Natural)
           → Polynomial.coefficient(r, Polynomial.Coefficients.add(r, p, q), index)
-            = Ring.add(r,
-                  Polynomial.coefficient(r, p, index),
-                  Polynomial.coefficient(r, q, index))
+            = (Polynomial.coefficient(r, p, index) + Polynomial.coefficient(r, q, index))
   | Polynomial.Coefficients.nil, q, index =>
       -- p + q = q and coefficient(nil, i) = 0, so the claim is
       -- coefficient(q, i) = 0 + coefficient(q, i).
@@ -76,7 +74,7 @@ theorem Polynomial.nth_add (r : Ring)
         | Polynomial.Coefficients.cons(b, restB) =>
             cases index {
               | zero =>
-                  reflexivity(Ring.carrier(r), Ring.add(r, a, b))
+                  reflexivity(Ring.carrier(r), (a + b))
               | successor(predecessor) =>
                   Polynomial.nth_add(r, restA, restB, predecessor)
             }
@@ -96,16 +94,10 @@ theorem Polynomial.Coefficients.add_respects (r : Ring)
               Polynomial.Coefficients.add(r, pPrime, qPrime)) :=
   (index : Natural) ↦
       calc Polynomial.coefficient(r, Polynomial.Coefficients.add(r, p, q), index)
-         = Ring.add(r,
-               Polynomial.coefficient(r, p, index),
-               Polynomial.coefficient(r, q, index))
-         = Ring.add(r,
-               Polynomial.coefficient(r, pPrime, index),
-               Polynomial.coefficient(r, q, index))
+         = (Polynomial.coefficient(r, p, index) + Polynomial.coefficient(r, q, index))
+         = (Polynomial.coefficient(r, pPrime, index) + Polynomial.coefficient(r, q, index))
                by firstEqual(index)
-         = Ring.add(r,
-               Polynomial.coefficient(r, pPrime, index),
-               Polynomial.coefficient(r, qPrime, index))
+         = (Polynomial.coefficient(r, pPrime, index) + Polynomial.coefficient(r, qPrime, index))
                by secondEqual(index)
          = Polynomial.coefficient(r, Polynomial.Coefficients.add(r, pPrime, qPrime), index)
 
