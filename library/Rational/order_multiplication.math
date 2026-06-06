@@ -109,7 +109,7 @@ theorem Rational.zero_not_equal_one : Not(Rational.zero = Rational.one) :=
     -- Rational.zero = [Integer.zero / 0], Rational.one = [Integer.one / 0];
     -- equal classes ⇒ Integer.zero · 1 = Integer.one · 1, i.e. the Integers
     -- are equal.
-    claim integerZeroEqualsOne : Integer.zero = Integer.one;
+    claim Integer.zero = Integer.one;
     -- Integer.zero = [0 / 0], Integer.one = [successor(0) / 0]; equal classes
     -- ⇒ 0 + 0 = successor(0) + 0, i.e. successor(0) = 0.
     claim successorZeroEqualsZero : successor(0) = (0 : Natural);
@@ -139,8 +139,7 @@ theorem Rational.halve_less_than_self
             by Rational.halve_doubled(epsilon)
      = Rational.halve(epsilon)                                       as diffEqualsHalve;
   -- halve(ε) > 0 from halve_positive.
-  claim halvePositive : Rational.zero < Rational.halve(epsilon)
-    by Rational.halve_positive(epsilon, epsilonPos);
+  claim halvePositive : Rational.zero < Rational.halve(epsilon);
   -- halve(ε) ≤ ε from IsNonneg(ε - halve(ε)) = IsNonneg(halve(ε)).
   claim halveLeqEpsilon : Rational.halve(epsilon) ≤ epsilon
     by rewrite(
@@ -150,16 +149,7 @@ theorem Rational.halve_less_than_self
                Rational.LessThan.weaken(halvePositive)));
   -- halve(ε) ≠ ε. If halve(ε) = ε, then ε - halve(ε) = 0, but it = halve(ε).
   -- So halve(ε) = 0. But halve_positive says ¬(0 = halve(ε)). Contradiction.
-  claim halveNeqEpsilon : Not(Rational.halve(epsilon) = epsilon)
-    by (halveEqEps : Rational.halve(epsilon) = epsilon) ↦
-         Rational.LessThan.distinct(halvePositive)(
-             -- 0 = halve(ε) follows from halve(ε) = ε.
-             -- ε - halve(ε) = halve(ε) and ε - ε = 0; so halve(ε) = 0.
-             Equality.symmetry(
-                 calc Rational.halve(epsilon)
-                    = epsilon - Rational.halve(epsilon)
-                    = epsilon - epsilon
-                    = Rational.zero));
+  claim halveNeqEpsilon : Not(Rational.halve(epsilon) = epsilon);
   And.introduction(halveLeqEpsilon, halveNeqEpsilon)
 }
 
@@ -270,12 +260,6 @@ theorem Rational.succ_natural_minus_natural_form_at_rep
               * (successor(d) : Integer)
          -- Apply the Integer simplification lemma.
          = (successor(K * d + d) : Integer)
-              * (successor(d) : Integer)
-         -- Bridge succ(d) on the right side to succ(d + 0·succ(d)).
-         -- d = d + 0 (Natural.add_zero in reverse). Then succ(d) = succ(d + 0)
-         -- and 0·succ(d) = 0, so succ(d + 0·succ(d)) = succ(d + 0) = succ(d).
-         -- Strict reverse: prove (succ(K·d+d) : I)·succ(d) = (succ(K·d+d) : I)·succ(d + 0·succ(d)).
-         = (successor(K * d + d) : Integer)
               * (successor(d + 0 * successor(d)) : Integer))
 
 -- |q|-at-rep ≤ (succ(K) : R) form, expressed via the explicit
@@ -366,7 +350,7 @@ theorem Rational.reciprocal_of_succ_nonzero (K : Natural)
     -- Rational.zero = [Integer.zero / 0] and 1/(K+1) = [successor(0) / K];
     -- equal classes ⇒ Integer.zero · succ(K) = successor(0) · 1, i.e. the
     -- Integers are equal.
-    claim integerZeroEqualsSucc : Integer.zero = (successor(0) : Integer);
+    claim Integer.zero = (successor(0) : Integer);
     -- Descending to Natural as in zero_not_equal_one: successor(0) = 0.
     claim successorZeroEqualsZero : successor(0) = (0 : Natural);
     Natural.successor_not_zero(0, successorZeroEqualsZero)
@@ -412,51 +396,7 @@ theorem Rational.multiply_positive_at_representatives
   claim productNonzero
       : Not(Rational.zero
             = Rational.fraction((successor(k_x) : Integer), d_x)
-                * Rational.fraction((successor(k_y) : Integer), d_y))
-    by (zeroEqProduct
-                    : Rational.zero
-                      = Rational.fraction((successor(k_x) : Integer), d_x)
-                          * Rational.fraction((successor(k_y) : Integer), d_y)) ↦
-         -- The product is, definitionally, the single fraction
-         -- (succ(k_x)·succ(k_y)) / (d_y + d_x·succ(d_y)); cross-multiplying
-         -- `0 = num/denom` gives num·1 = 0·(denom+1), so succ(k_x)·succ(k_y)
-         -- = 0 at Integer, hence at Natural — false.
-         Natural.successor_not_zero(
-             k_x + successor(k_x) * k_y,
-             -- succ(k_x) * succ(k_y) = succ(k_x + succ(k_x) · k_y) at Natural
-             -- (multiply_successor + arithmetic).
-             calc successor(k_x + successor(k_x) * k_y)
-                = successor(k_x) + successor(k_x) * k_y
-                = successor(k_x) * successor(k_y)
-                -- succ(k_x) · succ(k_y) = 0 from the Quotient.exact chain.
-                -- LHS_integer = (succ(k_x) · succ(k_y) : I), and we derive
-                -- this equals Integer.zero, hence Natural-level zero.
-                = 0
-                      by Natural.to_integer.injective(
-                             successor(k_x) * successor(k_y), 0,
-                             -- (succ(k_x) · succ(k_y) : I) = Integer.zero.
-                             calc (successor(k_x) * successor(k_y) : Integer)
-                                = (successor(k_x) : Integer)
-                                      * (successor(k_y) : Integer)
-                                = (successor(k_x) : Integer)
-                                      * (successor(k_y) : Integer)
-                                      * (successor(0) : Integer)
-                                -- `zeroEqProduct` says the product class is
-                                -- Rational.zero; Quotient.exact recovers the
-                                -- equivalent representatives — this cross-
-                                -- multiplied equation.
-                                = Integer.zero * (successor(d_y + d_x
-                                                           * successor(d_y))
-                                                      : Integer)
-                                      by Quotient.exact(
-                                             RationalRepresentative.make(
-                                                 (successor(k_x) : Integer)
-                                                     * (successor(k_y) : Integer),
-                                                 d_y + d_x * successor(d_y)),
-                                             RationalRepresentative.make(
-                                                 Integer.zero, zero),
-                                             Equality.symmetry(zeroEqProduct))
-                                = Integer.zero));
+                * Rational.fraction((successor(k_y) : Integer), d_y));
   And.introduction(
       Rational.LessOrEqual_zero_of_IsNonneg(
           Rational.fraction((successor(k_x) : Integer), d_x)
@@ -535,8 +475,6 @@ theorem Rational.multiply_positive_positive
       -- Transport to the (succ k_x, succ k_y) form.
       calc Rational.zero
          < Rational.fraction((successor(k_x) : Integer), d_x)
-               * Rational.fraction((successor(k_y) : Integer), d_y)
-         = Rational.fraction(n_x, d_x)
                * Rational.fraction((successor(k_y) : Integer), d_y)
          = Rational.fraction(n_x, d_x)
                * Rational.fraction(n_y, d_y)
