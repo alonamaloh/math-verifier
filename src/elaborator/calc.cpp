@@ -954,23 +954,40 @@ ExpressionPointer Elaborator::elaborateCalc(
         }
 
         // Optional check: look for redundant intermediate calc steps.
-        // For each internal step (one that isn't the first or last
-        // endpoint), see whether the auto-prover can close the
-        // combined neighbouring step directly. If yes, warn — the
-        // user can usually delete the intermediate `= midpoint` line
-        // without losing kernel acceptance. Restricted to all-`=`
-        // adjacent pairs for now (mixed `=`/`≤`/`<` combinations need
-        // per-case relation arithmetic). Off by default — the
-        // auto-prover dispatch is expensive on long chains.
+        // For each internal endpoint (not the first or last), see whether the
+        // auto-prover can close the combined step directly. If yes, warn — the
+        // user can usually delete the intermediate `= midpoint` line without
+        // losing kernel acceptance. Restricted to all-`=` runs (mixed
+        // `=`/`≤`/`<` combinations need per-case relation arithmetic). Off by
+        // default — the auto-prover dispatch is expensive on long chains.
+        //
+        // The walk is CUMULATIVE (greedy): `lastKept` is the most recent
+        // endpoint we decided to KEEP, and each candidate is tested against the
+        // combined step FROM `lastKept` — i.e. as if every midpoint flagged so
+        // far in this run were already removed. So a run of midpoints is only
+        // extended while the growing combined step still closes under the
+        // redundancy budget; the moment it would tip over, the run ends and the
+        // current endpoint is kept. This means deleting ALL flagged midpoints at
+        // once is safe by construction (each maximal run collapses to a single
+        // step the auto-prover closes within budget) — it can't suggest a set
+        // of removals that compound into an expensive search.
         if (reportRedundantCalcSteps_) {
+            size_t lastKept = 0;
             for (size_t k = 1; k + 1 <= steps.size(); ++k) {
-                // steps[k-1] takes endpointKernels[k-1] -> endpointKernels[k].
-                // steps[k]   takes endpointKernels[k]   -> endpointKernels[k+1].
-                // We're asking: can the auto-prover close endpointKernels[k-1]
-                // (= endpointKernels[k+1]) directly? Only check when both
-                // steps are Equality so the combined relation is unambiguous.
-                if (steps[k - 1].relation != CalcRelation::Equality
-                    || steps[k].relation != CalcRelation::Equality) {
+                // The combined step, if endpoint k is removed together with
+                // every midpoint already flagged in this run, is
+                // endpointKernels[lastKept] = endpointKernels[k+1]. It is a
+                // genuine `=` step only when every step in the span
+                // [lastKept, k] is Equality.
+                bool spanAllEquality = true;
+                for (size_t j = lastKept; j <= k; ++j) {
+                    if (steps[j].relation != CalcRelation::Equality) {
+                        spanAllEquality = false;
+                        break;
+                    }
+                }
+                if (!spanAllEquality) {
+                    lastKept = k;
                     continue;
                 }
                 ExpressionPointer combinedRelation = makeApplication(
@@ -978,7 +995,7 @@ ExpressionPointer Elaborator::elaborateCalc(
                         makeApplication(
                             makeConstant("Equality", {carrierLevel}),
                             carrierType),
-                        endpointKernels[k - 1]),
+                        endpointKernels[lastKept]),
                     endpointKernels[k + 1]);
                 ExpressionPointer autoAttempt;
                 {
@@ -989,7 +1006,7 @@ ExpressionPointer Elaborator::elaborateCalc(
                     try {
                         autoAttempt = autoProveCalcStep(
                             localBinders,
-                            endpointKernels[k - 1],
+                            endpointKernels[lastKept],
                             endpointKernels[k + 1],
                             carrierType, carrierLevel,
                             combinedRelation,
@@ -1001,11 +1018,11 @@ ExpressionPointer Elaborator::elaborateCalc(
                     }
                 }
                 if (autoAttempt) {
-                    // The redundant ENDPOINT is endpointKernels[k] — it's
-                    // the target of steps[k-1] and is written on that
-                    // step's line. Removing that line collapses steps
-                    // (k-1, k) into one step from endpoint (k-1) to
-                    // endpoint (k+1), which the auto-prover can close.
+                    // Endpoint k is removable (collapsing the run [lastKept,
+                    // k+1] into one step). It is the target of steps[k-1] and is
+                    // written on that step's line. Keep `lastKept` where it is
+                    // so the next candidate is tested against the still-growing
+                    // combined step.
                     std::cerr << "warning: " << moduleName_
                         << ":" << calc.steps[k - 1].line
                         << ":" << calc.steps[k - 1].column
@@ -1013,6 +1030,10 @@ ExpressionPointer Elaborator::elaborateCalc(
                         "redundant — removing it lets the auto-prover "
                         "close the combined step (next endpoint at line "
                         << calc.steps[k].line << ")\n";
+                } else {
+                    // The combined step would be too expensive: this endpoint
+                    // pulls its weight, so keep it and start a fresh run here.
+                    lastKept = k;
                 }
             }
         }
