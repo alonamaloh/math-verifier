@@ -46,32 +46,32 @@ theorem GaussianInteger.coordinatesOfCoefficients_scale (a : Integer)
             = Product.make(
                   a * Product.first(GaussianInteger.coordinatesOfCoefficients(k)),
                   a * Product.second(GaussianInteger.coordinatesOfCoefficients(k)))
-  | Polynomial.Coefficients.nil =>
-      Product.make_equal(Integer, Integer,
-          Integer.zero, a * Integer.zero, Integer.zero, a * Integer.zero, ring, ring)
+  | Polynomial.Coefficients.nil => {
+      -- coords(scale(a, [])) = (0, 0) = (a·0, a·0).
+      claim Integer.zero = a * Integer.zero;
+      done
+    }
   | Polynomial.Coefficients.cons(c, rest) => {
-      claim ih
+      -- scale(a, c :: rest) = (a·c) :: scale(a, rest); the induction
+      -- hypothesis gives the coordinates of the scaled tail.
+      claim tail
           : GaussianInteger.coordinatesOfCoefficients(
                 Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest))
             = Product.make(
                   a * Product.first(GaussianInteger.coordinatesOfCoefficients(rest)),
-                  a * Product.second(GaussianInteger.coordinatesOfCoefficients(rest)))
-          by GaussianInteger.coordinatesOfCoefficients_scale(a, rest);
-      Product.make_equal(Integer, Integer,
-          a * c - Product.second(GaussianInteger.coordinatesOfCoefficients(
-              Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest))),
-          a * (c - Product.second(GaussianInteger.coordinatesOfCoefficients(rest))),
-          Product.first(GaussianInteger.coordinatesOfCoefficients(
-              Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest))),
-          a * Product.first(GaussianInteger.coordinatesOfCoefficients(rest)),
-          calc a * c - Product.second(GaussianInteger.coordinatesOfCoefficients(
-                   Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest)))
-             = a * c - a * Product.second(GaussianInteger.coordinatesOfCoefficients(rest))
-                   by congruenceOf(
-                          (pair : Pair(Integer, Integer)) ↦ a * c - Product.second(pair), ih)
-             = a * (c - Product.second(GaussianInteger.coordinatesOfCoefficients(rest)))
-                   by ring,
-          congruenceOf((pair : Pair(Integer, Integer)) ↦ Product.first(pair), ih))
+                  a * Product.second(GaussianInteger.coordinatesOfCoefficients(rest)));
+      -- real part
+      calc a * c - Product.second(GaussianInteger.coordinatesOfCoefficients(
+               Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest)))
+         = a * c - a * Product.second(GaussianInteger.coordinatesOfCoefficients(rest))
+               by tail
+         = a * (c - Product.second(GaussianInteger.coordinatesOfCoefficients(rest)));
+      -- imaginary part
+      claim Product.first(GaussianInteger.coordinatesOfCoefficients(
+                Polynomial.Coefficients.scale(Integer.ring_bundle, a, rest)))
+            = a * Product.first(GaussianInteger.coordinatesOfCoefficients(rest))
+          by tail;
+      done
     }
 
 -- ----------------------------------------------------------------------
@@ -86,17 +86,23 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
             = GaussianInteger.gaussianProduct(
                   GaussianInteger.coordinatesOfCoefficients(p),
                   GaussianInteger.coordinatesOfCoefficients(q))
-  | Polynomial.Coefficients.nil, q =>
+  | Polynomial.Coefficients.nil, q => {
       -- coords(nil·q) = coords(nil) = (0,0) = (0,0) ⊗ coords(q).
-      Product.make_equal(Integer, Integer,
-          Integer.zero,
-          Integer.zero * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
-              - Integer.zero * Product.second(GaussianInteger.coordinatesOfCoefficients(q)),
-          Integer.zero,
-          Integer.zero * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
-              + Integer.zero * Product.first(GaussianInteger.coordinatesOfCoefficients(q)),
-          ring, ring)
+      claim Integer.zero
+          = Integer.zero * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
+                - Integer.zero * Product.second(GaussianInteger.coordinatesOfCoefficients(q));
+      claim Integer.zero
+          = Integer.zero * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
+                + Integer.zero * Product.first(GaussianInteger.coordinatesOfCoefficients(q));
+      done
+    }
   | Polynomial.Coefficients.cons(a, restA), q => {
+      -- multiply(a :: restA, q) = scale(a, q) + shift(restA · q). The
+      -- induction hypothesis evaluates coords(restA · q) as the Gaussian
+      -- product; `scaleCoordinates` and `shiftCoordinates` evaluate the two
+      -- summands. Additivity splits coords of the sum; then each coordinate
+      -- is a `ring` rearrangement into the Gaussian product of the cons.
+      -- induction hypothesis on the tail
       claim ihMultiply
           : GaussianInteger.coordinatesOfCoefficients(
                 Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))
@@ -109,8 +115,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
                 Polynomial.Coefficients.scale(Integer.ring_bundle, a, q))
             = Product.make(
                   a * Product.first(GaussianInteger.coordinatesOfCoefficients(q)),
-                  a * Product.second(GaussianInteger.coordinatesOfCoefficients(q)))
-          by GaussianInteger.coordinatesOfCoefficients_scale(a, q);
+                  a * Product.second(GaussianInteger.coordinatesOfCoefficients(q)));
       claim shiftCoordinates
           : GaussianInteger.coordinatesOfCoefficients(
                 Polynomial.Coefficients.shift(Integer.ring_bundle,
@@ -119,9 +124,60 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
                   Integer.negate(Product.second(GaussianInteger.coordinatesOfCoefficients(
                       Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q)))),
                   Product.first(GaussianInteger.coordinatesOfCoefficients(
-                      Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
-          by GaussianInteger.coordinatesOfCoefficients_shift(
-                 Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q));
+                      Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))));
+      -- The real part: a·re(q) − [re(restA)·im(q) + im(restA)·re(q)].
+      calc Product.first(GaussianInteger.coordinatesOfCoefficients(
+               Polynomial.Coefficients.scale(Integer.ring_bundle, a, q)))
+               + Product.first(GaussianInteger.coordinatesOfCoefficients(
+                     Polynomial.Coefficients.shift(Integer.ring_bundle,
+                         Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
+                 = a * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
+                       + Product.first(GaussianInteger.coordinatesOfCoefficients(
+                             Polynomial.Coefficients.shift(Integer.ring_bundle,
+                                 Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
+                       by scaleCoordinates
+                 = a * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
+                       + Integer.negate(Product.second(GaussianInteger.coordinatesOfCoefficients(
+                             Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
+                       by shiftCoordinates
+                 = a * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
+                       + Integer.negate(
+                             Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
+                                 * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
+                             + Product.second(GaussianInteger.coordinatesOfCoefficients(restA))
+                                 * Product.first(GaussianInteger.coordinatesOfCoefficients(q)))
+                       by ihMultiply
+                 = (a - Product.second(GaussianInteger.coordinatesOfCoefficients(restA)))
+                       * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
+                       - Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
+                         * Product.second(GaussianInteger.coordinatesOfCoefficients(q));
+      -- The imaginary part: a·im(q) + [re(restA)·re(q) − im(restA)·im(q)].
+      calc Product.second(GaussianInteger.coordinatesOfCoefficients(
+               Polynomial.Coefficients.scale(Integer.ring_bundle, a, q)))
+               + Product.second(GaussianInteger.coordinatesOfCoefficients(
+                     Polynomial.Coefficients.shift(Integer.ring_bundle,
+                         Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
+                 = a * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
+                       + Product.second(GaussianInteger.coordinatesOfCoefficients(
+                             Polynomial.Coefficients.shift(Integer.ring_bundle,
+                                 Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
+                       by scaleCoordinates
+                 = a * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
+                       + Product.first(GaussianInteger.coordinatesOfCoefficients(
+                             Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q)))
+                       by shiftCoordinates
+                 = a * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
+                       + (Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
+                              * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
+                          - Product.second(GaussianInteger.coordinatesOfCoefficients(restA))
+                              * Product.second(GaussianInteger.coordinatesOfCoefficients(q)))
+                       by ihMultiply
+                 = (a - Product.second(GaussianInteger.coordinatesOfCoefficients(restA)))
+                       * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
+                       + Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
+                         * Product.first(GaussianInteger.coordinatesOfCoefficients(q));
+      -- coords(scale(a,q) + shift(restA·q)) splits componentwise (additivity);
+      -- the two claims are exactly its real and imaginary parts.
       calc GaussianInteger.coordinatesOfCoefficients(
                Polynomial.Coefficients.add(Integer.ring_bundle,
                    Polynomial.Coefficients.scale(Integer.ring_bundle, a, q),
@@ -145,95 +201,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_multiply
          = GaussianInteger.gaussianProduct(
                GaussianInteger.coordinatesOfCoefficients(
                    Polynomial.Coefficients.cons(Integer, a, restA)),
-               GaussianInteger.coordinatesOfCoefficients(q))
-             by Product.make_equal(Integer, Integer,
-                    Product.first(GaussianInteger.coordinatesOfCoefficients(
-                        Polynomial.Coefficients.scale(Integer.ring_bundle, a, q)))
-                        + Product.first(GaussianInteger.coordinatesOfCoefficients(
-                              Polynomial.Coefficients.shift(Integer.ring_bundle,
-                                  Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q)))),
-                    (a - Product.second(GaussianInteger.coordinatesOfCoefficients(restA)))
-                        * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
-                        - Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
-                          * Product.second(GaussianInteger.coordinatesOfCoefficients(q)),
-                    Product.second(GaussianInteger.coordinatesOfCoefficients(
-                        Polynomial.Coefficients.scale(Integer.ring_bundle, a, q)))
-                        + Product.second(GaussianInteger.coordinatesOfCoefficients(
-                              Polynomial.Coefficients.shift(Integer.ring_bundle,
-                                  Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q)))),
-                    (a - Product.second(GaussianInteger.coordinatesOfCoefficients(restA)))
-                        * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
-                        + Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
-                          * Product.first(GaussianInteger.coordinatesOfCoefficients(q)),
-                    -- first component
-                    calc Product.first(GaussianInteger.coordinatesOfCoefficients(
-                             Polynomial.Coefficients.scale(Integer.ring_bundle, a, q)))
-                             + Product.first(GaussianInteger.coordinatesOfCoefficients(
-                                   Polynomial.Coefficients.shift(Integer.ring_bundle,
-                                       Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
-                       = a * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
-                             + Product.first(GaussianInteger.coordinatesOfCoefficients(
-                                   Polynomial.Coefficients.shift(Integer.ring_bundle,
-                                       Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
-                             by congruenceOf(
-                                    (w : Integer) ↦ w + Product.first(GaussianInteger.coordinatesOfCoefficients(
-                                        Polynomial.Coefficients.shift(Integer.ring_bundle,
-                                            Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q)))),
-                                    congruenceOf((pair : Pair(Integer, Integer)) ↦ Product.first(pair), scaleCoordinates))
-                       = a * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
-                             + Integer.negate(Product.second(GaussianInteger.coordinatesOfCoefficients(
-                                   Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
-                             by congruenceOf(
-                                    (w : Integer) ↦ a * Product.first(GaussianInteger.coordinatesOfCoefficients(q)) + w,
-                                    congruenceOf((pair : Pair(Integer, Integer)) ↦ Product.first(pair), shiftCoordinates))
-                       = a * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
-                             + Integer.negate(
-                                   Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
-                                       * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
-                                   + Product.second(GaussianInteger.coordinatesOfCoefficients(restA))
-                                       * Product.first(GaussianInteger.coordinatesOfCoefficients(q)))
-                             by congruenceOf(
-                                    (w : Integer) ↦ a * Product.first(GaussianInteger.coordinatesOfCoefficients(q)) + Integer.negate(w),
-                                    congruenceOf((pair : Pair(Integer, Integer)) ↦ Product.second(pair), ihMultiply))
-                       = (a - Product.second(GaussianInteger.coordinatesOfCoefficients(restA)))
-                             * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
-                             - Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
-                               * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
-                             by ring,
-                    -- second component
-                    calc Product.second(GaussianInteger.coordinatesOfCoefficients(
-                             Polynomial.Coefficients.scale(Integer.ring_bundle, a, q)))
-                             + Product.second(GaussianInteger.coordinatesOfCoefficients(
-                                   Polynomial.Coefficients.shift(Integer.ring_bundle,
-                                       Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
-                       = a * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
-                             + Product.second(GaussianInteger.coordinatesOfCoefficients(
-                                   Polynomial.Coefficients.shift(Integer.ring_bundle,
-                                       Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q))))
-                             by congruenceOf(
-                                    (w : Integer) ↦ w + Product.second(GaussianInteger.coordinatesOfCoefficients(
-                                        Polynomial.Coefficients.shift(Integer.ring_bundle,
-                                            Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q)))),
-                                    congruenceOf((pair : Pair(Integer, Integer)) ↦ Product.second(pair), scaleCoordinates))
-                       = a * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
-                             + Product.first(GaussianInteger.coordinatesOfCoefficients(
-                                   Polynomial.Coefficients.multiply(Integer.ring_bundle, restA, q)))
-                             by congruenceOf(
-                                    (w : Integer) ↦ a * Product.second(GaussianInteger.coordinatesOfCoefficients(q)) + w,
-                                    congruenceOf((pair : Pair(Integer, Integer)) ↦ Product.second(pair), shiftCoordinates))
-                       = a * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
-                             + (Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
-                                    * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
-                                - Product.second(GaussianInteger.coordinatesOfCoefficients(restA))
-                                    * Product.second(GaussianInteger.coordinatesOfCoefficients(q)))
-                             by congruenceOf(
-                                    (w : Integer) ↦ a * Product.second(GaussianInteger.coordinatesOfCoefficients(q)) + w,
-                                    congruenceOf((pair : Pair(Integer, Integer)) ↦ Product.first(pair), ihMultiply))
-                       = (a - Product.second(GaussianInteger.coordinatesOfCoefficients(restA)))
-                             * Product.second(GaussianInteger.coordinatesOfCoefficients(q))
-                             + Product.first(GaussianInteger.coordinatesOfCoefficients(restA))
-                               * Product.first(GaussianInteger.coordinatesOfCoefficients(q))
-                             by ring)
+               GaussianInteger.coordinatesOfCoefficients(q));
     }
 
 -- ----------------------------------------------------------------------
