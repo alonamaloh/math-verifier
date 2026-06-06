@@ -61,7 +61,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_all_zero
           : (i : Natural) → Polynomial.nth(Integer, Integer.zero,
                 Polynomial.Coefficients.cons(Integer, c, rest), i) = Integer.zero) ↦ {
         claim cIsZero : c = Integer.zero by allZero(0);
-        claim restAllZero
+        claim restAllZero  -- «redundant `by` on `claim` — auto-prover closes the goal without help»
             : (i : Natural) → Polynomial.nth(Integer, Integer.zero, rest, i) = Integer.zero
             by (i : Natural) ↦ allZero(successor(i));
         claim restCoordinates
@@ -70,17 +70,17 @@ theorem GaussianInteger.coordinatesOfCoefficients_all_zero
             by GaussianInteger.coordinatesOfCoefficients_all_zero(rest, restAllZero);
         calc GaussianInteger.coordinatesOfCoefficients(
                  Polynomial.Coefficients.cons(Integer, c, rest))
-           = Product.make(
+           = Product.make(  -- «redundant congruenceOf wrapper — `by <inner lemma>` alone would close this step (diff inference fills the lambda)»
                  c - Product.second(Product.make(Integer.zero, Integer.zero)),
                  Product.first(Product.make(Integer.zero, Integer.zero)))
                  by congruenceOf(
                         (pair : Pair(Integer, Integer)) ↦
                             Product.make(c - Product.second(pair), Product.first(pair)),
                         restCoordinates)
-           = Product.make(Integer.zero, Integer.zero)
+           = Product.make(Integer.zero, Integer.zero)  -- «redundant `by` on calc step — auto-prover closes it without help»
                  by Product.make_equal(Integer, Integer,
                         c - Integer.zero, Integer.zero, Integer.zero, Integer.zero,
-                        calc c - Integer.zero = c = Integer.zero by cIsZero,
+                        calc c - Integer.zero = c = Integer.zero by cIsZero,  -- «redundant `by` on calc step — auto-prover closes it without help»
                         reflexivity(Integer, Integer.zero))
       }
 
@@ -112,7 +112,7 @@ theorem GaussianInteger.coordinatesOfCoefficients_respects
                   (i : Natural) ↦ extensionallyEqual(i))
           | Polynomial.Coefficients.cons(d, restB) => {
               claim headsEqual : c = d by extensionallyEqual(0);
-              claim tailsExtensionallyEqual
+              claim tailsExtensionallyEqual  -- «redundant `by` on `claim` — auto-prover closes the goal without help»
                   : Polynomial.ExtensionallyEqual(Integer, Integer.zero, rest, restB)
                   by (i : Natural) ↦ extensionallyEqual(successor(i));
               claim tailCoordinates
@@ -126,16 +126,16 @@ theorem GaussianInteger.coordinatesOfCoefficients_respects
                   Product.first(GaussianInteger.coordinatesOfCoefficients(rest)),
                   Product.first(GaussianInteger.coordinatesOfCoefficients(restB)),
                   calc c - Product.second(GaussianInteger.coordinatesOfCoefficients(rest))
-                     = c - Product.second(GaussianInteger.coordinatesOfCoefficients(restB))
+                     = c - Product.second(GaussianInteger.coordinatesOfCoefficients(restB))  -- «redundant `by` on calc step — auto-prover closes it without help»
                            by congruenceOf(
                                   (pair : Pair(Integer, Integer)) ↦ c - Product.second(pair),
                                   tailCoordinates)
-                     = d - Product.second(GaussianInteger.coordinatesOfCoefficients(restB))
+                     = d - Product.second(GaussianInteger.coordinatesOfCoefficients(restB))  -- «redundant `by` on calc step — auto-prover closes it without help»
                            by congruenceOf(
                                   (z : Integer) ↦ z - Product.second(
                                       GaussianInteger.coordinatesOfCoefficients(restB)),
                                   headsEqual),
-                  congruenceOf(
+                  congruenceOf(  -- «redundant congruenceOf wrapper at function-call argument — the inner lemma alone would close the goal (diff inference fills the lambda)»
                       (pair : Pair(Integer, Integer)) ↦ Product.first(pair),
                       tailCoordinates))
             }
@@ -147,3 +147,9 @@ definition GaussianInteger.coordinatesOfPolynomial
         : Polynomial(Integer, Integer.zero) → Pair(Integer, Integer)
   by representatives a ↦ GaussianInteger.coordinatesOfCoefficients(a)
   well_defined by GaussianInteger.coordinatesOfCoefficients_respects
+
+-- `coords` abbreviates the coordinate map for the whole GaussianInteger
+-- cluster (importers inherit the overload); resolved by argument type —
+-- a coefficient list or a polynomial.
+overload coords := GaussianInteger.coordinatesOfCoefficients
+overload coords := GaussianInteger.coordinatesOfPolynomial
