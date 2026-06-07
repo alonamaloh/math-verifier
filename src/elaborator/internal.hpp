@@ -830,6 +830,7 @@ private:
         std::vector<LocalBinder> bodyStack,
         ExpressionPointer expectedType,
         int outerBinderCount,
+        int explicitOuterBinderCount,
         const std::map<std::string, std::string>&
             recursiveArgToHypothesis,
         const std::string& declarationName);

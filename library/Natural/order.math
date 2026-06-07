@@ -52,7 +52,7 @@ theorem LessOrEqual.transitive (a b c : Natural)
 -- resolves `a` and `b` to the OUTER binders (which kernel-level
 -- aren't equal to the destructured values, even though they are
 -- propositionally so in each case).
-theorem Natural.successor_less_or_equal_successor (a b : Natural)
+theorem Natural.successor_less_or_equal_successor {a b : Natural}
         : a ≤ b
           → successor(a) ≤ successor(b)
   | LessOrEqual.reflexivity(commonValue) =>
@@ -60,12 +60,12 @@ theorem Natural.successor_less_or_equal_successor (a b : Natural)
   | LessOrEqual.step(smallerD, largerPredecessor, subproof) =>
       LessOrEqual.step(
           successor(smallerD), successor(largerPredecessor),
-          Natural.successor_less_or_equal_successor(smallerD, largerPredecessor, subproof))
+          Natural.successor_less_or_equal_successor(subproof))
 
 -- 1 ≤ succ(k). Lifts `0 ≤ k` (zero_least) under `successor_le_successor`.
 -- Appears constantly in analytic proofs as a positivity witness.
 theorem Natural.successor_positive (k : Natural) : 1 ≤ successor(k) :=
-  Natural.successor_less_or_equal_successor(0, k, Natural.zero_least(k))
+  Natural.successor_less_or_equal_successor(Natural.zero_least(k))
 
 -- a ≤ a + b. Induction on a, using that successor(_) + m and zero + m
 -- reduce definitionally on the first argument.
@@ -74,9 +74,7 @@ theorem Natural.less_or_equal_add_right
   | zero, b =>
       Natural.zero_least(b)
   | successor(predecessor), b =>
-      Natural.successor_less_or_equal_successor(
-          predecessor, predecessor + b,
-          Natural.less_or_equal_add_right(predecessor, b))
+      Natural.successor_less_or_equal_successor(Natural.less_or_equal_add_right(predecessor, b))
 
 -- n ≤ successor(n). The one-step right-extension that calc chains
 -- over Natural reach for constantly. Built from reflexivity by

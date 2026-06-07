@@ -847,6 +847,17 @@ ExpressionPointer Elaborator::buildCaseLambda(
         // Otherwise it's a thin wrapper around elaborateExpression.
         std::vector<size_t> positionToBinderIndex =
             otherFunctionArgumentPositions;
+        // Recursive self-calls only pass the EXPLICIT outer binders (implicit
+        // ones are inferred), so the scrutinee argument in such a call sits at
+        // the number of explicit outer binders — not outerBinderStack.size(),
+        // which counts implicits too. rewriteRecursiveCalls uses this index.
+        int explicitOuterBinderCount = 0;
+        for (const auto& binder : declaration.arguments) {
+            if (!binder.isImplicit) {
+                explicitOuterBinderCount +=
+                    static_cast<int>(binder.names.size());
+            }
+        }
         ExpressionPointer bodyKernel = buildBodyForCase(
             *matchedCase,
             /*patternIndex=*/1,
@@ -855,6 +866,7 @@ ExpressionPointer Elaborator::buildCaseLambda(
             bodyStack,
             expectedBodyType,
             static_cast<int>(outerBinderStack.size()),
+            explicitOuterBinderCount,
             recursiveArgToHypothesis,
             declaration.name);
 
@@ -912,6 +924,7 @@ ExpressionPointer Elaborator::buildBodyForCase(
         std::vector<LocalBinder> bodyStack,
         ExpressionPointer expectedType,
         int outerBinderCount,
+        int explicitOuterBinderCount,
         const std::map<std::string, std::string>&
             recursiveArgToHypothesis,
         const std::string& declarationName) {
@@ -933,7 +946,7 @@ ExpressionPointer Elaborator::buildBodyForCase(
             // recursive calls by name.
             SurfaceExpressionPointer rewrittenBody = rewriteRecursiveCalls(
                 matchedCase.body, declarationName,
-                recursiveArgToHypothesis, outerBinderCount);
+                recursiveArgToHypothesis, explicitOuterBinderCount);
             ExpressionPointer caseBody = elaborateExpression(
                 *rewrittenBody, bodyStack, expectedType);
             caseBody = coerceToExpectedTypeViaDiff(
@@ -1293,6 +1306,7 @@ ExpressionPointer Elaborator::buildBodyForCase(
             caseBodyStack,
             caseBodyType,
             outerBinderCount,
+            explicitOuterBinderCount,
             recursiveArgToHypothesis,
             declarationName);
 
