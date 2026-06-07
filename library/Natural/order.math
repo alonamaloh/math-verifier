@@ -16,67 +16,66 @@ inductive LessOrEqual : Natural → Natural → Proposition where
         → LessOrEqual(smaller, larger)
         → LessOrEqual(smaller, successor(larger))
 
--- Zero is at most every natural number. Pattern-matched proof by
--- induction on the right operand.
-definition Natural.zero_least
-        : (upperBound : Natural) → 0 ≤ upperBound
-  | zero         => LessOrEqual.reflexivity(zero)
-  | successor(predecessor) =>
-      LessOrEqual.step(0, predecessor,
-                        Natural.zero_least(predecessor))
+-- Zero is at most every natural number. By induction on the upper bound:
+-- 0 ≤ 0 reflexively, and 0 ≤ predecessor lifts to 0 ≤ successor(predecessor)
+-- by stepping the bound once.
+definition Natural.zero_least (upperBound : Natural) : 0 ≤ upperBound :=
+  by_induction on upperBound with IH {
+    case zero:
+        LessOrEqual.reflexivity(0)
+    case successor(predecessor):
+        LessOrEqual.step(0, predecessor, IH)
+  }
 
--- ≤ is transitive. Pattern-match on the second proof (b ≤ c);
--- the first proof is threaded as a function argument that comes after
--- the scrutinee so the motive abstracts over its type. That way the
--- reflexivity case (which forces b = c) automatically specialises the
--- first proof's type to a ≤ c.
+-- ≤ is transitive. By induction on the derivation of b ≤ c, carrying the
+-- proof of a ≤ b (refined as the induction varies b).
 theorem LessOrEqual.transitive (a b c : Natural)
-        : b ≤ c
-          → a ≤ b
-          → a ≤ c
-  | LessOrEqual.reflexivity(_), firstProof =>
-      firstProof
-  | LessOrEqual.step(_, cPredecessor, secondProofSubdivided), firstProof =>
-      LessOrEqual.step(a, cPredecessor,
-          LessOrEqual.transitive(
-              a, b, cPredecessor,
-              secondProofSubdivided, firstProof))
+        (bc : b ≤ c) (ab : a ≤ b) : a ≤ c :=
+  by_induction on bc with IH refining ab {
+    case LessOrEqual.reflexivity(_):
+        -- b = c, so a ≤ b already is a ≤ c.
+        ab
+    case LessOrEqual.step(_, cPredecessor, _):
+        -- c = successor(cPredecessor) with b ≤ cPredecessor; the IH gives
+        -- a ≤ cPredecessor, then one more step reaches a ≤ c.
+        LessOrEqual.step(a, cPredecessor, IH(ab))
+  }
 
--- Successor preserves ≤: a ≤ b implies successor(a) ≤ successor(b). By induction
--- on the proof.
---
--- In the case bodies we use the DESTRUCTURED names (commonValue,
--- smallerD, etc.) rather than the outer binder names a and b. The
--- motive substitutes the constructor's specific index values into
--- the case's expected type, but the case body's local context still
--- resolves `a` and `b` to the OUTER binders (which kernel-level
--- aren't equal to the destructured values, even though they are
--- propositionally so in each case).
+-- Successor preserves ≤: a ≤ b implies successor(a) ≤ successor(b). By
+-- induction on the derivation of a ≤ b. The case bodies use the
+-- DESTRUCTURED names (commonValue, smallerD) — the constructor's specific
+-- index values — not the outer binders a and b.
 theorem Natural.successor_less_or_equal_successor (a b : Natural)
-        : a ≤ b
-          → successor(a) ≤ successor(b)
-  | LessOrEqual.reflexivity(commonValue) =>
-      LessOrEqual.reflexivity(successor(commonValue))
-  | LessOrEqual.step(smallerD, largerPredecessor, subproof) =>
-      LessOrEqual.step(
-          successor(smallerD), successor(largerPredecessor),
-          Natural.successor_less_or_equal_successor(smallerD, largerPredecessor, subproof))
+        (proof : a ≤ b) : successor(a) ≤ successor(b) :=
+  by_induction on proof with IH {
+    case LessOrEqual.reflexivity(commonValue):
+        LessOrEqual.reflexivity(successor(commonValue))
+    case LessOrEqual.step(smallerD, largerPredecessor, _):
+        LessOrEqual.step(
+            successor(smallerD), successor(largerPredecessor), IH)
+  }
 
--- 1 ≤ succ(k). Lifts `0 ≤ k` (zero_least) under `successor_le_successor`.
--- Appears constantly in analytic proofs as a positivity witness.
-theorem Natural.successor_positive (k : Natural) : 1 ≤ successor(k) :=
-  { goal by Natural.successor_less_or_equal_successor }
+-- 1 ≤ succ(k). Appears constantly in analytic proofs as a positivity witness.
+theorem Natural.successor_positive (k : Natural) : 1 ≤ successor(k) := {
+  -- 0 ≤ k since zero is least; then 1 ≤ successor(k) (i.e.
+  -- successor(0) ≤ successor(k)) because successor is monotone.
+  claim 0 ≤ k since Natural.zero_least;
+  done since Natural.successor_less_or_equal_successor
+}
 
--- a ≤ a + b. Induction on a, using that successor(_) + m and zero + m
--- reduce definitionally on the first argument.
-theorem Natural.less_or_equal_add_right
-        : (a b : Natural) → a ≤ a + b
-  | zero, b =>
-      Natural.zero_least(b)
-  | successor(predecessor), b =>
-      Natural.successor_less_or_equal_successor(
-          predecessor, predecessor + b,
-          Natural.less_or_equal_add_right(predecessor, b))
+-- a ≤ a + b. By induction on a (successor(_) + b and zero + b reduce
+-- definitionally on the first argument).
+theorem Natural.less_or_equal_add_right (a b : Natural) : a ≤ a + b :=
+  by_induction on a with IH {
+    case zero:
+        -- 0 + b ≡ b, and zero is least.
+        goal by Natural.zero_least
+    case successor(predecessor): {
+        -- predecessor ≤ predecessor + b by the IH; successor is monotone.
+        claim predecessor ≤ predecessor + b by IH;
+        done by Natural.successor_less_or_equal_successor
+      }
+  }
 
 -- n ≤ successor(n). The one-step right-extension that calc chains
 -- over Natural reach for constantly. Built from reflexivity by
@@ -90,10 +89,9 @@ theorem Natural.one_less_or_equal_two : 1 ≤ 2 :=
 
 -- successor(p) ≤ upperBound implies p ≤ upperBound. Transitive via the
 -- single-step `p ≤ successor(p)`.
-theorem Natural.less_or_equal_predecessor_less_or_equal (p upperBound : Natural)
-        : successor(p) ≤ upperBound
-          → p ≤ upperBound :=
-  (successorLessOrEqual : successor(p) ≤ upperBound) ↦
-    calc p
-       ≤ successor(p)
-       ≤ upperBound
+theorem Natural.less_or_equal_predecessor_less_or_equal
+        (p upperBound : Natural) (successorLessOrEqual : successor(p) ≤ upperBound)
+        : p ≤ upperBound :=
+  calc p
+     ≤ successor(p)
+     ≤ upperBound
