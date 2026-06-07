@@ -29,10 +29,12 @@ import Equality.basics
 theorem Natural.zero_add(a : Natural) : 0 + a = a :=
   reflexivity(a)
 
--- Theorem: a + 0 = a. Induction on a.
-theorem Natural.add_zero : (a : Natural) → a + 0 = a
-  | zero                   => reflexivity(zero)
-  | successor(predecessor) => Natural.add_zero(predecessor)
+-- Theorem: a + 0 = a. By induction on a.
+theorem Natural.add_zero (a : Natural) : a + 0 = a :=
+  by_induction on a with IH {
+    case zero: reflexivity(0)
+    case successor(predecessor): IH
+  }
 
 -- Theorem: 1 + a = successor(a). Definitional.
 theorem Natural.one_add(a : Natural) : 1 + a = successor(a) :=
@@ -40,10 +42,12 @@ theorem Natural.one_add(a : Natural) : 1 + a = successor(a) :=
 
 -- Theorem: a + successor(b) = successor(a + b). Mirror of the definitional
 -- rule for add on the first argument.
-theorem Natural.add_successor
-        : (a b : Natural) → a + successor(b) = successor(a + b)
-  | zero,                   b => reflexivity(successor(b))
-  | successor(predecessor), b => Natural.add_successor(predecessor, b)
+theorem Natural.add_successor (a b : Natural)
+        : a + successor(b) = successor(a + b) :=
+  by_induction on a with IH {
+    case zero: reflexivity(successor(b))
+    case successor(predecessor): IH
+  }
 
 -- Theorem: successor(a) + b = successor(a + b). Definitional —
 -- `Natural.add` recurses on the first arg's successor pattern. Exposed
@@ -54,34 +58,38 @@ theorem Natural.successor_add (a b : Natural)
   reflexivity(successor(a + b))
 
 -- Theorem: (a + b) + c = a + (b + c). Induction on a.
-theorem Natural.add_associative
-        : (a b c : Natural) → (a + b) + c = a + (b + c)
-  | zero,                   b, c => reflexivity(b + c)
-  | successor(predecessor), b, c =>
-      Natural.add_associative(predecessor, b, c)
+theorem Natural.add_associative (a b c : Natural)
+        : (a + b) + c = a + (b + c) :=
+  by_induction on a with IH {
+    case zero: reflexivity(b + c)
+    case successor(predecessor): IH
+  }
 
 -- Theorem: a + b = b + a. Induction on a.
-theorem Natural.add_commutative : (a b : Natural) → a + b = b + a
-  | zero, b =>
-      calc 0 + b
-         = b
-         = b + 0
-  | successor(predecessor), b =>
-      -- Definitionally, successor(predecessor) + b ≡ successor(predecessor + b),
-      -- so the calc chain starts with the reduced form.
-      calc successor(predecessor + b)
-         = successor(b + predecessor)
-                by Natural.add_commutative(predecessor, b)
-         = b + successor(predecessor)
+theorem Natural.add_commutative (a b : Natural) : a + b = b + a :=
+  by_induction on a with IH {
+    case zero:
+        calc 0 + b
+           = b
+           = b + 0
+    case successor(predecessor):
+        -- successor(predecessor) + b ≡ successor(predecessor + b), so the
+        -- calc chain starts with the reduced form.
+        calc successor(predecessor + b)
+           = successor(b + predecessor) by IH
+           = b + successor(predecessor)
+  }
 
 -- Theorem: 0 * a = 0. Definitional.
 theorem Natural.zero_multiply(a : Natural) : 0 * a = 0 :=
   reflexivity(0)
 
 -- Theorem: a * 0 = 0. By induction on a.
-theorem Natural.multiply_zero : (a : Natural) → a * 0 = 0
-  | zero                   => reflexivity(zero)
-  | successor(predecessor) => Natural.multiply_zero(predecessor)
+theorem Natural.multiply_zero (a : Natural) : a * 0 = 0 :=
+  by_induction on a with IH {
+    case zero: reflexivity(0)
+    case successor(predecessor): IH
+  }
 
 -- Theorem: 1 * a = a. 1 * a reduces to a + 0, which is a.
 theorem Natural.one_multiply(a : Natural) : 1 * a = a :=
@@ -97,48 +105,36 @@ theorem Natural.successor_multiply (a b : Natural)
         : successor(a) * b = b + a * b :=
   reflexivity(b + a * b)
 
--- Theorem: a * successor(b) = a + a * b. Induction on a.
---
--- Base case (a = 0): both sides reduce definitionally to 0
--- (multiply on a zero first argument).
---
--- Inductive step (a = successor(predecessor)): after multiply's first-argument
--- reduction and add's first-argument reduction, the goal becomes
---   successor(b + predecessor * successor(b))
---     = successor(predecessor + (b + predecessor * b)).
--- Strip the outer successor with congruenceOf; rewrite
--- `predecessor * successor(b)` using the inductive hypothesis to
--- `predecessor + predecessor * b`; then rearrange via
--- add_associative (twice) and add_commutative.
-theorem Natural.multiply_successor
-        : (a b : Natural) → a * successor(b) = a + a * b
-  | zero, b => reflexivity(zero)
-  | successor(predecessor), b =>
-      -- Both sides β-reduce to the calc-start / calc-end forms. The
-      -- one IH-using step stays explicit; the three middle algebraic
-      -- rearrangements are single-position assoc/comm, auto-closed.
-      calc successor(b + predecessor * successor(b))
-         = successor(b + (predecessor + predecessor * b))
-                by Natural.multiply_successor(predecessor, b)
-         = successor((b + predecessor) + predecessor * b)
-         = successor((predecessor + b) + predecessor * b)
-         = successor(predecessor + (b + predecessor * b))
+-- Theorem: a * successor(b) = a + a * b. By induction on a. The successor
+-- case rewrites predecessor * successor(b) via the IH, then rearranges by
+-- single-position associativity/commutativity (auto-closed).
+theorem Natural.multiply_successor (a b : Natural)
+        : a * successor(b) = a + a * b :=
+  by_induction on a with IH {
+    case zero: reflexivity(0)
+    case successor(predecessor):
+        calc successor(b + predecessor * successor(b))
+           = successor(b + (predecessor + predecessor * b)) by IH
+           = successor((b + predecessor) + predecessor * b)
+           = successor((predecessor + b) + predecessor * b)
+           = successor(predecessor + (b + predecessor * b))
+  }
 
 -- Theorem: a * b = b * a. Induction on a.
-theorem Natural.multiply_commutative
-        : (a b : Natural) → a * b = b * a
-  | zero, b =>
-      calc 0 * b
-         = 0
-         = b * 0
-  | successor(predecessor), b =>
-      -- successor(predecessor) * b ≡ b + predecessor * b. Rewrite the
-      -- right summand via IH, then collapse to b * successor(predecessor)
-      -- (the reverse of multiply_successor).
-      calc b + predecessor * b
-         = b + b * predecessor
-                by Natural.multiply_commutative(predecessor, b)
-         = b * successor(predecessor)
+theorem Natural.multiply_commutative (a b : Natural) : a * b = b * a :=
+  by_induction on a with IH {
+    case zero:
+        calc 0 * b
+           = 0
+           = b * 0
+    case successor(predecessor):
+        -- successor(predecessor) * b ≡ b + predecessor * b. Rewrite the
+        -- right summand via IH, then collapse to b * successor(predecessor)
+        -- (the reverse of multiply_successor).
+        calc b + predecessor * b
+           = b + b * predecessor by IH
+           = b * successor(predecessor)
+  }
 
 -- Theorem: a * 1 = a. From commutativity + one_multiply.
 theorem Natural.multiply_one(a : Natural) : a * 1 = a :=
@@ -150,27 +146,29 @@ theorem Natural.multiply_one(a : Natural) : a * 1 = a :=
 -- Leverages that successor(_) * m and zero * m reduce definitionally
 -- on the first argument; the only non-definitional step is the
 -- inductive hypothesis and a single add_associative rearrangement.
-theorem Natural.distributivity_right
-        : (a b c : Natural) → (a + b) * c = a * c + b * c
-  | zero, b, c => reflexivity(b * c)
-  | successor(predecessor), b, c =>
-      -- (successor(p) + b) * c ≡ c + (p + b) * c. Apply IH on
-      -- (p + b) * c, then re-associate.
-      calc c + (predecessor + b) * c
-         = c + (predecessor * c + b * c)
-                by Natural.distributivity_right(predecessor, b, c)
-         = (c + predecessor * c) + b * c
+theorem Natural.distributivity_right (a b c : Natural)
+        : (a + b) * c = a * c + b * c :=
+  by_induction on a with IH {
+    case zero: reflexivity(b * c)
+    case successor(predecessor):
+        -- (successor(p) + b) * c ≡ c + (p + b) * c. Apply the IH on
+        -- (p + b) * c, then re-associate.
+        calc c + (predecessor + b) * c
+           = c + (predecessor * c + b * c) by IH
+           = (c + predecessor * c) + b * c
+  }
 
 -- Theorem: (a * b) * c = a * (b * c). Induction on a, using
 -- distributivity_right for the successor case.
-theorem Natural.multiply_associative
-        : (a b c : Natural) → (a * b) * c = a * (b * c)
-  | zero, b, c => reflexivity(zero)
-  | successor(predecessor), b, c =>
-      calc (b + predecessor * b) * c
-         = b * c + (predecessor * b) * c
-         = b * c + predecessor * (b * c)
-                by Natural.multiply_associative(predecessor, b, c)
+theorem Natural.multiply_associative (a b c : Natural)
+        : (a * b) * c = a * (b * c) :=
+  by_induction on a with IH {
+    case zero: reflexivity(0)
+    case successor(predecessor):
+        calc (b + predecessor * b) * c
+           = b * c + (predecessor * b) * c
+           = b * c + predecessor * (b * c) by IH
+  }
 
 -- Cancellation on the left of addition. Proof by induction on `a`:
 -- the zero case is definitional (zero + x ≡ x for any x), and the
