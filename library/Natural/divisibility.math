@@ -104,33 +104,43 @@ theorem Natural.divides_add (d a b : Natural)
 --                                    (`d + (1 + d·q₁′) = d + d·q₂′`) and
 --                                    recurse on `q₁′, q₂′`.
 theorem Natural.divides_one_of_consecutive_multiples
-        (d : Natural)
-        : (q1 q2 : Natural)
+        (d q1 : Natural)
+        : (q2 : Natural)
           → successor(d * q1) = d * q2
-          → d ∣ 1
-  | zero, q2, equalityProof =>
-      witness q2 with calc successor(0)
-              = successor(d * 0)
-              = d * q2
-  | successor(q1Predecessor), q2, equalityProof =>
-      cases q2 refining equalityProof {
-        | zero =>
-            absurd(
-                calc successor(d * successor(q1Predecessor))
-                   = d * 0
-                   = 0)
-        | successor(q2Predecessor) =>
-            Natural.divides_one_of_consecutive_multiples(
-                d, q1Predecessor, q2Predecessor,
-                Natural.add_cancel_left(
-                    d, successor(d * q1Predecessor),
-                    d * q2Predecessor,
-                    calc d + successor(d * q1Predecessor)
-                       = successor(d + d * q1Predecessor)
-                       = successor(d * successor(q1Predecessor))
-                       = d * successor(q2Predecessor)
-                       = d + d * q2Predecessor))
+          → d ∣ 1 :=
+  by_induction on q1 with IH {
+    case zero: {
+        take q2 : Natural;
+        suppose successor(d * 0) = d * q2 as equalityProof;
+        witness q2 with calc successor(0)
+                = successor(d * 0)
+                = d * q2
       }
+    case successor(q1Predecessor): {
+        take q2 : Natural;
+        suppose successor(d * successor(q1Predecessor)) = d * q2 as equalityProof;
+        cases q2 refining equalityProof {
+          | zero =>
+              absurd(
+                  calc successor(d * successor(q1Predecessor))
+                     = d * 0
+                     = 0)
+          | successor(q2Predecessor) => {
+              -- Cancel a leading `d` from each side, then recurse on the
+              -- smaller pair via the induction hypothesis.
+              calc d + successor(d * q1Predecessor)
+                 = successor(d + d * q1Predecessor)
+                 = successor(d * successor(q1Predecessor))
+                 = d * successor(q2Predecessor)
+                 = d + d * q2Predecessor
+                as shifted;
+              claim peeled : successor(d * q1Predecessor) = d * q2Predecessor
+                  by Natural.add_cancel_left;
+              IH(q2Predecessor, peeled)
+            }
+        }
+      }
+  }
 
 -- If `d` divides two consecutive numbers `a` and `a + 1`, then `d ∣ 1`.
 -- The witnesses give `a = d · q₁` and `a + 1 = d · q₂`, hence
@@ -140,8 +150,9 @@ theorem Natural.divides_consecutive_implies_one
         : d ∣ 1 := {
   obtain ⟨firstQuotient, aEqualsDtimesFirst⟩ from dDividesA;
   obtain ⟨secondQuotient, successorAEqualsDtimesSecond⟩ from dDividesSuccessorA;
-  Natural.divides_one_of_consecutive_multiples(d, firstQuotient, secondQuotient,
-      calc successor(d * firstQuotient)
-         = successor(a)
-         = d * secondQuotient)
+  calc successor(d * firstQuotient)
+     = successor(a)
+     = d * secondQuotient
+    as consecutive;
+  done by Natural.divides_one_of_consecutive_multiples
 }
