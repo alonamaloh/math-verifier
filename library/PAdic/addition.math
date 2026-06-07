@@ -58,7 +58,17 @@ theorem Rational.sequence.sum_is_padic_cauchy
         (m : Natural)
                  (m_ge_max : Natural.maximum(N_s, N_t) ≤ m)
                  (n : Natural)
-                 (n_ge_max : Natural.maximum(N_s, N_t) ≤ n) ↦
+                 (n_ge_max : Natural.maximum(N_s, N_t) ≤ n) ↦ {
+          claim mGeNs : N_s ≤ m by Natural.le_through_max_left;
+          claim nGeNs : N_s ≤ n by Natural.le_through_max_left;
+          claim mGeNt : N_t ≤ m by Natural.le_through_max_right;
+          claim nGeNt : N_t ≤ n by Natural.le_through_max_right;
+          claim Rational.padic_absolute_value(p, primality, s(m) - s(n))
+                  < Rational.halve(epsilon)
+              by sBound(m, mGeNs, n, nGeNs);
+          claim Rational.padic_absolute_value(p, primality, t(m) - t(n))
+                  < Rational.halve(epsilon)
+              by tBound(m, mGeNt, n, nGeNt);
           calc Rational.padic_absolute_value(
                    p, primality,
                    s(m) + t(m) - (s(n) + t(n)))
@@ -70,21 +80,9 @@ theorem Rational.sequence.sum_is_padic_cauchy
                  + Rational.padic_absolute_value(
                        p, primality, t(m) - t(n))
              < Rational.halve(epsilon) + Rational.halve(epsilon)
-                   by Rational.LessThan.add_strict_strict(
-                          Rational.padic_absolute_value(
-                              p, primality, s(m) - s(n)),
-                          Rational.padic_absolute_value(
-                              p, primality, t(m) - t(n)),
-                          Rational.halve(epsilon),
-                          sBound(m,
-                              Natural.le_through_max_left(N_s, N_t, m, m_ge_max),
-                              n,
-                              Natural.le_through_max_left(N_s, N_t, n, n_ge_max)),
-                          tBound(m,
-                              Natural.le_through_max_right(N_s, N_t, m, m_ge_max),
-                              n,
-                              Natural.le_through_max_right(N_s, N_t, n, n_ge_max)))
+                   by Rational.LessThan.add_strict_strict
              = epsilon
+        }
   }
 
 -- Sum of two packaged p-adic Cauchy sequences.

@@ -80,16 +80,18 @@ theorem CauchyRationalSequence.IsEventuallyNonneg.respect_forward
     witness Natural.maximum(N_a, N_eq) with
         (m : Natural)
                  (mGeMax : Natural.maximum(N_a, N_eq) ≤ m) ↦ {
+          claim mGeNa : N_a ≤ m by Natural.le_through_max_left;
+          claim mGeNeq : N_eq ≤ m by Natural.le_through_max_right;
           claim
                 -Rational.halve(epsilon)
                   < CauchyRationalSequence.sequenceFunction(a, m)
-            by aBound(m, Natural.le_through_max_left(N_a, N_eq, m, mGeMax));
+            by aBound(m, mGeNa);
           claim
                 abs(
                       CauchyRationalSequence.sequenceFunction(a, m)
                       - CauchyRationalSequence.sequenceFunction(b, m))
                   < Rational.halve(epsilon)
-            by eqBound(m, Natural.le_through_max_right(N_a, N_eq, m, mGeMax));
+            by eqBound(m, mGeNeq);
           -- |sf(b, m) - sf(a, m)| < ε/2  (swap inside the abs).
           calc abs(
                        CauchyRationalSequence.sequenceFunction(b, m)
@@ -211,10 +213,10 @@ theorem Rational.sequence.IsEventuallyNonneg.add
     witness Natural.maximum(N_s, N_t) with
         (m : Natural)
                  (mGeMax : Natural.maximum(N_s, N_t) ≤ m) ↦ {
-          claim -Rational.halve(epsilon) < s(m)
-            by sBound(m, Natural.le_through_max_left(N_s, N_t, m, mGeMax));
-          claim -Rational.halve(epsilon) < t(m)
-            by tBound(m, Natural.le_through_max_right(N_s, N_t, m, mGeMax));
+          claim mGeNs : N_s ≤ m by Natural.le_through_max_left;
+          claim mGeNt : N_t ≤ m by Natural.le_through_max_right;
+          claim -Rational.halve(epsilon) < s(m) by sBound(m, mGeNs);
+          claim -Rational.halve(epsilon) < t(m) by tBound(m, mGeNt);
           -- Chain the two ε/2 bounds end-to-end:
           --   -ε = -halve(ε) + -halve(ε)
           --      < s(m) + -halve(ε)    (sAt, added on the right)
@@ -304,14 +306,12 @@ theorem Rational.sequence.equivalent_zero_of_IsEventuallyNonneg_both
         (m : Natural)
                  (mGeMax : Natural.maximum(N_s, N_negS) ≤ m) ↦ {
           -- Lower bound on s(m): -ε < s(m), from sNonneg.
-          claim sLowerAtM : -epsilon < s(m)
-            by sLowerBound(m,
-                   Natural.le_through_max_left(N_s, N_negS, m, mGeMax));
+          claim mGeNs : N_s ≤ m by Natural.le_through_max_left;
+          claim mGeNnegS : N_negS ≤ m by Natural.le_through_max_right;
+          claim sLowerAtM : -epsilon < s(m) by sLowerBound(m, mGeNs);
           -- Lower bound on -s(m): -ε < -s(m), from negSNonneg. Negating
           -- both sides flips the inequality: s(m) < ε.
-          claim -epsilon < -s(m)
-            by negSLowerBound(m,
-                   Natural.le_through_max_right(N_s, N_negS, m, mGeMax));
+          claim -epsilon < -s(m) by negSLowerBound(m, mGeNnegS);
           calc s(m)
              = -(-s(m))
              < -(-epsilon)
