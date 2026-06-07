@@ -104,6 +104,9 @@ POSITIONAL_CALL_CATEGORY = "direct proof-lemma call"
 # formers are excluded); any positional-argument arity counts.
 NAME_CALL_RE = re.compile(r"\b([A-Z][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\(")
 THEOREM_DECL_RE = re.compile(r"\btheorem\s+([A-Za-z_][A-Za-z0-9_.]*)")
+# A `NAME(` immediately preceded by a declaration keyword is the declaration's
+# own binder list (e.g. `theorem Foo.bar(a : T)` with no space), not a call.
+DECL_BEFORE_RE = re.compile(r"\b(?:theorem|definition|axiom|opaque)\s+$")
 # Note: `by substituting eq` is deliberately NOT a leak — it reads as
 # math ("by substituting the equation") and some goals genuinely need it.
 # Only the raw `rewrite(…)` primitive is counted.
@@ -146,6 +149,11 @@ def positional_lemma_calls(text, theorem_names):
     n1 = n2 = n3 = 0
     for match in NAME_CALL_RE.finditer(text):
         if match.group(1) not in theorem_names:
+            continue
+        # Skip the theorem's own DECLARATION: `theorem Foo.bar(a : T)` with no
+        # space before the paren looks like a call, but the parenthesised part
+        # is the binder list, not arguments.
+        if DECL_BEFORE_RE.search(text[:match.start()]):
             continue
         n_args, matched = count_call_arguments(text, match.end() - 1)
         if not matched:
