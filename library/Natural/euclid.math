@@ -57,9 +57,12 @@ theorem NaturalList.productOf_at_least_one
 
 -- No natural number is both at least 2 and at most 1: descend `2 ≤ 1` to
 -- `1 ≤ 0`, which `absurd` refutes.
-theorem Natural.not_two_less_or_equal_one : ¬(2 ≤ 1) :=
-  (twoLessOrEqualOne : 2 ≤ 1) ↦
-    absurd(Natural.less_or_equal_successor_successor_descend(1, 0, twoLessOrEqualOne))
+theorem Natural.not_two_less_or_equal_one : ¬(2 ≤ 1) := {
+  suppose 2 ≤ 1 as twoLessOrEqualOne;
+  claim oneLessOrEqualZero : 1 ≤ 0
+      by Natural.less_or_equal_successor_successor_descend;
+  absurd(oneLessOrEqualZero)
+}
 
 -- 1 is the only divisor of 1. `divides_less_or_equal_or_zero` bounds the
 -- divisor by 1 (the "1 = 0" alternative is vacuous); casing on it rules
@@ -98,8 +101,7 @@ theorem Natural.infinitely_many_primes
   claim 1 ≤ NaturalList.productOf(primes);
   -- Then n ≥ 2, so it has a prime divisor q.
   claim nAtLeastTwo : 2 ≤ n;
-  obtain ⟨q, qIsPrime, qDividesN⟩
-    from Natural.has_prime_divisor(n, nAtLeastTwo);
+  obtain ⟨q, qIsPrime, qDividesN⟩ by Natural.has_prime_divisor;
   -- q is our witness: it is prime, and we show it is not in the list.
   witness q with ⟨qIsPrime, {
     -- Suppose, for contradiction, that q is already listed.
@@ -111,6 +113,7 @@ theorem Natural.infinitely_many_primes
     -- So q = 1; but q ≥ 2 since q is prime, and 2 ≤ 1 is impossible.
     claim qEqualsOne : q = 1;
     claim qAtLeastTwo : 2 ≤ q;
-    Natural.not_two_less_or_equal_one(rewrite(qEqualsOne, qAtLeastTwo))
+    claim 2 ≤ 1 by substituting qEqualsOne;
+    done by Natural.not_two_less_or_equal_one
   }⟩
 }
