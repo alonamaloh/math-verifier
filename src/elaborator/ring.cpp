@@ -2026,6 +2026,15 @@ ExpressionPointer Elaborator::proveAbstractRingAC(
         // proof is re-closed before returning (mirrors elaborateRing's
         // bundled-carrier path).
         size_t binderCount = localBinders.size();
+        // ζ-unfold let-binders first, so a carrier written `Ring.carrier(s)`
+        // with `let s := IntegralDomain.ring(d)` exposes its bundle structure
+        // (needed to source the Phase 4 commutativity witness). The unfolded
+        // forms are ζ-equal to the originals, so the proof still discharges
+        // the original goal (the calc step is checked up to defeq). Mirrors
+        // autoProveCalcStepRaw's endpoint unfolding.
+        carrierType = zetaUnfoldLetBinders(carrierType, localBinders);
+        previousKernel = zetaUnfoldLetBinders(previousKernel, localBinders);
+        nextKernel = zetaUnfoldLetBinders(nextKernel, localBinders);
         ExpressionPointer carrierOpened =
             openOverLocalBinders(carrierType, localBinders, binderCount);
         // The carrier must be the abstract projection `Ring.carrier(s)`.

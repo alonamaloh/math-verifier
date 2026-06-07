@@ -1,0 +1,36 @@
+-- Test/ring_let_bundle_test.math
+--
+-- The `ring` tactic's abstract-ring AC normalizer sources a `·`
+-- commutativity witness from the carrier's bundle (IntegralDomain etc.).
+-- When the carrier is written `Ring.carrier(s)` with `let s := <bundle>`,
+-- the bundle is hidden behind the let-binder; proveAbstractRingAC must
+-- ζ-unfold it to find the witness. This test pins both forms.
+
+module Test.ring_let_bundle_test
+
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Algebra.integral_domain
+
+-- Baseline: carrier spelled directly as `Ring.carrier(IntegralDomain.ring(d))`
+-- — the witness is sourced without any ζ-unfold.
+theorem Test.ring_commute_direct (d : IntegralDomain)
+        (a b : Ring.carrier(IntegralDomain.ring(d)))
+        : Ring.multiply(IntegralDomain.ring(d), a, b)
+          = Ring.multiply(IntegralDomain.ring(d), b, a) :=
+  ring
+
+-- The case the ζ-unfold enables: the multiplication is written over a
+-- let-bound `s := IntegralDomain.ring(d)`, so the goal's carrier is
+-- `Ring.carrier(s)`. Commutative `·` rearrangement still closes by `ring`.
+theorem Test.ring_commute_let_bound (d : IntegralDomain)
+        (a b c : Ring.carrier(IntegralDomain.ring(d)))
+        : Ring.multiply(IntegralDomain.ring(d),
+              Ring.multiply(IntegralDomain.ring(d), a, b), c)
+          = Ring.multiply(IntegralDomain.ring(d),
+              Ring.multiply(IntegralDomain.ring(d), c, b), a) := {
+  let s : Ring := IntegralDomain.ring(d);
+  claim Ring.multiply(s, Ring.multiply(s, a, b), c)
+        = Ring.multiply(s, Ring.multiply(s, c, b), a) by ring;
+}
