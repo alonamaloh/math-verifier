@@ -21,39 +21,54 @@ definition Natural.maximum : Natural → Natural → Natural
         | successor(m) => successor(Natural.maximum(k, m))
       }
 
--- a ≤ max(a, b). Induct on a, case-split b in the successor case.
-theorem Natural.left_le_max : (a b : Natural) → a ≤ Natural.maximum(a, b)
-  | zero, b =>
-      Natural.zero_least(b)
-  | successor(k), b =>
-      cases b {
-        | zero =>
-            -- max(s(k), 0) = s(k); s(k) ≤ s(k).
-            LessOrEqual.reflexivity(successor(k))
-        | successor(m) =>
-            -- max(s(k), s(m)) = s(max(k, m)). s(k) ≤ s(max(k, m))
-            -- from IH on (k, m) via successor_less_or_equal_successor.
-            Natural.successor_less_or_equal_successor(
-                k, Natural.maximum(k, m),
-                Natural.left_le_max(k, m))
+-- a ≤ max(a, b). By induction on a (b stays universally quantified so the IH
+-- applies at the inner case-split's m), case-split b in the successor case.
+theorem Natural.left_le_max (a : Natural)
+        : (b : Natural) → a ≤ Natural.maximum(a, b) :=
+  by_induction on a with IH {
+    case zero: {
+        -- max(0, b) ≡ b, and zero is least.
+        take b : Natural;
+        goal by Natural.zero_least
       }
+    case successor(k): {
+        take b : Natural;
+        cases b {
+          | zero =>
+              -- max(s(k), 0) ≡ s(k).
+              LessOrEqual.reflexivity(successor(k))
+          | successor(m) => {
+              -- max(s(k), s(m)) ≡ s(max(k, m)); successor-monotone on the IH.
+              claim k ≤ Natural.maximum(k, m) since IH(m);
+              done by Natural.successor_less_or_equal_successor
+            }
+        }
+      }
+  }
 
 -- b ≤ max(a, b). Symmetric induction.
-theorem Natural.right_le_max : (a b : Natural) → b ≤ Natural.maximum(a, b)
-  | zero, b =>
-      -- max(0, b) = b.
-      LessOrEqual.reflexivity(b)
-  | successor(k), b =>
-      cases b {
-        | zero =>
-            -- max(s(k), 0) = s(k); 0 ≤ s(k).
-            Natural.zero_least(successor(k))
-        | successor(m) =>
-            -- max(s(k), s(m)) = s(max(k, m)); want s(m) ≤ s(max(k, m)).
-            Natural.successor_less_or_equal_successor(
-                m, Natural.maximum(k, m),
-                Natural.right_le_max(k, m))
+theorem Natural.right_le_max (a : Natural)
+        : (b : Natural) → b ≤ Natural.maximum(a, b) :=
+  by_induction on a with IH {
+    case zero: {
+        -- max(0, b) ≡ b.
+        take b : Natural;
+        LessOrEqual.reflexivity(b)
       }
+    case successor(k): {
+        take b : Natural;
+        cases b {
+          | zero =>
+              -- max(s(k), 0) ≡ s(k); 0 is least.
+              goal by Natural.zero_least
+          | successor(m) => {
+              -- max(s(k), s(m)) ≡ s(max(k, m)); successor-monotone on the IH.
+              claim m ≤ Natural.maximum(k, m) since IH(m);
+              done by Natural.successor_less_or_equal_successor
+            }
+        }
+      }
+  }
 
 -- max(a, b) ≤ x ⇒ a ≤ x. Composes left_le_max with transitivity.
 -- Pairs naturally with le_through_max_right to project either side of a
