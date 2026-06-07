@@ -207,6 +207,12 @@ struct SurfaceCases {
     // resulting cases to (h1, h2, …) from the outer context. Compatible
     // with `with equalityHypothesisName` (both can be used together).
     std::vector<std::string> refiningNames;
+    // `by_induction on X with IH { … }` — the user-chosen induction-
+    // hypothesis name. The parser also appends it as a trailing pattern
+    // arg to each recursive constructor case (where it names that case's
+    // hypothesis); recorded here too so the elaborator can recognise — and
+    // for a NON-recursive constructor, drop — that spurious trailing name.
+    std::string inductionHypothesisName;
 };
 
 // `sorry` — placeholder for an unwritten proof. Desugars at elaboration
@@ -772,9 +778,11 @@ inline SurfacePatternPointer makeSurfacePatternTuple(
 inline SurfaceExpressionPointer makeSurfaceCases(
     SurfaceExpressionPointer scrutinee,
     std::vector<SurfaceCasesClause> clauses,
-    int line, int column) {
+    int line, int column,
+    std::string inductionHypothesisName = {}) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
-        SurfaceCases{std::move(scrutinee), std::move(clauses), {}, {}},
+        SurfaceCases{std::move(scrutinee), std::move(clauses), {}, {},
+                      std::move(inductionHypothesisName)},
         line, column});
 }
 
@@ -810,7 +818,7 @@ inline SurfaceExpressionPointer makeSurfaceCasesWithEqualityHypothesis(
     int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceCases{std::move(scrutinee), std::move(clauses),
-                      std::move(equalityHypothesisName), {}},
+                      std::move(equalityHypothesisName), {}, {}},
         line, column});
 }
 
@@ -819,11 +827,13 @@ inline SurfaceExpressionPointer makeSurfaceCasesWithRefining(
     std::vector<SurfaceCasesClause> clauses,
     std::string equalityHypothesisName,
     std::vector<std::string> refiningNames,
-    int line, int column) {
+    int line, int column,
+    std::string inductionHypothesisName = {}) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceCases{std::move(scrutinee), std::move(clauses),
                       std::move(equalityHypothesisName),
-                      std::move(refiningNames)},
+                      std::move(refiningNames),
+                      std::move(inductionHypothesisName)},
         line, column});
 }
 

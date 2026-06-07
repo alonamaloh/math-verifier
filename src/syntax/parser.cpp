@@ -3010,13 +3010,15 @@ private:
         if (refiningNames.empty()) {
             return makeSurfaceCases(
                 std::move(scrutinee), std::move(clauses),
-                inductionToken.line, inductionToken.column);
+                inductionToken.line, inductionToken.column,
+                ihName);
         }
         return makeSurfaceCasesWithRefining(
             std::move(scrutinee), std::move(clauses),
             /*equalityHypothesisName=*/std::string(),
             std::move(refiningNames),
-            inductionToken.line, inductionToken.column);
+            inductionToken.line, inductionToken.column,
+            ihName);
     }
 
     // `claim P by cases on E [refining …] { case zero: …  case
@@ -3272,13 +3274,15 @@ private:
         if (refiningNames.empty()) {
             return makeSurfaceCases(
                 std::move(scrutinee), std::move(clauses),
-                byToken.line, byToken.column);
+                byToken.line, byToken.column,
+                ihName);
         }
         return makeSurfaceCasesWithRefining(
             std::move(scrutinee), std::move(clauses),
             /*equalityHypothesisName=*/std::string(),
             std::move(refiningNames),
-            byToken.line, byToken.column);
+            byToken.line, byToken.column,
+            ihName);
     }
 
     // `by_strong_induction on E with subject, ih { body }` —

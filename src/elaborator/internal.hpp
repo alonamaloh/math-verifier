@@ -800,7 +800,12 @@ private:
         const std::vector<LevelPointer>& inductiveUniverseArguments,
         ExpressionPointer motive,
         const std::vector<ExpressionPointer>& parameterValues,
-        const std::vector<LocalBinder>& outerBinderStack);
+        const std::vector<LocalBinder>& outerBinderStack,
+        // The `by_induction … with IH` hypothesis name, if any. The parser
+        // appends it as a trailing pattern arg to EVERY case; for a
+        // non-recursive constructor (no IH slot) that trailing name is
+        // spurious and is dropped here. Empty for ordinary pattern matches.
+        const std::string& injectedInductionHypothesisName = "");
 
     // Builds the body for one outer case of a pattern-match definition,
     // walking the user's pattern positions from `patternIndex` onwards.

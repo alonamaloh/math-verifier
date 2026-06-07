@@ -451,7 +451,8 @@ ExpressionPointer Elaborator::buildCaseLambda(
         const std::vector<LevelPointer>& inductiveUniverseArguments,
         ExpressionPointer motive,
         const std::vector<ExpressionPointer>& parameterValues,
-        const std::vector<LocalBinder>& outerBinderStack) {
+        const std::vector<LocalBinder>& outerBinderStack,
+        const std::string& injectedInductionHypothesisName) {
 
         Frame frame(*this,
             "case for '" + constructorName + "' of '"
@@ -623,6 +624,16 @@ ExpressionPointer Elaborator::buildCaseLambda(
         size_t recursiveCount = 0;
         for (const auto& constructorArgument : constructorArguments) {
             if (constructorArgument.isRecursive) ++recursiveCount;
+        }
+        // `by_induction … with IH` makes the parser append the IH name to
+        // every case pattern. A non-recursive constructor has no IH slot to
+        // absorb it, so that trailing name is spurious — drop it. (A
+        // recursive constructor keeps it; it names that case's hypothesis.)
+        if (!injectedInductionHypothesisName.empty()
+            && recursiveCount == 0
+            && destructuredNames.size() == constructorArguments.size() + 1
+            && destructuredNames.back() == injectedInductionHypothesisName) {
+            destructuredNames.pop_back();
         }
         size_t minNames = constructorArguments.size();
         size_t maxNames = constructorArguments.size() + recursiveCount;

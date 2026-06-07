@@ -701,7 +701,8 @@ ExpressionPointer Elaborator::elaborateCasesWithRefining(
             wrappedClauses.push_back(std::move(wrappedClause));
         }
         SurfaceExpressionPointer syntheticCases = makeSurfaceCases(
-            cases.scrutinee, std::move(wrappedClauses), line, column);
+            cases.scrutinee, std::move(wrappedClauses), line, column,
+            cases.inductionHypothesisName);
 
         // (4) Elaborate the synthetic cases against the wrapped Pi
         // chain.
@@ -1328,7 +1329,7 @@ ExpressionPointer Elaborator::elaborateCasesExpressionInner(
             caseLambdas.push_back(buildCaseLambda(
                 syntheticDeclaration, constructorName, constant->name,
                 inductiveUniverseArguments, motive, parameterValues,
-                localBinders));
+                localBinders, cases.inductionHypothesisName));
         }
 
         // Assemble the recursor call. For large-eliminating recursors
