@@ -58,9 +58,13 @@ theorem Natural.distance_self (a : Natural) : Natural.distance(a, a) = 0 :=
 theorem Natural.distance_symmetric (a : Natural)
         : (b : Natural) → Natural.distance(a, b) = Natural.distance(b, a) :=
   by_induction on a with IH {
-    case zero:
-        (b : Natural) ↦
-          Natural.distance_zero_right(b)
+    case zero: {
+        take b : Natural;
+        -- distance(0, b) ≡ b ≡ distance(b, 0).
+        calc Natural.distance(0, b)
+           = b
+           = Natural.distance(b, 0)
+      }
     case successor(k):
         (b : Natural) ↦
           cases b {
@@ -162,12 +166,12 @@ theorem Natural.le_add_distance (a : Natural)
             case zero:
                 -- 1+k ≤ 0 + distance(1+k, 0) = 1+k. Reflexive.
                 LessOrEqual.reflexivity(1 + k)
-            case successor(m):
-                -- 1+k ≤ (1+m) + distance(1+k, 1+m). Both sides
-                -- have a leading successor we can peel; IH(m)
-                -- gives k ≤ m + distance(k, m), then bump via
-                -- successor_less_or_equal_successor.
-                Natural.successor_less_or_equal_successor(?, ?, IH(m))
+            case successor(m): {
+                -- 1+k ≤ (1+m) + distance(1+k, 1+m); peel the leading
+                -- successor and bump the IH (k ≤ m + distance(k, m)).
+                claim k ≤ m + Natural.distance(k, m) since IH(m);
+                done by Natural.successor_less_or_equal_successor
+              }
           }
   }
 
