@@ -476,27 +476,79 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         // the goal, warn that the hint is redundant. A `since` hint is an
         // intentional explanation — exempt it from the check.
         if (reportRedundantBy_ && !claim.byIsExplanation) {
+            // Cap the budget so each re-proof bails early; exceeding it
+            // (the hint is load-bearing for speed) yields no proof. The guard
+            // also bounds the bare-citation re-elaboration below (its backward
+            // chaining respects autoProveBudgetLimit_).
+            RedundancyBudgetGuard budgetGuard(*this);
             ExpressionPointer autoAttempt;
-            {
-                // Cap the budget so the re-proof bails early; exceeding it
-                // (the hint is load-bearing for speed) yields no proof.
-                RedundancyBudgetGuard budgetGuard(*this);
-                try {
-                    autoAttempt = autoProveClaim(
-                        goalClosed, localBinders, line);
-                } catch (const ElaborateError&) {
-                    autoAttempt = nullptr;
-                } catch (const TypeError&) {
-                    autoAttempt = nullptr;
-                } catch (const AutoProverBudgetError&) {
-                    autoAttempt = nullptr;
-                }
+            try {
+                autoAttempt = autoProveClaim(
+                    goalClosed, localBinders, line);
+            } catch (const ElaborateError&) {
+                autoAttempt = nullptr;
+            } catch (const TypeError&) {
+                autoAttempt = nullptr;
+            } catch (const AutoProverBudgetError&) {
+                autoAttempt = nullptr;
             }
             if (autoAttempt) {
                 std::cerr << "warning: " << moduleName_
                     << ":" << line
                     << ": redundant `by` on `claim` — auto-prover"
                        " closes the goal without help\n";
+            } else if (claim.byHint) {
+                // The whole `by` isn't removable, but maybe its ARGUMENTS are:
+                // `claim T by Lemma(args)` where `by Lemma` alone (args
+                // inferred from the goal, premises discharged from context or
+                // backward-chained) would also close it. Mirrors the calc-step
+                // args check in calc.cpp. Only a real theorem cited with
+                // explicit args; congruenceOf has its own dedicated check.
+                auto* surfApp = std::get_if<SurfaceApplication>(
+                    &claim.byHint->node);
+                auto* head = surfApp
+                    ? std::get_if<SurfaceIdentifier>(
+                          &surfApp->function->node)
+                    : nullptr;
+                if (surfApp && !surfApp->arguments.empty()
+                    && head && head->universeArgs.empty()
+                    && head->qualifiedName != "congruenceOf"
+                    && environment_.lookup(head->qualifiedName) != nullptr) {
+                    ExpressionPointer bareAttempt = nullptr;
+                    try {
+                        SurfaceExpressionPointer bare =
+                            makeSurfaceIdentifier(
+                                head->qualifiedName, {}, line, 0);
+                        bareAttempt = elaborateExpression(
+                            *bare, localBinders, goalClosed);
+                    } catch (const ElaborateError&) {
+                        bareAttempt = nullptr;
+                    } catch (const TypeError&) {
+                        bareAttempt = nullptr;
+                    } catch (const AutoProverBudgetError&) {
+                        bareAttempt = nullptr;
+                    }
+                    bool valid = false;
+                    if (bareAttempt && !containsFreeVariable(bareAttempt)) {
+                        try {
+                            ExpressionPointer t = inferTypeInLocalContext(
+                                localBinders, bareAttempt);
+                            ExpressionPointer g = openOverLocalBinders(
+                                goalClosed, localBinders, localBinders.size());
+                            Context c = buildContextFromLocalBinders(
+                                localBinders);
+                            valid = isDefinitionallyEqual(
+                                environment_, c, t, g);
+                        } catch (...) { valid = false; }
+                    }
+                    if (valid) {
+                        std::cerr << "warning: " << moduleName_
+                            << ":" << line
+                            << ": arguments to `" << head->qualifiedName
+                            << "` are inferable from the goal — `by "
+                            << head->qualifiedName << "` alone suffices\n";
+                    }
+                }
             }
         }
         return result;
