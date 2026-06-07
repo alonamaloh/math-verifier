@@ -10,8 +10,10 @@ This is the number that `make leak-ratchet` / `make check` guard.
 Counted categories fall into three families:
 
   1. CIC VOCABULARY — substrate tokens (`Quotient.`, `congruenceOf`,
-     `transport_proposition`, `Equality.symmetry`, `False.eliminate_proposition`,
-     `Sort`, universe annotations, …). The original north-star metric.
+     `transport_proposition`, `rewrite`, `Equality.symmetry`,
+     `False.eliminate_proposition`, `Sort`, universe annotations, …). The
+     original north-star metric. (`substituting` is NOT counted — it reads
+     as math; only the raw `rewrite(…)` primitive does.)
 
   2. STRUCTURAL SMELLS — non-vocabulary patterns that still read as plumbing,
      e.g. `claim NAME : T by calc …` (the calc's endpoints already *are* T —
@@ -63,6 +65,10 @@ CATEGORIES = {
     # Hand-written congruence / transport where calc / auto should suffice.
     "congruenceOf":            re.compile(r"\bcongruenceOf\b"),
     "transport_proposition":   re.compile(r"\btransport_proposition\b"),
+    # Raw transport wearing a function-call costume: `rewrite(eq, term)`
+    # rewrites a term/goal along an equation. A calc step (or a by-less
+    # claim) reads as the substitution it is; the primitive should not show.
+    "rewrite":                 re.compile(r"\brewrite\b"),
     "Equality.symmetry":       re.compile(r"\bEquality\.symmetry\b"),
     "Equality.transitivity":   re.compile(r"\bEquality\.transitivity\b"),
     # Prop-elimination plumbing that should be hidden (WS7).
@@ -96,6 +102,9 @@ POSITIONAL_CALL_MIN_ARGS = 3
 # arguments.
 NAME_CALL_RE = re.compile(r"\b([A-Z][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\(")
 THEOREM_DECL_RE = re.compile(r"\btheorem\s+([A-Za-z_][A-Za-z0-9_.]*)")
+# Note: `by substituting eq` is deliberately NOT a leak — it reads as
+# math ("by substituting the equation") and some goals genuinely need it.
+# Only the raw `rewrite(…)` primitive is counted.
 
 COMMENT_RE = re.compile(r"--.*$")
 

@@ -169,11 +169,16 @@ converted (the `Logic/excluded_middle` uses are foundational, excluded).
   (reverse rewrite) and calc-flips. Needs case-by-case (calc /
   `substituting` / `linear_combination`); some are genuinely a flip.
 - `congruenceOf` (23): → one-step `calc … by <eq>` or element interface.
-- `transport_proposition` (14): → `substituting` / `rewrite`.
+- `transport_proposition` (14): → `calc` or `by substituting eq` (NOT raw
+  `rewrite` — that's now a leak too).
+- `rewrite` (124): NEW counted category. Raw `rewrite(eq, term)` is
+  transport plumbing → `calc` step or `by substituting eq`. Note:
+  `substituting` itself is deliberately NOT a leak (reads as math, and
+  some term-position transports genuinely need it).
 - `Quotient.` (107): biggest; needs `construction` / `by_representatives`
   intro sugar — the deepest rewrite.
 
-LEAK_BUDGET ratcheted 1346 → **1226**.
+LEAK_BUDGET ratcheted 1346 → 1226 → **1350** (after adding `rewrite`).
 
 ## Reducible fraction (running estimate)
 

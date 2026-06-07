@@ -182,6 +182,15 @@ Pick `as NAME` only when a later step or claim spells the name out.
 
 ## `rewrite(lemma)` / `rewrite(lemma, term)`
 
+**Prefer `calc` or `by substituting eq`.** Raw `rewrite(…)` is transport
+plumbing in a function-call costume and is now counted as a CIC leak by
+`scripts/cic_leak_report`. A `calc` step absorbs `=` rewrites and reads as
+the chain it is; `claim T by substituting eq` reads as "by substituting the
+equation" (and is *not* a leak). Reach for raw `rewrite(eq, term)` only
+when neither fits — typically a transport in a non-`calc` term position
+where `substituting` cannot be threaded. The mechanics below are for those
+residual cases.
+
 Two forms, disambiguated by argument count.
 
 **1-arg, in `calc` context**: `by rewrite(L)` for `L : a = b` finds
