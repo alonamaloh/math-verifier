@@ -1,14 +1,37 @@
+-- Test/backward_chaining_test.math
+--
+-- Exercises backward-chaining discharge of an argument-free citation
+-- `by Lemma` whose premise the goal does not directly supply. With
+-- MATH_BACKWARD_CHAINING=0 these fail (the citation falls through to the
+-- bare lemma); on (the default) they verify.
+
 module Test.backward_chaining_test
+
 import Natural.basics
 import Natural.order
 import Natural.add_order
+import Natural.maximum
 
--- (A) by-less transitivity: does the bridge prove a ≤ c from h1, h2?
+-- (A) by-less transitivity: the bridge proves a ≤ c from h1, h2.
 theorem Test.bw_bridge (a b c : Natural) (h1 : a ≤ b) (h2 : b ≤ c) : a ≤ c := {
   claim a ≤ c;
 }
 
--- (B) backward-chaining citation: le_antisymmetric needs a≤c (bridge) and c≤a (h3).
+-- (B) determined-premise backward chaining (Step 5d): le_antisymmetric needs
+-- a ≤ c and c ≤ a. c ≤ a is the hypothesis h3; a ≤ c is NOT in context but
+-- the transitivity bridge proves it from h1, h2.
 theorem Test.bw_antisym (a b c : Natural) (h1 : a ≤ b) (h2 : b ≤ c) (h3 : c ≤ a) : a = c := {
   claim a = c by Natural.le_antisymmetric;
+}
+
+-- (C) UNDETERMINED-premise backward chaining (Step 5e): le_through_max_left's
+-- premise `max(a, b) ≤ x` introduces `b`, which the conclusion `a ≤ x` does
+-- not pin. Citing it argument-free against `max(max(p,q),r) ≤ x` must apply
+-- the lemma AGAIN to the premise and unify the deeper premise against `h`,
+-- solving the otherwise-free `b`.
+theorem Test.bw_nested_max
+        (p q r x : Natural)
+        (h : Natural.maximum(Natural.maximum(p, q), r) ≤ x)
+        : p ≤ x := {
+  claim p ≤ x by Natural.le_through_max_left;
 }

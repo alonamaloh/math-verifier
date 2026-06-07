@@ -329,6 +329,124 @@ ExpressionPointer Elaborator::tryLemmaByConclusion(
         return call;
     }
 
+ExpressionPointer Elaborator::tryResolvePremiseSlot(
+        ExpressionPointer slotTypeClosed,
+        const std::vector<LocalBinder>& localBinders,
+        std::set<std::string>& metavariableNames,
+        std::map<std::string, ExpressionPointer>& assignment,
+        int depth, int line) {
+        autoProveSpend(1);
+        if (depth >= kBackwardChainDepthCap) return nullptr;
+        // Candidate lemmas by conclusion head. The slot may still contain
+        // parent metavar free variables; computeGoalHits's head filter +
+        // first-order match treat them as opaque, which is what we want (a
+        // metavar in an ARGUMENT position doesn't change the conclusion head).
+        ExpressionPointer slotOpened;
+        try {
+            slotOpened = openOverLocalBinders(
+                slotTypeClosed, localBinders, localBinders.size());
+        } catch (...) { return nullptr; }
+        std::string head;
+        std::vector<LemmaSearchHit> hits;
+        try {
+            static const std::set<std::string> noExclusions;
+            hits = computeGoalHits(environment_, slotOpened, head, noExclusions);
+        } catch (...) { return nullptr; }
+        int tried = 0;
+        for (const auto& hit : hits) {
+            if (tried >= kBackwardChainCandidateCap) break;
+            // In-scope lemmas only (computeGoalHits over environment_ already
+            // ensures this, but be explicit).
+            if (!environment_.lookup(hit.name)) continue;
+            ++tried;
+            ExpressionPointer proof = trySubLemmaSharingMetavars(
+                hit.name, hit.declaredType, slotTypeClosed, localBinders,
+                metavariableNames, assignment, line);
+            if (proof) return proof;
+        }
+        return nullptr;
+    }
+
+ExpressionPointer Elaborator::trySubLemmaSharingMetavars(
+        const std::string& name,
+        ExpressionPointer lemmaType,
+        ExpressionPointer slotTypeClosed,
+        const std::vector<LocalBinder>& localBinders,
+        std::set<std::string>& metavariableNames,
+        std::map<std::string, ExpressionPointer>& assignment,
+        int line) {
+        autoProveSpend(1);
+        int totalPi = countLeadingPis(lemmaType);
+        if (totalPi == 0) return nullptr;
+        std::vector<SurfaceExpressionPointer> holeArgs;
+        for (int i = 0; i < totalPi; ++i) {
+            holeArgs.push_back(makeSurfaceHole(line, 0));
+        }
+        // Apply the candidate as a sub-citation that SHARES the parent's
+        // metavar set (so a leaf premise unification can solve a parent hole)
+        // and reports which parent holes it solved. The sub-call's own Step 5e
+        // is bounded by backwardChainingDepth_ (incremented here).
+        std::map<std::string, ExpressionPointer> solvedInherited;
+        std::vector<ExpressionPointer> resolved;
+        ++backwardChainingDepth_;
+        // Depth-tag the sub-call's diagnostic name so its fresh hole names
+        // (`_hole_i_<diag>`) never collide with the parent's — crucial when a
+        // lemma is applied to its own premise (self-application).
+        std::string subDiag =
+            name + "@bc" + std::to_string(backwardChainingDepth_);
+        try {
+            resolved = inferCallWithHoles(
+                subDiag, lemmaType, holeArgs, localBinders, slotTypeClosed,
+                line, &metavariableNames, &solvedInherited);
+        } catch (...) {
+            --backwardChainingDepth_;
+            return nullptr;
+        }
+        --backwardChainingDepth_;
+        // Compose the parent assignment with the holes this sub-call solved,
+        // then substitute it (to a fixpoint) so the proof term and slot type
+        // carry no leftover metavar free variables.
+        std::map<std::string, ExpressionPointer> merged = assignment;
+        for (const auto& kv : solvedInherited) {
+            if (!merged.count(kv.first)) merged[kv.first] = kv.second;
+        }
+        auto resolveFully = [&](ExpressionPointer e) {
+            for (int k = 0; k <= kBackwardChainDepthCap + 1
+                            && containsFreeVariable(e); ++k) {
+                e = substituteFreeVariables(e, merged);
+            }
+            return e;
+        };
+        ExpressionPointer call = makeConstant(name, {});
+        for (auto& argument : resolved) {
+            call = makeApplication(std::move(call), resolveFully(argument));
+        }
+        if (containsFreeVariable(call)) return nullptr;
+        // The slot, with parent holes now substituted, must be hole-free and
+        // the built proof must actually have that type (soundness backstop;
+        // the kernel re-checks the whole citation afterwards regardless).
+        ExpressionPointer slotResolved = resolveFully(slotTypeClosed);
+        if (containsFreeVariable(slotResolved)) return nullptr;
+        try {
+            ExpressionPointer inferredOpened =
+                inferTypeInLocalContext(localBinders, call);
+            ExpressionPointer slotOpened = openOverLocalBinders(
+                slotResolved, localBinders, localBinders.size());
+            Context context = buildContextFromLocalBinders(localBinders);
+            if (!isDefinitionallyEqual(environment_, context,
+                                        inferredOpened, slotOpened)) {
+                return nullptr;
+            }
+        } catch (...) {
+            return nullptr;
+        }
+        // Commit the parent-hole solutions (only now, on full success).
+        for (const auto& kv : solvedInherited) {
+            if (!assignment.count(kv.first)) assignment[kv.first] = kv.second;
+        }
+        return call;
+    }
+
 ExpressionPointer Elaborator::tryContextFactMatch(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,

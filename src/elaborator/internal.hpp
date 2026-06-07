@@ -1094,6 +1094,40 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line);
 
+    // General backward chaining (inferCallWithHoles Step 5e). Discharge a
+    // premise slot that STILL mentions an unresolved parent metavar by
+    // applying ONE in-scope lemma whose conclusion unifies with the slot and
+    // whose own premises discharge (from context, or recursively). The
+    // `metavariableNames`/`assignment` are the PARENT's, passed by reference;
+    // a leaf unification that solves a parent hole is committed into
+    // `assignment` (only on full success). Returns a proof of `slotTypeClosed`
+    // (closed over localBinders), or nullptr.
+    ExpressionPointer tryResolvePremiseSlot(
+        ExpressionPointer slotTypeClosed,
+        const std::vector<LocalBinder>& localBinders,
+        std::set<std::string>& metavariableNames,
+        std::map<std::string, ExpressionPointer>& assignment,
+        int depth, int line);
+
+    // Per-candidate worker for tryResolvePremiseSlot: trial-apply
+    // `name : lemmaType` to the slot, sharing the parent metavar context.
+    ExpressionPointer trySubLemmaSharingMetavars(
+        const std::string& name,
+        ExpressionPointer lemmaType,
+        ExpressionPointer slotTypeClosed,
+        const std::vector<LocalBinder>& localBinders,
+        std::set<std::string>& metavariableNames,
+        std::map<std::string, ExpressionPointer>& assignment,
+        int line);
+
+    // Bounds for backward chaining (Step 5d/5e): recursion depth and
+    // candidate lemmas tried per slot per level. Depth 2 suffices for the
+    // doubly-nested projections in practice (e.g. a `le_through_max` chain
+    // over `max(max(a,b), max(c,d)) ≤ x`); each extra level multiplies the
+    // search by the candidate cap, so keep it tight.
+    static constexpr int kBackwardChainDepthCap = 2;
+    static constexpr int kBackwardChainCandidateCap = 8;
+
     ExpressionPointer tryContextFactMatch(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
@@ -3696,13 +3730,21 @@ private:
     //
     // Returns the resolved arg values by position. Errors if any hole
     // remains unassigned (with a diagnostic message naming the position).
+    // `inheritedMetavars` (optional): names of the CALLER's still-unresolved
+    // hole metavariables, seeded into this call's `metavariableNames` so that
+    // unifying a leaf premise against a context hypothesis can solve them
+    // (general backward chaining — Step 5e). On return, any of those names
+    // this call solved are copied into `*solvedInheritedOut`. Both default
+    // null (the normal citation path is byte-for-byte unchanged).
     std::vector<ExpressionPointer> inferCallWithHoles(
         const std::string& diagnosticName,
         ExpressionPointer instantiatedFunctionType,
         const std::vector<SurfaceExpressionPointer>& surfaceArgs,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line);
+        int line,
+        const std::set<std::string>* inheritedMetavars = nullptr,
+        std::map<std::string, ExpressionPointer>* solvedInheritedOut = nullptr);
 
     // Constructor-specific wrapper around `inferLeadingArguments`. Handles
     // the universe-argument plumbing and assembles the final constructor
@@ -4552,13 +4594,14 @@ private:
     // Stage-1 statements-only mode (skip proof bodies). See constructor.
     bool statementsOnly_ = false;
     int autoProveDepth_ = 0;
-    // Recursion guard for backward-chaining discharge (inferCallWithHoles
-    // Step 5d): when a cited lemma's premise can't be discharged from
-    // context, we try to PROVE it with the auto-prover (which may apply
-    // another lemma and discharge ITS premises from context). Held > 0
-    // while that sub-proof runs so the inner lemma application does not
-    // itself trigger another backward-chaining round — bounding the search
-    // to a single level (depth-1). See inferCallWithHoles.
+    // Depth counter for backward-chaining discharge (inferCallWithHoles
+    // Steps 5d/5e): when a cited lemma's premise can't be discharged from a
+    // ready-made hypothesis, we try to PROVE it — via the auto-prover (5d,
+    // determined slots) or by applying another lemma whose own premises
+    // discharge recursively (5e, metavar-containing slots). Incremented once
+    // per sub-application so the recursion is bounded by kBackwardChainDepthCap.
+    // Both 5d and 5e are also gated to autoProveDepth_==0 (never fire inside
+    // an auto-proof). See inferCallWithHoles.
     int backwardChainingDepth_ = 0;
     // Recursion guard for the symmetry-flip tactic: proving `x = y` by
     // proving `y = x` and wrapping in symmetry must not flip back to

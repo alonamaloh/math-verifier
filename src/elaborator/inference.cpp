@@ -702,7 +702,9 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
         const std::vector<SurfaceExpressionPointer>& surfaceArgs,
         const std::vector<LocalBinder>& localBinders,
         ExpressionPointer expectedType,
-        int line) {
+        int line,
+        const std::set<std::string>* inheritedMetavars,
+        std::map<std::string, ExpressionPointer>* solvedInheritedOut) {
 
         lastDischarges_.clear();
         // Step 1: walk the function's Pi chain. At each position, allocate
@@ -739,6 +741,19 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
         }
         // cursor is the result type with all positions opened as FVs.
         ExpressionPointer resultTypePattern = cursor;
+
+        // Backward chaining (Step 5e): the caller's still-unresolved holes are
+        // ADDITIONAL solvable metavariables, but ONLY during premise discharge
+        // (5c/5e) — never during conclusion/forward unification (Steps 2-4),
+        // where they belong to the goal and must stay rigid (otherwise a
+        // conclusion like `a := f(?inherited)` would self-unify `?inherited`
+        // against itself and lock it). So Steps 2-4 use `metavariableNames`
+        // (this call's own holes); the discharge steps use `dischargeMetavars`.
+        std::set<std::string> dischargeMetavars = metavariableNames;
+        if (inheritedMetavars) {
+            dischargeMetavars.insert(inheritedMetavars->begin(),
+                                     inheritedMetavars->end());
+        }
 
         // Step 2: backward inference. Unify the result type pattern
         // against the expected type to fix as many hole metavariables
@@ -994,16 +1009,28 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                         try {
                             unifyConstructorParameters(
                                 slotOpened, candidateType,
-                                metavariableNames, trial, 0, &binderStack);
+                                dischargeMetavars, trial, 0, &binderStack);
                         } catch (...) { continue; }
                         // Confirm the solved holes make the slot defeq the
                         // candidate (so the hypothesis really proves it).
                         ExpressionPointer slotResolved;
                         try {
-                            slotResolved = openOverLocalBinders(
-                                substituteFreeVariables(
-                                    piDomains[i], trial),
-                                localBinders, N);
+                            // Fixpoint substitution: a hole may be solved to a
+                            // value that itself mentions another (later-solved)
+                            // hole — e.g. backward chaining where `a := f(?inh)`
+                            // and `?inh` is solved by this very unification. A
+                            // single pass would leave `?inh` and fail the defeq
+                            // check; iterate until stable (bounded). Idempotent
+                            // when there is no such nesting (the normal path).
+                            ExpressionPointer sub = piDomains[i];
+                            for (int pass = 0; pass < 4; ++pass) {
+                                ExpressionPointer next =
+                                    substituteFreeVariables(sub, trial);
+                                if (!containsFreeVariable(next)) { sub = next; break; }
+                                sub = next;
+                            }
+                            slotResolved =
+                                openOverLocalBinders(sub, localBinders, N);
                         } catch (...) { continue; }
                         bool eq;
                         try {
@@ -1063,7 +1090,8 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
             return !(v && std::string(v) == "0");
         }();
         if (!unresolved.empty() && backwardChainingEnabled
-            && backwardChainingDepth_ == 0 && autoProveDepth_ == 0) {
+            && backwardChainingDepth_ < kBackwardChainDepthCap
+            && autoProveDepth_ == 0) {
             std::set<std::string> stillUnresolvedNames;
             for (size_t idx : unresolved) {
                 stillUnresolvedNames.insert(argFreshNames[idx]);
@@ -1114,6 +1142,84 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                 }
             }
             unresolved = std::move(remaining);
+        }
+        // Step 5e (general backward chaining): a PROOF slot that STILL mentions
+        // an unresolved metavar (so 5b/5c/5d skipped it) may be dischargeable
+        // by applying a sub-lemma whose conclusion unifies with the slot AND
+        // whose own premise unifies against a context hypothesis — SOLVING the
+        // parent metavar as a side effect. tryResolvePremiseSlot shares this
+        // call's metavariableNames/assignment so the leaf solution propagates.
+        if (!unresolved.empty() && backwardChainingEnabled
+            && backwardChainingDepth_ < kBackwardChainDepthCap
+            && autoProveDepth_ == 0) {
+            // Arm the kernel-step budget if not already (Step 5e is not inside
+            // autoProveClaim, which is what normally arms it). Mirrors the
+            // arming in autoProveClaim.
+            bool armedHere = false;
+            if (!autoProveBudgetActive_ && autoProveBudgetLimit_ > 0) {
+                autoProveBudgetActive_ = true;
+                autoProveBudgetTripped_ = false;
+                autoProveStepSnapshot_ = kernelStepsSoFar();
+                armedHere = true;
+            }
+            std::vector<size_t> remaining;
+            for (size_t i : unresolved) {
+                ExpressionPointer slotType =
+                    substituteFreeVariables(piDomains[i], assignment);
+                // 5e only handles slots that STILL mention an unresolved
+                // metavar (the premise whose hole the conclusion didn't pin).
+                // Determined slots are 5d's job (Prop) or are unsolved VALUE
+                // holes that a sibling premise's resolution will pin — skip
+                // them here so we don't recurse uselessly on data types.
+                if (!containsNamedFreeVariable(slotType, dischargeMetavars)) {
+                    remaining.push_back(i);
+                    continue;
+                }
+                ExpressionPointer proof = nullptr;
+                try {
+                    proof = tryResolvePremiseSlot(
+                        slotType, localBinders, dischargeMetavars, assignment,
+                        backwardChainingDepth_, line);
+                } catch (const AutoProverBudgetError&) {
+                    proof = nullptr;
+                } catch (const ElaborateError&) {
+                    proof = nullptr;
+                } catch (const TypeError&) {
+                    proof = nullptr;
+                }
+                if (proof) {
+                    elaboratedArgs[i] = proof;
+                } else {
+                    remaining.push_back(i);
+                }
+            }
+            if (armedHere) {
+                autoProveBudgetActive_ = false;
+                autoProveBudgetTripped_ = false;
+            }
+            // A sibling slot's value/proof hole may have been solved as a side
+            // effect of the unification above; pick those up before erroring.
+            std::vector<size_t> stillUnresolved;
+            for (size_t i : remaining) {
+                auto solved = assignment.find(argFreshNames[i]);
+                if (solved != assignment.end()) {
+                    elaboratedArgs[i] = solved->second;
+                } else {
+                    stillUnresolved.push_back(i);
+                }
+            }
+            unresolved = std::move(stillUnresolved);
+        }
+        // Propagate any of the CALLER's holes this call solved (backward
+        // chaining: a leaf unification here may have pinned an inherited
+        // metavar) back to the caller via solvedInheritedOut.
+        if (inheritedMetavars && solvedInheritedOut) {
+            for (const std::string& name : *inheritedMetavars) {
+                auto it = assignment.find(name);
+                if (it != assignment.end()) {
+                    (*solvedInheritedOut)[name] = it->second;
+                }
+            }
         }
         if (!unresolved.empty()) {
             std::string message =
