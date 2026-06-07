@@ -44,38 +44,30 @@ import Logic.exists
 
 -- The main theorem: every natural number ≥ 2 has a prime divisor.
 theorem Natural.has_prime_divisor (n : Natural)
-        (atLeastTwo : 2 ≤ n)
-        : ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ n :=
-  Natural.strong_induction(
-    (subject : Natural) ↦
-        2 ≤ subject
-        → ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ subject,
-    (subject : Natural)
-        (inductionHypothesis :
-            (smaller : Natural)
-            → successor(smaller) ≤ subject
-            → 2 ≤ smaller
-            → ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ smaller)
-        (subjectAtLeastTwo : 2 ≤ subject) ↦
-      claim Natural.is_prime(subject)
-          ∨ (∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject)
-      claim by cases {
-        in (Natural.is_prime(subject)) as subjectIsPrime:
-            witness subject
-                with ⟨subjectIsPrime, Natural.divides_reflexive(subject)⟩
-        in (∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject) as properDivisorWitness: {
-            obtain ⟨divisor, divisorAtLeastTwo,
-                    divisorBelowSubject, divisorDividesSubject⟩
-                from properDivisorWitness;
-            obtain ⟨prime, primeIsPrime, primeDividesDivisor⟩
-                from inductionHypothesis(
-                         divisor, divisorBelowSubject, divisorAtLeastTwo);
-            witness prime with
-                ⟨primeIsPrime,
-                 Natural.divides_transitive(
-                     prime, divisor, subject,
-                     primeDividesDivisor, divisorDividesSubject)⟩
+        : 2 ≤ n → ∃ (prime : Natural). Natural.is_prime(prime) ∧ prime ∣ n :=
+  by_strong_induction on n with subject, inductionHypothesis {
+    suppose 2 ≤ subject as subjectAtLeastTwo;
+    -- Either subject is itself prime, or it has a proper divisor below it.
+    claim Natural.is_prime(subject)
+        ∨ (∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject);
+    claim by cases {
+      in (Natural.is_prime(subject)) as subjectIsPrime: {
+          -- subject divides itself, and it is prime.
+          claim subjectDividesSubject : subject ∣ subject
+              by Natural.divides_reflexive;
+          witness subject with ⟨subjectIsPrime, subjectDividesSubject⟩
         }
-      },
-    n,
-    atLeastTwo)
+      in (∃ (divisor : Natural). 2 ≤ divisor ∧ successor(divisor) ≤ subject ∧ divisor ∣ subject) as properDivisorWitness: {
+          obtain ⟨divisor, divisorAtLeastTwo,
+                  divisorBelowSubject, divisorDividesSubject⟩
+              from properDivisorWitness;
+          -- Recurse on the smaller divisor; its prime factor divides subject too.
+          obtain ⟨prime, primeIsPrime, primeDividesDivisor⟩
+              from inductionHypothesis(
+                       divisor, divisorBelowSubject, divisorAtLeastTwo);
+          claim primeDividesSubject : prime ∣ subject
+              by Natural.divides_transitive;
+          witness prime with ⟨primeIsPrime, primeDividesSubject⟩
+      }
+    }
+  }
