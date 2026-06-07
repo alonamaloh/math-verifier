@@ -47,58 +47,56 @@ theorem Natural.power_one (p : Natural) : Natural.power(successor(0), p) = p :=
 -- power(a, p) * power(b, p). Induct on a; opaqueness means the
 -- recursive step uses power_succ to peel a successor instead of
 -- riding the kernel's ι.
-theorem Natural.power_add
-        : (a b p : Natural) → Natural.power(a + b, p)
-                              = Natural.power(a, p) * Natural.power(b, p)
-  | zero, b, p =>
-      -- 0 + b reduces to b; one_multiply restores the leading 1 and
-      -- power_zero recasts it as power(0, p).
-      calc Natural.power(0 + b, p)
-         = Natural.power(b, p)
-         = 1 * Natural.power(b, p)
-         = Natural.power(0, p) * Natural.power(b, p)
-  | successor(k), b, p =>
-      -- successor(k) + b reduces to successor(k + b); peel via
-      -- power_succ, recurse via the IH, then re-roll the leading
-      -- successor on the right.
-      calc Natural.power(successor(k) + b, p)
-         = p * Natural.power(k + b, p)
-         = p * (Natural.power(k, p) * Natural.power(b, p))
-              by Natural.power_add(k, b, p)
-         = (p * Natural.power(k, p)) * Natural.power(b, p)
-         = Natural.power(successor(k), p) * Natural.power(b, p)
+theorem Natural.power_add (a b p : Natural)
+        : Natural.power(a + b, p) = Natural.power(a, p) * Natural.power(b, p) :=
+  by_induction on a with IH {
+    case zero:
+        -- 0 + b reduces to b; one_multiply restores the leading 1 and
+        -- power_zero recasts it as power(0, p).
+        calc Natural.power(0 + b, p)
+           = Natural.power(b, p)
+           = 1 * Natural.power(b, p)
+           = Natural.power(0, p) * Natural.power(b, p)
+    case successor(k):
+        -- successor(k) + b reduces to successor(k + b); peel via power_succ,
+        -- recurse via the IH, then re-roll the leading successor on the right.
+        calc Natural.power(successor(k) + b, p)
+           = p * Natural.power(k + b, p)
+           = p * (Natural.power(k, p) * Natural.power(b, p)) by IH
+           = (p * Natural.power(k, p)) * Natural.power(b, p)
+           = Natural.power(successor(k), p) * Natural.power(b, p)
+  }
 
 -- Subtraction-witness extractor for `1 ≤ p^k`: provides a Natural m
 -- with p^k = succ(m). Useful for showing strict positivity.
-theorem Natural.power_succ_form
-        : (k p : Natural) → 1 ≤ p
-          → ∃ (m : Natural). Natural.power(k, p) = successor(m)
-  | zero, p, _ =>
-      -- power(0, p) = 1 = successor(0) via power_zero.
-      ⟨0, Natural.power_zero(p)⟩
-  | successor(j), p, pPositive => {
-      -- IH: there's an m with power(j, p) = succ(m).
-      obtain ⟨m, powerIsSucc⟩
-          from Natural.power_succ_form(j, p, pPositive);
-      -- p ≥ 1, so p = 1 + c for some c (and `1 + c` reduces to succ(c)).
-      obtain ⟨c, pEqualsOnePlusC⟩
-          from Natural.subtraction_witness(1, p, pPositive);
-      ⟨c + p * m,
-       calc Natural.power(successor(j), p)
-          = p * Natural.power(j, p)
-          = p * successor(m)
-          = p + p * m
-          = (1 + c) + p * m
-          = successor(c + p * m)⟩
-    }
+theorem Natural.power_succ_form (k p : Natural) (pPositive : 1 ≤ p)
+        : ∃ (m : Natural). Natural.power(k, p) = successor(m) :=
+  by_induction on k with IH {
+    case zero:
+        -- power(0, p) = 1 = successor(0) via power_zero.
+        witness 0 with calc Natural.power(0, p) = successor(0)
+    case successor(j): {
+        -- IH: there's an m with power(j, p) = succ(m).
+        obtain ⟨m, powerIsSucc⟩ from IH;
+        -- p ≥ 1, so p = 1 + c for some c (and `1 + c` reduces to succ(c)).
+        obtain ⟨c, pEqualsOnePlusC⟩ by Natural.subtraction_witness;
+        witness c + p * m with
+            calc Natural.power(successor(j), p)
+               = p * Natural.power(j, p)
+               = p * successor(m)
+               = p + p * m
+               = (1 + c) + p * m
+               = successor(c + p * m)
+      }
+  }
 
 -- p^k ≥ 1 for p ≥ 1. From the succ form.
 theorem Natural.power_positive
         (k p : Natural) (pPositive : 1 ≤ p)
         : 1 ≤ Natural.power(k, p) := {
   obtain ⟨m, eq⟩ from Natural.power_succ_form(k, p, pPositive);
-  rewrite(
-      Equality.symmetry(eq),
-      Natural.successor_less_or_equal_successor(
-          0, m, Natural.zero_least(m)))
+  -- 1 ≤ successor(m) = power(k, p).
+  calc 1
+     ≤ successor(m)
+     = Natural.power(k, p)
 }
