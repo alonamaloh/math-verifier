@@ -41,12 +41,7 @@ theorem Natural.least_witness_minimal (predicate : Natural → Proposition)
         }
       | no noneSmaller => {
           -- Nothing below `subject` satisfies the predicate, so it is least.
-          claim subjectIsMinimal : (k : Natural) → k < subject → ¬predicate(k) by {
-            take k : Natural;
-            suppose k < subject as kBelowSubject;
-            suppose predicate(k) as predicateAtK;
-            noneSmaller(⟨k, ⟨kBelowSubject, predicateAtK⟩⟩)
-          };
+          claim subjectIsMinimal : (k : Natural) → k < subject → ¬predicate(k);
           ⟨subject, ⟨predicateAtSubject, subjectIsMinimal⟩⟩
         }
     }
@@ -62,15 +57,6 @@ theorem Natural.least_witness (predicate : Natural → Proposition)
             predicate(minimum) ∧ ((k : Natural) → predicate(k) → minimum ≤ k) := {
   obtain ⟨minimum, predicateAtMinimum, nothingBelow⟩
       from Natural.least_witness_minimal(predicate, n, witnessAtN);
-  claim minimumIsLeast : (k : Natural) → predicate(k) → minimum ≤ k by {
-    take k : Natural;
-    suppose predicate(k) as predicateAtK;
-    -- k < minimum would contradict minimality, so minimum ≤ k.
-    cases Natural.trichotomy(k, minimum) {
-      | Or.introduceLeft(kBelowMinimum) =>
-          absurd(nothingBelow(k, kBelowMinimum, predicateAtK))
-      | Or.introduceRight(minimumAtMostK) => minimumAtMostK
-    }
-  };
+  claim minimumIsLeast : (k : Natural) → predicate(k) → minimum ≤ k;
   ⟨minimum, ⟨predicateAtMinimum, minimumIsLeast⟩⟩
 }
