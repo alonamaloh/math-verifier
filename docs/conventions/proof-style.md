@@ -271,6 +271,29 @@ reach for the math-like form instead:
   - Do **not** try to shrink a direct call by making the lemma's leading
     data-args implicit: `Foo.bar(proof)` is still a direct call. The fix is
     `by Foo.bar`, not a shorter application.
+  - **Recursion reads as induction.** A pattern-matched proof whose body
+    recurses by a positional self-call (`Foo.bar(predecessor, …)`) hides the
+    induction in a comment AND counts as a direct call. Write it
+    `by_induction on a with IH refining b, c, h { case zero: … case
+    successor(predecessor): … }` instead: the hypothesis is the named local
+    `IH`, cited argument-free like any fact (`done since IH` / `goal by IH`),
+    so the recursion both reads as induction and is no longer a lemma call.
+    Example — `Natural.add_cancel_left` (`library/Natural/arithmetic.math`):
+    ```
+    by_induction on a with IH refining b, c, equalityHypothesis {
+      case zero: equalityHypothesis
+      case successor(predecessor): {
+        claim predecessor + b = predecessor + c;   -- strip the successor
+        done since IH
+      }
+    }
+    ```
+  - **Closers.** `done`, `okay`, `goal` are synonyms: a bare one discharges
+    the goal by lookup; each also takes an optional `by <hint>` (prover needs
+    it) or `since <reason>` (kept explanation). Prefer **`since`** for an
+    illuminating reason — the induction hypothesis, the operative lemma —
+    **even when a bare closer would succeed**: we keep the explanation for the
+    reader regardless of how strong the auto-prover gets.
   - Transitivity / a "`x` is strictly below itself" contradiction reads as
     an inequality **`≤`-calc**, never a positional `transitive` call:
     ```
