@@ -288,6 +288,19 @@ reach for the math-like form instead:
       }
     }
     ```
+    This also works for induction on a **derivation** (an indexed inductive
+    `Prop`, e.g. a `≤` proof). Use the constructor names as cases, and
+    `refining <h>` for a hypothesis whose type mentions an index that the
+    induction varies. Example — `LessOrEqual.transitive`:
+    ```
+    by_induction on bc with IH refining ab {
+      case LessOrEqual.reflexivity(_): ab                       -- b = c
+      case LessOrEqual.step(_, cPredecessor, _):
+          LessOrEqual.step(a, cPredecessor, IH(ab))             -- one more step
+    }
+    ```
+    The case bodies use the constructor's *destructured* index names, not the
+    outer binders; `IH` (or `IH(<refined-hyp>)`) is the named hypothesis.
   - **Closers.** `done`, `okay`, `goal` are synonyms: a bare one discharges
     the goal by lookup; each also takes an optional `by <hint>` (prover needs
     it) or `since <reason>` (kept explanation). Prefer **`since`** for an
