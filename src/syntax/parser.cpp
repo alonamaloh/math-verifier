@@ -2878,14 +2878,20 @@ private:
     // form is handled by parseBlockContents and never reaches here.
     SurfaceExpressionPointer parseStructuredClaim() {
         Token claimToken = consumeAny();  // 'claim' / 'done' / 'okay'
-        // `done` and `okay` are strictly bare — they don't accept a
-        // proposition or a `by` hint. Return immediately so the
-        // proposition-parse path below doesn't try to swallow the
-        // next token.
+        // `done` and `okay` are math-style closers, synonyms of `goal`:
+        // they take no proposition (it comes from the expected type) but DO
+        // accept an optional `by <hint>` / `since <proof>` — so `done by IH`
+        // and `okay by add_zero` read as "…and we're done, by <reason>".
+        // A bare `done` / `okay` still means "discharge the goal by lookup".
         bool isBareCloser =
             claimToken.kind == TokenKind::KeywordDone
             || claimToken.kind == TokenKind::KeywordOkay;
         if (isBareCloser) {
+            if (peek().kind == TokenKind::KeywordBy
+                || peek().kind == TokenKind::KeywordSince) {
+                return parseStructuredClaimTail(
+                    claimToken, /*proposition=*/nullptr);
+            }
             return makeSurfaceStructuredClaim(
                 /*proposition=*/nullptr, /*label=*/"",
                 /*byHint=*/nullptr, /*byCases=*/false, /*arms=*/{},
