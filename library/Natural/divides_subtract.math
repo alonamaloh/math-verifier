@@ -66,12 +66,14 @@ theorem Natural.divides_after_remove_one
         : divisor ∣ secondSummand := {
   obtain ⟨q, equation⟩ from divisorDividesEnlargedSum;
   cases q refining equation {
-    | zero =>
-        Natural.divides_after_remove_one_witness_zero(
-            divisor, secondSummand, equation)
-    | successor(predQ) =>
-        Natural.divides_after_remove_one_witness_successor(
-            divisor, secondSummand, predQ, equation)
+    | zero => {
+        claim divisor ∣ secondSummand
+            by Natural.divides_after_remove_one_witness_zero
+      }
+    | successor(predQ) => {
+        claim divisor ∣ secondSummand
+            by Natural.divides_after_remove_one_witness_successor
+      }
   }
 }
 
@@ -82,27 +84,35 @@ theorem Natural.divides_after_remove_one
 -- recurses on q'.
 
 theorem Natural.divides_after_remove_multiple
-        (divisor : Natural)
-        : (q : Natural) → (secondSummand : Natural)
+        (divisor q : Natural)
+        : (secondSummand : Natural)
           → divisor ∣ (divisor * q + secondSummand)
-          → divisor ∣ secondSummand
-  | zero, secondSummand, dividesEnlargedSum => {
-      calc divisor * 0 + secondSummand
-         = 0 + secondSummand
-         = secondSummand;
-      claim divisor ∣ secondSummand by substitution
-  }
-  | successor(predQ), secondSummand, dividesEnlargedSum => {
-      calc divisor * successor(predQ) + secondSummand
-         = (divisor + divisor * predQ) + secondSummand
-         = divisor + (divisor * predQ + secondSummand);
-      claim shiftedSum
-          : divisor ∣ (divisor + (divisor * predQ + secondSummand))
-          by substitution;
-      Natural.divides_after_remove_multiple(
-          divisor, predQ, secondSummand,
-          Natural.divides_after_remove_one(
-              divisor, divisor * predQ + secondSummand, shiftedSum))
+          → divisor ∣ secondSummand :=
+  by_induction on q with IH {
+    case zero: {
+        take secondSummand : Natural;
+        suppose divisor ∣ (divisor * 0 + secondSummand) as dividesEnlargedSum;
+        calc divisor * 0 + secondSummand
+           = 0 + secondSummand
+           = secondSummand;
+        claim divisor ∣ secondSummand by substitution
+      }
+    case successor(predQ): {
+        take secondSummand : Natural;
+        suppose divisor ∣ (divisor * successor(predQ) + secondSummand)
+            as dividesEnlargedSum;
+        -- Reshape divisor·(predQ+1) + s into divisor + (divisor·predQ + s),
+        -- peel one divisor, then recurse on predQ via the IH.
+        calc divisor * successor(predQ) + secondSummand
+           = (divisor + divisor * predQ) + secondSummand
+           = divisor + (divisor * predQ + secondSummand);
+        claim shiftedSum
+            : divisor ∣ (divisor + (divisor * predQ + secondSummand))
+            by substitution;
+        claim peeled : divisor ∣ (divisor * predQ + secondSummand)
+            by Natural.divides_after_remove_one;
+        IH(secondSummand, peeled)
+      }
   }
 
 -- ----------------------------------------------------------------------
@@ -119,7 +129,7 @@ theorem Natural.divides_subtract_from_sum
   obtain ⟨q, firstEquation⟩ from dividesFirst;
   claim shiftedSum : divisor ∣ (divisor * q + secondSummand)
       by substituting firstEquation;
-  Natural.divides_after_remove_multiple(divisor, q, secondSummand, shiftedSum)
+  done by Natural.divides_after_remove_multiple
 }
 
 -- ----------------------------------------------------------------------
