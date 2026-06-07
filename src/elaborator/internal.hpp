@@ -1109,6 +1109,21 @@ private:
         std::map<std::string, ExpressionPointer>& assignment,
         int depth, int line);
 
+    // Last-resort discharge for a premise slot that STILL mentions exactly one
+    // unresolved metavar (a data hole the conclusion didn't pin). Guesses that
+    // metavar from the in-scope binders of its type, substitutes, and tries to
+    // close the resulting premise with the full auto-prover (which can bridge
+    // commutativity / ring identities against context hypotheses — e.g. a
+    // premise `b + ?m = 0` discharged as `b + a = 0` from a hypothesis
+    // `a + b = 0`). On success records the metavar solution in `assignment`.
+    ExpressionPointer tryGuessUndeterminedPremise(
+        ExpressionPointer slotTypeClosed,
+        const std::map<std::string, ExpressionPointer>& metavarTypes,
+        const std::vector<LocalBinder>& localBinders,
+        const std::set<std::string>& metavariableNames,
+        std::map<std::string, ExpressionPointer>& assignment,
+        int line);
+
     // Per-candidate worker for tryResolvePremiseSlot: trial-apply
     // `name : lemmaType` to the slot, sharing the parent metavar context.
     ExpressionPointer trySubLemmaSharingMetavars(

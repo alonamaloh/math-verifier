@@ -102,6 +102,13 @@ ExpressionPointer closeOverLocalBinders(
     const std::vector<LocalBinder>& localBinders,
     size_t count);
 
+// The Internal-origin FreeVariable that openOverLocalBinders substitutes for
+// localBinders[index] — i.e. how that binder appears in opened terms. Lets
+// callers construct a reference to a specific in-scope binder (e.g. as a
+// candidate argument) that is recognised by the opened forms of types/goals.
+ExpressionPointer openedLocalBinderReference(
+    const std::vector<LocalBinder>& localBinders, size_t index);
+
 bool referencesBoundBelowThreshold(ExpressionPointer expression,
                                     int threshold,
                                     int currentDepth = 0);

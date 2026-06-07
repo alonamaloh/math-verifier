@@ -367,6 +367,74 @@ ExpressionPointer Elaborator::tryResolvePremiseSlot(
         return nullptr;
     }
 
+ExpressionPointer Elaborator::tryGuessUndeterminedPremise(
+        ExpressionPointer slotTypeClosed,
+        const std::map<std::string, ExpressionPointer>& metavarTypes,
+        const std::vector<LocalBinder>& localBinders,
+        const std::set<std::string>& metavariableNames,
+        std::map<std::string, ExpressionPointer>& assignment,
+        int line) {
+        autoProveSpend(1);
+        // The slot must carry exactly one unresolved metavar: a single data
+        // hole to guess. (Zero is 5d's job; two or more would explode.)
+        std::vector<std::string> present;
+        for (const auto& name : metavariableNames) {
+            if (containsNamedFreeVariable(slotTypeClosed, {name})) {
+                present.push_back(name);
+            }
+        }
+        if (present.size() != 1) return nullptr;
+        const std::string& metavar = present[0];
+        auto typeIt = metavarTypes.find(metavar);
+        if (typeIt == metavarTypes.end()) return nullptr;
+        ExpressionPointer metavarType =
+            substituteFreeVariables(typeIt->second, assignment);
+        if (containsFreeVariable(metavarType)) return nullptr;
+        Context context = buildContextFromLocalBinders(localBinders);
+        ExpressionPointer metavarTypeOpened, slotOpened;
+        try {
+            metavarTypeOpened = openOverLocalBinders(
+                metavarType, localBinders, localBinders.size());
+            slotOpened = openOverLocalBinders(
+                slotTypeClosed, localBinders, localBinders.size());
+        } catch (...) { return nullptr; }
+        int tried = 0;
+        for (size_t bi = 0; bi < localBinders.size(); ++bi) {
+            if (tried >= kBackwardChainCandidateCap) break;
+            // The candidate binder must have the metavar's type.
+            bool typeMatches = false;
+            try {
+                typeMatches = isDefinitionallyEqual(
+                    environment_, context, localBinders[bi].type,
+                    metavarTypeOpened);
+            } catch (...) { typeMatches = false; }
+            if (!typeMatches) continue;
+            ++tried;
+            ExpressionPointer candidate =
+                openedLocalBinderReference(localBinders, bi);
+            ExpressionPointer goalOpened = substituteFreeVariables(
+                slotOpened, {{metavar, candidate}});
+            ExpressionPointer goalClosed;
+            try {
+                goalClosed = closeOverLocalBinders(
+                    goalOpened, localBinders, localBinders.size());
+            } catch (...) { continue; }
+            if (containsFreeVariable(goalClosed)) continue;
+            ExpressionPointer proof = nullptr;
+            try {
+                proof = autoProveClaim(goalClosed, localBinders, line);
+            } catch (const AutoProverBudgetError&) {
+                return nullptr;
+            } catch (...) { proof = nullptr; }
+            if (proof) {
+                assignment[metavar] = closeOverLocalBinders(
+                    candidate, localBinders, localBinders.size());
+                return proof;
+            }
+        }
+        return nullptr;
+    }
+
 ExpressionPointer Elaborator::trySubLemmaSharingMetavars(
         const std::string& name,
         ExpressionPointer lemmaType,

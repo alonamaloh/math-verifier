@@ -1187,6 +1187,28 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                 } catch (const TypeError&) {
                     proof = nullptr;
                 }
+                if (!proof) {
+                    // Fallback: the premise mentions one undetermined data
+                    // metavar a sub-lemma couldn't pin. Guess it from in-scope
+                    // binders and discharge the closed premise with the full
+                    // prover (commutativity / ring against context).
+                    std::map<std::string, ExpressionPointer> metavarTypes;
+                    for (size_t k = 0; k < argFreshNames.size(); ++k) {
+                        metavarTypes[argFreshNames[k]] =
+                            substituteFreeVariables(piDomains[k], assignment);
+                    }
+                    try {
+                        proof = tryGuessUndeterminedPremise(
+                            slotType, metavarTypes, localBinders,
+                            dischargeMetavars, assignment, line);
+                    } catch (const AutoProverBudgetError&) {
+                        proof = nullptr;
+                    } catch (const ElaborateError&) {
+                        proof = nullptr;
+                    } catch (const TypeError&) {
+                        proof = nullptr;
+                    }
+                }
                 if (proof) {
                     elaboratedArgs[i] = proof;
                 } else {

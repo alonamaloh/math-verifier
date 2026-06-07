@@ -106,6 +106,24 @@ ExpressionPointer closeOverLocalBinders(
     return term;
 }
 
+ExpressionPointer openedLocalBinderReference(
+    const std::vector<LocalBinder>& localBinders, size_t index) {
+    // Mirror the Internal-origin FreeVariable that openBinder constructs (same
+    // name + origin + hash), so this term is structurally identical to the one
+    // openOverLocalBinders produces for this binder.
+    const std::string name = openingNameFor(localBinders, index);
+    uint64_t nameHash = subtree_hash::hashString(name);
+    auto freeVar = makeRawExpression(
+        FreeVariable{name, FreeVariableOrigin::Internal});
+    freeVar->hash = subtree_hash::mix(
+        subtree_hash::mix(
+            subtree_hash::mix(subtree_hash::kSeed,
+                               subtree_hash::kTagFreeVariable),
+            nameHash),
+        static_cast<uint64_t>(FreeVariableOrigin::Internal));
+    return freeVar;
+}
+
 bool referencesBoundBelowThreshold(ExpressionPointer expression,
                                     int threshold,
                                     int currentDepth) {
