@@ -28,14 +28,19 @@ import Natural.strong_recursion
 -- Adding a fixed left summand preserves ≤. Induction on that summand;
 -- successor(a) + x ≡ successor(a + x) reduces definitionally, so each step
 -- is one application of `successor_less_or_equal_successor`.
-theorem Natural.add_left_monotone
-        : (a x y : Natural) → x ≤ y → a + x ≤ a + y
-  | zero, x, y, lessOrEqual =>
-      lessOrEqual
-  | successor(predecessorA), x, y, lessOrEqual =>
-      Natural.successor_less_or_equal_successor(
-          predecessorA + x, predecessorA + y,
-          Natural.add_left_monotone(predecessorA, x, y, lessOrEqual))
+theorem Natural.add_left_monotone (a x y : Natural)
+        (lessOrEqual : x ≤ y) : a + x ≤ a + y :=
+  by_induction on a with IH {
+    case zero:
+        -- 0 + x ≡ x and 0 + y ≡ y.
+        lessOrEqual
+    case successor(predecessorA): {
+        -- successor(predecessorA) + z ≡ successor(predecessorA + z); apply
+        -- successor monotonicity to the IH.
+        claim predecessorA + x ≤ predecessorA + y by IH;
+        done by Natural.successor_less_or_equal_successor
+      }
+  }
 
 -- Adding a fixed left summand reflects ≤: it can be cancelled. Same
 -- induction, peeling a successor off each side with
@@ -54,24 +59,36 @@ theorem Natural.add_left_le_cancel
 -- below itself (e.g. the wrong branch of a comparison in a bijection
 -- round-trip). Induction peels a successor off each side; the base case
 -- is `successor(0) ≤ 0`, refuted by `absurd`.
-theorem Natural.not_successor_less_or_equal_self
-        : (n : Natural) → successor(n) ≤ n → False
-  | zero, successorLessOrEqual =>
-      absurd(successorLessOrEqual)
-  | successor(predecessor), successorLessOrEqual =>
-      Natural.not_successor_less_or_equal_self(predecessor,
-          Natural.less_or_equal_successor_successor_descend(
-              successor(predecessor), predecessor, successorLessOrEqual))
+theorem Natural.not_successor_less_or_equal_self (n : Natural)
+        (successorLessOrEqual : successor(n) ≤ n) : False :=
+  by_induction on n with IH refining successorLessOrEqual {
+    case zero:
+        -- successor(0) ≤ 0 is impossible.
+        absurd(successorLessOrEqual)
+    case successor(predecessor): {
+        -- peel a successor off each side, then the IH.
+        claim peeled : successor(predecessor) ≤ predecessor
+            by Natural.less_or_equal_successor_successor_descend;
+        IH(peeled)
+      }
+  }
 
 -- x ≠ successor(x + c): a number is never its own successor-plus-more.
-theorem Natural.not_equal_successor_add
-        : (x c : Natural) → ¬(x = successor(x + c))
-  | zero, c =>
-      Natural.zero_not_successor(0 + c)
-  | successor(k), c =>
-      (equation : successor(k) = successor(successor(k) + c)) ↦
-          Natural.not_equal_successor_add(k, c,
-              Natural.successor_injective(k, successor(k + c), equation))
+theorem Natural.not_equal_successor_add (x c : Natural)
+        : ¬(x = successor(x + c)) :=
+  by_induction on x with IH {
+    case zero: {
+        -- 0 is never a successor.
+        suppose 0 = successor(0 + c) as equation;
+        absurd(equation)
+      }
+    case successor(k): {
+        suppose successor(k) = successor(successor(k) + c) as equation;
+        -- strip the successor: k = successor(k + c), contradicting the IH.
+        claim k = successor(k + c) by Natural.successor_injective;
+        done since IH
+      }
+  }
 
 -- j ≤ successor(m) and j ≠ successor(m) force j ≤ m.
 theorem Natural.less_or_equal_successor_not_equal (j m : Natural)
@@ -136,12 +153,14 @@ theorem Natural.le_add_preserves_left (a c b : Natural) (aLeC : a ≤ c)
 -- A sum of naturals that vanishes forces its left summand to vanish.
 -- Split on c: at zero the claim is immediate; at successor(p) the sum is
 -- successor(p + d), which cannot equal zero.
-theorem Natural.add_eq_zero_implies_left_zero
-        : (c d : Natural) → c + d = 0 → c = 0
-  | zero, d, sumIsZero =>
-      reflexivity(0)
-  | successor(p), d, sumIsZero =>
-      absurd(Natural.zero_not_successor(p + d, Equality.symmetry(sumIsZero)))
+theorem Natural.add_eq_zero_implies_left_zero (c d : Natural)
+        (sumIsZero : c + d = 0) : c = 0 :=
+  by_induction on c with IH refining sumIsZero {
+    case zero: reflexivity(0)
+    case successor(p):
+        -- successor(p) + d ≡ successor(p + d), which can't be 0.
+        absurd(sumIsZero)
+  }
 
 -- Antisymmetry of ≤: if a ≤ b and b ≤ a then a = b. Each inequality gives
 -- a witness — b = a + c and a = b + d — so a = a + (c + d); cancelling a
