@@ -1,11 +1,13 @@
--- `obtain ⟨…⟩ by <lemma>` — destructure a lemma's existential result with
--- the lemma's arguments inferred (its premises recovered from context), no
--- positional application.
+-- `obtain ⟨…⟩ by <lemma>` / `cases by <lemma>` — destructure or case-split a
+-- lemma's result with the lemma's arguments inferred (its premises recovered
+-- from context), no positional application.
 module Test.obtain_by_test
 
+import Logic.basics
 import Natural.basics
 import Natural.order
 import Natural.subtraction
+import Natural.divisibility
 import Logic.exists
 
 -- subtraction_witness : (b a) → b ≤ a → ∃ c. a = b + c. With a single ≤
@@ -15,3 +17,11 @@ theorem obtain_by_witness (j m : Natural) (lessOrEqual : j ≤ m)
   obtain ⟨c, equation⟩ by Natural.subtraction_witness;
   witness c with equation
 }
+
+-- `cases by <lemma>`: case-split on the disjunction a lemma yields, args
+-- inferred from the premise in context.
+theorem cases_by_disjunction (d : Natural) (dividesOne : d ∣ 1) : True :=
+  cases by Natural.divides_less_or_equal_or_zero {
+    | Or.introduceLeft(_)  => True.trivial
+    | Or.introduceRight(_) => True.trivial
+  }

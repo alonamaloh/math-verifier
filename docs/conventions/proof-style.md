@@ -369,6 +369,21 @@ returns its final non-`;`-terminated expression.
   replaces `obtain ⟨c, eq⟩ from Natural.subtraction_witness(b, a, proof);`.
   Needs the premises to be unambiguous in context — if two hypotheses match
   (e.g. both `a ≤ b` and `b ≤ a`), name them with the `from <lemma>(args)` form.
+- `cases by <lemma> { … }` — the same inference for a **case-split**: cite
+  `<lemma>` argument-free (premises from context) and case-split on the
+  disjunction / inductive it yields. E.g. `cases by
+  Natural.divides_less_or_equal_or_zero { … }`. (Only when the lemma's premises
+  pin its data arguments — a premise-less lemma like `totality_of_less_or_equal`
+  can't be cited this way.)
+- **Multi-argument helper with derived premises.** To discharge a helper that
+  takes several data arguments and several proof premises (some of them derived
+  — e.g. `quotient_strict_absurd`), state any derived premise as a bare
+  `calc`/`claim` so ALL its premises are in context, then `claim <conclusion>
+  by <helper>`: backward chaining discharges every premise from context and
+  pins all the data arguments as a side effect. Caveat: this search can be
+  expensive — if the helper's premises themselves invite a wide search (e.g.
+  `multiply_at_least_one` among many in-scope facts) it may not terminate in
+  budget; keep those explicit.
 - `choose N such that P(N);` — sugar for `obtain ⟨N, _⟩` followed
   by a `claim P(N) by …`; reads as the textbook phrasing.
 - `let <name> ∈ <type> [with <predicate>];` — introduce a typed

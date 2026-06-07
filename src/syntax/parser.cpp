@@ -2437,9 +2437,22 @@ private:
     // mixed inside the same `cases`). Builds an inductive eliminator at
     // elaboration time; the motive is derived from the enclosing
     // expected type.
+    // A `cases` scrutinee, allowing `cases by <lemma> { … }` — case-split on
+    // the (disjunction / inductive) result of citing <lemma> with all explicit
+    // arguments inferred (its premises recovered from context). Parallels
+    // `obtain ⟨…⟩ by <lemma>`.
+    SurfaceExpressionPointer parseCasesScrutinee() {
+        if (peek().kind == TokenKind::KeywordBy) {
+            Token byToken = consumeAny();  // 'by'
+            return makeSurfaceCiteInferred(
+                parseExpression(), byToken.line, byToken.column);
+        }
+        return parseExpression();
+    }
+
     SurfaceExpressionPointer parseCasesExpression() {
         Token casesToken = consumeAny();  // 'cases'
-        auto scrutinee = parseExpression();
+        auto scrutinee = parseCasesScrutinee();
         // Optional `with <equalityHypothesisName>`: each arm gets an
         // additional binder `<name> : <scrutinee> = <constructor pattern>`
         // in scope, generated via the standard convoy desugaring.
@@ -3045,7 +3058,7 @@ private:
     SurfaceExpressionPointer parseClaimByCasesOnScrutinee(
             const Token& casesToken) {
         expect(TokenKind::KeywordOn, "after 'by cases'");
-        auto scrutinee = parseExpression();
+        auto scrutinee = parseCasesScrutinee();
         std::vector<std::string> refiningNames =
             parseOptionalRefiningList();
         expect(TokenKind::LeftBrace,
