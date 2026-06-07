@@ -57,13 +57,13 @@ theorem Natural.monus_succ_succ (k j : Natural)
 -- monus(a, zero) = a. Case-split a; cite monus_zero_left and
 -- monus_succ_zero.
 theorem Natural.monus_zero : (a : Natural) → Natural.monus(a, 0) = a
-  | zero         => Natural.monus_zero_left(0)
-  | successor(k) => Natural.monus_succ_zero(k)
+  | zero         => goal by Natural.monus_zero_left
+  | successor(k) => goal by Natural.monus_succ_zero
 
 -- monus(a, a) = zero. Induct on a, using monus_succ_succ to peel
 -- successors from both sides.
 theorem Natural.monus_self : (a : Natural) → Natural.monus(a, a) = 0
-  | zero         => Natural.monus_zero_left(0)
+  | zero         => goal by Natural.monus_zero_left
   | successor(k) =>
       calc Natural.monus(successor(k), successor(k))
          = 0
@@ -72,28 +72,34 @@ theorem Natural.monus_self : (a : Natural) → Natural.monus(a, a) = 0
 -- All access to monus is via the characterising lemmas above —
 -- monus_zero_left for the b=0 / a=0 corners, monus_succ_succ to
 -- peel both sides in the recursive case.
-theorem Natural.le_implies_monus_zero
-        : (b a : Natural) → a ≤ b → Natural.monus(a, b) = 0
-  | zero, a, aLeqZero =>
-      -- a ≤ 0 forces a = 0; then monus(0, 0) = 0. The auto-prover
-      -- derives `a = 0` in scope for the first calc step.
-      calc Natural.monus(a, 0)
-         = Natural.monus(0, 0)
-         = 0
-  | successor(predecessorB), a, aLeqSuccB =>
-      (cases a {
-         | zero =>
-             (refinedProof : 0 ≤ successor(predecessorB)) ↦
-               Natural.monus_zero_left(successor(predecessorB))
-         | successor(k) =>
-             (refinedProof : successor(k) ≤ successor(predecessorB)) ↦
-               -- Peel both sides via monus_succ_succ, then recurse.
-               calc Natural.monus(successor(k), successor(predecessorB))
-                  = Natural.monus(k, predecessorB)
-                  = 0
-                       by Natural.le_implies_monus_zero(
-                              predecessorB, k,
-                              Natural.less_or_equal_successor_successor_descend(
-                                  k, predecessorB, refinedProof))
-       } : (refinedProof : a ≤ successor(predecessorB))
-           → Natural.monus(a, successor(predecessorB)) = 0)(aLeqSuccB)
+theorem Natural.le_implies_monus_zero (b : Natural)
+        : (a : Natural) → a ≤ b → Natural.monus(a, b) = 0 :=
+  by_induction on b with IH {
+    case zero: {
+        take a : Natural;
+        suppose a ≤ 0 as aLessOrEqualZero;
+        -- a ≤ 0 forces a = 0; then monus(0, 0) = 0. The auto-prover
+        -- derives `a = 0` in scope for the first calc step.
+        calc Natural.monus(a, 0)
+           = Natural.monus(0, 0)
+           = 0
+      }
+    case successor(predecessorB): {
+        take a : Natural;
+        suppose a ≤ successor(predecessorB) as aLessOrEqualSuccB;
+        cases a refining aLessOrEqualSuccB {
+          | zero =>
+              -- monus(0, successor(predecessorB)) = 0.
+              goal by Natural.monus_zero_left
+          | successor(k) => {
+              -- peel both sides via monus_succ_succ, then recurse (IH at
+              -- predecessorB on the descended bound).
+              claim descended : k ≤ predecessorB
+                  by Natural.less_or_equal_successor_successor_descend;
+              calc Natural.monus(successor(k), successor(predecessorB))
+                 = Natural.monus(k, predecessorB)
+                 = 0 since IH(k, descended)
+            }
+        }
+      }
+  }
