@@ -1,0 +1,106 @@
+# Proof-style leak reduction — findings log
+
+Running notes from the campaign to drive `scripts/cic_leak_report` to zero.
+Purpose: capture what transforms work, what don't, and **what the
+elaborator / error messages / tooling could do better** so the system
+improves, not just the corpus.
+
+## Categories (as of baseline reset)
+
+The linter now counts three families (see `scripts/cic_leak_report`):
+1. CIC vocabulary: `Quotient.` (107), `Equality.symmetry` (98),
+   `congruenceOf` (23), `transport_proposition` (14),
+   `False.eliminate_proposition` (8), `Equality.transitivity` (1).
+2. Structural: `claim-by-calc` (was 73, now 0).
+3. Positional lemma calls (`theorem` applied with ≥3 positional args):
+   started 1022.
+
+Baseline after promoting categories: **1346**. Two-arg positional calls
+(367) are reported advisory-only.
+
+## What works (mechanical, high-confidence)
+
+### claim-by-calc → `calc … as NAME`  ✅ (73 → 0)
+`claim NAME : T by calc <steps>` just restates the calc's endpoints.
+Rewrite to `calc <steps> as NAME` (bare `calc <steps>` when anonymous).
+- Fully automatable with a comment-aware rewriter (`/tmp/rewrite_cbc.py`):
+  scan to the statement's terminating `;` tracking `()[]{}⟨⟩` depth,
+  detect `claim IDENT :` for the name, strip `claim … by `, append `as NAME`.
+- Gotcha: a first pass missed claims **nested inside `by { … }` blocks**
+  because the outer non-cbc statement was consumed whole. Fix: when a
+  `claim` is non-cbc, emit only the `claim` keyword and keep scanning
+  inside it, so nested cbc claims are still found.
+- Net: kernel verification is a strong safety net — a wrong rewrite or a
+  dropped-but-referenced `as NAME` fails to verify.
+
+### Positional transitivity → calc  ✅
+`LessOrEqual.transitive(a, b, c, p_ab, p_bc)` → `calc a ≤ b ≤ c`.
+Works cleanly when each step is discharged by a **named hypothesis in
+scope** or a **library lemma found by conclusion shape** (e.g.
+`a ≤ max(a,b)` via `left_le_max`). Example: `Natural.le_through_max_left`.
+
+### Nested-premise hoist → argument-free `by Lemma`  ✅ (the key method)
+A positional call whose premise argument is itself a nested lemma result
+is NOT argument-free as-is, but becomes so after **claiming the nested
+result into context first**:
+```
+-- before (2 positional calls, nested):
+claim N_s_bound ≤ m by le_through_max_left(N_s_bound, N_t_bound, m,
+    le_through_max_left(maximum(N_s_bound, N_t_bound), maximum(N_s,N_t), m, m_ge));
+-- after (0 positional calls):
+claim maximum(N_s_bound, N_t_bound) ≤ m by Natural.le_through_max_left;
+claim N_s_bound ≤ m                  by Natural.le_through_max_left;
+```
+The data args (subjects) come from the goal; the remaining premise, now a
+context fact, is found by match-and-unify + context discharge.
+- Validated on `Real.multiplication` (the six `m,n ≥ witness` bounds:
+  12 positional calls → 0).
+- **Not automatable by regex** — hoisting needs the nested premise's
+  *type* (the sub-lemma's conclusion with unified indices), which only the
+  elaborator knows. Done by hand.
+
+## What does NOT work
+
+### Blind argument-drop on nested-premise citations  ❌
+Dropping all args from `by Lemma(args)` → `by Lemma` without hoisting
+fails when any premise is a derived (non-in-scope) fact.
+- Measured: `Real.multiplication` converted **0 of 12** this way.
+- The auto-prover's context discharge only searches *in-scope
+  hypotheses*; it does not synthesise a missing premise by applying
+  another lemma (no backward chaining beyond one library lookup).
+
+### Term-position helper applications  ❌ (largely irreducible)
+Big multi-arg helper calls used as a *term* — definition bodies, `witness`
+payloads, `obtain … from <call>`, tuple components — have no `by`/claim to
+host an argument-free citation. E.g. `obtain ⟨c,eq⟩ from
+Natural.subtraction_witness(a,b,aLeqB)`, or a theorem body that *is*
+`Helper(24 args)`. Reducing these means inlining/restructuring the helper,
+not a citation change. These form a large irreducible-ish tail of the 1022.
+
+## Ideas for system improvement (the real payoff)
+
+1. **Backward-chaining in `by Lemma` (argument-free).** Today the prover
+   discharges premises only from in-scope hypotheses. If it could attempt
+   one more level — discharge a premise by *another* argument-free library
+   lemma — the nested-premise case would need no manual hoisting. Bounded
+   depth (1–2) would already kill most of the positional-call tail.
+2. **Better failure message for argument-free `by Lemma`.** When it fails,
+   say *which premise* it couldn't find and its expected type (so the user
+   knows exactly what to `claim` into context). Right now the failure is
+   the generic "no in-scope hypothesis / no library lemma" message.
+3. **`obtain … from (by Lemma)` / argument-free in term position.** Allow a
+   goal-driven citation where a *term* of a known type is expected (the
+   expected type is available there), so existential-elimination and
+   witness payloads can drop their positional args too.
+4. **Auto-hoist suggestion.** The linter or elaborator could suggest the
+   exact `claim <premise-type> by <SubLemma>;` lines to insert, computed
+   from the call's elaboration — turning the manual hoist into an applied
+   fix.
+
+## Per-file progress
+
+- `Real/multiplication`: claim-by-calc (1) cleared; le_through_max block
+  hoisted (−12 positional). Remaining: term-position helper calls + a few
+  `multiply_by_nonneg` (need cascading nonneg hoists).
+- `Natural/maximum`: both `le_through_max_{left,right}` → ≤-calc (−2).
+- (more as they land)
