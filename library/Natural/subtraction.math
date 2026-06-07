@@ -19,23 +19,25 @@ import Natural.peano
 import Natural.arithmetic
 import Natural.order
 
--- If b ≤ a then ∃ c. a = b + c. Pattern-match on the ≤ proof:
--- reflexivity gives c = 0; step recurses on the sub-proof and bumps
--- the witness through successor + add_successor. The body uses the
--- destructured constructor names (commonValue, smaller, predA) so
--- the kernel's motive-substituted expected type lines up directly.
+-- If b ≤ a then ∃ c. a = b + c. By induction on the ≤ derivation:
+-- reflexivity gives c = 0; the step case takes the IH witness and bumps it
+-- through successor + add_successor.
 theorem Natural.subtraction_witness (b a : Natural)
-        : b ≤ a → ∃ (c : Natural). a = b + c
-  | LessOrEqual.reflexivity(commonValue) =>
-      witness 0 with Equality.symmetry(Natural.add_zero(commonValue))
-  | LessOrEqual.step(smaller, predecessorOfA, subProof) => {
-      obtain ⟨cPrime, predEquality⟩
-          from Natural.subtraction_witness(smaller, predecessorOfA, subProof);
-      witness successor(cPrime) with
-          calc successor(predecessorOfA)
-             = successor(smaller + cPrime)
-             = smaller + successor(cPrime)
-    }
+        (proof : b ≤ a) : ∃ (c : Natural). a = b + c :=
+  by_induction on proof with IH {
+    case LessOrEqual.reflexivity(commonValue):
+        -- b = a = commonValue, so c = 0.
+        witness 0 with calc commonValue = commonValue + 0
+    case LessOrEqual.step(smaller, predecessorOfA, _): {
+        -- a = successor(predecessorOfA), smaller ≤ predecessorOfA; the IH
+        -- gives predecessorOfA = smaller + cPrime, so c = successor(cPrime).
+        obtain ⟨cPrime, predEquality⟩ from IH;
+        witness successor(cPrime) with
+            calc successor(predecessorOfA)
+               = successor(smaller + cPrime)
+               = smaller + successor(cPrime)
+      }
+  }
 
 -- Totality: for any a, b, either a ≤ b or b ≤ a. The successor case
 -- on a needs a recursive call passed in as a hypothesis (mirroring
@@ -46,28 +48,35 @@ theorem Natural.totality_of_less_or_equal_successor_against
             (b : Natural) → predecessorOfA ≤ b ∨ b ≤ predecessorOfA)
         : (b : Natural)
           → successor(predecessorOfA) ≤ b ∨ b ≤ successor(predecessorOfA)
-  | zero =>
-      Or.introduceRight(Natural.zero_least(successor(predecessorOfA)))
+  | zero => {
+      claim zeroLeast : 0 ≤ successor(predecessorOfA) since Natural.zero_least;
+      Or.introduceRight(zeroLeast)
+    }
   | successor(predecessorOfB) =>
       claim (predecessorOfA ≤ predecessorOfB) ∨ (predecessorOfB ≤ predecessorOfA)
           by totalityPredecessorOfA(predecessorOfB)
       claim by cases {
-        in (predecessorOfA ≤ predecessorOfB) as leftBranch:
-            Or.introduceLeft(
-                Natural.successor_less_or_equal_successor(
-                    predecessorOfA, predecessorOfB, leftBranch))
-        in (predecessorOfB ≤ predecessorOfA) as rightBranch:
-            Or.introduceRight(
-                Natural.successor_less_or_equal_successor(
-                    predecessorOfB, predecessorOfA, rightBranch))
+        in (predecessorOfA ≤ predecessorOfB) as leftBranch: {
+            claim lifted : successor(predecessorOfA) ≤ successor(predecessorOfB)
+                by Natural.successor_less_or_equal_successor;
+            Or.introduceLeft(lifted)
+          }
+        in (predecessorOfB ≤ predecessorOfA) as rightBranch: {
+            claim lifted : successor(predecessorOfB) ≤ successor(predecessorOfA)
+                by Natural.successor_less_or_equal_successor;
+            Or.introduceRight(lifted)
+          }
       }
 
-theorem Natural.totality_of_less_or_equal
-        : (a b : Natural) → a ≤ b ∨ b ≤ a
-  | zero, b =>
-      Or.introduceLeft(Natural.zero_least(b))
-  | successor(predecessorOfA), b =>
-      Natural.totality_of_less_or_equal_successor_against(
-          predecessorOfA,
-          Natural.totality_of_less_or_equal(predecessorOfA),
-          b)
+theorem Natural.totality_of_less_or_equal (a : Natural)
+        : (b : Natural) → a ≤ b ∨ b ≤ a :=
+  by_induction on a with IH {
+    case zero: {
+        take b : Natural;
+        claim zeroLeast : 0 ≤ b since Natural.zero_least;
+        Or.introduceLeft(zeroLeast)
+      }
+    case successor(predecessorOfA):
+        -- the IH is totality for predecessorOfA against every b.
+        Natural.totality_of_less_or_equal_successor_against(predecessorOfA, IH)
+  }
