@@ -384,6 +384,12 @@ returns its final non-`;`-terminated expression.
   expensive — if the helper's premises themselves invite a wide search (e.g.
   `multiply_at_least_one` among many in-scope facts) it may not terminate in
   budget; keep those explicit.
+- **Proving a disjunction `A ∨ B`.** State the true disjunct and let the
+  auto-prover introduce the `∨`: `claim A since <reason>; done` (or `by`),
+  NOT the raw constructor `Or.introduceLeft(<proof of A>)`. `done`'s
+  disjunction-introduction picks whichever disjunct is in context. (Same for
+  proving a universal: prefer `take x; …` — introduce the variable — over a
+  point-free function value; see `Natural.totality_of_less_or_equal`.)
 - `choose N such that P(N);` — sugar for `obtain ⟨N, _⟩` followed
   by a `claim P(N) by …`; reads as the textbook phrasing.
 - `let <name> ∈ <type> [with <predicate>];` — introduce a typed
