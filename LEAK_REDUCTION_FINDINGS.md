@@ -251,6 +251,29 @@ their four intermediate hoists (the six `m,n ≥ witness` bounds are now bare
 `Real/order`, `Real/basics`, `Real/addition`, `PAdic/addition` hoisted to
 argument-free claims (those needed only 5c, not 5e). LEAK_BUDGET 1350→1335.
 
+## Redundant-args check + sweep (uses backward chaining)
+
+Added the args-redundancy check to the CLAIM `by` path
+(`elaborateStructuredClaim`), mirroring the pre-existing calc-step check:
+when the whole `by` isn't removable, re-elaborate the bare `by Lemma`
+against the goal under the redundancy budget and warn *"arguments to `X`
+are inferable from the goal — `by X` alone suffices"* if it's defeq. Reuses
+`--check-redundant-by` / `MATH_CHECK_REDUNDANT`; `.mark_redundant.py` picks
+it up via its generic warning regex (no script change). No false positives:
+the warning is the real verification path (and confirmed each flagged edit
+verifies).
+
+**Sweep:** scanned the whole library (`MATH_CHECK_REDUNDANT=1` per file) →
+41 sites in 25 files → dropped the args with a small rewriter
+(`by Lemma(args)` → `by Lemma`, balanced-paren removal at the flagged
+line), each file re-verified. Total 1335 → **1312** (positional ≥3:
+968 → 950; rest were ≤2-arg / nested). LEAK_BUDGET ratcheted.
+
+Note: the flagged set is exactly what's recoverable under the *redundancy
+budget* (10000 steps), so every dropped `by Lemma` re-verifies cheaply (no
+"expensive by-less" surprises). Re-running the check finds more only as the
+prover gets stronger.
+
 ## Earlier note (now resolved by the above)
 **Known limitation (the next step for a full version).** Step 5d only
 fires on a **fully-determined** premise. The motivating nested-`max` case
