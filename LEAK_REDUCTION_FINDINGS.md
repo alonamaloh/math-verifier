@@ -103,4 +103,44 @@ not a citation change. These form a large irreducible-ish tail of the 1022.
   hoisted (−12 positional). Remaining: term-position helper calls + a few
   `multiply_by_nonneg` (need cascading nonneg hoists).
 - `Natural/maximum`: both `le_through_max_{left,right}` → ≤-calc (−2).
-- (more as they land)
+- `Rational/order_arithmetic`: two `LessThan` transitives — `x ≤ z` by
+  the transitivity bridge (by-less `claim`), `x = y` by antisymmetric
+  found by conclusion shape (−3). Remaining: term-position `IsNonneg`
+  with `?`-holes and `LessThan.lift` bodies.
+- `Real/order`: two `LessThan` transitives fully de-positionalized
+  (−8): see the "dense order theorem" pattern below.
+
+## Pattern: dense order theorem (transitive + weaken + distinct + antisym)
+
+`Real.LessThan.transitive_{left,right}` packed FOUR positional calls into
+one nested term. The de-positionalized block:
+```
+theorem … : x < z := {
+  claim yLeqZ : y ≤ z by Real.LessThan.weaken;     -- arg-free: premise y<z in scope
+  claim xLeqZ : x ≤ z;                              -- transitivity bridge (by-less)
+  claim yNotZ : ¬(y = z) by Real.LessThan.distinct; -- arg-free
+  And.introduction(xLeqZ,
+      (xEqualsZ : x = z) ↦ {
+        calc y ≤ z = x as yLeqX;                    -- bare calc binds yLeqX
+        claim xEqualsY : x = y by Real.LessOrEqual.antisymmetric;  -- arg-free
+        yNotZ(calc y = x = z) }) }
+```
+Findings:
+- **Argument-free `by Lemma` works even for ¬-goals** (`by …distinct`
+  where distinct : … → ¬(y=z)) — the premise `y < z` is in scope.
+- **Transitivity bridge fires by-less** for any relation R with
+  `R.transitive` in scope and both edges as hypotheses (Real/Rational
+  `LessOrEqual`, not just `=`).
+- Net: a dense 4-call term becomes a 0-call block that reads as the
+  textbook argument. This is the highest-value shape — order/arithmetic
+  preambles are full of them.
+
+## Reducible fraction (running estimate)
+
+Of the ~1000 positional calls, the readily-reducible shapes are:
+nested-premise hoists, dense order/arith theorems, positional
+transitivity, and named-premise citations. A large minority are
+**term-position helper applications** (definition bodies, `witness`
+payloads, `obtain … from`, `?`-hole IsNonneg trees) that need real
+restructuring or an elaborator change (backward-chaining `by`) — these
+are the long tail and may not be worth hand-rewriting.
