@@ -178,11 +178,12 @@ library-clean:
 	rm -rf $(BUILD_DIR)
 
 # ----------------------------------------------------------------------
-# CIC-leak dashboard (PLAN_LESS_CIC_STYLE.md, Phase 0.2). Counts CIC-
-# vocabulary tokens in user-space `.math` files — the north-star metric
+# Proof-style leak dashboard (PLAN_LESS_CIC_STYLE.md, Phase 0.2). Counts
+# CIC-vocabulary tokens, structural smells (claim-by-calc), and positional
+# lemma calls (>=3 args) in user-space `.math` files — the north-star metric
 # the plan drives to zero. Non-failing report by default; `leak-ratchet`
 # fails if the total exceeds LEAK_BUDGET (the no-increase ratchet).
-LEAK_BUDGET ?= 249
+LEAK_BUDGET ?= 1346
 
 leak-report:
 	@scripts/cic_leak_report --by-file

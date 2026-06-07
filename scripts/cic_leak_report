@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
 """cic_leak_report — proof-style linter for the math library.
 
-Two jobs, reported separately:
+Scans *user-space* `.math` files (everything not on the foundational-layer
+manifest, see scripts/foundational_layer.txt) for proof-style leaks — places
+where the kernel substrate or a non-math-like construction shows through the
+surface mathematics. The plan drives the total to zero; `--max N` ratchets it.
+This is the number that `make leak-ratchet` / `make check` guard.
 
-  1. CIC LEAKS (the north-star metric for PLAN_LESS_CIC_STYLE.md). Scans
-     *user-space* `.math` files (everything not on the foundational-layer
-     manifest, see scripts/foundational_layer.txt) for CIC-vocabulary tokens
-     — the "leak" of the substrate into surface mathematics. The plan drives
-     this total to zero; `--max N` ratchets it. This is the number that
-     `make leak-ratchet` / `make check` guard.
+Counted categories fall into three families:
 
-  2. STYLE ANTI-PATTERNS (advisory). Structural proof smells that aren't
-     substrate vocabulary but still hurt readability — e.g. `claim NAME : T
-     by calc …`, which only restates the calc's endpoints (use `calc … as
-     NAME`, or a bare `calc …`). Reported in their own section and NOT added
-     to the leak total, so the ratchet stays a pure CIC-leak gate.
+  1. CIC VOCABULARY — substrate tokens (`Quotient.`, `congruenceOf`,
+     `transport_proposition`, `Equality.symmetry`, `False.eliminate_proposition`,
+     `Sort`, universe annotations, …). The original north-star metric.
+
+  2. STRUCTURAL SMELLS — non-vocabulary patterns that still read as plumbing,
+     e.g. `claim NAME : T by calc …` (the calc's endpoints already *are* T —
+     write `calc … as NAME`, or a bare `calc …`).
+
+  3. POSITIONAL LEMMA CALLS — invoking a `theorem` as a function with a string
+     of positional arguments (`Foo.bar(a, b, c, proof)`), instead of citing it
+     `by Foo.bar` (goal-driven, args inferred), via `calc`, or an element
+     interface. The counted category is calls with **three or more** positional
+     arguments — the least readable; two-argument calls are reported as an
+     advisory sub-line.
 
 This makes "feels like math" a number instead of a vibe. (Despite the
 historical filename, the tool now lints more than CIC leaks.)
@@ -65,25 +73,73 @@ CATEGORIES = {
     # binder, or a `Type(<var>)` variable level counts.
     "Sort":                    re.compile(r"\bSort\b"),
     "universe annotation":     re.compile(r"\.\{|\bType\(\s*[A-Za-z_]"),
+    # Structural smell: a `claim` whose proof is itself a `calc` —
+    # `claim NAME : T by calc …` (write `calc … as NAME`) or anonymous
+    # `claim T by calc …` (write a bare `calc …`). The calc's endpoints
+    # already *are* T, so the `claim … by` wrapper just restates it.
+    # The `(?:(?!\bby\b)[^;{}])*?` consumes the claim's TYPE (no `by`) up to
+    # its proof-introducing `by`, then requires that `by` to be `by calc`.
+    # Spans newlines, stops at the statement/block boundary (`;{}`), and does
+    # NOT match `claim … by Lemma(… calc …)` (a calc nested in an argument).
+    "claim-by-calc":           re.compile(r"\bclaim\b(?:(?!\bby\b)[^;{}])*?\bby\s+\(?\s*calc\b"),
 }
 
-# Style anti-patterns: structural proof smells (not substrate vocabulary).
-# Reported separately and NOT counted toward the CIC-leak total/ratchet.
-#
-# claim-by-calc: a `claim` whose proof is itself a `calc` —
-# `claim NAME : T by calc …` (write `calc … as NAME`) or an anonymous
-# `claim T by calc …` (write a bare `calc …`). The calc's endpoints already
-# *are* T, so the `claim … by` wrapper just restates it.
-# The `(?:(?!\bby\b)[^;{}])*?` consumes the claim's TYPE (which has no `by`)
-# up to its proof-introducing `by`, then requires that `by` to be `by calc`.
-# This (a) spans newlines (character class), (b) stops at the statement /
-# block boundary (`;{}`), and (c) does NOT match `claim … by Lemma(… calc …)`
-# (a calc merely nested in an argument — there the first `by` is not `by calc`).
-ANTIPATTERNS = {
-    "claim-by-calc": re.compile(r"\bclaim\b(?:(?!\bby\b)[^;{}])*?\bby\s+\(?\s*calc\b"),
-}
+# The positional-lemma-call category (computed, not a plain regex — it needs
+# balanced-paren argument counting and the set of theorem names). The display
+# name of the counted (>= 3 args) category:
+POSITIONAL_CALL_CATEGORY = "positional lemma call (>=3 args)"
+POSITIONAL_CALL_MIN_ARGS = 3
+
+# A qualified or bare name immediately followed by `(`. We only count it when
+# the name is a known `theorem` (so definitions, constructors, and type
+# formers are excluded) and the call has >= POSITIONAL_CALL_MIN_ARGS top-level
+# arguments.
+NAME_CALL_RE = re.compile(r"\b([A-Z][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\(")
+THEOREM_DECL_RE = re.compile(r"\btheorem\s+([A-Za-z_][A-Za-z0-9_.]*)")
 
 COMMENT_RE = re.compile(r"--.*$")
+
+
+def count_call_arguments(text, open_paren_index):
+    """Top-level argument count of the call whose `(` is at the given index.
+
+    Returns (n_args, matched): n_args is the number of comma-separated
+    top-level arguments (0 for `()`), matched is False if parens are
+    unbalanced (truncated source)."""
+    depth = 0
+    commas = 0
+    i = open_paren_index
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                inner = text[open_paren_index + 1:i].strip()
+                return (0 if inner == "" else commas + 1, True)
+        elif c == "," and depth == 1:
+            commas += 1
+        i += 1
+    return (0, False)
+
+
+def positional_lemma_calls(text, theorem_names):
+    """(count_ge3, count_eq2): theorem applications by positional-arg arity."""
+    ge3 = 0
+    eq2 = 0
+    for match in NAME_CALL_RE.finditer(text):
+        if match.group(1) not in theorem_names:
+            continue
+        n_args, matched = count_call_arguments(text, match.end() - 1)
+        if not matched:
+            continue
+        if n_args >= POSITIONAL_CALL_MIN_ARGS:
+            ge3 += 1
+        elif n_args == 2:
+            eq2 += 1
+    return ge3, eq2
 
 
 def load_manifest(path):
@@ -111,12 +167,36 @@ def strip_comments(text):
     return "\n".join(COMMENT_RE.sub("", line) for line in text.splitlines())
 
 
-def scan_file(path):
+def collect_theorem_names(library_root):
+    """Set of every `theorem` name declared in the library (Test excluded).
+
+    Foundational files ARE included: a lemma defined there is still cited
+    positionally in user space, and we want those citations counted."""
+    names = set()
+    for dirpath, _dirs, files in os.walk(library_root):
+        for filename in files:
+            if not filename.endswith(".math"):
+                continue
+            rel = os.path.relpath(os.path.join(dirpath, filename), REPO_ROOT)
+            if rel.startswith(os.path.join("library", "Test") + os.sep):
+                continue
+            with open(os.path.join(dirpath, filename)) as handle:
+                body = strip_comments(handle.read())
+            for match in THEOREM_DECL_RE.finditer(body):
+                names.add(match.group(1))
+    return names
+
+
+def scan_file(path, theorem_names):
+    """Return (leaks, advisory): leaks is the counted per-category dict;
+    advisory holds the uncounted two-argument positional-call tally."""
     with open(path) as handle:
         body = strip_comments(handle.read())
     leaks = {name: len(rx.findall(body)) for name, rx in CATEGORIES.items()}
-    antipatterns = {name: len(rx.findall(body)) for name, rx in ANTIPATTERNS.items()}
-    return leaks, antipatterns
+    ge3, eq2 = positional_lemma_calls(body, theorem_names)
+    leaks[POSITIONAL_CALL_CATEGORY] = ge3
+    advisory = {"positional lemma call (2 args)": eq2}
+    return leaks, advisory
 
 
 def main():
@@ -131,11 +211,15 @@ def main():
     args = parser.parse_args()
 
     exact, prefixes = load_manifest(MANIFEST)
+    theorem_names = collect_theorem_names(LIBRARY_ROOT)
 
-    per_file = {}       # rel_path -> {category: count}   (CIC leaks)
-    per_file_anti = {}  # rel_path -> {category: count}   (style anti-patterns)
-    category_totals = {name: 0 for name in CATEGORIES}
-    anti_totals = {name: 0 for name in ANTIPATTERNS}
+    # Display order: the regex CIC/structural categories, then positional calls.
+    category_names = list(CATEGORIES) + [POSITIONAL_CALL_CATEGORY]
+
+    per_file = {}       # rel_path -> {category: count}   (counted leaks)
+    per_file_anti = {}  # rel_path -> {category: count}   (advisory)
+    category_totals = {name: 0 for name in category_names}
+    anti_totals = {"positional lemma call (2 args)": 0}
     foundational_count = 0
 
     for dirpath, _dirs, files in os.walk(LIBRARY_ROOT):
@@ -149,7 +233,7 @@ def main():
             if is_foundational(rel, exact, prefixes):
                 foundational_count += 1
                 continue
-            leaks, antis = scan_file(full)
+            leaks, antis = scan_file(full, theorem_names)
             if sum(leaks.values()) > 0:
                 per_file[rel] = leaks
                 for name, count in leaks.items():
@@ -177,9 +261,9 @@ def main():
             },
         }, indent=2, ensure_ascii=False))
     else:
-        print("CIC leak report (user space — outside the foundational layer)")
+        print("Proof-style leak report (user space — outside the foundational layer)")
         print("=" * 62)
-        for name in CATEGORIES:
+        for name in category_names:
             print(f"  {category_totals[name]:5d}  {name}")
         print("-" * 62)
         print(f"  {total:5d}  TOTAL across {len(per_file)} leaking files "
@@ -192,12 +276,12 @@ def main():
                 cats = ", ".join(f"{k}:{v}" for k, v in counts.items() if v)
                 print(f"  {sum(counts.values()):4d}  {rel}  ({cats})")
 
-        print("\nStyle anti-patterns (advisory — NOT counted in the leak total)")
+        print("\nAdvisory (NOT counted in the total)")
         print("=" * 62)
-        for name in ANTIPATTERNS:
+        for name in anti_totals:
             print(f"  {anti_totals[name]:5d}  {name}")
-        print("        hint: `claim NAME : T by calc …`  →  `calc … as NAME`"
-              " (or a bare `calc …`)")
+        print("        hint: cite a theorem `by Foo.bar` (args inferred from the"
+              " goal), via `calc`, or an element interface")
         if args.by_file and per_file_anti:
             print("  Per-file:")
             for rel, counts in sorted(per_file_anti.items(),
