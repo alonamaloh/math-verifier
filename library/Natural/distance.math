@@ -73,31 +73,6 @@ theorem Natural.distance_symmetric (a : Natural)
           }
   }
 
--- Helper: distance(a + b, b) = a. Walking off the rightmost `b`
--- decrements both sides by 1, leaving `(a, 0)` whose distance is `a`.
--- Induction on b (a is a free parameter).
-theorem Natural.distance_add_self_right (a b : Natural)
-        : Natural.distance(a + b, b) = a :=
-  by_induction on b with IH {
-    case zero:
-        calc Natural.distance(a + 0, 0)
-           = Natural.distance(a, 0)
-           = a
-    case successor(predecessor):
-        calc Natural.distance(a + (1 + predecessor), 1 + predecessor)
-           = Natural.distance(1 + (a + predecessor), 1 + predecessor)
-                  by Natural.add_successor(a, predecessor)
-           = a
-  }
-
--- The symmetric companion: distance(b, a + b) = a. Symmetry of
--- distance reduces it to the previous lemma.
-theorem Natural.distance_self_add_right (a b : Natural)
-        : Natural.distance(b, a + b) = a :=
-  calc Natural.distance(b, a + b)
-     = Natural.distance(a + b, b)
-     = a
-
 -- distance(a, b) ≤ a + b. Triangle inequality at Natural level.
 -- Induction on a; b stays polymorphic in the IH by binding it
 -- inside the inductive body.
@@ -148,6 +123,23 @@ theorem Natural.distance_add_right_cancel (a b c : Natural)
   calc Natural.distance(a + b, c + b)
      = Natural.distance(b + a, b + c)
      = Natural.distance(a, c)
+
+-- Helper: distance(a + b, b) = a. Reorder to a common left summand
+-- `b`, then cancel it: distance(b + a, b + 0) = distance(a, 0) = a.
+theorem Natural.distance_add_self_right (a b : Natural)
+        : Natural.distance(a + b, b) = a :=
+  calc Natural.distance(a + b, b)
+     = Natural.distance(b + a, b + 0)
+     = Natural.distance(a, 0)
+     = a
+
+-- The symmetric companion: distance(b, a + b) = a. Symmetry of
+-- distance reduces it to the previous lemma.
+theorem Natural.distance_self_add_right (a b : Natural)
+        : Natural.distance(b, a + b) = a :=
+  calc Natural.distance(b, a + b)
+     = Natural.distance(a + b, b)
+     = a
 
 -- Key inequality: a ≤ b + distance(a, b). One direction of the
 -- "distance ≤ z iff a ≤ c + z and c ≤ a + z" characterisation;
