@@ -156,6 +156,25 @@ discharged without hand-hoisting, collapsing a large fraction
 automatically.** Recommend doing that before grinding the term-position
 tail by hand.
 
+## CIC tokens
+
+### False.eliminate_proposition → absurd  ✅ (8 → 0)
+`False.eliminate_proposition(GOAL, fp)` → `absurd(fp)`. `absurd` infers
+the goal from the surrounding expected type, so the explicit `GOAL`
+argument was pure plumbing. Fully mechanical; all 8 user-space sites
+converted (the `Logic/excluded_middle` uses are foundational, excluded).
+
+### Still open
+- `Equality.symmetry` (98): mostly `rewrite(Equality.symmetry(eq), x)`
+  (reverse rewrite) and calc-flips. Needs case-by-case (calc /
+  `substituting` / `linear_combination`); some are genuinely a flip.
+- `congruenceOf` (23): → one-step `calc … by <eq>` or element interface.
+- `transport_proposition` (14): → `substituting` / `rewrite`.
+- `Quotient.` (107): biggest; needs `construction` / `by_representatives`
+  intro sugar — the deepest rewrite.
+
+LEAK_BUDGET ratcheted 1346 → **1226**.
+
 ## Reducible fraction (running estimate)
 
 Of the ~1000 positional calls, the readily-reducible shapes are:
