@@ -35,25 +35,30 @@ import Lists.basics
 -- The product of a list of primes is at least 1. Empty case is
 -- reflexivity on 1; prepend case multiplies head (≥ 2 because prime)
 -- with the induction hypothesis on the tail.
-theorem NaturalList.productOf_at_least_one
-        : (list : NaturalList)
-          → ((p : Natural) → NaturalList.member(p, list)
-              → Natural.is_prime(p))
-          → 1 ≤ NaturalList.productOf(list)
-  | NaturalList.empty, _ =>
-      LessOrEqual.reflexivity(1)
-  | NaturalList.prepend(head, tail), allPrime =>
-      Natural.multiply_at_least_one(
-          head, NaturalList.productOf(tail),
-          LessOrEqual.transitive(1, 2, head,
-            And.left(?, ?,
-                allPrime(head, NaturalList.member.here(tail))),
-            Natural.one_less_or_equal_two),
-          NaturalList.productOf_at_least_one(tail,
-            (p : Natural)
-                (memberOfTail : NaturalList.member(p, tail)) ↦
-              allPrime(p,
-                NaturalList.member.there(head, tail, memberOfTail))))
+theorem NaturalList.productOf_at_least_one (list : NaturalList)
+        (allPrime : (p : Natural) → NaturalList.member(p, list)
+                    → Natural.is_prime(p))
+        : 1 ≤ NaturalList.productOf(list) :=
+  by_induction on list with IH refining allPrime {
+    case NaturalList.empty:
+        LessOrEqual.reflexivity(1)
+    case NaturalList.prepend(head, tail): {
+        -- head is prime, so 2 ≤ head, hence 1 ≤ head; and 1 ≤ productOf(tail)
+        -- by the IH on the tail (every tail member is also a list member).
+        claim headPrime : Natural.is_prime(head)
+            since allPrime(head, NaturalList.member.here(tail));
+        obtain ⟨twoLessOrEqualHead, headRest⟩ from headPrime;
+        calc 1 ≤ 2 ≤ head as oneLessOrEqualHead;
+        claim 1 ≤ NaturalList.productOf(tail)
+            since IH((p : Natural)
+                       (memberOfTail : NaturalList.member(p, tail)) ↦
+                     allPrime(p,
+                         NaturalList.member.there(head, tail, memberOfTail)));
+        -- productOf(prepend(head, tail)) ≡ head * productOf(tail).
+        change 1 ≤ head * NaturalList.productOf(tail);
+        done by Natural.multiply_at_least_one
+      }
+  }
 
 -- No natural number is both at least 2 and at most 1: descend `2 ≤ 1` to
 -- `1 ≤ 0`, which `absurd` refutes.
