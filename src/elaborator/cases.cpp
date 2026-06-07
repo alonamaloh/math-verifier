@@ -597,6 +597,18 @@ ExpressionPointer Elaborator::elaborateCasesWithRefining(
                 "cases ... refining ... { ... } needs an expected "
                 "type from context");
         }
+        // Bound re-entrancy: an infinite refining recursion would overflow the
+        // stack and crash the process. Genuine nesting is shallow.
+        if (casesRefiningDepth_ >= kCasesRefiningDepthCap) {
+            throwElaborate(
+                "cases ... refining ... nested too deeply (possible "
+                "non-terminating refinement) at line " + std::to_string(line));
+        }
+        struct RefiningDepthGuard {
+            int& depth;
+            RefiningDepthGuard(int& d) : depth(d) { ++depth; }
+            ~RefiningDepthGuard() { --depth; }
+        } refiningDepthGuard(casesRefiningDepth_);
         Frame frame(*this,
             "cases ... refining ... at line " + std::to_string(line));
 
@@ -705,9 +717,17 @@ ExpressionPointer Elaborator::elaborateCasesWithRefining(
             cases.inductionHypothesisName);
 
         // (4) Elaborate the synthetic cases against the wrapped Pi
-        // chain.
-        ExpressionPointer innerCasesKernel = elaborateExpression(
-            *syntheticCases, localBinders, wrappedExpectedType);
+        // chain. Call the INNER elaborator directly rather than going through
+        // elaborateExpression → elaborateCasesExpression: the dependent
+        // hypotheses have already been generalised into `wrappedExpectedType`,
+        // so the auto-refine in elaborateCasesExpression must NOT fire again —
+        // it would still see those hypotheses in scope and recurse into
+        // refining forever (stack overflow).
+        const SurfaceCases& syntheticCasesNode =
+            std::get<SurfaceCases>(syntheticCases->node);
+        ExpressionPointer innerCasesKernel = elaborateCasesExpressionInner(
+            syntheticCasesNode, localBinders, wrappedExpectedType,
+            line, column);
 
         // (5) Apply the result to (h_1, h_2, …, h_N), each as a
         // BoundVariable reference into the outer context. The kernel
@@ -919,22 +939,15 @@ ExpressionPointer Elaborator::elaborateCasesExpression(
             std::vector<std::string> autoRefine =
                 scrutineeDependentBinders(cases.scrutinee, localBinders);
             if (!autoRefine.empty()) {
-                try {
-                    return elaborateCasesExpressionInner(
-                        cases, localBinders, expectedType, line, column);
-                } catch (const ElaborateError& plainError) {
-                    SurfaceCases reverted = cases;
-                    reverted.refiningNames = std::move(autoRefine);
-                    try {
-                        return elaborateCasesExpressionInner(
-                            reverted, localBinders, expectedType,
-                            line, column);
-                    } catch (const ElaborateError&) {
-                        // The auto-revert didn't help; surface the
-                        // original (more relevant) failure.
-                        throw plainError;
-                    }
-                }
+                // A hypothesis depends on the scrutinee, so it must be
+                // generalised (reverted) before the case-split. Go straight to
+                // the refining path: trying the plain path first can LOOP on
+                // such a hypothesis (the motive/typecheck never terminates)
+                // rather than failing fast, so we must not attempt it here.
+                SurfaceCases reverted = cases;
+                reverted.refiningNames = std::move(autoRefine);
+                return elaborateCasesExpressionInner(
+                    reverted, localBinders, expectedType, line, column);
             }
         }
         return elaborateCasesExpressionInner(

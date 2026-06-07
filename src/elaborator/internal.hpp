@@ -4614,6 +4614,12 @@ private:
     // Stage-1 statements-only mode (skip proof bodies). See constructor.
     bool statementsOnly_ = false;
     int autoProveDepth_ = 0;
+    // Re-entrancy guard for `cases … refining …`. Genuine nesting (a refining
+    // cases inside another's arm) is shallow; a runaway here means an infinite
+    // refining recursion, which would otherwise overflow the stack and crash
+    // the process. Capped so it throws a normal ElaborateError instead.
+    int casesRefiningDepth_ = 0;
+    static constexpr int kCasesRefiningDepthCap = 200;
     // Depth counter for backward-chaining discharge (inferCallWithHoles
     // Steps 5d/5e): when a cited lemma's premise can't be discharged from a
     // ready-made hypothesis, we try to PROVE it — via the auto-prover (5d,

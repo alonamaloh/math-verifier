@@ -7,6 +7,7 @@ module Test.auto_generalize_test
 import Logic.basics
 import Equality.basics
 import Natural.basics
+import Lists.basics
 
 -- `equation : n = 0` depends on the scrutinee `n`. In the successor case
 -- it is refined to `successor(k) = 0`, which is exactly the goal there —
@@ -18,4 +19,16 @@ theorem Test.uses_refined_hypothesis (n : Natural) (equation : n = 0)
   cases n {
     | zero          => reflexivity(Natural, 0)
     | successor(k)  => equation
+  }
+
+-- Regression: a hypothesis whose type is a recursive predicate over a
+-- non-Natural inductive scrutinee. The plain auto-generalize path used to
+-- NON-TERMINATE (unbounded-memory loop → could crash the machine) on such a
+-- hypothesis instead of failing fast; it must route straight to the refining
+-- path and terminate. (`member(0, list)` depends on the scrutinee `list`.)
+theorem Test.list_dependent_hypothesis (list : NaturalList)
+        (h : NaturalList.member(0, list)) : True :=
+  by_induction on list with IH {
+    case NaturalList.empty: True.trivial
+    case NaturalList.prepend(head, tail): True.trivial
   }
