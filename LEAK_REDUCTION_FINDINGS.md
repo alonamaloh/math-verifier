@@ -135,6 +135,27 @@ Findings:
   textbook argument. This is the highest-value shape — order/arithmetic
   preambles are full of them.
 
+## Progress + the plateau (positional calls)
+
+Total **1346 → 1234** so far (claim-by-calc 73→0; positional 1022→983;
+CIC tokens steady at 251). The cleanly-reducible positional shapes are
+now largely harvested:
+- nested-max preamble hoist: `Real.multiplication`, `PAdic.multiplication`
+  (−12 each).
+- dense order theorems: `Real.order`, `Rational.order_arithmetic`.
+- scattered transitivity bridges: `Natural.maximum`, `Polynomial.degree`.
+
+**Plateau reached.** The remaining ~983 are dominated by **deep
+term-position nests** — `le_through_max` buried inside a calc-step's `by
+add_strict_strict(…)` argument (`PAdic/addition`), `?`-hole `IsNonneg`
+trees, big helper-application theorem bodies, `obtain … from`. Each needs
+a risky multi-line restructure for a small per-site gain. **The
+high-leverage move for this tail is the elaborator change (backward-
+chaining argument-free `by`, idea #1): it would let the nested premises be
+discharged without hand-hoisting, collapsing a large fraction
+automatically.** Recommend doing that before grinding the term-position
+tail by hand.
+
 ## Reducible fraction (running estimate)
 
 Of the ~1000 positional calls, the readily-reducible shapes are:
