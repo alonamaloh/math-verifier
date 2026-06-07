@@ -33,15 +33,23 @@ theorem Natural.multiply_at_least_one
 -- successor(a) ≤ a + b when 1 ≤ b. Induct on a; both cases use that
 -- add reduces on its first argument (zero + b ≡ b, successor(k) + b ≡
 -- successor(k + b)).
-theorem Natural.successor_less_or_equal_add_at_least_one
-        : (a b : Natural) → 1 ≤ b → successor(a) ≤ a + b
-  | zero, _, bAtLeastOne =>
-      bAtLeastOne
-  | successor(predA), b, bAtLeastOne =>
-      Natural.successor_less_or_equal_successor(
-          successor(predA), predA + b,
-          Natural.successor_less_or_equal_add_at_least_one(
-              predA, b, bAtLeastOne))
+theorem Natural.successor_less_or_equal_add_at_least_one (a : Natural)
+        : (b : Natural) → 1 ≤ b → successor(a) ≤ a + b :=
+  by_induction on a with IH {
+    case zero: {
+        take b : Natural;
+        suppose 1 ≤ b as bAtLeastOne;
+        -- successor(0) ≤ 0 + b reduces to 1 ≤ b.
+        bAtLeastOne
+      }
+    case successor(predA): {
+        take b : Natural;
+        suppose 1 ≤ b as bAtLeastOne;
+        -- successor(predA) ≤ predA + b by the IH; bump both sides.
+        claim step : successor(predA) ≤ predA + b since IH(b, bAtLeastOne);
+        done by Natural.successor_less_or_equal_successor
+      }
+  }
 
 -- successor(q) ≤ p * q when 2 ≤ p and 1 ≤ q. With p = successor(predP)
 -- and predP ≥ 1 (from 2 ≤ p), multiply_at_least_one gives predP * q ≥ 1;
@@ -53,8 +61,7 @@ theorem Natural.successor_less_or_equal_multiply
       absurd(twoLessOrEqualZero)
   | successor(predP), q, twoLessOrEqualSuccessorPredP, qAtLeastOne => {
       claim predPAtLeastOne : 1 ≤ predP;
-      Natural.successor_less_or_equal_add_at_least_one(
-          q, predP * q,
-          Natural.multiply_at_least_one(
-              predP, q, predPAtLeastOne, qAtLeastOne))
+      -- predP · q ≥ 1, so successor(q) ≤ q + predP · q = successor(predP) · q.
+      claim productAtLeastOne : 1 ≤ predP * q by Natural.multiply_at_least_one;
+      done by Natural.successor_less_or_equal_add_at_least_one
     }
