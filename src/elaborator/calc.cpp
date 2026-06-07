@@ -997,6 +997,16 @@ ExpressionPointer Elaborator::elaborateCalc(
                             carrierType),
                         endpointKernels[lastKept]),
                     endpointKernels[k + 1]);
+                // Measure with the SAME prover a by-less `=` step verifies
+                // through — `autoProveClaim` (equality battery, then the full
+                // tactic set). Using the narrower `autoProveCalcStep` here
+                // under-measured: it could close the combined step cheaply
+                // while the actual by-less re-proof takes the full tactic
+                // set's pricier path, so a "cheap" suggestion turned into an
+                // expensive search once the midpoint was deleted. Closing over
+                // the local binders to match autoProveClaim's goal contract.
+                ExpressionPointer combinedRelationClosed = closeOverLocalBinders(
+                    combinedRelation, localBinders, localBinders.size());
                 ExpressionPointer autoAttempt;
                 {
                     // Cap the budget so collapsing is only suggested when the
@@ -1004,13 +1014,11 @@ ExpressionPointer Elaborator::elaborateCalc(
                     // intermediate is pulling its weight).
                     RedundancyBudgetGuard budgetGuard(*this);
                     try {
-                        autoAttempt = autoProveCalcStep(
-                            localBinders,
-                            endpointKernels[lastKept],
-                            endpointKernels[k + 1],
-                            carrierType, carrierLevel,
-                            combinedRelation,
-                            calc.steps[k - 1].line, calc.steps[k - 1].column);
+                        autoAttempt = autoProveClaim(
+                            combinedRelationClosed, localBinders,
+                            calc.steps[k - 1].line);
+                    } catch (const AutoProverBudgetError&) {
+                        autoAttempt = nullptr;
                     } catch (const ElaborateError&) {
                         autoAttempt = nullptr;
                     } catch (const TypeError&) {
