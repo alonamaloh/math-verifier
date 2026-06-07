@@ -401,37 +401,37 @@ theorem Real.LessOrEqual.antisymmetric
 theorem Real.LessThan.transitive_left
         (x y z : Real)
         (xLeqY : x ≤ y) (yLessThanZ : y < z)
-        : x < z :=
+        : x < z := {
+  claim yLeqZ : y ≤ z by Real.LessThan.weaken;
+  claim xLeqZ : x ≤ z;
+  claim yNotZ : ¬(y = z) by Real.LessThan.distinct;
   And.introduction(
-      Real.LessOrEqual.transitive(x, y, z, xLeqY,
-          Real.LessThan.weaken(y, z, yLessThanZ)),
-      (xEqualsZ : x = z) ↦
+      xLeqZ,
+      (xEqualsZ : x = z) ↦ {
         -- y ≤ z = x, with x ≤ y gives x = y by antisymmetry.
         -- Then y = x = z contradicts y ≠ z.
-        Real.LessThan.distinct(y, z, yLessThanZ)(
-            calc y
-               = x       by Real.LessOrEqual.antisymmetric(x, y,
-                                    xLeqY,
-                                    (calc y
-                                        ≤ z
-                                        = x))
-               = z))
+        calc y ≤ z = x as yLeqX;
+        claim xEqualsY : x = y by Real.LessOrEqual.antisymmetric;
+        yNotZ(calc y = x = z)
+      })
+}
 
 -- Real.LessThan.transitive_right: x < y, y ≤ z → x < z.
 theorem Real.LessThan.transitive_right
         (x y z : Real)
         (xLessThanY : x < y) (yLeqZ : y ≤ z)
-        : x < z :=
+        : x < z := {
+  claim xLeqY : x ≤ y by Real.LessThan.weaken;
+  claim xLeqZ : x ≤ z;
+  claim xNotY : ¬(x = y) by Real.LessThan.distinct;
   And.introduction(
-      Real.LessOrEqual.transitive(x, y, z,
-          Real.LessThan.weaken(x, y, xLessThanY), yLeqZ),
-      (xEqualsZ : x = z) ↦
-        Real.LessThan.distinct(x, y, xLessThanY)(
-            Real.LessOrEqual.antisymmetric(x, y,
-                Real.LessThan.weaken(x, y, xLessThanY),
-                (calc y
-                    ≤ z
-                    = x))))
+      xLeqZ,
+      (xEqualsZ : x = z) ↦ {
+        calc y ≤ z = x as yLeqX;
+        claim xEqualsY : x = y by Real.LessOrEqual.antisymmetric;
+        xNotY(xEqualsY)
+      })
+}
 
 -- ----------------------------------------------------------------------
 -- Additive monotonicity on Real: x ≤ y → x + z ≤ y + z, and the
