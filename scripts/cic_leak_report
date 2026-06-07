@@ -19,12 +19,14 @@ Counted categories fall into three families:
      e.g. `claim NAME : T by calc …` (the calc's endpoints already *are* T —
      write `calc … as NAME`, or a bare `calc …`).
 
-  3. POSITIONAL LEMMA CALLS — invoking a `theorem` as a function with a string
-     of positional arguments (`Foo.bar(a, b, c, proof)`), instead of citing it
-     `by Foo.bar` (goal-driven, args inferred), via `calc`, or an element
-     interface. The counted category is calls with **three or more** positional
-     arguments — the least readable; two-argument calls are reported as an
-     advisory sub-line.
+  3. DIRECT PROOF-LEMMA CALLS — invoking a `theorem` as a function on
+     positional arguments (`Foo.bar(a, b, proof)`, `Foo.bar(proof)`), instead
+     of stating the fact and discharging it with `by Foo.bar` (goal-driven,
+     args inferred) or chaining it via `calc`. EVERY positional arity counts —
+     even `Foo.bar(proof)` is a direct call; a by-arity breakdown is printed
+     for visibility but the whole category is in the total. (Value-level
+     applications — `definition`s, constructors, type formers — are NOT
+     theorems and are not counted.)
 
 This makes "feels like math" a number instead of a vibe. (Despite the
 historical filename, the tool now lints more than CIC leaks.)
@@ -90,16 +92,16 @@ CATEGORIES = {
     "claim-by-calc":           re.compile(r"\bclaim\b(?:(?!\bby\b)[^;{}])*?\bby\s+\(?\s*calc\b"),
 }
 
-# The positional-lemma-call category (computed, not a plain regex — it needs
-# balanced-paren argument counting and the set of theorem names). The display
-# name of the counted (>= 3 args) category:
-POSITIONAL_CALL_CATEGORY = "positional lemma call (>=3 args)"
-POSITIONAL_CALL_MIN_ARGS = 3
+# The direct-proof-lemma-call category (computed, not a plain regex — it needs
+# balanced-paren argument counting and the set of theorem names). Every
+# application of a `theorem` to positional arguments is a leak: the math-like
+# form is to state the fact and discharge it with `by <lemma>` (the args are
+# then inferred from the goal), not to invoke the lemma as a function.
+POSITIONAL_CALL_CATEGORY = "direct proof-lemma call"
 
 # A qualified or bare name immediately followed by `(`. We only count it when
 # the name is a known `theorem` (so definitions, constructors, and type
-# formers are excluded) and the call has >= POSITIONAL_CALL_MIN_ARGS top-level
-# arguments.
+# formers are excluded); any positional-argument arity counts.
 NAME_CALL_RE = re.compile(r"\b([A-Z][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\(")
 THEOREM_DECL_RE = re.compile(r"\btheorem\s+([A-Za-z_][A-Za-z0-9_.]*)")
 # Note: `by substituting eq` is deliberately NOT a leak — it reads as
@@ -135,20 +137,26 @@ def count_call_arguments(text, open_paren_index):
 
 
 def positional_lemma_calls(text, theorem_names):
-    """(count_ge3, count_eq2): theorem applications by positional-arg arity."""
-    ge3 = 0
-    eq2 = 0
+    """Direct proof-lemma applications, counted by positional arity.
+
+    Returns (total, arity) where total counts EVERY application of a known
+    `theorem` to one or more positional arguments, and arity is the
+    informational by-arity breakdown {"1 arg": …, "2 args": …, ">=3 args": …}
+    (its values sum to total — it is not a separate tally)."""
+    n1 = n2 = n3 = 0
     for match in NAME_CALL_RE.finditer(text):
         if match.group(1) not in theorem_names:
             continue
         n_args, matched = count_call_arguments(text, match.end() - 1)
         if not matched:
             continue
-        if n_args >= POSITIONAL_CALL_MIN_ARGS:
-            ge3 += 1
+        if n_args == 1:
+            n1 += 1
         elif n_args == 2:
-            eq2 += 1
-    return ge3, eq2
+            n2 += 1
+        elif n_args >= 3:
+            n3 += 1
+    return n1 + n2 + n3, {"1 arg": n1, "2 args": n2, ">=3 args": n3}
 
 
 def load_manifest(path):
@@ -197,15 +205,15 @@ def collect_theorem_names(library_root):
 
 
 def scan_file(path, theorem_names):
-    """Return (leaks, advisory): leaks is the counted per-category dict;
-    advisory holds the uncounted two-argument positional-call tally."""
+    """Return (leaks, breakdown): leaks is the counted per-category dict;
+    breakdown is the by-arity split of the counted direct-proof-lemma-call
+    category (informational — its values are already inside the total)."""
     with open(path) as handle:
         body = strip_comments(handle.read())
     leaks = {name: len(rx.findall(body)) for name, rx in CATEGORIES.items()}
-    ge3, eq2 = positional_lemma_calls(body, theorem_names)
-    leaks[POSITIONAL_CALL_CATEGORY] = ge3
-    advisory = {"positional lemma call (2 args)": eq2}
-    return leaks, advisory
+    total_calls, arity = positional_lemma_calls(body, theorem_names)
+    leaks[POSITIONAL_CALL_CATEGORY] = total_calls
+    return leaks, arity
 
 
 def main():
@@ -226,9 +234,9 @@ def main():
     category_names = list(CATEGORIES) + [POSITIONAL_CALL_CATEGORY]
 
     per_file = {}       # rel_path -> {category: count}   (counted leaks)
-    per_file_anti = {}  # rel_path -> {category: count}   (advisory)
+    per_file_anti = {}  # rel_path -> {arity: count}       (informational)
     category_totals = {name: 0 for name in category_names}
-    anti_totals = {"positional lemma call (2 args)": 0}
+    anti_totals = {"1 arg": 0, "2 args": 0, ">=3 args": 0}
     foundational_count = 0
 
     for dirpath, _dirs, files in os.walk(LIBRARY_ROOT):
@@ -262,9 +270,9 @@ def main():
             "leaking_files": len(per_file),
             "foundational_files": foundational_count,
             "per_file": {p: {k: v for k, v in c.items() if v} for p, c in per_file.items()},
-            "antipatterns": {
+            "proof_lemma_call_arity": {
                 "total": anti_total,
-                "by_category": anti_totals,
+                "by_arity": anti_totals,
                 "per_file": {p: {k: v for k, v in c.items() if v}
                              for p, c in per_file_anti.items()},
             },
@@ -285,12 +293,13 @@ def main():
                 cats = ", ".join(f"{k}:{v}" for k, v in counts.items() if v)
                 print(f"  {sum(counts.values()):4d}  {rel}  ({cats})")
 
-        print("\nAdvisory (NOT counted in the total)")
+        print("\nDirect proof-lemma calls by arity"
+              " (already included in the total above)")
         print("=" * 62)
         for name in anti_totals:
             print(f"  {anti_totals[name]:5d}  {name}")
-        print("        hint: cite a theorem `by Foo.bar` (args inferred from the"
-              " goal), via `calc`, or an element interface")
+        print("        hint: state the fact and cite the theorem `by Foo.bar`"
+              " (args inferred from the goal), or chain it via `calc`")
         if args.by_file and per_file_anti:
             print("  Per-file:")
             for rel, counts in sorted(per_file_anti.items(),
