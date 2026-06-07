@@ -22,7 +22,7 @@ import Natural.divide
 -- Write b as a + s (its excess over a); then c*b = c*a + c*s, which is at
 -- least c*a.
 theorem Natural.multiply_monotone_left (c a b : Natural) (aLeB : a ≤ b) : c * a ≤ c * b := {
-  obtain ⟨excess, bEqual⟩ from Natural.subtraction_witness(a, b, aLeB);
+  obtain ⟨excess, bEqual⟩ by Natural.subtraction_witness;
   calc c * a
      ≤ c * a + c * excess       
      = c * (a + excess)
@@ -45,17 +45,17 @@ theorem Natural.quotient_strict_absurd
         (strictlyBelow : successor(quotientLow) ≤ quotientHigh)
         (equation : divisor * quotientLow + remainderLow = divisor * quotientHigh + remainderHigh)
         : False := {
-  obtain ⟨gap, highEqual⟩ from Natural.subtraction_witness(successor(quotientLow), quotientHigh, strictlyBelow);
+  obtain ⟨gap, highEqual⟩ by Natural.subtraction_witness;
   -- Cancel divisor*quotientLow from the equation, exposing rLow on the left
   -- and divisor + divisor*gap + rHigh on the right.
+  calc divisor * quotientLow + remainderLow
+     = divisor * quotientHigh + remainderHigh
+     = divisor * (successor(quotientLow) + gap) + remainderHigh
+     = (divisor * successor(quotientLow) + divisor * gap) + remainderHigh
+     = ((divisor + divisor * quotientLow) + divisor * gap) + remainderHigh
+     = divisor * quotientLow + (divisor + divisor * gap + remainderHigh);
   claim remainderLow = divisor + divisor * gap + remainderHigh
-      by Natural.add_cancel_left(divisor * quotientLow, remainderLow, divisor + divisor * gap + remainderHigh,
-          calc divisor * quotientLow + remainderLow
-             = divisor * quotientHigh + remainderHigh
-             = divisor * (successor(quotientLow) + gap) + remainderHigh
-             = (divisor * successor(quotientLow) + divisor * gap) + remainderHigh
-             = ((divisor + divisor * quotientLow) + divisor * gap) + remainderHigh
-             = divisor * quotientLow + (divisor + divisor * gap + remainderHigh));
+      by Natural.add_cancel_left;
   -- So divisor ≤ rLow, hence successor(rLow) ≤ divisor ≤ rLow: impossible.
   calc divisor
         ≤ divisor + (divisor * gap + remainderHigh)
@@ -66,7 +66,7 @@ theorem Natural.quotient_strict_absurd
         ≤ divisor         
         ≤ remainderLow    
       as selfBelow;
-  absurd(Natural.not_successor_less_or_equal_self(remainderLow, selfBelow))
+  done by Natural.not_successor_less_or_equal_self
 }
 
 -- Quotients are unique: same divisor, equal `quotient*divisor + remainder`
@@ -102,7 +102,7 @@ theorem Natural.quotient_remainder_unique
           atLeast
     }
   };
-  Natural.le_antisymmetric(quotientOne, quotientTwo, oneLeTwo, twoLeOne)
+  done by Natural.le_antisymmetric
 }
 
 -- With equal quotients, the remainders are equal too: cancel the common
@@ -115,8 +115,8 @@ theorem Natural.remainder_unique
         : remainderOne = remainderTwo := {
   claim quotientOne = quotientTwo
       since Natural.quotient_remainder_unique;
-  Natural.add_cancel_left(divisor * quotientTwo, remainderOne, remainderTwo,
-      calc divisor * quotientTwo + remainderOne
-         = divisor * quotientOne + remainderOne
-         = divisor * quotientTwo + remainderTwo)
+  calc divisor * quotientTwo + remainderOne
+     = divisor * quotientOne + remainderOne
+     = divisor * quotientTwo + remainderTwo;
+  done by Natural.add_cancel_left
 }
