@@ -69,7 +69,7 @@ theorem Natural.not_two_less_or_equal_one : ¬(2 ≤ 1) := {
 -- out 0 (a zero divisor would force 1 = 0) and leaves exactly 1.
 theorem Natural.one_is_only_divisor_of_one (d : Natural) (dividesOne : d ∣ 1)
         : d = 1 :=
-  cases Natural.divides_less_or_equal_or_zero(d, 1, dividesOne) {
+  cases by Natural.divides_less_or_equal_or_zero {
     | Or.introduceLeft(oneEqualsZero) => absurd(oneEqualsZero)
     | Or.introduceRight(dAtMostOne)   =>
         cases d refining dAtMostOne, dividesOne {
@@ -77,10 +77,14 @@ theorem Natural.one_is_only_divisor_of_one (d : Natural) (dividesOne : d ∣ 1)
               obtain ⟨quotient, oneEqualsZeroTimesQuotient⟩ from dividesOne;
               absurd(calc (1 : Natural) = 0)
             }
-          | successor(dPredecessor) =>
-              Natural.less_or_equal_zero_implies_equals_zero(dPredecessor,
-                  Natural.less_or_equal_successor_successor_descend(
-                      dPredecessor, 0, dAtMostOne))
+          | successor(dPredecessor) => {
+              -- d ≤ 1 forces dPredecessor ≤ 0, so dPredecessor = 0 and d = 1.
+              claim dPredecessor ≤ 0
+                  by Natural.less_or_equal_successor_successor_descend;
+              claim dPredecessor = 0
+                  by Natural.less_or_equal_zero_implies_equals_zero;
+              done
+            }
         }
   }
 
