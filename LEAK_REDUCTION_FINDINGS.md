@@ -214,6 +214,44 @@ dispatch.cpp already re-checks the result is defeq the goal).
    `goalClosed`); closing it again mangles the goal and the sub-proof
    silently fails. Pass `slotType` directly.
 
+## General backward chaining (Step 5e) — IMPLEMENTED
+
+The full unification-driven version now lands as **Step 5e** in
+`inferCallWithHoles`. When a premise slot still mentions an unresolved
+metavar the conclusion didn't pin (`max(a, ?b) ≤ x` from citing
+`le_through_max_left`), `tryResolvePremiseSlot` / `trySubLemmaSharingMetavars`
+recurse via `inferCallWithHoles`, threading the parent's hole names in as
+`inheritedMetavars`, so a leaf unification against a context hypothesis
+solves the parent hole. Candidate lemmas come from `computeGoalHits`
+(conclusion-head match). `library/Test/backward_chaining_test.math` case C
+(nested-max) verifies on, fails with `MATH_BACKWARD_CHAINING=0`.
+
+**Subtleties that bit (record for the next implementer):**
+1. **Self-application hole collision.** A lemma applied to its own premise
+   reuses the same fresh-hole names — depth-tag the sub-call's diagnostic
+   (`name@bcN`) so `_hole_i_<diag>` names stay distinct.
+2. **Inherited holes must be RIGID during conclusion unification.** Seeding
+   them into the set used by Steps 2–4 makes a conclusion `a := f(?inh)`
+   self-unify `?inh` against itself and lock it. Keep two sets:
+   `metavariableNames` (own, Steps 2–4) and `dischargeMetavars`
+   (own ∪ inherited, only 5c/5e).
+3. **5c substitution must be a fixpoint.** A hole solved to a value that
+   mentions a later-solved hole (`a := max(p, ?b)`, then `?b := q`) needs
+   iterated substitution; the old single pass left `?b` free and failed the
+   defeq check. (Now bounded-fixpoint in 5c — also helps the general case.)
+4. **Search/budget.** Goal-growing candidates (e.g. `succ(p) ≤ x → p ≤ x`)
+   are ranked first and recurse fruitlessly; with depth cap 3 they exhaust
+   the kernel-step budget before the productive candidate is tried. Depth
+   cap **2** (enough for the library's doubly-nested projections) collapses
+   the tree; candidate cap 8; budget armed in 5e.
+
+**Sweep (exploiting it).** Both `multiplication` Cauchy-bound preambles drop
+their four intermediate hoists (the six `m,n ≥ witness` bounds are now bare
+`by le_through_max_*`). Single-level term-position `le_through_max` calls in
+`Real/order`, `Real/basics`, `Real/addition`, `PAdic/addition` hoisted to
+argument-free claims (those needed only 5c, not 5e). LEAK_BUDGET 1350→1335.
+
+## Earlier note (now resolved by the above)
 **Known limitation (the next step for a full version).** Step 5d only
 fires on a **fully-determined** premise. The motivating nested-`max` case
 (`by le_through_max_left` with premise `max(a, ?b) ≤ x`) leaves `?b`
