@@ -200,6 +200,45 @@ ExpressionPointer Elaborator::elaborateExpression(
                 "`Natural.successor_injective(?, ?, eq)`).");
         }
 
+        if (auto* citeInferred =
+                std::get_if<SurfaceCiteInferred>(&expression.node)) {
+            // `<lemma>` with all explicit arguments inferred: expand to
+            // `lemma(?, …, ?)` and let the hole-driven call path resolve them
+            // (premises discharged from context, data args pinned thereby).
+            auto* identifier = std::get_if<SurfaceIdentifier>(
+                &citeInferred->function->node);
+            if (!identifier) {
+                throwElaborate(
+                    "`by <lemma>` (in obtain) expects a lemma name");
+            }
+            const Declaration* decl =
+                environment_.lookup(identifier->qualifiedName);
+            if (!decl) {
+                throwElaborate("unknown lemma '" + identifier->qualifiedName
+                               + "' in `by`-citation");
+            }
+            ExpressionPointer declType = declarationType(*decl);
+            int totalPi = declType ? countLeadingPis(declType) : 0;
+            int implicitCount = environment_.implicitArgumentCount(
+                identifier->qualifiedName);
+            int explicitCount = totalPi - implicitCount;
+            if (explicitCount <= 0) {
+                throwElaborate("lemma '" + identifier->qualifiedName
+                               + "' takes no explicit arguments to infer");
+            }
+            std::vector<SurfaceArgument> holeArgs;
+            for (int i = 0; i < explicitCount; ++i) {
+                holeArgs.push_back(
+                    {"", makeSurfaceHole(expression.line, expression.column)});
+            }
+            SurfaceExpressionPointer call = makeSurfaceApplication(
+                makeSurfaceIdentifier(
+                    identifier->qualifiedName, identifier->universeArgs,
+                    expression.line, expression.column),
+                std::move(holeArgs), expression.line, expression.column);
+            return elaborateExpression(*call, localBinders, expectedType);
+        }
+
         if (auto* unfold =
                 std::get_if<SurfaceUnfold>(&expression.node)) {
             // Flip each named definition's opacity from Opaque to

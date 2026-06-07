@@ -1314,9 +1314,21 @@ private:
             } else if (isObtain) {
                 wrapper.kind = BlockWrapper::PatternLet;
                 wrapper.pattern = parsePattern();
-                expect(TokenKind::KeywordFrom,
-                       "after obtain-pattern (obtain ⟨…⟩ from E;)");
-                wrapper.value = parseExpression();
+                // `obtain ⟨…⟩ from E;` destructures the value E.
+                // `obtain ⟨…⟩ by Lemma;` cites Lemma with all explicit
+                // arguments inferred (its premises recovered from context),
+                // then destructures the result — the math-like "for some c,
+                // … by <lemma>".
+                if (peek().kind == TokenKind::KeywordBy) {
+                    Token byToken = consumeAny();  // 'by'
+                    wrapper.value = makeSurfaceCiteInferred(
+                        parseExpression(), byToken.line, byToken.column);
+                } else {
+                    expect(TokenKind::KeywordFrom,
+                           "after obtain-pattern (obtain ⟨…⟩ from E; "
+                           "or obtain ⟨…⟩ by Lemma;)");
+                    wrapper.value = parseExpression();
+                }
             } else if (!isClaim && peek().kind == TokenKind::LeftAngle) {
                 wrapper.kind = BlockWrapper::PatternLet;
                 wrapper.pattern = parsePattern();

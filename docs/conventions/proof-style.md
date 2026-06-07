@@ -362,6 +362,13 @@ returns its final non-`;`-terminated expression.
   { … }`, `by cases on E { case A: … case B: … }`, `by induction { … }`.
 - `obtain ⟨a, b⟩ from <existentialOrAnd>;` — destructure an
   `∃ x. P(x)` or `And(A, B)` into named binders.
+- `obtain ⟨a, b⟩ by <lemma>;` — cite `<lemma>` with ALL its explicit
+  arguments inferred (its premises recovered from context, no positional
+  application), then destructure the existential it yields. E.g. with a
+  single `≤` hypothesis in scope, `obtain ⟨c, eq⟩ by Natural.subtraction_witness;`
+  replaces `obtain ⟨c, eq⟩ from Natural.subtraction_witness(b, a, proof);`.
+  Needs the premises to be unambiguous in context — if two hypotheses match
+  (e.g. both `a ≤ b` and `b ≤ a`), name them with the `from <lemma>(args)` form.
 - `choose N such that P(N);` — sugar for `obtain ⟨N, _⟩` followed
   by a `claim P(N) by …`; reads as the textbook phrasing.
 - `let <name> ∈ <type> [with <predicate>];` — introduce a typed

@@ -406,6 +406,14 @@ struct SurfaceGoal {};
 // Natural arguments inferred from the goal.
 struct SurfaceHole {};
 
+// `<function>` cited with ALL its explicit arguments left to be inferred —
+// elaborates `function(?, …, ?)` (one hole per explicit argument). Used by
+// `obtain ⟨…⟩ by <lemma>`, where the lemma's premises (and hence its data
+// arguments) are recovered from context with no expected type to drive them.
+struct SurfaceCiteInferred {
+    SurfaceExpressionPointer function;
+};
+
 // `unfold <name> in <body>` — temporarily flips `<name>`'s opacity
 // from Opaque to Transparent for the duration of elaborating
 // `<body>`. The kernel then δ-unfolds `<name>` freely, so reductions
@@ -504,7 +512,7 @@ struct SurfaceExpression {
         SurfaceCalc, SurfaceByInductionUsing,
         SurfaceStructuredClaim, SurfaceGiven, SurfaceChoose,
         SurfaceByStrongInduction, SurfaceGoal, SurfaceUnfold,
-        SurfaceDecide, SurfaceNote, SurfaceHole
+        SurfaceDecide, SurfaceNote, SurfaceHole, SurfaceCiteInferred
     > node;
     int line = 0;
     int column = 0;
@@ -690,6 +698,11 @@ inline SurfaceExpressionPointer makeSurfaceGoal(int line, int column) {
 inline SurfaceExpressionPointer makeSurfaceHole(int line, int column) {
     return std::make_shared<const SurfaceExpression>(SurfaceExpression{
         SurfaceHole{}, line, column});
+}
+inline SurfaceExpressionPointer makeSurfaceCiteInferred(
+    SurfaceExpressionPointer function, int line, int column) {
+    return std::make_shared<const SurfaceExpression>(SurfaceExpression{
+        SurfaceCiteInferred{std::move(function)}, line, column});
 }
 inline SurfaceExpressionPointer makeSurfaceUnfold(
     std::vector<std::string> names,
