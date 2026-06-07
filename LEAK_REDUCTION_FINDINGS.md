@@ -180,6 +180,51 @@ converted (the `Logic/excluded_middle` uses are foundational, excluded).
 
 LEAK_BUDGET ratcheted 1346 → 1226 → **1350** (after adding `rewrite`).
 
+## Prototype: backward-chaining `by` (elaborator change) — DONE
+
+Added **Step 5d** to `inferCallWithHoles` (src/elaborator/inference.cpp):
+after the existing context-discharge steps (5b/5c) fail to fill a cited
+lemma's premise slot, hand the (fully-determined, Prop) slot to
+`autoProveClaim`. The auto-prover then proves it however it can —
+transitivity bridge, equality battery, context facts, etc. — which is
+exactly depth-1 backward chaining.
+
+Guards:
+- `autoProveDepth_ == 0`: only at the outermost elaboration (a user's
+  citation), never inside an auto-proof — otherwise it compounds and blows
+  the kernel-step budget (observed: a first version without this gate broke
+  GaussianInteger/Integer/Natural files with budget-exhaustion).
+- `backwardChainingDepth_ == 0`: the sub-proof's own lemma applications
+  don't re-enter Step 5d, bounding to a single level.
+- `MATH_BACKWARD_CHAINING=0` toggles it off.
+
+**Works** (see `library/Test/backward_chaining_test.math`): a citation
+`claim a = c by Natural.le_antisymmetric` where one premise (`c ≤ a`) is a
+hypothesis and the other (`a ≤ c`) is only *derivable* (transitivity
+bridge from `a≤b, b≤c`) now succeeds argument-free. OFF → falls through to
+the bare lemma and fails. Full library + `make tests` pass with it on (no
+regressions — it only fires on slots that would otherwise error, and
+dispatch.cpp already re-checks the result is defeq the goal).
+
+**Two bugs found while prototyping** (instructive for the real version):
+1. *Gating*: backward chaining must not run inside `autoProveClaim`
+   (depth-0 gate), or search explodes.
+2. *Scope*: the premise `slotType` from Step 5b is **already** in
+   closed-over-localBinders form (what `autoProveClaim` wants as
+   `goalClosed`); closing it again mangles the goal and the sub-proof
+   silently fails. Pass `slotType` directly.
+
+**Known limitation (the next step for a full version).** Step 5d only
+fires on a **fully-determined** premise. The motivating nested-`max` case
+(`by le_through_max_left` with premise `max(a, ?b) ≤ x`) leaves `?b`
+*undetermined* — the lemma's conclusion `a ≤ x` doesn't pin the other max
+argument — so Step 5d skips it. Solving that needs a **unification-driven
+library search**: enumerate library lemmas whose conclusion can match the
+premise (`computeGoalHits` in errors.cpp already does this for
+suggestions), apply each via the holes path so unification *solves* `?b`
+as a side effect, recursing on its premises. That's the general backward
+chaining; the current prototype is the determined-premise special case.
+
 ## Reducible fraction (running estimate)
 
 Of the ~1000 positional calls, the readily-reducible shapes are:

@@ -1048,6 +1048,73 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                 unresolved = std::move(stillUnresolved);
             }
         }
+        // Step 5d (backward chaining): a PROOF slot 5b/5c couldn't discharge
+        // from a ready-made hypothesis may still be PROVABLE — apply a
+        // library lemma and discharge ITS premises from context. Hand the
+        // fully-determined Prop slot to the auto-prover, which does exactly
+        // that goal-driven search. Bounded to ONE level by
+        // backwardChainingDepth_ (the sub-proof's own lemma applications
+        // won't re-enter here) and by the auto-prove kernel-step budget
+        // (an expensive discharge also trips the by-less warning). Only runs
+        // on slots that would otherwise be a hard error, so it never changes
+        // an already-resolved call. Toggle off with MATH_BACKWARD_CHAINING=0.
+        static const bool backwardChainingEnabled = [] {
+            const char* v = std::getenv("MATH_BACKWARD_CHAINING");
+            return !(v && std::string(v) == "0");
+        }();
+        if (!unresolved.empty() && backwardChainingEnabled
+            && backwardChainingDepth_ == 0 && autoProveDepth_ == 0) {
+            std::set<std::string> stillUnresolvedNames;
+            for (size_t idx : unresolved) {
+                stillUnresolvedNames.insert(argFreshNames[idx]);
+            }
+            Context openedContext =
+                buildContextFromLocalBinders(localBinders);
+            std::vector<size_t> remaining;
+            for (size_t i : unresolved) {
+                ExpressionPointer slotType =
+                    substituteFreeVariables(piDomains[i], assignment);
+                if (containsNamedFreeVariable(slotType,
+                                              stillUnresolvedNames)) {
+                    remaining.push_back(i);
+                    continue;
+                }
+                ExpressionPointer slotOpened;
+                ExpressionPointer slotNormalised;
+                try {
+                    slotOpened = openOverLocalBinders(
+                        slotType, localBinders, localBinders.size());
+                    slotNormalised = weakHeadNormalForm(
+                        environment_, slotOpened);
+                } catch (const TypeError&) {
+                    remaining.push_back(i);
+                    continue;
+                }
+                if (!typeIsProposition(openedContext, slotNormalised)) {
+                    remaining.push_back(i);
+                    continue;
+                }
+                // slotType is already in closed-over-localBinders form (Step
+                // 5b opens it with openOverLocalBinders), which is exactly the
+                // `goalClosed` autoProveClaim expects.
+                ExpressionPointer proof = nullptr;
+                ++backwardChainingDepth_;
+                try {
+                    proof = autoProveClaim(slotType, localBinders, line);
+                } catch (const ElaborateError&) {
+                    proof = nullptr;
+                } catch (const TypeError&) {
+                    proof = nullptr;
+                }
+                --backwardChainingDepth_;
+                if (proof) {
+                    elaboratedArgs[i] = proof;
+                } else {
+                    remaining.push_back(i);
+                }
+            }
+            unresolved = std::move(remaining);
+        }
         if (!unresolved.empty()) {
             std::string message =
                 "call to '" + diagnosticName

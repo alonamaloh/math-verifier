@@ -4552,6 +4552,14 @@ private:
     // Stage-1 statements-only mode (skip proof bodies). See constructor.
     bool statementsOnly_ = false;
     int autoProveDepth_ = 0;
+    // Recursion guard for backward-chaining discharge (inferCallWithHoles
+    // Step 5d): when a cited lemma's premise can't be discharged from
+    // context, we try to PROVE it with the auto-prover (which may apply
+    // another lemma and discharge ITS premises from context). Held > 0
+    // while that sub-proof runs so the inner lemma application does not
+    // itself trigger another backward-chaining round — bounding the search
+    // to a single level (depth-1). See inferCallWithHoles.
+    int backwardChainingDepth_ = 0;
     // Recursion guard for the symmetry-flip tactic: proving `x = y` by
     // proving `y = x` and wrapping in symmetry must not flip back to
     // `x = y`. Allowed only at depth 0.
