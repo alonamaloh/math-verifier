@@ -24,13 +24,13 @@ import Natural.order
 -- the witness through successor + add_successor. The body uses the
 -- destructured constructor names (commonValue, smaller, predA) so
 -- the kernel's motive-substituted expected type lines up directly.
-theorem Natural.subtraction_witness {b a : Natural}
+theorem Natural.subtraction_witness (b a : Natural)
         : b ≤ a → ∃ (c : Natural). a = b + c
   | LessOrEqual.reflexivity(commonValue) =>
       witness 0 with Equality.symmetry(Natural.add_zero(commonValue))
   | LessOrEqual.step(smaller, predecessorOfA, subProof) => {
       obtain ⟨cPrime, predEquality⟩
-          from Natural.subtraction_witness(subProof);
+          from Natural.subtraction_witness(smaller, predecessorOfA, subProof);
       witness successor(cPrime) with
           calc successor(predecessorOfA)
              = successor(smaller + cPrime)
@@ -54,10 +54,12 @@ theorem Natural.totality_of_less_or_equal_successor_against
       claim by cases {
         in (predecessorOfA ≤ predecessorOfB) as leftBranch:
             Or.introduceLeft(
-                Natural.successor_less_or_equal_successor(leftBranch))
+                Natural.successor_less_or_equal_successor(
+                    predecessorOfA, predecessorOfB, leftBranch))
         in (predecessorOfB ≤ predecessorOfA) as rightBranch:
             Or.introduceRight(
-                Natural.successor_less_or_equal_successor(rightBranch))
+                Natural.successor_less_or_equal_successor(
+                    predecessorOfB, predecessorOfA, rightBranch))
       }
 
 theorem Natural.totality_of_less_or_equal

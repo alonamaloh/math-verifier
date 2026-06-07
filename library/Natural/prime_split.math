@@ -113,7 +113,10 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                                           twoLessOrEqualDivisor,
                                           rewrite(
                                               Equality.symmetry(
-                                                  Natural.successor_injective(successorEquals)),
+                                                  Natural.successor_injective(
+                                                      predecessorOfBound,
+                                                      bPredecessor,
+                                                      successorEquals)),
                                               divisorLessOrEqualBPredecessor),
                                           divDividesN)
                                     }
@@ -143,7 +146,8 @@ theorem Natural.geq_one_when_not_zero
   | zero, notZero =>
       absurd(notZero(reflexivity(0)))
   | successor(predD), _ =>
-      Natural.successor_less_or_equal_successor(Natural.zero_least(predD))
+      Natural.successor_less_or_equal_successor(
+          0, predD, Natural.zero_least(predD))
 
 -- Helper: if d is neither 0 nor 1, then 2 ≤ d. Pattern-match on d.
 theorem Natural.geq_two_when_not_zero_or_one
@@ -152,7 +156,9 @@ theorem Natural.geq_two_when_not_zero_or_one
   | zero, notZero, _ =>
       absurd(notZero(reflexivity(0)))
   | successor(predD), _, notOne =>
-      Natural.successor_less_or_equal_successor(Natural.geq_one_when_not_zero(predD,
+      Natural.successor_less_or_equal_successor(
+          1, predD,
+          Natural.geq_one_when_not_zero(predD,
               (predecessorEqualsZero : predD = 0) ↦
                   notOne(predecessorEqualsZero)))
 
@@ -173,7 +179,8 @@ theorem Natural.equals_when_less_or_equal_and_not_less_than (a b : Natural)
         absurd(notSuccessorALessOrEqualB(
             rewrite(
                 Equality.symmetry(bEqualsSuccessor),
-                Natural.successor_less_or_equal_successor(aLessOrEqualBPredecessor))))
+                Natural.successor_less_or_equal_successor(
+                    a, bPredecessor, aLessOrEqualBPredecessor))))
     }
   }
 
@@ -264,7 +271,9 @@ theorem Natural.prime_or_proper_divisor
             Or.introduceRight(
                 witness divisor with
                     ⟨twoLessOrEqualDivisor,
-                     Natural.successor_less_or_equal_successor(divisorLessOrEqualPredecessorOfN),
+                     Natural.successor_less_or_equal_successor(
+                         divisor, predecessorOfN,
+                         divisorLessOrEqualPredecessorOfN),
                      divDivides⟩)
         }
         in ((divisor : Natural) → 2 ≤ divisor → divisor ≤ predecessorOfN → divisor ∤ successor(predecessorOfN)) as noProperDivisor:
