@@ -256,12 +256,21 @@ reach for the math-like form instead:
   spelling. Writing the interface costs a dozen lines once and removes the
   CIC spelling from every theorem that follows.
 
-- **Positional multi-argument lemma calls** — `LessOrEqual.transitive(a,
-  b, c, p, q)`, `Lemma(x, y, z, h1, h2)` — are unreadable. Cite the lemma
-  **by name, argument-free**: `by <Lemma>` / `since <Lemma>`, letting
-  goal-driven inference + context-discharge fill the arguments (see
+- **Direct proof-lemma calls** — applying a `theorem` to positional
+  arguments — are discouraged *entirely*, at every arity. Not just
+  `LessOrEqual.transitive(a, b, c, p, q)` but also the one-argument
+  `successor_less_or_equal_successor(proof)`: both invoke the lemma as a
+  function instead of reading as mathematics. **State the fact you are
+  adding to context and discharge it by name, argument-free**: `note T;`
+  then `by <Lemma>`, or `claim T by <Lemma>`, or chain it via `calc`,
+  letting goal-driven inference + context-discharge fill the arguments (see
   structures-and-inference.md, "Citing a lemma by name"). Name the
-  *operative result* (the insight), not the plumbing.
+  *operative result* (the insight), not the plumbing. (This is a proof
+  citation rule only — value-level applications such as constructors,
+  `ring`/list/arithmetic ops, and `witness … with …` data are fine.)
+  - Do **not** try to shrink a direct call by making the lemma's leading
+    data-args implicit: `Foo.bar(proof)` is still a direct call. The fix is
+    `by Foo.bar`, not a shorter application.
   - Transitivity / a "`x` is strictly below itself" contradiction reads as
     an inequality **`≤`-calc**, never a positional `transitive` call:
     ```
