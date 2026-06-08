@@ -151,6 +151,37 @@ A few things to read off this example:
   `3` and the proof is `sixIsTwoTimesThree`. (`d ∣ n` is *defined* as
   `∃ q. n = d * q`, which is why a witness closes it.)
 
+## Writing the proposition where a proof is expected
+
+That example is more ceremony than it needs. **Anywhere the system expects
+a *proof*, you may instead write the *proposition* it should prove, and the
+automatic prover is dispatched to establish it.** It is the inline form of
+a bare `claim`: you say *what* must hold, the machine works out *how*. So
+the whole block above collapses to one line:
+
+```
+theorem Tutorial.two_divides_six : 2 ∣ 6 :=
+  witness 3 with 6 = 2 * 3
+```
+
+The `6 = 2 * 3` sitting in the proof slot is not a proof term — it is the
+proposition the witness obliges you to discharge, and the prover closes it.
+This works in *every* proof-expecting position, not just `witness`: a
+component of a tuple `⟨…, P⟩`, an argument you pass to a lemma, a `let`
+value, even the whole body of a theorem (`theorem T : P := <P written out>`).
+
+Two things to keep in mind:
+
+- The proposition you write must be (definitionally) *the* obligation at
+  that spot — you are restating what is needed, not substituting a
+  different claim. An unrelated proposition fails loudly rather than being
+  quietly "corrected".
+- The prover still has to *succeed*. If the fact needs a real argument,
+  you must supply one (a proof term, or a `claim … by <lemma>`). And when a
+  fact is reused or genuinely illuminating, a *named* `claim` reads better
+  than inlining it — the terse form is for the steps that are obvious once
+  stated.
+
 ## Closing the goal
 
 To close the current goal, write `done` or `okay`. They are precisely
