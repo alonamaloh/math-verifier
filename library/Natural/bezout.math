@@ -64,7 +64,9 @@ definition Natural.has_bezout
 theorem Natural.has_bezout_zero_right (a : Natural)
         : Natural.has_bezout(a, 0) := {
     calc (a : Integer) * Integer.one + (0 : Integer) * Integer.zero
-              = (a : Integer)    as combined;    ⟨a, Integer.one, Integer.zero, combined, Natural.is_gcd_zero_right(a)⟩
+              = (a : Integer)    as combined;
+    claim isGcd : Natural.is_gcd(a, a, 0) by Natural.is_gcd_zero_right;
+    ⟨a, Integer.one, Integer.zero, combined, isGcd⟩
 }
 
 -- ----------------------------------------------------------------------
@@ -142,9 +144,11 @@ theorem Natural.has_bezout_successor_step
             → (aPrime : Natural) → Natural.has_bezout(aPrime, k))
         : Natural.has_bezout(a, successor(predB)) := {
     claim divisorPositive : 1 ≤ successor(predB);
+    claim quotientRemainder
+          : Natural.has_quotient_remainder(successor(predB), a)
+        by Natural.divide_with_remainder;
     obtain ⟨q, r, decomposition, remainderBelowDivisor⟩
-        from Natural.divide_with_remainder(
-                 successor(predB), divisorPositive, a);
+        from quotientRemainder;
     claim hasBezoutForBR : Natural.has_bezout(successor(predB), r);
     obtain ⟨gcdValue, xPrime, yPrime, recursedEquation, isGcdForBR⟩
         from hasBezoutForBR;
@@ -177,23 +181,18 @@ theorem Natural.has_bezout_step (b : Natural)
         : (a : Natural) → Natural.has_bezout(a, b) :=
   cases b refining inductionHypothesis {
     | zero =>
-        (a : Natural) ↦ Natural.has_bezout_zero_right(a)
+        (a : Natural) ↦ { goal by Natural.has_bezout_zero_right }
     | successor(predB) =>
-        (a : Natural) ↦
-          Natural.has_bezout_successor_step(predB, a, inductionHypothesis)
+        (a : Natural) ↦ { goal by Natural.has_bezout_successor_step }
   }
 
 -- ----------------------------------------------------------------------
 -- Main theorem: Bezout's identity.
 theorem Natural.bezout (a b : Natural)
         : Natural.has_bezout(a, b) :=
-  Natural.strong_induction(
-      (bArgument : Natural) ↦
-          (aPrime : Natural) → Natural.has_bezout(aPrime, bArgument),
-      (bArgument : Natural)
-               (inductionHypothesis :
-                   (k : Natural) → successor(k) ≤ bArgument
-                   → (aPrime : Natural)
-                   → Natural.has_bezout(aPrime, k)) ↦
-          Natural.has_bezout_step(bArgument, inductionHypothesis),
-      b, a)
+  (by_induction on b using Natural.strong_induction
+       with bArgument, inductionHypothesis {
+     done by Natural.has_bezout_step
+   }
+   : (aPrime : Natural) → Natural.has_bezout(aPrime, b)
+   )(a)
