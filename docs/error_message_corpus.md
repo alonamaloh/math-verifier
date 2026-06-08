@@ -8,9 +8,14 @@ each improvement is measured and protected against regression.
 
 ## How this works
 
-- **When you hit a confusing error** while writing or simplifying proofs,
-  add an entry below: a minimal trigger, the verbatim message, the *true*
-  diagnosis, a severity, and (if known) a better message.
+- **Capture first (frictionless):** when you hit a confusing error, run
+  `scripts/record_error.sh <file.math> ["note"]`. It appends the verbatim
+  output + a blank diagnosis to `docs/error_message_inbox.md` (an
+  append-only scratch log) so nothing is lost while context is fresh.
+- **Triage into this catalogue:** once an inbox entry is understood,
+  promote it to an entry below — a minimal trigger, the verbatim message,
+  the *true* diagnosis, a rubric score, and (if known) a better message —
+  then delete it from the inbox.
 - **When a message is fixed**, add a paired regression case under
   `library/ErrorTest/`: a broken `<name>.math` plus a `<name>.expected`
   sidecar listing substrings the message MUST contain. `make error-tests`
