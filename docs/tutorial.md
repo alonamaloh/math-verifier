@@ -125,9 +125,10 @@ prover and later steps can use it. By default the prover discharges it; a
 `by`/`since` hint helps when needed:
 
 ```
-theorem Tutorial.two_divides_four : 2 ∣ 4 := {
-  claim fourIsTwoSquared : 4 = 2 * 2;   -- the prover checks this
-  witness 2 with fourIsTwoSquared
+theorem Tutorial.two_divides_six : 2 ∣ 6 := {
+  note goal : ∃ (quotient : Natural). 6 = 2 * quotient;   -- this is what `2 ∣ 6` means
+  claim sixIsTwoTimesThree : 6 = 2 * 3;                   -- the prover checks this
+  witness 3 with sixIsTwoTimesThree
 }
 ```
 
@@ -135,12 +136,19 @@ A few things to read off this example:
 
 - The proof is a `{ … }` *block*: a sequence of statements ending in `;`,
   whose final (un-`;`-terminated) expression is the proof's result.
+- **`note goal : T;` is a checked comment.** It asserts that the current
+  goal is, by definition, `T` — here it spells out that `2 ∣ 6` unfolds to
+  `∃ quotient. 6 = 2 * quotient`. The system verifies the two really are
+  the same, then discards the line: it changes nothing and binds nothing,
+  so you could delete it and the proof would still work. Its only job is to
+  remind the reader (and you) what must actually be produced.
 - **Name a claim only if you use the name.** Here we reference
-  `fourIsTwoSquared` in the `witness`, so it earns a name. If you never
-  refer to it, drop the name — write `claim 4 = 2 * 2;` — and the prover
+  `sixIsTwoTimesThree` in the `witness`, so it earns a name. If you never
+  refer to it, drop the name — write `claim 6 = 2 * 3;` — and the prover
   will still find the fact by its type. An unused name is just noise.
 - `witness w with proof` proves an existential `∃ x. P(x)` by exhibiting
-  the witness `w` and a proof of `P(w)`. (`d ∣ n` is *defined* as
+  the witness `w` and a proof of `P(w)`. Here the witness is the quotient
+  `3` and the proof is `sixIsTwoTimesThree`. (`d ∣ n` is *defined* as
   `∃ q. n = d * q`, which is why a witness closes it.)
 
 ## Closing the goal
