@@ -8,7 +8,7 @@
 
 bool Elaborator::referencesAnyBoundInRange(
         ExpressionPointer expression, int low, int high,
-        int currentDepth) {
+        int currentDepth) const {
         if (auto* bv =
                 std::get_if<BoundVariable>(&expression->node)) {
             int idx = bv->deBruijnIndex - currentDepth;

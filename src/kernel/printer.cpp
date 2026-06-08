@@ -53,6 +53,11 @@ classifyBinaryOperator(const std::string& name) {
         return BinaryOperatorInfo{"≤", kPrecedenceRelation};
     if (endsWith(".LessThan") || name == "LessThan")
         return BinaryOperatorInfo{"<", kPrecedenceRelation};
+    // Divisibility `Natural.divides(d, n)` → `d ∣ n` (and the `.divides`
+    // of every other carrier). Renders the re-folded form (errors.cpp's
+    // refoldForDisplay) in the surface notation the user wrote.
+    if (endsWith(".divides"))
+        return BinaryOperatorInfo{"∣", kPrecedenceRelation};
     // Logical disjunction `Or(A, B)` → `A ∨ B`. Right-associative, loosest.
     if (name == "Or")
         return BinaryOperatorInfo{"∨", kPrecedenceLogical, /*rightAssoc=*/true};

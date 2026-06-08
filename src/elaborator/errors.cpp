@@ -6,6 +6,8 @@
 
 #include "elaborator/internal.hpp"
 
+#include <limits>
+
 ExpressionPointer Elaborator::betaNormalizeForDisplay(
         ExpressionPointer expression) const {
         if (auto* pi = std::get_if<Pi>(&expression->node)) {
@@ -34,10 +36,118 @@ ExpressionPointer Elaborator::betaNormalizeForDisplay(
         return expression;
     }
 
+std::string Elaborator::foldHeadKey(
+        ExpressionPointer expression) const {
+        ExpressionPointer cursor = expression;
+        while (auto* app = std::get_if<Application>(&cursor->node)) {
+            cursor = app->function;
+        }
+        if (auto* constant = std::get_if<Constant>(&cursor->node)) {
+            return constant->name;
+        }
+        if (std::holds_alternative<Pi>(cursor->node)) {
+            return "__Pi__";
+        }
+        return "";
+    }
+
+ExpressionPointer Elaborator::refoldForDisplay(
+        ExpressionPointer expression) const {
+        if (!expression) return expression;
+
+        // (1) Re-fold children first (bottom-up), so a folded subterm's
+        // arguments are themselves already in their nicest form.
+        ExpressionPointer rebuilt = expression;
+        if (auto* app = std::get_if<Application>(&expression->node)) {
+            ExpressionPointer function = refoldForDisplay(app->function);
+            ExpressionPointer argument = refoldForDisplay(app->argument);
+            if (function.get() != app->function.get()
+                || argument.get() != app->argument.get()) {
+                rebuilt = makeApplication(function, argument);
+            }
+        } else if (auto* pi = std::get_if<Pi>(&expression->node)) {
+            ExpressionPointer domain = refoldForDisplay(pi->domain);
+            ExpressionPointer codomain = refoldForDisplay(pi->codomain);
+            if (domain.get() != pi->domain.get()
+                || codomain.get() != pi->codomain.get()) {
+                rebuilt = makePi(pi->displayHint, domain, codomain);
+            }
+        } else if (auto* lambda = std::get_if<Lambda>(&expression->node)) {
+            ExpressionPointer domain = refoldForDisplay(lambda->domain);
+            ExpressionPointer body = refoldForDisplay(lambda->body);
+            if (domain.get() != lambda->domain.get()
+                || body.get() != lambda->body.get()) {
+                rebuilt = makeLambda(lambda->displayHint, domain, body);
+            }
+        }
+        // (Let and atoms: nothing to descend into for display folding.)
+
+        // (2) Try to fold `rebuilt` itself. Only when it is CLOSED (no
+        // BoundVariable escapes it) — then the round-trip defeq check can
+        // run in the empty context. A subterm under a binder that uses
+        // that binder is "open" and is left as-is.
+        if (referencesAnyBoundInRange(
+                rebuilt, 0, std::numeric_limits<int>::max(), 0)) {
+            return rebuilt;
+        }
+        std::string key = foldHeadKey(rebuilt);
+        if (key.empty()) return rebuilt;
+
+        for (const auto& entry : environment_.declarations) {
+            auto* definition =
+                std::get_if<Definition>(&entry.second);
+            if (!definition) continue;
+            // Opaque definitions never appear unfolded, and universe-
+            // polymorphic ones would need their level arguments
+            // reconstructed — skip both.
+            if (definition->opacity == Opacity::Opaque) continue;
+            if (!definition->universeParameters.empty()) continue;
+
+            // Arity = leading lambdas of the body; the remainder is the
+            // pattern, with those binders acting as match metavariables.
+            int arity = 0;
+            ExpressionPointer pattern = definition->body;
+            while (auto* lambda = std::get_if<Lambda>(&pattern->node)) {
+                pattern = lambda->body;
+                arity++;
+            }
+            if (arity == 0) continue;  // nullary defs: skip (noise risk)
+            if (foldHeadKey(pattern) != key) continue;
+
+            std::vector<ExpressionPointer> bindings(arity);
+            if (!const_cast<Elaborator*>(this)->matchAgainstPattern(
+                    pattern, rebuilt, arity, bindings, 0)) {
+                continue;
+            }
+            bool allFilled = true;
+            for (const auto& binding : bindings) {
+                if (!binding) { allFilled = false; break; }
+            }
+            if (!allFilled) continue;
+
+            // Re-assemble `Name(arg0, …, arg_{arity-1})`. bindings is
+            // innermost-binder-first, so parameter j (outermost-first)
+            // is bindings[arity - 1 - j].
+            ExpressionPointer candidate = makeConstant(entry.first);
+            for (int j = arity - 1; j >= 0; --j) {
+                candidate = makeApplication(candidate, bindings[j]);
+            }
+
+            // Round-trip: only display the fold if it is provably the
+            // same proposition.
+            if (isDefinitionallyEqual(
+                    environment_, Context{}, candidate, rebuilt)) {
+                return candidate;
+            }
+        }
+        return rebuilt;
+    }
+
 std::string Elaborator::prettyPrintForDisplay(
         ExpressionPointer expression) const {
         std::string raw =
-            prettyPrint(betaNormalizeForDisplay(expression));
+            prettyPrint(refoldForDisplay(
+                betaNormalizeForDisplay(expression)));
         // The printer prefixes Internal-origin FreeVariables with '@'
         // so that any leak into user output is visible. In error
         // messages we deliberately open binders into named FreeVars,
@@ -64,7 +174,8 @@ std::string Elaborator::prettyPrintInLocalScope(
             opened = openBinder(opened, localBinders[i - 1].name,
                                  FreeVariableOrigin::User);
         }
-        return prettyPrint(betaNormalizeForDisplay(opened));
+        return prettyPrint(refoldForDisplay(
+            betaNormalizeForDisplay(opened)));
     }
 
 std::string Elaborator::prettyPrintInLocalScope(

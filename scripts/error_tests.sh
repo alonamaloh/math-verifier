@@ -51,10 +51,22 @@ for f in "${files[@]}"; do
   else
     while IFS= read -r line || [ -n "$line" ]; do
       [ -z "$line" ] && continue
-      case "$line" in \#*) continue ;; esac
-      if ! grep -qF -- "$line" <<<"$out"; then
-        problems+=("missing expected substring: $line")
-      fi
+      case "$line" in
+        \#*) continue ;;
+        # A `!`-prefixed line asserts the substring is ABSENT (e.g. the
+        # unfolded form must NOT appear after re-folding for display).
+        "!"*)
+          needle=${line#!}
+          if grep -qF -- "$needle" <<<"$out"; then
+            problems+=("forbidden substring present: $needle")
+          fi
+          ;;
+        *)
+          if ! grep -qF -- "$line" <<<"$out"; then
+            problems+=("missing expected substring: $line")
+          fi
+          ;;
+      esac
     done < "$exp"
   fi
 

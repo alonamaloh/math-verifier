@@ -314,6 +314,21 @@ private:
     ExpressionPointer betaNormalizeForDisplay(
         ExpressionPointer expression) const;
 
+    // DISPLAY-ONLY re-folding. A goal that flowed through an eliminator
+    // motive reaches the printer δ-UNFOLDED — e.g. `d ∣ n` shows as its
+    // body `Exists.{0} Natural (λ q. n = d * q)`. This walks `expression`
+    // bottom-up and, at each CLOSED subterm, tries to fold a transparent
+    // `definition`'s body back to `Name(args)` (which the printer then
+    // renders with its registered notation, e.g. `∣`). A fold is accepted
+    // ONLY when `Name(args)` round-trips defeq to the subterm, so it can
+    // never display a wrong type — at worst it declines to fold. Used by
+    // the prettyPrint*ForDisplay paths; never affects elaboration.
+    ExpressionPointer refoldForDisplay(
+        ExpressionPointer expression) const;
+    // Helper: the spine-head key used to index/compare foldable terms —
+    // a Constant's name, "__Pi__" for a Pi, or "" (not foldable-headed).
+    std::string foldHeadKey(ExpressionPointer expression) const;
+
     std::string prettyPrintForDisplay(
         ExpressionPointer expression) const;
 
@@ -1863,7 +1878,7 @@ private:
     // when the lemma is applied in the outer context.
     bool referencesAnyBoundInRange(
         ExpressionPointer expression, int low, int high,
-        int currentDepth = 0);
+        int currentDepth = 0) const;
 
     // Simultaneously substitute the matched bindings into a lemma's
     // LHS or RHS. The lemma's expression is in closed-over-binders

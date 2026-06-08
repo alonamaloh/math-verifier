@@ -85,24 +85,31 @@ each improvement is measured and protected against regression.
   as a *later* name (`(a witness : T)`) still gives a generic "expected ':'
   in binder". Low frequency.
 
-### 3. Goal printed unfolded; surface string lost — PENDING
+### 3. Goal printed unfolded — FIXED (fix #3, Approach A)
 
 - **Trigger:** any error whose goal flowed through an eliminator motive
-  (e.g. an `obtain`), which WHNF-unfolds a `definition`-headed goal.
-- **Symptom:** the error prints `Exists.{0} Natural (λ q. n = d * q)` where
-  the source said `Natural.divides(d, n)` / `d ∣ n`. Scores 0 on axis 4.
-- **Two complementary fixes:**
-  - *Re-fold for display* in `prettyPrintForDisplay` (errors.cpp): show
-    `Natural.divides …` rather than its `Exists` body. Heuristic, lossy.
-  - *Provenance quoting* (user's idea — preferred where available):
-    remember the **exact surface string** the user wrote for a type
-    annotation (theorem signature, `claim`/`note`/`change`/`suppose`
-    type) and quote it verbatim in the error (e.g. as a trailing
-    `-- as written: d ∣ secondSummand`). Lossless and instantly
-    recognisable; mechanism = stash the surface expression / source span
-    alongside the elaborated goal in the Frame, pretty-print the surface
-    form. Falls back to re-folding for synthesised goals with no surface
-    origin.
+  (e.g. an `obtain`), which δ-unfolds a `definition`-headed goal. Repro:
+  `library/ErrorTest/unfolded_goal_display.math`.
+- **Was (symptom):** `Exists.{0} Natural (λ q. n = d * q)` where the source
+  said `d ∣ n`. Scored 0 on axis 4.
+- **Now:** `errors.cpp`'s `refoldForDisplay` walks the term bottom-up and,
+  at each CLOSED subterm, re-folds a transparent `definition`'s body back
+  to `Name(args)` — accepted ONLY when `Name(args)` round-trips defeq to
+  the subterm (so a fold is never wrong; at worst it declines). The
+  printer then renders the registered notation, so the goal shows `d ∣ n`
+  (added `∣` for `.divides` to printer.cpp's operator table). Display-only;
+  never touches elaboration. The `.expected` asserts both `d ∣ n` present
+  and `Exists.{0}` absent (harness supports `!`-prefixed negative lines).
+- **Deferred — Approach B (provenance quoting, user's idea):** remember
+  the **exact surface string / source span** the user wrote for a type
+  annotation and quote it verbatim (e.g. `-- as written: d ∣ n`). Wins
+  where folding can't: literal fidelity (`2` vs `successor(successor 0)`),
+  user-defined notation the printer doesn't know, and synthesised
+  sub-goals (`d ∣ 0` in a refining arm) where quoting the original `d ∣ n`
+  helps the user locate the code even though it's a transformed goal —
+  ideally with a note explaining the transformation. Needs surface end-
+  positions (nodes carry only start now). Revisit once we see, in
+  practice, that re-folding leaves real gaps.
 
 ### 4. `done`/`goal`/`okay` silently weaker than `claim` in refining arms — FIXED
 
