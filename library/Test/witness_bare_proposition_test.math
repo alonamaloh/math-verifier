@@ -7,10 +7,12 @@
 --
 -- This mirrors the coercion already available in ordinary function-call
 -- argument positions; the test pins it down for the constructor /
--- anonymous-tuple path used by `witness`.
+-- anonymous-tuple path used by `witness`, and for the goal-driven
+-- hole-inference path (`f(?, …)`) below.
 
 module Test.witness_bare_proposition_test
 
+import axioms
 import Logic.basics
 import Logic.exists
 import Equality.basics
@@ -34,3 +36,13 @@ theorem Test.witness_divides_explicit : 2 ∣ 6 := {
   claim sixIsTwoTimesThree : 6 = 2 * 3;
   witness 3 with sixIsTwoTimesThree
 }
+
+-- Hole-inference path: a call with `?` arguments routes through a separate
+-- elaborator path. Here the `?`s are solved from the goal (a = 1,
+-- b = successor(n)), and the final argument — the hypothesis the lemma
+-- needs — is written as the *proposition* `2 = successor(successor(n))`
+-- rather than naming `h`; the auto-prover finds `h` in scope to discharge
+-- it. Compare Test/hole_test.math, which passes the proof `h` directly.
+theorem Test.hole_call_bare (n : Natural) (h : 2 = successor(successor(n)))
+        : 1 = successor(n) :=
+  Natural.successor_injective(?, ?, 2 = successor(successor(n)))

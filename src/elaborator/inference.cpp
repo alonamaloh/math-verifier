@@ -926,6 +926,22 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
             if (isHole[i]) continue;
             ExpressionPointer kernelArg = elaborateExpression(
                 *surfaceArgs[i], localBinders, expectedDomain);
+            // Bare-proposition-as-proof (and the other diff coercions): the
+            // same treatment the constructor and plain function-call paths
+            // give their arguments, so e.g. `f(?, 6 = 2 * 3)` discharges the
+            // written equation via the auto-prover exactly as `f(?, proof)`
+            // would. Skip when the domain still mentions an unresolved hole
+            // metavariable — the coercion needs a concrete expected type, and
+            // a later forward/backward step may yet pin it. WHNF first (after
+            // substitution the domain is often a redex `(λx. … x …) arg`,
+            // which the coercion's cheap structural prefilter would miss); it
+            // no-ops when the argument already fits, leaving existing calls
+            // unaffected.
+            if (!containsNamedFreeVariable(expectedDomain, metavariableNames)) {
+                kernelArg = coerceToExpectedTypeViaDiff(
+                    localBinders, kernelArg,
+                    weakHeadNormalForm(environment_, expectedDomain));
+            }
             ExpressionPointer inferredType =
                 weakHeadNormalForm(environment_,
                     inferTypeInLocalContext(
