@@ -60,7 +60,7 @@ void Elaborator::warnIfBinderUnusedAtIndex(
         int relativeIndex,
         int line, int column,
         const char* form) {
-        if (!reportRedundantBy_) return;
+        if (!reportUnusedNames_) return;
         if (name.empty() || name[0] == '_') return;
         if (referencesBoundVariable(bodyUnderBinders, relativeIndex)) return;
         emitUnusedNameWarning(name, line, column, form);
@@ -71,7 +71,7 @@ void Elaborator::warnIfSurfaceNameUnused(
         const SurfaceExpression& body,
         int line, int column,
         const char* form) {
-        if (!reportRedundantBy_) return;
+        if (!reportUnusedNames_) return;
         if (name.empty() || name[0] == '_') return;
         if (surfaceMentionsName(body, name)) return;
         emitUnusedNameWarning(name, line, column, form);

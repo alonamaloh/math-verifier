@@ -5163,6 +5163,7 @@ int verifyWithCache(const std::string& sourcePath,
                     bool reportRedundantBy = false,
                     bool reportRedundantCalcSteps = false,
                     bool reportRedundantByNonEq = false,
+                    bool reportUnusedNames = false,
                     bool writeInterface = true) {
     Environment environment;
     std::set<std::string> alreadyLoaded;
@@ -5307,7 +5308,8 @@ int verifyWithCache(const std::string& sourcePath,
     try {
         elaborateModule(parsedModule, environment, importedModules,
                          reportRedundantBy, reportRedundantCalcSteps,
-                         reportRedundantByNonEq, librarySearchProvider);
+                         reportRedundantByNonEq, reportUnusedNames,
+                         librarySearchProvider);
     } catch (const ElaborateError& error) {
         std::cerr << sourcePath << ":"
                   << (error.line > 0 ? error.line : 1) << ":"
@@ -6225,6 +6227,11 @@ int main(int argc, char* argv[]) {
         bool reportRedundantBy = redundantEnvOn;
         bool reportRedundantByNonEq = redundantEnvOn;
         bool reportRedundantCalcSteps = redundantEnvOn;
+        // Unused-name check: cheap scope/use query (no speculative re-
+        // proving), separate from the expensive redundant-`by` check. Opt-in
+        // via `--check-unused-names` for now; intended to become always-on
+        // once the library's remaining flagged names are cleaned up.
+        bool reportUnusedNames = false;
         bool writeInterface = true;
         enum class State { None, Source, Output, Deps, CacheRoot } state = State::None;
         for (int i = 2; i < argc; ++i) {
@@ -6255,6 +6262,11 @@ int main(int argc, char* argv[]) {
                 state = State::None;
                 continue;
             }
+            if (argument == "--check-unused-names") {
+                reportUnusedNames = true;
+                state = State::None;
+                continue;
+            }
             switch (state) {
                 case State::Source: sourcePath = argument; state = State::None; break;
                 case State::Output: outputCachePath = argument; state = State::None; break;
@@ -6274,6 +6286,7 @@ int main(int argc, char* argv[]) {
                                reportRedundantBy,
                                reportRedundantCalcSteps,
                                reportRedundantByNonEq,
+                               reportUnusedNames,
                                writeInterface);
     }
     if (argc >= 3 && std::string(argv[1]) == "deps") {

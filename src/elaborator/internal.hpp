@@ -205,6 +205,13 @@ public:
     // `--check-redundant-by` CLI flag.
     void setReportRedundantBy(bool flag);
 
+    // Unused-name diagnostics: a `claim NAME : T` / `calc … as NAME` / a
+    // `suppose … as h` whose NAME is never referenced (and dead bindings).
+    // These are cheap scope/use queries — no speculative re-proving — so
+    // they can run always-on, separate from the expensive redundant-`by`
+    // check. Drives the `--check-unused-names` CLI flag.
+    void setReportUnusedNames(bool flag);
+
     // Injects the lazy whole-library snapshot used to enrich failing-proof
     // errors with unimported-lemma suggestions. See elaborateModule.
     void setLibrarySearchProvider(
@@ -4765,6 +4772,7 @@ private:
     std::unordered_map<Expression*, MotiveWalkerCacheEntry>
         motiveWalkerCache_;
     bool reportRedundantBy_ = false;
+    bool reportUnusedNames_ = false;
     bool reportRedundantByNonEq_ = false;
     bool reportRedundantCalcSteps_ = false;
     // The kernel-step budget below which a speculative redundancy auto-prove

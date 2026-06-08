@@ -14,12 +14,14 @@ void elaborateModule(const SurfaceModule& module,
                      bool reportRedundantBy,
                      bool reportRedundantCalcSteps,
                      bool reportRedundantByNonEq,
+                     bool reportUnusedNames,
                      std::function<const LibrarySearchIndex*()>
                          librarySearchProvider) {
     Elaborator elaborator(environment, importedModules);
     elaborator.setReportRedundantBy(reportRedundantBy);
     elaborator.setReportRedundantCalcSteps(reportRedundantCalcSteps);
     elaborator.setReportRedundantByNonEq(reportRedundantByNonEq);
+    elaborator.setReportUnusedNames(reportUnusedNames);
     elaborator.setLibrarySearchProvider(std::move(librarySearchProvider));
     elaborator.runModule(module);
 }

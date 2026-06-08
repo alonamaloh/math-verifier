@@ -176,6 +176,8 @@ void Elaborator::emitAutoProverProfile() {
 
 void Elaborator::setReportRedundantBy(bool flag) { reportRedundantBy_ = flag; }
 
+void Elaborator::setReportUnusedNames(bool flag) { reportUnusedNames_ = flag; }
+
 void Elaborator::setLibrarySearchProvider(
         std::function<const LibrarySearchIndex*()> provider) {
         librarySearchProvider_ = std::move(provider);

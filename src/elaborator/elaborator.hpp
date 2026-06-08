@@ -63,5 +63,6 @@ void elaborateModule(const SurfaceModule& module,
                      bool reportRedundantBy = false,
                      bool reportRedundantCalcSteps = false,
                      bool reportRedundantByNonEq = false,
+                     bool reportUnusedNames = false,
                      std::function<const LibrarySearchIndex*()>
                          librarySearchProvider = nullptr);

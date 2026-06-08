@@ -1186,7 +1186,7 @@ ExpressionPointer Elaborator::elaborateExpression(
                 if (let->fromCalcAsBinding) {
                     // Specialised message: the fix is to drop the
                     // `as NAME` postfix, not the calc itself.
-                    if (reportRedundantBy_
+                    if (reportUnusedNames_
                         && !let->name.empty()
                         && let->name[0] != '_'
                         && !surfaceMentionsName(
@@ -1201,7 +1201,7 @@ ExpressionPointer Elaborator::elaborateExpression(
                                " form (downstream calc steps still"
                                " find this equation by type-match)\n";
                     }
-                } else if (reportRedundantBy_
+                } else if (reportUnusedNames_
                            && !let->name.empty()
                            && let->name[0] != '_'
                            && !surfaceMentionsName(
