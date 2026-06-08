@@ -114,8 +114,7 @@ theorem Rational.halve_preserves_LessOrEqual
         (x y : Rational) (xLeqY : x ≤ y)
         : Rational.halve(x) ≤ Rational.halve(y) := {
   claim (0 : Rational) ≤ Rational.one_half
-    by Rational.LessOrEqual_zero_of_IsNonneg(
-           Rational.one_half, Rational.one_half_IsNonneg);
+    by Rational.LessOrEqual_zero_of_IsNonneg;
   calc Rational.halve(x)
      = x * Rational.one_half
      ≤ y * Rational.one_half   since Rational.LessOrEqual.multiply_by_nonneg_right
@@ -128,7 +127,7 @@ theorem Rational.halve_left_le_sum (a b : Rational) (aLeqB : a ≤ b)
         : a ≤ Rational.halve(a + b) := {
   claim a + a ≤ a + b   by Rational.add_general_LessOrEqual_left;
   calc a
-     = Rational.halve(a + a)   by Rational.halve_of_doubled(a)
+     = Rational.halve(a + a)   by Rational.halve_of_doubled
      ≤ Rational.halve(a + b)   since Rational.halve_preserves_LessOrEqual
 }
 
@@ -139,7 +138,7 @@ theorem Rational.halve_sum_le_right (a b : Rational) (aLeqB : a ≤ b)
   claim a + b ≤ b + b   by Rational.add_preserves_LessOrEqual;
   calc Rational.halve(a + b)
      ≤ Rational.halve(b + b)   since Rational.halve_preserves_LessOrEqual
-     = b                       by Rational.halve_of_doubled(b)
+     = b                       by Rational.halve_of_doubled
 }
 
 -- ----------------------------------------------------------------------
@@ -677,7 +676,7 @@ theorem Real.LessOrEqual_of_pointwise_at_make
           -- -halve(ε) < -(s(m) - s(N_s)), then rewrite via negate_subtract.
           calc -Rational.halve(epsilon)
                   < -(s(m) - s(N_s))
-                  = s(N_s) - s(m) as sFlippedBound;
+                  = s(N_s) - s(m);
           -- bMinusSAt at m: -halve(ε) < b(m) - s(N_s)
           claim
                 -Rational.halve(epsilon) < b(m) - s(N_s)
@@ -688,7 +687,7 @@ theorem Real.LessOrEqual_of_pointwise_at_make
           --      ≤ (b(m) - s(N_s)) + (s(N_s) - s(m))      (sFlippedBound, weakened)
           --      = b(m) - s(m).
           claim -Rational.halve(epsilon) ≤ s(N_s) - s(m)
-            by Rational.LessThan.weaken(sFlippedBound);
+            by Rational.LessThan.weaken;
           calc -epsilon
              = -(Rational.halve(epsilon) + Rational.halve(epsilon))
              = -Rational.halve(epsilon) + -Rational.halve(epsilon)
@@ -754,8 +753,7 @@ theorem Real.LessOrEqual_of_pointwise_lower_at_make
           -- Lower bound: -halve(ε) < s(m) - s(N_s)  (lower half of |·| bounds).
           obtain ⟨sLowerBound, _⟩ by Rational.absolute_value_LessThan_bounds;
           -- pointwiseGeq at m: -halve(ε) < s(N_s) - b(m).
-          claim sBBound
-                : -Rational.halve(epsilon) < s(N_s) - b(m)
+          claim -Rational.halve(epsilon) < s(N_s) - b(m)
             by sNsMinusBAt(m, m_geq_N_b);
           -- Chain the two ε/2 bounds end-to-end and simplify:
           --   -ε = -halve(ε) + -halve(ε)
@@ -763,7 +761,7 @@ theorem Real.LessOrEqual_of_pointwise_lower_at_make
           --      ≤ (s(m) - s(N_s)) + (s(N_s) - b(m))      (sBBound, weakened)
           --      = s(m) - b(m).
           claim -Rational.halve(epsilon) ≤ s(N_s) - b(m)
-            by Rational.LessThan.weaken(sBBound);
+            by Rational.LessThan.weaken;
           calc -epsilon
              = -(Rational.halve(epsilon) + Rational.halve(epsilon))
              = -Rational.halve(epsilon) + -Rational.halve(epsilon)
@@ -1242,9 +1240,8 @@ theorem Rational.reciprocal_function_positive_of_positive
   claim ¬(x = (0 : Rational));
   claim xRecipEqOne
         : x * Rational.reciprocal_function(x) = (1 : Rational);
-  claim Rational.IsNonneg(x)
-    by Rational.IsNonneg_of_LessOrEqual_zero(x,
-           Rational.LessThan.weaken(xPositive));
+  claim (0 : Rational) ≤ x by Rational.LessThan.weaken;
+  claim Rational.IsNonneg(x) by Rational.IsNonneg_of_LessOrEqual_zero;
   cases Rational.LessOrEqual.linear(
             Rational.reciprocal_function(x), (0 : Rational)) {
     | Or.introduceLeft(recipLeqZero) => {
@@ -1252,24 +1249,18 @@ theorem Rational.reciprocal_function_positive_of_positive
         claim (0 : Rational) ≤ -Rational.reciprocal_function(x);
         claim Rational.IsNonneg(-Rational.reciprocal_function(x));
         claim Rational.IsNonneg(x * -Rational.reciprocal_function(x));
-        claim negProductNonneg
-              : Rational.IsNonneg(-(x * Rational.reciprocal_function(x)))
+        claim Rational.IsNonneg(-(x * Rational.reciprocal_function(x)))
           by substituting (ring : x * -Rational.reciprocal_function(x)
                                   = -(x * Rational.reciprocal_function(x)));
-        claim productLeqZero
-              : x * Rational.reciprocal_function(x) ≤ (0 : Rational)
-          by Rational.LessOrEqual_zero_of_negate_IsNonneg(
-                 x * Rational.reciprocal_function(x), negProductNonneg);
-        claim oneLeqZero : (1 : Rational) ≤ (0 : Rational)
-          by rewrite(xRecipEqOne, productLeqZero);
+        claim x * Rational.reciprocal_function(x) ≤ (0 : Rational)
+          by Rational.LessOrEqual_zero_of_negate_IsNonneg;
+        claim (1 : Rational) ≤ (0 : Rational) by substituting xRecipEqOne;
+        claim (0 : Rational) ≤ (1 : Rational) by Rational.LessThan.weaken;
         claim zeroEqOne : (0 : Rational) = (1 : Rational)
-          by Rational.LessOrEqual.antisymmetric(
-                 (0 : Rational), (1 : Rational),
-                 Rational.LessThan.weaken(Rational.zero_less_one),
-                 oneLeqZero);
-        absurd(
-            Rational.LessThan.distinct(Rational.zero_less_one)(
-                zeroEqOne))
+          by Rational.LessOrEqual.antisymmetric;
+        claim (0 : Rational) < (1 : Rational) by Rational.zero_less_one;
+        claim zeroNotOne : (0 : Rational) ≠ (1 : Rational) by Rational.LessThan.distinct;
+        absurd(zeroNotOne(zeroEqOne))
       }
     | Or.introduceRight(zeroLeqRecip) =>
         decide (0 : Rational) = Rational.reciprocal_function(x) {
@@ -1279,9 +1270,9 @@ theorem Rational.reciprocal_function_positive_of_positive
               calc (0 : Rational)
                       = x * (0 : Rational)
                       = (1 : Rational) as zeroEqOne;
-              absurd(
-                  Rational.LessThan.distinct(Rational.zero_less_one)(
-                      zeroEqOne))
+              claim (0 : Rational) < (1 : Rational) by Rational.zero_less_one;
+              claim zeroNotOne : (0 : Rational) ≠ (1 : Rational) by Rational.LessThan.distinct;
+              absurd(zeroNotOne(zeroEqOne))
             }
           | no zeroNotEqRecip =>
               And.introduction(zeroLeqRecip, zeroNotEqRecip)
@@ -1661,8 +1652,7 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
                   ≤ Real.bisectionLeft(subset, initial, j)
             by Real.bisectionLeft_le_at_le(
                    subset, initial, initialLeftLeqRight, K, j, j_geq_K);
-          claim negWidthGtNegHalvedEpsilon
-                : -Rational.halve(epsilon) < -Real.bisectionWidth(initial, K);
+          claim -Rational.halve(epsilon) < -Real.bisectionWidth(initial, K);
           claim
                 -Rational.halve(epsilon)
                   < Real.bisectionRight(subset, initial, K) - yseq(j)
@@ -1684,7 +1674,7 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
           -- Chain the two ε/2 bounds end-to-end, bridge by widthBridge,
           -- then weaken K → j on the left endpoint.
           claim -Rational.halve(epsilon) ≤ -Real.bisectionWidth(initial, K)
-            by Rational.LessThan.weaken(negWidthGtNegHalvedEpsilon);
+            by Rational.LessThan.weaken;
           calc -epsilon
              = -(Rational.halve(epsilon) + Rational.halve(epsilon))
              = -Rational.halve(epsilon) + -Rational.halve(epsilon)
