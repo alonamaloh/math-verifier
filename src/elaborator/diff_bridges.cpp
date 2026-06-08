@@ -912,8 +912,26 @@ bool Elaborator::matchAgainstPattern(
                                           binderCount, bindings,
                                           piDepth + 1);
         }
-        // Lambda / Let are rare in lemma LHSs and need extra binder
-        // bookkeeping; bail conservatively.
+        if (auto* p = std::get_if<Lambda>(&pattern->node)) {
+            // Same binder bookkeeping as Pi. A lambda shows up on the
+            // pattern side once a conclusion is δ-unfolded to a binder-
+            // carrying head — e.g. `Natural.divides a b` unfolds to
+            // `Exists Natural (λ q. b = a * q)`, whose predicate is a
+            // lambda. Recurse into the body at piDepth + 1 so the data
+            // binders inside still pin (this is what lets a cited lemma
+            // whose conclusion is a `definition` match a goal that has
+            // already been unfolded — as a propositionless
+            // `done`/`goal`/`okay` sees it past an eliminator motive).
+            auto* s = std::get_if<Lambda>(&subject->node);
+            if (!s) return false;
+            return matchAgainstPattern(p->domain, s->domain,
+                                          binderCount, bindings, piDepth)
+                && matchAgainstPattern(p->body, s->body,
+                                          binderCount, bindings,
+                                          piDepth + 1);
+        }
+        // Let is rare in lemma LHSs and needs extra binder bookkeeping;
+        // bail conservatively.
         return false;
     }
 

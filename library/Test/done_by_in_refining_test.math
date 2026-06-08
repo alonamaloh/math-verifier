@@ -1,0 +1,50 @@
+-- Regression: `done` / `goal` / `okay` (propositionless closers) must
+-- discharge a refining-cases arm exactly like a term arm or `claim P
+-- by …` does — even when the arm's goal is headed by a `definition`
+-- that the surrounding eliminator motive has already unfolded.
+--
+-- The bug: after an `obtain` (an `Exists` elimination), the goal
+-- `Test.splits(d, n)` reaches each refining arm in its UNFOLDED form
+-- `∃ q. n = d * q`. A propositionless `done by L` took that unfolded
+-- goal verbatim, while the cited lemma `L`'s conclusion stayed FOLDED
+-- (`Test.splits …`), so the conclusion-matcher could not unify the two
+-- and fell back to the bare lemma. `claim P by L` was unaffected only
+-- because it re-elaborates the explicit `P` to the folded form. The
+-- fix folds the two onto a common head in `autoFillHintForClaim`
+-- (reduce the lemma conclusion) and lets `matchAgainstPattern` descend
+-- through the resulting predicate lambda. No user-visible quirk: all of
+-- `done` / `goal` / `okay` / `claim` now behave the same here.
+
+module Test.done_by_in_refining_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+
+-- A definition-headed proposition that δ-unfolds to an `Exists`.
+definition Test.splits(divisor dividend : Natural) : Proposition :=
+  ∃ (quotient : Natural). dividend = divisor * quotient
+
+-- Reconstruct `splits` from an explicit witness equation. Its data
+-- argument `quotient` lives only in the premise, so a `by`-citation
+-- must pin it by discharging that premise from context.
+theorem Test.splits_from_equation
+        (divisor dividend quotient : Natural)
+        (equation : dividend = divisor * quotient)
+        : Test.splits(divisor, dividend) :=
+  witness quotient with equation
+
+-- The regression proper: each arm closes with a propositionless
+-- closer, citing the folded-conclusion lemma against the unfolded goal.
+theorem Test.done_goal_okay_in_refining
+        (divisor dividend : Natural) (hypothesis : Test.splits(divisor, dividend))
+        : Test.splits(divisor, dividend) := {
+  obtain ⟨quotient, equation⟩ from hypothesis;
+  cases quotient refining equation {
+    | zero                    => done by Test.splits_from_equation
+    | successor(predecessor)  => goal by Test.splits_from_equation
+  }
+}

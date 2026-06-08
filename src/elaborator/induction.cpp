@@ -631,6 +631,25 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
                 bindings = std::move(trialUnreduced);
                 break;
             }
+            // Third attempt: reduce the conclusion cursor too. The lemma's
+            // conclusion may be headed by a `definition` (e.g.
+            // `Natural.divides …`) while the goal arrives unfolded (e.g.
+            // `Exists …` — as a propositionless `done`/`goal`/`okay` sees it
+            // when the goal flowed through an eliminator motive that WHNF'd
+            // it). WHNF-ing the cursor folds the two onto a common head so
+            // the data binders still pin. The cursor is open (its trialDepth
+            // peeled binders act as pattern metavariables); WHNF only does
+            // δ/β, leaving those bound variables intact.
+            ExpressionPointer cursorReduced = weakHeadNormalForm(
+                environment_, cursorsAtDepth[trialDepth]);
+            std::vector<ExpressionPointer> trialCursorReduced(trialDepth);
+            if (matchAgainstPattern(
+                    cursorReduced, goalReduced,
+                    trialDepth, trialCursorReduced)) {
+                matchedDepth = trialDepth;
+                bindings = std::move(trialCursorReduced);
+                break;
+            }
         }
         if (matchedDepth == -1) {
             throwElaborate(
