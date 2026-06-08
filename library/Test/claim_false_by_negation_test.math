@@ -1,0 +1,38 @@
+-- Regression: `claim False by <lemma>` / `done by <lemma>` where the
+-- cited lemma's conclusion is a NEGATION `¬P` (i.e. `Not(P)` = `P →
+-- False`). The conclusion is headed by the `Not` definition, so the
+-- `by`-citation's Pi-peeling must unfold it once to expose the hidden
+-- `P → False` arrow, peel the `P` premise (discharged from context),
+-- and reach the `False` the goal asks for. Without the peel-through-Not
+-- step the citation stalls at `¬P` and falls back to the bare lemma.
+
+module Test.claim_false_by_negation_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.strong_recursion
+
+-- A lemma whose conclusion is a negation, with its data argument `k`
+-- appearing only inside the negated proposition.
+theorem Test.not_successor_le_zero (k : Natural)
+        : ¬(successor(k) ≤ 0) :=
+  Natural.not_less_or_equal_successor_zero(k)
+
+-- `claim False by …` must discharge the `successor(k) ≤ 0` premise from
+-- the in-scope hypothesis and reach `False`.
+theorem Test.false_from_negation_lemma
+        (k : Natural) (impossible : successor(k) ≤ 0)
+        : False := {
+  claim False by Test.not_successor_le_zero
+}
+
+-- The same, reaching an arbitrary goal through `absurd`.
+theorem Test.anything_from_negation_lemma
+        (k : Natural) (impossible : successor(k) ≤ 0)
+        : Natural := {
+  claim contradiction : False by Test.not_successor_le_zero;
+  absurd(contradiction)
+}

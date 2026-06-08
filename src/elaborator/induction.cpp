@@ -581,12 +581,31 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
         }
 
         // Peel Pi chain, collecting domains outermost-first and the
-        // cursor at each peel depth.
+        // cursor at each peel depth. When the cursor is not syntactically
+        // a Pi, try a single WHNF step to expose a HIDDEN one: a
+        // conclusion headed by a definition that unfolds to a function —
+        // most importantly `¬P` (`Not(P)` = `P → False`) — so that e.g.
+        // `claim False by no_member_in_empty` (whose conclusion is
+        // `¬member(n, empty)`) peels the `member` premise and reaches the
+        // `False` the goal wants. If WHNF makes no progress, or doesn't
+        // produce a Pi, stop — leaving the un-unfolded conclusion as the
+        // last cursor (so a `definition`-headed conclusion like
+        // `Natural.divides …` is preserved for the folded-match attempts,
+        // not eagerly expanded to its `Exists` body here).
         std::vector<ExpressionPointer> domainsOutermostFirst;
         std::vector<ExpressionPointer> cursorsAtDepth;
         cursorsAtDepth.push_back(hintTypeReduced);
         ExpressionPointer cursor = hintTypeReduced;
-        while (auto* pi = std::get_if<Pi>(&cursor->node)) {
+        while (true) {
+            auto* pi = std::get_if<Pi>(&cursor->node);
+            if (!pi) {
+                ExpressionPointer unfolded =
+                    weakHeadNormalForm(environment_, cursor);
+                if (unfolded.get() == cursor.get()) break;
+                pi = std::get_if<Pi>(&unfolded->node);
+                if (!pi) break;
+                cursor = unfolded;
+            }
             domainsOutermostFirst.push_back(pi->domain);
             cursor = pi->codomain;
             cursorsAtDepth.push_back(cursor);

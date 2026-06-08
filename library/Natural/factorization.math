@@ -32,7 +32,10 @@ import Lists.basics
 theorem Natural.is_zero_or_at_least_one
         : (k : Natural) → k = 0 ∨ 1 ≤ k
   | zero                    => okay
-  | successor(kPredecessor) => Natural.successor_positive(kPredecessor)
+  | successor(kPredecessor) => {
+      claim 1 ≤ successor(kPredecessor) by Natural.successor_positive;
+      done
+    }
 
 -- 1 ≤ n splits into n = 1 ∨ 2 ≤ n. Pattern-match on n: zero
 -- contradicts the hypothesis, successor(predN) re-splits via
@@ -46,10 +49,12 @@ theorem Natural.equals_one_or_at_least_two
         in (nPredecessor = 0) as predecessorIsZero:
             -- n = successor(0) = 1, the left disjunct.
             calc successor(nPredecessor) = 1
-        in (1 ≤ nPredecessor) as predecessorPositive:
+        in (1 ≤ nPredecessor) as predecessorPositive: {
             -- 1 ≤ nPredecessor lifts to 2 ≤ successor(nPredecessor), the right.
-            Natural.successor_less_or_equal_successor(
-                1, nPredecessor, predecessorPositive)
+            claim 2 ≤ successor(nPredecessor)
+                by Natural.successor_less_or_equal_successor;
+            done
+          }
       }
 
 -- If 1 ≤ n and n = p * q, then 1 ≤ q. By cases on q: q = 0 forces
@@ -134,13 +139,15 @@ theorem Natural.prime_factorization_exists
              witness NaturalList.empty
                  with ⟨(k : Natural)
                                 (memberOfEmpty :
-                                    NaturalList.member(k, NaturalList.empty)) ↦
-                         absurd(NaturalList.no_member_in_empty(k, memberOfEmpty)),
+                                    NaturalList.member(k, NaturalList.empty)) ↦ {
+                         claim noMember : False by NaturalList.no_member_in_empty;
+                         absurd(noMember)
+                       },
                        calc NaturalList.productOf(NaturalList.empty) = subject⟩
          -- subject ≥ 2: peel off a prime divisor and recurse on the quotient.
          in (2 ≤ subject) as subjectAtLeastTwo: {
              obtain ⟨prime, primeIsPrime, primeDividesSubject⟩
-               from Natural.has_prime_divisor(subject, subjectAtLeastTwo);
+               by Natural.has_prime_divisor;
              obtain ⟨quotient, subjectEqualsPrimeTimesQuotient⟩
                from primeDividesSubject;
              claim 2 ≤ prime;
@@ -154,10 +161,9 @@ theorem Natural.prime_factorization_exists
                  with ⟨(k : Natural)
                                 (memberProof :
                                     NaturalList.member(
-                                        k, NaturalList.prepend(prime, tail))) ↦
-                         NaturalList.all_prime_prepend(
-                             prime, tail, primeIsPrime, allPrimeTail,
-                             k, memberProof),
+                                        k, NaturalList.prepend(prime, tail))) ↦ {
+                         claim Natural.is_prime(k) by NaturalList.all_prime_prepend
+                       },
                        calc prime * NaturalList.productOf(tail)
                           = prime * quotient
                           = subject⟩
