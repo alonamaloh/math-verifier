@@ -45,7 +45,7 @@ theorem Natural.not_less_or_equal_successor_zero (k : Natural)
         ∨ (∃ (bPredecessor : Natural). 0 = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor)
     claim by cases {
       in (successor(k) = 0) as successorKEqualsZero:
-          Natural.successor_not_zero(k, successorKEqualsZero)
+          done by Natural.successor_not_zero
       in (∃ (bPredecessor : Natural). 0 = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor) as existsProof: {
           obtain ⟨bPredecessor, zeroEqualsSucc, _⟩ from existsProof;
           absurd(zeroEqualsSucc)
@@ -62,23 +62,23 @@ theorem Natural.less_or_equal_successor_successor_inversion (k m : Natural)
     claim (successor(k) = successor(m))
         ∨ (∃ (bPredecessor : Natural). successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor)
     claim by cases {
-      in (successor(k) = successor(m)) as successorKEqualsSuccessorM:
-          Or.introduceLeft(
-              Natural.successor_injective(k, m, successorKEqualsSuccessorM))
+      in (successor(k) = successor(m)) as successorKEqualsSuccessorM: {
+          -- strip the successors: k = m, the left disjunct.
+          claim k = m by Natural.successor_injective;
+          done
+        }
       in (∃ (bPredecessor : Natural). successor(m) = successor(bPredecessor) ∧ successor(k) ≤ bPredecessor) as existsProof:
           {
             obtain ⟨bPredecessor,
                     successorMEqualsSuccessorBPredecessor,
                     successorKLessOrEqualBPredecessor⟩
                 from existsProof;
-            -- m = bPredecessor by injectivity; transport successor(k) ≤
-            -- bPredecessor back to successor(k) ≤ m.
-            Or.introduceRight(
-                rewrite(
-                    Equality.symmetry(
-                        Natural.successor_injective(
-                            m, bPredecessor, successorMEqualsSuccessorBPredecessor)),
-                    successorKLessOrEqualBPredecessor))
+            -- m = bPredecessor by injectivity; substitute it back so
+            -- successor(k) ≤ bPredecessor becomes successor(k) ≤ m.
+            claim mEqualsBPredecessor : m = bPredecessor
+                by Natural.successor_injective;
+            claim successor(k) ≤ m by substituting mEqualsBPredecessor;
+            done
           }
     }
 
@@ -89,30 +89,26 @@ theorem Natural.for_all_below
                 → ((k : Natural)
                     → successor(k) ≤ n → P(k))
                 → P(n))
-        : (n : Natural) → (k : Natural)
-          → successor(k) ≤ n → P(k)
-  | zero =>
-      (k : Natural)
-          (impossible : successor(k) ≤ 0) ↦
-        absurd(impossible)
-  | successor(predecessor) =>
-      (k : Natural)
-          (successorKLessOrEqualSuccessorM : successor(k) ≤ successor(predecessor)) ↦
-        cases Natural.less_or_equal_successor_successor_inversion(
-                  k, predecessor, successorKLessOrEqualSuccessorM) {
-          | Or.introduceLeft(kEqualsPredecessor) =>
-              -- We need P(k). Use step(predecessor,
-              -- for_all_below(predecessor)) to get P(predecessor);
-              -- the diff-bridge auto-lifts via kEqualsPredecessor in
-              -- scope.
-              step(predecessor,
-                    Natural.for_all_below(
-                        P, step, predecessor))
-          | Or.introduceRight(successorKLessOrEqualPredecessor) =>
-              -- Recurse on the predecessor level.
-              Natural.for_all_below(
-                  P, step, predecessor, k, successorKLessOrEqualPredecessor)
-        }
+        (n : Natural)
+        : (k : Natural) → successor(k) ≤ n → P(k) :=
+  by_induction on n with IH {
+    case zero:
+        (k : Natural) (impossible : successor(k) ≤ 0) ↦
+          absurd(impossible)
+    case successor(predecessor):
+        (k : Natural)
+            (successorKLessOrEqualSuccessor :
+                successor(k) ≤ successor(predecessor)) ↦
+          cases by Natural.less_or_equal_successor_successor_inversion {
+            | Or.introduceLeft(kEqualsPredecessor) =>
+                -- We need P(k). step(predecessor, IH) gives P(predecessor);
+                -- the diff-bridge auto-lifts via kEqualsPredecessor in scope.
+                step(predecessor, IH)
+            | Or.introduceRight(successorKLessOrEqualPredecessor) =>
+                -- Recurse on the predecessor level via the IH.
+                IH(k, successorKLessOrEqualPredecessor)
+          }
+  }
 
 -- q ≤ 0 forces q = 0. Apply LessOrEqual.invert and discharge the
 -- step disjunct via zero_not_successor.
@@ -153,5 +149,8 @@ theorem Natural.strong_induction
                     → successor(k) ≤ n → P(k))
                 → P(n))
         (n : Natural)
-        : P(n) :=
-  step(n, Natural.for_all_below(P, step, n))
+        : P(n) := {
+  claim below : (k : Natural) → successor(k) ≤ n → P(k)
+      by Natural.for_all_below;
+  step(n, below)
+}
