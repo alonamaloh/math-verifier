@@ -1,0 +1,20 @@
+-- Citing a lemma whose higher-order EXPLICIT argument `predicate`
+-- cannot be inferred by `by`. The citation machinery falls back to the
+-- bare (unapplied) lemma, so the failure surfaces downstream as a
+-- confusing kernel "expected ∃…, actual (predicate)→(proof)→∃…" rather
+-- than "I could not infer the predicate argument of witness_holds".
+module ErrorTest.higher_order_explicit_cite
+
+import Natural.basics
+import Natural.peano
+import Logic.basics
+import Logic.exists
+
+theorem ErrorTest.witness_holds (predicate : Natural → Proposition)
+        (proof : predicate(0))
+        : ∃ (n : Natural). predicate(n) :=
+  ⟨0, proof⟩
+
+theorem ErrorTest.cite_it : ∃ (n : Natural). n = n := {
+  claim ∃ (n : Natural). n = n by ErrorTest.witness_holds
+}

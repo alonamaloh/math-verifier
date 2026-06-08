@@ -690,10 +690,69 @@ ExpressionPointer Elaborator::recoverClaimHint(
             return bridgeCitedFact(
                 hintTerm, goalClosed, localBinders, line);
         }
-        return coerceToExpectedTypeViaDiff(
-            localBinders,
-            elaborateExpression(byHint, localBinders, goalClosed),
-            goalClosed);
+        // Last-ditch recovery: re-elaborate the hint AT the goal type and
+        // diff-bridge it (handles `claim f(a) = f(b) by eq` with `eq : a = b`).
+        // If that genuinely produces a term of the goal type, return it.
+        // Otherwise the citation simply does not apply — and we must say so
+        // HERE, naming the hint, its type and the goal. Left to fall through,
+        // `coerceToExpectedTypeViaDiff` returns the un-bridged (often bare,
+        // unapplied) hint term, and the enclosing theorem typecheck then
+        // rejects it with an opaque "proof does not have its declared type"
+        // that mentions a bare `(a) → (b) → …` function type — the single
+        // most confusing failure when a `by`/`done`/`goal` citation can't
+        // infer its arguments or cites the wrong lemma.
+        try {
+            ExpressionPointer coerced = coerceToExpectedTypeViaDiff(
+                localBinders,
+                elaborateExpression(byHint, localBinders, goalClosed),
+                goalClosed);
+            Context openedContext =
+                buildContextFromLocalBinders(localBinders);
+            ExpressionPointer coercedTypeOpened =
+                inferTypeInLocalContext(localBinders, coerced);
+            ExpressionPointer goalOpened = openOverLocalBinders(
+                goalClosed, localBinders, localBinders.size());
+            if (isDefinitionallyEqual(environment_, openedContext,
+                          coercedTypeOpened, goalOpened)) {
+                return coerced;
+            }
+        } catch (const ElaborateError&) {
+            // fall through to the descriptive citation-failure error
+        } catch (const TypeError&) {
+            // fall through to the descriptive citation-failure error
+        }
+
+        // Build a citation-failure message at the claim site.
+        std::string hintName;
+        if (auto* identifier =
+                std::get_if<SurfaceIdentifier>(&byHint.node)) {
+            hintName = identifier->qualifiedName;
+        } else if (auto* application =
+                       std::get_if<SurfaceApplication>(&byHint.node)) {
+            if (auto* identifier = std::get_if<SurfaceIdentifier>(
+                    &application->function->node)) {
+                hintName = identifier->qualifiedName;
+            }
+        }
+        std::string nameQuoted =
+            hintName.empty() ? "the `by` hint" : ("`" + hintName + "`");
+        std::string message =
+            "the " + nameQuoted
+            + " citation does not prove this goal\n    goal:        "
+            + prettyPrintInLocalScope(goalClosed, localBinders);
+        if (hintTerm) {
+            ExpressionPointer hintTypeClosed = closeOverLocalBinders(
+                inferTypeInLocalContext(localBinders, hintTerm),
+                localBinders, localBinders.size());
+            message += "\n    " + nameQuoted + " has type: "
+                + prettyPrintInLocalScope(hintTypeClosed, localBinders);
+        }
+        message +=
+            "\n  the hint's arguments could not be inferred from the goal "
+            "or discharged from context, or its conclusion does not unify "
+            "with the goal — check the lemma name, and that the goal (or an "
+            "in-scope hypothesis) determines each of its arguments";
+        throwElaborate(message);
     }
 
 std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
