@@ -1,0 +1,36 @@
+-- `witness w with P` builds the anonymous tuple `⟨w, P⟩` for an
+-- existential goal. The proof component `P` may be written either as an
+-- actual proof term or — exercised here — as the *proposition* it should
+-- prove: when that proposition is the obligation `predicate(w)`, the
+-- elaborator hands it to the auto-prover (the "bare proposition as proof"
+-- coercion), so `witness 3 with 6 = 2 * 3` closes `2 ∣ 6` directly.
+--
+-- This mirrors the coercion already available in ordinary function-call
+-- argument positions; the test pins it down for the constructor /
+-- anonymous-tuple path used by `witness`.
+
+module Test.witness_bare_proposition_test
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.divisibility
+
+-- The motivating case: the second component is the equation itself, and
+-- the auto-prover discharges the arithmetic.
+theorem Test.witness_divides_bare : 2 ∣ 6 :=
+  witness 3 with 6 = 2 * 3
+
+-- Works inside a bare existential goal too (not only behind `∣`).
+theorem Test.witness_exists_bare : ∃ (n : Natural). 6 = n + 4 :=
+  witness 2 with 6 = 2 + 4
+
+-- An explicit proof term in the same slot still works — the coercion
+-- no-ops when the component already has proof type.
+theorem Test.witness_divides_explicit : 2 ∣ 6 := {
+  claim sixIsTwoTimesThree : 6 = 2 * 3;
+  witness 3 with sixIsTwoTimesThree
+}

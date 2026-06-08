@@ -212,6 +212,24 @@ Elaborator::CallInferenceResult Elaborator::inferLeadingArguments(
             ExpressionPointer kernelTrailingArgument = elaborateExpression(
                 *trailingArgumentsSurface[j], localBinders,
                 expectedForArgument);
+            // Apply the same coercion the plain function-call path gives its
+            // arguments (dispatch.cpp): diff-wrap an equality, bridge via a
+            // context equality, inject a disjunct, or — the case that makes
+            // `witness w with <proposition>` work — auto-prove a bare
+            // proposition written where its proof was expected. We WHNF the
+            // domain first: after substituting the earlier arguments it is
+            // typically an unreduced redex (`(λx. … x …) witness`), and the
+            // coercion's cheap prefilter inspects the head/structure, so it
+            // would otherwise miss the equality and bare-proposition shapes.
+            // Only attempt it when the domain is fully resolved (no leading
+            // metavariable left), and it no-ops unless the elaborated
+            // argument fails to fit the domain, so existing calls are
+            // unaffected.
+            if (expectedForArgument) {
+                kernelTrailingArgument = coerceToExpectedTypeViaDiff(
+                    localBinders, kernelTrailingArgument,
+                    weakHeadNormalForm(environment_, expectedForArgument));
+            }
             // Infer the trailing arg's type WITHOUT normalising first, so a
             // Definition head (e.g. `Rational.LessOrEqual` for an `a ≤ b`
             // domain) is preserved and matches the Pi domain's head
