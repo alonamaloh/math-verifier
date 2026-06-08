@@ -194,7 +194,7 @@ library-clean:
 # proof-lemma calls (any positional arity) in user-space `.math` files — the
 # north-star metric the plan drives to zero. Non-failing report by default;
 # `leak-ratchet` fails if the total exceeds LEAK_BUDGET (the no-increase ratchet).
-LEAK_BUDGET ?= 1790
+LEAK_BUDGET ?= 1778
 
 leak-report:
 	@scripts/cic_leak_report --by-file
