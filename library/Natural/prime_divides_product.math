@@ -94,7 +94,7 @@ theorem Natural.divides_one_implies_equals_one
                   claim productEqZero
                         : predD * successor(predQ) = 0;
                   claim predDEqZero : predD = 0;
-                  congruenceOf(successor, predDEqZero)
+                  calc successor(predD) = 1
                 }
            };
          successorPredDEqualsOne
@@ -114,8 +114,8 @@ theorem Natural.bezout_one_when_prime_coprime
         (notDividesA : ¬ Natural.divides(p, a))
         : ∃ (x : Integer). ∃ (y : Integer).
             (p : Integer) * x + (a : Integer) * y = (1 : Integer) := {
-    obtain ⟨g, x, y, bezoutEquation, isgcd⟩
-        from Natural.bezout(p, a);
+    claim bezoutWitness : Natural.has_bezout(p, a) by Natural.bezout;
+    obtain ⟨g, x, y, bezoutEquation, isgcd⟩ from bezoutWitness;
     let ⟨gDividesP, gDividesA, _⟩ := isgcd;
     let ⟨_, divisorClassification⟩ := primality;
     claim (g = 1) ∨ (g = p)
@@ -154,7 +154,7 @@ theorem Natural.natural_eq_negate_natural_implies_first_zero
                 IntegerRepresentative.make(b, 0),
                 IntegerRepresentative.make(0, m));
     claim sumIsZero : b + m = 0;
-    Natural.add_eq_zero_left_zero(b, m, sumIsZero)
+    done by Natural.add_eq_zero_left_zero
 }
 
 -- ----------------------------------------------------------------------
@@ -172,7 +172,7 @@ theorem Natural.prime_divides_product_when_coprime
         (productDivides : p ∣ a * b)
         : p ∣ b := {
     obtain ⟨x, y, bezoutEquation⟩
-        from Natural.bezout_one_when_prime_coprime(p, a, primality, notDividesA);
+        by Natural.bezout_one_when_prime_coprime;
     obtain ⟨productQuotient, productEquation⟩ from productDivides;
     -- productEquation : a * b = p * productQuotient.
 
@@ -223,8 +223,9 @@ theorem Natural.prime_divides_product_when_coprime
                   + (productQuotient : Integer) * y)
            = (p : Integer) * (coefficient : Integer)
            = (p * coefficient : Integer)                     as bAsCastedProduct;
-        ⟨coefficient,
-         Natural.to_integer.injective(b, p * coefficient, bAsCastedProduct)⟩
+        claim bEqualsProduct : b = p * coefficient
+            by Natural.to_integer.injective;
+        ⟨coefficient, bEqualsProduct⟩
       }
       in (∃ (negativePart : Natural).
               x * (b : Integer) + (productQuotient : Integer) * y
@@ -260,10 +261,10 @@ theorem Natural.prime_divides_product
   claim (p ∣ a) ∨ (p ∤ a)
   claim by cases {
     in (p ∣ a) as pDividesA:
-        Or.introduceLeft(pDividesA)
-    in (p ∤ a) as notDividesA:
-        Or.introduceRight(
-            Natural.prime_divides_product_when_coprime(
-                p, a, b, primality, notDividesA, productDivides))
+        done
+    in (p ∤ a) as notDividesA: {
+        claim p ∣ b by Natural.prime_divides_product_when_coprime;
+        done
+      }
   }
 
