@@ -32,6 +32,15 @@ write in a textbook, with the kernel doing the typechecking. Optimize for
   expressions (both kernel-defeq). Exceptions and the pattern-position
   caveat: `docs/conventions/numerals-and-naming.md`.
 
+## Documentation (`docs/`)
+
+- **tutorial.md** — a 10-minute, example-driven introduction to writing
+  proofs. Start here.
+- **reference.md** — a catalogue of every surface construct.
+- **style.md** — how to make a proof read well (and what to avoid); the
+  `docs/conventions/` files below are the depth behind it.
+- **library.md** — a map of `library/` by mathematical area.
+
 ## Convention files (`docs/conventions/`)
 
 - **quotients.md** — `Quotient.mk`/`.sound`/`.lift`/`.induct[_two/_three]`
