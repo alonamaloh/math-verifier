@@ -260,9 +260,9 @@ reach for the math-like form instead:
   arguments — are discouraged *entirely*, at every arity. Not just
   `LessOrEqual.transitive(a, b, c, p, q)` but also the one-argument
   `successor_less_or_equal_successor(proof)`: both invoke the lemma as a
-  function instead of reading as mathematics. **State the fact you are
-  adding to context and discharge it by name, argument-free**: `note T;`
-  then `by <Lemma>`, or `claim T by <Lemma>`, or chain it via `calc`,
+  function instead of reading as mathematics. **State the fact and
+  discharge it by name, argument-free**: `claim T by <Lemma>` (which binds
+  `T` into context), or chain it via `calc`,
   letting goal-driven inference + context-discharge fill the arguments (see
   structures-and-inference.md, "Citing a lemma by name"). Name the
   *operative result* (the insight), not the plumbing. (This is a proof

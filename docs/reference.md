@@ -62,8 +62,9 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 | `claim P by substituting eq;` | prove `P` by rewriting with `eq` |
 | `claim goal [by V]` | close the current goal (type from context) |
 | `done` / `okay` | ≡ `claim goal`; bare or with `by`/`since` |
-| `note P [by V];` | like `claim` but a *verified comment* (for the reader) |
-| `change T;` | replace the goal by a defeq `T` |
+| `note P [by V];` | a *checked comment*: verify `P` holds, then **discard** it — unlike `claim`, it does NOT bind `P`, so later steps don't see it |
+| `note goal : T;` | a checked assertion that the goal is (defeq) `T`; non-binding, goal unchanged |
+| `change T;` | replace the goal by a defeq `T` (this *does* change the proof state) |
 
 `goal` is the *name* of the current goal type (used in `claim goal`,
 `note goal : T`); it is not a standalone proof.
