@@ -160,3 +160,23 @@ each improvement is measured and protected against regression.
   positions, not tuples) is the real papercut.
 - **Wanted:** either make `?` invoke the auto-prover in proof positions, or
   emit a message saying so and suggesting `claim <component> by …`.
+
+### 8. Misspelled / unknown cited lemma name — FIXED (fix #4)
+
+- **Trigger:** `claim T by Natural.add_comutative` (a typo). Repro:
+  `library/ErrorTest/unknown_lemma_name.math`.
+- **Was:** after fix #1, this produced the generic "the
+  `Natural.add_comutative` citation does not prove this goal … check the
+  lemma name" — masking the real cause (no such lemma exists). Fix #1's
+  recovery catches re-elaboration's "unknown identifier" and replaced it
+  with the generic message. Scored 0 on cause.
+- **Now:** recoverClaimHint first checks whether a QUALIFIED cited name
+  (contains `.`) resolves to a declaration; if not, it throws "unknown
+  lemma `Natural.add_comutative` in `by` citation — no declaration by that
+  name is in scope". Restricted to qualified names AND not-a-local-binder
+  so it never false-flags a local hypothesis cited in `by` (e.g. a
+  destructured ring-bundle field like `addIdentityRight`) or an overload
+  alias. (inference.cpp.) `.expected` asserts the unknown-lemma text and
+  that the generic "citation does not prove this goal" is absent.
+- **Possible follow-up (deferred):** a "did you mean …?" suggestion via
+  edit-distance over declaration names — only if it proves worth it.

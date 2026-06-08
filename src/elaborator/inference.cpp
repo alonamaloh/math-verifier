@@ -690,6 +690,44 @@ ExpressionPointer Elaborator::recoverClaimHint(
             return bridgeCitedFact(
                 hintTerm, goalClosed, localBinders, line);
         }
+        // If the cited name does not exist at all (a typo), say so plainly.
+        // This is far clearer than the generic "citation does not prove this
+        // goal" below — and necessary, because the recovery attempt would
+        // otherwise re-throw "unknown identifier" only to have it masked by
+        // our own catch and replaced with the generic message.
+        {
+            std::string citedName;
+            if (auto* identifier =
+                    std::get_if<SurfaceIdentifier>(&byHint.node)) {
+                citedName = identifier->qualifiedName;
+            } else if (auto* application =
+                           std::get_if<SurfaceApplication>(&byHint.node)) {
+                if (auto* identifier = std::get_if<SurfaceIdentifier>(
+                        &application->function->node)) {
+                    citedName = identifier->qualifiedName;
+                }
+            }
+            // Only flag QUALIFIED names (containing `.`): those are
+            // unambiguously global lemma references, so a missing one is a
+            // typo. Bare names can be local hypotheses (a destructured
+            // bundle field cited in `by`), overload aliases, or
+            // `recalling`-introduced facts — none of which live in the
+            // declaration table, so we leave those to the generic path to
+            // avoid false "unknown lemma" reports on valid proofs.
+            bool isLocalBinder = false;
+            for (const auto& binder : localBinders) {
+                if (binder.name == citedName) { isLocalBinder = true; break; }
+            }
+            if (!citedName.empty()
+                && citedName.find('.') != std::string::npos
+                && !isLocalBinder
+                && !environment_.lookup(citedName)) {
+                throwElaborate(
+                    "unknown lemma `" + citedName + "` in `by` citation — "
+                    "no declaration by that name is in scope (check the "
+                    "spelling)");
+            }
+        }
         // Last-ditch recovery: re-elaborate the hint AT the goal type and
         // diff-bridge it (handles `claim f(a) = f(b) by eq` with `eq : a = b`).
         // If that genuinely produces a term of the goal type, return it.

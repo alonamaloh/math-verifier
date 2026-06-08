@@ -17,3 +17,19 @@ Workflow:
 Keep entries here only until triaged — the corpus is the durable record.
 
 <!-- captures are appended below this line -->
+
+### library/ErrorTest/probe_obtain_arity.math — 2026-06-07 22:28:55 (exit 1)
+note: obtain with too many components (∃q.n=d*q has 2, gave 3)
+```
+$ ./kernel verify --source library/ErrorTest/probe_obtain_arity.math --cache-root build
+library/ErrorTest/probe_obtain_arity.math:1:1: elaborate error: cases at line 7: index 0 of scrutinee type must be a local variable
+```
+diagnosis: the `obtain ⟨q, r, extra⟩` pattern has MORE components than the
+  existential provides (∃q. n=d*q = ⟨witness, proof⟩, 2 components); the extra
+  destructure of the equality proof fails, surfacing the internal refining
+  message "index 0 of scrutinee type must be a local variable". Real problem =
+  destructuring-pattern arity mismatch. Wanted: "obtain pattern has 3 components
+  but `d ∣ n` provides 2". FIX UNCERTAIN (obtain → nested-cases desugar) — collect more.
+rubric (0/1): cause · location · actionable · folded-types · no-jargon
+
+---
