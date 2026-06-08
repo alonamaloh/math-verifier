@@ -368,6 +368,15 @@ bool Elaborator::surfaceMentionsName(
             }
             return false;
         }
+        if (auto* linearCombination =
+                std::get_if<SurfaceLinearCombination>(&expression.node)) {
+            // `linear_combination(c1 * h1 + h2 - ...)` references each
+            // hypothesis `h_i` inside the combination tree. Without this
+            // case the walker missed those leaves and emitted spurious
+            // "unused name" warnings (cf. the `SurfaceField` case above).
+            return linearCombination->combination
+                && surfaceMentionsName(*linearCombination->combination, name);
+        }
         if (auto* byInd =
                 std::get_if<SurfaceByInductionUsing>(&expression.node)) {
             if (byInd->scrutinee

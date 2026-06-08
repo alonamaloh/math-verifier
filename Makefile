@@ -138,6 +138,12 @@ ifeq ($(CHECK_REDUNDANT_BY_NON_EQ),1)
 VERIFY_FLAGS := --check-redundant-by --check-redundant-by-non-eq
 endif
 
+# The unused-name check is always-on (the library is clean). But Test/
+# fixtures deliberately exercise named claims, unused `let`s, and local
+# abbreviations — that named/unused shape is exactly what they verify —
+# so opt the Test/ targets out to keep their output free of expected noise.
+$(TEST_MATHV_FILES): VERIFY_FLAGS += --no-check-unused-names
+
 # Recipe for a .mathv. The pattern rule provides the .math prerequisite;
 # the .mathv prerequisites — listed by the included dependency file —
 # drive `make`'s staleness tracking but are NOT passed to `kernel
@@ -194,7 +200,7 @@ library-clean:
 # proof-lemma calls (any positional arity) in user-space `.math` files — the
 # north-star metric the plan drives to zero. Non-failing report by default;
 # `leak-ratchet` fails if the total exceeds LEAK_BUDGET (the no-increase ratchet).
-LEAK_BUDGET ?= 1753
+LEAK_BUDGET ?= 1752
 
 leak-report:
 	@scripts/cic_leak_report --by-file

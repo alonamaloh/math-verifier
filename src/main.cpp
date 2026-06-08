@@ -6228,10 +6228,11 @@ int main(int argc, char* argv[]) {
         bool reportRedundantByNonEq = redundantEnvOn;
         bool reportRedundantCalcSteps = redundantEnvOn;
         // Unused-name check: cheap scope/use query (no speculative re-
-        // proving), separate from the expensive redundant-`by` check. Opt-in
-        // via `--check-unused-names` for now; intended to become always-on
-        // once the library's remaining flagged names are cleaned up.
-        bool reportUnusedNames = false;
+        // proving), separate from the expensive redundant-`by` check. Now
+        // always-on (the library is clean); opt out with
+        // `--no-check-unused-names`. `--check-unused-names` is kept as an
+        // accepted no-op for compatibility.
+        bool reportUnusedNames = true;
         bool writeInterface = true;
         enum class State { None, Source, Output, Deps, CacheRoot } state = State::None;
         for (int i = 2; i < argc; ++i) {
@@ -6264,6 +6265,11 @@ int main(int argc, char* argv[]) {
             }
             if (argument == "--check-unused-names") {
                 reportUnusedNames = true;
+                state = State::None;
+                continue;
+            }
+            if (argument == "--no-check-unused-names") {
+                reportUnusedNames = false;
                 state = State::None;
                 continue;
             }
