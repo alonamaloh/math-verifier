@@ -1875,6 +1875,11 @@ private:
             break;
         }
         if (names.empty()) {
+            if (isKeyword(peek().kind)) {
+                throwHere(
+                    "'" + peek().lexeme + "' is a reserved word and cannot "
+                    "be used as a binder name — choose another name");
+            }
             throwHere("expected at least one name in binder");
         }
         expect(TokenKind::Colon, "in binder");

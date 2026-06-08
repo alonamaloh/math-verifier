@@ -62,24 +62,28 @@ each improvement is measured and protected against regression.
   unification solves them) would let more citations succeed, not just fail
   better. See `Natural.least_witness_minimal` (deferred refactor).
 
-### 2. Reserved word used as an identifier — PENDING (candidate fix #2)
+### 2. Reserved word used as an identifier — FIXED (fix #2)
 
-- **Trigger:** a binder/identifier named with a reserved word, e.g.
+- **Trigger:** a binder named with a reserved word, e.g.
   `theorem f (witness : Natural) : …`. Repro:
   `library/ErrorTest/reserved_word_binder.math`.
-- **Now (symptom):**
+- **Was (symptom):**
   ```
   parse error: expected at least one name in binder … (got 'witness')
   ```
-  Scored 0 on cause and actionable: never says `witness` is *reserved*.
-  This recurs often (`witness`, `goal`, `done`, `okay`, `note`, `change`,
-  `suppose`, `take`, `claim`, …). Hit twice in one session while authoring
+  Scored 0 on cause and actionable: never said `witness` is *reserved*.
+  Recurs often (`witness`, `goal`, `done`, `okay`, `note`, `change`,
+  `suppose`, `take`, `claim`, …); hit twice in one session while authoring
   error-test files themselves.
-- **Diagnosis:** the parser, in binder/identifier position, sees a keyword
-  token and reports the generic "expected a name" instead of recognising
-  the keyword and naming the collision.
-- **Wanted:** `'witness' is a reserved word — choose another binder name`
-  (ideally listing it is reserved for `witness …`). Lexer/parser.cpp.
+- **Diagnosis:** `parseExplicitBinder` broke its name loop on a non-
+  identifier token and, finding no names, reported the generic message —
+  never noticing the offending token was a keyword.
+- **Now:** when the binder has no names and the next token is a keyword,
+  the parser says `'witness' is a reserved word and cannot be used as a
+  binder name — choose another name`. (parser.cpp, using `isKeyword`.)
+- **Still open (minor):** only the empty-binder case is covered; a keyword
+  as a *later* name (`(a witness : T)`) still gives a generic "expected ':'
+  in binder". Low frequency.
 
 ### 3. Goal printed unfolded; surface string lost — PENDING
 
