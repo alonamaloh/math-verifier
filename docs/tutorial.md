@@ -92,16 +92,23 @@ that tries to close the step from facts already in scope and a library of
 basic lemmas. When it can manage on its own, say nothing — that is the
 cleanest a proof gets.
 
-When a step needs help, justify it by its *reason*:
+When a step needs help, justify it by its *reason*. Here the first step
+rewrites the left-hand side with the lemma
+`Natural.add_successor : a + successor(b) = successor(a + b)`, and the
+second step is left to the prover:
 
 ```
-     = successor(a + predecessor)   by Natural.add_successor
+theorem Tutorial.add_successor_commute (a b : Natural)
+        : a + successor(b) = successor(b + a) :=
+  calc a + successor(b)
+     = successor(a + b)   by Natural.add_successor
+     = successor(b + a)   -- the automatic prover closes this (commutativity)
 ```
 
 Notice the lemma is named with **no arguments**: `by Natural.add_successor`,
-not `Natural.add_successor(a, predecessor)`. The system infers the
-arguments from the shape of the step. This is the heart of the preferred
-style — you cite the operative fact, not the call.
+not `Natural.add_successor(a, b)`. The system infers the arguments from the
+shape of the step. This is the heart of the preferred style — you cite the
+operative fact, not the call.
 
 There are two flavours of citation:
 
