@@ -15,15 +15,11 @@ Durable backlog of ideas worth trying. Promote to a real task when picked up.
   opt-in flag, and confirm the build stays fast and noise-free.
   (Raised 2026-06-07 during the proof-readability sweep.)
 
-- **`since` is not exempt from the redundant-`by` check.** Design intent
-  (and the proof-style docs) say `since <proof>` is "like `by` but exempt
-  from the redundant-`by` check — an explanation kept for the reader."
-  Empirically (2026-06-07), `claim P since L` / `done since L` STILL emit
-  "redundant `by` on `claim`" under `--check-redundant-by`. So converting
-  `by`→`since` does not silence the lint; only dropping the hint does.
-  Fix the checker to actually exempt `since` so kept-for-readability cites
-  don't show as redundant — otherwise the opt-in check is noisy on exactly
-  the cites we deliberately keep.
+- **[FIXED]** `since` was not exempt from the redundant-`by` check inside
+  `by_induction`/`cases` bodies: the `byIsExplanation` flag was dropped by
+  the two claim-rebuild sites (parser `substituteSurfaceName` and
+  elaborator `rewriteRecursiveCalls`), both of which omitted it from
+  `makeSurfaceStructuredClaim`. Now plumbed through.
 
 ## Error messages (see docs/error_message_corpus.md for the full catalogue)
 

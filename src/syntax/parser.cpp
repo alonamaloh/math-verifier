@@ -344,7 +344,8 @@ SurfaceExpressionPointer substituteSurfaceName(
             std::move(newProposition), structured->label,
             std::move(newByHint), structured->byCases,
             std::move(newArms), line, column,
-            structured->byInduction, structured->bySubstitution);
+            structured->byInduction, structured->bySubstitution,
+            structured->byIsExplanation);
     }
     if (auto* note = std::get_if<SurfaceNote>(&node.node)) {
         // `note goal : T;` / `note P [by V];` / `change T;` — recurse into
