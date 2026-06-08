@@ -1285,12 +1285,11 @@ theorem Rational.archimedean_for_positives
         (cNonneg : Rational.IsNonneg(c))
         (epsilonPositive : (0 : Rational) < epsilon)
         : ∃ (K : Natural). c ≤ (successor(K) : Rational) * epsilon := {
-  claim recipPositive
-        : (0 : Rational) < Rational.reciprocal_function(epsilon);
+  claim (0 : Rational) < Rational.reciprocal_function(epsilon);
+  claim (0 : Rational) ≤ Rational.reciprocal_function(epsilon)
+    by Rational.LessThan.weaken;
   claim Rational.IsNonneg(Rational.reciprocal_function(epsilon))
-    by Rational.IsNonneg_of_LessOrEqual_zero(
-           Rational.reciprocal_function(epsilon),
-           Rational.LessThan.weaken(recipPositive));
+    by Rational.IsNonneg_of_LessOrEqual_zero;
   claim Rational.IsNonneg(c * Rational.reciprocal_function(epsilon));
   claim abs(c * Rational.reciprocal_function(epsilon))
         = c * Rational.reciprocal_function(epsilon);
@@ -1328,22 +1327,19 @@ theorem Rational.LessThan.multiply_cancel_right_positive
         decide a = b {
           | yes aEqB => {
               claim productsEqual : a * c = b * c;
-              absurd(
-                  Rational.LessThan.distinct(productLessThan)(productsEqual))
+              claim productNotEqual : a * c ≠ b * c by Rational.LessThan.distinct;
+              absurd(productNotEqual(productsEqual))
             }
           | no aNotEqB =>
               And.introduction(aLeqB, aNotEqB)
         }
     | Or.introduceRight(bLeqA) => {
         claim Rational.LessOrEqual((0 : Rational), c);
-        claim reversedProduct : b * c ≤ a * c;
-        claim productsEqual : a * c = b * c
-          by Rational.LessOrEqual.antisymmetric(
-                 a * c, b * c,
-                 Rational.LessThan.weaken(productLessThan),
-                 reversedProduct);
-        absurd(
-            Rational.LessThan.distinct(productLessThan)(productsEqual))
+        claim b * c ≤ a * c;
+        claim a * c ≤ b * c by Rational.LessThan.weaken;
+        claim productsEqual : a * c = b * c by Rational.LessOrEqual.antisymmetric;
+        claim productNotEqual : a * c ≠ b * c by Rational.LessThan.distinct;
+        absurd(productNotEqual(productsEqual))
       }
   }
 }
@@ -1357,13 +1353,9 @@ theorem Rational.succ_K_strictly_less_succ_succ_K_times_epsilon
         : (successor(K) : Rational) * epsilon
           < (successor(successor(K)) : Rational) * epsilon :=
   calc (successor(K) : Rational) * epsilon
+     = (successor(K) : Rational) * epsilon + (0 : Rational)
      < (successor(K) : Rational) * epsilon + epsilon
-          by rewrite(
-                 Rational.add_zero((successor(K) : Rational) * epsilon),
-                 Rational.add_left_preserves_LessThan(
-                     (0 : Rational), epsilon,
-                     (successor(K) : Rational) * epsilon,
-                     epsilonPositive))
+          by Rational.add_left_preserves_LessThan
      = ((1 : Rational) + (successor(K) : Rational)) * epsilon
      = (successor(successor(K)) : Rational) * epsilon
 
