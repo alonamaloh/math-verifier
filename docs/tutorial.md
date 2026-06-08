@@ -59,10 +59,12 @@ import Natural.arithmetic
 import Equality.basics
 
 -- `0 + n` reduces to `n` automatically (addition is defined by recursion
--- on its first argument), so the two sides are *literally* the same term
--- and `reflexivity` closes the goal.
+-- on its first argument), so to the kernel the goal `0 + n = n` is
+-- *literally* `n = n` — true on the nose, with nothing to prove. `done`
+-- says "the goal holds"; the automatic prover sees both sides are the
+-- same term and accepts it.
 theorem Tutorial.zero_add (n : Natural) : 0 + n = n :=
-  reflexivity(n)
+  done
 ```
 
 Some equalities hold "on the nose" like this (the kernel reduces both
