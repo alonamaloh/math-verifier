@@ -948,9 +948,7 @@ theorem Real.bisectionLeft_le_subsequent
         : (k n : Natural)
           → Real.bisectionLeft(subset, initial, n)
             ≤ Real.bisectionLeft(subset, initial, k + n)
-  | zero, n =>
-      Rational.LessOrEqual.reflexive(
-          Real.bisectionLeft(subset, initial, n))
+  | zero, n => done
   | successor(k), n => {
       claim
             Real.bisectionLeft(subset, initial, n)
@@ -972,9 +970,7 @@ theorem Real.bisectionRight_le_predecessor
         : (k n : Natural)
           → Real.bisectionRight(subset, initial, k + n)
             ≤ Real.bisectionRight(subset, initial, n)
-  | zero, n =>
-      Rational.LessOrEqual.reflexive(
-          Real.bisectionRight(subset, initial, n))
+  | zero, n => done
   | successor(k), n => {
       claim
             Real.bisectionRight(subset, initial, k + n)
@@ -1023,9 +1019,8 @@ theorem Rational.successor_cast (n : Natural)
 -- 0 < (successor(n) : Rational). 0 < 1 (strict) ≤ 1 + (n : R) = succ(n).
 theorem Rational.successor_cast_positive (n : Natural)
         : (0 : Rational) < (successor(n) : Rational) := {
-  claim (0 : Rational) ≤ (n : Rational)
-    by Rational.LessOrEqual_zero_of_IsNonneg(
-           (n : Rational), Rational.from_natural_IsNonneg(n));
+  claim Rational.IsNonneg((n : Rational)) by Rational.from_natural_IsNonneg;
+  claim (0 : Rational) ≤ (n : Rational) by Rational.LessOrEqual_zero_of_IsNonneg;
   calc (0 : Rational)
      < (1 : Rational)
      = (1 : Rational) + (0 : Rational)
@@ -1085,11 +1080,11 @@ theorem Real.bisectionWidth_nonneg
         : (n : Natural)
           → Rational.IsNonneg(Real.bisectionWidth(initial, n))
   | zero => initialWidthNonneg
-  | successor(predecessor) =>
-      Rational.halve_IsNonneg(
-          Real.bisectionWidth(initial, predecessor),
-          Real.bisectionWidth_nonneg(
-              initial, initialWidthNonneg, predecessor))
+  | successor(predecessor) => {
+      claim Rational.IsNonneg(Real.bisectionWidth(initial, predecessor))
+          by Real.bisectionWidth_nonneg(initial, initialWidthNonneg, predecessor);
+      done by Rational.halve_IsNonneg
+    }
 
 -- For c ≥ 0, halve^n(c) * (successor(n) : Rational) ≤ c. Multiplicative
 -- bound that turns into the Cauchy modulus via Archimedean.
