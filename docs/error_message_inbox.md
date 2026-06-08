@@ -33,3 +33,17 @@ diagnosis: the `obtain ⟨q, r, extra⟩` pattern has MORE components than the
 rubric (0/1): cause · location · actionable · folded-types · no-jargon
 
 ---
+
+### library/ErrorTest/probe_hole_in_tuple.math — 2026-06-07 22:33:27 (exit 1)
+note: ? in an And-tuple proof slot (entry #7); contrast: ? works in constructor arg positions
+```
+$ ./kernel verify --source library/ErrorTest/probe_hole_in_tuple.math --cache-root build
+library/ErrorTest/probe_hole_in_tuple.math:7:3: elaborate error: theorem 'ErrorTest.p'
+  call to 'And.introduction' at line 8: could not infer hole(s) at position 1
+  expected return type: And (zero ≤ a) (zero ≤ a)
+  Provide the missing argument(s) explicitly to disambiguate.
+```
+diagnosis: TODO — what was the *real* problem?
+rubric (0/1): cause · location · actionable · folded-types · no-jargon
+
+---
