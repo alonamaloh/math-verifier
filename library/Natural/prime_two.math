@@ -20,73 +20,100 @@ import Logic.exists
 
 -- d = 0 does not divide 2: the witness equality `2 = 0 * q` reduces
 -- definitionally to `2 = 0` (multiply pattern-matches on its first
--- argument), and we already have `successor(_) ≠ zero`.
-theorem Natural.zero_not_divides_two
-        : 0 ∣ 2 → False
-  | Exists.introduce(_, equalityProof) =>
-      Natural.successor_not_zero(1, equalityProof)
+-- argument), which is impossible.
+theorem Natural.zero_not_divides_two (zeroDividesTwo : 0 ∣ 2) : False := {
+  obtain ⟨quotient, equalityProof⟩ from zeroDividesTwo;
+  -- equalityProof : 2 = 0 * quotient ≡ 2 = 0.
+  absurd(equalityProof)
+}
 
 -- d ≥ 3 does not divide 2. After applying multiply_successor, the RHS
 -- becomes successor(successor(successor(_))), which `two_not_three_plus`
--- rules out. (We need q ≠ 0 too: when q = 0 the RHS reduces to 0, and
--- we use multiply_zero + successor_not_zero.)
-theorem Natural.three_plus_not_divides_two_via_quotient (predecessor3 : Natural)
-        : (quotient : Natural)
-          → 2 = successor(successor(successor(predecessor3))) * quotient
-          → False
-  | zero, equalityProof =>
-      Natural.successor_not_zero(1,
-          calc 2
-             = successor(successor(successor(predecessor3))) * 0
-             = 0)
-  | successor(quotientPredecessor), equalityProof =>
-      Natural.two_not_three_plus(
-          predecessor3 + successor(successor(successor(predecessor3))) * quotientPredecessor,
-          calc 2
-             = successor(successor(successor(predecessor3)))
-                   * successor(quotientPredecessor)
-             = successor(successor(successor(predecessor3)))
-                   + successor(successor(successor(predecessor3))) * quotientPredecessor)
+-- rules out. (We need q ≠ 0 too: when q = 0 the RHS reduces to 0.)
+theorem Natural.three_plus_not_divides_two_via_quotient
+        (predecessor3 quotient : Natural)
+        (equalityProof
+            : 2 = successor(successor(successor(predecessor3))) * quotient)
+        : False :=
+  cases quotient refining equalityProof {
+    | zero => {
+        -- 2 = succ³(predecessor3) * 0 = 0 — impossible.
+        calc 2
+           = successor(successor(successor(predecessor3))) * 0
+           = 0
+          as twoIsZero;
+        absurd(twoIsZero)
+      }
+    | successor(quotientPredecessor) => {
+        -- 2 = succ³(predecessor3) · succ(q') = succ³(predecessor3) +
+        -- succ³(predecessor3)·q', whose left summand makes it ≥ 3.
+        calc 2
+           = successor(successor(successor(predecessor3)))
+                 * successor(quotientPredecessor)
+           = successor(successor(successor(predecessor3)))
+                 + successor(successor(successor(predecessor3)))
+                     * quotientPredecessor
+          as expanded;
+        done by Natural.two_not_three_plus
+      }
+  }
 
 theorem Natural.three_plus_not_divides_two (predecessor3 : Natural)
-        : Natural.divides(
-              successor(successor(successor(predecessor3))), 2)
-          → False
-  | Exists.introduce(quotient, equalityProof) =>
-      Natural.three_plus_not_divides_two_via_quotient(
-          predecessor3, quotient, equalityProof)
+        (dividesProof
+            : Natural.divides(successor(successor(successor(predecessor3))), 2))
+        : False := {
+  obtain ⟨quotient, equalityProof⟩ from dividesProof;
+  done by Natural.three_plus_not_divides_two_via_quotient
+}
 
 -- The case-analysis chain: for each "depth" of successor we peel off
 -- the candidate, decide between the immediate value being 1, 2, or
 -- "three-or-more" (the impossible case).
 
-theorem Natural.divisor_two_classify_at_two
-        : (predecessor2 : Natural)
-          → successor(successor(predecessor2)) ∣ 2
-          → successor(successor(predecessor2)) = 1 ∨ successor(successor(predecessor2)) = 2
-  | zero, _ =>
-      Or.introduceRight(reflexivity(2))
-  | successor(predecessor3), divisionProof =>
-      absurd(Natural.three_plus_not_divides_two(
-                 predecessor3, divisionProof))
+theorem Natural.divisor_two_classify_at_two (predecessor2 : Natural)
+        (dividesProof : successor(successor(predecessor2)) ∣ 2)
+        : successor(successor(predecessor2)) = 1
+          ∨ successor(successor(predecessor2)) = 2 :=
+  cases predecessor2 refining dividesProof {
+    | zero => {
+        -- successor(successor(0)) = 2, the right disjunct.
+        claim successor(successor(0)) = 2;
+        done
+      }
+    | successor(predecessor3) => {
+        claim contradiction : False
+            by Natural.three_plus_not_divides_two;
+        absurd(contradiction)
+      }
+  }
 
-theorem Natural.divisor_two_classify_at_one
-        : (predecessor : Natural)
-          → successor(predecessor) ∣ 2
-          → successor(predecessor) = 1 ∨ successor(predecessor) = 2
-  | zero, _ =>
-      Or.introduceLeft(reflexivity(1))
-  | successor(predecessor2), divisionProof =>
-      Natural.divisor_two_classify_at_two(predecessor2, divisionProof)
+theorem Natural.divisor_two_classify_at_one (predecessor : Natural)
+        (dividesProof : successor(predecessor) ∣ 2)
+        : successor(predecessor) = 1 ∨ successor(predecessor) = 2 :=
+  cases predecessor refining dividesProof {
+    | zero => {
+        -- successor(0) = 1, the left disjunct.
+        claim successor(0) = 1;
+        done
+      }
+    | successor(predecessor2) => {
+        done by Natural.divisor_two_classify_at_two
+      }
+  }
 
 -- The main classification: every divisor of 2 is 1 or 2.
-theorem Natural.divisor_two_is_one_or_two
-        : (divisor : Natural) → divisor ∣ 2
-          → divisor = 1 ∨ divisor = 2
-  | zero, divisionProof =>
-      absurd(Natural.zero_not_divides_two(divisionProof))
-  | successor(predecessor), divisionProof =>
-      Natural.divisor_two_classify_at_one(predecessor, divisionProof)
+theorem Natural.divisor_two_is_one_or_two (divisor : Natural)
+        (dividesProof : divisor ∣ 2)
+        : divisor = 1 ∨ divisor = 2 :=
+  cases divisor refining dividesProof {
+    | zero => {
+        claim contradiction : False by Natural.zero_not_divides_two;
+        absurd(contradiction)
+      }
+    | successor(predecessor) => {
+        done by Natural.divisor_two_classify_at_one
+      }
+  }
 
 -- And finally: 2 is prime.
 theorem Natural.is_prime_two : Natural.is_prime(2) :=
