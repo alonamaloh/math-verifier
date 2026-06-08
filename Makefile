@@ -90,7 +90,10 @@ compile_commands.json:
 # any .math source changes.
 
 BUILD_DIR := build
-MATH_FILES := $(shell find library -name '*.math' | sort)
+# ErrorTest/ holds intentionally-broken proofs for the error-message
+# harness (`make error-tests`); they MUST fail to verify, so exclude them
+# from the normal build/test globs.
+MATH_FILES := $(shell find library -name '*.math' -not -path 'library/ErrorTest/*' | sort)
 # Split: `library` verifies math content; `tests` verifies the elaborator-
 # feature exercises under library/Test/. `library` is the inner loop —
 # keep it fast and noise-free (the test files use `sorry` deliberately,
@@ -107,11 +110,19 @@ TEST_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(TEST_MATH_FILES))
 LIBRARY_MATHV_IFACE_FILES := $(LIBRARY_MATHV_FILES:.mathv=.mathv.iface)
 TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 
-.PHONY: library library-clean tests
+.PHONY: library library-clean tests error-tests
 
 library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
 tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES)
+
+# Error-message regression suite: each library/ErrorTest/<name>.math is an
+# intentionally-broken proof paired with a <name>.expected sidecar listing
+# substrings its error MUST contain. `make error-tests` asserts each file
+# fails to verify AND that its message still says the informative thing.
+# Needs the library caches present (imports resolve from build/).
+error-tests: library
+	@bash scripts/error_tests.sh
 
 # Verification flags. The redundant-`by` check is OFF by default: it
 # re-runs the auto-prover speculatively on every `by` annotation, which

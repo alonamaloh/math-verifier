@@ -1,0 +1,146 @@
+# Error-message corpus
+
+A living catalogue of elaborator/parser error messages we have found
+confusing, the circumstances that produced them, and a diagnosis of what
+the problem *really* was. It exists so that improving error messages is
+**data-driven** (real failures we hit) rather than guesswork, and so that
+each improvement is measured and protected against regression.
+
+## How this works
+
+- **When you hit a confusing error** while writing or simplifying proofs,
+  add an entry below: a minimal trigger, the verbatim message, the *true*
+  diagnosis, a severity, and (if known) a better message.
+- **When a message is fixed**, add a paired regression case under
+  `library/ErrorTest/`: a broken `<name>.math` plus a `<name>.expected`
+  sidecar listing substrings the message MUST contain. `make error-tests`
+  asserts each file fails to verify and that its message still says the
+  informative thing. (Those files are excluded from `make library`/`tests`.)
+- A not-yet-fixed message can still get a harness case whose `.expected`
+  locks the *current* text (so drift is caught); update it to the better
+  text when the fix lands. Mark such entries **PENDING** here.
+
+## Rubric (score each message 0/1 on five axes)
+
+1. **Cause, not symptom** — does it name the actual fault, or just where a
+   bad term was finally rejected?
+2. **Right location** — does it point at the source line the user must
+   change (the citation/binder), not a distant enclosing theorem?
+3. **Actionable** — does it suggest a concrete fix?
+4. **User-facing types** — does it print types as the user wrote them
+   (folded definitions, `∣`/`≤` notation), not raw kernel/unfolded forms?
+5. **No jargon leak** — no internal term-kind names, metavariable gensyms,
+   or de Bruijn indices in the user-visible text.
+
+## Catalogue
+
+### 1. Cited lemma can't be applied → bare-lemma fallback — FIXED (fix #1)
+
+- **Trigger:** `claim T by L` / `done by L` / `goal by L` where `L`'s
+  arguments can't be inferred (e.g. a higher-order explicit arg), **or**
+  `L` is simply the wrong lemma. Repros:
+  `library/ErrorTest/higher_order_explicit_cite.math`,
+  `library/ErrorTest/wrong_lemma_cite.math`.
+- **Was (symptom):**
+  ```
+  the proof of theorem 'X' does not have its declared type
+    declared type:        <goal>
+    but this proof has type: (predicate : …) → … → <conclusion>
+  ```
+  Scored 0 on cause, location (points at the theorem, not the `claim`),
+  and actionable. The bare `(a) → (b) → …` function type was the only clue.
+- **Diagnosis:** `recoverClaimHint` (the recovery path after
+  `autoFillHintForClaim` throws) ran `coerceToExpectedTypeViaDiff` and
+  returned its result **without checking it had the goal type**; the
+  un-bridged bare lemma then failed the enclosing typecheck far away.
+- **Now:** `recoverClaimHint` verifies the recovered term is defeq to the
+  goal; if not it throws at the claim site, naming the hint, showing
+  `goal:` and the hint's (folded) type, and explaining that the arguments
+  couldn't be inferred / the conclusion doesn't unify. (inference.cpp.)
+- **Still open:** the deeper inference limit — a higher-order *explicit*
+  argument is genuinely uninferable; making such args implicit (so normal
+  unification solves them) would let more citations succeed, not just fail
+  better. See `Natural.least_witness_minimal` (deferred refactor).
+
+### 2. Reserved word used as an identifier — PENDING (candidate fix #2)
+
+- **Trigger:** a binder/identifier named with a reserved word, e.g.
+  `theorem f (witness : Natural) : …`. Repro:
+  `library/ErrorTest/reserved_word_binder.math`.
+- **Now (symptom):**
+  ```
+  parse error: expected at least one name in binder … (got 'witness')
+  ```
+  Scored 0 on cause and actionable: never says `witness` is *reserved*.
+  This recurs often (`witness`, `goal`, `done`, `okay`, `note`, `change`,
+  `suppose`, `take`, `claim`, …). Hit twice in one session while authoring
+  error-test files themselves.
+- **Diagnosis:** the parser, in binder/identifier position, sees a keyword
+  token and reports the generic "expected a name" instead of recognising
+  the keyword and naming the collision.
+- **Wanted:** `'witness' is a reserved word — choose another binder name`
+  (ideally listing it is reserved for `witness …`). Lexer/parser.cpp.
+
+### 3. Goal printed unfolded; surface string lost — PENDING
+
+- **Trigger:** any error whose goal flowed through an eliminator motive
+  (e.g. an `obtain`), which WHNF-unfolds a `definition`-headed goal.
+- **Symptom:** the error prints `Exists.{0} Natural (λ q. n = d * q)` where
+  the source said `Natural.divides(d, n)` / `d ∣ n`. Scores 0 on axis 4.
+- **Two complementary fixes:**
+  - *Re-fold for display* in `prettyPrintForDisplay` (errors.cpp): show
+    `Natural.divides …` rather than its `Exists` body. Heuristic, lossy.
+  - *Provenance quoting* (user's idea — preferred where available):
+    remember the **exact surface string** the user wrote for a type
+    annotation (theorem signature, `claim`/`note`/`change`/`suppose`
+    type) and quote it verbatim in the error (e.g. as a trailing
+    `-- as written: d ∣ secondSummand`). Lossless and instantly
+    recognisable; mechanism = stash the surface expression / source span
+    alongside the elaborated goal in the Frame, pretty-print the surface
+    form. Falls back to re-folding for synthesised goals with no surface
+    origin.
+
+### 4. `done`/`goal`/`okay` silently weaker than `claim` in refining arms — FIXED
+
+- **Trigger:** a `cases … refining h` arm closed with `done by L` when the
+  arm's goal is headed by a `definition` (unfolded by the motive). Repro:
+  `library/Test/done_by_in_refining_test.math`.
+- **Was:** fell back to the bare lemma (see entry 1) — but the deeper
+  surprise was that `claim P by L` worked in the same spot while `done by
+  L` didn't, an undocumented asymmetry one would "learn" as a quirk.
+- **Now:** `autoFillHintForClaim` also matches the WHNF-reduced conclusion
+  cursor, and `matchAgainstPattern` descends into `Lambda`; the closers
+  behave identically to `claim`. (induction.cpp, diff_bridges.cpp.)
+
+### 5. `claim False by <neg-lemma>` stalled on `Not` — FIXED
+
+- **Trigger:** citing a lemma whose conclusion is `¬P` (`Not(P)` =
+  `P → False`) to prove `False`. Repro:
+  `library/Test/claim_false_by_negation_test.math`.
+- **Was:** bare-lemma fallback — the Pi-peel stopped at the `Not`-headed
+  conclusion and never reached `False`.
+- **Now:** the peel loop unfolds a non-Pi cursor once to expose a hidden
+  Pi. (induction.cpp.)
+
+### 6. Non-terminating elaboration → OOM, no message — PARTIALLY FIXED
+
+- **Trigger:** `cases`/`by_induction` with a scrutinee-dependent
+  hypothesis on the plain (non-refining) path used to loop, growing memory
+  until the machine died — the worst failure mode (no error at all).
+- **Now:** that specific loop is routed to refining + a re-entrancy depth
+  cap (cases.cpp). **Still open:** a *global* elaboration fuel/recursion
+  cap so any runaway becomes a normal error rather than an OOM. Always
+  guard manual repros with `( ulimit -t 90; ./kernel verify … )`.
+
+### 7. `?` holes don't fill anonymous-tuple proof slots — PENDING (surprise)
+
+- **Trigger:** `⟨proof, ?⟩` for an `And`/`Exists` — the `?` for the second
+  component is not auto-discharged (`could not infer hole(s) at position
+  1` from `And.introduction`), although `?` *does* fill constructor
+  argument positions (e.g. `StrictComparison.below(…, ?)`).
+- **Diagnosis:** `?` is goal-driven *argument* inference (unify from other
+  args), not an auto-prover request; in an `And.introduction` slot there's
+  nothing to unify against. The inconsistency (works for some constructor
+  positions, not tuples) is the real papercut.
+- **Wanted:** either make `?` invoke the auto-prover in proof positions, or
+  emit a message saying so and suggesting `claim <component> by …`.
