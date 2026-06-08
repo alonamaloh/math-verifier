@@ -62,12 +62,14 @@ theorem Natural.search_quotient_witness_up_to
               Or.introduceRight(
                   (q : Natural)
                       (quotientLessOrEqualZero : q ≤ 0)
-                      (nEqualsDTimesQuotient : n = d * q) ↦
-                    nNotDTimesZero(
-                        rewrite(
-                            Natural.less_or_equal_zero_implies_equals_zero(
-                                q, quotientLessOrEqualZero),
-                            nEqualsDTimesQuotient)))
+                      (nEqualsDTimesQuotient : n = d * q) ↦ {
+                    -- q ≤ 0 forces q = 0, so n = d·q = d·0 — contradiction.
+                    claim qIsZero : q = 0
+                        by Natural.less_or_equal_zero_implies_equals_zero;
+                    claim nEqualsDTimesZero : n = d * 0
+                        by substituting qIsZero;
+                    nNotDTimesZero(nEqualsDTimesZero)
+                  })
         }
       }
     case successor(prevBound):
@@ -103,25 +105,29 @@ theorem Natural.search_quotient_witness_up_to
                                   ∨ (∃ (bPredecessor : Natural). successor(prevBound) =
                                                   successor(bPredecessor) ∧ q ≤ bPredecessor)
                             claim by cases {
-                              in (q = successor(prevBound)) as quotientEqualsSuccessorPrevious:
-                                  nNotDTimesSuccessorPrevious(
-                                      rewrite(
-                                          quotientEqualsSuccessorPrevious,
-                                          nEqualsDTimesQuotient))
+                              in (q = successor(prevBound)) as quotientEqualsSuccessorPrevious: {
+                                  -- q = successor(prevBound) ⇒ n = d·successor(prevBound).
+                                  claim nEqualsDTimesSuccessor
+                                        : n = d * successor(prevBound)
+                                      by substituting quotientEqualsSuccessorPrevious;
+                                  nNotDTimesSuccessorPrevious(nEqualsDTimesSuccessor)
+                                }
                               in (∃ (bPredecessor : Natural). successor(prevBound) =
                                                   successor(bPredecessor) ∧ q ≤ bPredecessor) as existsProof: {
                                   obtain ⟨bPredecessor, successorEquals,
                                           quotientLessOrEqualBPredecessor⟩
                                       from existsProof;
+                                  -- strip successors: prevBound = bPredecessor, so
+                                  -- q ≤ bPredecessor becomes q ≤ prevBound.
+                                  claim prevBoundEqualsBPredecessor
+                                        : prevBound = bPredecessor
+                                      by Natural.successor_injective;
+                                  claim quotientLessOrEqualPrevBound
+                                        : q ≤ prevBound
+                                      by substituting prevBoundEqualsBPredecessor;
                                   noneEarlier(
                                       q,
-                                      rewrite(
-                                          Equality.symmetry(
-                                              Natural.successor_injective(
-                                                  prevBound,
-                                                  bPredecessor,
-                                                  successorEquals)),
-                                          quotientLessOrEqualBPredecessor),
+                                      quotientLessOrEqualPrevBound,
                                       nEqualsDTimesQuotient)
                               }
                             }
@@ -172,14 +178,13 @@ theorem Natural.decides_divides
               Or.introduceRight(
                   (divProof : successor(predD) ∣ n) ↦ {
                 obtain ⟨q, nEqualsDTimesQuotient⟩ from divProof;
-                claim qLeN : q ≤ n
-                    by rewrite(
-                           Equality.symmetry(nEqualsDTimesQuotient),
-                           Natural.le_q_d_mult_q(
-                               successor(predD), q,
-                               Natural.successor_less_or_equal_successor(
-                                   0, predD,
-                                   Natural.zero_least(predD))));
+                -- successor(predD) ≥ 1, so q ≤ successor(predD)·q = n.
+                claim zeroLessOrEqualPredD : 0 ≤ predD by Natural.zero_least;
+                claim divisorPositive : 1 ≤ successor(predD)
+                    by Natural.successor_less_or_equal_successor;
+                claim qLeProduct : q ≤ successor(predD) * q
+                    by Natural.le_q_d_mult_q;
+                claim qLeN : q ≤ n by substituting nEqualsDTimesQuotient;
                 noQuotientInRange(q, qLeN, nEqualsDTimesQuotient)
               })
         }
