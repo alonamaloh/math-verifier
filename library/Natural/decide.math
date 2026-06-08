@@ -47,32 +47,40 @@ theorem Natural.decides_equality_successor_against
               ∨ (predecessor ≠ otherPredecessor)
             by decidePredecessor(otherPredecessor)
         claim by cases {
-          in (predecessor = otherPredecessor) as predEqOther:
-              Or.introduceLeft(
-                  congruenceOf(successor, predEqOther))
-          in (predecessor ≠ otherPredecessor) as predNeqOther:
-              Or.introduceRight(
-                  (successorEquals :
-                             successor(predecessor)
-                             = successor(otherPredecessor)) ↦
-                      predNeqOther(
-                          Natural.successor_injective(
-                              predecessor, otherPredecessor,
-                              successorEquals)))
+          in (predecessor = otherPredecessor) as predEqOther: {
+              -- equal predecessors give equal successors (left disjunct).
+              claim successor(predecessor) = successor(otherPredecessor);
+              done
+            }
+          in (predecessor ≠ otherPredecessor) as predNeqOther: {
+              -- equal successors would force equal predecessors, absurd.
+              claim successor(predecessor) ≠ successor(otherPredecessor)
+                  by (successorEquals :
+                          successor(predecessor) = successor(otherPredecessor)) ↦ {
+                    claim predsEqual : predecessor = otherPredecessor
+                        by Natural.successor_injective;
+                    predNeqOther(predsEqual)
+                  };
+              done
+            }
         }
       }
   }
 
 -- Decidable equality on Natural.
-theorem Natural.decides_equality
-        : (a b : Natural) → a = b ∨ a ≠ b
-  | zero, b =>
-      Natural.decides_equality_zero_against(b)
-  | successor(predecessor), b =>
-      Natural.decides_equality_successor_against(
-          predecessor,
-          Natural.decides_equality(predecessor),
-          b)
+theorem Natural.decides_equality (a : Natural)
+        : (b : Natural) → a = b ∨ a ≠ b :=
+  by_induction on a with IH {
+    case zero: {
+        take b : Natural;
+        goal by Natural.decides_equality_zero_against
+      }
+    case successor(predecessor): {
+        take b : Natural;
+        -- IH decides equality at the predecessor; the successor helper lifts it.
+        goal by Natural.decides_equality_successor_against
+      }
+  }
 
 -- decidable ≤, with zero as the left operand: always true. The
 -- left branch (0 ≤ other) closes via `Natural.zero_least`, found
@@ -96,33 +104,40 @@ theorem Natural.decides_less_or_equal_successor_against
               ∨ (predecessor ≰ otherPredecessor)
             by decidePredecessor(otherPredecessor)
         claim by cases {
-          in (predecessor ≤ otherPredecessor) as predecessorLessOrEqual:
-              Or.introduceLeft(
-                  Natural.successor_less_or_equal_successor(
-                      predecessor, otherPredecessor,
-                      predecessorLessOrEqual))
-          in (predecessor ≰ otherPredecessor) as predecessorNotLessOrEqual:
-              Or.introduceRight(
-                  (successorLessOrEqual :
-                          successor(predecessor)
-                          ≤ successor(otherPredecessor)) ↦
-                      predecessorNotLessOrEqual(
-                          Natural.less_or_equal_successor_successor_descend(
-                              predecessor, otherPredecessor,
-                              successorLessOrEqual)))
+          in (predecessor ≤ otherPredecessor) as predecessorLessOrEqual: {
+              -- monotone: predecessor ≤ otherPredecessor lifts to successors.
+              claim successor(predecessor) ≤ successor(otherPredecessor)
+                  by Natural.successor_less_or_equal_successor;
+              done
+            }
+          in (predecessor ≰ otherPredecessor) as predecessorNotLessOrEqual: {
+              -- successor(predecessor) ≤ successor(otherPredecessor) would
+              -- descend to predecessor ≤ otherPredecessor, absurd.
+              claim successor(predecessor) ≰ successor(otherPredecessor)
+                  by (successorLessOrEqual :
+                          successor(predecessor) ≤ successor(otherPredecessor)) ↦ {
+                    claim descended : predecessor ≤ otherPredecessor
+                        by Natural.less_or_equal_successor_successor_descend;
+                    predecessorNotLessOrEqual(descended)
+                  };
+              done
+            }
         }
       }
   }
 
 -- Decidable ≤ on Natural.
-theorem Natural.decides_less_or_equal
-        : (a b : Natural)
-          → a ≤ b ∨ a ≰ b
-  | zero, b =>
-      Natural.decides_less_or_equal_zero_against(b)
-  | successor(predecessor), b =>
-      Natural.decides_less_or_equal_successor_against(
-          predecessor,
-          Natural.decides_less_or_equal(predecessor),
-          b)
+theorem Natural.decides_less_or_equal (a : Natural)
+        : (b : Natural) → a ≤ b ∨ a ≰ b :=
+  by_induction on a with IH {
+    case zero: {
+        take b : Natural;
+        goal by Natural.decides_less_or_equal_zero_against
+      }
+    case successor(predecessor): {
+        take b : Natural;
+        -- IH decides ≤ at the predecessor; the successor helper lifts it.
+        goal by Natural.decides_less_or_equal_successor_against
+      }
+  }
 
