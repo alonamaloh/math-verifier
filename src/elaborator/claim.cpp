@@ -410,17 +410,21 @@ ExpressionPointer Elaborator::elaborateClaimByCases(
         }
         const size_t armCount = claim.arms.size();
 
-        // The goal each arm must prove.
+        // The goal each arm must prove. A `goal` proposition (`claim goal
+        // by cases …`, and the `done`/`okay` desugaring) is the expected
+        // type itself.
         ExpressionPointer goalClosed;
-        if (claim.proposition) {
+        bool propositionIsGoal = claim.proposition
+            && std::holds_alternative<SurfaceGoal>(claim.proposition->node);
+        if (claim.proposition && !propositionIsGoal) {
             goalClosed = elaborateExpression(
                 *claim.proposition, localBinders);
         } else if (expectedType) {
             goalClosed = expectedType;
         } else {
             throwElaborate(
-                "`claim by cases` needs either a proposition or an "
-                "expected type from context");
+                "`claim by cases` / `done by cases` needs either a "
+                "proposition or an expected type from context");
         }
 
         // Elaborate each arm's disjunct proposition.

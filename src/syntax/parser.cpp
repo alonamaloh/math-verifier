@@ -2341,19 +2341,13 @@ private:
             return makeSurfaceProposition(token.line, token.column);
         }
         if (current.kind == TokenKind::KeywordGoal) {
+            // `goal` is just the NAME of the type we are trying to prove —
+            // a type reference (used as `claim goal [by …]`, `note goal :
+            // T`, etc.). It is NOT a standalone proof-closer: to close the
+            // goal write `done` / `okay` (≡ `claim goal`). A bare `goal`
+            // (or `goal by …`) in proof position is therefore as ill-formed
+            // as a bare proposition `a + b = b + a` without `claim`/`calc`.
             Token token = consumeAny();
-            // `goal by <Hint>` (and all the structured-claim modifier
-            // shapes — `by cases`, `by substituting`, `by induction`,
-            // etc.) is a math-style alias for `claim by <Hint>`. Both
-            // resolve the proposition from expected type, so the only
-            // difference is the leading keyword. We dispatch to
-            // parseStructuredClaimTail (factored below) so the same
-            // modifier-parsing code handles both spellings.
-            if (peek().kind == TokenKind::KeywordBy) {
-                return parseStructuredClaimTail(
-                    token,
-                    /*proposition=*/nullptr);
-            }
             return makeSurfaceGoal(token.line, token.column);
         }
         if (current.kind == TokenKind::Question) {
@@ -2918,13 +2912,19 @@ private:
             claimToken.kind == TokenKind::KeywordDone
             || claimToken.kind == TokenKind::KeywordOkay;
         if (isBareCloser) {
+            // `done` / `okay` are precisely `claim goal`: a claim whose
+            // proposition is the `goal` type-reference (resolved from the
+            // expected type). They accept the same optional `by <hint>` /
+            // `since <proof>` tail, so `done by IH` ≡ `claim goal by IH`.
+            SurfaceExpressionPointer goalProposition =
+                makeSurfaceGoal(claimToken.line, claimToken.column);
             if (peek().kind == TokenKind::KeywordBy
                 || peek().kind == TokenKind::KeywordSince) {
                 return parseStructuredClaimTail(
-                    claimToken, /*proposition=*/nullptr);
+                    claimToken, std::move(goalProposition));
             }
             return makeSurfaceStructuredClaim(
-                /*proposition=*/nullptr, /*label=*/"",
+                std::move(goalProposition), /*label=*/"",
                 /*byHint=*/nullptr, /*byCases=*/false, /*arms=*/{},
                 claimToken.line, claimToken.column);
         }

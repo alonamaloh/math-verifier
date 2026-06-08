@@ -353,17 +353,22 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
                 claim, localBinders, expectedType, line);
         }
 
-        // Resolve the goal proposition.
+        // Resolve the goal proposition. A `goal` proposition (the form
+        // `claim goal …`, and `done`/`okay` which desugar to it) is the
+        // expected type itself — use it directly rather than elaborating
+        // the `goal` reference.
         ExpressionPointer goalClosed;
-        if (claim.proposition) {
+        bool propositionIsGoal = claim.proposition
+            && std::holds_alternative<SurfaceGoal>(claim.proposition->node);
+        if (claim.proposition && !propositionIsGoal) {
             goalClosed = elaborateExpression(
                 *claim.proposition, localBinders);
         } else if (expectedType) {
             goalClosed = expectedType;
         } else {
             throwElaborate(
-                "bare `claim` needs an expected type from context "
-                "(none available — wrap the claim in `(claim : T)` "
+                "bare `claim` / `done` needs an expected type from context "
+                "(none available — wrap it in `(claim : T)` "
                 "or provide a proposition: `claim P [by Hint]`)");
         }
 
