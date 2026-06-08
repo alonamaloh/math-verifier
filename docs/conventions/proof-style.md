@@ -276,7 +276,7 @@ reach for the math-like form instead:
     induction in a comment AND counts as a direct call. Write it
     `by_induction on a with IH refining b, c, h { case zero: … case
     successor(predecessor): … }` instead: the hypothesis is the named local
-    `IH`, cited argument-free like any fact (`done since IH` / `goal by IH`),
+    `IH`, cited argument-free like any fact (`done since IH` / `done by IH`),
     so the recursion both reads as induction and is no longer a lemma call.
     Example — `Natural.add_cancel_left` (`library/Natural/arithmetic.math`):
     ```
@@ -301,9 +301,13 @@ reach for the math-like form instead:
     ```
     The case bodies use the constructor's *destructured* index names, not the
     outer binders; `IH` (or `IH(<refined-hyp>)`) is the named hypothesis.
-  - **Closers.** `done`, `okay`, `goal` are synonyms: a bare one discharges
-    the goal by lookup; each also takes an optional `by <hint>` (prover needs
-    it) or `since <reason>` (kept explanation). Prefer **`since`** for an
+  - **Closers.** `done` and `okay` are precisely `claim goal` — a claim
+    whose proposition is the `goal` (the expected type). A bare `done`/`okay`
+    discharges the goal by lookup; each also takes an optional `by <hint>`
+    (prover needs it) or `since <reason>` (kept explanation). `goal` itself is
+    only the NAME of the type being proved — a type reference (`claim goal`,
+    `note goal : T`), NOT a standalone closer (`goal by …` is rejected; write
+    `done by …` / `okay by …` / `claim goal by …`). Prefer **`since`** for an
     illuminating reason — the induction hypothesis, the operative lemma —
     **even when a bare closer would succeed**: we keep the explanation for the
     reader regardless of how strong the auto-prover gets.
@@ -351,9 +355,10 @@ naturally and read as math prose. All end with `;` and the block
 returns its final non-`;`-terminated expression.
 
 - `claim <name> : <type> by <proof>;` — assert and discharge.
-  Synonym: `goal <name> by <proof>` (when the type comes from the
-  surrounding expected type), `done` / `okay` (bare claim,
-  auto-prover closes the goal).
+  To close the current goal (type from the surrounding expected type):
+  `claim goal [by <proof>]`, or its synonyms `done` / `okay`
+  (`done by <proof>` ≡ `claim goal by <proof>`; bare `done`/`okay` let the
+  auto-prover close it).
 - `claim <type> by <hint>;` — anonymous claim. Hints include `by
   (<fact>)` (cite a proposition: auto-proved, then used as a proof of
   itself — below), `by substitution` (auto-find equality + body), `by
@@ -505,10 +510,10 @@ Outermost-arm shorthands for case-splits:
 - `by_strong_induction on n with IH { … }` — strong induction on a
   Natural; IH has type `(k : Natural) → k < n → P(k)`.
 
-The bare keywords `done`, `okay`, `goal` are pure aliases — pick
-whichever spells the proof's intent. "the proof is done here"
-(`done`), "okay, that proves it" (`okay`), "the goal is closed by
-…" (`goal by …`).
+`done` and `okay` are aliases for `claim goal` — pick whichever spells
+the proof's intent: "the proof is done here" (`done`), "okay, that proves
+it" (`okay`), or the explicit `claim goal by …`. (`goal` on its own is
+just the name of the goal type, not a closer.)
 
 The remaining subsections are about *CIC noise* — bureaucracy that
 the kernel demands but a mathematician would never write. Those
