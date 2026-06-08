@@ -112,31 +112,35 @@ theorem Rational.halve_endpoint_right (a b : Rational)
 
 theorem Rational.halve_preserves_LessOrEqual
         (x y : Rational) (xLeqY : x ≤ y)
-        : Rational.halve(x) ≤ Rational.halve(y) :=
-  Rational.LessOrEqual.multiply_by_nonneg_right(
-      x, y, Rational.one_half, xLeqY,
-      Rational.LessOrEqual_zero_of_IsNonneg(
-          Rational.one_half, Rational.one_half_IsNonneg))
+        : Rational.halve(x) ≤ Rational.halve(y) := {
+  claim (0 : Rational) ≤ Rational.one_half
+    by Rational.LessOrEqual_zero_of_IsNonneg(
+           Rational.one_half, Rational.one_half_IsNonneg);
+  calc Rational.halve(x)
+     = x * Rational.one_half
+     ≤ y * Rational.one_half   since Rational.LessOrEqual.multiply_by_nonneg_right
+     = Rational.halve(y)
+}
 
 -- a ≤ b → a ≤ halve(a + b). From a + a ≤ a + b (left-add b), halve
 -- both sides, then `halve(a + a) = a`.
 theorem Rational.halve_left_le_sum (a b : Rational) (aLeqB : a ≤ b)
-        : a ≤ Rational.halve(a + b) :=
-  rewrite(
-      Rational.halve_of_doubled(a),
-      Rational.halve_preserves_LessOrEqual(
-          a + a, a + b,
-          Rational.add_general_LessOrEqual_left(a, a, b, aLeqB)))
+        : a ≤ Rational.halve(a + b) := {
+  claim a + a ≤ a + b   by Rational.add_general_LessOrEqual_left;
+  calc a
+     = Rational.halve(a + a)   by Rational.halve_of_doubled(a)
+     ≤ Rational.halve(a + b)   since Rational.halve_preserves_LessOrEqual
+}
 
 -- a ≤ b → halve(a + b) ≤ b. Symmetric: a + b ≤ b + b, then halve and
 -- `halve(b + b) = b`.
 theorem Rational.halve_sum_le_right (a b : Rational) (aLeqB : a ≤ b)
-        : Rational.halve(a + b) ≤ b :=
-  rewrite(
-      Rational.halve_of_doubled(b),
-      Rational.halve_preserves_LessOrEqual(
-          a + b, b + b,
-          Rational.add_preserves_LessOrEqual(a, b, b, aLeqB)))
+        : Rational.halve(a + b) ≤ b := {
+  claim a + b ≤ b + b   by Rational.add_preserves_LessOrEqual;
+  calc Rational.halve(a + b)
+     ≤ Rational.halve(b + b)   since Rational.halve_preserves_LessOrEqual
+     = b                       by Rational.halve_of_doubled(b)
+}
 
 -- ----------------------------------------------------------------------
 -- Bound vocabulary on Real.
@@ -190,17 +194,13 @@ theorem Real.exists_rational_below_at_make
         let epsilon ∈ Rational with (0 : Rational) < epsilon;
         witness N with {
           let m ∈ Natural with N ≤ m;
-          claim absBound
-                : abs(seq(m) - seq(N))
-                  < (1: Rational)
+          claim abs(seq(m) - seq(N)) < (1: Rational)
             by cauchyAt1(m, given(N ≤ m),
                          N, LessOrEqual.reflexivity(N));
           -- absolute_value_LessThan_bounds returns the conjunction
           -- `-1 < seq(m) - seq(N) ∧ ... < 1`; destructure to name
           -- only the half we use.
-          obtain ⟨diffBound, _⟩
-              from Rational.absolute_value_LessThan_bounds(
-                       seq(m) - seq(N), (1 : Rational), absBound);
+          obtain ⟨diffBound, _⟩ by Rational.absolute_value_LessThan_bounds;
           -- 0 = -1 + 1 < (seq(m) - seq(N)) + 1 by adding 1 on the
           -- right of diffBound, and ring rearranges the RHS to
           -- `seq(m) - (seq(N) - 1)`.
@@ -220,7 +220,7 @@ theorem Real.exists_rational_below_at_make
 -- Lift the at-make form via Quotient.induct.
 theorem Real.exists_rational_below (x : Real)
         : ∃ (q : Rational). (q : Real) ≤ x :=
-  by_representatives x as rep => Real.exists_rational_below_at_make(rep)
+  by_representatives x as rep => done by Real.exists_rational_below_at_make
 
 -- ----------------------------------------------------------------------
 -- Building block #2: every Real has a Rational upper bound. Symmetric
@@ -240,15 +240,11 @@ theorem Real.exists_rational_above_at_make
                    (epsilonPositive : (0 : Rational) < epsilon) ↦
             witness N with
                 (m : Natural) (mGeN : N ≤ m) ↦ {
-                  claim absBound
-                        : abs(seq(m) - seq(N))
-                          < (1 : Rational)
+                  claim abs(seq(m) - seq(N)) < (1 : Rational)
                     by cauchyAt1(m, mGeN, N,
                                  LessOrEqual.reflexivity(N));
                   -- seq(m) - seq(N) < 1  (upper half of |·| bounds).
-                  obtain ⟨_, diffBound⟩
-                      from Rational.absolute_value_LessThan_bounds(
-                               seq(m) - seq(N), (1 : Rational), absBound);
+                  obtain ⟨_, diffBound⟩ by Rational.absolute_value_LessThan_bounds;
                   -- Negate both sides: from `seq(m) - seq(N) < 1` we
                   -- get `-1 < -(seq(m) - seq(N)) = seq(N) - seq(m)`.
                   -- Then add 1 to both sides:
@@ -268,7 +264,7 @@ theorem Real.exists_rational_above_at_make
 -- Lift exists_rational_above_at_make via Quotient.induct.
 theorem Real.exists_rational_above (x : Real)
         : ∃ (q : Rational). x ≤ (q : Real) :=
-  by_representatives x as rep => Real.exists_rational_above_at_make(rep)
+  by_representatives x as rep => done by Real.exists_rational_above_at_make
 
 -- ----------------------------------------------------------------------
 -- Building block #3: the bisection state and step function.
@@ -673,14 +669,10 @@ theorem Real.LessOrEqual_of_pointwise_at_make
           claim m_geq_N_s : N_s ≤ m;
           claim m_geq_N_b : N_b ≤ m;
           -- |s(m) - s(N_s)| < halve(ε)
-          claim sCauchyAtM
-                : abs(s(m) - s(N_s))
-                  < Rational.halve(epsilon)
+          claim abs(s(m) - s(N_s)) < Rational.halve(epsilon)
             by sCauchyAt(m, m_geq_N_s, N_s, LessOrEqual.reflexivity(N_s));
           -- Upper bound: s(m) - s(N_s) < halve(ε)  (upper half of |·| bounds).
-          obtain ⟨_, sUpperBound⟩
-              from Rational.absolute_value_LessThan_bounds(
-                       s(m) - s(N_s), Rational.halve(epsilon), sCauchyAtM);
+          obtain ⟨_, sUpperBound⟩ by Rational.absolute_value_LessThan_bounds;
           -- Flip: -halve(ε) < s(N_s) - s(m). LessThan.negate gives
           -- -halve(ε) < -(s(m) - s(N_s)), then rewrite via negate_subtract.
           calc -Rational.halve(epsilon)
@@ -695,16 +687,14 @@ theorem Real.LessOrEqual_of_pointwise_at_make
           --      < (b(m) - s(N_s)) + -halve(ε)            (bBound)
           --      ≤ (b(m) - s(N_s)) + (s(N_s) - s(m))      (sFlippedBound, weakened)
           --      = b(m) - s(m).
+          claim -Rational.halve(epsilon) ≤ s(N_s) - s(m)
+            by Rational.LessThan.weaken(sFlippedBound);
           calc -epsilon
              = -(Rational.halve(epsilon) + Rational.halve(epsilon))
              = -Rational.halve(epsilon) + -Rational.halve(epsilon)
              < (b(m) - s(N_s)) + -Rational.halve(epsilon)
              ≤ (b(m) - s(N_s)) + (s(N_s) - s(m))
-                  by Rational.add_general_LessOrEqual_left(
-                         b(m) - s(N_s),
-                         -Rational.halve(epsilon),
-                         s(N_s) - s(m),
-                         Rational.LessThan.weaken(sFlippedBound))
+                  since Rational.add_general_LessOrEqual_left
              = b(m) - s(m)
         }
   })
@@ -759,14 +749,10 @@ theorem Real.LessOrEqual_of_pointwise_lower_at_make
           claim m_geq_N_s : N_s ≤ m;
           claim m_geq_N_b : N_b ≤ m;
           -- |s(m) - s(N_s)| < halve(ε)
-          claim sCauchyAtM
-                : abs(s(m) - s(N_s))
-                  < Rational.halve(epsilon)
+          claim abs(s(m) - s(N_s)) < Rational.halve(epsilon)
             by sCauchyAt(m, m_geq_N_s, N_s, LessOrEqual.reflexivity(N_s));
           -- Lower bound: -halve(ε) < s(m) - s(N_s)  (lower half of |·| bounds).
-          obtain ⟨sLowerBound, _⟩
-              from Rational.absolute_value_LessThan_bounds(
-                       s(m) - s(N_s), Rational.halve(epsilon), sCauchyAtM);
+          obtain ⟨sLowerBound, _⟩ by Rational.absolute_value_LessThan_bounds;
           -- pointwiseGeq at m: -halve(ε) < s(N_s) - b(m).
           claim sBBound
                 : -Rational.halve(epsilon) < s(N_s) - b(m)
@@ -776,16 +762,14 @@ theorem Real.LessOrEqual_of_pointwise_lower_at_make
           --      < (s(m) - s(N_s)) + -halve(ε)            (sLowerBound)
           --      ≤ (s(m) - s(N_s)) + (s(N_s) - b(m))      (sBBound, weakened)
           --      = s(m) - b(m).
+          claim -Rational.halve(epsilon) ≤ s(N_s) - b(m)
+            by Rational.LessThan.weaken(sBBound);
           calc -epsilon
              = -(Rational.halve(epsilon) + Rational.halve(epsilon))
              = -Rational.halve(epsilon) + -Rational.halve(epsilon)
              < (s(m) - s(N_s)) + -Rational.halve(epsilon)
              ≤ (s(m) - s(N_s)) + (s(N_s) - b(m))
-                  by Rational.add_general_LessOrEqual_left(
-                         s(m) - s(N_s),
-                         -Rational.halve(epsilon),
-                         s(N_s) - b(m),
-                         Rational.LessThan.weaken(sBBound))
+                  since Rational.add_general_LessOrEqual_left
              = s(m) - b(m)
         }
   })
@@ -828,15 +812,11 @@ theorem Real.bisectionLeq_invariant_step
                   Real.bisectionStepWithDec(subset, intervals, decision)) :=
   cases decision {
     | Logic.Decidable.yes(_) =>
-        Rational.halve_left_le_sum(
-            Real.BisectionInterval.left(intervals),
-            Real.BisectionInterval.right(intervals),
-            predecessorLeftLeqRight)
+        -- New interval [left, midpoint]: left ≤ midpoint = halve(left + right).
+        done since Rational.halve_left_le_sum
     | Logic.Decidable.no(_) =>
-        Rational.halve_sum_le_right(
-            Real.BisectionInterval.left(intervals),
-            Real.BisectionInterval.right(intervals),
-            predecessorLeftLeqRight)
+        -- New interval [midpoint, right]: midpoint = halve(left + right) ≤ right.
+        done since Rational.halve_sum_le_right
   }
 
 theorem Real.bisectionLeq_invariant
@@ -885,14 +865,10 @@ theorem Real.bisectionLeft_step_monotone_step
             ≤ Real.BisectionInterval.left(
                   Real.bisectionStepWithDec(subset, intervals, decision)) :=
   cases decision {
-    | Logic.Decidable.yes(_) =>
-        Rational.LessOrEqual.reflexive(
-            Real.BisectionInterval.left(intervals))
-    | Logic.Decidable.no(_) =>
-        Rational.halve_left_le_sum(
-            Real.BisectionInterval.left(intervals),
-            Real.BisectionInterval.right(intervals),
-            withinInterval)
+    -- yes-branch keeps left = left(intervals); no-branch advances it to
+    -- the midpoint, which is ≥ left since left ≤ right.
+    | Logic.Decidable.yes(_) => done since Rational.LessOrEqual.reflexive
+    | Logic.Decidable.no(_)  => done since Rational.halve_left_le_sum
   }
 
 theorem Real.bisectionLeft_step_monotone
@@ -935,14 +911,10 @@ theorem Real.bisectionRight_step_monotone_step
               Real.bisectionStepWithDec(subset, intervals, decision))
             ≤ Real.BisectionInterval.right(intervals) :=
   cases decision {
-    | Logic.Decidable.yes(_) =>
-        Rational.halve_sum_le_right(
-            Real.BisectionInterval.left(intervals),
-            Real.BisectionInterval.right(intervals),
-            withinInterval)
-    | Logic.Decidable.no(_) =>
-        Rational.LessOrEqual.reflexive(
-            Real.BisectionInterval.right(intervals))
+    -- yes-branch advances right to the midpoint (≤ right since left ≤ right);
+    -- no-branch keeps right = right(intervals).
+    | Logic.Decidable.yes(_) => done since Rational.halve_sum_le_right
+    | Logic.Decidable.no(_)  => done since Rational.LessOrEqual.reflexive
   }
 
 theorem Real.bisectionRight_step_monotone
@@ -1040,8 +1012,7 @@ theorem Real.bisectionLeft_le_bisectionRight_predecessor
 -- representative is Integer.from_natural(n), which is Integer.IsNonneg.
 theorem Rational.from_natural_IsNonneg (n : Natural)
         : Rational.IsNonneg((n : Rational)) :=
-  
-  (Integer.from_natural_is_nonneg(n))
+  Integer.from_natural_is_nonneg(n)
 
 -- (successor(n) : Rational) = (1 : Rational) + (n : Rational). The cast
 -- of (succ(n) : Integer) reduces definitionally to Integer.one + (n :
@@ -1053,17 +1024,17 @@ theorem Rational.successor_cast (n : Natural)
 
 -- 0 < (successor(n) : Rational). 0 < 1 (strict) ≤ 1 + (n : R) = succ(n).
 theorem Rational.successor_cast_positive (n : Natural)
-        : (0 : Rational) < (successor(n) : Rational) :=
+        : (0 : Rational) < (successor(n) : Rational) := {
+  claim (0 : Rational) ≤ (n : Rational)
+    by Rational.LessOrEqual_zero_of_IsNonneg(
+           (n : Rational), Rational.from_natural_IsNonneg(n));
   calc (0 : Rational)
      < (1 : Rational)
      = (1 : Rational) + (0 : Rational)
      ≤ (1 : Rational) + (n : Rational)
-          by Rational.add_general_LessOrEqual_left(
-                 (1 : Rational), (0 : Rational), (n : Rational),
-                 Rational.LessOrEqual_zero_of_IsNonneg(
-                     (n : Rational),
-                     Rational.from_natural_IsNonneg(n)))
+          since Rational.add_general_LessOrEqual_left
      = (successor(n) : Rational)
+}
 
 -- (successor(successor(n)) : Rational) = (1 : Rational) + (1 : Rational)
 -- + (n : Rational). Two applications of add_preserves, bridging
@@ -1091,9 +1062,8 @@ theorem Rational.halve_two_plus_le_one_plus (n : Natural)
         : Rational.halve((1 : Rational) + (1 : Rational) + (n : Rational))
           ≤ (1 : Rational) + (n : Rational) := {
   -- 1 ≤ 1 + n because n ≥ 0:  1 = 1 + 0 ≤ 1 + n.
-  claim (0 : Rational) ≤ (n : Rational)
-    by Rational.LessOrEqual_zero_of_IsNonneg(
-           (n : Rational), Rational.from_natural_IsNonneg(n));
+  claim Rational.IsNonneg((n : Rational))   since Rational.from_natural_IsNonneg;
+  claim (0 : Rational) ≤ (n : Rational)     since Rational.LessOrEqual_zero_of_IsNonneg;
   claim (1 : Rational) ≤ (1 : Rational) + (n : Rational);
   -- 1 + 1 + n = 1 + (1 + n) ≤ (1 + n) + (1 + n), since 1 ≤ 1 + n.
   calc (1 : Rational) + (1 : Rational) + (n : Rational)
@@ -1160,8 +1130,7 @@ theorem Real.bisectionWidth_times_succ_le_initial
       -- halve(1+1+pred) ≤ 1+pred                  [halve_two_plus_le_one_plus]
       -- width(predecessor) ≥ 0 (need this)
       -- So width(predecessor) * halve(1+1+pred) ≤ width(predecessor) * (1+pred) ≤ initial
-      claim widthNonneg
-            : Rational.IsNonneg(Real.bisectionWidth(initial, predecessor));
+      claim Rational.IsNonneg(Real.bisectionWidth(initial, predecessor));
       claim halveSwap
             : Rational.halve(Real.bisectionWidth(initial, predecessor))
                 * (successor(successor(predecessor)) : Rational)
@@ -1175,27 +1144,23 @@ theorem Real.bisectionWidth_times_succ_le_initial
               = Rational.halve(
                     (1 : Rational) + (1 : Rational) + (predecessor : Rational))
               ≤ (1 : Rational) + (predecessor : Rational)
-              = (successor(predecessor) : Rational) as halveOfTwoPlus;
-      claim widthMultLeq
-            : Real.bisectionWidth(initial, predecessor)
+              = (successor(predecessor) : Rational);
+      claim (0 : Rational) ≤ Real.bisectionWidth(initial, predecessor)
+        since Rational.LessOrEqual_zero_of_IsNonneg;
+      claim Real.bisectionWidth(initial, predecessor)
                 * Rational.halve(
                       (successor(successor(predecessor)) : Rational))
               ≤ Real.bisectionWidth(initial, predecessor)
                 * (successor(predecessor) : Rational)
-        by Rational.LessOrEqual.multiply_by_nonneg_left(
-               Rational.halve(
-                   (successor(successor(predecessor)) : Rational)),
-               (successor(predecessor) : Rational),
-               Real.bisectionWidth(initial, predecessor),
-               halveOfTwoPlus,
-               Rational.LessOrEqual_zero_of_IsNonneg(
-                   Real.bisectionWidth(initial, predecessor),
-                   widthNonneg));
+        since Rational.LessOrEqual.multiply_by_nonneg_left;
       calc Rational.halve(Real.bisectionWidth(initial, predecessor))
               * (successor(successor(predecessor)) : Rational)
+         = Real.bisectionWidth(initial, predecessor)
+              * Rational.halve(
+                    (successor(successor(predecessor)) : Rational))
+              by halveSwap
          ≤ Real.bisectionWidth(initial, predecessor)
               * (successor(predecessor) : Rational)
-              by rewrite(Equality.symmetry(halveSwap), widthMultLeq)
          ≤ Real.BisectionInterval.right(initial)
               - Real.BisectionInterval.left(initial)
   }
@@ -1209,10 +1174,12 @@ theorem Natural.le_to_add (smaller larger : Natural)
         : smaller ≤ larger
           → ∃ (k : Natural). larger = k + smaller
   | LessOrEqual.reflexivity(commonValue) =>
-      witness 0 with reflexivity(Natural, commonValue)
+      witness 0 with done
   | LessOrEqual.step(_, largerPredecessor, subProof) => {
       obtain ⟨k', preEq⟩
           from Natural.le_to_add(smaller, largerPredecessor, subProof);
+      -- larger = successor(largerPredecessor) = successor(k' + smaller)
+      --        = successor(k') + smaller.
       witness successor(k') with
           congruenceOf(successor, preEq)
   }
@@ -1230,7 +1197,7 @@ theorem Real.bisectionLeft_le_at_le
           ≤ Real.bisectionLeft(subset, initial, m) := {
   -- Write m as k + N (justified by N ≤ m), then the step-monotone
   -- lemma at k iterations closes the rewritten goal.
-  obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
+  obtain ⟨k, mEq⟩ by Natural.le_to_add;
   claim Real.bisectionLeft(subset, initial, N)
         ≤ Real.bisectionLeft(subset, initial, k + N);
   claim by substitution
@@ -1244,7 +1211,7 @@ theorem Real.bisectionRight_le_at_le
         (N m : Natural) (NLeqM : N ≤ m)
         : Real.bisectionRight(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N) := {
-  obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
+  obtain ⟨k, mEq⟩ by Natural.le_to_add;
   claim Real.bisectionRight(subset, initial, k + N)
         ≤ Real.bisectionRight(subset, initial, N);
   claim by substitution
@@ -1258,7 +1225,7 @@ theorem Real.bisectionLeft_le_bisectionRight_at_le
         (N m : Natural) (NLeqM : N ≤ m)
         : Real.bisectionLeft(subset, initial, m)
           ≤ Real.bisectionRight(subset, initial, N) := {
-  obtain ⟨k, mEq⟩ from Natural.le_to_add(N, m, NLeqM);
+  obtain ⟨k, mEq⟩ by Natural.le_to_add;
   claim Real.bisectionLeft(subset, initial, k + N)
         ≤ Real.bisectionRight(subset, initial, N);
   claim by substitution
@@ -1716,6 +1683,8 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
              = Real.bisectionLeft(subset, initial, K) - yseq(j);
           -- Chain the two ε/2 bounds end-to-end, bridge by widthBridge,
           -- then weaken K → j on the left endpoint.
+          claim -Rational.halve(epsilon) ≤ -Real.bisectionWidth(initial, K)
+            by Rational.LessThan.weaken(negWidthGtNegHalvedEpsilon);
           calc -epsilon
              = -(Rational.halve(epsilon) + Rational.halve(epsilon))
              = -Rational.halve(epsilon) + -Rational.halve(epsilon)
@@ -1723,11 +1692,7 @@ theorem Real.bisectionLimit_is_upper_bound_at_rep
                  + -Rational.halve(epsilon)
              ≤ (Real.bisectionRight(subset, initial, K) - yseq(j))
                  + -Real.bisectionWidth(initial, K)
-                  by Rational.add_general_LessOrEqual_left(
-                         Real.bisectionRight(subset, initial, K) - yseq(j),
-                         -Rational.halve(epsilon),
-                         -Real.bisectionWidth(initial, K),
-                         Rational.LessThan.weaken(negWidthGtNegHalvedEpsilon))
+                  since Rational.add_general_LessOrEqual_left
              = Real.bisectionLeft(subset, initial, K) - yseq(j)
              ≤ Real.bisectionLeft(subset, initial, j) - yseq(j)
         }
