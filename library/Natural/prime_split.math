@@ -47,12 +47,12 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
           (divisor : Natural)
               (twoLessOrEqualDivisor : 2 ≤ divisor)
               (divisorLessOrEqualZero : divisor ≤ 0)
-              (_ : divisor ∣ n) ↦
-            absurd(
-                rewrite(
-                    Natural.less_or_equal_zero_implies_equals_zero(
-                        divisor, divisorLessOrEqualZero),
-                    twoLessOrEqualDivisor)))
+              (_ : divisor ∣ n) ↦ {
+            claim divisorIsZero : divisor = 0
+                by Natural.less_or_equal_zero_implies_equals_zero;
+            claim twoLessOrEqualZero : (2 : Natural) ≤ 0 by substituting divisorIsZero;
+            absurd(twoLessOrEqualZero)
+          })
   | successor(predecessorOfBound) =>
       cases Natural.search_proper_divisor_up_to(n, predecessorOfBound) {
         | Or.introduceLeft(foundEarlier) => {
@@ -81,8 +81,7 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                           Or.introduceLeft(
                               witness successor(predecessorOfBound) with
                                   ⟨twoLeSuccPredBound,
-                                   LessOrEqual.reflexivity(
-                                       successor(predecessorOfBound)),
+                                   done,
                                    successorPredecessorBoundDivides⟩)
                       | Or.introduceRight(successorPredecessorBoundDoesNotDivide) =>
                           Or.introduceRight(
@@ -95,29 +94,30 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                                 -- divisor ≤ predecessorOfBound (use induction hypothesis) or
                                 -- divisor = successor(predecessorOfBound) (use this
                                 -- case's negation).
-                                cases LessOrEqual.invert(
-                                          divisor,
-                                          successor(predecessorOfBound),
-                                          divisorLessOrEqualSuccessorPredecessorBound) {
-                                  | Or.introduceLeft(divisorEqualsSuccessorPredecessorBound) =>
-                                      successorPredecessorBoundDoesNotDivide(
-                                          rewrite(
-                                              divisorEqualsSuccessorPredecessorBound,
-                                              divDividesN))
+                                cases by LessOrEqual.invert {
+                                  | Or.introduceLeft(divisorEqualsSuccessorPredecessorBound) => {
+                                      claim succPredBoundDivides
+                                            : successor(predecessorOfBound) ∣ n
+                                          by substituting divisorEqualsSuccessorPredecessorBound;
+                                      successorPredecessorBoundDoesNotDivide(succPredBoundDivides)
+                                    }
                                   | Or.introduceRight(existsProof) => {
                                       obtain ⟨bPredecessor, successorEquals,
                                               divisorLessOrEqualBPredecessor⟩
                                           from existsProof;
+                                      -- successor is injective, so predecessorOfBound = bPredecessor,
+                                      -- hence divisor ≤ predecessorOfBound — a candidate the
+                                      -- induction hypothesis already ruled out.
+                                      claim predecessorEqualsBPredecessor
+                                            : predecessorOfBound = bPredecessor
+                                          by Natural.successor_injective;
+                                      claim divisorLessOrEqualPredecessorOfBound
+                                            : divisor ≤ predecessorOfBound
+                                          by substituting predecessorEqualsBPredecessor;
                                       noEarlierDivisor(
                                           divisor,
                                           twoLessOrEqualDivisor,
-                                          rewrite(
-                                              Equality.symmetry(
-                                                  Natural.successor_injective(
-                                                      predecessorOfBound,
-                                                      bPredecessor,
-                                                      successorEquals)),
-                                              divisorLessOrEqualBPredecessor),
+                                          divisorLessOrEqualPredecessorOfBound,
                                           divDividesN)
                                     }
                                 }
@@ -131,12 +131,12 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
                             (twoLessOrEqualDivisor : 2 ≤ divisor)
                             (divisorLessOrEqualSuccessorPredecessorBound :
                                 divisor ≤ successor(predecessorOfBound))
-                            (divDividesN : divisor ∣ n) ↦
-                          notTwoLeSuccPredBound(
-                              LessOrEqual.transitive(
-                                  2, divisor, successor(predecessorOfBound),
-                                  divisorLessOrEqualSuccessorPredecessorBound,
-                                  twoLessOrEqualDivisor)))
+                            (divDividesN : divisor ∣ n) ↦ {
+                          calc (2 : Natural)
+                             ≤ divisor
+                             ≤ successor(predecessorOfBound) as twoLessOrEqualSuccessorPredecessorBound;
+                          notTwoLeSuccPredBound(twoLessOrEqualSuccessorPredecessorBound)
+                        })
               }
       }
 
@@ -144,23 +144,21 @@ theorem Natural.search_proper_divisor_up_to (n : Natural)
 theorem Natural.geq_one_when_not_zero
         : (d : Natural) → d ≠ 0 → 1 ≤ d
   | zero, notZero =>
-      absurd(notZero(reflexivity(0)))
+      absurd(notZero(done))
   | successor(predD), _ =>
-      Natural.successor_less_or_equal_successor(
-          0, predD, Natural.zero_least(predD))
+      done
 
 -- Helper: if d is neither 0 nor 1, then 2 ≤ d. Pattern-match on d.
 theorem Natural.geq_two_when_not_zero_or_one
         : (d : Natural)
           → d ≠ 0 → d ≠ 1 → 2 ≤ d
   | zero, notZero, _ =>
-      absurd(notZero(reflexivity(0)))
-  | successor(predD), _, notOne =>
-      Natural.successor_less_or_equal_successor(
-          1, predD,
-          Natural.geq_one_when_not_zero(predD,
-              (predecessorEqualsZero : predD = 0) ↦
-                  notOne(predecessorEqualsZero)))
+      absurd(notZero(done))
+  | successor(predD), _, notOne => {
+      claim predD ≠ 0 by (predecessorEqualsZero : predD = 0) ↦ notOne(predecessorEqualsZero);
+      claim 1 ≤ predD by Natural.geq_one_when_not_zero;
+      done by Natural.successor_less_or_equal_successor
+    }
 
 -- Antisymmetry-like: if a ≤ b and successor(a) ≰ b, then a = b.
 -- (Equivalently, ≤ is total and ¬less than gives equality.)
@@ -176,11 +174,10 @@ theorem Natural.equals_when_less_or_equal_and_not_less_than (a b : Natural)
     in (∃ (bPredecessor : Natural). b = successor(bPredecessor) ∧ a ≤ bPredecessor) as existsProof: {
         obtain ⟨bPredecessor, bEqualsSuccessor, aLessOrEqualBPredecessor⟩
             from existsProof;
-        absurd(notSuccessorALessOrEqualB(
-            rewrite(
-                Equality.symmetry(bEqualsSuccessor),
-                Natural.successor_less_or_equal_successor(
-                    a, bPredecessor, aLessOrEqualBPredecessor))))
+        -- successor(a) ≤ successor(bPredecessor) = b, contradicting the
+        -- hypothesis that successor(a) ≰ b.
+        claim successorALessOrEqualB : successor(a) ≤ b by substituting bEqualsSuccessor;
+        absurd(notSuccessorALessOrEqualB(successorALessOrEqualB))
     }
   }
 
@@ -205,12 +202,12 @@ theorem Natural.classify_divisor_when_no_proper
         -- divisor = 0 → divides(0, successor(predecessorOfN)) means
         -- successor(predecessorOfN) = 0, but successor ≠ zero.
         obtain ⟨q, equality⟩ from divDivides;
-        absurd(Natural.successor_not_zero(
-            predecessorOfN,
-            calc successor(predecessorOfN)
-               = divisor * q
-               = 0 * q
-               = 0))
+        calc successor(predecessorOfN)
+           = divisor * q
+           = 0 * q
+           = 0;
+        claim False by Natural.successor_not_zero;
+        done
     }
     in (divisor ≠ 0) as divisorNotZero:
         cases Natural.decides_equality(divisor, 1) {
@@ -225,28 +222,29 @@ theorem Natural.classify_divisor_when_no_proper
               -- forces divisor = successor(predecessorOfN).
               cases Natural.decides_less_or_equal(
                         successor(divisor), successor(predecessorOfN)) {
-                | Or.introduceLeft(successorDivisorLessOrEqualSuccessorPredecessorOfN) =>
-                    absurd(noProperDivisor(
-                        divisor,
-                        Natural.geq_two_when_not_zero_or_one(
-                            divisor, divisorNotZero, divisorNotOne),
-                        Natural.less_or_equal_successor_successor_descend(
-                            divisor, predecessorOfN,
-                            successorDivisorLessOrEqualSuccessorPredecessorOfN),
-                        divDivides))
-                | Or.introduceRight(notSuccessorDivisorLessOrEqualSuccessorPredecessorOfN) =>
-                    Or.introduceRight(
-                        Natural.equals_when_less_or_equal_and_not_less_than(
-                            divisor, successor(predecessorOfN),
-                            cases Natural.divides_less_or_equal_or_zero(
-                                      divisor, successor(predecessorOfN),
-                                      divDivides) {
-                              | Or.introduceLeft(successorPredecessorEqualsZero) =>
-                                  absurd(successorPredecessorEqualsZero)
-                              | Or.introduceRight(divisorLessOrEqual) =>
-                                  divisorLessOrEqual
-                            },
-                            notSuccessorDivisorLessOrEqualSuccessorPredecessorOfN))
+                | Or.introduceLeft(successorDivisorLessOrEqualSuccessorPredecessorOfN) => {
+                    claim twoLessOrEqualDivisor : 2 ≤ divisor
+                        by Natural.geq_two_when_not_zero_or_one;
+                    claim divisorLessOrEqualPredecessorOfN : divisor ≤ predecessorOfN
+                        by Natural.less_or_equal_successor_successor_descend;
+                    absurd(noProperDivisor(divisor, twoLessOrEqualDivisor,
+                        divisorLessOrEqualPredecessorOfN, divDivides))
+                  }
+                | Or.introduceRight(notSuccessorDivisorLessOrEqualSuccessorPredecessorOfN) => {
+                    -- divisor divides successor(predecessorOfN) and is nonzero, so
+                    -- divisor ≤ successor(predecessorOfN); with successor(divisor) ≰
+                    -- successor(predecessorOfN) that forces divisor = successor(predecessorOfN).
+                    let _ : divisor ≤ successor(predecessorOfN)
+                        := cases by Natural.divides_less_or_equal_or_zero {
+                          | Or.introduceLeft(successorPredecessorEqualsZero) =>
+                              absurd(successorPredecessorEqualsZero)
+                          | Or.introduceRight(divisorLessOrEqual) =>
+                              divisorLessOrEqual
+                        };
+                    claim divisor = successor(predecessorOfN)
+                        by Natural.equals_when_less_or_equal_and_not_less_than;
+                    done
+                  }
               }
         }
   }
@@ -271,9 +269,7 @@ theorem Natural.prime_or_proper_divisor
             Or.introduceRight(
                 witness divisor with
                     ⟨twoLessOrEqualDivisor,
-                     Natural.successor_less_or_equal_successor(
-                         divisor, predecessorOfN,
-                         divisorLessOrEqualPredecessorOfN),
+                     done,
                      divDivides⟩)
         }
         in ((divisor : Natural) → 2 ≤ divisor → divisor ≤ predecessorOfN → divisor ∤ successor(predecessorOfN)) as noProperDivisor:
@@ -281,7 +277,5 @@ theorem Natural.prime_or_proper_divisor
                 ⟨atLeastTwo,
                  (divisor : Natural)
                      (divDivides : divisor ∣ successor(predecessorOfN)) ↦
-                   Natural.classify_divisor_when_no_proper(
-                       predecessorOfN, noProperDivisor, divisor,
-                       divDivides)⟩)
+                   done by Natural.classify_divisor_when_no_proper⟩)
       }
