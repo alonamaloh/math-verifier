@@ -1,0 +1,68 @@
+-- GaussianInteger/imaginary_unit.math
+--
+-- The imaginary unit i ∈ ℤ[i] (the class of the polynomial x) and the
+-- defining relation i² = −1. The relation is just the modulus vanishing:
+-- modulus = x·x + 1, and the class of the modulus is 0, so i·i + 1 = 0.
+
+module GaussianInteger.imaginary_unit
+
+import Logic.basics
+import Logic.quotient
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Integer.basics
+import Integer.ring
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+import GaussianInteger.basics
+
+-- The imaginary unit: the class of x in ℤ[x]/(x²+1).
+definition GaussianInteger.i : GaussianInteger :=
+  RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+      GaussianInteger.x)
+
+-- i² + 1 = 0 in ℤ[i]: the class of x·x + 1 = modulus is zero.
+theorem GaussianInteger.i_squared_plus_one
+        : GaussianInteger.i * GaussianInteger.i
+            + RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+          = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus) :=
+  calc GaussianInteger.i * GaussianInteger.i
+         + RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+     = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+           GaussianInteger.modulus)
+     = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+           by RingModulo.modulus_is_zero
+
+-- i² = −1. Subtract 1 from i² + 1 = 0.
+theorem GaussianInteger.i_squared
+        : GaussianInteger.i * GaussianInteger.i
+          = RingModulo.negate(
+                RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)) :=
+  calc GaussianInteger.i * GaussianInteger.i
+     = GaussianInteger.i * GaussianInteger.i
+         + RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+           by RingModulo.add_identity_right
+     = GaussianInteger.i * GaussianInteger.i
+         + (RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+            + RingModulo.negate(
+                  RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)))
+           by RingModulo.add_negate_right
+     = (GaussianInteger.i * GaussianInteger.i
+          + RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus))
+         + RingModulo.negate(
+               RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus))
+           by RingModulo.add_associative
+     = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+         + RingModulo.negate(
+               RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus))
+           by GaussianInteger.i_squared_plus_one
+     = RingModulo.negate(
+           RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus))
+           by RingModulo.add_identity_left
