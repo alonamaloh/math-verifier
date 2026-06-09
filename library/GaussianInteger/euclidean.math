@@ -1,0 +1,147 @@
+-- GaussianInteger/euclidean.math
+--
+-- ℤ[i] is a Euclidean domain under the norm. Division is nearest-integer:
+-- to divide a by b ≠ 0, balanced-divide the coordinates of a·conj(b) by
+-- D = N(b) to get a quotient q, and set r = a − b·q; then N(r) ≤ N(b)/2 <
+-- N(b). The three arithmetic facts below isolate the pure ℤ / ℕ content of
+-- that bound; the main theorem assembles them with the coordinate algebra.
+
+module GaussianInteger.euclidean
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.add_order
+import Natural.arithmetic
+import Natural.multiply_order
+import Natural.multiply_bounds
+import Natural.compare
+import Natural.cancellation
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.absolute_value
+import Integer.order_multiply
+
+-- The norm crux: with s_i the balanced remainders of the conj-product
+-- coordinates and r_i the coordinates of a − b·q, D·(s₁²+s₂²) = D²·(r₁²+r₂²),
+-- D = b₁²+b₂². A pure polynomial identity once the four defs are unfolded.
+theorem Integer.gaussian_norm_crux (a1 a2 b1 b2 q1 q2 s1 s2 r1 r2 : Integer)
+        (s1Def : s1 = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
+        (s2Def : s2 = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
+        (r1Def : r1 = a1 - (b1 * q1 - b2 * q2))
+        (r2Def : r2 = a2 - (b2 * q1 + b1 * q2))
+        : (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
+          = ((b1 * b1 + b2 * b2) * (b1 * b1 + b2 * b2)) * (r1 * r1 + r2 * r2) := {
+  -- Two linear relations: the conj-product times the divisor coordinates gives
+  -- D·r componentwise. Each is degree 4 — cheap for `ring`.
+  claim linRel1 : b1 * s1 - b2 * s2 = (b1 * b1 + b2 * b2) * r1
+      by calc b1 * s1 - b2 * s2
+            = b1 * ((a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
+                - b2 * ((a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
+                  by substitution
+            = (b1 * b1 + b2 * b2) * (a1 - (b1 * q1 - b2 * q2))
+                  by ring
+            = (b1 * b1 + b2 * b2) * r1
+                  by substituting r1Def;
+  claim linRel2 : b2 * s1 + b1 * s2 = (b1 * b1 + b2 * b2) * r2
+      by calc b2 * s1 + b1 * s2
+            = b2 * ((a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
+                + b1 * ((a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
+                  by substitution
+            = (b1 * b1 + b2 * b2) * (a2 - (b2 * q1 + b1 * q2))
+                  by ring
+            = (b1 * b1 + b2 * b2) * r2
+                  by substituting r2Def;
+  -- Brahmagupta on the two linear relations: D·(s₁²+s₂²) = (b₁s₁−b₂s₂)² +
+  -- (b₂s₁+b₁s₂)² = (D·r₁)² + (D·r₂)² = D²·(r₁²+r₂²).
+  calc (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
+     = (b1 * s1 - b2 * s2) * (b1 * s1 - b2 * s2)
+         + (b2 * s1 + b1 * s2) * (b2 * s1 + b1 * s2)
+           by ring
+     = ((b1 * b1 + b2 * b2) * r1) * ((b1 * b1 + b2 * b2) * r1)
+         + (b2 * s1 + b1 * s2) * (b2 * s1 + b1 * s2)
+           by substituting linRel1
+     = ((b1 * b1 + b2 * b2) * r1) * ((b1 * b1 + b2 * b2) * r1)
+         + ((b1 * b1 + b2 * b2) * r2) * ((b1 * b1 + b2 * b2) * r2)
+           by substituting linRel2
+     = ((b1 * b1 + b2 * b2) * (b1 * b1 + b2 * b2)) * (r1 * r1 + r2 * r2)
+           by ring
+}
+
+-- 4a ≤ 2b with b ≥ 1 forces a < b: otherwise b ≤ a gives 4a ≤ 2a, while
+-- 1 ≤ 2a gives successor(2a) ≤ 2a — impossible.
+theorem Natural.less_of_four_times_le_double (a b : Natural)
+        (bound : 4 * a ≤ 2 * b) (bPositive : 1 ≤ b) : a < b :=
+  cases Natural.compare_strict(a, b) {
+    | Natural.StrictComparison.below(belowProof) => belowProof
+    | Natural.StrictComparison.atLeast(bLessOrEqualA) => {
+        claim 1 ≤ a by LessOrEqual.transitive;
+        claim 1 ≤ 2 * a by Natural.multiply_at_least_one;
+        claim 2 * b ≤ 2 * a by Natural.multiply_monotone_left;
+        claim fourALeTwoA : 4 * a ≤ 2 * a by LessOrEqual.transitive;
+        claim fourAExpand : 4 * a = 2 * a + 2 * a by Natural.distributivity_right;
+        claim successor(2 * a) ≤ 2 * a
+            by calc successor(2 * a)
+                  = (1 : Natural) + 2 * a
+                  ≤ 2 * a + 2 * a                  by Natural.le_add_preserves_left
+                  = 4 * a                          by fourAExpand
+                  ≤ 2 * a                          by fourALeTwoA;
+        claim False by Natural.not_successor_less_or_equal_self;
+        done
+      }
+  }
+
+-- Cancelling the bound: from D·sSquares = D²·norm and 4·sSquares ≤ 2·D²,
+-- multiply the bound by D and cancel D² to get 4·norm ≤ 2·D.
+theorem Integer.cancel_norm_bound (dNat : Natural) (dPositive : 1 ≤ dNat)
+        (sSquares norm : Integer)
+        (crux : (dNat : Integer) * sSquares = ((dNat : Integer) * (dNat : Integer)) * norm)
+        (bound : (4 : Integer) * sSquares ≤ (2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
+        : (4 : Integer) * norm ≤ (2 : Integer) * (dNat : Integer) := {
+  claim scaled
+      : (dNat : Integer) * ((4 : Integer) * sSquares)
+        ≤ (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
+      by Integer.multiply_le_by_natural;
+  claim dSquareCast : ((dNat * dNat : Natural) : Integer) = (dNat : Integer) * (dNat : Integer)
+      by Natural.to_integer.multiply_preserves;
+  claim lhsForm
+      : (dNat : Integer) * ((4 : Integer) * sSquares) = ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
+      by calc (dNat : Integer) * ((4 : Integer) * sSquares)
+            = (4 : Integer) * ((dNat : Integer) * sSquares)
+                  by ring
+            = (4 : Integer) * (((dNat : Integer) * (dNat : Integer)) * norm)
+                  by substituting crux
+            = ((dNat : Integer) * (dNat : Integer)) * ((4 : Integer) * norm)
+                  by ring
+            = ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
+                  by substituting dSquareCast;
+  claim rhsForm
+      : (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
+        = ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer))
+      by calc (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
+            = ((dNat : Integer) * (dNat : Integer)) * ((2 : Integer) * (dNat : Integer))
+                  by ring
+            = ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer))
+                  by substituting dSquareCast;
+  let _ : ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
+          ≤ ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer)) :=
+      calc ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
+            = (dNat : Integer) * ((4 : Integer) * sSquares)
+                  by lhsForm
+            ≤ (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
+                  by scaled
+            = ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer))
+                  by rhsForm;
+  claim 1 ≤ dNat * dNat by Natural.multiply_at_least_one;
+  done by Integer.cancel_le_by_natural_positive
+}
