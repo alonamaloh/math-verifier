@@ -1,0 +1,128 @@
+-- Integer/order_multiply.math
+--
+-- Order interacts with multiplication by a Natural image: it is monotone,
+-- and cancellable when the multiplier is positive. These are the two facts
+-- the Gaussian Euclidean-division bound needs (scale the remainder bound by
+-- N(b), then cancel N(b)² to land at 2·N(ρ) ≤ N(β)).
+--
+-- `x ≤ y` on ℤ is `∃n. y = x + (n:ℤ)`, which is equivalent to — but not
+-- definitionally equal to — `IsNonneg(y − x)`; the two bridge lemmas below
+-- move between the forms so the non-negativity machinery can be reused.
+
+module Integer.order_multiply
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.cancellation
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.sign
+import Integer.sum_of_squares
+
+-- The product of two non-negative integers is non-negative.
+theorem Integer.multiply_nonneg (a b : Integer)
+        (aNonneg : Integer.IsNonneg(a)) (bNonneg : Integer.IsNonneg(b))
+        : Integer.IsNonneg(a * b) := {
+  obtain ⟨j, aImage⟩ from aNonneg;
+  obtain ⟨k, bImage⟩ from bNonneg;
+  witness j * k with
+      calc a * b
+         = (j : Integer) * (k : Integer)
+               by substitution
+         = ((j * k : Natural) : Integer)
+               by Natural.to_integer.multiply_preserves
+}
+
+-- x ≤ y ⟹ y − x is non-negative.
+theorem Integer.nonneg_difference_of_le (x y : Integer) (xLeY : x ≤ y)
+        : Integer.IsNonneg(y - x) := {
+  obtain ⟨n, yEquation⟩ from xLeY;
+  witness n with
+      calc y - x
+         = (x + (n : Integer)) - x   by substituting yEquation
+         = (n : Integer)              by ring
+}
+
+-- y − x non-negative ⟹ x ≤ y.
+theorem Integer.le_of_nonneg_difference (x y : Integer) (differenceNonneg : Integer.IsNonneg(y - x))
+        : x ≤ y := {
+  obtain ⟨n, differenceEquation⟩ from differenceNonneg;
+  witness n with
+      calc y
+         = (y - x) + x         by ring
+         = (n : Integer) + x   by substituting differenceEquation
+         = x + (n : Integer)   by ring
+}
+
+-- Multiplying both sides by a Natural image preserves ≤.
+theorem Integer.multiply_le_by_natural (m : Natural) (x y : Integer) (xLeY : x ≤ y)
+        : (m : Integer) * x ≤ (m : Integer) * y := {
+  claim Integer.IsNonneg((m : Integer)) by Integer.from_natural_is_nonneg;
+  claim Integer.IsNonneg(y - x) by Integer.nonneg_difference_of_le;
+  claim Integer.IsNonneg((m : Integer) * (y - x)) by Integer.multiply_nonneg;
+  claim ringEq : (m : Integer) * y - (m : Integer) * x = (m : Integer) * (y - x) by ring;
+  claim Integer.IsNonneg((m : Integer) * y - (m : Integer) * x) by substituting ringEq;
+  done by Integer.le_of_nonneg_difference
+}
+
+-- Cancelling a positive Natural multiplier reflects ≤.
+theorem Integer.cancel_le_by_natural_positive (m : Natural) (mPositive : 1 ≤ m)
+        (x y : Integer) (productLe : (m : Integer) * x ≤ (m : Integer) * y) : x ≤ y := {
+  claim Integer.IsNonneg((m : Integer) * y - (m : Integer) * x)
+      by Integer.nonneg_difference_of_le;
+  claim ringEq : (m : Integer) * y - (m : Integer) * x = (m : Integer) * (y - x) by ring;
+  claim Integer.IsNonneg((m : Integer) * (y - x)) by substituting ringEq;
+  claim Integer.IsNonneg(Integer.zero) by Integer.zero_is_nonneg;
+  cases Integer.sign_split(y - x) {
+    | Or.introduceLeft(nonnegative) => done by Integer.le_of_nonneg_difference
+    | Or.introduceRight(negative) => {
+        obtain ⟨k, diffEqualsNegativeK⟩ from negative;
+        calc (m : Integer) * (y - x)
+                  = (m : Integer) * (-(k : Integer))
+                        by substituting diffEqualsNegativeK
+                  = -((m : Integer) * (k : Integer))
+                        by ring
+                  = -((m * k : Natural) : Integer)
+                        by substituting Natural.to_integer.multiply_preserves(m, k)
+            as productImage;
+        claim negativeImageNonneg : Integer.IsNonneg(-((m * k : Natural) : Integer))
+            by substituting productImage;
+        obtain ⟨j, negativeImageEqualsJ⟩ from negativeImageNonneg;
+        let _ : ((m * k + j : Natural) : Integer) = Integer.zero :=
+            calc ((m * k + j : Natural) : Integer)
+                  = ((m * k : Natural) : Integer) + (j : Integer)
+                        by Natural.to_integer.add_preserves
+                  = ((m * k : Natural) : Integer) + (-((m * k : Natural) : Integer))
+                        by substituting negativeImageEqualsJ
+                  = Integer.zero
+                        by ring;
+        claim m * k + j = 0 by Natural.to_integer.eq_zero_implies;
+        claim productZero : m * k = 0 by Natural.add_equals_zero_left;
+        let _ : k * m = 0 := calc k * m = m * k by Natural.multiply_commutative = 0 by productZero;
+        claim kZero : k = 0 by Natural.multiply_equals_zero_with_positive_right;
+        calc y - x
+                  = -(k : Integer)
+                        by diffEqualsNegativeK
+                  = -((0 : Natural) : Integer)
+                        by substituting kZero
+                  = -(Integer.zero)
+                        by substituting Natural.to_integer.zero_preserves
+                  = Integer.zero
+                        by ring
+        as diffZero;
+        claim Integer.IsNonneg(y - x) by substituting diffZero;
+        done by Integer.le_of_nonneg_difference
+      }
+  }
+}
