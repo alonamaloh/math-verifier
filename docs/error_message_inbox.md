@@ -47,3 +47,66 @@ diagnosis: TODO — what was the *real* problem?
 rubric (0/1): cause · location · actionable · folded-types · no-jargon
 
 ---
+
+### library/ErrorTest/probe_cases_by_ambiguous.math — 2026-06-09 01:36:38 (exit 1)
+note: cases by <lemma> with two context premises of same x*y=0 shape; wanted a=0 but tactic chose bbZero
+```
+$ ./kernel verify --source library/ErrorTest/probe_cases_by_ambiguous.math --cache-root build
+library/ErrorTest/probe_cases_by_ambiguous.math:16:3: elaborate error: case for 'Or.introduceLeft' of 'Or'
+  cases expression at line 16
+  theorem 'ErrorTest.p'
+  this case's result has the wrong type for the function's declared return type
+    expected:            a = Integer.zero
+    but this case gives: b = Integer.zero
+```
+diagnosis: `cases by Integer.multiply_eq_zero_implies` must pick which context
+  hypothesis discharges the lemma's `x*y = 0` premise. TWO match here
+  (`aaZero : a*a=0` and `bbZero : b*b=0`), and the return type `a = 0` does NOT
+  feed back into the choice — so it silently takes `bbZero`, instantiates
+  `x=y=b`, and the branches now prove `b = 0` against the declared `a = 0`. The
+  surfaced message blames the branch body ("this case gives b = Integer.zero"),
+  which is a SYMPTOM; the real problem is ambiguous premise selection in
+  `cases by`. Wanted, at the `cases by` site: "the premise `x*y = 0` is
+  discharged by more than one hypothesis (`aaZero`, `bbZero`); disambiguate
+  with explicit args — `cases Integer.multiply_eq_zero_implies(a, a, aaZero)`".
+  Even better: prefer the instantiation whose branches match the expected
+  return type before falling back to first-match. FIX: premise search in
+  `cases by` should detect multiple matches (error, or use the goal type to
+  disambiguate) rather than taking the first.
+rubric (0/1): cause · location · actionable · folded-types · no-jargon
+
+---
+
+### library/ErrorTest/probe_substituting_lemma_no_args.math — 2026-06-09 01:36:38 (exit 1)
+note: argument-free substituting of a lemma that still needs its arg
+```
+$ ./kernel verify --source library/ErrorTest/probe_substituting_lemma_no_args.math --cache-root build
+library/ErrorTest/probe_substituting_lemma_no_args.math:12:1: elaborate error: claim by substitution at line 12
+  claim at line 12
+  calc step 1 at line 12
+    context:
+      n : Natural
+  calc block at line 11
+    context:
+      n : Natural
+    goal: n + zero = n
+  theorem 'ErrorTest.q'
+  `by substituting`: the supplied expression's type is not an equality `a = b`
+```
+diagnosis: `substituting <expr>` wants a concrete equality term, but
+  `Natural.add_zero` is a FUNCTION `(a : Natural) → a + 0 = a` — only equal to
+  an equality AFTER applying it. So the diagnosis ("not an equality") is
+  literally correct but unhelpful: it doesn't say *why* (a partially-applied
+  lemma) or what to do. Real intent was "rewrite by add_zero, infer the arg
+  from the target". Two fixes: (a) when the supplied expression is a function
+  whose RESULT type is an equality, say so — "`Natural.add_zero` still expects
+  1 argument (`a : Natural`); apply it, or use `by Natural.add_zero` /
+  `by substitution` to infer it". (b) `substituting` could itself accept a
+  lemma and infer the arguments by matching its conclusion against the calc
+  step's diff, like `by <lemma>` already does. NOTE the asymmetry worth
+  recording: `by <lemma>` and the unnamed `by substitution` BOTH infer
+  arguments, but `by substituting <lemma>` does not — that inconsistency is the
+  trap a user falls into.
+rubric (0/1): cause · location · actionable · folded-types · no-jargon
+
+---
