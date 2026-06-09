@@ -253,3 +253,43 @@ theorem GaussianInteger.gauss_horner
            by RingModulo.add_associative
      = GaussianInteger.embedInteger(c - im)
          + GaussianInteger.i * GaussianInteger.embedInteger(re)
+
+-- Reconstruction at the coefficient level: classOf(a) = re + i·im, where
+-- (re, im) = coords(a). Induction on the coefficient list; the cons step
+-- is classOf_cons + IH + gauss_horner.
+theorem GaussianInteger.reconstruct_coeffs
+        : (a : Polynomial.Coefficients(Ring.carrier(Integer.ring_bundle)))
+          → GaussianInteger.classOf(a)
+            = GaussianInteger.embedInteger(
+                  Product.first(GaussianInteger.coordinatesOfCoefficients(a)))
+              + GaussianInteger.i
+                * GaussianInteger.embedInteger(
+                      Product.second(GaussianInteger.coordinatesOfCoefficients(a)))
+  | Polynomial.Coefficients.nil => {
+      -- coords(nil) = (0,0); classOf(nil) = 0 = embed(0) + i·0
+      -- (embed(0)=0 found via embed_zero; i·0=0 here).
+      claim GaussianInteger.i
+              * RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+            = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+          by Ring.multiply_zero_right(GaussianInteger.ring_bundle, GaussianInteger.i);
+      done
+    }
+  | Polynomial.Coefficients.cons(c, rest) =>
+      calc GaussianInteger.classOf(
+               Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), c, rest))
+         = GaussianInteger.embedInteger(c) + GaussianInteger.i * GaussianInteger.classOf(rest)
+               by GaussianInteger.classOf_cons
+         = GaussianInteger.embedInteger(c)
+             + GaussianInteger.i
+               * (GaussianInteger.embedInteger(
+                      Product.first(GaussianInteger.coordinatesOfCoefficients(rest)))
+                  + GaussianInteger.i
+                    * GaussianInteger.embedInteger(
+                          Product.second(GaussianInteger.coordinatesOfCoefficients(rest))))
+               by substituting GaussianInteger.reconstruct_coeffs(rest)
+         = GaussianInteger.embedInteger(
+               c - Product.second(GaussianInteger.coordinatesOfCoefficients(rest)))
+             + GaussianInteger.i
+               * GaussianInteger.embedInteger(
+                     Product.first(GaussianInteger.coordinatesOfCoefficients(rest)))
+               by GaussianInteger.gauss_horner
