@@ -1,0 +1,109 @@
+-- Natural/sqrt_two_irrational.math
+--
+-- The irrationality of √2 (Freek #1): there are no natural numbers
+-- m, n ≥ 1 with m² = 2·n².
+--
+-- The proof is the classic one by infinite descent. If m² = 2·n² then
+-- 2 ∣ m², and — 2 being prime — 2 ∣ m. Writing m = 2·k and cancelling a
+-- factor of 2 turns the equation into n² = 2·k². That is a *smaller*
+-- solution (n < m), so a well-founded induction on m closes the loop:
+-- there is no least solution, hence none at all.
+
+module Natural.sqrt_two_irrational
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.add_order
+import Natural.compare
+import Natural.cancellation
+import Natural.multiply_order
+import Natural.multiply_bounds
+import Natural.divisibility
+import Natural.prime
+import Natural.prime_two
+import Natural.prime_divides_product
+import Natural.strong_recursion
+
+-- ----------------------------------------------------------------------
+-- A prime dividing a square divides its root. For p = 2 this is the one
+-- number-theoretic fact the descent rests on.
+
+theorem Natural.two_divides_root (m : Natural) (squareEven : 2 ∣ (m * m)) : 2 ∣ m := {
+  -- 2 is prime, so dividing the product m·m forces it to divide a factor.
+  claim eitherFactor : (2 ∣ m) ∨ (2 ∣ m) by Natural.prime_divides_product;
+  cases eitherFactor {
+    | Or.introduceLeft(fromFactor)  => fromFactor
+    | Or.introduceRight(fromFactor) => fromFactor
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- The descent, phrased as: no m admits a partner n with m² = 2·n².
+-- Strong induction on m supplies the "no smaller solution" hypothesis.
+
+theorem Natural.no_double_square (m : Natural)
+        : (n : Natural) → 1 ≤ m → 1 ≤ n → m * m = 2 * (n * n) → False :=
+  by_strong_induction on m with subject, inductionHypothesis {
+    take n : Natural;
+    suppose 1 ≤ subject as subjectPositive;
+    suppose 1 ≤ n as nPositive;
+    suppose subject * subject = 2 * (n * n) as equation;
+
+    -- 2 divides subject², hence — 2 being prime — divides subject itself.
+    claim 2 ∣ (subject * subject);
+    claim twoDividesSubject : 2 ∣ subject;
+    obtain ⟨k, subjectEquation⟩ from twoDividesSubject;
+
+    -- k ≥ 1, since otherwise subject = 2·0 = 0 would contradict subject ≥ 1.
+    let kPositive : 1 ≤ k :=
+        cases k with kIsZero {
+          | zero => { absurd(calc successor(0) ≤ subject = 2 * k = 2 * 0 = 0) }
+          | successor(predecessor) => { claim }
+        };
+
+    -- Substituting subject = 2·k and cancelling the leading 2 leaves
+    -- n² = 2·k² — a strictly smaller instance of the same equation.
+    claim 1 ≤ 2;
+    claim 2 * (2 * (k * k)) = 2 * (n * n)
+        by calc 2 * (2 * (k * k))
+              = (2 * k) * (2 * k)
+              = subject * subject
+              = 2 * (n * n);
+    claim 2 * (k * k) = n * n;
+    claim descendedEquation : n * n = 2 * (k * k);
+
+    -- The new instance is smaller: n < subject. (Otherwise subject ≤ n
+    -- gives subject² ≤ n² < 2·n² = subject², which is absurd.)
+    cases Natural.compare_strict(n, subject) {
+      | Natural.StrictComparison.below(nBelowSubject) =>
+          inductionHypothesis(n, nBelowSubject, k, nPositive, kPositive, descendedEquation)
+      | Natural.StrictComparison.atLeast(subjectAtMostN) => {
+          claim subject * subject ≤ subject * n;
+          claim n * subject ≤ n * n;
+          claim subject * subject ≤ n * n
+              by calc subject * subject
+                    ≤ subject * n
+                    = n * subject
+                    ≤ n * n;
+          claim 1 ≤ n * n;
+          claim successor(n * n) ≤ 2 * (n * n) by Natural.successor_less_or_equal_multiply;
+          claim 2 * (n * n) ≤ n * n by substituting equation;
+          claim successor(n * n) ≤ n * n;
+          done
+      }
+    }
+  }
+
+-- ----------------------------------------------------------------------
+-- Freek #1.
+
+theorem Natural.sqrt_two_irrational
+        : ¬ ∃ (m n : Natural). 1 ≤ m ∧ 1 ≤ n ∧ m * m = 2 * (n * n) := {
+  suppose ∃ (m n : Natural). 1 ≤ m ∧ 1 ≤ n ∧ m * m = 2 * (n * n) as solutionExists;
+  obtain ⟨m, n, mPositive, nPositive, equation⟩ from solutionExists;
+  done
+}
