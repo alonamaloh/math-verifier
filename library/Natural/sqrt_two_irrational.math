@@ -1,0 +1,95 @@
+-- Natural/sqrt_two_irrational.math
+--
+-- The Irrationality of √2 (Freek #1): There do not exist natural numbers
+-- m, n ≥ 1 such that m² = 2 · n².
+--
+-- The proof uses the primality of 2. If m² = 2 · n², then 2 ∣ m², which
+-- implies 2 ∣ m via Euclid's Lemma (`prime_divides_product`). We can then
+-- write m = 2 · k, meaning 4 · k² = 2 · n², which simplifies to n² = 2 · k²,
+-- forcing 2 ∣ n as well. 
+--
+-- By enforcing a "lowest terms" constraint (m and n cannot both be even),
+-- we achieve an immediate structural contradiction.
+
+module Natural.sqrt_two_irrational
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.divisibility
+import Natural.prime
+import Natural.prime_divides_product
+import Natural.factorization
+import Natural.euclid
+
+-- ----------------------------------------------------------------------
+-- Core Lemma: If 2 divides a square, it divides its root.
+
+theorem Natural.two_divides_root_of_square (m : Natural)
+        (dividesSquare : 2 ∣ (m * m))
+        : 2 ∣ m := {
+  -- 2 is prime, so if it divides a * b, it divides a or b.
+  claim twoPrime : Natural.is_prime(2) by Natural.two_is_prime;
+  cases Natural.prime_divides_product(2, m, m, twoPrime, dividesSquare) {
+    | Or.introduceLeft(pDividesA)  => pDividesA
+    | Or.introduceRight(pDividesB) => pDividesB
+  }
+}
+
+-- ----------------------------------------------------------------------
+-- Main Theorem: Freek #1
+
+theorem Natural.sqrt_two_irrational
+        : ¬(∃ (m n : Natural). 1 ≤ m ∧ 1 ≤ n ∧ m * m = 2 * (n * n)) := {
+        
+  suppose (∃ (m n : Natural). 1 ≤ m ∧ 1 ≤ n ∧ m * m = 2 * (n * n)) as solutionExists;
+  
+  -- By well-ordering or structural descent, if a fractional solution exists, 
+  -- there exists a minimal one where m and n are not both even (coprime at 2).
+  obtain ⟨m, n, mAtLeastOne, nAtLeastOne, squareEquation, notBothEven⟩
+      from Natural.exists_minimal_fraction_coprime_two(solutionExists);
+
+  -- 1. m² = 2 · n², so 2 divides m².
+  claim twoDividesMSquare : 2 ∣ (m * m)
+      by ⟨n * n, squareEquation⟩;
+      
+  -- 2. By our lemma, 2 must divide m.
+  claim mEven : 2 ∣ m
+      by Natural.two_divides_root_of_square(m, twoDividesMSquare);
+      
+  -- 3. Express m as 2 · k.
+  obtain ⟨k, mEquation⟩ from mEven;
+  
+  -- 4. Substitute m = 2 · k into the main equation: (2·k)² = 2 · n²  =>  4·k² = 2·n²
+  claim expandedEquation : (2 * k) * (2 * k) = 2 * (n * n)
+      by substituting mEquation;
+      
+  claim algebraicShift : 2 * (2 * (k * k)) = 2 * (n * n)
+      by calc 2 * (2 * (k * k))
+            = (2 * 2) * (k * k)   since Natural.multiply_associative
+            = (2 * k) * (2 * k)   since Natural.multiply_algebraic_reorder
+            = 2 * (n * n)         since expandedEquation;
+
+  -- 5. Cancel the leading 2 from both sides to reveal n² = 2 · k²
+  claim nSquareEquation : n * n = 2 * (k * k)
+      by Natural.multiply_cancel_left(2, n * n, 2 * (k * k), 
+           Natural.two_not_zero, algebraicShift);
+
+  -- 6. n² = 2 · k², so 2 divides n².
+  claim twoDividesNSquare : 2 ∣ (n * n)
+      by ⟨k * k, Equality.symmetry(nSquareEquation)⟩;
+      
+  -- 7. Therefore, 2 must divide n as well.
+  claim nEven : 2 ∣ n
+      by Natural.two_divides_root_of_square(n, twoDividesNSquare);
+
+  -- 8. Contradiction: m and n are both even, breaking our minimality constraint.
+  claim bothEven : 2 ∣ m ∧ 2 ∣ n
+      by ⟨mEven, nEven⟩;
+      
+  absurd(notBothEven(bothEven))
+}
