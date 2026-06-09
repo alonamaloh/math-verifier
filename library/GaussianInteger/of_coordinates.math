@@ -1,0 +1,56 @@
+-- GaussianInteger/of_coordinates.math
+--
+-- The inverse of the coordinate map at the level we need for division:
+-- `ofCoordinates(x, y)` is the Gaussian integer x + y·i, and its
+-- coordinates are exactly (x, y). Together with additivity of `coords`
+-- (lifted from the polynomial level) this lets the Euclidean-division
+-- argument read off the coordinates of a − b·q.
+
+module GaussianInteger.of_coordinates
+
+import Logic.basics
+import Logic.product
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Integer.basics
+import Integer.addition
+import Integer.ring
+import Integer.algebra
+import RingModulo.basics
+import RingModulo.operations
+import GaussianInteger.basics
+import GaussianInteger.coordinates
+import GaussianInteger.coordinate_map
+import GaussianInteger.modulus_vanishes
+import GaussianInteger.reconstruction
+
+-- `coords` is additive on ℤ[i] (lifted from `coordinatesOfPolynomial_add`).
+theorem GaussianInteger.coordinates_add (z w : GaussianInteger)
+        : coords(RingModulo.add(z, w))
+          = Product.make(
+                Product.first(coords(z)) + Product.first(coords(w)),
+                Product.second(coords(z)) + Product.second(coords(w))) :=
+  cases z { | p =>
+    cases w { | q =>
+      GaussianInteger.coordinatesOfPolynomial_add(p, q)
+    }
+  }
+
+-- The Gaussian integer with coordinates (x, y): the class of [x, y].
+definition GaussianInteger.ofCoordinates (x y : Ring.carrier(Integer.ring_bundle)) : GaussianInteger :=
+  GaussianInteger.classOf(
+      Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), x,
+          Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), y,
+              Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)))))
+
+-- Its coordinates are (x, y) — the reim recursion gives (x − 0, y − 0).
+theorem GaussianInteger.coordinates_ofCoordinates (x y : Integer)
+        : coords(GaussianInteger.ofCoordinates(x, y)) = Product.make(x, y) := {
+  claim firstZero : x - Integer.zero = x by ring;
+  claim secondZero : y - Integer.zero = y by ring;
+  calc coords(GaussianInteger.ofCoordinates(x, y))
+     = Product.make(x - Integer.zero, y - Integer.zero)
+     = Product.make(x, y - Integer.zero)   by substituting firstZero
+     = Product.make(x, y)                   by substituting secondZero
+}
