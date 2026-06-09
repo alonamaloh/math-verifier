@@ -140,3 +140,41 @@ theorem GaussianInteger.classOf_cons
          + GaussianInteger.i * GaussianInteger.classOf(rest)
            by substituting GaussianInteger.i_times_classOf(rest)
 }
+
+-- embed(0) = 0: the constant polynomial 0 is the zero polynomial
+-- (cons(0, nil) agrees with nil at every coefficient).
+theorem GaussianInteger.embed_zero
+        : GaussianInteger.embedInteger(Ring.zero(Integer.ring_bundle))
+          = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus) := {
+  claim coeffsEqual
+      : Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+            Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+                Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle))),
+            Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)))
+      by (index : Natural) ↦
+           cases index {
+             | zero => reflexivity(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle))
+             | successor(j) => reflexivity(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle))
+           };
+  claim polyEqual
+      : Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+            Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+                Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle))))
+        = Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+            Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)))
+      by Polynomial.make_equal_of_coefficients_equal(Integer.ring_bundle,
+             Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+                 Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle))),
+             Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)),
+             coeffsEqual);
+  calc GaussianInteger.embedInteger(Ring.zero(Integer.ring_bundle))
+     = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+           Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+               Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+                   Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)))))
+     = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+           Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+               Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle))))
+           by substituting polyEqual
+     = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+}
