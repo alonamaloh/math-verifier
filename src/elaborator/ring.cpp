@@ -4337,30 +4337,36 @@ ExpressionPointer Elaborator::proveMultiplyMerge(
                             stepProof = distLeftCall;
                             newRowForm = rhsExpanded;
                         } else {
-                            // rowCurrent has shape lhsExpanded + tail.
-                            std::vector<ExpressionPointer> tailSummands(
-                                rowSummands.begin()
-                                    + static_cast<long>(k),
-                                rowSummands.end());
-                            ExpressionPointer tailKernel;
-                            if (tailSummands.size() == 1) {
-                                tailKernel = tailSummands[0];
-                            } else {
-                                tailKernel = leftAssoc(tailSummands);
+                            // rowCurrent is LEFT-associated:
+                            //   ((lhsExpanded + T_k) + T_{k+1}) + ... + T_{q-1}
+                            // — the already-peeled tail hangs off the right in a
+                            // left-nested chain, NOT as a single `lhsExpanded +
+                            // tail`. The congruence motive must therefore wrap z
+                            // by folding each tail summand with a left-associated
+                            // add (mirroring phase 1a). A single `z +
+                            // leftAssoc(tail)` is right-leaning and only matches
+                            // when the tail is a single summand — for q >= 4 the
+                            // tail has >= 2 elements and the mismatch surfaces as
+                            // a kernel "wrong type" on the assembled term.
+                            ExpressionPointer lambdaBody = makeBoundVariable(0);
+                            for (size_t t = k; t < rightSigned.size(); ++t) {
+                                ExpressionPointer tt = liftBoundVariables(
+                                    rowSummands[t], 1, 0);
+                                lambdaBody = buildRingOp(
+                                    context.addName, lambdaBody, tt);
                             }
-                            ExpressionPointer tailLifted =
-                                liftBoundVariables(tailKernel, 1, 0);
-                            ExpressionPointer lambdaBody = buildRingOp(
-                                context.addName,
-                                makeBoundVariable(0), tailLifted);
                             ExpressionPointer lambda = makeLambda(
                                 "_ring_distL_z", carrierType, lambdaBody);
                             stepProof =
                                 buildEqualityCongruenceSameCarrier(
                                     universeLevel, carrierType, lambda,
                                     lhsExpanded, rhsExpanded, distLeftCall);
-                            newRowForm = buildRingOp(
-                                context.addName, rhsExpanded, tailKernel);
+                            newRowForm = rhsExpanded;
+                            for (size_t t = k; t < rightSigned.size(); ++t) {
+                                newRowForm = buildRingOp(
+                                    context.addName, newRowForm,
+                                    rowSummands[t]);
+                            }
                         }
                         rowProof = buildEqualityTransitivity(
                             universeLevel, carrierType,

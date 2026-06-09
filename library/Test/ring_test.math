@@ -11,6 +11,9 @@ import Natural.basics
 import Integer.basics
 import Integer.addition
 import Integer.multiplication
+import Integer.negation
+import Integer.algebra
+import Integer.absolute_value
 import Integer.ring
 
 -- (1) Trivial: structurally identical, factors aligned.
@@ -45,3 +48,26 @@ theorem ring_add_assoc (a b c : Integer)
 -- (9) Additive multi-factor reordering.
 theorem ring_add_three_factor_swap (a b c : Integer)
         : a + b + c = c + b + a := ring
+
+-- (10) Regression: distributing a factor over a sum of FOUR-OR-MORE terms.
+-- Phase 1b of proveMultiplyMerge peels summands right-to-left, leaving a
+-- left-nested `((lhsExpanded + T_k) + ...) + T_last` chain; the congruence
+-- motive used to be the right-leaning `z + leftAssoc(tail)`, which only
+-- matches when the tail is a single summand (q <= 3). For q >= 4 the
+-- mismatch surfaced as a kernel "wrong type" on the assembled proof term.
+theorem ring_distribute_four (b v x y z : Integer)
+        : b * (v + x + y + z) = b*v + b*x + b*y + b*z := ring
+
+theorem ring_distribute_five (b u v x y z : Integer)
+        : b * (u + v + x + y + z) = b*u + b*v + b*x + b*y + b*z := ring
+
+-- The identity that first surfaced the bug: the core of Gaussian Euclidean
+-- division, D·(s₁²+s₂²) = D²·(r₁²+r₂²) with everything a polynomial in the
+-- six base integers (degree 3, heavy mixed signs).
+theorem ring_gaussian_division_crux (a1 a2 b1 b2 q1 q2 : Integer)
+        : (b1*b1 + b2*b2) * (
+              (((a1*b1 + a2*b2) - (b1*b1 + b2*b2)*q1) * ((a1*b1 + a2*b2) - (b1*b1 + b2*b2)*q1))
+            + (((a2*b1 - a1*b2) - (b1*b1 + b2*b2)*q2) * ((a2*b1 - a1*b2) - (b1*b1 + b2*b2)*q2)))
+          = ((b1*b1 + b2*b2) * (b1*b1 + b2*b2)) * (
+              ((a1 - (b1*q1 - b2*q2)) * (a1 - (b1*q1 - b2*q2)))
+            + ((a2 - (b2*q1 + b1*q2)) * (a2 - (b2*q1 + b1*q2)))) := ring

@@ -120,7 +120,10 @@ library/ErrorTest/probe_ring_assembly_bug.math:21:57: elaborate error: theorem '
     the function expects: b1 * (a2 * b2 + a1 * b1) + b1 * -(q1 * b2 * b2) + b1 * -(q1 * b1 * b1) = b1 * (a2 * b2) + b1 * (a1 * b1) + (b1 * -(q1 * b2 * b2) + b1 * -(q1 * b1 * b1))
     but this argument is: b1 * (a2 * b2 + a1 * b1) + (b1 * -(q1 * b2 * b2) + b1 * -(q1 * b1 * b1)) = b1 * (a2 * b2) + b1 * (a1 * b1) + (b1 * -(q1 * b2 * b2) + b1 * -(q1 * b1 * b1))
 ```
-diagnosis: NOT really an error-message problem — a `ring` **soundness-of-
+diagnosis: **FIXED 2026-06-09** (ring.cpp `proveMultiplyMerge` phase-1b motive
+  — see below; regression = `Test.ring_distribute_four/_five/_gaussian_division_crux`
+  in library/Test/ring_test.math; the ErrorTest probe was removed since it now
+  verifies). NOT really an error-message problem — a `ring` **soundness-of-
   assembly bug**. The message is the kernel correctly rejecting a malformed
   proof term `ring` built: `expects` and `argument` are identical except for
   `+`-association — `A + B + C` (left-nested) vs `A + (B + C)` (right-nested).
