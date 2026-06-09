@@ -1,0 +1,141 @@
+-- Integer/balanced_division.math
+--
+-- Balanced division on ℤ: for a positive modulus m, any integer a can be
+-- written a = m·q + s with the remainder symmetric, recorded as the clean
+-- squared bound 4·s² ≤ m² (i.e. |s| ≤ m/2). This is the rounding step
+-- behind nearest-integer (Gaussian) division: the ordinary non-negative
+-- remainder r from `divide_by_positive` is kept when r + r ≤ m, otherwise
+-- the quotient is bumped and the remainder becomes −(m − r).
+--
+-- Doubling is written `t + t`, not `2 * t`, throughout: the cast
+-- `((t + t : ℕ) : ℤ) = (t : ℤ) + (t : ℤ)` is a clean `add_preserves`,
+-- whereas a `2 *` literal leaves `((2 : ℕ) : ℤ)` as an atom `ring` can't see.
+
+module Integer.balanced_division
+
+import Logic.basics
+import Logic.exists
+import Logic.sum
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.add_order
+import Natural.arithmetic
+import Natural.multiply_bounds
+import Natural.subtraction
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Algebra.integer_euclidean
+
+-- The Natural embedding is monotone: a ≤ b ⟹ (a : ℤ) ≤ (b : ℤ).
+theorem Natural.to_integer.preserves_less_or_equal (a b : Natural) (aLeB : a ≤ b)
+        : (a : Integer) ≤ (b : Integer) := {
+  claim gapExists : ∃ (gap : Natural). b = a + gap by Natural.subtraction_witness;
+  obtain ⟨gap, bEquation⟩ from gapExists;
+  witness gap with
+      calc (b : Integer)
+         = ((a + gap : Natural) : Integer)
+               by substituting bEquation
+         = (a : Integer) + (gap : Integer)
+               by Natural.to_integer.add_preserves
+}
+
+-- t + t ≤ m forces 4t² ≤ m² (square the bound in ℕ, then transport to ℤ).
+theorem Integer.four_square_le_from_natural (t m : Natural) (bound : t + t ≤ m)
+        : (4 : Integer) * ((t : Integer) * (t : Integer)) ≤ (m : Integer) * (m : Integer) := {
+  let _ : (t + t) * (t + t) ≤ m * m :=
+      calc (t + t) * (t + t)
+            ≤ (t + t) * m
+                  by Natural.multiply_monotone_left
+            = m * (t + t)
+                  by Natural.multiply_commutative
+            ≤ m * m
+                  by Natural.multiply_monotone_left;
+  claim castSquared : ((t + t) * (t + t) : Integer) ≤ (m * m : Integer)
+      by Natural.to_integer.preserves_less_or_equal;
+  calc (((t + t) * (t + t) : Natural) : Integer)
+            = ((t + t : Natural) : Integer) * ((t + t : Natural) : Integer)
+                  by Natural.to_integer.multiply_preserves
+            = ((t : Integer) + (t : Integer)) * ((t : Integer) + (t : Integer))
+                  by substitution
+            = (4 : Integer) * ((t : Integer) * (t : Integer))
+                  by ring
+      as leftImage;
+  claim rightImage : ((m * m : Natural) : Integer) = (m : Integer) * (m : Integer)
+      by Natural.to_integer.multiply_preserves;
+  calc (4 : Integer) * ((t : Integer) * (t : Integer))
+     = ((t + t) * (t + t) : Integer)   by leftImage
+     ≤ (m * m : Integer)               by castSquared
+     = (m : Integer) * (m : Integer)   by rightImage
+}
+
+-- Balanced division.
+theorem Integer.divide_balanced (a : Integer) (m : Natural) (mPositive : 1 ≤ m)
+        : ∃ (quotient : Integer). ∃ (remainder : Integer).
+            a = (m : Integer) * quotient + remainder
+            ∧ (4 : Integer) * (remainder * remainder) ≤ (m : Integer) * (m : Integer) := {
+  obtain ⟨quotient0, naturalRemainder, aEquation, remainderBelow⟩
+      from Integer.divide_by_positive(a, m, mPositive);
+  cases Natural.totality_of_less_or_equal(naturalRemainder + naturalRemainder, m) {
+    | Or.introduceLeft(smallRemainder) => {
+        -- r + r ≤ m: keep r. remainder = (r : ℤ), quotient = quotient0.
+        witness quotient0 with
+        witness (naturalRemainder : Integer) with
+            { claim keepBound : (4 : Integer) * ((naturalRemainder : Integer) * (naturalRemainder : Integer)) ≤ (m : Integer) * (m : Integer)
+                  by Integer.four_square_le_from_natural;
+              And.introduction(aEquation, keepBound) }
+      }
+    | Or.introduceRight(largeRemainder) => {
+        -- m ≤ r + r: bump. With m = r + d, remainder = −(d : ℤ), quotient = quotient0 + (1 : Integer).
+        let _ : naturalRemainder ≤ m :=
+            calc naturalRemainder
+                  ≤ successor(naturalRemainder)   by Natural.le_successor
+                  ≤ m                              by remainderBelow;
+        claim dExists : ∃ (d : Natural). m = naturalRemainder + d by Natural.subtraction_witness;
+        obtain ⟨d, mEquation⟩ from dExists;
+        -- d ≤ r: from m ≤ r + r and m = r + d, so r + d ≤ r + r, cancel r.
+        let _ : naturalRemainder + d ≤ naturalRemainder + naturalRemainder :=
+            calc naturalRemainder + d
+                  = m                                          by mEquation
+                  ≤ naturalRemainder + naturalRemainder        by largeRemainder;
+        claim d ≤ naturalRemainder by Natural.add_left_le_cancel;
+        -- d + d ≤ r + d = m.
+        let _ : d + d ≤ m :=
+            calc d + d
+                  ≤ naturalRemainder + d                       by Natural.le_add_preserves_left
+                  = m                                          by mEquation;
+        claim (4 : Integer) * ((d : Integer) * (d : Integer)) ≤ (m : Integer) * (m : Integer)
+            by Integer.four_square_le_from_natural;
+        calc (m : Integer)
+                  = ((naturalRemainder + d : Natural) : Integer)
+                        by substituting mEquation
+                  = (naturalRemainder : Integer) + (d : Integer)
+                        by Natural.to_integer.add_preserves
+            as mCast;
+        claim remainderCast : (naturalRemainder : Integer) = (m : Integer) - (d : Integer)
+            by substituting mCast;
+        calc a
+                  = (m : Integer) * quotient0 + (naturalRemainder : Integer)
+                        by aEquation
+                  = (m : Integer) * quotient0 + ((m : Integer) - (d : Integer))
+                        by substituting remainderCast
+                  = (m : Integer) * (quotient0 + (1 : Integer)) + (-(d : Integer))
+                        by ring
+            as aBalanced;
+        claim squareNegate : (-(d : Integer)) * (-(d : Integer)) = (d : Integer) * (d : Integer) by ring;
+        claim remainderBound
+            : (4 : Integer) * ((-(d : Integer)) * (-(d : Integer))) ≤ (m : Integer) * (m : Integer)
+            by substituting squareNegate;
+        witness quotient0 + (1 : Integer) with
+        witness -(d : Integer) with
+            And.introduction(aBalanced, remainderBound)
+      }
+  }
+}
