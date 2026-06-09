@@ -31,6 +31,25 @@ import Integer.embedding
 import Integer.order
 import Integer.absolute_value
 import Integer.order_multiply
+import Integer.balanced_division
+import Logic.product
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.euclidean_domain
+import Algebra.principal_ideal_domain
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+import GaussianInteger.basics
+import GaussianInteger.coordinates
+import GaussianInteger.coordinate_map
+import GaussianInteger.coordinate_multiplicative
+import GaussianInteger.norm
+import GaussianInteger.reconstruction
+import GaussianInteger.of_coordinates
+import GaussianInteger.norm_natural
+import GaussianInteger.integral_domain
 
 -- The norm crux: with s_i the balanced remainders of the conj-product
 -- coordinates and r_i the coordinates of a − b·q, D·(s₁²+s₂²) = D²·(r₁²+r₂²),
@@ -145,3 +164,148 @@ theorem Integer.cancel_norm_bound (dNat : Natural) (dPositive : 1 ≤ dNat)
   claim 1 ≤ dNat * dNat by Natural.multiply_at_least_one;
   done by Integer.cancel_le_by_natural_positive
 }
+
+-- ----------------------------------------------------------------------
+-- ℤ[i] admits Euclidean division by the norm.
+theorem GaussianInteger.has_euclidean_division
+        : Ring.HasEuclideanDivision(GaussianInteger.ring_bundle, GaussianInteger.normNatural) :=
+  (a b : GaussianInteger)
+      (bNonzero : ¬(b = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus))) ↦ {
+    let a1 : Integer := Product.first(coords(a));
+    let a2 : Integer := Product.second(coords(a));
+    let b1 : Integer := Product.first(coords(b));
+    let b2 : Integer := Product.second(coords(b));
+    let dNat : Natural := GaussianInteger.normNatural(b);
+    claim dPositive : 1 ≤ dNat by GaussianInteger.normNatural_positive;
+    claim dCast : (dNat : Integer) = b1 * b1 + b2 * b2
+        by calc (dNat : Integer)
+              = GaussianInteger.normInteger(b)   by GaussianInteger.normNatural_is_normInteger
+              = b1 * b1 + b2 * b2;
+    -- Balanced-divide the two coordinates of a·conj(b) by D.
+    obtain ⟨q1, s1, s1Equation, bound1⟩
+        from Integer.divide_balanced(a1 * b1 + a2 * b2, dNat, dPositive);
+    obtain ⟨q2, s2, s2Equation, bound2⟩
+        from Integer.divide_balanced(a2 * b1 - a1 * b2, dNat, dPositive);
+    -- s_i = n_i − D·q_i, with D = b₁²+b₂².
+    let _ : s1 = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1 :=
+        calc s1
+              = ((dNat : Integer) * q1 + s1) - (dNat : Integer) * q1   by ring
+              = (a1 * b1 + a2 * b2) - (dNat : Integer) * q1            by substituting s1Equation
+              = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1         by substituting dCast;
+    let _ : s2 = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2 :=
+        calc s2
+              = ((dNat : Integer) * q2 + s2) - (dNat : Integer) * q2   by ring
+              = (a2 * b1 - a1 * b2) - (dNat : Integer) * q2            by substituting s2Equation
+              = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2         by substituting dCast;
+    -- The quotient and remainder in ℤ[i].
+    let q : GaussianInteger := GaussianInteger.ofCoordinates(q1, q2);
+    let r : GaussianInteger :=
+        RingModulo.add(a, RingModulo.negate(RingModulo.multiply(b, q)));
+    let r1 : Integer := Product.first(coords(r));
+    let r2 : Integer := Product.second(coords(r));
+    -- a = b·q + r, an additive-group rearrangement.
+    claim aEquation : a = RingModulo.add(RingModulo.multiply(b, q), r)
+        by calc a
+              = RingModulo.add(
+                    RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus), a)
+                    by RingModulo.add_identity_left
+              = RingModulo.add(
+                    RingModulo.add(RingModulo.multiply(b, q),
+                        RingModulo.negate(RingModulo.multiply(b, q))), a)
+                    by RingModulo.add_negate_right
+              = RingModulo.add(RingModulo.multiply(b, q),
+                    RingModulo.add(RingModulo.negate(RingModulo.multiply(b, q)), a))
+                    by RingModulo.add_associative
+              = RingModulo.add(RingModulo.multiply(b, q),
+                    RingModulo.add(a, RingModulo.negate(RingModulo.multiply(b, q))))
+                    by RingModulo.add_commutative;
+    -- The coordinates of b·q.
+    claim bqFirst : Product.first(coords(RingModulo.multiply(b, q))) = b1 * q1 - b2 * q2
+        by calc Product.first(coords(RingModulo.multiply(b, q)))
+              = Product.first(GaussianInteger.gaussianProduct(coords(b), Product.make(q1, q2)))
+                    by GaussianInteger.coordinates_multiply
+              = b1 * q1 - b2 * q2;
+    claim Product.second(coords(RingModulo.multiply(b, q))) = b2 * q1 + b1 * q2
+        by calc Product.second(coords(RingModulo.multiply(b, q)))
+              = Product.second(GaussianInteger.gaussianProduct(coords(b), Product.make(q1, q2)))
+                    by GaussianInteger.coordinates_multiply
+              = b2 * q1 + b1 * q2;
+    -- coords(a) = coords(b·q) + coords(r) componentwise.
+    claim coordsAEquation
+        : coords(a) = Product.make((b1 * q1 - b2 * q2) + r1, (b2 * q1 + b1 * q2) + r2)
+        by calc coords(a)
+              = coords(RingModulo.add(RingModulo.multiply(b, q), r))
+                    by substituting aEquation
+              = Product.make(
+                    Product.first(coords(RingModulo.multiply(b, q))) + r1,
+                    Product.second(coords(RingModulo.multiply(b, q))) + r2)
+                    by GaussianInteger.coordinates_add
+              = Product.make((b1 * q1 - b2 * q2) + r1, (b2 * q1 + b1 * q2) + r2)
+                    by substituting bqFirst;
+    claim r1 = a1 - (b1 * q1 - b2 * q2)
+        by calc r1
+              = Product.first(coords(a)) - (b1 * q1 - b2 * q2)
+                    by substituting coordsAEquation
+              = a1 - (b1 * q1 - b2 * q2);
+    claim r2 = a2 - (b2 * q1 + b1 * q2)
+        by calc r2
+              = Product.second(coords(a)) - (b2 * q1 + b1 * q2)
+                    by substituting coordsAEquation
+              = a2 - (b2 * q1 + b1 * q2);
+    -- The crux, in terms of D = (dNat : ℤ).
+    let _
+        : (dNat : Integer) * (s1 * s1 + s2 * s2)
+          = ((dNat : Integer) * (dNat : Integer)) * (r1 * r1 + r2 * r2)
+        := calc (dNat : Integer) * (s1 * s1 + s2 * s2)
+              = (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
+                    by substituting dCast
+              = ((b1 * b1 + b2 * b2) * (b1 * b1 + b2 * b2)) * (r1 * r1 + r2 * r2)
+                    by Integer.gaussian_norm_crux
+              = ((dNat : Integer) * (dNat : Integer)) * (r1 * r1 + r2 * r2)
+                    by substituting dCast;
+    -- Combine the two coordinate bounds: 4·(s₁²+s₂²) ≤ 2·D².
+    let _
+        : (4 : Integer) * (s1 * s1 + s2 * s2)
+          ≤ (2 : Integer) * ((dNat : Integer) * (dNat : Integer))
+        := calc (4 : Integer) * (s1 * s1 + s2 * s2)
+              = (4 : Integer) * (s1 * s1) + (4 : Integer) * (s2 * s2)   by ring
+              ≤ (dNat : Integer) * (dNat : Integer) + (4 : Integer) * (s2 * s2)
+                    by Integer.add_preserves_less_or_equal
+              = (4 : Integer) * (s2 * s2) + (dNat : Integer) * (dNat : Integer)
+                    by ring
+              ≤ (dNat : Integer) * (dNat : Integer) + (dNat : Integer) * (dNat : Integer)
+                    by Integer.add_preserves_less_or_equal
+              = (2 : Integer) * ((dNat : Integer) * (dNat : Integer))   by ring;
+    -- 4·N(r) ≤ 2·D, then transfer to ℕ.
+    claim normBound : (4 : Integer) * (r1 * r1 + r2 * r2) ≤ (2 : Integer) * (dNat : Integer)
+        by Integer.cancel_norm_bound;
+    let _
+        : ((4 * GaussianInteger.normNatural(r) : Natural) : Integer)
+          ≤ ((2 * GaussianInteger.normNatural(b) : Natural) : Integer)
+        := calc ((4 * GaussianInteger.normNatural(r) : Natural) : Integer)
+              = (4 : Integer) * (GaussianInteger.normNatural(r) : Integer)
+                    by Natural.to_integer.multiply_preserves(4, GaussianInteger.normNatural(r))
+              = (4 : Integer) * GaussianInteger.normInteger(r)
+                    by substituting GaussianInteger.normNatural_is_normInteger(r)
+              = (4 : Integer) * (r1 * r1 + r2 * r2)
+              ≤ (2 : Integer) * (dNat : Integer)               by normBound
+              = (2 : Integer) * (GaussianInteger.normNatural(b) : Integer)
+              = ((2 * GaussianInteger.normNatural(b) : Natural) : Integer)
+                    by Natural.to_integer.multiply_preserves(2, GaussianInteger.normNatural(b));
+    claim 4 * GaussianInteger.normNatural(r) ≤ 2 * GaussianInteger.normNatural(b)
+        by Natural.to_integer.reflects_less_or_equal;
+    claim remainderNormLess : GaussianInteger.normNatural(r) < GaussianInteger.normNatural(b)
+        by Natural.less_of_four_times_le_double;
+    witness q with
+    witness r with
+        And.introduction(aEquation, Or.introduceRight(remainderNormLess))
+  }
+
+-- ----------------------------------------------------------------------
+-- ℤ[i] is therefore a Euclidean domain, and hence a principal ideal domain.
+definition GaussianInteger.euclidean_domain : EuclideanDomain :=
+  EuclideanDomain.make(GaussianInteger.integral_domain, GaussianInteger.normNatural,
+      GaussianInteger.has_euclidean_division)
+
+definition GaussianInteger.principal_ideal_domain : PrincipalIdealDomain :=
+  EuclideanDomain.to_principal_ideal_domain(GaussianInteger.euclidean_domain)
