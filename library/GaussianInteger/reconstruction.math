@@ -201,3 +201,55 @@ theorem GaussianInteger.negate_one_multiply (w : GaussianInteger)
      = RingModulo.negate(w)
            by substituting RingModulo.multiply_identity_left(
                   Integer.polynomial_commutative_ring, GaussianInteger.modulus, w)
+
+-- i·(i·w) = −w.
+theorem GaussianInteger.i_squared_multiply (w : GaussianInteger)
+        : GaussianInteger.i * (GaussianInteger.i * w) = RingModulo.negate(w) :=
+  calc GaussianInteger.i * (GaussianInteger.i * w)
+     = (GaussianInteger.i * GaussianInteger.i) * w
+           by RingModulo.multiply_associative
+     = RingModulo.negate(
+           RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)) * w
+           by substituting GaussianInteger.i_squared
+     = RingModulo.negate(w)
+           by GaussianInteger.negate_one_multiply
+
+-- i·(re + i·im) = −im + i·re  (the Horner rotation).
+theorem GaussianInteger.inner_horner
+        (re im : Ring.carrier(Integer.ring_bundle))
+        : GaussianInteger.i
+            * (GaussianInteger.embedInteger(re) + GaussianInteger.i * GaussianInteger.embedInteger(im))
+          = RingModulo.negate(GaussianInteger.embedInteger(im))
+            + GaussianInteger.i * GaussianInteger.embedInteger(re) :=
+  calc GaussianInteger.i
+         * (GaussianInteger.embedInteger(re) + GaussianInteger.i * GaussianInteger.embedInteger(im))
+     = GaussianInteger.i * GaussianInteger.embedInteger(re)
+         + GaussianInteger.i * (GaussianInteger.i * GaussianInteger.embedInteger(im))
+           by RingModulo.distributivity_left
+     = GaussianInteger.i * GaussianInteger.embedInteger(re)
+         + RingModulo.negate(GaussianInteger.embedInteger(im))
+           by substituting GaussianInteger.i_squared_multiply(GaussianInteger.embedInteger(im))
+     = RingModulo.negate(GaussianInteger.embedInteger(im))
+         + GaussianInteger.i * GaussianInteger.embedInteger(re)
+           by RingModulo.add_commutative
+
+-- The full cons-step algebra: c + i·(re + i·im) = (c − im) + i·re.
+theorem GaussianInteger.gauss_horner
+        (c re im : Ring.carrier(Integer.ring_bundle))
+        : GaussianInteger.embedInteger(c)
+            + GaussianInteger.i
+              * (GaussianInteger.embedInteger(re) + GaussianInteger.i * GaussianInteger.embedInteger(im))
+          = GaussianInteger.embedInteger(c - im)
+            + GaussianInteger.i * GaussianInteger.embedInteger(re) :=
+  calc GaussianInteger.embedInteger(c)
+         + GaussianInteger.i
+           * (GaussianInteger.embedInteger(re) + GaussianInteger.i * GaussianInteger.embedInteger(im))
+     = GaussianInteger.embedInteger(c)
+         + (RingModulo.negate(GaussianInteger.embedInteger(im))
+            + GaussianInteger.i * GaussianInteger.embedInteger(re))
+           by substituting GaussianInteger.inner_horner(re, im)
+     = (GaussianInteger.embedInteger(c) + RingModulo.negate(GaussianInteger.embedInteger(im)))
+         + GaussianInteger.i * GaussianInteger.embedInteger(re)
+           by RingModulo.add_associative
+     = GaussianInteger.embedInteger(c - im)
+         + GaussianInteger.i * GaussianInteger.embedInteger(re)
