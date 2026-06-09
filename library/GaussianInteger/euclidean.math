@@ -63,24 +63,24 @@ theorem Integer.gaussian_norm_crux (a1 a2 b1 b2 q1 q2 s1 s2 r1 r2 : Integer)
           = ((b1 * b1 + b2 * b2) * (b1 * b1 + b2 * b2)) * (r1 * r1 + r2 * r2) := {
   -- Two linear relations: the conj-product times the divisor coordinates gives
   -- D·r componentwise. Each is degree 4 — cheap for `ring`.
-  claim linRel1 : b1 * s1 - b2 * s2 = (b1 * b1 + b2 * b2) * r1
-      by calc b1 * s1 - b2 * s2
+  calc b1 * s1 - b2 * s2
             = b1 * ((a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
                 - b2 * ((a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
                   by substitution
             = (b1 * b1 + b2 * b2) * (a1 - (b1 * q1 - b2 * q2))
                   by ring
             = (b1 * b1 + b2 * b2) * r1
-                  by substituting r1Def;
-  claim linRel2 : b2 * s1 + b1 * s2 = (b1 * b1 + b2 * b2) * r2
-      by calc b2 * s1 + b1 * s2
+                  by substituting r1Def
+      as linRel1;
+  calc b2 * s1 + b1 * s2
             = b2 * ((a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
                 + b1 * ((a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
                   by substitution
             = (b1 * b1 + b2 * b2) * (a2 - (b2 * q1 + b1 * q2))
                   by ring
             = (b1 * b1 + b2 * b2) * r2
-                  by substituting r2Def;
+                  by substituting r2Def
+      as linRel2;
   -- Brahmagupta on the two linear relations: D·(s₁²+s₂²) = (b₁s₁−b₂s₂)² +
   -- (b₂s₁+b₁s₂)² = (D·r₁)² + (D·r₂)² = D²·(r₁²+r₂²).
   calc (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
@@ -133,9 +133,7 @@ theorem Integer.cancel_norm_bound (dNat : Natural) (dPositive : 1 ≤ dNat)
       by Integer.multiply_le_by_natural;
   claim dSquareCast : ((dNat * dNat : Natural) : Integer) = (dNat : Integer) * (dNat : Integer)
       by Natural.to_integer.multiply_preserves;
-  claim lhsForm
-      : (dNat : Integer) * ((4 : Integer) * sSquares) = ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
-      by calc (dNat : Integer) * ((4 : Integer) * sSquares)
+  calc (dNat : Integer) * ((4 : Integer) * sSquares)
             = (4 : Integer) * ((dNat : Integer) * sSquares)
                   by ring
             = (4 : Integer) * (((dNat : Integer) * (dNat : Integer)) * norm)
@@ -143,15 +141,14 @@ theorem Integer.cancel_norm_bound (dNat : Natural) (dPositive : 1 ≤ dNat)
             = ((dNat : Integer) * (dNat : Integer)) * ((4 : Integer) * norm)
                   by ring
             = ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
-                  by substituting dSquareCast;
-  claim rhsForm
-      : (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
-        = ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer))
-      by calc (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
+                  by substituting dSquareCast
+      as lhsForm;
+  calc (dNat : Integer) * ((2 : Integer) * ((dNat : Integer) * (dNat : Integer)))
             = ((dNat : Integer) * (dNat : Integer)) * ((2 : Integer) * (dNat : Integer))
                   by ring
             = ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer))
-                  by substituting dSquareCast;
+                  by substituting dSquareCast
+      as rhsForm;
   let _ : ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
           ≤ ((dNat * dNat : Natural) : Integer) * ((2 : Integer) * (dNat : Integer)) :=
       calc ((dNat * dNat : Natural) : Integer) * ((4 : Integer) * norm)
@@ -177,10 +174,10 @@ theorem GaussianInteger.has_euclidean_division
     let b2 : Integer := Product.second(coords(b));
     let dNat : Natural := GaussianInteger.normNatural(b);
     claim dPositive : 1 ≤ dNat by GaussianInteger.normNatural_positive;
-    claim dCast : (dNat : Integer) = b1 * b1 + b2 * b2
-        by calc (dNat : Integer)
+    calc (dNat : Integer)
               = GaussianInteger.normInteger(b)   by GaussianInteger.normNatural_is_normInteger
-              = b1 * b1 + b2 * b2;
+              = b1 * b1 + b2 * b2
+        as dCast;
     -- Balanced-divide the two coordinates of a·conj(b) by D.
     obtain ⟨q1, s1, s1Equation, bound1⟩
         from Integer.divide_balanced(a1 * b1 + a2 * b2, dNat, dPositive);
@@ -204,8 +201,7 @@ theorem GaussianInteger.has_euclidean_division
     let r1 : Integer := Product.first(coords(r));
     let r2 : Integer := Product.second(coords(r));
     -- a = b·q + r, an additive-group rearrangement.
-    claim aEquation : a = RingModulo.add(RingModulo.multiply(b, q), r)
-        by calc a
+    calc a
               = RingModulo.add(
                     RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus), a)
                     by RingModulo.add_identity_left
@@ -218,22 +214,21 @@ theorem GaussianInteger.has_euclidean_division
                     by RingModulo.add_associative
               = RingModulo.add(RingModulo.multiply(b, q),
                     RingModulo.add(a, RingModulo.negate(RingModulo.multiply(b, q))))
-                    by RingModulo.add_commutative;
+                    by RingModulo.add_commutative
+        as aEquation;
     -- The coordinates of b·q.
-    claim bqFirst : Product.first(coords(RingModulo.multiply(b, q))) = b1 * q1 - b2 * q2
-        by calc Product.first(coords(RingModulo.multiply(b, q)))
+    calc Product.first(coords(RingModulo.multiply(b, q)))
               = Product.first(GaussianInteger.gaussianProduct(coords(b), Product.make(q1, q2)))
                     by GaussianInteger.coordinates_multiply
-              = b1 * q1 - b2 * q2;
-    claim Product.second(coords(RingModulo.multiply(b, q))) = b2 * q1 + b1 * q2
-        by calc Product.second(coords(RingModulo.multiply(b, q)))
+              = b1 * q1 - b2 * q2
+        as bqFirst;
+    let _ : Product.second(coords(RingModulo.multiply(b, q))) = b2 * q1 + b1 * q2 :=
+        calc Product.second(coords(RingModulo.multiply(b, q)))
               = Product.second(GaussianInteger.gaussianProduct(coords(b), Product.make(q1, q2)))
                     by GaussianInteger.coordinates_multiply
               = b2 * q1 + b1 * q2;
     -- coords(a) = coords(b·q) + coords(r) componentwise.
-    claim coordsAEquation
-        : coords(a) = Product.make((b1 * q1 - b2 * q2) + r1, (b2 * q1 + b1 * q2) + r2)
-        by calc coords(a)
+    calc coords(a)
               = coords(RingModulo.add(RingModulo.multiply(b, q), r))
                     by substituting aEquation
               = Product.make(
@@ -241,14 +236,15 @@ theorem GaussianInteger.has_euclidean_division
                     Product.second(coords(RingModulo.multiply(b, q))) + r2)
                     by GaussianInteger.coordinates_add
               = Product.make((b1 * q1 - b2 * q2) + r1, (b2 * q1 + b1 * q2) + r2)
-                    by substituting bqFirst;
-    claim r1 = a1 - (b1 * q1 - b2 * q2)
-        by calc r1
+                    by substituting bqFirst
+        as coordsAEquation;
+    let _ : r1 = a1 - (b1 * q1 - b2 * q2) :=
+        calc r1
               = Product.first(coords(a)) - (b1 * q1 - b2 * q2)
                     by substituting coordsAEquation
               = a1 - (b1 * q1 - b2 * q2);
-    claim r2 = a2 - (b2 * q1 + b1 * q2)
-        by calc r2
+    let _ : r2 = a2 - (b2 * q1 + b1 * q2) :=
+        calc r2
               = Product.second(coords(a)) - (b2 * q1 + b1 * q2)
                     by substituting coordsAEquation
               = a2 - (b2 * q1 + b1 * q2);
@@ -284,14 +280,14 @@ theorem GaussianInteger.has_euclidean_division
           ≤ ((2 * GaussianInteger.normNatural(b) : Natural) : Integer)
         := calc ((4 * GaussianInteger.normNatural(r) : Natural) : Integer)
               = (4 : Integer) * (GaussianInteger.normNatural(r) : Integer)
-                    by Natural.to_integer.multiply_preserves(4, GaussianInteger.normNatural(r))
+                    by Natural.to_integer.multiply_preserves
               = (4 : Integer) * GaussianInteger.normInteger(r)
                     by substituting GaussianInteger.normNatural_is_normInteger(r)
               = (4 : Integer) * (r1 * r1 + r2 * r2)
               ≤ (2 : Integer) * (dNat : Integer)               by normBound
               = (2 : Integer) * (GaussianInteger.normNatural(b) : Integer)
               = ((2 * GaussianInteger.normNatural(b) : Natural) : Integer)
-                    by Natural.to_integer.multiply_preserves(2, GaussianInteger.normNatural(b));
+                    by Natural.to_integer.multiply_preserves;
     claim 4 * GaussianInteger.normNatural(r) ≤ 2 * GaussianInteger.normNatural(b)
         by Natural.to_integer.reflects_less_or_equal;
     claim remainderNormLess : GaussianInteger.normNatural(r) < GaussianInteger.normNatural(b)
