@@ -55,15 +55,13 @@ theorem GaussianInteger.x_times_make
       : Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
             Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest), rest)
       by Polynomial.Coefficients.multiply_one_left(Integer.ring_bundle, rest);
-  claim shiftMultiplyExt
-      : Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+  claim Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
             Polynomial.Coefficients.multiply(Integer.ring_bundle,
                 Polynomial.Coefficients.shift(Integer.ring_bundle, oneList), rest),
             Polynomial.Coefficients.shift(Integer.ring_bundle,
                 Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest)))
       by Polynomial.Coefficients.shift_multiply(Integer.ring_bundle, oneList, rest);
-  claim shiftRespectsExt
-      : Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+  claim Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
             Polynomial.Coefficients.shift(Integer.ring_bundle,
                 Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest)),
             Polynomial.Coefficients.shift(Integer.ring_bundle, rest))
@@ -78,19 +76,10 @@ theorem GaussianInteger.x_times_make
      = Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
            Polynomial.Coefficients.shift(Integer.ring_bundle,
                Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest)))
-           by Polynomial.make_equal_of_coefficients_equal(Integer.ring_bundle,
-                  Polynomial.Coefficients.multiply(Integer.ring_bundle,
-                      Polynomial.Coefficients.shift(Integer.ring_bundle, oneList), rest),
-                  Polynomial.Coefficients.shift(Integer.ring_bundle,
-                      Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest)),
-                  shiftMultiplyExt)
+           by Polynomial.make_equal_of_coefficients_equal
      = Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
            Polynomial.Coefficients.shift(Integer.ring_bundle, rest))
-           by Polynomial.make_equal_of_coefficients_equal(Integer.ring_bundle,
-                  Polynomial.Coefficients.shift(Integer.ring_bundle,
-                      Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest)),
-                  Polynomial.Coefficients.shift(Integer.ring_bundle, rest),
-                  shiftRespectsExt)
+           by Polynomial.make_equal_of_coefficients_equal
 }
 
 -- The Gaussian integer of a coefficient list: the class of its polynomial.
@@ -115,7 +104,7 @@ theorem GaussianInteger.i_times_classOf
            GaussianInteger.x
              * Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle), rest))
      = GaussianInteger.classOf(Polynomial.Coefficients.shift(Integer.ring_bundle, rest))
-           by substituting GaussianInteger.x_times_make(rest)
+           by substitution
 
 -- Structural identity: classOf([c, rest]) = c + i·classOf(rest).
 theorem GaussianInteger.classOf_cons
@@ -138,7 +127,7 @@ theorem GaussianInteger.classOf_cons
          + GaussianInteger.classOf(Polynomial.Coefficients.shift(Integer.ring_bundle, rest))
      = GaussianInteger.embedInteger(c)
          + GaussianInteger.i * GaussianInteger.classOf(rest)
-           by substituting GaussianInteger.i_times_classOf(rest)
+           by substitution
 }
 
 -- embed(0) = 0: the constant polynomial 0 is the zero polynomial
@@ -146,15 +135,14 @@ theorem GaussianInteger.classOf_cons
 theorem GaussianInteger.embed_zero
         : GaussianInteger.embedInteger(Ring.zero(Integer.ring_bundle))
           = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus) := {
-  claim coeffsEqual
-      : Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+  claim Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
             Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
                 Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle))),
             Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)))
       by (index : Natural) ↦
            cases index {
-             | zero => reflexivity(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle))
-             | successor(j) => reflexivity(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle))
+             | zero => done
+             | successor(j) => done
            };
   claim polyEqual
       : Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
@@ -162,11 +150,7 @@ theorem GaussianInteger.embed_zero
                 Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle))))
         = Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
             Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)))
-      by Polynomial.make_equal_of_coefficients_equal(Integer.ring_bundle,
-             Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
-                 Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle))),
-             Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)),
-             coeffsEqual);
+      by Polynomial.make_equal_of_coefficients_equal;
   calc GaussianInteger.embedInteger(Ring.zero(Integer.ring_bundle))
      = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
            Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
@@ -228,7 +212,7 @@ theorem GaussianInteger.inner_horner
            by RingModulo.distributivity_left
      = GaussianInteger.i * GaussianInteger.embedInteger(re)
          + RingModulo.negate(GaussianInteger.embedInteger(im))
-           by substituting GaussianInteger.i_squared_multiply(GaussianInteger.embedInteger(im))
+           by substitution
      = RingModulo.negate(GaussianInteger.embedInteger(im))
          + GaussianInteger.i * GaussianInteger.embedInteger(re)
            by RingModulo.add_commutative
@@ -286,7 +270,7 @@ theorem GaussianInteger.reconstruct_coeffs
                   + GaussianInteger.i
                     * GaussianInteger.embedInteger(
                           Product.second(GaussianInteger.coordinatesOfCoefficients(rest))))
-               by substituting GaussianInteger.reconstruct_coeffs(rest)
+               by substitution
          = GaussianInteger.embedInteger(
                c - Product.second(GaussianInteger.coordinatesOfCoefficients(rest)))
              + GaussianInteger.i
