@@ -1,0 +1,116 @@
+-- Integer/sum_of_squares.math
+--
+-- a² + b² = 0 over ℤ forces a = b = 0. A square is non-negative (it is the
+-- image of a Natural square), and a sum of two Natural images is zero only
+-- when both are; then a² = 0 gives a = 0 (ℤ has no zero divisors).
+
+module Integer.sum_of_squares
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.cancellation
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Integer.embedding
+import Integer.order
+import Integer.sign
+import Algebra.integer_domain
+
+-- The Natural embedding is injective at 0: (m : Integer) = 0 ⟹ m = 0.
+theorem Natural.to_integer.eq_zero_implies (m : Natural)
+        (imageZero : Natural.to_integer(m) = Integer.zero) : m = 0 := {
+  claim equiv
+      : IntegerEquivalent(IntegerRepresentative.make(m, 0), IntegerRepresentative.make(0, 0))
+      by Quotient.exact(IntegerRepresentative.make(m, 0), IntegerRepresentative.make(0, 0),
+             imageZero);
+  -- IntegerEquivalent(make(m,0), make(0,0)) is definitionally m + 0 = 0 + 0.
+  calc m
+     = m + 0       by Natural.add_zero
+     = 0 + 0       by equiv
+     = 0
+}
+
+-- A square is non-negative: ∃ n. a·a = (n : Integer).
+theorem Integer.square_is_nonneg (a : Integer) : Integer.IsNonneg(a * a) :=
+  cases Integer.sign_split(a) {
+    | Or.introduceLeft(nonnegative) => {
+        obtain ⟨n, aEqualsN⟩ from nonnegative;
+        witness n * n with
+            calc a * a
+               = (n : Integer) * (n : Integer)
+                     by substituting aEqualsN
+               = ((n * n : Natural) : Integer)
+                     by Natural.to_integer.multiply_preserves(n, n)
+      }
+    | Or.introduceRight(negative) => {
+        obtain ⟨k, aEqualsNegativeK⟩ from negative;
+        witness k * k with
+            calc a * a
+               = (-(k : Integer)) * (-(k : Integer))
+                     by substituting aEqualsNegativeK
+               = (k : Integer) * (k : Integer)
+                     by ring
+               = ((k * k : Natural) : Integer)
+                     by Natural.to_integer.multiply_preserves(k, k)
+      }
+  }
+
+-- a² + b² = 0 ⟹ a = 0 ∧ b = 0.
+theorem Integer.sum_of_squares_zero (a b : Integer)
+        (squaresSumZero : a * a + b * b = Integer.zero)
+        : And(a = Integer.zero, b = Integer.zero) := {
+  obtain ⟨m, aaEqualsM⟩ from Integer.square_is_nonneg(a);
+  obtain ⟨n, bbEqualsN⟩ from Integer.square_is_nonneg(b);
+  -- (m + n : Integer) = a² + b² = 0, so m + n = 0 as Naturals.
+  claim Natural.to_integer(m + n) = Integer.zero
+      by calc Natural.to_integer(m + n)
+            = (m : Integer) + (n : Integer)
+                  by Natural.to_integer.add_preserves(m, n)
+            = a * a + (n : Integer)
+                  by substituting aaEqualsM
+            = a * a + b * b
+                  by substituting bbEqualsN
+            = Integer.zero
+                  by squaresSumZero;
+  claim m + n = 0 by Natural.to_integer.eq_zero_implies;
+  claim mZero : m = 0 by Natural.add_equals_zero_left;
+  claim nZero : n = 0 by Natural.add_equals_zero_right;
+  -- a² = (m : Integer) = (0 : Integer) = 0, so a = 0; likewise b.
+  claim aaZero : a * a = Integer.zero
+      by calc a * a
+            = (m : Integer)
+                  by aaEqualsM
+            = (0 : Integer)
+                  by substituting mZero
+            = Integer.zero
+                  by Natural.to_integer.zero_preserves;
+  claim bbZero : b * b = Integer.zero
+      by calc b * b
+            = (n : Integer)
+                  by bbEqualsN
+            = (0 : Integer)
+                  by substituting nZero
+            = Integer.zero
+                  by Natural.to_integer.zero_preserves;
+  let aZero : a = Integer.zero :=
+      cases Integer.multiply_eq_zero_implies(a, a, aaZero) {
+        | Or.introduceLeft(aIsZero) => aIsZero
+        | Or.introduceRight(aIsZero) => aIsZero
+      };
+  let bZero : b = Integer.zero :=
+      cases Integer.multiply_eq_zero_implies(b, b, bbZero) {
+        | Or.introduceLeft(bIsZero) => bIsZero
+        | Or.introduceRight(bIsZero) => bIsZero
+      };
+  And.introduction(aZero, bZero)
+}
