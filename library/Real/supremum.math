@@ -708,9 +708,15 @@ theorem Real.LessOrEqual_of_pointwise
         : Real.from_cauchy_sequence(s, sIsCauchy)
             ≤ B :=
   cases B refining pointwiseLeq {
-    | CauchyRationalSequence.make(b, bIsCauchy) =>
-        Real.LessOrEqual_of_pointwise_at_make(
-            s, sIsCauchy, b, bIsCauchy, pointwiseLeq)
+    | CauchyRationalSequence.make(b, bIsCauchy) => {
+        -- The goal β-reduces (through the quotient) to the eventually-nonneg
+        -- form; state the `≤` the at-make lemma proves and let `done` cross
+        -- the opaque `Real.IsNonneg` to close the reduced goal.
+        claim Real.from_cauchy_sequence(s, sIsCauchy)
+                ≤ Real.from_cauchy_sequence(b, bIsCauchy)
+            by Real.LessOrEqual_of_pointwise_at_make;
+        done
+      }
   }
 
 -- Dual: at-make form, lower bound by the limit. If every term of a
@@ -780,9 +786,12 @@ theorem Real.LessOrEqual_of_pointwise_lower
         (pointwiseGeq : (n : Natural) → B ≤ (s(n) : Real))
         : B ≤ Real.from_cauchy_sequence(s, sIsCauchy) :=
   cases B refining pointwiseGeq {
-    | CauchyRationalSequence.make(b, bIsCauchy) =>
-        Real.LessOrEqual_of_pointwise_lower_at_make(
-            s, sIsCauchy, b, bIsCauchy, pointwiseGeq)
+    | CauchyRationalSequence.make(b, bIsCauchy) => {
+        claim Real.from_cauchy_sequence(b, bIsCauchy)
+                ≤ Real.from_cauchy_sequence(s, sIsCauchy)
+            by Real.LessOrEqual_of_pointwise_lower_at_make;
+        done
+      }
   }
 
 -- ----------------------------------------------------------------------
