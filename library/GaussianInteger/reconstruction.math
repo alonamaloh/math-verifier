@@ -92,3 +92,51 @@ theorem GaussianInteger.x_times_make
                   Polynomial.Coefficients.shift(Integer.ring_bundle, rest),
                   shiftRespectsExt)
 }
+
+-- The Gaussian integer of a coefficient list: the class of its polynomial.
+definition GaussianInteger.classOf
+        (a : Polynomial.Coefficients(Ring.carrier(Integer.ring_bundle))) : GaussianInteger :=
+  RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+      Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle), a))
+
+-- The integer a as a Gaussian integer (the constant polynomial a).
+definition GaussianInteger.embedInteger (a : Ring.carrier(Integer.ring_bundle)) : GaussianInteger :=
+  RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+      Polynomial.monomial(Integer.ring_bundle, a, 0))
+
+-- i · classOf(rest) = classOf(shift(rest)): multiplying the class by i
+-- prepends a zero coefficient (x_times_make lifted into ℤ[i]).
+theorem GaussianInteger.i_times_classOf
+        (rest : Polynomial.Coefficients(Ring.carrier(Integer.ring_bundle)))
+        : GaussianInteger.i * GaussianInteger.classOf(rest)
+          = GaussianInteger.classOf(Polynomial.Coefficients.shift(Integer.ring_bundle, rest)) :=
+  calc GaussianInteger.i * GaussianInteger.classOf(rest)
+     = RingModulo.make(Integer.polynomial_commutative_ring, GaussianInteger.modulus,
+           GaussianInteger.x
+             * Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle), rest))
+     = GaussianInteger.classOf(Polynomial.Coefficients.shift(Integer.ring_bundle, rest))
+           by substituting GaussianInteger.x_times_make(rest)
+
+-- Structural identity: classOf([c, rest]) = c + i·classOf(rest).
+theorem GaussianInteger.classOf_cons
+        (c : Ring.carrier(Integer.ring_bundle))
+        (rest : Polynomial.Coefficients(Ring.carrier(Integer.ring_bundle)))
+        : GaussianInteger.classOf(
+              Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), c, rest))
+          = GaussianInteger.embedInteger(c)
+            + GaussianInteger.i * GaussianInteger.classOf(rest) := {
+  claim addZero
+      : Ring.add(Integer.ring_bundle, c, Ring.zero(Integer.ring_bundle)) = c
+      by Ring.add_zero;
+  calc GaussianInteger.classOf(
+           Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), c, rest))
+     = GaussianInteger.classOf(
+           Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle),
+               Ring.add(Integer.ring_bundle, c, Ring.zero(Integer.ring_bundle)), rest))
+           by substituting addZero
+     = GaussianInteger.embedInteger(c)
+         + GaussianInteger.classOf(Polynomial.Coefficients.shift(Integer.ring_bundle, rest))
+     = GaussianInteger.embedInteger(c)
+         + GaussianInteger.i * GaussianInteger.classOf(rest)
+           by substituting GaussianInteger.i_times_classOf(rest)
+}
