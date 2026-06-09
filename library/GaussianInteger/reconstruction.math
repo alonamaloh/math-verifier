@@ -1,0 +1,94 @@
+-- GaussianInteger/reconstruction.math
+--
+-- Reconstruction: every Gaussian integer equals re(z) + im(z)·i, where
+-- (re, im) = coords(z). This is the inverse direction of the coordinate
+-- map — the one fact the homomorphism modules don't give — and it makes
+-- `coords` injective, hence N(z)=0 ⟹ z=0 (the keystone for ℤ[i] being an
+-- integral domain).
+--
+-- The engine is an induction on the coefficient list using the structural
+-- identity [c, rest] = c + x·[rest] together with i² = −1.
+
+module GaussianInteger.reconstruction
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.commutative_ring_bundle
+import Integer.basics
+import Integer.addition
+import Integer.ring
+import Integer.algebra
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.additive_group
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import RingModulo.ring
+import RingModulo.instances
+import GaussianInteger.basics
+import GaussianInteger.coordinates
+import GaussianInteger.coordinate_map
+import GaussianInteger.imaginary_unit
+
+-- Multiplying a polynomial (given by a coefficient list) by x prepends a
+-- zero coefficient: x · make(rest) = make(shift(rest)). Same coefficient
+-- chain as `coordinatesOfPolynomial_times_x`, transported by
+-- `make_equal_of_coefficients_equal` instead of through `coords`.
+theorem GaussianInteger.x_times_make
+        (rest : Polynomial.Coefficients(Ring.carrier(Integer.ring_bundle)))
+        : GaussianInteger.x
+            * Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle), rest)
+          = Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+                Polynomial.Coefficients.shift(Integer.ring_bundle, rest)) := {
+  let oneList : Polynomial.Coefficients(Ring.carrier(Integer.ring_bundle)) :=
+      Polynomial.Coefficients.cons(Ring.carrier(Integer.ring_bundle), Ring.one(Integer.ring_bundle),
+          Polynomial.Coefficients.nil(Ring.carrier(Integer.ring_bundle)));
+  -- multiply(shift([1]), rest) ~ shift(multiply([1], rest)) ~ shift(rest).
+  claim multiplyOneRest
+      : Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+            Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest), rest)
+      by Polynomial.Coefficients.multiply_one_left(Integer.ring_bundle, rest);
+  claim shiftMultiplyExt
+      : Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+            Polynomial.Coefficients.multiply(Integer.ring_bundle,
+                Polynomial.Coefficients.shift(Integer.ring_bundle, oneList), rest),
+            Polynomial.Coefficients.shift(Integer.ring_bundle,
+                Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest)))
+      by Polynomial.Coefficients.shift_multiply(Integer.ring_bundle, oneList, rest);
+  claim shiftRespectsExt
+      : Polynomial.ExtensionallyEqual(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+            Polynomial.Coefficients.shift(Integer.ring_bundle,
+                Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest)),
+            Polynomial.Coefficients.shift(Integer.ring_bundle, rest))
+      by Polynomial.Coefficients.shift_respects(Integer.ring_bundle,
+             Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest), rest,
+             multiplyOneRest);
+  calc GaussianInteger.x
+         * Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle), rest)
+     = Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+           Polynomial.Coefficients.multiply(Integer.ring_bundle,
+               Polynomial.Coefficients.shift(Integer.ring_bundle, oneList), rest))
+     = Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+           Polynomial.Coefficients.shift(Integer.ring_bundle,
+               Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest)))
+           by Polynomial.make_equal_of_coefficients_equal(Integer.ring_bundle,
+                  Polynomial.Coefficients.multiply(Integer.ring_bundle,
+                      Polynomial.Coefficients.shift(Integer.ring_bundle, oneList), rest),
+                  Polynomial.Coefficients.shift(Integer.ring_bundle,
+                      Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest)),
+                  shiftMultiplyExt)
+     = Polynomial.make(Ring.carrier(Integer.ring_bundle), Ring.zero(Integer.ring_bundle),
+           Polynomial.Coefficients.shift(Integer.ring_bundle, rest))
+           by Polynomial.make_equal_of_coefficients_equal(Integer.ring_bundle,
+                  Polynomial.Coefficients.shift(Integer.ring_bundle,
+                      Polynomial.Coefficients.multiply(Integer.ring_bundle, oneList, rest)),
+                  Polynomial.Coefficients.shift(Integer.ring_bundle, rest),
+                  shiftRespectsExt)
+}
