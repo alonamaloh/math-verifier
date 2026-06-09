@@ -178,3 +178,26 @@ theorem GaussianInteger.embed_zero
            by substituting polyEqual
      = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
 }
+
+definition GaussianInteger.ring_bundle : Ring :=
+  Ring.make(GaussianInteger, RingModulo.add,
+      RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus),
+      RingModulo.negate, RingModulo.multiply,
+      RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus),
+      RingModulo.is_ring(Integer.polynomial_commutative_ring, GaussianInteger.modulus))
+
+-- (−1)·w = −w in ℤ[i] (the one ring fact the cons-step needs beyond the
+-- RingModulo add/multiply lemmas; via the bundle and `negate_multiply_left`).
+theorem GaussianInteger.negate_one_multiply (w : GaussianInteger)
+        : RingModulo.negate(
+              RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)) * w
+          = RingModulo.negate(w) :=
+  calc RingModulo.negate(
+           RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus)) * w
+     = RingModulo.negate(
+           RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus) * w)
+           by Ring.negate_multiply_left(GaussianInteger.ring_bundle,
+                  RingModulo.one(Integer.polynomial_commutative_ring, GaussianInteger.modulus), w)
+     = RingModulo.negate(w)
+           by substituting RingModulo.multiply_identity_left(
+                  Integer.polynomial_commutative_ring, GaussianInteger.modulus, w)
