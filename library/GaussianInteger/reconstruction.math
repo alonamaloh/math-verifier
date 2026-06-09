@@ -293,3 +293,48 @@ theorem GaussianInteger.reconstruct_coeffs
                * GaussianInteger.embedInteger(
                      Product.first(GaussianInteger.coordinatesOfCoefficients(rest)))
                by GaussianInteger.gauss_horner
+
+-- Reconstruction on ℤ[i]: z = re(z) + i·im(z). Double representatives
+-- reduce z to classOf(a) and coords(z) to coordsOfCoefficients(a).
+theorem GaussianInteger.reconstruct (z : GaussianInteger)
+        : z = GaussianInteger.embedInteger(
+                  Product.first(GaussianInteger.coordinates(z)))
+              + GaussianInteger.i
+                * GaussianInteger.embedInteger(
+                      Product.second(GaussianInteger.coordinates(z))) :=
+  cases z { | p =>
+    cases p { | a =>
+      GaussianInteger.reconstruct_coeffs(a)
+    }
+  }
+
+-- Injectivity at 0: a Gaussian integer with both coordinates 0 is 0.
+theorem GaussianInteger.eq_zero_of_coordinates_zero (z : GaussianInteger)
+        (coordinatesZero
+            : GaussianInteger.coordinates(z)
+              = Product.make(Integer.zero, Integer.zero))
+        : z = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus) := {
+  claim embedZero
+      : GaussianInteger.embedInteger(Integer.zero)
+        = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+      by GaussianInteger.embed_zero;
+  claim iTimesZero
+      : GaussianInteger.i * GaussianInteger.embedInteger(Integer.zero)
+        = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+      by substituting embedZero;
+  calc z
+     = GaussianInteger.embedInteger(Product.first(GaussianInteger.coordinates(z)))
+         + GaussianInteger.i
+           * GaussianInteger.embedInteger(Product.second(GaussianInteger.coordinates(z)))
+           by GaussianInteger.reconstruct
+     = GaussianInteger.embedInteger(Integer.zero)
+         + GaussianInteger.i * GaussianInteger.embedInteger(Integer.zero)
+           by substituting coordinatesZero
+     = GaussianInteger.embedInteger(Integer.zero)
+         + RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+           by substituting iTimesZero
+     = GaussianInteger.embedInteger(Integer.zero)
+           by RingModulo.add_identity_right
+     = RingModulo.zero(Integer.polynomial_commutative_ring, GaussianInteger.modulus)
+           by substituting embedZero
+}
