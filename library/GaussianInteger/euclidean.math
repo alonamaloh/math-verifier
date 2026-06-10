@@ -57,9 +57,41 @@ import GaussianInteger.integral_domain
 theorem Integer.scaled_sum_of_squares (k r1 r2 : Integer)
         : (k * r1) * (k * r1) + (k * r2) * (k * r2) = (k * k) * (r1 * r1 + r2 * r2) := ring
 
--- The norm crux: with s_i the balanced remainders of the conj-product
--- coordinates and r_i the coordinates of a − b·q, D·(s₁²+s₂²) = D²·(r₁²+r₂²),
--- D = b₁²+b₂². A pure polynomial identity once the four defs are unfolded.
+-- The two linear relations: the conj-product times the divisor coordinates
+-- gives D·r componentwise. Each is degree 4 — cheap for `ring`. Kept as
+-- separate theorems (not inline `claim`s) so the crux references them as
+-- opaque constants: a `substituting <local proof>` re-traverses the inlined
+-- proof term on every use, turning these 66ms steps into a 7.9s blowup.
+theorem Integer.gaussian_linear_relation_one (a1 a2 b1 b2 q1 q2 s1 s2 r1 : Integer)
+        (s1Def : s1 = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
+        (s2Def : s2 = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
+        (r1Def : r1 = a1 - (b1 * q1 - b2 * q2))
+        : b1 * s1 - b2 * s2 = (b1 * b1 + b2 * b2) * r1 :=
+  calc b1 * s1 - b2 * s2
+     = b1 * ((a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
+         - b2 * ((a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
+           by substitution
+     = (b1 * b1 + b2 * b2) * (a1 - (b1 * q1 - b2 * q2))
+           by ring
+     = (b1 * b1 + b2 * b2) * r1
+           by substituting r1Def
+
+theorem Integer.gaussian_linear_relation_two (a1 a2 b1 b2 q1 q2 s1 s2 r2 : Integer)
+        (s1Def : s1 = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
+        (s2Def : s2 = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
+        (r2Def : r2 = a2 - (b2 * q1 + b1 * q2))
+        : b2 * s1 + b1 * s2 = (b1 * b1 + b2 * b2) * r2 :=
+  calc b2 * s1 + b1 * s2
+     = b2 * ((a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
+         + b1 * ((a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
+           by substitution
+     = (b1 * b1 + b2 * b2) * (a2 - (b2 * q1 + b1 * q2))
+           by ring
+     = (b1 * b1 + b2 * b2) * r2
+           by substituting r2Def
+
+-- The norm crux: D·(s₁²+s₂²) = D²·(r₁²+r₂²), D = b₁²+b₂². Brahmagupta on the
+-- two linear relations.
 theorem Integer.gaussian_norm_crux (a1 a2 b1 b2 q1 q2 s1 s2 r1 r2 : Integer)
         (s1Def : s1 = (a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
         (s2Def : s2 = (a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
@@ -67,28 +99,10 @@ theorem Integer.gaussian_norm_crux (a1 a2 b1 b2 q1 q2 s1 s2 r1 r2 : Integer)
         (r2Def : r2 = a2 - (b2 * q1 + b1 * q2))
         : (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
           = ((b1 * b1 + b2 * b2) * (b1 * b1 + b2 * b2)) * (r1 * r1 + r2 * r2) := {
-  -- Two linear relations: the conj-product times the divisor coordinates gives
-  -- D·r componentwise. Each is degree 4 — cheap for `ring`.
-  calc b1 * s1 - b2 * s2
-            = b1 * ((a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
-                - b2 * ((a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
-                  by substitution
-            = (b1 * b1 + b2 * b2) * (a1 - (b1 * q1 - b2 * q2))
-                  by ring
-            = (b1 * b1 + b2 * b2) * r1
-                  by substituting r1Def
-      as linRel1;
-  calc b2 * s1 + b1 * s2
-            = b2 * ((a1 * b1 + a2 * b2) - (b1 * b1 + b2 * b2) * q1)
-                + b1 * ((a2 * b1 - a1 * b2) - (b1 * b1 + b2 * b2) * q2)
-                  by substitution
-            = (b1 * b1 + b2 * b2) * (a2 - (b2 * q1 + b1 * q2))
-                  by ring
-            = (b1 * b1 + b2 * b2) * r2
-                  by substituting r2Def
-      as linRel2;
-  -- Brahmagupta on the two linear relations: D·(s₁²+s₂²) = (b₁s₁−b₂s₂)² +
-  -- (b₂s₁+b₁s₂)² = (D·r₁)² + (D·r₂)² = D²·(r₁²+r₂²).
+  claim linRel1 : b1 * s1 - b2 * s2 = (b1 * b1 + b2 * b2) * r1
+      by Integer.gaussian_linear_relation_one;
+  claim linRel2 : b2 * s1 + b1 * s2 = (b1 * b1 + b2 * b2) * r2
+      by Integer.gaussian_linear_relation_two;
   calc (b1 * b1 + b2 * b2) * (s1 * s1 + s2 * s2)
      = (b1 * s1 - b2 * s2) * (b1 * s1 - b2 * s2)
          + (b2 * s1 + b1 * s2) * (b2 * s1 + b1 * s2)
