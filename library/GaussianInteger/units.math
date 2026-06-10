@@ -1,0 +1,149 @@
+-- GaussianInteger/units.math
+--
+-- The arithmetic of ℤ[i] needed for the sum-of-two-squares descent:
+--   * `coordinates (embedInteger a) = (a, 0)`;
+--   * `coordinates` is injective (read off from `reconstruct`);
+--   * the conjugate, and `z · conjugate z = embedInteger (N z)`;
+--   * a Gaussian integer of norm 1 is a unit (its conjugate inverts it).
+-- These let the descent argument move between `Ring.IsUnit` / `Ring.divides`
+-- on `GaussianInteger.ring_bundle` and concrete facts about coordinates.
+
+module GaussianInteger.units
+
+import Logic.basics
+import Logic.product
+import Equality.basics
+import Integer.basics
+import Integer.addition
+import Integer.ring
+import Integer.algebra
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_divisibility
+import Algebra.integral_domain
+import RingModulo.basics
+import RingModulo.operations
+import GaussianInteger.basics
+import GaussianInteger.coordinates
+import GaussianInteger.coordinate_map
+import GaussianInteger.coordinate_multiplicative
+import GaussianInteger.of_coordinates
+import GaussianInteger.reconstruction
+import GaussianInteger.norm
+import GaussianInteger.integral_domain
+
+-- ----------------------------------------------------------------------
+-- The embedding of an integer has coordinates (a, 0): embedInteger(a) is
+-- the class of the constant coefficient list [a], whose reim recursion
+-- gives (a − 0, 0).
+theorem GaussianInteger.coordinates_embedInteger (a : Integer)
+        : coords(GaussianInteger.embedInteger(a)) = Product.make(a, Integer.zero) := {
+  claim firstZero : a - Integer.zero = a by ring;
+  calc coords(GaussianInteger.embedInteger(a))
+     = Product.make(a - Integer.zero, Integer.zero)
+     = Product.make(a, Integer.zero)   by substituting firstZero
+}
+
+-- ----------------------------------------------------------------------
+-- `coordinates` is injective: a Gaussian integer is determined by its
+-- real and imaginary parts (this is just `reconstruct` applied to both
+-- sides once the coordinate pairs agree).
+theorem GaussianInteger.coordinates_injective (z w : GaussianInteger)
+        (coordinatesEqual : coords(z) = coords(w))
+        : z = w :=
+  calc z
+     = GaussianInteger.embedInteger(Product.first(coords(z)))
+         + GaussianInteger.i * GaussianInteger.embedInteger(Product.second(coords(z)))
+           by GaussianInteger.reconstruct
+     = GaussianInteger.embedInteger(Product.first(coords(w)))
+         + GaussianInteger.i * GaussianInteger.embedInteger(Product.second(coords(w)))
+           by substituting coordinatesEqual
+     = w
+           by GaussianInteger.reconstruct
+
+-- ----------------------------------------------------------------------
+-- The conjugate a − b·i of a + b·i.
+definition GaussianInteger.conjugate (z : GaussianInteger) : GaussianInteger :=
+  GaussianInteger.ofCoordinates(
+      Product.first(coords(z)),
+      -(Product.second(coords(z))))
+
+-- N(z) = a² + b² as a coordinate-pair fact: (a,b)⊗(a,−b) = (a²+b², 0).
+theorem GaussianInteger.gaussianProduct_conjugate (p : Pair(Integer, Integer))
+        : GaussianInteger.gaussianProduct(p,
+              Product.make(Product.first(p), -(Product.second(p))))
+          = Product.make(GaussianInteger.normPair(p), Integer.zero) :=
+  cases p { | Product.make(a, b) =>
+    {
+      claim firstEqual : a * a - b * (-b) = a * a + b * b by ring;
+      claim secondEqual : a * (-b) + b * a = Integer.zero by ring;
+      calc GaussianInteger.gaussianProduct(Product.make(a, b), Product.make(a, -b))
+         = Product.make(a * a - b * (-b), a * (-b) + b * a)
+         = Product.make(a * a + b * b, a * (-b) + b * a)   by substituting firstEqual
+         = Product.make(a * a + b * b, Integer.zero)        by substituting secondEqual
+    }
+  }
+
+-- z · conjugate(z) = N(z) (embedded as a Gaussian integer).
+theorem GaussianInteger.multiply_conjugate (z : GaussianInteger)
+        : z * GaussianInteger.conjugate(z)
+          = GaussianInteger.embedInteger(GaussianInteger.normInteger(z)) := {
+  claim coordinatesConjugate
+      : coords(GaussianInteger.conjugate(z))
+        = Product.make(Product.first(coords(z)), -(Product.second(coords(z))))
+      by GaussianInteger.coordinates_ofCoordinates;
+  claim coordinatesProduct
+      : coords(z * GaussianInteger.conjugate(z))
+        = Product.make(GaussianInteger.normInteger(z), Integer.zero)
+      by calc coords(z * GaussianInteger.conjugate(z))
+            = GaussianInteger.gaussianProduct(coords(z), coords(GaussianInteger.conjugate(z)))
+                  by GaussianInteger.coordinates_multiply
+            = GaussianInteger.gaussianProduct(coords(z),
+                  Product.make(Product.first(coords(z)), -(Product.second(coords(z)))))
+                  by substituting coordinatesConjugate
+            = Product.make(GaussianInteger.normPair(coords(z)), Integer.zero)
+                  by GaussianInteger.gaussianProduct_conjugate;
+  claim coords(z * GaussianInteger.conjugate(z))
+        = coords(GaussianInteger.embedInteger(GaussianInteger.normInteger(z)))
+      by calc coords(z * GaussianInteger.conjugate(z))
+            = Product.make(GaussianInteger.normInteger(z), Integer.zero)   by coordinatesProduct
+            = coords(GaussianInteger.embedInteger(GaussianInteger.normInteger(z)))
+                  by GaussianInteger.coordinates_embedInteger;
+  done by GaussianInteger.coordinates_injective
+}
+
+-- N(embedInteger a) = a².
+theorem GaussianInteger.normInteger_embedInteger (a : Integer)
+        : GaussianInteger.normInteger(GaussianInteger.embedInteger(a)) = a * a := {
+  claim coordinatesEmbed
+      : coords(GaussianInteger.embedInteger(a)) = Product.make(a, Integer.zero)
+      by GaussianInteger.coordinates_embedInteger;
+  calc GaussianInteger.normInteger(GaussianInteger.embedInteger(a))
+     = GaussianInteger.normPair(Product.make(a, Integer.zero))   by substituting coordinatesEmbed
+     = a * a + Integer.zero * Integer.zero
+     = a * a   by ring
+}
+
+-- ----------------------------------------------------------------------
+-- embed(1) is the ring unit (the constant polynomial 1 is the one of ℤ[i]).
+theorem GaussianInteger.embedInteger_one
+        : GaussianInteger.embedInteger(Integer.one)
+          = Ring.one(GaussianInteger.ring_bundle) :=
+  calc GaussianInteger.embedInteger(Integer.one)
+     = Ring.one(GaussianInteger.ring_bundle)
+
+-- A Gaussian integer of norm 1 is a unit: its conjugate inverts it.
+theorem GaussianInteger.unit_of_normInteger_one (z : GaussianInteger)
+        (normOne : GaussianInteger.normInteger(z) = Integer.one)
+        : Ring.IsUnit(GaussianInteger.ring_bundle, z) := {
+  claim oneEqual
+      : Ring.one(GaussianInteger.ring_bundle) = z * GaussianInteger.conjugate(z)
+      by calc Ring.one(GaussianInteger.ring_bundle)
+            = GaussianInteger.embedInteger(Integer.one)
+                  by GaussianInteger.embedInteger_one
+            = GaussianInteger.embedInteger(GaussianInteger.normInteger(z))
+                  by substituting normOne
+            = z * GaussianInteger.conjugate(z)
+                  by GaussianInteger.multiply_conjugate;
+  ⟨GaussianInteger.conjugate(z), oneEqual⟩
+}
