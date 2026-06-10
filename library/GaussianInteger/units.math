@@ -17,6 +17,7 @@ import Integer.basics
 import Integer.addition
 import Integer.ring
 import Integer.algebra
+import Integer.divisibility
 import Algebra.ring
 import Algebra.ring_bundle
 import Algebra.ring_divisibility
@@ -30,6 +31,7 @@ import GaussianInteger.coordinate_multiplicative
 import GaussianInteger.of_coordinates
 import GaussianInteger.reconstruction
 import GaussianInteger.norm
+import GaussianInteger.norm_natural
 import GaussianInteger.integral_domain
 
 -- ----------------------------------------------------------------------
@@ -146,4 +148,103 @@ theorem GaussianInteger.unit_of_normInteger_one (z : GaussianInteger)
             = z * GaussianInteger.conjugate(z)
                   by GaussianInteger.multiply_conjugate;
   ⟨GaussianInteger.conjugate(z), oneEqual⟩
+}
+
+-- ----------------------------------------------------------------------
+-- Multiplying by embed(p) scales both coordinates by p.
+theorem GaussianInteger.coordinates_embedInteger_multiply (p : Integer) (w : GaussianInteger)
+        : coords(GaussianInteger.embedInteger(p) * w)
+          = Product.make(p * Product.first(coords(w)), p * Product.second(coords(w))) := {
+  claim firstSimplify
+      : p * Product.first(coords(w)) - Integer.zero * Product.second(coords(w))
+        = p * Product.first(coords(w)) by ring;
+  claim secondSimplify
+      : p * Product.second(coords(w)) + Integer.zero * Product.first(coords(w))
+        = p * Product.second(coords(w)) by ring;
+  claim embedCoordinates : coords(GaussianInteger.embedInteger(p)) = Product.make(p, Integer.zero)
+      by GaussianInteger.coordinates_embedInteger;
+  calc coords(GaussianInteger.embedInteger(p) * w)
+     = GaussianInteger.gaussianProduct(coords(GaussianInteger.embedInteger(p)), coords(w))
+           by GaussianInteger.coordinates_multiply
+     = GaussianInteger.gaussianProduct(Product.make(p, Integer.zero), coords(w))
+           by substituting embedCoordinates
+     = Product.make(
+           p * Product.first(coords(w)) - Integer.zero * Product.second(coords(w)),
+           p * Product.second(coords(w)) + Integer.zero * Product.first(coords(w)))
+     = Product.make(p * Product.first(coords(w)),
+           p * Product.second(coords(w)) + Integer.zero * Product.first(coords(w)))
+           by substituting firstSimplify
+     = Product.make(p * Product.first(coords(w)), p * Product.second(coords(w)))
+           by substituting secondSimplify
+}
+
+-- embed is multiplicative: embed(a·b) = embed a · embed b.
+theorem GaussianInteger.embedInteger_multiply (a b : Integer)
+        : GaussianInteger.embedInteger(a * b)
+          = GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b) := {
+  claim aTimesZero : a * Integer.zero = Integer.zero by ring;
+  claim bCoordinates : coords(GaussianInteger.embedInteger(b)) = Product.make(b, Integer.zero)
+      by GaussianInteger.coordinates_embedInteger;
+  claim leftCoordinates
+      : coords(GaussianInteger.embedInteger(a * b)) = Product.make(a * b, Integer.zero)
+      by GaussianInteger.coordinates_embedInteger;
+  claim rightCoordinates
+      : coords(GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b))
+        = Product.make(a * b, Integer.zero)
+      by calc coords(GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b))
+            = Product.make(a * Product.first(coords(GaussianInteger.embedInteger(b))),
+                  a * Product.second(coords(GaussianInteger.embedInteger(b))))
+                  by GaussianInteger.coordinates_embedInteger_multiply
+            = Product.make(a * b, a * Integer.zero)   by substituting bCoordinates
+            = Product.make(a * b, Integer.zero)   by substituting aTimesZero;
+  claim coords(GaussianInteger.embedInteger(a * b))
+        = coords(GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b))
+      by calc coords(GaussianInteger.embedInteger(a * b))
+            = Product.make(a * b, Integer.zero)   by leftCoordinates
+            = coords(GaussianInteger.embedInteger(a) * GaussianInteger.embedInteger(b))
+                  by rightCoordinates;
+  done by GaussianInteger.coordinates_injective
+}
+
+-- If embed(p) divides z then p divides z's imaginary part.
+theorem GaussianInteger.embedInteger_divides_imaginary (p : Integer) (z : GaussianInteger)
+        (dividesZ : Ring.divides(GaussianInteger.ring_bundle, GaussianInteger.embedInteger(p), z))
+        : Integer.divides(p, Product.second(coords(z))) := {
+  obtain ⟨w, zEqual⟩ from dividesZ;
+  let factor : GaussianInteger := w;
+  claim zProduct : z = GaussianInteger.embedInteger(p) * factor by zEqual;
+  claim productCoordinates
+      : coords(GaussianInteger.embedInteger(p) * factor)
+        = Product.make(p * Product.first(coords(factor)), p * Product.second(coords(factor)))
+      by GaussianInteger.coordinates_embedInteger_multiply;
+  claim secondEqual : Product.second(coords(z)) = p * Product.second(coords(factor))
+      by calc Product.second(coords(z))
+            = Product.second(coords(GaussianInteger.embedInteger(p) * factor))   by substituting zProduct
+            = Product.second(Product.make(p * Product.first(coords(factor)), p * Product.second(coords(factor))))
+                  by substituting productCoordinates
+            = p * Product.second(coords(factor));
+  ⟨Product.second(coords(factor)), secondEqual⟩
+}
+
+-- The natural-valued norm is multiplicative.
+theorem GaussianInteger.normNatural_multiply (z w : GaussianInteger)
+        : GaussianInteger.normNatural(z * w)
+          = GaussianInteger.normNatural(z) * GaussianInteger.normNatural(w) := {
+  claim zCast : (GaussianInteger.normNatural(z) : Integer) = GaussianInteger.normInteger(z)
+      by GaussianInteger.normNatural_is_normInteger;
+  claim wCast : (GaussianInteger.normNatural(w) : Integer) = GaussianInteger.normInteger(w)
+      by GaussianInteger.normNatural_is_normInteger;
+  claim (GaussianInteger.normNatural(z * w) : Integer)
+        = ((GaussianInteger.normNatural(z) * GaussianInteger.normNatural(w)) : Integer)
+      by calc (GaussianInteger.normNatural(z * w) : Integer)
+            = GaussianInteger.normInteger(z * w)   by GaussianInteger.normNatural_is_normInteger
+            = GaussianInteger.normInteger(z) * GaussianInteger.normInteger(w)
+                  by GaussianInteger.normInteger_multiply
+            = (GaussianInteger.normNatural(z) : Integer) * GaussianInteger.normInteger(w)
+                  by substituting zCast
+            = (GaussianInteger.normNatural(z) : Integer) * (GaussianInteger.normNatural(w) : Integer)
+                  by substituting wCast
+            = ((GaussianInteger.normNatural(z) * GaussianInteger.normNatural(w)) : Integer)
+                  by Natural.to_integer.multiply_preserves;
+  done by Natural.to_integer.injective
 }
