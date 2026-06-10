@@ -4955,13 +4955,20 @@ std::vector<std::string> importedModulesOf(const SurfaceModule& module) {
 // or has a malformed header.
 void loadCacheRecursive(Environment& environment,
                         const std::string& cachePath,
-                        std::set<std::string>& alreadyLoaded) {
+                        std::set<std::string>& alreadyLoaded,
+                        bool indexMode = false) {
     if (alreadyLoaded.count(cachePath)) return;
-    CacheContents contents = readCacheFile(cachePath);
+    // indexMode (lemma-suggestion index only): parse past every proof BODY
+    // without materialising it (readCacheFile returns type-only Axioms), so
+    // the library's gigabytes of proof terms are never allocated. The index
+    // matches on declaration TYPES alone; nothing δ-unfolds the dropped
+    // bodies. Real verification (indexMode=false) reads every body intact.
+    CacheContents contents = readCacheFile(cachePath, /*skipBodies=*/indexMode);
     // Load deps first (post-order: deps' declarations available before
     // this cache's declarations are added).
     for (const auto& dependency : contents.dependencies) {
-        loadCacheRecursive(environment, dependency.cachePath, alreadyLoaded);
+        loadCacheRecursive(environment, dependency.cachePath, alreadyLoaded,
+                           indexMode);
     }
     // Register this file's delta. We bypass the typecheck-on-add API
     // (addAxiom, addDefinition, ...) because the cache encodes a
@@ -5758,8 +5765,10 @@ LibrarySearchIndex buildLibraryIndex(const std::string& cacheRoot) {
     std::sort(cacheFiles.begin(), cacheFiles.end());
     for (const auto& cacheFile : cacheFiles) {
         try {
-            loadCacheRecursive(index.environment, cacheFile, alreadyLoaded);
-            CacheContents contents = readCacheFile(cacheFile);
+            loadCacheRecursive(index.environment, cacheFile, alreadyLoaded,
+                               /*indexMode=*/true);
+            CacheContents contents =
+                readCacheFile(cacheFile, /*skipDefinitionBodies=*/true);
             bool isTest =
                 contents.sourcePath.find("/Test/") != std::string::npos;
             for (const auto& [name, declaration] : contents.declarations) {

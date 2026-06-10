@@ -366,6 +366,24 @@ private:
         const std::vector<LocalBinder>& localBinders,
         size_t limit = 5) const;
 
+    // searchSuggestions deserializes the ENTIRE library cache to build the
+    // lemma index (hundreds of MB on disk, several GB once expanded into
+    // in-memory ASTs). The auto-prover routinely throws-and-catches
+    // SPECULATIVELY — disjunction-intro trying an unprovable disjunct,
+    // trySymmetryFlip, backward-chaining branches all recurse through
+    // autoProveClaim at depth > 1, and those transient errors are caught
+    // and discarded. Building the giant index for a message no one will
+    // read is pure waste; under `make -j16` many concurrent kernels each
+    // doing it exhausts RAM and takes the machine down. So attach
+    // suggestions only to the genuinely top-level, user-visible failure
+    // (depth <= 1); nested speculative failures get the base message alone.
+    std::string searchSuggestionsIfTopLevel(
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders) const {
+        if (autoProveDepth_ > 1) return std::string();
+        return searchSuggestions(goalClosed, localBinders);
+    }
+
     // Tail for a "couldn't prove this step" error: the step goal
     // (LHS rel RHS) followed by library-lemma candidates keyed by the
     // goal's conclusion shape. The surrounding frame already dumps the

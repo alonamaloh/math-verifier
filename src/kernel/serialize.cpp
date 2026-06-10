@@ -248,6 +248,47 @@ ExpressionPointer readExpression(Reader& reader) {
     }
 }
 
+// Consume exactly the bytes readExpression would, but build NOTHING — no
+// node tree is allocated. Used to skip proof BODIES when assembling the
+// lemma-suggestion index, which needs only declaration types. Proof terms
+// are the bulk of the library's bytes; materialising every one at once is
+// what made a single failing-claim suggestion exhaust RAM (and, under
+// `make -j16`, take the machine down). Small leaf payloads (strings,
+// levels) are read-and-discarded — the win is skipping the deep Pi /
+// Lambda / Application / Let spines.
+void skipExpression(Reader& reader) {
+    uint8_t tag = reader.readU8();
+    switch (tag) {
+        case 0: reader.readI32(); return;                      // BoundVariable
+        case 1: reader.readString(); reader.readU8(); return;  // FreeVariable
+        case 2: readLevel(reader); return;                     // Sort
+        case 3:                                                // Pi
+        case 4:                                                // Lambda
+            reader.readString();
+            skipExpression(reader);
+            skipExpression(reader);
+            return;
+        case 5:                                                // Application
+            skipExpression(reader);
+            skipExpression(reader);
+            return;
+        case 6: {                                              // Constant
+            reader.readString();
+            uint32_t universeCount = reader.readU32();
+            for (uint32_t i = 0; i < universeCount; ++i) readLevel(reader);
+            return;
+        }
+        case 7:                                                // Let
+            reader.readString();
+            skipExpression(reader);
+            skipExpression(reader);
+            skipExpression(reader);
+            return;
+        default:
+            throw SerializationError("skipExpression: bad tag");
+    }
+}
+
 // ----------------------------------------------------------------------
 // String-vector helper.
 
@@ -316,7 +357,8 @@ void writeDeclaration(Writer& writer, const Declaration& declaration) {
     }
 }
 
-Declaration readDeclaration(Reader& reader) {
+Declaration readDeclaration(Reader& reader,
+                            bool skipDefinitionBodies = false) {
     uint8_t tag = reader.readU8();
     switch (tag) {
         case 0: {
@@ -329,6 +371,21 @@ Declaration readDeclaration(Reader& reader) {
             Definition definition;
             definition.universeParameters = readStringVector(reader);
             definition.type = readExpression(reader);
+            if (skipDefinitionBodies) {
+                // Lemma-index load: parse past the proof body without
+                // building it, then drop to a type-only Axiom. The opacity
+                // byte follows the body in the format, so it must still be
+                // consumed. Nothing downstream δ-unfolds an Axiom, so the
+                // missing body can't cause a wrong result — only the type
+                // (all the index matches on) is retained.
+                skipExpression(reader);
+                reader.readU8();  // opacity byte (discarded)
+                Axiom axiom;
+                axiom.universeParameters =
+                    std::move(definition.universeParameters);
+                axiom.type = std::move(definition.type);
+                return axiom;
+            }
             definition.body = readExpression(reader);
             uint8_t opacityByte = reader.readU8();
             definition.opacity = (opacityByte == 0)
@@ -449,7 +506,8 @@ void writeCacheFile(const std::string& path, const CacheContents& contents) {
     }
 }
 
-CacheContents readCacheFile(const std::string& path) {
+CacheContents readCacheFile(const std::string& path,
+                            bool skipDefinitionBodies) {
     std::ifstream input(path, std::ios::binary);
     if (!input) {
         throw SerializationError("cannot open for read: " + path);
@@ -483,7 +541,8 @@ CacheContents readCacheFile(const std::string& path) {
     contents.declarations.reserve(declarationCount);
     for (uint32_t i = 0; i < declarationCount; ++i) {
         std::string name = reader.readString();
-        Declaration declaration = readDeclaration(reader);
+        Declaration declaration =
+            readDeclaration(reader, skipDefinitionBodies);
         contents.declarations.emplace_back(std::move(name),
                                             std::move(declaration));
     }

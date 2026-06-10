@@ -130,4 +130,9 @@ void writeCacheFile(const std::string& path, const CacheContents& contents);
 
 // Read a cache from `path`. Throws SerializationError on I/O failure,
 // missing file, magic/version mismatch, or malformed content.
-CacheContents readCacheFile(const std::string& path);
+// skipDefinitionBodies: parse past each Definition's proof BODY without
+// materialising it, returning it as a type-only Axiom. For building the
+// lemma-suggestion index, which matches on types only — avoids holding the
+// whole library's proof terms (gigabytes) in memory at once.
+CacheContents readCacheFile(const std::string& path,
+                            bool skipDefinitionBodies = false);

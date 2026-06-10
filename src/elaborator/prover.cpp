@@ -1344,7 +1344,7 @@ ExpressionPointer Elaborator::autoProveClaimTactics(
             "with this conclusion shape applies, and no context "
             "equality lets us rewrite to a provable form — add "
             "`by <lemma>` to specify"
-            + searchSuggestions(goalClosed, localBinders));
+            + searchSuggestionsIfTopLevel(goalClosed, localBinders));
     }
 
 void Elaborator::throwAutoProveBudgetExceeded(
@@ -1477,7 +1477,7 @@ ExpressionPointer Elaborator::autoProveClaimProfiling(
             "with this conclusion shape applies, and no context "
             "equality lets us rewrite to a provable form — add "
             "`by <lemma>` to specify"
-            + searchSuggestions(goalClosed, localBinders));
+            + searchSuggestionsIfTopLevel(goalClosed, localBinders));
     }
 
 std::string Elaborator::goalHeadName(ExpressionPointer expression) {
