@@ -1,0 +1,36 @@
+-- Natural/factorial.math
+--
+-- The factorial function on naturals: 0! = 1 and
+-- (successor n)! = successor(n) · n!. With the positivity witness
+-- 1 ≤ n! (every factorial value is a successor), needed downstream
+-- to know (p-1)! is nonzero as a class.
+
+module Natural.factorial
+
+import Natural.basics
+import Natural.order
+import Natural.multiply_order
+
+-- factorial(0) = 1, factorial(successor n) = successor(n) · factorial(n).
+definition Natural.factorial : Natural → Natural
+  | zero         => 1
+  | successor(n) => successor(n) * Natural.factorial(n)
+
+-- Every factorial value is at least 1: by induction, the empty product is
+-- 1 and a successor times a positive number is again a successor.
+theorem Natural.factorial_positive (n : Natural) : 1 ≤ Natural.factorial(n) :=
+  by_induction on n with IH {
+    case zero:
+        -- factorial(0) ≡ 1, and 1 ≤ 1.
+        done
+    case successor(predecessor): {
+        -- factorial(successor predecessor) ≡ successor(predecessor) · factorial(predecessor),
+        -- a product of two positive naturals (the head is a successor, the
+        -- tail is positive by the induction hypothesis).
+        claim 1 ≤ successor(predecessor) by Natural.successor_positive;
+        claim 1 ≤ Natural.factorial(predecessor) by IH;
+        claim productPositive : 1 ≤ successor(predecessor) * Natural.factorial(predecessor)
+            by Natural.multiply_at_least_one;
+        productPositive
+    }
+  }
