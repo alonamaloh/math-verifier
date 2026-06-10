@@ -39,6 +39,15 @@ struct LocalBinder {
     std::string name;
     ExpressionPointer type;
     ExpressionPointer value = nullptr;
+    // True when `type` is a Proposition, i.e. `value` is a PROOF term
+    // (`claim X : T by V` / `calc … as X`). Proof values are omitted from
+    // the kernel ContextEntry: ζ-substituting a proof into the terms of a
+    // defeq query can never decide a type-level equality, but it makes
+    // every isDefinitionallyEqual under the binder pay an O(proof-size)
+    // substitution walk on both sides (and bloats the defeq cache keys) —
+    // a measured 120× blowup on proof-heavy calc blocks. The auto-prover's
+    // closed-term matchers still see `value` via the LocalBinder itself.
+    bool valueIsProof = false;
 };
 
 // Returns the FreeVariable name used when opening / closing the binder

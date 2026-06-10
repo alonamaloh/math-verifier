@@ -1095,10 +1095,12 @@ ExpressionPointer Elaborator::elaborateExpression(
                 && claimSizeFlag2[0] != '\0'
                 && claimSizeFlag2[0] != '0';
             auto tLet0 = std::chrono::steady_clock::now();
+            auto tLetTypeOnly = tLet0;
             ExpressionPointer letType;
             ExpressionPointer letValue;
             if (let->type) {
                 letType = elaborateExpression(*let->type, localBinders);
+                tLetTypeOnly = std::chrono::steady_clock::now();
                 // Pass the declared type as the expected type for the
                 // value so bidirectional elaborators (cases, anonymous
                 // tuples, hammer, calc) can use it — without this,
@@ -1124,7 +1126,7 @@ ExpressionPointer Elaborator::elaborateExpression(
                     inferTypeInLocalContext(localBinders, letValue),
                     localBinders, localBinders.size());
             }
-            auto tLetType = std::chrono::steady_clock::now();
+            auto tLetType = tLetTypeOnly;
             auto tLetValue = std::chrono::steady_clock::now();
             // Diff-inference for non-calc equality coercion: covers
             // `claim X : succ(a) = succ(b) by eq` (desugars to a
@@ -1164,8 +1166,12 @@ ExpressionPointer Elaborator::elaborateExpression(
             // openedContext builders can mark it as let-bound (enabling
             // ζ-reduction in isDefinitionallyEqual on the FreeVariable),
             // and so the auto-prover's structural matchers can ζ-unfold
-            // when matching on the closed term.
-            extended.push_back({let->name, letType, letValue});
+            // when matching on the closed term. Proof-valued lets (the
+            // binder type is a Proposition: `claim X : T by V`,
+            // `calc … as X`) are flagged so the kernel Context omits the
+            // value — see LocalBinder::valueIsProof.
+            bool valueIsProof = termIsProposition(localBinders, letType);
+            extended.push_back({let->name, letType, letValue, valueIsProof});
             // Propagate expectedType to body (shifted for new binder).
             ExpressionPointer bodyExpectedType =
                 expectedType ? shift(expectedType, 1) : nullptr;

@@ -484,7 +484,12 @@ Context buildContextFromLocalBinders(
         ExpressionPointer openedType = openOverLocalBinders(
             localBinders[i].type, localBinders, i);
         ExpressionPointer openedValue = nullptr;
-        if (localBinders[i].value) {
+        // Proof-valued lets are omitted from the kernel context: ζ-
+        // substituting a proof term can never decide a type-level defeq,
+        // and carrying it makes every isDefinitionallyEqual under the
+        // binder pay an O(proof-size) substitution on both query sides
+        // (see LocalBinder::valueIsProof).
+        if (localBinders[i].value && !localBinders[i].valueIsProof) {
             openedValue = openOverLocalBinders(
                 localBinders[i].value, localBinders, i);
         }
