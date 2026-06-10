@@ -1,0 +1,83 @@
+-- Natural/prime_square.math
+--
+-- A factorization fact about prime squares used by the Gaussian-integer
+-- sum-of-two-squares descent: if a·b = p² with p prime and both factors
+-- at least 2, then a = p. (p divides one factor; the other is then a
+-- divisor of p forced up to p, and cancelling p pins the first factor.)
+
+module Natural.prime_square
+
+import Logic.basics
+import Logic.sum
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.add_order
+import Natural.cancellation
+import Natural.divisibility
+import Natural.prime
+import Natural.prime_divides_product
+
+theorem Natural.prime_square_factor (p a b : Natural)
+        (primality : Natural.is_prime(p))
+        (aAtLeastTwo : 2 ≤ a) (bAtLeastTwo : 2 ≤ b)
+        (product : a * b = p * p)
+        : a = p := {
+  let ⟨pAtLeastTwo, divisorClause⟩ := primality;
+  claim pPositive : 1 ≤ p by Natural.is_prime.positive;
+  claim p ∣ a * b by ⟨p, product⟩;
+  claim disjunction : (p ∣ a) ∨ (p ∣ b) by Natural.prime_divides_product;
+  cases disjunction {
+    | Or.introduceLeft(pDividesA) => {
+        obtain ⟨k, aEqual⟩ from pDividesA;
+        claim p * p = p * (k * b)
+            by calc p * p
+                  = a * b         by product
+                  = (p * k) * b   by substituting aEqual
+                  = p * (k * b)   by ring;
+        claim pEqualKtimesB : p = k * b by Natural.multiply_cancel_left;
+        claim bDividesP : b ∣ p by ⟨k, calc p = k * b = b * k by ring⟩;
+        claim bIsOneOrP : b = 1 ∨ b = p by divisorClause(b, bDividesP);
+        cases bIsOneOrP {
+          | Or.introduceLeft(bEqualOne) => {
+              claim 2 ≤ 1 by substituting bEqualOne;
+              claim False by Natural.not_successor_less_or_equal_self;
+              done
+            }
+          | Or.introduceRight(bEqualP) => {
+              claim onePEqualKP : (1 : Natural) * p = k * p
+                  by calc (1 : Natural) * p
+                        = p           by Natural.one_multiply
+                        = k * b       by pEqualKtimesB
+                        = k * p       by substituting bEqualP;
+              claim kEqualOne : 1 = k
+                  by Natural.multiply_cancel_right(1, k, p, pPositive, onePEqualKP);
+              calc a
+                 = p * k   by aEqual
+                 = p * 1   by substituting kEqualOne
+                 = p       by Natural.multiply_one
+            }
+        }
+      }
+    | Or.introduceRight(pDividesB) => {
+        obtain ⟨k, bEqual⟩ from pDividesB;
+        claim p * p = p * (a * k)
+            by calc p * p
+                  = a * b         by product
+                  = a * (p * k)   by substituting bEqual
+                  = p * (a * k)   by ring;
+        claim pEqualAtimesK : p = a * k by Natural.multiply_cancel_left;
+        claim aDividesP : a ∣ p by ⟨k, pEqualAtimesK⟩;
+        claim aIsOneOrP : a = 1 ∨ a = p by divisorClause(a, aDividesP);
+        cases aIsOneOrP {
+          | Or.introduceLeft(aEqualOne) => {
+              claim 2 ≤ 1 by substituting aEqualOne;
+              claim False by Natural.not_successor_less_or_equal_self;
+              done
+            }
+          | Or.introduceRight(aEqualP) => aEqualP
+        }
+      }
+  }
+}
