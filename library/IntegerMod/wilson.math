@@ -1,0 +1,149 @@
+-- IntegerMod/wilson.math
+--
+-- Field structure facts on F_p = IntegerMod(p) for prime p, building
+-- toward Wilson's theorem and (eventually) Freek #20:
+--
+--   * IntegerMod.multiply_zero        — x · 0 = 0 (the right zero law)
+--   * IntegerMod.no_zero_divisors     — a field has no zero divisors
+--   * IntegerMod.square_one_iff       — x² = 1 ⟹ x = 1 ∨ x = −1
+--
+-- The self-inverse fact is the geometric heart of Wilson: in F_p the
+-- inversion involution x ↦ x⁻¹ fixes only ±1, so the product of all
+-- nonzero elements collapses to −1.
+
+module IntegerMod.wilson
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.prime
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Algebra.ring_lemmas
+import IntegerMod.basics
+import IntegerMod.operations
+import IntegerMod.ring
+import IntegerMod.instances
+import IntegerMod.field
+
+-- ----------------------------------------------------------------------
+-- The right zero law: x · 0 = 0. (There is no `ring` instance on
+-- IntegerMod, so we read it off the Integer representative.)
+theorem IntegerMod.multiply_zero (modulus : Natural) (x : IntegerMod(modulus))
+        : x * IntegerMod.zero(modulus) = IntegerMod.zero(modulus) :=
+  by_representatives x as a =>
+    claim IntegerMod.make(modulus, a * Integer.zero)
+        = IntegerMod.make(modulus, Integer.zero)
+      by substituting (ring : a * Integer.zero = Integer.zero)
+
+-- ----------------------------------------------------------------------
+-- Small additive-cancellation rearrangements, read off the integer
+-- representative (where `ring` applies). `subtract_add_cancel`:
+-- (x − c) + c = x; `add_subtract_cancel`: (x + c) − c = x.
+theorem IntegerMod.subtract_add_cancel (modulus : Natural)
+        (x c : IntegerMod(modulus))
+        : (x - c) + c = x :=
+  by_representatives x as a, c as b =>
+    claim IntegerMod.make(modulus, a + -b + b) = IntegerMod.make(modulus, a)
+      by substituting (ring : a + -b + b = a)
+
+theorem IntegerMod.add_subtract_cancel (modulus : Natural)
+        (x c : IntegerMod(modulus))
+        : (x + c) - c = x :=
+  by_representatives x as a, c as b =>
+    claim IntegerMod.make(modulus, a + b + -b) = IntegerMod.make(modulus, a)
+      by substituting (ring : a + b + -b = a)
+
+-- 0 − c = −c.
+theorem IntegerMod.zero_subtract (modulus : Natural) (c : IntegerMod(modulus))
+        : IntegerMod.zero(modulus) - c = IntegerMod.negate(c) :=
+  by_representatives c as b =>
+    claim IntegerMod.make(modulus, Integer.zero + -b) = IntegerMod.make(modulus, -b)
+      by substituting (ring : Integer.zero + -b = -b)
+
+-- ----------------------------------------------------------------------
+-- A field has no zero divisors: if x ≠ 0 and x·y = 0 then y = 0.
+-- Multiply the equation by an inverse of x:
+--   y = 1·y = (x⁻¹·x)·y = x⁻¹·(x·y) = x⁻¹·0 = 0.
+theorem IntegerMod.no_zero_divisors (p : Natural) (primality : Natural.is_prime(p))
+        (x y : IntegerMod(p))
+        (xNonzero : ¬(x = IntegerMod.zero(p)))
+        (productZero : x * y = IntegerMod.zero(p))
+        : y = IntegerMod.zero(p) := {
+  obtain ⟨inverse, inverseEquation⟩
+      from IntegerMod.nonzero_invertible(p, primality, x, xNonzero);
+  -- inverseEquation : x · inverse = one. Commute to inverse · x = one.
+  claim inverseLeft : inverse * x = IntegerMod.one(p)
+      by calc inverse * x
+            = x * inverse           by IntegerMod.multiply_commutative
+            = IntegerMod.one(p);
+  calc y
+     = IntegerMod.one(p) * y               by IntegerMod.multiply_identity_left
+     = (inverse * x) * y                   by substituting inverseLeft
+     = inverse * (x * y)                   by IntegerMod.multiply_associative
+     = inverse * IntegerMod.zero(p)        by substituting productZero
+     = IntegerMod.zero(p)                  by IntegerMod.multiply_zero
+}
+
+-- ----------------------------------------------------------------------
+-- Ring identity (true at the integer-representative level):
+--   (x − 1)·(x + 1) = x·x − 1.
+theorem IntegerMod.difference_of_squares (modulus : Natural) (x : IntegerMod(modulus))
+        : (x - IntegerMod.one(modulus)) * (x + IntegerMod.one(modulus))
+          = x * x - IntegerMod.one(modulus) :=
+  by_representatives x as a =>
+    claim IntegerMod.make(modulus, (a + -Integer.one) * (a + Integer.one))
+        = IntegerMod.make(modulus, a * a + -Integer.one)
+      by substituting
+          (ring : (a + -Integer.one) * (a + Integer.one)
+              = a * a + -Integer.one)
+
+-- x² = 1 ⟹ x = 1 ∨ x = −1 in F_p. Factor:
+--   (x − 1)·(x + 1) = x² − 1 = 0,
+-- so one of the factors is zero (no zero divisors), giving x = ±1.
+theorem IntegerMod.square_one_iff (p : Natural) (primality : Natural.is_prime(p))
+        (x : IntegerMod(p))
+        (squareIsOne : x * x = IntegerMod.one(p))
+        : x = IntegerMod.one(p) ∨ x = IntegerMod.negate(IntegerMod.one(p)) := {
+  -- Using x·x = 1, the difference of squares is 1 − 1 = 0.
+  claim factorsZero
+      : (x - IntegerMod.one(p)) * (x + IntegerMod.one(p)) = IntegerMod.zero(p)
+      by calc (x - IntegerMod.one(p)) * (x + IntegerMod.one(p))
+            = x * x - IntegerMod.one(p)                 by IntegerMod.difference_of_squares
+            = IntegerMod.one(p) - IntegerMod.one(p)     by substituting squareIsOne
+            = IntegerMod.zero(p)                        by IntegerMod.add_negate_right;
+  -- A product is zero, so one factor is zero. Case-split classically on
+  -- whether the left factor x − 1 vanishes.
+  claim by cases {
+    in (x - IntegerMod.one(p) = IntegerMod.zero(p)) as leftZero:
+        -- x − 1 = 0 ⟹ x = 1 (add 1 back).
+        Or.introduceLeft(
+            calc x
+               = (x - IntegerMod.one(p)) + IntegerMod.one(p)
+                     by IntegerMod.subtract_add_cancel
+               = IntegerMod.zero(p) + IntegerMod.one(p)
+                     by substituting leftZero
+               = IntegerMod.one(p)
+                     by IntegerMod.add_identity_left)
+    in (Not(x - IntegerMod.one(p) = IntegerMod.zero(p))) as leftNonzero: {
+        -- x − 1 ≠ 0, so the other factor x + 1 must vanish (no zero
+        -- divisors), giving x = −1.
+        claim rightZero : x + IntegerMod.one(p) = IntegerMod.zero(p)
+            by IntegerMod.no_zero_divisors(p, primality,
+                   x - IntegerMod.one(p), x + IntegerMod.one(p),
+                   leftNonzero, factorsZero);
+        Or.introduceRight(
+            calc x
+               = (x + IntegerMod.one(p)) - IntegerMod.one(p)
+                     by IntegerMod.add_subtract_cancel
+               = IntegerMod.zero(p) - IntegerMod.one(p)
+                     by substituting rightZero
+               = IntegerMod.negate(IntegerMod.one(p))
+                     by IntegerMod.zero_subtract)
+    }
+  }
+}
