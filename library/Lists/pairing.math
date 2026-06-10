@@ -1,0 +1,46 @@
+-- Lists/pairing.math
+--
+-- The inverse-pair collapse step behind Wilson's theorem: in a
+-- commutative monoid, a list that rearranges to `prepend(x, prepend(y,
+-- rest))` with `x · y = one` has the same fold-product as `rest` — the
+-- pair contributes the identity and drops out. Iterating this over the
+-- nonzero elements of a field (paired by inversion) collapses their
+-- product down to its self-inverse fixed points.
+
+module Lists.pairing
+
+import Logic.basics
+import Equality.basics
+import Lists.list
+import Lists.permutation
+
+-- A list that permutes to `prepend(x, prepend(y, rest))` with `x · y =
+-- one` has the same product as `rest`: the pair `{x, y}` contributes the
+-- identity and drops out.
+theorem List.Permutation.pair_collapse (A : Type(0))
+        (multiply : A → A → A) (one : A)
+        (associativity
+            : (a b c : A) → multiply(multiply(a, b), c) = multiply(a, multiply(b, c)))
+        (commutativity : (a b : A) → multiply(a, b) = multiply(b, a))
+        (identityLeft : (a : A) → multiply(one, a) = a)
+        (x y : A) (rest list : List(A))
+        (permutation
+            : List.Permutation(A, list,
+                  List.prepend(A, x, List.prepend(A, y, rest))))
+        (pairsToOne : multiply(x, y) = one)
+        : List.product(A, multiply, one, list)
+          = List.product(A, multiply, one, rest) :=
+  calc List.product(A, multiply, one, list)
+     = List.product(A, multiply, one,
+           List.prepend(A, x, List.prepend(A, y, rest)))
+           by List.Permutation.product_invariant(A, multiply, one,
+                  associativity, commutativity, list,
+                  List.prepend(A, x, List.prepend(A, y, rest)), permutation)
+     = multiply(x, multiply(y, List.product(A, multiply, one, rest)))
+     = multiply(multiply(x, y), List.product(A, multiply, one, rest))
+           by Equality.symmetry(
+                  associativity(x, y, List.product(A, multiply, one, rest)))
+     = multiply(one, List.product(A, multiply, one, rest))
+           by substituting pairsToOne
+     = List.product(A, multiply, one, rest)
+           by identityLeft(List.product(A, multiply, one, rest))
