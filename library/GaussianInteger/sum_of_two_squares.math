@@ -93,6 +93,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
   let beta : GaussianInteger := GaussianInteger.ofCoordinates(m, -(Integer.one));
 
   claim pAtLeastTwo : 2 ≤ p by Natural.is_prime.at_least_two;
+  claim pPositive : 1 ≤ p by Natural.is_prime.positive;
 
   -- Step 1: α·β = embed(m² + 1).
   claim alphaCoordinates : coords(alpha) = Product.make(m, Integer.one)
@@ -124,8 +125,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
             = coords(GaussianInteger.embedInteger(m * m + Integer.one))
                   by productEmbedCoordinates;
   claim alphaBetaEqual : alpha * beta = GaussianInteger.embedInteger(m * m + Integer.one)
-      by GaussianInteger.coordinates_injective(alpha * beta,
-             GaussianInteger.embedInteger(m * m + Integer.one), alphaBetaCoordinates);
+      by GaussianInteger.coordinates_injective;
 
   -- Step 2: bigP divides α·β.
   obtain ⟨q, qEqual⟩ from dividesSquarePlusOne;
@@ -142,7 +142,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
   claim bigPNotDividesAlpha : ¬(Ring.divides(s, bigP, alpha))
       by (dividesAlpha : Ring.divides(s, bigP, alpha)) ↦ {
         claim Integer.divides((p : Integer), Product.second(coords(alpha)))
-            by GaussianInteger.embedInteger_divides_imaginary((p : Integer), alpha, dividesAlpha);
+            by GaussianInteger.embedInteger_divides_imaginary;
         claim imaginaryOne : Product.second(coords(alpha)) = Integer.one
             by calc Product.second(coords(alpha))
                   = Product.second(Product.make(m, Integer.one))   by substituting alphaCoordinates
@@ -153,7 +153,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
   claim bigPNotDividesBeta : ¬(Ring.divides(s, bigP, beta))
       by (dividesBeta : Ring.divides(s, bigP, beta)) ↦ {
         claim Integer.divides((p : Integer), Product.second(coords(beta)))
-            by GaussianInteger.embedInteger_divides_imaginary((p : Integer), beta, dividesBeta);
+            by GaussianInteger.embedInteger_divides_imaginary;
         claim imaginaryNegOne : Product.second(coords(beta)) = -(Integer.one)
             by calc Product.second(coords(beta))
                   = Product.second(Product.make(m, -(Integer.one)))   by substituting betaCoordinates
@@ -181,7 +181,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
                   = GaussianInteger.normNatural(Ring.zero(s))   by substituting bigPZero
                   = 0   by GaussianInteger.normNatural_zero;
         claim p ≤ p * p
-            by Natural.le_multiply_when_factor_at_least_one(p, p, Natural.is_prime.positive(p, primality));
+            by Natural.le_multiply_when_factor_at_least_one;
         claim pLessEqualZero : p ≤ 0 by substituting normEqual;
         claim twoLessEqualZero : 2 ≤ 0
             by LessOrEqual.transitive(2, p, 0, pLessEqualZero, pAtLeastTwo);
@@ -205,7 +205,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
         claim (p * p) ∣ 1 by ⟨GaussianInteger.normNatural(factor), normProduct⟩;
         claim squareEqualOne : p * p = 1 by Natural.divides_one_implies_equals_one;
         claim p ≤ p * p
-            by Natural.le_multiply_when_factor_at_least_one(p, p, Natural.is_prime.positive(p, primality));
+            by Natural.le_multiply_when_factor_at_least_one;
         claim pLessEqualOne : p ≤ 1 by substituting squareEqualOne;
         claim twoLessEqualOne : 2 ≤ 1
             by LessOrEqual.transitive(2, p, 1, pLessEqualOne, pAtLeastTwo);
@@ -243,8 +243,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
                existsB);
   claim productAndNotUnits
       : And(bigP = aG * bG, ¬(Ring.IsUnit(s, aG) ∨ Ring.IsUnit(s, bG)))
-      by Logic.not_implies_implies_and_not(bigP = aG * bG,
-             Ring.IsUnit(s, aG) ∨ Ring.IsUnit(s, bG), notImplication);
+      by Logic.not_implies_implies_and_not;
   obtain ⟨bigPFactored, notOrUnit⟩ from productAndNotUnits;
   let aGauss : GaussianInteger := aG;
   claim aGNotUnit : ¬(Ring.IsUnit(s, aG))
@@ -274,9 +273,9 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
 
   -- Step 9: norms of aG and bG are ≥ 2.
   claim aGNormAtLeastOne : 1 ≤ GaussianInteger.normNatural(aG)
-      by GaussianInteger.normNatural_positive(aG, aGNotZero);
+      by GaussianInteger.normNatural_positive;
   claim bGNormAtLeastOne : 1 ≤ GaussianInteger.normNatural(bG)
-      by GaussianInteger.normNatural_positive(bG, bGNotZero);
+      by GaussianInteger.normNatural_positive;
   claim aGNormNotOne : ¬(GaussianInteger.normNatural(aG) = 1)
       by (aGNormOne : GaussianInteger.normNatural(aG) = 1) ↦ {
         claim GaussianInteger.normInteger(aG) = Integer.one
@@ -300,11 +299,9 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
         done by bGNotUnit
       };
   claim aGNormAtLeastTwo : 2 ≤ GaussianInteger.normNatural(aG)
-      by Natural.at_least_two_of_at_least_one_and_not_one(
-             GaussianInteger.normNatural(aG), aGNormAtLeastOne, aGNormNotOne);
+      by Natural.at_least_two_of_at_least_one_and_not_one;
   claim bGNormAtLeastTwo : 2 ≤ GaussianInteger.normNatural(bG)
-      by Natural.at_least_two_of_at_least_one_and_not_one(
-             GaussianInteger.normNatural(bG), bGNormAtLeastOne, bGNormNotOne);
+      by Natural.at_least_two_of_at_least_one_and_not_one;
 
   -- Step 10: norm(aG)·norm(bG) = p², so norm(aG) = p.
   claim normProductSquare
@@ -315,9 +312,7 @@ theorem GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
             = GaussianInteger.normNatural(bigP)   by substituting bigPFactored
             = p * p   by GaussianInteger.normNatural_embedInteger_natural;
   claim aGNormEqualP : GaussianInteger.normNatural(aG) = p
-      by Natural.prime_square_factor(p, GaussianInteger.normNatural(aG),
-             GaussianInteger.normNatural(bG), primality,
-             aGNormAtLeastTwo, bGNormAtLeastTwo, normProductSquare);
+      by Natural.prime_square_factor;
 
   -- Step 11: p = re(aG)² + im(aG)².
   claim pEqualNorm : (p : Integer)
