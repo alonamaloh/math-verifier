@@ -122,6 +122,20 @@ What it eliminates:
 
 When `decide` doesn't apply: the goal mentions some OTHER decidable expression (not the user's `P`), so the head-directed search finds no `classical_decidable(P)` and the motive falls back to constant. That's fine — it's the same as the old `cases Logic.excluded_middle(P)` pattern, just spelled more clearly. Either binder name may be `_`.
 
+Two things that work and used to require `_step` helper splits (see
+Lists/filter.math for the natural style):
+
+- **Recursion in arms.** In a pattern-match definition or theorem, a
+  self-call inside a `decide` arm resolves to the induction hypothesis
+  like anywhere else in the case body.
+- **Occurrences under a Pi.** The motive abstraction sees
+  `classical_decidable(P)` on the hypothesis side of an implication
+  goal too (it unfolds Pi domains with the same gated WHNF walk as the
+  conclusion). So a lemma `member(filter(P, prepend(h, t))) → …` can
+  open directly with `decide P(h)`, and each arm `suppose`s the
+  membership at its ι-reduced form (`prepend`-form in `yes`, tail-form
+  in `no`).
+
 Error diagnostic: if the assembled `Decidable_recursor` application doesn't typecheck, the elaborator pre-checks it and dumps each of the 5 arg slots (proposition / motive / yes case / no case / scrutinee) with its inferred type, so the error points at which slot is the culprit. Generic kernel "Application: argument type does not match Pi domain" errors anywhere in the file now also print `expected type:` and `actual type:` lines.
 
 ## Introducing a disjunction — state the side, skip `Or.introduce*`
