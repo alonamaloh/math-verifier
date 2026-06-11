@@ -1,0 +1,141 @@
+-- Real/order_field.math
+--
+-- Where the order meets the field structure: a product of positives is
+-- strictly positive (nonnegativity from IsNonneg.multiply; strictness
+-- because a vanishing product with an invertible factor forces the
+-- other factor to vanish), and the midpoint machinery built on it —
+-- (x + y) · ½ lies strictly between x and y. The interval-splitting
+-- arguments (nested intervals, bisection at Real endpoints) run on
+-- these.
+
+module Real.order_field
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+
+-- ----------------------------------------------------------------------
+-- A product of strict positives is strictly positive.
+theorem Real.multiply_positive (x y : Real)
+        (xPositive : Real.zero < x) (yPositive : Real.zero < y)
+        : Real.zero < x * y := {
+  -- Nonnegativity, from the multiplicative order axiom.
+  claim Real.zero ≤ x since Real.LessThan.weaken;
+  claim Real.zero ≤ y since Real.LessThan.weaken;
+  claim xNonneg : Real.IsNonneg(x)
+      since Real.IsNonneg_of_LessOrEqual_zero;
+  claim yNonneg : Real.IsNonneg(y)
+      since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg(x * y) since Real.IsNonneg.multiply;
+  claim zeroLeqProduct : Real.zero ≤ x * y
+      since Real.LessOrEqual_zero_of_IsNonneg;
+  -- Strictness: were x · y = 0, multiplying by x's reciprocal would
+  -- force y = 0, against 0 < y.
+  claim zeroNotProduct : ¬(Real.zero = x * y)
+      by (zeroEqualsProduct : Real.zero = x * y) ↦ {
+           claim xNotZero : ¬(x = Real.zero);
+           obtain ⟨inverseX, inverseProperty⟩
+               from Real.reciprocal_exists_for_nonzero(x, xNotZero);
+           claim yIsZero : y = Real.zero
+               by calc y
+                     = Real.one * y           by ring
+                     = (x * inverseX) * y     by inverseProperty
+                     = inverseX * (x * y)     by ring
+                     = inverseX * Real.zero   by zeroEqualsProduct
+                     = Real.zero              by ring;
+           claim zeroNotY : ¬(Real.zero = y) since Real.LessThan.distinct;
+           zeroNotY(calc Real.zero = y by yIsZero)
+         };
+  And.introduction(zeroLeqProduct, zeroNotProduct)
+}
+
+-- ----------------------------------------------------------------------
+-- The midpoint of two reals.
+definition Real.midpoint (x y : Real) : Real :=
+  (x + y) * (Rational.one_half : Real)
+
+-- x < y puts the midpoint strictly between them. The two distances
+-- are each (y − x) · ½ — positive by multiply_positive — and the
+-- ½ + ½ = 1 identity feeds linear_combination for the algebra.
+theorem Real.midpoint_between (x y : Real) (xLessY : x < y)
+        : And(x < Real.midpoint(x, y), Real.midpoint(x, y) < y) := {
+  claim halfSum
+        : (Rational.one_half : Real) + (Rational.one_half : Real)
+          = (Rational.one : Real)
+      by calc (Rational.one_half : Real) + (Rational.one_half : Real)
+            = ((Rational.one_half + Rational.one_half : Rational) : Real)
+                  by Rational.to_real.add_preserves(
+                         Rational.one_half, Rational.one_half)
+            = (Rational.one : Real)
+                  by Rational.one_half_doubled;
+  claim Rational.zero < Rational.one_half
+      since Rational.one_half_positive;
+  claim Real.zero < (Rational.one_half : Real)
+      since Rational.to_real.positive_preserves;
+  claim gapPositive : Real.zero < y - x
+      by calc Real.zero
+            = x - x    by ring
+            < y - x    by Real.add_preserves_LessThan;
+  claim halfGapPositive
+        : Real.zero < (y - x) * (Rational.one_half : Real)
+      since Real.multiply_positive;
+  claim lowerPart : x < Real.midpoint(x, y)
+      by calc x
+            = x + Real.zero      by ring
+            < x + (y - x) * (Rational.one_half : Real)
+                  by Real.add_left_preserves_LessThan
+            = (x + y) * (Rational.one_half : Real)
+                  by linear_combination(x - x * halfSum);
+  claim -((y - x) * (Rational.one_half : Real)) < Real.zero
+      by calc -((y - x) * (Rational.one_half : Real))
+            = Real.zero - (y - x) * (Rational.one_half : Real)
+                  by ring
+            < (y - x) * (Rational.one_half : Real)
+                  - (y - x) * (Rational.one_half : Real)
+                  by Real.add_preserves_LessThan
+            = Real.zero    by ring;
+  claim upperPart : Real.midpoint(x, y) < y
+      by calc (x + y) * (Rational.one_half : Real)
+            = y - (y - x) * (Rational.one_half : Real)
+                  by linear_combination(y * halfSum - y)
+            = -((y - x) * (Rational.one_half : Real)) + y
+                  by ring
+            < Real.zero + y
+                  by Real.add_preserves_LessThan
+            = y    by ring;
+  And.introduction(lowerPart, upperPart)
+}
