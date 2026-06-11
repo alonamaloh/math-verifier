@@ -317,18 +317,24 @@ theorem IntegerMod.euler_fermat (n : Natural)
 
 -- ----------------------------------------------------------------------
 -- Euler's theorem over the integers (Freek #10): gcd(a, n) = 1 gives
--- n ∣ a^φ(n) − 1. (For n = 1 everything is divisible by n.)
+-- a^φ(n) ≡ 1 (mod n) — coprimality is the only hypothesis. The
+-- degenerate moduli hold on their own: φ(0) = 0 makes a^φ(0) = 1
+-- on the nose, and everything is congruent mod 1.
 theorem Natural.euler_fermat (n a : Natural)
-        (nPositive : 1 ≤ n)
         (coprime : Natural.coprime(a, n))
-        : Integer.divides((n : Integer),
-              (Natural.power(Natural.totient(n), a) : Integer) - Integer.one) :=
-  cases n refining coprime, nPositive {
+        : Integer.CongruentModulo(n,
+              (Natural.power(Natural.totient(n), a) : Integer), Integer.one) :=
+  cases n refining coprime {
     | zero => {
-        -- 1 ≤ 0 is absurd.
-        claim 1 ≤ 0 by nPositive;
-        claim impossible : False since Natural.not_less_or_equal_successor_zero;
-        absurd(impossible)
+        -- φ(0) = 0, so the power is 1 and the difference is 0.
+        claim powerIsOne : Natural.power(Natural.totient(0), a) = 1
+            by Natural.power_zero(a);
+        witness Integer.zero with
+            calc (Natural.power(Natural.totient(0), a) : Integer) - Integer.one
+               = ((1 : Natural) : Integer) - Integer.one
+                     by substituting powerIsOne
+               = ((0 : Natural) : Integer) * Integer.zero
+                     by ring
       }
     | successor(m) =>
         cases m refining coprime {
