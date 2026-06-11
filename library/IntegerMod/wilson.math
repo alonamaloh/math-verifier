@@ -219,11 +219,11 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
               List.prepend(IntegerMod(p), IntegerMod.one(p),
                   List.prepend(IntegerMod(p), minusOne, rest)),
               IntegerMod.residues_up_to(p, n))
-        by List.Permutation.symmetric;
+        since List.Permutation.symmetric;
     claim List.member(IntegerMod(p), z, IntegerMod.residues_up_to(p, n))
-        by List.Permutation.member_forward;
+        since List.Permutation.member_forward;
     claim ¬(z = IntegerMod.zero(p))
-        by IntegerMod.residues_member_nonzero;
+        since IntegerMod.residues_member_nonzero;
     obtain ⟨w, zTimesWIsOne⟩ by IntegerMod.nonzero_invertible;
     claim ¬(w = IntegerMod.zero(p))
         by (wZero : w = IntegerMod.zero(p)) ↦ {
@@ -231,7 +231,7 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
                 by calc IntegerMod.one(p)
                       = z * w                   by zTimesWIsOne
                       = z * IntegerMod.zero(p)  by substituting wZero
-                      = IntegerMod.zero(p)      by IntegerMod.multiply_zero(p, z);
+                      = IntegerMod.zero(p);
             claim IntegerMod.zero(p) = IntegerMod.one(p)
                 by calc IntegerMod.zero(p) = IntegerMod.one(p)
                       by (IntegerMod.one(p) = IntegerMod.zero(p));
@@ -240,11 +240,11 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
           };
     -- So w is itself on the residue list, hence in 1 :: −1 :: rest.
     claim List.member(IntegerMod(p), w, IntegerMod.residues_up_to(p, n))
-        by IntegerMod.residues_complete;
+        since IntegerMod.residues_complete;
     claim List.member(IntegerMod(p), w,
               List.prepend(IntegerMod(p), IntegerMod.one(p),
                   List.prepend(IntegerMod(p), minusOne, rest)))
-        by List.Permutation.member_forward;
+        since List.Permutation.member_forward;
     -- w ≠ 1: otherwise z = z·1 = 1, but 1 ∉ rest.
     claim ¬(w = IntegerMod.one(p))
         by (wIsOne : w = IntegerMod.one(p)) ↦ {
@@ -252,7 +252,7 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
                 by substituting wIsOne;
             claim zIsOne : z = IntegerMod.one(p)
                 by calc z
-                      = z * IntegerMod.one(p)   by IntegerMod.multiply_identity_right(p, z)
+                      = z * IntegerMod.one(p)
                       = IntegerMod.one(p)       by zTimesOneIsOne;
             claim oneMemberRest
                 : List.member(IntegerMod(p), IntegerMod.one(p), rest)
@@ -265,19 +265,16 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
             claim zTimesMinusOne : z * minusOne = IntegerMod.one(p)
                 by substituting wIsMinusOne;
             claim minusOneSquare : minusOne * minusOne = IntegerMod.one(p)
-                by IntegerMod.negate_one_multiply_negate_one;
+                since IntegerMod.negate_one_multiply_negate_one;
             claim zIsMinusOne : z = minusOne
                 by calc z
                       = z * IntegerMod.one(p)
-                            by IntegerMod.multiply_identity_right(p, z)
                       = z * (minusOne * minusOne)
                             by substituting minusOneSquare
                       = (z * minusOne) * minusOne
-                            by IntegerMod.multiply_associative(p, z, minusOne, minusOne)
                       = IntegerMod.one(p) * minusOne
                             by substituting zTimesMinusOne
-                      = minusOne
-                            by IntegerMod.multiply_identity_left(p, minusOne);
+                      = minusOne;
             claim minusOneMemberRest : List.member(IntegerMod(p), minusOne, rest)
                 by substituting zIsMinusOne;
             negateOneNotInRest(minusOneMemberRest)
@@ -288,7 +285,7 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
             claim z * z = IntegerMod.one(p) by rewrite(wIsZ, zTimesWIsOne);
             claim zSelfInverse
                 : z = IntegerMod.one(p) ∨ z = IntegerMod.negate(IntegerMod.one(p))
-                by IntegerMod.square_one_iff;
+                since IntegerMod.square_one_iff;
             cases zSelfInverse {
               | Or.introduceLeft(zIsOne) => {
                   claim oneMemberRest
@@ -307,9 +304,9 @@ theorem IntegerMod.wilson_pairing (p n : Natural)
     -- So w sits in rest, and is the required distinct inverse of z.
     claim List.member(IntegerMod(p), w,
               List.prepend(IntegerMod(p), minusOne, rest))
-        by List.member_of_prepend_not_head;
+        since List.member_of_prepend_not_head;
     claim wMemberRest : List.member(IntegerMod(p), w, rest)
-        by List.member_of_prepend_not_head;
+        since List.member_of_prepend_not_head;
     witness w with
         And.introduction(wMemberRest, And.introduction(zTimesWIsOne, wNotZ))
   }
@@ -328,26 +325,26 @@ theorem IntegerMod.wilson_product (p n : Natural)
   claim oneMember
       : List.member(IntegerMod(p), IntegerMod.one(p),
             IntegerMod.residues_up_to(p, n))
-      by IntegerMod.one_member_residues;
+      since IntegerMod.one_member_residues;
   obtain ⟨afterOne, oneExtracted⟩
       from List.Permutation.extract(IntegerMod(p), IntegerMod.one(p),
                IntegerMod.residues_up_to(p, n), oneMember);
   -- …then −1 (a different class, since p ≥ 3) to the front of the rest.
   claim List.member(IntegerMod(p), minusOne, IntegerMod.residues_up_to(p, n))
-      by IntegerMod.negate_one_member_residues;
+      since IntegerMod.negate_one_member_residues;
   claim List.member(IntegerMod(p), minusOne,
             List.prepend(IntegerMod(p), IntegerMod.one(p), afterOne))
-      by List.Permutation.member_forward;
+      since List.Permutation.member_forward;
   claim ¬(minusOne = IntegerMod.one(p))
       by (minusOneIsOne : minusOne = IntegerMod.one(p)) ↦ {
           claim IntegerMod.one(p) = IntegerMod.negate(IntegerMod.one(p))
               by calc IntegerMod.one(p)
                     = IntegerMod.negate(IntegerMod.one(p)) by minusOneIsOne;
-          claim False by IntegerMod.one_not_negate_one;
+          claim False since IntegerMod.one_not_negate_one;
           done
         };
   claim minusOneInAfterOne : List.member(IntegerMod(p), minusOne, afterOne)
-      by List.member_of_prepend_not_head;
+      since List.member_of_prepend_not_head;
   obtain ⟨rest, minusOneExtracted⟩
       from List.Permutation.extract(IntegerMod(p), minusOne, afterOne,
                minusOneInAfterOne);
@@ -366,21 +363,21 @@ theorem IntegerMod.wilson_product (p n : Natural)
                  minusOneExtracted));
   -- Distinctness travels along the permutation, so 1 and −1 do not recur.
   claim List.Distinct(IntegerMod(p), IntegerMod.residues_up_to(p, n))
-      by IntegerMod.residues_distinct;
+      since IntegerMod.residues_distinct;
   claim List.Distinct(IntegerMod(p),
             List.prepend(IntegerMod(p), IntegerMod.one(p),
                 List.prepend(IntegerMod(p), minusOne, rest)))
-      by List.Permutation.distinct_invariant;
+      since List.Permutation.distinct_invariant;
   claim oneNotInMinusOneRest
       : ¬(List.member(IntegerMod(p), IntegerMod.one(p),
              List.prepend(IntegerMod(p), minusOne, rest)))
-      by List.Distinct.head_not_member;
+      since List.Distinct.head_not_member;
   claim List.Distinct(IntegerMod(p), List.prepend(IntegerMod(p), minusOne, rest))
-      by List.Distinct.tail_distinct;
+      since List.Distinct.tail_distinct;
   claim ¬(List.member(IntegerMod(p), minusOne, rest))
-      by List.Distinct.head_not_member;
+      since List.Distinct.head_not_member;
   claim List.Distinct(IntegerMod(p), rest)
-      by List.Distinct.tail_distinct;
+      since List.Distinct.tail_distinct;
   claim ¬(List.member(IntegerMod(p), IntegerMod.one(p), rest))
       by (oneInRest : List.member(IntegerMod(p), IntegerMod.one(p), rest)) ↦
           oneNotInMinusOneRest(
@@ -392,7 +389,7 @@ theorem IntegerMod.wilson_product (p n : Natural)
               IntegerMod.one(p), rest, z)
       by (z : IntegerMod(p))
          (zMemberRest : List.member(IntegerMod(p), z, rest)) ↦ {
-           done by IntegerMod.wilson_pairing
+           done since IntegerMod.wilson_pairing
          };
   claim restProductOne
       : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p), rest)

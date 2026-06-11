@@ -67,12 +67,9 @@ theorem IntegerMod.negate_one_power_even (p t : Natural)
         calc IntegerMod.negate_one_power(p, successor(k) + successor(k))
            = IntegerMod.negate(IntegerMod.negate_one_power(p, k + successor(k)))
            = IntegerMod.negate(IntegerMod.negate_one_power(p, successor(k + k)))
-                 by (k + successor(k) = successor(k + k))
            = IntegerMod.negate(IntegerMod.negate(
                  IntegerMod.negate_one_power(p, k + k)))
            = IntegerMod.negate_one_power(p, k + k)
-                 by IntegerMod.negate_negate(p,
-                        IntegerMod.negate_one_power(p, k + k))
            = IntegerMod.one(p)
                  by IH
   }
@@ -110,7 +107,7 @@ theorem IntegerMod.offset_residues_product_pairs (p h : Natural)
         suppose j + 0 = h as jEquation;
         claim jEqualsH : j = h
             by calc j
-                  = j + 0   by Natural.add_zero(j)
+                  = j + 0
                   = h       by jEquation;
         -- The empty slice contributes 1 on both sides.
         calc IntegerMod.offset_residues_product(p, h, 0)
@@ -129,17 +126,17 @@ theorem IntegerMod.offset_residues_product_pairs (p h : Natural)
         -- The new top element h + (1 + count′) pairs with 1 + j across p.
         claim (h + (1 + predecessorCount)) + (1 + j) = p
             by calc (h + (1 + predecessorCount)) + (1 + j)
-                  = 1 + ((j + (1 + predecessorCount)) + h)   by ring
+                  = 1 + ((j + (1 + predecessorCount)) + h)
                   = 1 + (h + h)                              by substituting jEquation
                   = p                                        by pEquation;
         claim topPairs
             : IntegerMod.residue(p, h + (1 + predecessorCount))
               = IntegerMod.negate(IntegerMod.residue(p, 1 + j))
-            by IntegerMod.residue_negate_of_add_to_modulus;
+            since IntegerMod.residue_negate_of_add_to_modulus;
         -- The induction hypothesis applies at 1 + j.
         claim shiftedEquation : (1 + j) + predecessorCount = h
             by calc (1 + j) + predecessorCount
-                  = j + (1 + predecessorCount)   by ring
+                  = j + (1 + predecessorCount)
                   = h                            by jEquation;
         -- Pull the sign out, fold [1+j] into the factorial, and recurse.
         calc IntegerMod.offset_residues_product(p, h, successor(predecessorCount))
@@ -151,22 +148,12 @@ theorem IntegerMod.offset_residues_product_pairs (p h : Natural)
                  by substituting topPairs
            = IntegerMod.negate(IntegerMod.residue(p, 1 + j) * remainingProduct)
                  * IntegerMod.make(p, (Natural.factorial(j) : Integer))
-                 by IntegerMod.negate_multiply_left(p,
-                        IntegerMod.residue(p, 1 + j), remainingProduct)
            = IntegerMod.negate((IntegerMod.residue(p, 1 + j) * remainingProduct)
                  * IntegerMod.make(p, (Natural.factorial(j) : Integer)))
-                 by IntegerMod.negate_multiply_left(p,
-                        IntegerMod.residue(p, 1 + j) * remainingProduct,
-                        IntegerMod.make(p, (Natural.factorial(j) : Integer)))
            = IntegerMod.negate((remainingProduct * IntegerMod.residue(p, 1 + j))
                  * IntegerMod.make(p, (Natural.factorial(j) : Integer)))
-                 by IntegerMod.multiply_commutative(p,
-                        IntegerMod.residue(p, 1 + j), remainingProduct)
            = IntegerMod.negate(remainingProduct * (IntegerMod.residue(p, 1 + j)
                  * IntegerMod.make(p, (Natural.factorial(j) : Integer))))
-                 by IntegerMod.multiply_associative(p, remainingProduct,
-                        IntegerMod.residue(p, 1 + j),
-                        IntegerMod.make(p, (Natural.factorial(j) : Integer)))
            = IntegerMod.negate(remainingProduct
                  * IntegerMod.make(p,
                        (((1 + j) * Natural.factorial(j) : Natural) : Integer)))
@@ -194,7 +181,7 @@ theorem IntegerMod.residues_product_split (p h : Natural)
   claim rangeSplit
       : List.range_down(h + h)
         = List.append(Natural, List.range_down_offset(h, h), List.range_down(h))
-      by List.range_down_split;
+      since List.range_down_split;
   calc IntegerMod.residues_product(p, h + h)
      = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
            List.map(Natural, IntegerMod(p), IntegerMod.residue(p),
@@ -210,8 +197,6 @@ theorem IntegerMod.residues_product_split (p h : Natural)
                    List.range_down_offset(h, h)),
                List.map(Natural, IntegerMod(p), IntegerMod.residue(p),
                    List.range_down(h))))
-           by List.map_append(Natural, IntegerMod(p), IntegerMod.residue(p),
-                  List.range_down_offset(h, h), List.range_down(h))
      = IntegerMod.offset_residues_product(p, h, h)
            * IntegerMod.residues_product(p, h)
            by List.product_append(IntegerMod(p), IntegerMod.multiply,
@@ -248,12 +233,12 @@ theorem IntegerMod.half_factorial_square_is_negate_one (p t : Natural)
   claim wilson
       : IntegerMod.residues_product(p, h + h)
         = IntegerMod.negate(IntegerMod.one(p))
-      by IntegerMod.wilson_product;
+      since IntegerMod.wilson_product;
   claim split
       : IntegerMod.residues_product(p, h + h)
         = IntegerMod.offset_residues_product(p, h, h)
               * IntegerMod.residues_product(p, h)
-      by IntegerMod.residues_product_split;
+      since IntegerMod.residues_product_split;
   -- The pairing identity at count = h, j = 0: upper half = (−1)^h · [h!].
   claim 0 + h = h;
   claim pairedAll
@@ -261,7 +246,7 @@ theorem IntegerMod.half_factorial_square_is_negate_one (p t : Natural)
             * IntegerMod.make(p, (Natural.factorial(0) : Integer))
         = IntegerMod.negate_one_power(p, h)
             * IntegerMod.make(p, (Natural.factorial(h) : Integer))
-      by IntegerMod.offset_residues_product_pairs;
+      since IntegerMod.offset_residues_product_pairs;
   claim secondHalf
       : IntegerMod.offset_residues_product(p, h, h)
         = IntegerMod.negate_one_power(p, h)
@@ -274,18 +259,16 @@ theorem IntegerMod.half_factorial_square_is_negate_one (p t : Natural)
                   * IntegerMod.make(p, (Natural.factorial(h) : Integer))
                   by pairedAll;
   claim evenPower : IntegerMod.negate_one_power(p, t + t) = IntegerMod.one(p)
-      by IntegerMod.negate_one_power_even;
+      since IntegerMod.negate_one_power_even;
   claim factorialProduct
       : IntegerMod.residues_product(p, h)
         = IntegerMod.make(p, (Natural.factorial(h) : Integer))
-      by IntegerMod.residues_product_is_factorial;
+      since IntegerMod.residues_product_is_factorial;
   -- Assemble: [h!]² = (−1)^h · [h!] · [h!] = upper · lower = −1.
   calc IntegerMod.make(p, (Natural.factorial(h) : Integer))
            * IntegerMod.make(p, (Natural.factorial(h) : Integer))
      = (IntegerMod.one(p) * IntegerMod.make(p, (Natural.factorial(h) : Integer)))
            * IntegerMod.make(p, (Natural.factorial(h) : Integer))
-           by IntegerMod.multiply_identity_left(p,
-                  IntegerMod.make(p, (Natural.factorial(h) : Integer)))
      = (IntegerMod.negate_one_power(p, h)
            * IntegerMod.make(p, (Natural.factorial(h) : Integer)))
            * IntegerMod.make(p, (Natural.factorial(h) : Integer))
@@ -334,7 +317,6 @@ theorem IntegerMod.half_factorial_square_plus_one_divisible (p t : Natural)
                * (Natural.factorial(t + t) : Integer) + Integer.one
          = (Natural.factorial(t + t) : Integer)
                * (Natural.factorial(t + t) : Integer) - (-Integer.one)
-               by ring
          = (p : Integer) * quotient
                by differenceEquation
 }
