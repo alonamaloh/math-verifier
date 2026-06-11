@@ -698,6 +698,65 @@ ExpressionPointer Elaborator::bridgeCitedFact(
             "(or bridge by ring / rewrite / congruence to) the goal.");
     }
 
+ExpressionPointer Elaborator::citePiGoalByIntroduction(
+        const SurfaceExpression& byHint,
+        const ExpressionPointer& goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line) {
+        // Peel the goal's leading Pis into fresh local binders, in the
+        // closed-form convention LocalBinder uses: each Pi's domain is
+        // already expressed relative to the binders peeled before it.
+        std::vector<LocalBinder> extended = localBinders;
+        ExpressionPointer coreGoal = goalClosed;
+        while (auto* pi = std::get_if<Pi>(&coreGoal->node)) {
+            std::string name = pi->displayHint;
+            bool collides = name.empty();
+            for (const auto& binder : extended) {
+                if (binder.name == name) { collides = true; break; }
+            }
+            if (collides) {
+                name = "_cited_intro_"
+                    + std::to_string(extended.size() - localBinders.size());
+            }
+            extended.push_back({name, pi->domain});
+            coreGoal = pi->codomain;
+        }
+        if (extended.size() == localBinders.size()) return nullptr;
+        // Run the citation machinery against the core goal with the
+        // introduced binders in scope — automating the
+        // `(x)(h) ↦ { done by <lemma> }` wrapper idiom.
+        ExpressionPointer result;
+        ExpressionPointer hintTerm;
+        try {
+            hintTerm = elaborateExpression(byHint, extended, nullptr);
+            ExpressionPointer hintType = closeOverLocalBinders(
+                inferTypeInLocalContext(extended, hintTerm),
+                extended, extended.size());
+            result = autoFillHintForClaim(
+                hintTerm, hintType, coreGoal, extended, line);
+        } catch (...) {
+            // Mirror the claim flow's recovery against the core goal.
+            // No recursion risk: the core goal is Pi-free, so the
+            // Pi-introduction branch cannot re-fire.
+            try {
+                result = recoverClaimHint(
+                    hintTerm, byHint, coreGoal, extended, line);
+            } catch (...) {
+                return nullptr;
+            }
+        }
+        if (!result
+            || !bridgedResultProvesGoal(result, coreGoal, extended)) {
+            return nullptr;
+        }
+        for (int i = static_cast<int>(extended.size()) - 1;
+             i >= static_cast<int>(localBinders.size()); --i) {
+            result = makeLambda(extended[i].name,
+                                extended[i].type, result);
+        }
+        return result;
+    }
+
 ExpressionPointer Elaborator::recoverClaimHint(
         const ExpressionPointer& hintTerm,
         const SurfaceExpression& byHint,
@@ -745,6 +804,15 @@ ExpressionPointer Elaborator::recoverClaimHint(
                     "no declaration by that name is in scope (check the "
                     "spelling)");
             }
+        }
+        // Pi-typed goal: introduce its binders and retry the citation
+        // against the inner goal (`claim (x : T) → P by Lemma` cites Lemma
+        // at P with x in scope, wrapping the result back into a lambda).
+        if (std::get_if<Pi>(&goalClosed->node)
+            && !hintShapeIsProofTerm(byHint)) {
+            ExpressionPointer introduced = citePiGoalByIntroduction(
+                byHint, goalClosed, localBinders, line);
+            if (introduced) return introduced;
         }
         // Last-ditch recovery: re-elaborate the hint AT the goal type and
         // diff-bridge it (handles `claim f(a) = f(b) by eq` with `eq : a = b`).

@@ -3784,6 +3784,16 @@ private:
     // must propagate to the user unmasked.
     static bool hintShapeIsProofTerm(const SurfaceExpression& byHint);
 
+    // Cite a lemma against a Pi-typed goal by introducing the goal's
+    // binders and running the citation machinery on the core goal, then
+    // wrapping the result in lambdas. Returns nullptr when the citation
+    // doesn't close the core goal either.
+    ExpressionPointer citePiGoalByIntroduction(
+        const SurfaceExpression& byHint,
+        const ExpressionPointer& goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line);
+
     ExpressionPointer recoverClaimHint(
         const ExpressionPointer& hintTerm,
         const SurfaceExpression& byHint,
