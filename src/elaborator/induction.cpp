@@ -420,10 +420,7 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
         // make the kernel reject the Pi-typed result mid-elaboration,
         // before autoFillHintForClaim gets to bridge the gap.
         bool propagateExpectedTypeToHint =
-            std::holds_alternative<SurfaceLambda>(claim.byHint->node)
-            || std::holds_alternative<SurfaceLet>(claim.byHint->node)
-            || std::holds_alternative<SurfaceRing>(claim.byHint->node)
-            || std::holds_alternative<SurfaceField>(claim.byHint->node);
+            hintShapeIsProofTerm(*claim.byHint);
         const char* claimSizeFlag = std::getenv("MATH_CLAIM_SIZES");
         bool dumpClaimSize = claimSizeFlag && claimSizeFlag[0] != '\0'
             && claimSizeFlag[0] != '0';
@@ -446,17 +443,30 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
             result = autoFillHintForClaim(
                 hintTerm, hintType, goalClosed, localBinders, line);
         } catch (const ElaborateError&) {
-            // The hint didn't fill against the goal directly. Either it is a
-            // cited fact `by (P)` (a Proposition — prove it, then bridge its
-            // proof to the goal), or an ordinary hint that needs the diff-
-            // congruence path on a goal-typed re-elaboration — the behaviour
-            // the named (`let`-style) claim path always provided. Having both
-            // strategies here is what makes `claim NAME : T by …` and
-            // `claim T by …` elaborate identically (the name only adds a
-            // binding); e.g. `claim f(a) = f(b) by eq` with `eq : a = b`.
+            // A proof-TERM hint (a lambda or a block, or ring/field) whose
+            // own elaboration failed has no recovery: recoverClaimHint
+            // would just re-elaborate the identical term and fail again,
+            // masking the genuinely informative inner error (the failing
+            // claim inside the body) behind the generic citation message.
+            // Re-throw the inner error instead — it is the real one.
+            if (!hintTerm && hintShapeIsProofTerm(*claim.byHint)) {
+                throw;
+            }
+            // Otherwise: the hint didn't fill against the goal directly.
+            // Either it is a cited fact `by (P)` (a Proposition — prove it,
+            // then bridge its proof to the goal), or an ordinary hint that
+            // needs the diff-congruence path on a goal-typed re-elaboration —
+            // the behaviour the named (`let`-style) claim path always
+            // provided. Having both strategies here is what makes
+            // `claim NAME : T by …` and `claim T by …` elaborate identically
+            // (the name only adds a binding); e.g. `claim f(a) = f(b) by eq`
+            // with `eq : a = b`.
             result = recoverClaimHint(
                 hintTerm, *claim.byHint, goalClosed, localBinders, line);
         } catch (const TypeError&) {
+            if (!hintTerm && hintShapeIsProofTerm(*claim.byHint)) {
+                throw;
+            }
             result = recoverClaimHint(
                 hintTerm, *claim.byHint, goalClosed, localBinders, line);
         }
@@ -557,6 +567,13 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
             }
         }
         return result;
+    }
+
+bool Elaborator::hintShapeIsProofTerm(const SurfaceExpression& byHint) {
+        return std::holds_alternative<SurfaceLambda>(byHint.node)
+            || std::holds_alternative<SurfaceLet>(byHint.node)
+            || std::holds_alternative<SurfaceRing>(byHint.node)
+            || std::holds_alternative<SurfaceField>(byHint.node);
     }
 
 ExpressionPointer Elaborator::autoFillHintForClaim(

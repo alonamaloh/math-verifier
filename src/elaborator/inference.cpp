@@ -791,7 +791,7 @@ ExpressionPointer Elaborator::recoverClaimHint(
             }
         }
         std::string nameQuoted =
-            hintName.empty() ? "the `by` hint" : ("`" + hintName + "`");
+            hintName.empty() ? "`by` hint" : ("`" + hintName + "`");
         std::string message =
             "the " + nameQuoted
             + " citation does not prove this goal\n    goal:        "

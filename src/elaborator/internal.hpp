@@ -3777,6 +3777,13 @@ private:
     // its proof to the goal; otherwise fall back to the diff-congruence path
     // on the hint re-elaborated at the goal type — the behaviour the named-
     // claim path always had.
+    // True when a `by` hint is a proof TERM rather than a citation: a
+    // lambda, a `{ … }` block (SurfaceLet chain), or ring/field. These
+    // shapes elaborate directly at the goal type; the citation/recovery
+    // machinery never applies to them, so their inner elaboration errors
+    // must propagate to the user unmasked.
+    static bool hintShapeIsProofTerm(const SurfaceExpression& byHint);
+
     ExpressionPointer recoverClaimHint(
         const ExpressionPointer& hintTerm,
         const SurfaceExpression& byHint,
