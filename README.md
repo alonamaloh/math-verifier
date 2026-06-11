@@ -27,6 +27,8 @@ kernel terms that the kernel rechecks.
 
 ```
 make -j 16 library     # verify all .math files in library/
+make -j 16 tests       # also verify the Test/ feature files
+make error-tests       # error-message regression suite
 ./kernel               # unit tests (kernel + elaborator)
 ```
 
@@ -89,8 +91,11 @@ library/
   RingModulo/                     generic quotient ring R/(ideal)
   ComplexNumber/                  ℂ = ℝ[x]/(x²+1)
   FiniteField/                    F_{p^k} = F_p[x]/(f) for irreducible f
-  Lists/                          basic list machinery
+  GaussianInteger/                ℤ[i] = ℤ[x]/(x²+1); Euclidean; two squares
+  Lists/                          polymorphic lists: products, permutations,
+                                  ranges, filter, distinctness
   Test/                           small files exercising individual features
+  ErrorTest/                      error-message regressions (`make error-tests`)
 ```
 
 Imports flow up the dependency layers: a file in `Integer/` can import
@@ -109,14 +114,21 @@ Imports flow up the dependency layers: a file in `Integer/` can import
   inverse-preservation, composition), subgroups, the kernel and image
   of a homomorphism, and injectivity ⟺ trivial kernel.
 - **Natural:** arithmetic, order, divisibility, Bezout, Euclidean
-  algorithm, GCD, factorization, primes, p-adic valuation.
-- **Integer:** commutative ring via the (a, b) representative quotient.
-- **IntegerMod:** ℤ/(n) as a quotient; ring structure.
+  algorithm, GCD, factorization, primes, p-adic valuation, factorial,
+  Euler's totient; the fundamental theorem of arithmetic.
+- **Integer:** commutative ring via the (a, b) representative quotient;
+  Euclidean division; sign / absolute value.
+- **IntegerMod:** ℤ/(n) as a quotient; ring structure; **F_p is a field
+  for prime p**; canonical representatives; the unit group of ℤ/n
+  characterised by coprimality.
 - **Rational:** field via (numerator : Integer, denominatorMinusOne : ℕ).
   Order; absolute value; halving; reciprocal; triangle inequality.
-- **Real:** Cauchy sequences of Rationals; addition, multiplication,
-  negation; order; **field instance**; completeness (suprema of
-  bounded-above nonempty sets via bisection).
+- **Real:** Cauchy sequences of Rationals — and a **fully proven
+  complete-ordered-field interface** (field, total order compatible
+  with + and ×, suprema of bounded-above nonempty sets, an
+  order-embedded ℚ), after which downstream development never touches
+  the quotient. Analysis is under way on top: limit arithmetic and the
+  monotone convergence theorem.
 - **PAdic:** p-adic-Cauchy sequences of Rationals; full
   commutative-ring instance; honest p-adic absolute value; embedding.
 - **Polynomial:** polynomials over a ring; degree, division with
@@ -125,6 +137,17 @@ Imports flow up the dependency layers: a file in `Integer/` can import
 - **ComplexNumber:** ℂ = ℝ[x]/(x²+1) — commutative ring and field
   (x²+1 irreducible over ℝ), i² = −1, injective ℝ ↪ ℂ.
 - **FiniteField:** F_{p^k} = F_p[x]/(f) is a field for irreducible f.
+- **GaussianInteger:** ℤ[i] via the generic RingModulo; coordinates,
+  norm, units, Euclidean structure.
+- **Set:** finite-cardinality layer — equinumerosity, sizes, the sum
+  and product rules, pigeonhole; Cantor's theorem and enumerability.
+
+Headline theorems (Freek Wiedijk's "100 theorems" tally — eight so
+far): irrationality of √2 (#1), Euler's totient theorem (#10),
+infinitude of primes (#11), **Fermat's two-squares theorem** (#20,
+primes ≡ 1 mod 4, via Wilson + descent in ℤ[i]), **Wilson's theorem
+with its converse** (#51), Cantor's theorem (#63), the Euclidean
+algorithm (#69), and the fundamental theorem of arithmetic (#80).
 
 ## Elaborator features at a glance
 
@@ -132,8 +155,9 @@ The patterns are documented in detail in `CLAUDE.md`. Highlights:
 
 - **`ring` / `field` tactics.** `ring` normalises any commutative-ring
   identity (distributivity, AC-rearrangement, like-term collection at
-  signed integer coefficients, cancellation, Integer literals) over any
-  carrier with an `IsRing` instance — including an abstract bundled
+  signed integer coefficients, cancellation, numeric literals — Peano
+  numerals fold on Natural, where `successor(e)` reads as `1 + e`) over
+  any carrier with an `IsRing` instance — including an abstract bundled
   ring. `field(h₁, …)` extends it with reciprocal side-relations from
   nonzero hypotheses, and `linear_combination(e)` closes a ring
   equality from a linear combination of equational hypotheses.
@@ -156,6 +180,15 @@ The patterns are documented in detail in `CLAUDE.md`. Highlights:
   implicit structure/operation/instance arguments get them filled at
   concrete call sites (and from unique in-scope hypotheses for abstract
   carriers).
+- **Argument-free citation.** `claim P since <Lemma>` infers every
+  argument: data args from the goal, proof premises discharged from
+  in-scope hypotheses (with back-inference for arguments that occur
+  only in premises). This extends to Pi-typed goals (binders are
+  introduced and the citation runs on the core goal) and to lemmas
+  quantified over a predicate (`P(x)` conclusions recover `P` from the
+  premises, unfolding folded definitions one δ-step at a time). For
+  `obtain … by` / `cases by` — where no goal validates the choice — an
+  ambiguous premise match is an error listing the candidates.
 - **Statement-level proof sugar.** `claim`/`goal`/`obtain`/`choose`/
   `take`/`suppose`/`let`/`note`/`change` compose as math prose;
   `by_induction on n with IH`, `by_strong_induction on n with IH`, and
@@ -194,9 +227,18 @@ These have been load-bearing decisions that show up everywhere:
 
 ## Where to go for more
 
-- `CLAUDE.md` — the idiomatic patterns for writing proofs in this
-  library, kept up to date for both humans and assistant sessions.
+- `docs/tutorial.md` — a 10-minute, example-driven introduction to
+  writing proofs; start here.
+- `docs/reference.md` — a catalogue of every surface construct;
+  `docs/style.md` and `docs/conventions/` — how to make a proof read
+  well; `docs/library.md` — a map of `library/` by mathematical area.
+- `CLAUDE.md` — the always-apply project conventions (an index into
+  `docs/conventions/`), kept up to date for both humans and assistant
+  sessions.
+- `docs/error_message_corpus.md` — the data-driven error-message
+  improvement workflow (capture → diagnose → fix → regression).
 - `TODO.md` — planned work, in priority/dependency order.
+- `LUX_PLAN.md` — design for a planned higher-level proof surface.
 - `HASH_USE_VS_LEAN.md` — design note pinning down where our
   subtree-hashing plan lines up with Lean's and where it diverges.
 - `library/Test/` — small files that exercise individual elaborator
