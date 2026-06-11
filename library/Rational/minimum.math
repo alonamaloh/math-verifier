@@ -1,0 +1,85 @@
+-- Rational/minimum.math
+--
+-- The minimum of two Rationals. The comparison is decided classically
+-- (Logic.classical_decidable), so the definition is split into a
+-- decidability-parametrized core plus the classical wrapper — the same
+-- shape as Real.bisectionStepWithDec: a proof that case-analyzes the
+-- decision (via `decide`) sees each arm ι-reduce to the chosen
+-- endpoint.
+
+module Rational.minimum
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Integer.basics
+import Integer.embedding
+import Integer.negation
+import Integer.order
+import Integer.sign
+import Integer.absolute_value
+import Rational.basics
+import Rational.addition
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.absolute_value
+import Rational.linearity
+
+-- The core, parametrized by the decision on a ≤ b.
+definition Rational.minimumWithDecision
+        (a b : Rational) (decision : Logic.Decidable(a ≤ b))
+        : Rational :=
+  cases decision {
+    | Logic.Decidable.yes(_) => a
+    | Logic.Decidable.no(_)  => b
+  }
+
+-- min(a, b): the smaller of the two.
+definition Rational.minimum (a b : Rational) : Rational :=
+  Rational.minimumWithDecision(a, b, Logic.classical_decidable(a ≤ b))
+
+-- min(a, b) ≤ a. When a ≤ b the minimum is a itself; otherwise it is
+-- b, and ¬(a ≤ b) forces b ≤ a by linearity of the order.
+theorem Rational.minimum_LessOrEqual_left
+        (a b : Rational) : Rational.minimum(a, b) ≤ a :=
+  decide a ≤ b {
+    | yes _ => {
+        note goal : a ≤ a;
+        done since Rational.LessOrEqual.reflexive
+      }
+    | no notALeqB => {
+        note goal : b ≤ a;
+        cases Rational.LessOrEqual.linear(a, b) {
+          | Or.introduceLeft(aLeqB)  => absurd(notALeqB(aLeqB))
+          | Or.introduceRight(bLeqA) => bLeqA
+        }
+      }
+  }
+
+-- min(a, b) ≤ b. Symmetric: the yes arm is the hypothesis itself.
+theorem Rational.minimum_LessOrEqual_right
+        (a b : Rational) : Rational.minimum(a, b) ≤ b :=
+  decide a ≤ b {
+    | yes aLeqB => aLeqB
+    | no _ => {
+        note goal : b ≤ b;
+        done since Rational.LessOrEqual.reflexive
+      }
+  }
+
+-- The minimum of two positives is positive: whichever endpoint the
+-- decision picks, its positivity hypothesis is already in context.
+theorem Rational.minimum_positive
+        (a b : Rational)
+        (aPositive : Rational.zero < a) (bPositive : Rational.zero < b)
+        : Rational.zero < Rational.minimum(a, b) :=
+  decide a ≤ b {
+    | yes _ => aPositive
+    | no  _ => bPositive
+  }
