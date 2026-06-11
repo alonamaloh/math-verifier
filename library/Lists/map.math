@@ -68,6 +68,24 @@ theorem List.map_member_invert (A B : Type(0)) (f : A → B) (b : B)
           }
         }
 
+-- If `head ∉ tail` and `f` is injective at `head` relative to the members
+-- of `tail`, then `f(head) ∉ map(f, tail)`. (The local-injectivity form a
+-- map like k ↦ [k] mod p — injective on 1..p−1 but not globally — needs.)
+theorem List.not_member_map_of_not_member_on (A B : Type(0)) (f : A → B)
+        (head : A) (tail : List(A))
+        (injectiveAtHead
+            : (x : A) → List.member(A, x, tail) → f(x) = f(head) → x = head)
+        (notMember : ¬(List.member(A, head, tail)))
+        : ¬(List.member(B, f(head), List.map(A, B, f, tail))) :=
+  (memberImage : List.member(B, f(head), List.map(A, B, f, tail))) ↦ {
+      obtain ⟨a, aProperties⟩
+          from List.map_member_invert(A, B, f, f(head), tail, memberImage);
+      let ⟨aMember, faEqual⟩ := aProperties;
+      claim aEqualHead : a = head by injectiveAtHead(a, aMember, faEqual);
+      claim headInTail : List.member(A, head, tail) by substituting aEqualHead;
+      notMember(headInTail)
+    }
+
 -- If `head ∉ tail` and `f` is injective, then `f(head) ∉ map(f, tail)`.
 theorem List.not_member_map_of_not_member (A B : Type(0)) (f : A → B)
         (injective : (x y : A) → f(x) = f(y) → x = y)

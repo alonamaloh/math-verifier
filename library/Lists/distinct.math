@@ -93,7 +93,7 @@ theorem List.Permutation.distinct_invariant (A : Type(0)) (l1 l2 : List(A))
       (distinct : List.Distinct(A, List.prepend(A, x, a))) ↦ {
         -- x does not recur in a, hence (transporting along the
         -- permutation) not in b either; the tails stay distinct.
-        claim xNotInA : ¬(List.member(A, x, a))
+        claim ¬(List.member(A, x, a))
             by List.Distinct.head_not_member;
         claim aDistinct : List.Distinct(A, a)
             by List.Distinct.tail_distinct;
@@ -107,7 +107,7 @@ theorem List.Permutation.distinct_invariant (A : Type(0)) (l1 l2 : List(A))
         -- Unpack: x ∉ y::l, y ∉ l, and l is distinct.
         claim xNotInYL : ¬(List.member(A, x, List.prepend(A, y, l)))
             by List.Distinct.head_not_member;
-        claim ylDistinct : List.Distinct(A, List.prepend(A, y, l))
+        claim List.Distinct(A, List.prepend(A, y, l))
             by List.Distinct.tail_distinct;
         claim yNotInL : ¬(List.member(A, y, l))
             by List.Distinct.head_not_member;
@@ -161,6 +161,60 @@ theorem List.range_down_distinct (n : Natural)
             List.range_down(predecessor), notMember, IH)
       }
   }
+
+-- As `map_distinct` below, but requiring injectivity only on the members
+-- of the list. (k ↦ [k] mod p is not globally injective — [0] = [p] — yet
+-- on the members of range_down(p−1) it is, and that is all this asks.)
+theorem List.map_distinct_on (A B : Type(0)) (f : A → B)
+        : (list : List(A))
+          → ((x y : A) → List.member(A, x, list) → List.member(A, y, list)
+                 → f(x) = f(y) → x = y)
+          → List.Distinct(A, list)
+          → List.Distinct(B, List.map(A, B, f, list))
+  | List.empty =>
+      (injectiveOnList
+          : (x y : A) → List.member(A, x, List.empty(A))
+              → List.member(A, y, List.empty(A)) → f(x) = f(y) → x = y)
+      (distinct : List.Distinct(A, List.empty(A))) ↦
+        List.Distinct.empty(B)
+  | List.prepend(head, tail) =>
+      (injectiveOnList
+          : (x y : A) → List.member(A, x, List.prepend(A, head, tail))
+              → List.member(A, y, List.prepend(A, head, tail))
+              → f(x) = f(y) → x = y)
+      (distinct : List.Distinct(A, List.prepend(A, head, tail))) ↦ {
+        -- Restrict the injectivity hypothesis to the tail's members, and
+        -- to comparisons against the head.
+        claim injectiveOnTail
+            : (x y : A) → List.member(A, x, tail) → List.member(A, y, tail)
+                → f(x) = f(y) → x = y
+            by (x y : A)
+               (xMember : List.member(A, x, tail))
+               (yMember : List.member(A, y, tail))
+               (imagesEqual : f(x) = f(y)) ↦
+                 injectiveOnList(x, y,
+                     List.member.there(A, x, head, tail, xMember),
+                     List.member.there(A, y, head, tail, yMember),
+                     imagesEqual);
+        claim (x : A) → List.member(A, x, tail) → f(x) = f(head) → x = head
+            by (x : A)
+               (xMember : List.member(A, x, tail))
+               (imagesEqual : f(x) = f(head)) ↦
+                 injectiveOnList(x, head,
+                     List.member.there(A, x, head, tail, xMember),
+                     List.member.here(A, head, tail),
+                     imagesEqual);
+        claim ¬(List.member(A, head, tail))
+            by List.Distinct.head_not_member;
+        claim tailDistinct : List.Distinct(A, tail)
+            by List.Distinct.tail_distinct;
+        claim imageHeadNotInImageTail
+            : ¬(List.member(B, f(head), List.map(A, B, f, tail)))
+            by List.not_member_map_of_not_member_on;
+        List.Distinct.prepend(B, f(head), List.map(A, B, f, tail),
+            imageHeadNotInImageTail,
+            List.map_distinct_on(A, B, f, tail, injectiveOnTail, tailDistinct))
+      }
 
 -- An injective map preserves distinctness.
 theorem List.map_distinct (A B : Type(0)) (f : A → B)
