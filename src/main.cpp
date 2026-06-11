@@ -3554,9 +3554,9 @@ theorem caller (P Q : Proposition) (h : Q) : Q := pick_b(h)
     // Universe-inference footgun: a saturated call to a
     // universe-polymorphic constant whose universe parameter appears
     // ONLY in the result (never in a value-argument type) cannot be
-    // pinned from the arguments. It used to default silently to level 0;
-    // it must now report a clear, actionable error naming the call and
-    // suggesting an explicit `.{...}`.
+    // pinned from the arguments. It must report a clear, actionable
+    // error naming the call and suggesting an explicit `.{...}` —
+    // never silently default to level 0.
     expectErrorContains(R"(
 module Test.errors_uninferred_universe
 
@@ -5226,8 +5226,8 @@ int verifyWithCache(const std::string& sourcePath,
         // Prefer the dependency's interface cache: a downstream file's
         // verification depends only on its imports' interfaces (declaration
         // types + transparent bodies + registries), never on their proof
-        // bodies. Fall back to the full cache if no interface exists (e.g.
-        // a legacy --deps path), preserving old behaviour.
+        // bodies. Fall back to the full cache if no interface exists
+        // (e.g. a --deps entry that names a full cache directly).
         std::string loadPath = dependency + ".iface";
         if (!std::filesystem::exists(loadPath)) {
             loadPath = dependency;
@@ -6204,7 +6204,7 @@ int main(int argc, char* argv[]) {
         // exercise the unmemoised fuel/throw contract directly.
         kernelCacheEnabled = true;
         // Two forms:
-        //   kernel verify FILE.math FILE.math ...                  (legacy)
+        //   kernel verify FILE.math FILE.math ...                  (positional form)
         //   kernel verify --source SRC --output OUT.mathv \        (cache form)
         //                  [--deps DEP.mathv DEP.mathv ...]
         bool useFlags = false;
