@@ -44,17 +44,17 @@ theorem List.filter_member_subset (A : Type(0)) (P : A → Proposition) (x : A)
             -- The head was kept: the membership is in the prepend form.
             suppose List.member(A, x,
                 List.prepend(A, head, List.filter(A, P, tail))) as mem;
-            claim split : x = head ∨ List.member(A, x, List.filter(A, P, tail))
+            claim x = head ∨ List.member(A, x, List.filter(A, P, tail))
                 since List.member_prepend_invert;
-            cases split {
-              | Or.introduceLeft(xIsHead) => {
+            claim by cases {
+              in (x = head) as xIsHead: {
                   claim List.member(A, head, List.prepend(A, head, tail))
                       by List.member.here(A, head, tail);
                   claim List.member(A, x, List.prepend(A, head, tail))
                       by substituting xIsHead;
                   done
                 }
-              | Or.introduceRight(memberFilteredTail) =>
+              in (List.member(A, x, List.filter(A, P, tail))) as memberFilteredTail:
                   List.member.there(A, x, head, tail,
                       List.filter_member_subset(A, P, x, tail, memberFilteredTail))
             }
@@ -80,15 +80,15 @@ theorem List.filter_member_property (A : Type(0)) (P : A → Proposition) (x : A
         | yes propertyWitness => {
             suppose List.member(A, x,
                 List.prepend(A, head, List.filter(A, P, tail))) as mem;
-            claim split : x = head ∨ List.member(A, x, List.filter(A, P, tail))
+            claim x = head ∨ List.member(A, x, List.filter(A, P, tail))
                 since List.member_prepend_invert;
-            cases split {
-              | Or.introduceLeft(xIsHead) => {
+            claim by cases {
+              in (x = head) as xIsHead: {
                   -- x is the kept head, and the decision carries P(head).
                   claim P(x) by substituting xIsHead;
                   done
                 }
-              | Or.introduceRight(memberFilteredTail) =>
+              in (List.member(A, x, List.filter(A, P, tail))) as memberFilteredTail:
                   List.filter_member_property(A, P, x, tail, memberFilteredTail)
             }
           }
@@ -115,8 +115,10 @@ theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A
             suppose List.member(A, x, List.prepend(A, head, tail)) as mem;
             suppose P(x) as property;
             -- The head is kept: place x in the prepend form.
-            cases List.member_prepend_invert(A, x, head, tail, mem) {
-              | Or.introduceLeft(xIsHead) => {
+            claim x = head ∨ List.member(A, x, tail)
+                since List.member_prepend_invert;
+            claim by cases {
+              in (x = head) as xIsHead: {
                   claim List.member(A, head,
                             List.prepend(A, head, List.filter(A, P, tail)))
                       by List.member.here(A, head, List.filter(A, P, tail));
@@ -125,7 +127,7 @@ theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A
                       by substituting xIsHead;
                   done
                 }
-              | Or.introduceRight(memberTail) =>
+              in (List.member(A, x, tail)) as memberTail:
                   List.member.there(A, x, head, List.filter(A, P, tail),
                       List.filter_member_complete(A, P, x, tail, memberTail, property))
             }
@@ -134,13 +136,15 @@ theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A
             suppose List.member(A, x, List.prepend(A, head, tail)) as mem;
             suppose P(x) as property;
             -- The head is dropped: x must sit in the filtered tail.
-            cases List.member_prepend_invert(A, x, head, tail, mem) {
-              | Or.introduceLeft(xIsHead) => {
+            claim x = head ∨ List.member(A, x, tail)
+                since List.member_prepend_invert;
+            claim by cases {
+              in (x = head) as xIsHead: {
                   -- x is the dropped head, yet P(x) holds — absurd.
                   claim propertyAtHead : P(head) by substituting xIsHead;
                   absurd(propertyFails(propertyAtHead))
                 }
-              | Or.introduceRight(memberTail) =>
+              in (List.member(A, x, tail)) as memberTail:
                   List.filter_member_complete(A, P, x, tail, memberTail, property)
             }
           }
