@@ -1,0 +1,91 @@
+-- Natural/totient.math
+--
+-- Coprimality and Euler's totient function. Two naturals are coprime
+-- when 1 is their greatest common divisor; φ(n) is the number of
+-- integers in [1, n] coprime to n, defined directly as the length of
+-- the filtered range — the list `coprime_residues(n)` doubles as the
+-- enumeration of the units of ℤ/n for Euler's theorem (Freek #10).
+
+module Natural.totient
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.divisibility
+import Natural.gcd
+import Natural.bezout
+import Natural.euclid
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.embedding
+import Integer.ring
+import Lists.list
+import Lists.length
+import Lists.range
+import Lists.filter
+
+-- a and b are coprime when 1 is their greatest common divisor.
+definition Natural.coprime (a b : Natural) : Proposition :=
+  Natural.is_gcd(1, a, b)
+
+-- The integers in [1, n] coprime to n — for n ≥ 1 these represent
+-- exactly the units of ℤ/n.
+definition Natural.coprime_residues (n : Natural) : List(Natural) :=
+  List.filter(Natural, (k : Natural) ↦ Natural.coprime(k, n),
+      List.range_down(n))
+
+-- Euler's totient: φ(n) = #{1 ≤ k ≤ n : gcd(k, n) = 1}.
+definition Natural.totient (n : Natural) : Natural :=
+  List.length(Natural, Natural.coprime_residues(n))
+
+-- ----------------------------------------------------------------------
+-- A common divisor of coprime numbers is 1 (the defining property,
+-- unfolded once here so callers never touch the is_gcd record).
+theorem Natural.coprime_divisor_is_one (d a b : Natural)
+        (coprime : Natural.coprime(a, b))
+        (dividesA : d ∣ a) (dividesB : d ∣ b)
+        : d = 1 := {
+  obtain ⟨oneDividesA, remainder⟩ from coprime;
+  let ⟨oneDividesB, greatest⟩ := remainder;
+  claim d ∣ 1 by greatest(d, dividesA, dividesB);
+  done since Natural.one_is_only_divisor_of_one
+}
+
+-- n is never coprime to itself except for n = 1.
+theorem Natural.coprime_self_is_one (n : Natural)
+        (coprimeSelf : Natural.coprime(n, n))
+        : n = 1 := {
+  claim n ∣ n since Natural.divides_reflexive;
+  done since Natural.coprime_divisor_is_one
+}
+
+-- 0 is coprime to n only for n = 1 (every n divides 0 and n).
+theorem Natural.coprime_zero_is_one (n : Natural)
+        (coprimeZero : Natural.coprime(0, n))
+        : n = 1 := {
+  claim n ∣ 0 since Natural.divides_zero;
+  claim n ∣ n since Natural.divides_reflexive;
+  done since Natural.coprime_divisor_is_one
+}
+
+-- ----------------------------------------------------------------------
+-- Bezout's identity at coprime arguments: the gcd produced by
+-- `Natural.bezout` divides both a and n, hence is 1.
+theorem Natural.coprime_bezout (a n : Natural)
+        (coprime : Natural.coprime(a, n))
+        : ∃ (x : Integer). ∃ (y : Integer).
+            (a : Integer) * x + (n : Integer) * y = Integer.one := {
+  obtain ⟨gcdValue, x, y, properties⟩ from Natural.bezout(a, n);
+  let ⟨bezoutEquation, gcdProperty⟩ := properties;
+  obtain ⟨gcdDividesA, remainder⟩ from gcdProperty;
+  let ⟨gcdDividesN, greatest⟩ := remainder;
+  claim gcdIsOne : gcdValue = 1 since Natural.coprime_divisor_is_one;
+  ⟨x, ⟨y, calc (a : Integer) * x + (n : Integer) * y
+              = (gcdValue : Integer)   by bezoutEquation
+              = Integer.one            by substituting gcdIsOne⟩⟩
+}
