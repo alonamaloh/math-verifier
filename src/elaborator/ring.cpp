@@ -131,6 +131,20 @@ std::optional<uint64_t> Elaborator::evaluateFingerprint(
             }
         }
     }
+    // Bare Natural literal / successor — mirrors the normaliser's
+    // literal recognition on the Natural carrier.
+    if (carrierName == "Natural") {
+        int literalValue = 0;
+        if (tryParseNaturalLiteral(expression, literalValue)) {
+            return uint64_t(literalValue) % kFingerprintModulus;
+        }
+        ExpressionPointer successorInner;
+        if (tryParseNaturalSuccessor(expression, successorInner)) {
+            auto value = evaluateFingerprint(successorInner, carrierName);
+            if (!value) return std::nullopt;
+            return fingerprintAdd(*value, uint64_t{1});
+        }
+    }
     // Otherwise: opaque atom. Use the cached subtree hash mod p.
     return expression->hash % kFingerprintModulus;
 }
@@ -396,6 +410,21 @@ uint64_t Elaborator::evalRingMod(
                         }
                     }
                 }
+            }
+        }
+        // Bare Natural literal / successor — mirrors the normaliser's
+        // literal recognition on the Natural carrier.
+        if (carrierName == "Natural") {
+            int literalValue = 0;
+            if (tryParseNaturalLiteral(expression, literalValue)) {
+                return uint64_t(literalValue) % modulus;
+            }
+            ExpressionPointer successorInner;
+            if (tryParseNaturalSuccessor(expression, successorInner)) {
+                uint64_t inner = evalRingMod(successorInner, carrierName,
+                    addName, multiplyName, negateName, subtractName,
+                    zeroName, oneName, modulus);
+                return (inner + 1) % modulus;
             }
         }
         // Atom: use the cached bottom-up structural hash. Two
@@ -2346,6 +2375,16 @@ bool Elaborator::tryParseNaturalLiteral(
         return true;
     }
 
+bool Elaborator::tryParseNaturalSuccessor(
+        ExpressionPointer expression, ExpressionPointer& innerOut) {
+        auto* app = std::get_if<Application>(&expression->node);
+        if (!app) return false;
+        auto* head = std::get_if<Constant>(&app->function->node);
+        if (!head || head->name != "successor") return false;
+        innerOut = app->argument;
+        return true;
+    }
+
 bool Elaborator::tryParseCarrierEmbeddedNaturalLiteral(
         ExpressionPointer expression,
         const RingNormalisationContext& context,
@@ -2430,6 +2469,22 @@ ExpressionPointer Elaborator::buildNaturalLiteralKernel(int value) {
                 makeConstant("successor"), std::move(expr));
         }
         return expr;
+    }
+
+ExpressionPointer Elaborator::buildRingZeroKernel(
+        const RingNormalisationContext& context) {
+        if (context.carrierName == "Natural") {
+            return buildNaturalLiteralKernel(0);
+        }
+        return ringConst(context.zeroName);
+    }
+
+ExpressionPointer Elaborator::buildRingOneKernel(
+        const RingNormalisationContext& context) {
+        if (context.carrierName == "Natural") {
+            return buildNaturalLiteralKernel(1);
+        }
+        return ringConst(context.oneName);
     }
 
 Elaborator::RingPolynomial Elaborator::normaliseToRingPolynomial(
@@ -2524,6 +2579,27 @@ Elaborator::RingPolynomial Elaborator::normaliseToRingPolynomial(
                 return ringPolynomialMultiply(scalarPoly, atomPoly);
             }
         }
+        // Bare Natural literal / successor — only on the Natural carrier,
+        // whose numerals are constructor towers rather than carrier-named
+        // constants. A literal successor^k(zero) is the constant k;
+        // successor(e) is definitionally 1 + e.
+        if (context.carrierName == "Natural") {
+            int literalValue = 0;
+            if (tryParseNaturalLiteral(expression, literalValue)) {
+                RingPolynomial polynomial;
+                if (literalValue > 0) {
+                    polynomial[RingMonomialSignature{}] = literalValue;
+                }
+                return polynomial;
+            }
+            ExpressionPointer successorInner;
+            if (tryParseNaturalSuccessor(expression, successorInner)) {
+                RingPolynomial polynomial =
+                    normaliseToRingPolynomial(successorInner, context);
+                polynomial[RingMonomialSignature{}] += 1;
+                return polynomial;
+            }
+        }
         // Otherwise: an opaque atom.
         return ringPolynomialAtom(context, expression);
     }
@@ -2574,11 +2650,11 @@ ExpressionPointer Elaborator::buildCoercedScalarForCarrier(
 
 ExpressionPointer Elaborator::buildRingCoefficientExpression(
         int count, const RingNormalisationContext& context) {
-        ExpressionPointer one = ringConst(context.oneName);
+        ExpressionPointer one = buildRingOneKernel(context);
         if (count == 1) return one;
         ExpressionPointer accumulator = one;
         for (int i = 1; i < count; ++i) {
-            ExpressionPointer onePlus = ringConst(context.oneName);
+            ExpressionPointer onePlus = buildRingOneKernel(context);
             accumulator = buildRingOp(context.addName,
                                         std::move(accumulator),
                                         std::move(onePlus));
@@ -2612,7 +2688,7 @@ ExpressionPointer Elaborator::buildCanonicalMonomial(
             // No explicit coefficient. If no factors, the monomial is
             // just `one`.
             monomial = factorProduct ? factorProduct
-                                      : ringConst(context.oneName);
+                                      : buildRingOneKernel(context);
         } else {
             ExpressionPointer coefficientExpr =
                 buildRingCoefficientExpression(magnitude, context);
@@ -2634,7 +2710,7 @@ ExpressionPointer Elaborator::buildCanonicalPolynomial(
         const RingPolynomial& polynomial,
         const RingNormalisationContext& context) {
         if (polynomial.empty()) {
-            return ringConst(context.zeroName);
+            return buildRingZeroKernel(context);
         }
         std::vector<ExpressionPointer> monomials;
         for (const auto& entry : polynomial) {
@@ -3094,6 +3170,40 @@ ExpressionPointer Elaborator::proveEqualsCanonical_impl(
                     reflBridge, unfoldProof);
             }
         }
+        // Bare Natural literal / successor — only on the Natural carrier.
+        // Numerals compute definitionally, so the canonical kernel (a sum
+        // of ones, or zero) is definitionally equal to the literal and a
+        // reflexivity proof bridges them; successor(e) is definitionally
+        // 1 + e, so a reflexivity bridge routes it through the add path.
+        if (context.carrierName == "Natural") {
+            int literalValue = 0;
+            if (tryParseNaturalLiteral(expression, literalValue)) {
+                RingPolynomial polynomial;
+                if (literalValue > 0) {
+                    polynomial[RingMonomialSignature{}] = literalValue;
+                }
+                polynomialOut = polynomial;
+                return buildReflexivity(universeLevel, carrierType, expression);
+            }
+            ExpressionPointer successorInner;
+            if (tryParseNaturalSuccessor(expression, successorInner)) {
+                ExpressionPointer unfolded = buildRingOp(
+                    context.addName, buildNaturalLiteralKernel(1),
+                    successorInner);
+                ExpressionPointer unfoldProof = proveEqualsCanonical(
+                    unfolded, context, axiomNames, polynomialOut);
+                ExpressionPointer canonicalKernel =
+                    buildCanonicalPolynomial(polynomialOut, context);
+                // expression ≡ unfolded definitionally (1 + e ι-reduces
+                // to successor(e)); reflexivity at `expression` bridges.
+                ExpressionPointer reflBridge = buildReflexivity(
+                    universeLevel, carrierType, expression);
+                return buildEqualityTransitivity(
+                    universeLevel, carrierType,
+                    expression, unfolded, canonicalKernel,
+                    reflBridge, unfoldProof);
+            }
+        }
         // Otherwise: an opaque atom. Its canonical kernel is itself.
         polynomialOut = ringPolynomialAtom(context, expression);
         ExpressionPointer canonicalKernel =
@@ -3375,7 +3485,7 @@ ExpressionPointer Elaborator::proveAddMerge(
             // zero + zero = zero. Use zero_add(zero) :  0 + 0 = 0.
             demandAxiomName(axiomNames.zeroAddLeft, "zero_add/add_identity_left",
                               context.carrierName);
-            ExpressionPointer zeroConst = ringConst(context.zeroName);
+            ExpressionPointer zeroConst = buildRingZeroKernel(context);
             ExpressionPointer call =
                 makeApplication(ringConst(axiomNames.zeroAddLeft),
                                   zeroConst);

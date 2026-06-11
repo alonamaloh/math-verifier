@@ -2708,8 +2708,14 @@ private:
 
     // True if `expression` is a Natural literal `successor^k(zero)`
     // for some k >= 0. Sets `value` to k on match.
-    bool tryParseNaturalLiteral(
+    static bool tryParseNaturalLiteral(
         ExpressionPointer expression, int& value);
+
+    // True if `expression` is `successor(inner)` for some inner term
+    // (literal or not). Sets `innerOut` on match. Used by the Natural
+    // carrier's `ring` support: successor(e) is definitionally 1 + e.
+    static bool tryParseNaturalSuccessor(
+        ExpressionPointer expression, ExpressionPointer& innerOut);
 
     // Recognise the carrier's idiom of a Natural literal: the
     // chain of coercions wrapping `successor^k(zero)`. The chain is
@@ -2740,6 +2746,13 @@ private:
 
     // Build the Natural-level kernel for `successor^k(zero)`.
     ExpressionPointer buildNaturalLiteralKernel(int value);
+
+    // The kernel terms for the carrier's zero and one. Almost always the
+    // named constants `<carrier>.zero` / `<carrier>.one`; the exception
+    // is the Natural carrier, whose zero and one are the constructor
+    // literals `zero` / `successor(zero)` (there are no named constants).
+    ExpressionPointer buildRingZeroKernel(const RingNormalisationContext& context);
+    ExpressionPointer buildRingOneKernel(const RingNormalisationContext& context);
 
     // Convert a kernel expression to a RingPolynomial, registering
     // opaque subterms as atoms along the way. Recursive: add /
