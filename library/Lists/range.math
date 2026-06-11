@@ -1,0 +1,32 @@
+-- Lists/range.math
+--
+-- `List.range_down(n) = [n, n−1, …, 1]`, the list of the positive integers
+-- 1..n. (Descending because the `prepend` recursion is clean; order is
+-- immaterial for the commutative-product / set-membership uses this is built
+-- for. A general-purpose range, e.g. for Wilson's product over 1..p−1.)
+
+module Lists.range
+
+import Natural.basics
+import Natural.order
+import Equality.basics
+import Lists.list
+import Lists.length
+
+definition List.range_down : Natural → List(Natural)
+  | zero => List.empty(Natural)
+  | successor(predecessor) =>
+      List.prepend(Natural, successor(predecessor), List.range_down(predecessor))
+
+-- `range_down(n)` has exactly n elements.
+theorem List.range_down_length (n : Natural)
+        : List.length(Natural, List.range_down(n)) = n :=
+  by_induction on n with IH {
+    case zero:
+        calc List.length(Natural, List.range_down(0))
+           = 0
+    case successor(predecessor):
+        calc List.length(Natural, List.range_down(successor(predecessor)))
+           = successor(List.length(Natural, List.range_down(predecessor)))
+           = successor(predecessor)   by substituting IH
+  }
