@@ -12,6 +12,7 @@ import Natural.order
 import Natural.add_order
 import Lists.list
 import Lists.range
+import Lists.map
 
 inductive List.Distinct (A : Type(0)) : List(A) → Proposition where
   | List.Distinct.empty : List.Distinct(A, List.empty(A))
@@ -41,3 +42,15 @@ theorem List.range_down_distinct (n : Natural)
             List.range_down(predecessor), notMember, IH)
       }
   }
+
+-- An injective map preserves distinctness.
+theorem List.map_distinct (A B : Type(0)) (f : A → B)
+        (injective : (x y : A) → f(x) = f(y) → x = y)
+        (list : List(A))
+        : List.Distinct(A, list)
+          → List.Distinct(B, List.map(A, B, f, list))
+  | List.Distinct.empty => List.Distinct.empty(B)
+  | List.Distinct.prepend(head, tail, headNotInTail, tailDistinct) =>
+      List.Distinct.prepend(B, f(head), List.map(A, B, f, tail),
+          List.not_member_map_of_not_member(A, B, f, injective, head, tail, headNotInTail),
+          List.map_distinct(A, B, f, injective, tail, tailDistinct))
