@@ -86,6 +86,63 @@ theorem Real.ContinuousAt.identity (x : Real)
         ⟨epsilonPositive,
          (y : Real) (yClose : abs(y - x) < (epsilon : Real)) ↦ yClose⟩
 
+-- Sums of continuous functions are continuous: the usual ε/2 argument,
+-- with δ = min(δf, δg) so both summands' bounds apply at once.
+theorem Real.ContinuousAt.add (f g : Real → Real) (x : Real)
+        (fContinuous : Real.ContinuousAt(f, x))
+        (gContinuous : Real.ContinuousAt(g, x))
+        : Real.ContinuousAt((y : Real) ↦ f(y) + g(y), x) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    claim halfPositive : Rational.zero < Rational.halve(epsilon)
+        since Rational.halve_positive;
+    obtain ⟨fDelta, fDeltaProperties⟩
+        from fContinuous(Rational.halve(epsilon), halfPositive);
+    obtain ⟨fDeltaPositive, fClose⟩ from fDeltaProperties;
+    obtain ⟨gDelta, gDeltaProperties⟩
+        from gContinuous(Rational.halve(epsilon), halfPositive);
+    obtain ⟨gDeltaPositive, gClose⟩ from gDeltaProperties;
+    claim minimumPositive : Rational.zero < Rational.minimum(fDelta, gDelta)
+        since Rational.minimum_positive;
+    witness Rational.minimum(fDelta, gDelta) with
+        ⟨minimumPositive,
+         (y : Real)
+         (yClose : abs(y - x) < (Rational.minimum(fDelta, gDelta) : Real)) ↦ {
+           claim Rational.minimum(fDelta, gDelta) ≤ fDelta
+               since Rational.minimum_LessOrEqual_left;
+           claim Rational.minimum(fDelta, gDelta) ≤ gDelta
+               since Rational.minimum_LessOrEqual_right;
+           claim yCloseF : abs(y - x) < (fDelta : Real)
+               by calc abs(y - x)
+                     < (Rational.minimum(fDelta, gDelta) : Real)   by yClose
+                     ≤ (fDelta : Real)
+                           by Rational.to_real.LessOrEqual_preserves;
+           claim yCloseG : abs(y - x) < (gDelta : Real)
+               by calc abs(y - x)
+                     < (Rational.minimum(fDelta, gDelta) : Real)   by yClose
+                     ≤ (gDelta : Real)
+                           by Rational.to_real.LessOrEqual_preserves;
+           claim abs(f(y) - f(x)) < (Rational.halve(epsilon) : Real)
+               by fClose(y, yCloseF);
+           claim abs(g(y) - g(x)) < (Rational.halve(epsilon) : Real)
+               by gClose(y, yCloseG);
+           calc abs((f(y) + g(y)) - (f(x) + g(x)))
+              = abs((f(y) - f(x)) + (g(y) - g(x)))
+                    by substituting
+                        (ring : (f(y) + g(y)) - (f(x) + g(x))
+                            = (f(y) - f(x)) + (g(y) - g(x)))
+              ≤ abs(f(y) - f(x)) + abs(g(y) - g(x))
+                    by Real.triangle_inequality
+              < (Rational.halve(epsilon) : Real) + (Rational.halve(epsilon) : Real)
+                    since Real.LessThan.add_strict_strict
+              = ((Rational.halve(epsilon) + Rational.halve(epsilon) : Rational) : Real)
+                    by Rational.to_real.add_preserves(
+                           Rational.halve(epsilon), Rational.halve(epsilon))
+              = (epsilon : Real)
+                    by Rational.halve_doubled(epsilon)
+         }⟩
+  }
+
 -- Negation preserves continuity: |−f(y) − (−f(x))| = |f(y) − f(x)|,
 -- so f's own δ serves unchanged.
 theorem Real.ContinuousAt.negate (f : Real → Real) (x : Real)
@@ -108,3 +165,35 @@ theorem Real.ContinuousAt.negate (f : Real → Real) (x : Real)
               < (epsilon : Real)
                     by fClose(y, yClose)⟩
   }
+
+-- Composition: g's δ for the tolerance f demands at g(x). No minimum
+-- needed — the tolerances chain instead of combining.
+theorem Real.ContinuousAt.composition (f g : Real → Real) (x : Real)
+        (gContinuous : Real.ContinuousAt(g, x))
+        (fContinuous : Real.ContinuousAt(f, g(x)))
+        : Real.ContinuousAt((y : Real) ↦ f(g(y)), x) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨fDelta, fDeltaProperties⟩
+        from fContinuous(epsilon, epsilonPositive);
+    obtain ⟨fDeltaPositive, fClose⟩ from fDeltaProperties;
+    obtain ⟨gDelta, gDeltaProperties⟩
+        from gContinuous(fDelta, fDeltaPositive);
+    obtain ⟨gDeltaPositive, gClose⟩ from gDeltaProperties;
+    witness gDelta with
+        ⟨gDeltaPositive,
+         (y : Real) (yClose : abs(y - x) < (gDelta : Real)) ↦
+           fClose(g(y), gClose(y, yClose))⟩
+  }
+
+-- Differences: f − g = f + (−g), and subtraction on Real is
+-- definitionally addition of the negation.
+theorem Real.ContinuousAt.subtract (f g : Real → Real) (x : Real)
+        (fContinuous : Real.ContinuousAt(f, x))
+        (gContinuous : Real.ContinuousAt(g, x))
+        : Real.ContinuousAt((y : Real) ↦ f(y) - g(y), x) := {
+  claim negateGContinuous : Real.ContinuousAt((y : Real) ↦ -g(y), x)
+      since Real.ContinuousAt.negate;
+  done by Real.ContinuousAt.add(f, (y : Real) ↦ -g(y), x,
+             fContinuous, negateGContinuous)
+}
