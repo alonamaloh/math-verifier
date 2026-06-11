@@ -9,6 +9,11 @@ module Lists.range
 
 import Natural.basics
 import Natural.order
+import Natural.add_order
+import Natural.decide
+import Natural.strong_recursion
+import Logic.basics
+import Logic.sum
 import Equality.basics
 import Lists.list
 import Lists.length
@@ -29,4 +34,49 @@ theorem List.range_down_length (n : Natural)
         calc List.length(Natural, List.range_down(successor(predecessor)))
            = successor(List.length(Natural, List.range_down(predecessor)))
            = successor(predecessor)   by substituting IH
+  }
+
+-- Completeness: every positive integer ≤ n appears in range_down(n).
+-- (Induct on n with j generalised so the bound varies; the successor case
+-- splits j = successor(predecessor) (head) vs j ≤ predecessor (tail, by IH).)
+theorem List.range_down_complete (n : Natural)
+        : (j : Natural) → 1 ≤ j → j ≤ n
+          → List.member(Natural, j, List.range_down(n)) :=
+  by_induction on n with IH {
+    case zero: {
+        take j : Natural;
+        suppose 1 ≤ j as lower;
+        suppose j ≤ 0 as upper;
+        claim 1 ≤ 0
+            by calc (1 : Natural)
+                  ≤ j   by lower
+                  ≤ 0   by upper;
+        claim False by Natural.not_less_or_equal_successor_zero;
+        done
+      }
+    case successor(predecessor): {
+        take j : Natural;
+        suppose 1 ≤ j as lower;
+        suppose j ≤ successor(predecessor) as upper;
+        claim decision : j = successor(predecessor) ∨ ¬(j = successor(predecessor))
+            by Natural.decides_equality;
+        cases decision {
+          | Or.introduceLeft(jEqual) => {
+              claim memberSucc
+                  : List.member(Natural, successor(predecessor),
+                        List.range_down(successor(predecessor)))
+                  by List.member.here(Natural, successor(predecessor),
+                         List.range_down(predecessor));
+              claim List.member(Natural, j, List.range_down(successor(predecessor)))
+                  by substituting jEqual;
+              done
+            }
+          | Or.introduceRight(jNotEqual) => {
+              claim jLeK : j ≤ predecessor
+                  by Natural.less_or_equal_successor_not_equal;
+              List.member.there(Natural, j, successor(predecessor),
+                  List.range_down(predecessor), IH(j, lower, jLeK))
+            }
+        }
+      }
   }
