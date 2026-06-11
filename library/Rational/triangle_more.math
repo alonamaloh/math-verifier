@@ -241,3 +241,55 @@ theorem Rational.absolute_value_LessThan_of_bounds
            < -(-c)
            = c
   }
+
+-- ----------------------------------------------------------------------
+-- x ≤ |x|: equality when x is nonnegative; otherwise x ≤ -x = |x|.
+theorem Rational.le_absolute_value (x : Rational) : x ≤ abs(x) :=
+  cases Rational.IsNonneg_or_negate_IsNonneg(x) {
+    | Or.introduceLeft(xNonneg) =>
+        calc x
+           ≤ x        by Rational.LessOrEqual.reflexive
+           = abs(x)   by Rational.absolute_value_when_nonneg(x, xNonneg)
+    | Or.introduceRight(negateNonneg) => {
+        -- x ≤ -x, since -x - x = -x + -x is a sum of nonnegatives.
+        claim Rational.IsNonneg(-x + -x) since Rational.IsNonneg.add;
+        claim x ≤ -x by substituting (ring : -x + -x = -x - x);
+        calc x
+           ≤ -x       by (x ≤ -x)
+           = abs(x)   by Rational.absolute_value_when_negate_nonneg(x, negateNonneg)
+      }
+  }
+
+-- A lower bound survives subtracting the absolute value, at twice the
+-- slack: -δ < x gives -(δ + δ) < x - |x| (the difference is 0 when x is
+-- nonnegative, and 2x > -2δ otherwise).
+theorem Rational.subtract_absolute_value_lower_bound (x delta : Rational)
+        (deltaPositive : Rational.zero < delta)
+        (lowerBound : -delta < x)
+        : -(delta + delta) < x - abs(x) :=
+  cases Rational.IsNonneg_or_negate_IsNonneg(x) {
+    | Or.introduceLeft(xNonneg) => {
+        claim absEquation : abs(x) = x
+            by Rational.absolute_value_when_nonneg(x, xNonneg);
+        claim Rational.zero < delta + delta
+            by calc Rational.zero
+                  = Rational.zero + Rational.zero   by ring
+                  < delta + Rational.zero           by Rational.add_preserves_LessThan
+                  < delta + delta                   by Rational.add_left_preserves_LessThan;
+        calc -(delta + delta)
+           < Rational.zero    by Rational.negate_LessThan_zero_of_positive
+           = x - x            by ring
+           = x - abs(x)       by substituting absEquation
+      }
+    | Or.introduceRight(negateNonneg) => {
+        claim absEquation : abs(x) = -x
+            by Rational.absolute_value_when_negate_nonneg(x, negateNonneg);
+        -- x - |x| = x + x, and each summand exceeds -δ.
+        calc -(delta + delta)
+           = -delta + -delta   by ring
+           < x + -delta        by Rational.add_preserves_LessThan
+           < x + x             by Rational.add_left_preserves_LessThan
+           = x - -x            by ring
+           = x - abs(x)        by substituting absEquation
+      }
+  }

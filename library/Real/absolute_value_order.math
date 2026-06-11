@@ -1,0 +1,175 @@
+-- Real/absolute_value_order.math
+--
+-- How the absolute value sits against the order on ℝ:
+--
+--   * x ≤ |x| and -x ≤ |x|;
+--   * |x| = x when x ≥ 0, |x| = -x when -x ≥ 0;
+--   * |x| < c exactly when -c < x < c (both directions) — the bridge
+--     between ε-bounds on |·| and two-sided bounds, used throughout
+--     limits and continuity.
+--
+-- Only the two `_at_make` lemmas touch representatives (pointwise
+-- Rational facts lifted along the established at-make pattern);
+-- everything else is Real-level order algebra.
+
+module Real.absolute_value_order
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Rational.basics
+import Rational.addition
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.absolute_value
+import Rational.halve
+import Rational.positive
+import Rational.triangle_more
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.order
+import Real.linearity
+import Real.absolute_value
+
+-- ----------------------------------------------------------------------
+-- x ≤ |x|. Pointwise: the Rational fact x ≤ |x| at every index.
+theorem Real.LessOrEqual_absolute_value_at_make
+        : (rep : CauchyRationalSequence)
+          → (Quotient.mk(rep) : Real) ≤ abs((Quotient.mk(rep) : Real))
+  | CauchyRationalSequence.make(s, _) =>
+      ((epsilon : Rational)
+               (epsilonPositive : Rational.zero < epsilon) ↦
+        witness 0 with
+            (m : Natural) (_ : 0 ≤ m) ↦
+              -- Goal: -ε < |s(m)| + -s(m), and the bound is nonnegative.
+              calc -epsilon
+                 < Rational.zero
+                 ≤ abs(s(m)) + -(s(m))
+                      by Rational.LessOrEqual_zero_of_IsNonneg(
+                             abs(s(m)) + -(s(m)),
+                             Rational.le_absolute_value(s(m))))
+
+theorem Real.LessOrEqual_absolute_value (x : Real) : x ≤ abs(x) :=
+  by_representatives x as rep =>
+      Real.LessOrEqual_absolute_value_at_make(rep)
+
+-- -x ≤ |x|: apply the previous bound at -x and fold |-x| = |x|.
+theorem Real.negate_LessOrEqual_absolute_value (x : Real) : -x ≤ abs(x) :=
+  calc -x
+     ≤ abs(-x)   by Real.LessOrEqual_absolute_value
+     = abs(x)    by Real.absolute_value_negate(x)
+
+-- ----------------------------------------------------------------------
+-- |x| ≤ x when x ≥ 0. Pointwise: a nonnegativity bound -δ < s(m) gives
+-- -2δ < s(m) - |s(m)| (the difference is 0 on the nonnegative side and
+-- 2·s(m) otherwise), so the ε-argument runs at δ = ε/2.
+theorem Real.absolute_value_LessOrEqual_of_nonneg_at_make
+        : (rep : CauchyRationalSequence)
+          → CauchyRationalSequence.IsEventuallyNonneg(rep)
+          → abs((Quotient.mk(rep) : Real)) ≤ (Quotient.mk(rep) : Real)
+  | CauchyRationalSequence.make(s, sCauchy) =>
+      (eventuallyNonneg
+          : CauchyRationalSequence.IsEventuallyNonneg(
+                CauchyRationalSequence.make(s, sCauchy)))
+      (epsilon : Rational)
+      (epsilonPositive : Rational.zero < epsilon) ↦ {
+        claim halfPositive : Rational.zero < Rational.halve(epsilon)
+            since Rational.halve_positive;
+        obtain ⟨N, eventuallyAboveHalf⟩
+            from eventuallyNonneg(Rational.halve(epsilon), halfPositive);
+        witness N with
+            (m : Natural) (NLeqM : N ≤ m) ↦ {
+              claim lowerBound : -Rational.halve(epsilon) < s(m)
+                  by eventuallyAboveHalf(m, NLeqM);
+              -- Goal: -ε < s(m) + -|s(m)|; ε is twice the slack δ.
+              calc -epsilon
+                 = -(Rational.halve(epsilon) + Rational.halve(epsilon))
+                       by Rational.halve_doubled(epsilon)
+                 < s(m) + -abs(s(m))
+                       by Rational.subtract_absolute_value_lower_bound(
+                              s(m), Rational.halve(epsilon),
+                              halfPositive, lowerBound)
+            }
+      }
+
+theorem Real.absolute_value_LessOrEqual_of_nonneg (x : Real)
+        (xNonneg : Real.IsNonneg(x))
+        : abs(x) ≤ x :=
+  cases x refining xNonneg { | rep =>
+      Real.absolute_value_LessOrEqual_of_nonneg_at_make(rep, xNonneg) }
+
+-- ----------------------------------------------------------------------
+-- The sign-case equalities, by antisymmetry / reflection.
+
+theorem Real.absolute_value_when_nonneg (x : Real)
+        (xNonneg : Real.IsNonneg(x))
+        : abs(x) = x := {
+  claim abs(x) ≤ x since Real.absolute_value_LessOrEqual_of_nonneg;
+  claim x ≤ abs(x) since Real.LessOrEqual_absolute_value;
+  done since Real.LessOrEqual.antisymmetric
+}
+
+theorem Real.absolute_value_when_negate_nonneg (x : Real)
+        (negateNonneg : Real.IsNonneg(-x))
+        : abs(x) = -x :=
+  calc abs(x)
+     = abs(-x)   by Real.absolute_value_negate(x)
+     = -x        by Real.absolute_value_when_nonneg(-x, negateNonneg)
+
+-- ----------------------------------------------------------------------
+-- Reflecting a strict bound through negation: -a < b gives -b < a
+-- (add b + -a to both sides).
+theorem Real.negate_flip_LessThan (a b : Real)
+        (lowerBound : -a < b)
+        : -b < a := {
+  claim shifted : -a + (a + -b) < b + (a + -b)
+      since Real.add_preserves_LessThan;
+  calc -b
+     = -a + (a + -b)   by ring
+     < b + (a + -b)    by shifted
+     = a               by ring
+}
+
+-- ----------------------------------------------------------------------
+-- The two-sided characterisation of |x| < c.
+
+theorem Real.absolute_value_LessThan_of_bounds (x c : Real)
+        (lowerBound : -c < x) (upperBound : x < c)
+        : abs(x) < c :=
+  cases Real.IsNonneg_or_negate_IsNonneg(x) {
+    | Or.introduceLeft(xNonneg) =>
+        calc abs(x)
+           = x    by Real.absolute_value_when_nonneg(x, xNonneg)
+           < c    by upperBound
+    | Or.introduceRight(negateNonneg) => {
+        claim -x < c since Real.negate_flip_LessThan;
+        calc abs(x)
+           = -x   by Real.absolute_value_when_negate_nonneg(x, negateNonneg)
+           < c    by (-x < c)
+      }
+  }
+
+theorem Real.absolute_value_LessThan_bounds (x c : Real)
+        (absoluteBound : abs(x) < c)
+        : And(-c < x, x < c) := {
+  claim upperBound : x < c
+      by calc x
+            ≤ abs(x)   by Real.LessOrEqual_absolute_value
+            < c        by absoluteBound;
+  claim -x < c
+      by calc -x
+            ≤ abs(x)   by Real.negate_LessOrEqual_absolute_value
+            < c        by absoluteBound;
+  claim lowerBound : -c < x since Real.negate_flip_LessThan;
+  And.introduction(lowerBound, upperBound)
+}

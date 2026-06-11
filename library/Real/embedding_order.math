@@ -1,0 +1,93 @@
+-- Real/embedding_order.math
+--
+-- The embedding ℚ → ℝ preserves the order, in both the weak and the
+-- strict form. Strictness is the essential half: a positive rational ε
+-- coerces to a positive real, which is what lets every ε–N and ε–δ
+-- argument compare real quantities against rational tolerances.
+
+module Real.embedding_order
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Rational.basics
+import Rational.addition
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.absolute_value
+import Rational.triangle_more
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.ring
+import Real.order
+
+-- ----------------------------------------------------------------------
+-- Weak order: a ≤ b transfers pointwise (the difference of the constant
+-- sequences is the constant b − a, which is nonnegative).
+theorem Rational.to_real.LessOrEqual_preserves (a b : Rational)
+        (aLessOrEqualB : a ≤ b)
+        : (a : Real) ≤ (b : Real) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦
+    witness 0 with
+        (m : Natural) (_ : 0 ≤ m) ↦
+          calc -epsilon
+             < Rational.zero
+             ≤ b + -a
+                  by Rational.LessOrEqual_zero_of_IsNonneg(
+                         b + -a, aLessOrEqualB)
+
+-- ----------------------------------------------------------------------
+-- Strict order. The weak part is above; distinctness is the embedding's
+-- injectivity at distinct points: were (a : ℝ) = (b : ℝ), the constant
+-- sequences would be Cauchy-equivalent, putting |a − b| below the
+-- positive gap b − a itself — yet b − a ≤ |a − b|.
+theorem Rational.to_real.LessThan_preserves (a b : Rational)
+        (aLessThanB : a < b)
+        : (a : Real) < (b : Real) := {
+  claim a ≤ b since Rational.LessThan.weaken;
+  claim lessOrEqualPart : (a : Real) ≤ (b : Real)
+      since Rational.to_real.LessOrEqual_preserves;
+  claim gapPositive : Rational.zero < b - a
+      by calc Rational.zero
+            = a + -a   by ring
+            < b + -a   by Rational.add_preserves_LessThan;
+  claim notEqualPart : ¬((a : Real) = (b : Real))
+      by (coercedEqual : (a : Real) = (b : Real)) ↦ {
+          -- Equal classes mean equivalent constant representatives.
+          claim equivalent
+              : CauchyEquivalent(Rational.to_cauchy_constant(a),
+                    Rational.to_cauchy_constant(b));
+          -- Evaluate the equivalence at ε = b − a.
+          obtain ⟨N, eventuallyClose⟩ from equivalent(b - a, gapPositive);
+          claim N ≤ N;
+          claim tooClose : abs(a - b) < b - a
+              by eventuallyClose(N, (N ≤ N));
+          -- But the gap is at most that absolute difference.
+          claim b - a < b - a
+              by calc b - a
+                    ≤ abs(b - a)   by Rational.le_absolute_value
+                    = abs(a - b)   by Rational.absolute_value_subtract_swap(b, a)
+                    < b - a        by tooClose;
+          claim notSelfEqual : ¬(b - a = b - a)
+              since Rational.LessThan.distinct;
+          notSelfEqual(reflexivity(Rational, b - a))
+        };
+  And.introduction(lessOrEqualPart, notEqualPart)
+}
+
+-- The workhorse special case: a positive rational tolerance is a
+-- positive real.
+theorem Rational.to_real.positive_preserves (epsilon : Rational)
+        (epsilonPositive : Rational.zero < epsilon)
+        : Real.zero < (epsilon : Real) := {
+  done since Rational.to_real.LessThan_preserves
+}
