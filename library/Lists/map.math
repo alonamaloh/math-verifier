@@ -27,3 +27,15 @@ theorem List.map_length (A B : Type(0)) (f : A → B)
          = successor(List.length(B, List.map(A, B, f, tail)))
          = successor(List.length(A, tail))
          = List.length(A, List.prepend(A, head, tail))
+
+-- `map` carries membership forward: x ∈ l ⟹ f(x) ∈ map(f, l). (Pattern-match
+-- on the member proof at definition level — `cases` on it is blocked by the
+-- index-must-be-local rule, but a top-level match refines `list` fine.)
+theorem List.map_member (A B : Type(0)) (f : A → B) (element : A) (list : List(A))
+        : List.member(A, element, list)
+          → List.member(B, f(element), List.map(A, B, f, list))
+  | List.member.here(rest) =>
+      List.member.here(B, f(element), List.map(A, B, f, rest))
+  | List.member.there(head, rest, innerMember) =>
+      List.member.there(B, f(element), f(head), List.map(A, B, f, rest),
+          List.map_member(A, B, f, element, rest, innerMember))
