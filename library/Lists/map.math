@@ -67,3 +67,18 @@ theorem List.map_member_invert (A B : Type(0)) (f : A → B) (b : B)
               }
           }
         }
+
+-- If `head ∉ tail` and `f` is injective, then `f(head) ∉ map(f, tail)`.
+theorem List.not_member_map_of_not_member (A B : Type(0)) (f : A → B)
+        (injective : (x y : A) → f(x) = f(y) → x = y)
+        (head : A) (tail : List(A))
+        (notMember : ¬(List.member(A, head, tail)))
+        : ¬(List.member(B, f(head), List.map(A, B, f, tail))) :=
+  (mem : List.member(B, f(head), List.map(A, B, f, tail))) ↦ {
+      obtain ⟨a, aProperties⟩
+          from List.map_member_invert(A, B, f, f(head), tail, mem);
+      let ⟨aMember, faEqual⟩ := aProperties;
+      claim aEqualHead : a = head by injective(a, head, faEqual);
+      claim headInTail : List.member(A, head, tail) by substituting aEqualHead;
+      notMember(headInTail)
+    }
