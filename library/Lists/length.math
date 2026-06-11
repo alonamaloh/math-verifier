@@ -11,6 +11,7 @@ import Natural.basics
 import Natural.order
 import Equality.basics
 import Lists.list
+import Lists.permutation
 
 -- The number of elements in a list.
 definition List.length (A : Type(0)) : List(A) → Natural
@@ -32,3 +33,27 @@ theorem List.length_positive_of_member (A : Type(0)) (element : A) (list : List(
     | List.empty => absurd(List.no_member_empty(A, element, membership))
     | List.prepend(head, tail) => Natural.successor_positive(List.length(A, tail))
   }
+
+-- Length is invariant under permutation (mirrors `product_invariant`:
+-- induct on the permutation; skip adds one to both, swap adds two to both,
+-- transitive chains, and the by-less steps backward-chain this lemma on the
+-- sub-permutations). Needed for the orbit induction in Wilson's theorem, but
+-- a basic reusable fact.
+theorem List.Permutation.length_invariant (A : Type(0)) (l1 l2 : List(A))
+        : List.Permutation(A, l1, l2)
+          → List.length(A, l1) = List.length(A, l2)
+  | List.Permutation.empty =>
+      reflexivity(Natural, List.length(A, List.empty(A)))
+  | List.Permutation.skip(x, a, b, perm) =>
+      calc List.length(A, List.prepend(A, x, a))
+         = successor(List.length(A, a))
+         = successor(List.length(A, b))
+         = List.length(A, List.prepend(A, x, b))
+  | List.Permutation.swap(x, y, l) =>
+      calc List.length(A, List.prepend(A, x, List.prepend(A, y, l)))
+         = successor(successor(List.length(A, l)))
+         = List.length(A, List.prepend(A, y, List.prepend(A, x, l)))
+  | List.Permutation.transitive(a, b, c, p, q) =>
+      calc List.length(A, a)
+         = List.length(A, b)
+         = List.length(A, c)
