@@ -1,0 +1,69 @@
+-- GaussianInteger/fermat_two_squares.math
+--
+-- Fermat's two-squares theorem (Freek #20): every prime p ≡ 1 (mod 4)
+-- is a sum of two squares. The two halves, both already proved:
+--
+--   * Wilson route (IntegerMod/square_root_of_minus_one.math): writing
+--     p = 1 + 4t, the class of (2t)! is a square root of −1 in F_p, so
+--     p ∣ ((2t)!)² + 1;
+--   * Gaussian-integer descent (GaussianInteger/sum_of_two_squares.math):
+--     a prime dividing m² + 1 is a sum of two squares, by factoring
+--     m² + 1 = (m + i)(m − i) in the Euclidean domain ℤ[i].
+
+module GaussianInteger.fermat_two_squares
+
+import Logic.basics
+import Logic.exists
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.factorial
+import Natural.prime
+import Natural.prime_split
+import Integer.basics
+import Integer.multiplication
+import Integer.embedding
+import Integer.divisibility
+import IntegerMod.field
+import IntegerMod.square_root_of_minus_one
+import GaussianInteger.sum_of_two_squares
+
+-- Every prime congruent to 1 modulo 4 is a sum of two squares.
+theorem Natural.prime_one_mod_four_sum_of_two_squares (p : Natural)
+        (primality : Natural.is_prime(p))
+        (oneModFour : ∃ (t : Natural). p = 1 + 4 * t)
+        : ∃ (a : Integer). ∃ (b : Integer). (p : Integer) = a * a + b * b := {
+  obtain ⟨t, pEquation⟩ from oneModFour;
+  -- t ≥ 1: t = 0 would make p = 1, which is not prime.
+  claim t ≠ 0
+      by (tZero : t = 0) ↦ {
+          claim pIsOne : p = 1
+              by calc p
+                    = 1 + 4 * t   by pEquation
+                    = 1 + 4 * 0   by substituting tZero
+                    = 1;
+          claim 2 ≤ p by Natural.is_prime.at_least_two;
+          claim 2 ≤ 1 by substituting pIsOne;
+          claim False by Natural.not_two_less_or_equal_one;
+          done
+        };
+  claim 1 ≤ t by Natural.geq_one_when_not_zero;
+  -- Write 4t as 2t + 2t, the shape the Wilson route wants.
+  claim fourSplit : 4 * t = (t + t) + (t + t)
+      by calc 4 * t
+            = t + (t + (t + (t + 0)))
+            = t + (t + (t + t))       by (t + 0 = t)
+            = (t + t) + (t + t)       by Natural.add_associative(t, t, t + t);
+  claim p = 1 + ((t + t) + (t + t))
+      by calc p
+            = 1 + 4 * t                 by pEquation
+            = 1 + ((t + t) + (t + t))   by fourSplit;
+  -- Wilson route: p divides ((2t)!)² + 1…
+  claim Integer.divides((p : Integer),
+            (Natural.factorial(t + t) : Integer)
+                * (Natural.factorial(t + t) : Integer) + Integer.one)
+      by IntegerMod.half_factorial_square_plus_one_divisible;
+  -- …and the Gaussian-integer descent turns that into two squares.
+  done by GaussianInteger.sum_of_two_squares_of_divides_square_plus_one
+}
