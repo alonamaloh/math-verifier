@@ -11,15 +11,22 @@ import Logic.exists
 import Logic.quotient
 import Equality.basics
 import Natural.basics
+import Natural.arithmetic
 import Natural.order
+import Natural.add_order
+import Natural.subtraction
+import Natural.division
+import Natural.divisibility
 import Integer.basics
 import Integer.addition
+import Integer.embedding
 import Integer.ring
 import Integer.algebra
 import Integer.divisibility
 import Algebra.integer_euclidean
 import IntegerMod.basics
 import IntegerMod.operations
+import IntegerMod.field
 
 -- Every class is `make(p, r)` for some natural `r` with `r < p`.
 theorem IntegerMod.exists_natural_representative (p : Natural) (pPositive : 1 ≤ p)
@@ -44,3 +51,78 @@ theorem IntegerMod.exists_natural_representative (p : Natural) (pPositive : 1 �
           Quotient.sound(x, (remainder : Integer), congruent))⟩
     }
   }
+
+-- ----------------------------------------------------------------------
+-- Uniqueness of the representative: congruent naturals below the modulus
+-- are equal, so `make` is injective on 0..p−1.
+
+-- The ordered half: with j ≤ i < p and p ∣ (i − j), the difference i − j
+-- is a natural multiple of p smaller than p, hence zero.
+theorem Integer.CongruentModulo.equal_of_ordered_below (p i j : Natural)
+        (jLessOrEqual : j ≤ i)
+        (iBelow : successor(i) ≤ p)
+        (congruent : Integer.CongruentModulo(p, (i : Integer), (j : Integer)))
+        : i = j := {
+  -- Write i = j + difference.
+  obtain ⟨difference, iEquation⟩ from Natural.subtraction_witness(j, i, jLessOrEqual);
+  -- The integer difference i − j is that natural difference.
+  claim differenceEquation
+      : (i : Integer) - (j : Integer) = (difference : Integer)
+      by calc (i : Integer) - (j : Integer)
+            = (((j + difference) : Natural) : Integer) - (j : Integer)
+                  by substituting iEquation
+            = ((j : Integer) + (difference : Integer)) - (j : Integer)
+                  by Natural.to_integer.add_preserves(j, difference)
+            = (difference : Integer)
+                  by ring;
+  -- So p divides the natural difference.
+  claim Integer.divides((p : Integer), (difference : Integer))
+      by substituting differenceEquation;
+  claim Natural.divides(p, difference)
+      by Integer.natural_divides_of_integer_divides;
+  -- A natural multiple of p below p must vanish.
+  cases by Natural.divides_less_or_equal_or_zero {
+    | Or.introduceLeft(differenceZero) =>
+        calc i
+           = j + difference     by iEquation
+           = j + 0              by substituting differenceZero
+           = j
+    | Or.introduceRight(pLessOrEqualDifference) => {
+        -- Otherwise p ≤ difference ≤ j + difference = i, contradicting i < p.
+        claim successor(i) ≤ i
+            by calc successor(i)
+                  ≤ p                 by iBelow
+                  ≤ difference        by pLessOrEqualDifference
+                  ≤ j + difference    by Natural.less_or_equal_add_left
+                  = i                 by iEquation;
+        claim False by Natural.not_successor_less_or_equal_self;
+        done
+      }
+  }
+}
+
+-- `make` is injective on the residues 0..p−1: distinct naturals below the
+-- modulus represent distinct classes.
+theorem IntegerMod.make_injective_below_modulus (p i j : Natural)
+        (iBelow : successor(i) ≤ p) (jBelow : successor(j) ≤ p)
+        (makeEquality
+            : IntegerMod.make(p, (i : Integer)) = IntegerMod.make(p, (j : Integer)))
+        : i = j := {
+  claim Integer.CongruentModulo(p, (i : Integer), (j : Integer))
+      by IntegerMod.congruent_of_make_equal;
+  -- Order i against j; each order goes through the ordered lemma.
+  claim ordering : successor(i) ≤ j ∨ j ≤ i by Natural.trichotomy;
+  cases ordering {
+    | Or.introduceLeft(iStrictlyBelowJ) => {
+        -- i < j: swap the roles.
+        claim i ≤ j by Natural.less_or_equal_predecessor_less_or_equal;
+        claim Integer.CongruentModulo(p, (j : Integer), (i : Integer))
+            by Integer.CongruentModulo.symmetric;
+        claim jEqualsI : j = i
+            by Integer.CongruentModulo.equal_of_ordered_below;
+        calc i = j by jEqualsI
+      }
+    | Or.introduceRight(jLessOrEqualI) =>
+        done by Integer.CongruentModulo.equal_of_ordered_below
+  }
+}
