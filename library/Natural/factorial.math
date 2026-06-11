@@ -7,9 +7,18 @@
 
 module Natural.factorial
 
+import Logic.basics
+import Logic.sum
+import Logic.exists
+import Equality.basics
 import Natural.basics
+import Natural.peano
+import Natural.arithmetic
 import Natural.order
+import Natural.add_order
 import Natural.multiply_order
+import Natural.decide
+import Natural.divisibility
 
 -- factorial(0) = 1, factorial(successor n) = successor(n) · factorial(n).
 definition Natural.factorial : Natural → Natural
@@ -34,3 +43,72 @@ theorem Natural.factorial_positive (n : Natural) : 1 ≤ Natural.factorial(n) :=
         productPositive
     }
   }
+
+-- ----------------------------------------------------------------------
+-- Divisibility of factorials: every 1 ≤ d ≤ n appears as a factor of n!.
+theorem Natural.divides_factorial (d n : Natural)
+        (dPositive : 1 ≤ d) (dAtMost : d ≤ n)
+        : d ∣ Natural.factorial(n) :=
+  by_induction on n with IH refining dAtMost {
+    case zero: {
+        -- d ≤ 0 contradicts 1 ≤ d.
+        claim 1 ≤ 0
+            by calc (1 : Natural)
+                  ≤ d   by dPositive
+                  ≤ 0   by dAtMost;
+        claim impossible : False since Natural.not_less_or_equal_successor_zero;
+        absurd(impossible)
+      }
+    case successor(predecessor): {
+        claim decision : d = successor(predecessor) ∨ ¬(d = successor(predecessor))
+            since Natural.decides_equality;
+        cases decision {
+          | Or.introduceLeft(dIsTopFactor) => {
+              -- d is the leading factor of (1 + n′)! = (1 + n′) · n′!.
+              claim successor(predecessor)
+                    ∣ successor(predecessor) * Natural.factorial(predecessor)
+                  since Natural.divides_self_multiple;
+              claim d ∣ successor(predecessor) * Natural.factorial(predecessor)
+                  by substituting dIsTopFactor;
+              done
+            }
+          | Or.introduceRight(dNotTopFactor) => {
+              -- d ≤ n′, so d divides n′! and hence the product.
+              claim dAtMostPredecessor : d ≤ predecessor
+                  since Natural.less_or_equal_successor_not_equal;
+              claim d ∣ Natural.factorial(predecessor) by IH(dAtMostPredecessor);
+              claim d ∣ successor(predecessor) * Natural.factorial(predecessor)
+                  since Natural.divides_multiple_left;
+              done
+            }
+        }
+      }
+  }
+
+-- A divisor d with 1 ≤ d ≤ n of n! + 1 must be 1: it divides the two
+-- consecutive numbers n! and n! + 1, hence divides 1.
+theorem Natural.small_divisor_of_factorial_plus_one_is_one (d n : Natural)
+        (dPositive : 1 ≤ d) (dAtMost : d ≤ n)
+        (dividesFactorialPlusOne : d ∣ Natural.factorial(n) + 1)
+        : d = 1 := {
+  claim d ∣ Natural.factorial(n) since Natural.divides_factorial;
+  claim successorEquation
+      : Natural.factorial(n) + 1 = successor(Natural.factorial(n))
+      by calc Natural.factorial(n) + 1
+            = successor(Natural.factorial(n) + 0)
+                  by Natural.add_successor(Natural.factorial(n), 0)
+            = successor(Natural.factorial(n))
+                  by Natural.add_zero(Natural.factorial(n));
+  claim d ∣ successor(Natural.factorial(n)) by substituting successorEquation;
+  claim d ∣ 1 since Natural.divides_consecutive_implies_one;
+  -- d ∣ 1 forces d ≤ 1, and 1 ≤ d already, so d = 1.
+  claim oneBound : 1 = 0 ∨ d ≤ 1 by Natural.divides_less_or_equal_or_zero;
+  cases oneBound {
+    | Or.introduceLeft(oneIsZero) => {
+        claim impossible : False since Natural.successor_not_zero;
+        absurd(impossible)
+      }
+    | Or.introduceRight(dAtMostOne) =>
+        done since Natural.le_antisymmetric
+  }
+}

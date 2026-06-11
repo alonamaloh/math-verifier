@@ -486,3 +486,121 @@ theorem Natural.wilson_divides (p n : Natural)
          = (Natural.factorial(n) : Integer) - (-Integer.one)   by ring
          = (p : Integer) * quotient                            by differenceEquation
 }
+
+-- Wilson's theorem for every prime (Freek #51, forward direction):
+-- p ∣ (p−1)! + 1. The pairing argument above needs p ≥ 3; the one
+-- remaining prime is p = 2, where 1! + 1 = 2 = p directly.
+theorem Natural.wilson (p n : Natural)
+        (primality : Natural.is_prime(p))
+        (pEquation : p = 1 + n)
+        : Integer.divides((p : Integer),
+              (Natural.factorial(n) : Integer) + Integer.one) :=
+  cases n refining pEquation {
+    | zero => {
+        -- n = 0 would make p = 1, which is not prime.
+        claim 2 ≤ p since Natural.is_prime.at_least_two;
+        claim 2 ≤ 1 by substituting pEquation;
+        claim impossible : False since Natural.not_two_less_or_equal_one;
+        absurd(impossible)
+      }
+    | successor(m) =>
+        cases m refining pEquation {
+          | zero => {
+              -- p = 2: 1! + 1 = 2 divides itself.
+              claim Integer.divides((((1 + 1) : Natural) : Integer),
+                        (Natural.factorial(1) : Integer) + Integer.one)
+                  by ⟨Integer.one,
+                      calc (Natural.factorial(1) : Integer) + Integer.one
+                         = (((1 + 1) : Natural) : Integer) * Integer.one⟩;
+              done by substituting pEquation
+            }
+          | successor(k) => {
+              -- n = 2 + k ≥ 2: the pairing argument applies.
+              claim 1 ≤ successor(k) since Natural.successor_positive;
+              claim 2 ≤ successor(successor(k))
+                  since Natural.successor_less_or_equal_successor;
+              done since Natural.wilson_divides
+            }
+        }
+  }
+
+-- The divisor analysis behind the converse of Wilson's theorem: when
+-- p = 1 + n divides n! + 1, a divisor of p other than p itself is at most
+-- n, hence divides both n! and (through p) n! + 1, forcing it to be 1.
+theorem Natural.divisor_one_or_self_of_divides_factorial_plus_one
+        (p n : Natural)
+        (pEquation : p = 1 + n)
+        (pAtLeastTwo : 2 ≤ p)
+        (wilsonDivides : Natural.divides(p, Natural.factorial(n) + 1))
+        (divisor : Natural) (dividesP : divisor ∣ p)
+        : divisor = 1 ∨ divisor = p := {
+  claim decision : divisor = p ∨ ¬(divisor = p)
+      since Natural.decides_equality;
+  cases decision {
+    | Or.introduceLeft(isP) => done since isP
+    | Or.introduceRight(notP) => {
+        -- divisor ≤ p, and not p itself, so divisor ≤ n.
+        claim bound : p = 0 ∨ divisor ≤ p
+            by Natural.divides_less_or_equal_or_zero;
+        cases bound {
+          | Or.introduceLeft(pZero) => {
+              claim 2 ≤ 0 by substituting pZero;
+              claim impossible : False
+                  since Natural.not_less_or_equal_successor_zero;
+              absurd(impossible)
+            }
+          | Or.introduceRight(divisorAtMostP) => {
+              claim divisor ≤ successor(n) by substituting pEquation;
+              claim ¬(divisor = successor(n))
+                  by (isTop : divisor = successor(n)) ↦ {
+                      claim isPAgain : divisor = p
+                          by calc divisor
+                                = successor(n)   by isTop
+                                = p              by pEquation;
+                      notP(isPAgain)
+                    };
+              claim divisor ≤ n
+                  since Natural.less_or_equal_successor_not_equal;
+              -- divisor ≥ 1: a divisor of the positive p is not 0.
+              claim ¬(divisor = 0)
+                  by (isZero : divisor = 0) ↦ {
+                      obtain ⟨quotient, pProduct⟩ from dividesP;
+                      claim pZero : p = 0
+                          by calc p
+                                = divisor * quotient   by pProduct
+                                = 0 * quotient         by substituting isZero
+                                = 0;
+                      claim 2 ≤ 0 by substituting pZero;
+                      claim impossible : False
+                          since Natural.not_less_or_equal_successor_zero;
+                      impossible
+                    };
+              claim 1 ≤ divisor since Natural.geq_one_when_not_zero;
+              -- divisor divides n! + 1 through p, so it is 1.
+              claim divisor ∣ Natural.factorial(n) + 1
+                  since Natural.divides_transitive;
+              claim divisor = 1
+                  since Natural.small_divisor_of_factorial_plus_one_is_one;
+              done
+            }
+        }
+      }
+  }
+}
+
+-- The converse of Wilson's theorem: if p = 1 + n (n ≥ 1) divides n! + 1,
+-- then p is prime. Together with `Natural.wilson` this characterises the
+-- primes ≥ 2 by the Wilson congruence, completing Freek #51.
+theorem Natural.prime_of_divides_factorial_plus_one (p n : Natural)
+        (pEquation : p = 1 + n) (nPositive : 1 ≤ n)
+        (wilsonDivides : Natural.divides(p, Natural.factorial(n) + 1))
+        : Natural.is_prime(p) := {
+  claim 1 + 1 ≤ 1 + n since Natural.add_left_monotone;
+  claim pAtLeastTwo : 2 ≤ p by substituting pEquation;
+  claim divisorCondition
+      : (divisor : Natural) → divisor ∣ p → divisor = 1 ∨ divisor = p
+      by (divisor : Natural) (dividesP : divisor ∣ p) ↦ {
+          done by Natural.divisor_one_or_self_of_divides_factorial_plus_one
+        };
+  And.introduction(pAtLeastTwo, divisorCondition)
+}
