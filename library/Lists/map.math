@@ -1,0 +1,29 @@
+-- Lists/map.math
+--
+-- `List.map(f, l)` applies `f` to every element. A fundamental, reusable
+-- list operation (used, among other things, to carry the integer range
+-- 1..p−1 into the residues of IntegerMod(p) for Wilson's theorem).
+
+module Lists.map
+
+import Natural.basics
+import Equality.basics
+import Logic.basics
+import Lists.list
+import Lists.length
+
+definition List.map (A B : Type(0)) (f : A → B) : List(A) → List(B)
+  | List.empty               => List.empty(B)
+  | List.prepend(head, tail) =>
+      List.prepend(B, f(head), List.map(A, B, f, tail))
+
+-- `map` preserves length.
+theorem List.map_length (A B : Type(0)) (f : A → B)
+        : (list : List(A))
+          → List.length(B, List.map(A, B, f, list)) = List.length(A, list)
+  | List.empty => reflexivity(Natural, 0)
+  | List.prepend(head, tail) =>
+      calc List.length(B, List.map(A, B, f, List.prepend(A, head, tail)))
+         = successor(List.length(B, List.map(A, B, f, tail)))
+         = successor(List.length(A, tail))
+         = List.length(A, List.prepend(A, head, tail))
