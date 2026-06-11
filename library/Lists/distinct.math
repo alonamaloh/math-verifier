@@ -1,0 +1,43 @@
+-- Lists/distinct.math
+--
+-- `List.Distinct(l)`: the elements of `l` are pairwise distinct (no
+-- duplicates). A reusable predicate; here we show `range_down(n)` is
+-- distinct (its head successor(k) exceeds every element of range_down(k)).
+
+module Lists.distinct
+
+import Logic.basics
+import Natural.basics
+import Natural.order
+import Natural.add_order
+import Lists.list
+import Lists.range
+
+inductive List.Distinct (A : Type(0)) : List(A) → Proposition where
+  | List.Distinct.empty : List.Distinct(A, List.empty(A))
+  | List.Distinct.prepend
+      : (head : A) → (tail : List(A))
+        → ¬(List.member(A, head, tail))
+        → List.Distinct(A, tail)
+        → List.Distinct(A, List.prepend(A, head, tail))
+
+-- range_down(n) has no duplicates.
+theorem List.range_down_distinct (n : Natural)
+        : List.Distinct(Natural, List.range_down(n)) :=
+  by_induction on n with IH {
+    case zero: List.Distinct.empty(Natural)
+    case successor(predecessor): {
+        claim notMember
+            : ¬(List.member(Natural, successor(predecessor),
+                    List.range_down(predecessor)))
+            by (mem : List.member(Natural, successor(predecessor),
+                    List.range_down(predecessor))) ↦ {
+                claim successor(predecessor) ≤ predecessor
+                    by List.range_down_member_le;
+                claim False by Natural.not_successor_less_or_equal_self;
+                done
+              };
+        List.Distinct.prepend(Natural, successor(predecessor),
+            List.range_down(predecessor), notMember, IH)
+      }
+  }
