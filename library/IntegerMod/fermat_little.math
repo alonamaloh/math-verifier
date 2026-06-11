@@ -1,0 +1,379 @@
+-- IntegerMod/fermat_little.math
+--
+-- Fermat's little theorem (Freek #10): for p prime and x a nonzero class
+-- of F_p, x^(p−1) = 1; equivalently p ∣ a^(p−1) − 1 whenever p ∤ a.
+--
+-- The bijection proof: multiplication by x maps the p−1 nonzero classes
+-- injectively into themselves, so (writing U for that list of classes)
+-- map(x·_, U) is a permutation of U. Multiplying out,
+--
+--   ∏ U = ∏ map(x·_, U) = x^|U| · ∏ U,
+--
+-- and cancelling the (nonzero) product ∏ U leaves x^(p−1) = 1.
+
+module IntegerMod.fermat_little
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.power
+import Natural.prime
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.embedding
+import Integer.ring
+import Integer.divisibility
+import Algebra.ring_lemmas
+import Lists.list
+import Lists.length
+import Lists.map
+import Lists.range
+import Lists.permutation
+import Lists.distinct
+import IntegerMod.basics
+import IntegerMod.operations
+import IntegerMod.ring
+import IntegerMod.instances
+import IntegerMod.field
+import IntegerMod.representative
+import IntegerMod.residues
+import IntegerMod.wilson
+
+-- ----------------------------------------------------------------------
+-- Powers in IntegerMod, by recursion on the exponent: x^0 = 1,
+-- x^(1+k) = x · x^k.
+definition IntegerMod.power (modulus : Natural)
+        (x : IntegerMod(modulus)) : Natural → IntegerMod(modulus)
+  | zero => IntegerMod.one(modulus)
+  | successor(k) => IntegerMod.multiply(x, IntegerMod.power(modulus, x, k))
+
+-- Multiplication by a fixed x, with the modulus explicit so the partial
+-- application `multiply_by(p, x)` is a clean one-argument function to map
+-- over a list (the implicit-modulus `multiply` cannot be partially
+-- applied: a lone argument would land in the modulus slot).
+definition IntegerMod.multiply_by (modulus : Natural)
+        (x y : IntegerMod(modulus)) : IntegerMod(modulus) :=
+  IntegerMod.multiply(x, y)
+
+-- ----------------------------------------------------------------------
+-- Scaling every element of a list by x multiplies its product by
+-- x^length: ∏ map(x·_, l) = x^|l| · ∏ l.
+theorem IntegerMod.product_map_multiply (p : Natural) (x : IntegerMod(p))
+        : (list : List(IntegerMod(p)))
+          → List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+                List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x), list))
+            = IntegerMod.power(p, x, List.length(IntegerMod(p), list))
+                * List.product(IntegerMod(p), IntegerMod.multiply,
+                      IntegerMod.one(p), list)
+  | List.empty =>
+      -- Both sides are 1 (and 1·1 reduces to 1).
+      calc List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+               List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                   List.empty(IntegerMod(p))))
+         = IntegerMod.power(p, x, List.length(IntegerMod(p), List.empty(IntegerMod(p))))
+               * List.product(IntegerMod(p), IntegerMod.multiply,
+                     IntegerMod.one(p), List.empty(IntegerMod(p)))
+  | List.prepend(head, tail) =>
+      -- Peel the head and exchange the four factors.
+      calc List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+               List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                   List.prepend(IntegerMod(p), head, tail)))
+         = (x * head)
+               * List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+                     List.map(IntegerMod(p), IntegerMod(p),
+                         IntegerMod.multiply_by(p, x), tail))
+         = (x * head)
+               * (IntegerMod.power(p, x, List.length(IntegerMod(p), tail))
+                   * List.product(IntegerMod(p), IntegerMod.multiply,
+                         IntegerMod.one(p), tail))
+               by substituting IntegerMod.product_map_multiply(p, x, tail)
+         = (x * IntegerMod.power(p, x, List.length(IntegerMod(p), tail)))
+               * (head * List.product(IntegerMod(p), IntegerMod.multiply,
+                     IntegerMod.one(p), tail))
+               by IntegerMod.multiply_exchange(p, x, head,
+                      IntegerMod.power(p, x, List.length(IntegerMod(p), tail)),
+                      List.product(IntegerMod(p), IntegerMod.multiply,
+                          IntegerMod.one(p), tail))
+         = IntegerMod.power(p, x,
+               List.length(IntegerMod(p), List.prepend(IntegerMod(p), head, tail)))
+               * List.product(IntegerMod(p), IntegerMod.multiply,
+                     IntegerMod.one(p), List.prepend(IntegerMod(p), head, tail))
+
+-- ----------------------------------------------------------------------
+-- A product of nonzero classes is nonzero.
+theorem IntegerMod.product_nonzero (p : Natural)
+        (primality : Natural.is_prime(p))
+        : (list : List(IntegerMod(p)))
+          → ((z : IntegerMod(p)) → List.member(IntegerMod(p), z, list)
+                 → ¬(z = IntegerMod.zero(p)))
+          → ¬(List.product(IntegerMod(p), IntegerMod.multiply,
+                  IntegerMod.one(p), list)
+              = IntegerMod.zero(p))
+  | List.empty =>
+      (membersNonzero
+          : (z : IntegerMod(p)) → List.member(IntegerMod(p), z, List.empty(IntegerMod(p)))
+              → ¬(z = IntegerMod.zero(p)))
+      (productZero
+          : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+                List.empty(IntegerMod(p)))
+            = IntegerMod.zero(p)) ↦ {
+        -- The empty product is 1, and 1 ≠ 0.
+        claim IntegerMod.zero(p) = IntegerMod.one(p)
+            by calc IntegerMod.zero(p)
+                  = IntegerMod.one(p)   by productZero;
+        claim impossible : False since IntegerMod.zero_not_one;
+        impossible
+      }
+  | List.prepend(head, tail) =>
+      (membersNonzero
+          : (z : IntegerMod(p))
+              → List.member(IntegerMod(p), z, List.prepend(IntegerMod(p), head, tail))
+              → ¬(z = IntegerMod.zero(p)))
+      (productZero
+          : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+                List.prepend(IntegerMod(p), head, tail))
+            = IntegerMod.zero(p)) ↦ {
+        -- The head is nonzero, the tail product is nonzero by recursion,
+        -- and a field has no zero divisors.
+        claim ¬(head = IntegerMod.zero(p))
+            by membersNonzero(head, List.member.here(IntegerMod(p), head, tail));
+        claim tailMembersNonzero
+            : (z : IntegerMod(p)) → List.member(IntegerMod(p), z, tail)
+                → ¬(z = IntegerMod.zero(p))
+            by (z : IntegerMod(p))
+               (zMember : List.member(IntegerMod(p), z, tail)) ↦
+                 membersNonzero(z,
+                     List.member.there(IntegerMod(p), z, head, tail, zMember));
+        claim tailProductNonzero
+            : ¬(List.product(IntegerMod(p), IntegerMod.multiply,
+                    IntegerMod.one(p), tail)
+                = IntegerMod.zero(p))
+            by IntegerMod.product_nonzero(p, primality, tail, tailMembersNonzero);
+        -- Read the hypothesis at its reduced shape: head · ∏tail = 0.
+        claim head * List.product(IntegerMod(p), IntegerMod.multiply,
+                  IntegerMod.one(p), tail)
+              = IntegerMod.zero(p)
+            by productZero;
+        claim tailProductZero
+            : List.product(IntegerMod(p), IntegerMod.multiply,
+                  IntegerMod.one(p), tail)
+              = IntegerMod.zero(p)
+            since IntegerMod.no_zero_divisors;
+        tailProductNonzero(tailProductZero)
+      }
+
+-- ----------------------------------------------------------------------
+-- Multiplication by a nonzero class x permutes the nonzero classes: the
+-- scaled list map(x·_, U) is contained in U.
+theorem IntegerMod.scaled_residue_member (p n : Natural)
+        (primality : Natural.is_prime(p))
+        (pEquation : p = 1 + n)
+        (x : IntegerMod(p)) (xNonzero : ¬(x = IntegerMod.zero(p)))
+        (z : IntegerMod(p))
+        (zMember : List.member(IntegerMod(p), z,
+            List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                IntegerMod.residues_up_to(p, n))))
+        : List.member(IntegerMod(p), z, IntegerMod.residues_up_to(p, n)) := {
+  -- z = x·u for a nonzero class u, so z is itself nonzero, hence listed.
+  obtain ⟨u, uProperties⟩
+      from List.map_member_invert(IntegerMod(p), IntegerMod(p),
+               IntegerMod.multiply_by(p, x), z, IntegerMod.residues_up_to(p, n),
+               zMember);
+  let ⟨uMember, scaledEqualsZ⟩ := uProperties;
+  claim ¬(u = IntegerMod.zero(p)) since IntegerMod.residues_member_nonzero;
+  claim ¬(x * u = IntegerMod.zero(p)) since IntegerMod.multiply_nonzero;
+  claim ¬(z = IntegerMod.zero(p)) by substituting scaledEqualsZ;
+  done since IntegerMod.residues_complete
+}
+
+-- ----------------------------------------------------------------------
+-- Fermat's little theorem in F_p: x ≠ 0 implies x^(p−1) = 1.
+theorem IntegerMod.fermat_little (p n : Natural)
+        (primality : Natural.is_prime(p))
+        (pEquation : p = 1 + n)
+        (x : IntegerMod(p)) (xNonzero : ¬(x = IntegerMod.zero(p)))
+        : IntegerMod.power(p, x, n) = IntegerMod.one(p) := {
+  -- The scaled list map(x·_, U) is a permutation of U: it is contained in
+  -- U (scaled_residue_member), distinct (x cancels), and of equal length.
+  claim (z : IntegerMod(p))
+        → List.member(IntegerMod(p), z,
+              List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                  IntegerMod.residues_up_to(p, n)))
+        → List.member(IntegerMod(p), z, IntegerMod.residues_up_to(p, n))
+      by (z : IntegerMod(p))
+         (zMember : List.member(IntegerMod(p), z,
+             List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                 IntegerMod.residues_up_to(p, n)))) ↦ {
+           done since IntegerMod.scaled_residue_member
+         };
+  claim (u v : IntegerMod(p))
+        → List.member(IntegerMod(p), u, IntegerMod.residues_up_to(p, n))
+        → List.member(IntegerMod(p), v, IntegerMod.residues_up_to(p, n))
+        → IntegerMod.multiply_by(p, x, u) = IntegerMod.multiply_by(p, x, v) → u = v
+      by (u v : IntegerMod(p))
+         (uMember : List.member(IntegerMod(p), u, IntegerMod.residues_up_to(p, n)))
+         (vMember : List.member(IntegerMod(p), v, IntegerMod.residues_up_to(p, n)))
+         (scaledEqual : IntegerMod.multiply_by(p, x, u) = IntegerMod.multiply_by(p, x, v)) ↦ {
+           done since IntegerMod.multiply_cancel_left
+         };
+  claim List.Distinct(IntegerMod(p), IntegerMod.residues_up_to(p, n))
+      since IntegerMod.residues_distinct;
+  claim List.Distinct(IntegerMod(p),
+            List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                IntegerMod.residues_up_to(p, n)))
+      since List.map_distinct_on;
+  claim List.length(IntegerMod(p),
+            List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                IntegerMod.residues_up_to(p, n)))
+        = List.length(IntegerMod(p), IntegerMod.residues_up_to(p, n))
+      since List.map_length;
+  claim List.Permutation(IntegerMod(p),
+            List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                IntegerMod.residues_up_to(p, n)),
+            IntegerMod.residues_up_to(p, n))
+      since List.permutation_of_distinct_inclusion;
+  -- Multiply out both sides of the permutation.
+  claim productEquation
+      : List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+            List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                IntegerMod.residues_up_to(p, n)))
+        = IntegerMod.residues_product(p, n)
+      by List.Permutation.product_invariant
+         recalling IntegerMod.multiply_associative(p),
+             IntegerMod.multiply_commutative(p);
+  claim scaledProduct
+      : IntegerMod.power(p, x,
+            List.length(IntegerMod(p), IntegerMod.residues_up_to(p, n)))
+            * IntegerMod.residues_product(p, n)
+        = IntegerMod.residues_product(p, n)
+      by calc IntegerMod.power(p, x,
+                  List.length(IntegerMod(p), IntegerMod.residues_up_to(p, n)))
+                  * IntegerMod.residues_product(p, n)
+            = List.product(IntegerMod(p), IntegerMod.multiply, IntegerMod.one(p),
+                  List.map(IntegerMod(p), IntegerMod(p), IntegerMod.multiply_by(p, x),
+                      IntegerMod.residues_up_to(p, n)))
+                  by IntegerMod.product_map_multiply(p, x,
+                         IntegerMod.residues_up_to(p, n))
+            = IntegerMod.residues_product(p, n)
+                  by productEquation;
+  -- Cancel the nonzero product ∏ U.
+  claim residuesNonzero
+      : (z : IntegerMod(p))
+        → List.member(IntegerMod(p), z, IntegerMod.residues_up_to(p, n))
+        → ¬(z = IntegerMod.zero(p))
+      by (z : IntegerMod(p))
+         (zMember : List.member(IntegerMod(p), z,
+             IntegerMod.residues_up_to(p, n))) ↦ {
+           done since IntegerMod.residues_member_nonzero
+         };
+  claim ¬(IntegerMod.residues_product(p, n) = IntegerMod.zero(p))
+      by IntegerMod.product_nonzero(p, primality,
+             IntegerMod.residues_up_to(p, n), residuesNonzero);
+  claim IntegerMod.residues_product(p, n)
+            * IntegerMod.power(p, x,
+                  List.length(IntegerMod(p), IntegerMod.residues_up_to(p, n)))
+        = IntegerMod.residues_product(p, n) * IntegerMod.one(p)
+      by calc IntegerMod.residues_product(p, n)
+                  * IntegerMod.power(p, x,
+                        List.length(IntegerMod(p), IntegerMod.residues_up_to(p, n)))
+            = IntegerMod.power(p, x,
+                  List.length(IntegerMod(p), IntegerMod.residues_up_to(p, n)))
+                  * IntegerMod.residues_product(p, n)
+                  by IntegerMod.multiply_commutative
+            = IntegerMod.residues_product(p, n)
+                  by scaledProduct
+            = IntegerMod.residues_product(p, n) * IntegerMod.one(p)
+                  by IntegerMod.multiply_identity_right;
+  claim IntegerMod.power(p, x,
+            List.length(IntegerMod(p), IntegerMod.residues_up_to(p, n)))
+        = IntegerMod.one(p)
+      since IntegerMod.multiply_cancel_left;
+  -- The list has exactly n elements.
+  claim lengthValue
+      : List.length(IntegerMod(p), IntegerMod.residues_up_to(p, n)) = n
+      by calc List.length(IntegerMod(p), IntegerMod.residues_up_to(p, n))
+            = List.length(Natural, List.range_down(n))
+                  by List.map_length(Natural, IntegerMod(p),
+                         IntegerMod.residue(p), List.range_down(n))
+            = n   by List.range_down_length(n);
+  done by substituting lengthValue
+}
+
+-- ----------------------------------------------------------------------
+-- Bridging to the integers: the class of a^k is the k-th power of the
+-- class of a.
+theorem IntegerMod.power_of_class (p a : Natural)
+        : (k : Natural)
+          → IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), k)
+            = IntegerMod.make(p, (Natural.power(k, a) : Integer))
+  | zero =>
+      -- Both sides are the class of 1 (a⁰ = 1 by power_zero).
+      calc IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), 0)
+         = IntegerMod.make(p, ((1 : Natural) : Integer))
+         = IntegerMod.make(p, (Natural.power(0, a) : Integer))
+               by Natural.power_zero(a)
+  | successor(k) =>
+      calc IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), successor(k))
+         = IntegerMod.make(p, (a : Integer))
+               * IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), k)
+         = IntegerMod.make(p, (a : Integer))
+               * IntegerMod.make(p, (Natural.power(k, a) : Integer))
+               by substituting IntegerMod.power_of_class(p, a, k)
+         = IntegerMod.make(p, (a : Integer) * (Natural.power(k, a) : Integer))
+         = IntegerMod.make(p, ((a * Natural.power(k, a) : Natural) : Integer))
+               by Natural.to_integer.multiply_preserves(a, Natural.power(k, a))
+         = IntegerMod.make(p, (Natural.power(successor(k), a) : Integer))
+               by Natural.power_succ(k, a)
+
+-- A natural number not divisible by p has a nonzero class.
+theorem IntegerMod.class_nonzero_of_not_divides (p a : Natural)
+        (notDivides : ¬(Natural.divides(p, a)))
+        : ¬(IntegerMod.make(p, (a : Integer)) = IntegerMod.zero(p)) :=
+  (classZero : IntegerMod.make(p, (a : Integer)) = IntegerMod.zero(p)) ↦ {
+    -- p ∣ a − 0 = a, over the integers and then over the naturals.
+    obtain ⟨quotient, differenceEquation⟩ by IntegerMod.congruent_of_make_equal;
+    claim Integer.divides((p : Integer), (a : Integer))
+        by ⟨quotient,
+            calc (a : Integer)
+               = (a : Integer) - Integer.zero   by ring
+               = (p : Integer) * quotient       by differenceEquation⟩;
+    claim naturalDivides : Natural.divides(p, a)
+        since Integer.natural_divides_of_integer_divides;
+    notDivides(naturalDivides)
+  }
+
+-- ----------------------------------------------------------------------
+-- Fermat's little theorem over the integers (Freek #10): for p prime,
+-- p = 1 + n, and p ∤ a, we have p ∣ a^n − 1.
+theorem Natural.fermat_little (p n a : Natural)
+        (primality : Natural.is_prime(p))
+        (pEquation : p = 1 + n)
+        (notDivides : ¬(Natural.divides(p, a)))
+        : Integer.divides((p : Integer),
+              (Natural.power(n, a) : Integer) - Integer.one) := {
+  claim ¬(IntegerMod.make(p, (a : Integer)) = IntegerMod.zero(p))
+      since IntegerMod.class_nonzero_of_not_divides;
+  claim classPower
+      : IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), n)
+        = IntegerMod.one(p)
+      since IntegerMod.fermat_little;
+  claim IntegerMod.make(p, (Natural.power(n, a) : Integer))
+      = IntegerMod.make(p, Integer.one)
+      by calc IntegerMod.make(p, (Natural.power(n, a) : Integer))
+            = IntegerMod.power(p, IntegerMod.make(p, (a : Integer)), n)
+                  by IntegerMod.power_of_class(p, a, n)
+            = IntegerMod.one(p)
+                  by classPower;
+  -- Equal classes mean congruent representatives: p ∣ a^n − 1.
+  claim congruent
+      : Integer.CongruentModulo(p, (Natural.power(n, a) : Integer), Integer.one)
+      by IntegerMod.congruent_of_make_equal;
+  congruent
+}
