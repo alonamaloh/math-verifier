@@ -38,3 +38,26 @@ definition IsCommutativeMonoid
     IsMonoid(carrier, operation, identity)
     ∧ ((x y : carrier) →
            operation(x, y) = operation(y, x))
+
+-- An element of a commutative monoid has at most one inverse: if x and y
+-- both cancel w, then x = (y·w)·x = y·(x·w) = y. (Unbundled hypotheses, in
+-- the style of the list fold-product lemmas that consume it.)
+theorem shared_inverse_equal (carrier : Type(0))
+        (operation : carrier → carrier → carrier) (identity : carrier)
+        (associativity
+            : (a b c : carrier)
+              → operation(operation(a, b), c) = operation(a, operation(b, c)))
+        (commutativity : (a b : carrier) → operation(a, b) = operation(b, a))
+        (identityLeft : (a : carrier) → operation(identity, a) = a)
+        (x y w : carrier)
+        (xCancelsW : operation(x, w) = identity)
+        (yCancelsW : operation(y, w) = identity)
+        : x = y :=
+  calc x
+     = operation(identity, x)               by identityLeft(x)
+     = operation(operation(y, w), x)        by substituting yCancelsW
+     = operation(y, operation(w, x))        by associativity(y, w, x)
+     = operation(y, operation(x, w))        by commutativity(w, x)
+     = operation(y, identity)               by substituting xCancelsW
+     = operation(identity, y)               by commutativity(y, identity)
+     = y                                    by identityLeft(y)

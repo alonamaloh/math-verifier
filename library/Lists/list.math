@@ -98,6 +98,20 @@ theorem List.member_prepend_invert (A : Type(0)) (element head : A)
   List.member_invert_general(A, element, List.prepend(A, head, tail), mem,
       head, tail, reflexivity(List(A), List.prepend(A, head, tail)))
 
+-- A member of prepend(head, tail) that is not the head is in the tail.
+theorem List.member_of_prepend_not_head (A : Type(0)) (element head : A)
+        (tail : List(A))
+        (mem : List.member(A, element, List.prepend(A, head, tail)))
+        (notHead : ¬(element = head))
+        : List.member(A, element, tail) := {
+  claim split : element = head ∨ List.member(A, element, tail)
+      by List.member_prepend_invert;
+  cases split {
+    | Or.introduceLeft(isHead)   => absurd(notHead(isHead))
+    | Or.introduceRight(inTail)  => inTail
+  }
+}
+
 -- Discriminator: True on `prepend`, False on `empty`. Refutes membership
 -- in the empty list — any member proof lifts to `is_nonempty`, but
 -- `is_nonempty(empty)` is False.

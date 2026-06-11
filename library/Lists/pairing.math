@@ -10,9 +10,16 @@
 module Lists.pairing
 
 import Logic.basics
+import Logic.exists
 import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.add_order
+import Algebra.monoid
 import Lists.list
+import Lists.length
 import Lists.permutation
+import Lists.distinct
 
 -- A list that permutes to `prepend(x, prepend(y, rest))` with `x · y =
 -- one` has the same product as `rest`: the pair `{x, y}` contributes the
@@ -44,3 +51,254 @@ theorem List.Permutation.pair_collapse (A : Type(0))
            by substituting pairsToOne
      = List.product(A, multiply, one, rest)
            by identityLeft(List.product(A, multiply, one, rest))
+
+-- ----------------------------------------------------------------------
+-- The full orbit collapse. A list in which every member has an inverse
+-- *elsewhere* in the list multiplies out to the identity: repeatedly pull
+-- a member and its partner to the front and drop the pair. This is the
+-- engine of Wilson's theorem, applied there to the nonzero classes of F_p
+-- other than ±1 (which are exactly the self-inverse ones).
+
+-- z has an inverse partner elsewhere in the list: some OTHER member w
+-- with z · w = one.
+definition List.has_distinct_inverse_in (A : Type(0))
+        (multiply : A → A → A) (one : A)
+        (list : List(A)) (z : A) : Proposition :=
+  ∃ (w : A). List.member(A, w, list) ∧ multiply(z, w) = one ∧ ¬(w = z)
+
+-- Dropping an inverse pair from the front preserves the pairing property:
+-- if every member of `list` has an inverse elsewhere in `list`, and `list`
+-- permutes to head :: partner :: rest with head · partner = one, then every
+-- member of `rest` still has its inverse inside `rest`. The partner of a
+-- z ∈ rest cannot be `head` (z and partner would share the inverse `head`,
+-- forcing z = partner ∉ rest) nor `partner` (z and head would share the
+-- inverse `partner`, forcing z = head ∉ rest).
+theorem List.paired_inverses_drop_pair (A : Type(0))
+        (multiply : A → A → A) (one : A)
+        (associativity
+            : (a b c : A) → multiply(multiply(a, b), c) = multiply(a, multiply(b, c)))
+        (commutativity : (a b : A) → multiply(a, b) = multiply(b, a))
+        (identityLeft : (a : A) → multiply(one, a) = a)
+        (list : List(A)) (head partner : A) (rest : List(A))
+        (listPermutation
+            : List.Permutation(A, list,
+                  List.prepend(A, head, List.prepend(A, partner, rest))))
+        (headPairsToOne : multiply(head, partner) = one)
+        (headNotInRest : ¬(List.member(A, head, rest)))
+        (partnerNotInRest : ¬(List.member(A, partner, rest)))
+        (paired : (z : A) → List.member(A, z, list)
+            → List.has_distinct_inverse_in(A, multiply, one, list, z))
+        : (z : A) → List.member(A, z, rest)
+          → List.has_distinct_inverse_in(A, multiply, one, rest, z) :=
+  (z : A) (zMemberRest : List.member(A, z, rest)) ↦ {
+    -- z sits in the original list, so it has a partner w there.
+    claim List.member(A, z,
+              List.prepend(A, head, List.prepend(A, partner, rest)))
+        by List.member.there(A, z, head, List.prepend(A, partner, rest),
+               List.member.there(A, z, partner, rest, zMemberRest));
+    claim List.Permutation(A,
+              List.prepend(A, head, List.prepend(A, partner, rest)), list)
+        by List.Permutation.symmetric;
+    claim zMemberList : List.member(A, z, list)
+        by List.Permutation.member_forward;
+    obtain ⟨w, wProperties⟩ from paired(z, zMemberList);
+    let ⟨wMemberList, wInverseProperties⟩ := wProperties;
+    let ⟨zPairsToOne, wNotZ⟩ := wInverseProperties;
+    claim List.member(A, w,
+              List.prepend(A, head, List.prepend(A, partner, rest)))
+        by List.Permutation.member_forward;
+    -- w ≠ head: otherwise z and partner both cancel head, so z = partner —
+    -- but partner ∉ rest.
+    claim ¬(w = head)
+        by (wEqualsHead : w = head) ↦ {
+            claim multiply(z, head) = one
+                by substituting wEqualsHead;
+            claim multiply(partner, head) = one
+                by calc multiply(partner, head)
+                      = multiply(head, partner)   by commutativity(head, partner)
+                      = one                       by headPairsToOne;
+            claim zEqualsPartner : z = partner
+                by shared_inverse_equal;
+            claim partnerMemberRest : List.member(A, partner, rest)
+                by substituting zEqualsPartner;
+            partnerNotInRest(partnerMemberRest)
+          };
+    -- w ≠ partner: otherwise z and head both cancel partner, so z = head —
+    -- but head ∉ rest.
+    claim ¬(w = partner)
+        by (wEqualsPartner : w = partner) ↦ {
+            claim multiply(z, partner) = one
+                by substituting wEqualsPartner;
+            claim zEqualsHead : z = head
+                by shared_inverse_equal;
+            claim headMemberRest : List.member(A, head, rest)
+                by substituting zEqualsHead;
+            headNotInRest(headMemberRest)
+          };
+    -- So w sits in rest, and is the required partner.
+    claim List.member(A, w, List.prepend(A, partner, rest))
+        by List.member_of_prepend_not_head;
+    claim wMemberRest : List.member(A, w, rest)
+        by List.member_of_prepend_not_head;
+    witness w with
+        And.introduction(wMemberRest, And.introduction(zPairsToOne, wNotZ))
+  }
+
+-- The collapse, by induction on an explicit length bound (each step
+-- removes a pair, so plain structural induction does not fit).
+theorem List.product_one_of_paired_inverses_bounded (A : Type(0))
+        (multiply : A → A → A) (one : A)
+        (associativity
+            : (a b c : A) → multiply(multiply(a, b), c) = multiply(a, multiply(b, c)))
+        (commutativity : (a b : A) → multiply(a, b) = multiply(b, a))
+        (identityLeft : (a : A) → multiply(one, a) = a)
+        (bound : Natural)
+        : (list : List(A))
+          → List.length(A, list) ≤ bound
+          → List.Distinct(A, list)
+          → ((z : A) → List.member(A, z, list)
+                 → List.has_distinct_inverse_in(A, multiply, one, list, z))
+          → List.product(A, multiply, one, list) = one :=
+  by_induction on bound with IH {
+    case zero: {
+        take list : List(A);
+        cases list {
+          | List.empty => {
+              suppose List.length(A, List.empty(A)) ≤ 0 as _;
+              suppose List.Distinct(A, List.empty(A)) as _;
+              suppose (z : A) → List.member(A, z, List.empty(A))
+                  → List.has_distinct_inverse_in(A, multiply, one,
+                        List.empty(A), z) as _;
+              calc List.product(A, multiply, one, List.empty(A)) = one
+            }
+          | List.prepend(head, tail) => {
+              -- A nonempty list has successor length, never ≤ 0.
+              suppose List.length(A, List.prepend(A, head, tail)) ≤ 0 as lengthBound;
+              suppose List.Distinct(A, List.prepend(A, head, tail)) as _;
+              suppose (z : A) → List.member(A, z, List.prepend(A, head, tail))
+                  → List.has_distinct_inverse_in(A, multiply, one,
+                        List.prepend(A, head, tail), z) as _;
+              claim successor(List.length(A, tail)) ≤ 0 by lengthBound;
+              claim False by Natural.not_less_or_equal_successor_zero;
+              done
+            }
+        }
+      }
+    case successor(boundPredecessor): {
+        take list : List(A);
+        cases list {
+          | List.empty => {
+              suppose List.length(A, List.empty(A)) ≤ successor(boundPredecessor) as _;
+              suppose List.Distinct(A, List.empty(A)) as _;
+              suppose (z : A) → List.member(A, z, List.empty(A))
+                  → List.has_distinct_inverse_in(A, multiply, one,
+                        List.empty(A), z) as _;
+              calc List.product(A, multiply, one, List.empty(A)) = one
+            }
+          | List.prepend(head, tail) => {
+              suppose List.length(A, List.prepend(A, head, tail))
+                  ≤ successor(boundPredecessor) as lengthBound;
+              suppose List.Distinct(A, List.prepend(A, head, tail)) as distinct;
+              suppose (z : A) → List.member(A, z, List.prepend(A, head, tail))
+                  → List.has_distinct_inverse_in(A, multiply, one,
+                        List.prepend(A, head, tail), z) as paired;
+
+              -- The head has a partner elsewhere in the list — in the tail.
+              claim headMember
+                  : List.member(A, head, List.prepend(A, head, tail))
+                  by List.member.here(A, head, tail);
+              obtain ⟨partner, partnerProperties⟩ from paired(head, headMember);
+              let ⟨partnerMember, partnerInverseProperties⟩ := partnerProperties;
+              let ⟨headPairsToOne, partnerNotHead⟩ := partnerInverseProperties;
+              claim partnerInTail : List.member(A, partner, tail)
+                  by List.member_of_prepend_not_head;
+
+              -- Rotate the partner to the front of the tail, so the whole
+              -- list permutes to head :: partner :: rest.
+              obtain ⟨rest, tailPermutation⟩
+                  from List.Permutation.extract(A, partner, tail, partnerInTail);
+              claim List.Permutation(A, List.prepend(A, head, tail),
+                        List.prepend(A, head, List.prepend(A, partner, rest)))
+                  by List.Permutation.skip(A, head, tail,
+                         List.prepend(A, partner, rest), tailPermutation);
+
+              -- The pair {head, partner} multiplies to one and drops out.
+              claim productCollapse
+                  : List.product(A, multiply, one, List.prepend(A, head, tail))
+                    = List.product(A, multiply, one, rest)
+                  by List.Permutation.pair_collapse;
+
+              -- What remains is still distinct…
+              claim List.Distinct(A,
+                        List.prepend(A, head, List.prepend(A, partner, rest)))
+                  by List.Permutation.distinct_invariant;
+              claim headNotInPartnerRest
+                  : ¬(List.member(A, head, List.prepend(A, partner, rest)))
+                  by List.Distinct.head_not_member;
+              claim List.Distinct(A, List.prepend(A, partner, rest))
+                  by List.Distinct.tail_distinct;
+              claim ¬(List.member(A, partner, rest))
+                  by List.Distinct.head_not_member;
+              claim restDistinct : List.Distinct(A, rest)
+                  by List.Distinct.tail_distinct;
+              claim ¬(List.member(A, head, rest))
+                  by (memberHeadInRest : List.member(A, head, rest)) ↦
+                      headNotInPartnerRest(
+                          List.member.there(A, head, partner, rest,
+                              memberHeadInRest));
+
+              -- …and shorter: |list| = 2 + |rest|, so |rest| fits the
+              -- smaller bound.
+              claim lengthEquation
+                  : List.length(A, List.prepend(A, head, tail))
+                    = List.length(A,
+                          List.prepend(A, head, List.prepend(A, partner, rest)))
+                  by List.Permutation.length_invariant;
+              claim successor(successor(List.length(A, rest)))
+                    ≤ successor(boundPredecessor)
+                  by calc successor(successor(List.length(A, rest)))
+                        = List.length(A, List.prepend(A, head, tail))
+                              by lengthEquation
+                        ≤ successor(boundPredecessor)
+                              by lengthBound;
+              claim successor(List.length(A, rest)) ≤ boundPredecessor
+                  by Natural.successor_le_cancel;
+              claim restLengthBound : List.length(A, rest) ≤ boundPredecessor
+                  by Natural.less_or_equal_predecessor_less_or_equal;
+
+              -- …and still pairs off: a member of rest keeps its partner,
+              -- which can be neither head nor partner (inverses are unique,
+              -- and those two pair with each other).
+              claim restPaired
+                  : (z : A) → List.member(A, z, rest)
+                    → List.has_distinct_inverse_in(A, multiply, one, rest, z)
+                  by (z : A) (zMemberRest : List.member(A, z, rest)) ↦ {
+                      done by List.paired_inverses_drop_pair
+                    };
+
+              -- Conclude by the induction hypothesis on the remainder.
+              calc List.product(A, multiply, one, List.prepend(A, head, tail))
+                 = List.product(A, multiply, one, rest)   by productCollapse
+                 = one
+                       by IH(rest, restLengthBound, restDistinct, restPaired)
+            }
+        }
+      }
+  }
+
+-- The clean entry point: a distinct list in which every member has an
+-- inverse elsewhere in the list multiplies out to the identity.
+theorem List.product_one_of_paired_inverses (A : Type(0))
+        (multiply : A → A → A) (one : A)
+        (associativity
+            : (a b c : A) → multiply(multiply(a, b), c) = multiply(a, multiply(b, c)))
+        (commutativity : (a b : A) → multiply(a, b) = multiply(b, a))
+        (identityLeft : (a : A) → multiply(one, a) = a)
+        (list : List(A))
+        (distinct : List.Distinct(A, list))
+        (paired : (z : A) → List.member(A, z, list)
+            → List.has_distinct_inverse_in(A, multiply, one, list, z))
+        : List.product(A, multiply, one, list) = one := {
+  claim List.length(A, list) ≤ List.length(A, list);
+  done by List.product_one_of_paired_inverses_bounded
+}
