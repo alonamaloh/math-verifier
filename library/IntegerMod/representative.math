@@ -1,0 +1,46 @@
+-- IntegerMod/representative.math
+--
+-- Modular reduction: every class of IntegerMod(p) (p positive) is the class
+-- of a natural number r < p. Used to enumerate the residues; broadly the
+-- "canonical representative in [0, p−1]" fact for ℤ/p.
+
+module IntegerMod.representative
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.addition
+import Integer.ring
+import Integer.algebra
+import Integer.divisibility
+import Algebra.integer_euclidean
+import IntegerMod.basics
+import IntegerMod.operations
+
+-- Every class is `make(p, r)` for some natural `r` with `r < p`.
+theorem IntegerMod.exists_natural_representative (p : Natural) (pPositive : 1 ≤ p)
+        (c : IntegerMod(p))
+        : ∃ (r : Natural). successor(r) ≤ p
+            ∧ c = IntegerMod.make(p, (r : Integer)) :=
+  cases c { | x =>
+    {
+      obtain ⟨quotient, remainder, properties⟩
+          from Integer.divide_by_positive(x, p, pPositive);
+      let ⟨xEquation, remainderBound⟩ := properties;
+      claim differenceEquation
+          : x - (remainder : Integer) = (p : Integer) * quotient
+          by calc x - (remainder : Integer)
+                = ((p : Integer) * quotient + (remainder : Integer))
+                    - (remainder : Integer)
+                      by substituting xEquation
+                = (p : Integer) * quotient   by ring;
+      claim congruent : Integer.CongruentModulo(p, x, (remainder : Integer))
+          by ⟨quotient, differenceEquation⟩;
+      ⟨remainder, And.introduction(remainderBound,
+          Quotient.sound(x, (remainder : Integer), congruent))⟩
+    }
+  }
