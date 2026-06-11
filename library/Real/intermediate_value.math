@@ -1,0 +1,341 @@
+-- Real/intermediate_value.math
+--
+-- The intermediate value theorem: a function continuous on [a, b] that
+-- starts at or below zero and ends at or above zero hits zero.
+--
+-- The classical supremum proof. Let S be the set of points of [a, b]
+-- where f is still ≤ 0, and let c = sup S (S is nonempty — it holds a
+-- — and bounded above by b). Continuity at c rules both signs out:
+--   * f(c) > 0 would push a whole δ-band below c out of S, making
+--     c − δ a smaller upper bound than the least one;
+--   * f(c) < 0 would keep f negative on a δ-band around c, and either
+--     a point just above c lands in S (beating the upper bound c), or
+--     b itself lies in the band and f(b) < 0 contradicts f(b) ≥ 0.
+-- Everything runs on the sealed Real interface: the supremum from
+-- completeness, the two-sided |·| bounds, and rational density for
+-- turning the real gap |f(c)| into a rational tolerance.
+
+module Real.intermediate_value
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Rational.basics
+import Rational.addition
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Set.basics
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.order
+import Real.linearity
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.embedding_order
+import Real.density
+import Real.supremum
+import Real.limits
+import Real.continuity
+
+-- ----------------------------------------------------------------------
+-- The candidate set: points of [a, b] where f has not yet crossed zero.
+definition Real.intermediate_value_candidates
+        (f : Real → Real) (a b : Real) : Set(Real) :=
+  (x : Real) ↦ And(a ≤ x, And(x ≤ b, f(x) ≤ Real.zero))
+
+-- ----------------------------------------------------------------------
+-- The intermediate value theorem (zero-crossing form).
+theorem Real.intermediate_value
+        (f : Real → Real) (a b : Real)
+        (aLeqB : a ≤ b)
+        (fContinuous : Real.ContinuousOn(f, a, b))
+        (fStartsNonpositive : f(a) ≤ Real.zero)
+        (fEndsNonnegative : Real.zero ≤ f(b))
+        : ∃ (c : Real). And(a ≤ c, And(c ≤ b, f(c) = Real.zero)) := {
+  -- a is a candidate, and b bounds all of them, so the supremum exists.
+  claim aLeqA : a ≤ a since Real.LessOrEqual.reflexive;
+  claim aInCandidates : a ∈ Real.intermediate_value_candidates(f, a, b)
+      by And.introduction(
+             aLeqA, And.introduction(aLeqB, fStartsNonpositive));
+  claim bIsUpper : Real.IsUpperBound(Real.intermediate_value_candidates(f, a, b), b)
+      by (y : Real) (yInCandidates : y ∈ Real.intermediate_value_candidates(f, a, b)) ↦ {
+           obtain ⟨_, yRest⟩ from yInCandidates;
+           obtain ⟨yLeqB, _⟩ from yRest;
+           yLeqB
+         };
+  obtain ⟨c, isSupremum⟩
+      from Real.supremum_exists(
+               Real.intermediate_value_candidates(f, a, b), ⟨a, aInCandidates⟩, ⟨b, bIsUpper⟩);
+  let ⟨isUpper, isLeast⟩ := isSupremum;
+  claim aLeqC : a ≤ c by isUpper(a, aInCandidates);
+  claim cLeqB : c ≤ b by isLeast(b, bIsUpper);
+  claim fContinuousAtC : Real.ContinuousAt(f, c)
+      by fContinuous(c, aLeqC, cLeqB);
+
+  -- ------------------------------------------------------------------
+  -- f(c) ≤ 0: otherwise f stays positive on a δ-band around c, so
+  -- c − δ already bounds the candidate set — beating the least bound c.
+  claim f(c) ≤ Real.zero
+      by cases {
+           case f(c) ≤ Real.zero as nonpositive: nonpositive
+           case Not(f(c) ≤ Real.zero) as notNonpositive: {
+               claim fCPositive : Real.zero < f(c)
+                   since Real.LessThan_of_not_LessOrEqual;
+               -- A rational tolerance inside the gap (0, f(c)).
+               obtain ⟨epsilon, epsilonData⟩
+                   from Real.exists_positive_rational_below(
+                            f(c), fCPositive);
+               let ⟨epsilonPositive, epsilonBelowFC⟩ := epsilonData;
+               obtain ⟨delta, deltaProperties⟩
+                   from fContinuousAtC(epsilon, epsilonPositive);
+               obtain ⟨deltaPositive, fClose⟩ from deltaProperties;
+               claim deltaRealPositive : Real.zero < (delta : Real)
+                   since Rational.to_real.positive_preserves;
+               -- Any candidate above c − δ would sit δ-close to c
+               -- (candidates never exceed c), forcing f > 0 there —
+               -- impossible for a candidate. So c − δ is an upper bound.
+               claim shiftedIsUpper
+                     : Real.IsUpperBound(Real.intermediate_value_candidates(f, a, b), c - (delta : Real))
+                   by (y : Real) (yInCandidates : y ∈ Real.intermediate_value_candidates(f, a, b)) ↦
+                        decide y ≤ c - (delta : Real) {
+                          | yes below => below
+                          | no notBelow => {
+                              obtain ⟨_, yRest⟩ from yInCandidates;
+                              obtain ⟨_, fYNonpositive⟩ from yRest;
+                              claim y ≤ c by isUpper(y, yInCandidates);
+                              claim c - (delta : Real) < y
+                                  since Real.LessThan_of_not_LessOrEqual;
+                              -- |y − c| < δ from the two sides.
+                              claim -(delta : Real) < y - c
+                                  by calc -(delta : Real)
+                                        = (c - (delta : Real)) - c   by ring
+                                        < y - c
+                                              by Real.add_preserves_LessThan;
+                              claim y - c < (delta : Real)
+                                  by calc y - c
+                                        ≤ c - c             by Real.add_preserves_LessOrEqual
+                                        = Real.zero         by ring
+                                        < (delta : Real)    by deltaRealPositive;
+                              claim yClose : abs(y - c) < (delta : Real)
+                                  since Real.absolute_value_LessThan_of_bounds;
+                              claim fImageClose
+                                    : abs(f(y) - f(c)) < (epsilon : Real)
+                                  by fClose(y, yClose);
+                              obtain ⟨fLowerSide, _⟩
+                                  from Real.absolute_value_LessThan_bounds(
+                                           f(y) - f(c), (epsilon : Real),
+                                           fImageClose);
+                              -- 0 < f(c) − ε < f(y), yet f(y) ≤ 0.
+                              claim Real.zero < f(c) - (epsilon : Real)
+                                  by calc Real.zero
+                                        = (epsilon : Real) - (epsilon : Real)
+                                              by ring
+                                        < f(c) - (epsilon : Real)
+                                              by Real.add_preserves_LessThan;
+                              claim Real.zero ≤ f(c) - (epsilon : Real)
+                                  since Real.LessThan.weaken;
+                              claim f(c) - (epsilon : Real) < f(y)
+                                  by calc f(c) - (epsilon : Real)
+                                        = -(epsilon : Real) + f(c)     by ring
+                                        < (f(y) - f(c)) + f(c)
+                                              by Real.add_preserves_LessThan
+                                        = f(y)                         by ring;
+                              claim Real.zero < f(y)
+                                  since Real.LessThan.transitive_left;
+                              claim Real.zero < Real.zero
+                                  since Real.LessThan.transitive_right;
+                              claim notSelfEqual : ¬(Real.zero = Real.zero)
+                                  since Real.LessThan.distinct;
+                              absurd(notSelfEqual(reflexivity(Real, Real.zero)))
+                            }
+                        };
+               claim c ≤ c - (delta : Real)
+                   by isLeast(c - (delta : Real), shiftedIsUpper);
+               claim c - (delta : Real) < c
+                   since Real.subtract_positive_LessThan;
+               claim c < c since Real.LessThan.transitive_left;
+               claim notSelfEqual : ¬(c = c) since Real.LessThan.distinct;
+               absurd(notSelfEqual(reflexivity(Real, c)))
+             }
+         };
+
+  -- ------------------------------------------------------------------
+  -- 0 ≤ f(c): otherwise f stays negative on a δ-band around c. Either
+  -- a point just above c is then a candidate beyond the upper bound c,
+  -- or b itself lies in the band and f(b) < 0 — both absurd.
+  claim Real.zero ≤ f(c)
+      by cases {
+           case Real.zero ≤ f(c) as nonnegative: nonnegative
+           case Not(Real.zero ≤ f(c)) as notNonnegative: {
+               claim f(c) < Real.zero
+                   since Real.LessThan_of_not_LessOrEqual;
+               claim negFCPositive : Real.zero < -f(c)
+                   by calc Real.zero
+                         = f(c) + -f(c)           by ring
+                         < Real.zero + -f(c)
+                               by Real.add_preserves_LessThan
+                         = -f(c)                  by ring;
+               -- A rational tolerance inside the gap (0, −f(c)).
+               obtain ⟨epsilon, epsilonData⟩
+                   from Real.exists_positive_rational_below(
+                            -f(c), negFCPositive);
+               let ⟨epsilonPositive, epsilonBelowNegFC⟩ := epsilonData;
+               obtain ⟨delta, deltaProperties⟩
+                   from fContinuousAtC(epsilon, epsilonPositive);
+               obtain ⟨deltaPositive, fClose⟩ from deltaProperties;
+               -- Everything δ-close to c keeps f negative.
+               claim bandNegative
+                     : (y : Real) → abs(y - c) < (delta : Real)
+                       → f(y) < Real.zero
+                   by (y : Real)
+                      (yClose : abs(y - c) < (delta : Real)) ↦ {
+                        claim fImageClose
+                              : abs(f(y) - f(c)) < (epsilon : Real)
+                            by fClose(y, yClose);
+                        obtain ⟨_, fUpperSide⟩
+                            from Real.absolute_value_LessThan_bounds(
+                                     f(y) - f(c), (epsilon : Real),
+                                     fImageClose);
+                        -- f(y) < f(c) + ε < f(c) + (−f(c)) = 0.
+                        claim f(c) + (epsilon : Real) < Real.zero
+                            by calc f(c) + (epsilon : Real)
+                                  = (epsilon : Real) + f(c)   by ring
+                                  < -f(c) + f(c)
+                                        by Real.add_preserves_LessThan
+                                  = Real.zero                 by ring;
+                        claim f(y) < f(c) + (epsilon : Real)
+                            by calc f(y)
+                                  = (f(y) - f(c)) + f(c)      by ring
+                                  < (epsilon : Real) + f(c)
+                                        by Real.add_preserves_LessThan
+                                  = f(c) + (epsilon : Real)   by ring;
+                        claim f(y) ≤ f(c) + (epsilon : Real)
+                            since Real.LessThan.weaken;
+                        done since Real.LessThan.transitive_left
+                      };
+               -- The half-δ step we probe with, as a real quantity.
+               claim Rational.halve(delta) < delta
+                   since Rational.halve_less_than_self;
+               claim halfBelowDelta
+                     : (Rational.halve(delta) : Real) < (delta : Real)
+                   since Rational.to_real.LessThan_preserves;
+               claim Real.zero < (Rational.halve(delta) : Real)
+                   by Rational.to_real.positive_preserves(
+                          Rational.halve(delta),
+                          Rational.halve_positive(delta, deltaPositive));
+               claim halfRealNonneg
+                     : Real.zero ≤ (Rational.halve(delta) : Real)
+                   since Real.LessThan.weaken;
+               decide c + (Rational.halve(delta) : Real) ≤ b {
+                 -- c + δ/2 stays inside [a, b]: it is a candidate
+                 -- strictly above the upper bound c.
+                 | yes insideInterval => {
+                     claim -(delta : Real)
+                             < (c + (Rational.halve(delta) : Real)) - c
+                         by calc -(delta : Real)
+                               = Real.zero - (delta : Real)         by ring
+                               < (delta : Real) - (delta : Real)
+                                     by Real.add_preserves_LessThan
+                               = Real.zero                          by ring
+                               ≤ (Rational.halve(delta) : Real)
+                                     by halfRealNonneg
+                               = (c + (Rational.halve(delta) : Real)) - c
+                                     by ring;
+                     claim (c + (Rational.halve(delta) : Real)) - c
+                             < (delta : Real)
+                         by calc (c + (Rational.halve(delta) : Real)) - c
+                               = (Rational.halve(delta) : Real)   by ring
+                               < (delta : Real)                   by halfBelowDelta;
+                     claim candidateClose
+                           : abs((c + (Rational.halve(delta) : Real)) - c)
+                               < (delta : Real)
+                         since Real.absolute_value_LessThan_of_bounds;
+                     claim f(c + (Rational.halve(delta) : Real)) < Real.zero
+                         by bandNegative(
+                                c + (Rational.halve(delta) : Real),
+                                candidateClose);
+                     claim fCandidateNonpositive
+                           : f(c + (Rational.halve(delta) : Real)) ≤ Real.zero
+                         since Real.LessThan.weaken;
+                     claim aLeqCandidate
+                           : a ≤ c + (Rational.halve(delta) : Real)
+                         by calc a
+                               ≤ c                          by aLeqC
+                               = Real.zero + c              by ring
+                               ≤ (Rational.halve(delta) : Real) + c
+                                     by Real.add_preserves_LessOrEqual
+                               = c + (Rational.halve(delta) : Real)
+                                     by ring;
+                     claim candidateInCandidates
+                           : (c + (Rational.halve(delta) : Real)) ∈ Real.intermediate_value_candidates(f, a, b)
+                         by And.introduction(
+                                aLeqCandidate,
+                                And.introduction(
+                                    insideInterval, fCandidateNonpositive));
+                     claim c + (Rational.halve(delta) : Real) ≤ c
+                         by isUpper(
+                                c + (Rational.halve(delta) : Real),
+                                candidateInCandidates);
+                     claim c < c + (Rational.halve(delta) : Real)
+                         by calc c
+                               = Real.zero + c    by ring
+                               < (Rational.halve(delta) : Real) + c
+                                     by Real.add_preserves_LessThan
+                               = c + (Rational.halve(delta) : Real)
+                                     by ring;
+                     claim c < c since Real.LessThan.transitive_right;
+                     claim notSelfEqual : ¬(c = c)
+                         since Real.LessThan.distinct;
+                     absurd(notSelfEqual(reflexivity(Real, c)))
+                   }
+                 -- Otherwise b itself sits inside the δ-band, so
+                 -- f(b) < 0 — against f(b) ≥ 0.
+                 | no notInside => {
+                     claim b < c + (Rational.halve(delta) : Real)
+                         since Real.LessThan_of_not_LessOrEqual;
+                     claim -(delta : Real) < b - c
+                         by calc -(delta : Real)
+                               = Real.zero - (delta : Real)        by ring
+                               < (delta : Real) - (delta : Real)
+                                     by Real.add_preserves_LessThan
+                               = c - c                             by ring
+                               ≤ b - c
+                                     by Real.add_preserves_LessOrEqual;
+                     claim b - c < (delta : Real)
+                         by calc b - c
+                               < (c + (Rational.halve(delta) : Real)) - c
+                                     by Real.add_preserves_LessThan
+                               = (Rational.halve(delta) : Real)    by ring
+                               < (delta : Real)                    by halfBelowDelta;
+                     claim bClose : abs(b - c) < (delta : Real)
+                         since Real.absolute_value_LessThan_of_bounds;
+                     claim f(b) < Real.zero by bandNegative(b, bClose);
+                     claim Real.zero < Real.zero
+                         since Real.LessThan.transitive_left;
+                     claim notSelfEqual : ¬(Real.zero = Real.zero)
+                         since Real.LessThan.distinct;
+                     absurd(notSelfEqual(reflexivity(Real, Real.zero)))
+                   }
+               }
+             }
+         };
+
+  claim fCZero : f(c) = Real.zero
+      since Real.LessOrEqual.antisymmetric;
+  witness c with ⟨aLeqC, ⟨cLeqB, fCZero⟩⟩
+}
