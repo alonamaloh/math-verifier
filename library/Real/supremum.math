@@ -1772,3 +1772,34 @@ theorem Real.supremum_exists
                 initialLeftBelowSome,
                 otherBound, otherIsUpper))
 }
+
+-- ----------------------------------------------------------------------
+-- Approximation from below: anything strictly below the supremum is
+-- exceeded by some element of the set. (Otherwise that smaller value
+-- would itself be an upper bound, contradicting leastness.) This is
+-- the lemma every "the supremum is attained up to ε" argument — IVT,
+-- monotone convergence on sets — actually consumes.
+theorem Real.IsSupremum.exists_above
+        (subset : Set(Real)) (s u : Real)
+        (isSupremum : Real.IsSupremum(subset, s))
+        (uBelowSupremum : u < s)
+        : ∃ (x : Real). And(x ∈ subset, u < x) :=
+  decide ∃ (x : Real). And(x ∈ subset, u < x) {
+    | yes someAbove => someAbove
+    | no noneAbove => {
+        -- Every element fails to exceed u, so u is an upper bound …
+        claim uIsUpper : Real.IsUpperBound(subset, u)
+            by (y : Real) (yInSubset : y ∈ subset) ↦ {
+              claim ¬(u < y)
+                  by (uBelowY : u < y) ↦
+                       noneAbove(⟨y, ⟨yInSubset, uBelowY⟩⟩);
+              done since Real.LessOrEqual_of_not_LessThan
+            };
+        -- … so leastness pins s ≤ u, against u < s.
+        let ⟨_, isLeast⟩ := isSupremum;
+        claim s ≤ u by isLeast(u, uIsUpper);
+        claim u < u since Real.LessThan.transitive_right;
+        claim notSelfEqual : ¬(u = u) since Real.LessThan.distinct;
+        absurd(notSelfEqual(reflexivity(Real, u)))
+      }
+  }
