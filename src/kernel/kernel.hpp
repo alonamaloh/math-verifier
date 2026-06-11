@@ -41,9 +41,9 @@ using Context = std::vector<ContextEntry>;
 //   Axiom       — a name and its type, no body ("assume this exists").
 //   Definition  — name, declared type, and body whose inferred type matches.
 //                 Delta-reduces to body in weakHeadNormalForm.
-//   Inductive   — an inductively-defined type, with its kind (Sort i for v1,
-//                 since we don't yet support parameters or indices) and
-//                 the names of its constructors. Stuck under reduction.
+//   Inductive   — an inductively-defined type, with its kind (a Pi-chain
+//                 of parameters and indices ending in a Sort) and the names
+//                 of its constructors. Stuck under reduction.
 //   Constructor — a single constructor of an inductive type, with the name
 //                 of that inductive, the constructor's index within it,
 //                 and the constructor's declared type. Stuck.
@@ -249,11 +249,10 @@ struct ConstructorSpec {
 
 // Declares an inductive type and atomically adds: the inductive itself,
 // each of its constructors, and an automatically-generated recursor under
-// the name "<inductiveName>_recursor". For v1, the `kind` must be a plain
-// Sort (no parameters or indices), and constructor types must be a Pi-
+// the name "<inductiveName>_recursor". Constructor types must be a Pi-
 // prefix whose recursive arguments are direct references to the inductive
 // (no nested or higher-order recursion). Strict positivity is the user's
-// responsibility; the kernel does not check it yet.
+// responsibility; the kernel does not check it.
 // Canonical signature: inductive with explicit numParameters. The kind is
 // a Pi-chain Π(p_1) ... Π(p_n). Π(i_1) ... Π(i_m). Sort u, where the first
 // `numParameters` Pis bind parameters and the remaining Pis bind indices.

@@ -212,8 +212,8 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
         // (`Ring.carrier(s)` for a variable `s`) stays stuck under WHNF, so
         // its bundle dispatch is unchanged. Only consulted after the
         // raw-head lookup failed, so this never overrides an existing
-        // dispatch — it can only turn a previously-erroring mixed/projected
-        // head pair into a successful one.
+        // dispatch — it can only turn a mixed/projected head pair that
+        // would otherwise error into a successful one.
         if (targetFunction.empty()) {
             // Resolve a carrier PROJECTION over a concrete ring to the
             // carrier field as written in the bundle's constructor (NOT
@@ -358,10 +358,10 @@ ExpressionPointer Elaborator::desugarArithmeticOperator(
                                              implicitBindings[i]);
                 }
             } else {
-                // Fall back to the legacy single-filler heuristic for
+                // Fall back to the single-filler heuristic for
                 // safety. If this fires, the kernel typecheck will
                 // catch a mismatch — better than silently building a
-                // wrong term, no worse than the prior behaviour.
+                // wrong term.
                 ExpressionPointer implicitFiller = leftTypeClosed;
                 auto* leftTypeApp =
                     std::get_if<Application>(&leftTypeClosed->node);

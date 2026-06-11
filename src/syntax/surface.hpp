@@ -278,7 +278,7 @@ struct SurfaceRing { };
 // `field(h1, h2, ...)` — closes an equality goal in a field by clearing
 // `reciprocal_function(t)` occurrences with the user-supplied nonzero
 // hypotheses `h_i : ¬(t_i = zero)`, then deferring to `ring` on the
-// cleared expression. Built on top of ring v2.
+// cleared expression. Built on top of the ring polynomial normaliser.
 struct SurfaceField {
     std::vector<SurfaceExpressionPointer> nonzeroHypotheses;
 };

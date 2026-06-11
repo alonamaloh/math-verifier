@@ -191,7 +191,7 @@ ExpressionPointer Elaborator::desugarAbsurd(
         if (!levelConstant) {
             throwElaborate(
                 "absurd: goal's universe isn't a concrete level — "
-                "v1 only dispatches against Proposition or "
+                "absurd dispatches only against Proposition or "
                 "Type N for explicit N");
         }
         // Type N case: pass N as the universe arg to False.eliminate.

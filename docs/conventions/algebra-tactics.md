@@ -73,8 +73,8 @@ write them differently.
 `add_negate_left` / `add_negate_right`, `distributivity_left` /
 `distributivity_right`. These have to be proved per-carrier (they're
 the inputs that `<carrier>.is_ring` packages up). Live in the
-carrier's `ring.math` / `algebra.math`. Foundational means: ring v2
-looks them up by `<carrier>.<axiom>` name when it needs them.
+carrier's `ring.math` / `algebra.math`. Foundational means: the `ring`
+normaliser looks them up by `<carrier>.<axiom>` name when it needs them.
 
 **Derived lemmas** — provable from `IsRing` alone: `zero_multiply`,
 `multiply_zero`, `multiply_negate_left`, `multiply_negate_right`,
@@ -88,20 +88,19 @@ specific carrier, either:
   Rational.negate, Rational.multiply, Rational.one, Rational.is_ring,
   x)` — verbose but mechanical.
 - Just `:= ring` (or in a calc step, a step that needs the lemma).
-  Ring v2 finds `Ring.<lemma>` plus `<carrier>.is_ring` in scope and
+  The `ring` normaliser finds `Ring.<lemma>` plus `<carrier>.is_ring` in scope and
   emits the abstract application internally.
 
 **Don't add `Rational.zero_multiply` / `Real.zero_multiply` /
 `Real.multiply_negate_left` / etc. as one-line wrappers around the
-abstract form.** Those wrappers used to exist; they were removed once
-the abstract path landed because they cost more than they buy:
-they're an extra import target, an extra name to know, and they have
-to be kept in sync with the abstract.
+abstract form.** Such wrappers cost more than they buy: they're an
+extra import target, an extra name to know, and they have to be kept
+in sync with the abstract.
 
 Integer is the exception — `Integer.multiply_zero_left` / `_right` /
 `multiply_negate_left` / `_right` are proved at the representative
 level via `reflexivity` through Quotient.lift, which is shorter than
-the abstract derivation would compile to. Ring v2's helpers
+the abstract derivation would compile to. The `ring` normaliser's helpers
 (`buildRingAnnihilatorProof`, `buildRingMultiplyNegateProof`) prefer
 the abstract form when both it and `<carrier>.is_ring` are in scope,
 fall back to the per-carrier name otherwise.

@@ -520,7 +520,7 @@ bool Elaborator::tryFirstOrderMatch(
             || std::get_if<FreeVariable>(&pattern->node)) {
             return structurallyEqual(pattern, term);
         }
-        // Pi/Lambda/Let — v1 doesn't match under binders.
+        // Pi/Lambda/Let — matching does not descend under binders.
         return false;
     }
 
@@ -615,7 +615,7 @@ bool Elaborator::findFirstSimplifyMatch(
                                             matchedLemmaIndex, bindings,
                                             matchedSubterm);
         }
-        // Don't descend into Pi/Lambda/Let bodies in v1 — the captured
+        // Don't descend into Pi/Lambda/Let bodies — the captured
         // binders would make any match references invalid in the outer
         // proof. Constants/Sorts/Bound/FreeVariable are leaves.
         return false;

@@ -244,7 +244,7 @@ ExpressionPointer Elaborator::elaborateQuotientCases(
         // Accepted pattern shapes (where <pat_inner> is itself a bare
         // name or a constructor pattern over the carrier type):
         //   - <bare_name>                      — bind rep, no destructure
-        //   - Quotient.mk(<pat_inner>)         — explicit wrap (legacy)
+        //   - Quotient.mk(<pat_inner>)         — explicit wrap (also accepted)
         //   - <Constructor.…>(args)            — destructure rep directly
         //
         // For the non-bare-name inner patterns, we synthesise a fresh

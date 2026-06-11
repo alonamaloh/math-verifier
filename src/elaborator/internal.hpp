@@ -558,7 +558,7 @@ private:
         const SurfaceConventionDeclaration& declaration);
 
     // `instance <name>` — register `name` as the canonical instance for
-    // its (structure, carrier) pair. v1 supports concrete-carrier,
+    // its (structure, carrier) pair. Supports concrete-carrier,
     // non-parameterized instances (e.g. `Integer.add_is_group :
     // IsGroup(Integer, …)`). Reject-on-ambiguity: a second instance for
     // the same (structure, carrier) is refused, mirroring the coercion
@@ -802,7 +802,7 @@ private:
     //     | zero,         m => m
     //     | successor(k), m => successor(Natural.add(k, m))
     //
-    // is translated into a recursor call. For v1 the supported shape is:
+    // is translated into a recursor call. The supported shape is:
     //   - All function arguments are listed in the type signature
     //     (Pi-chain). No `(arguments)` allowed before the colon.
     //   - The first argument is the scrutinee. Its type must be a bare
@@ -862,7 +862,7 @@ private:
     //     types), and recursively calls back into this function for the
     //     next position.
     //
-    // V1 restrictions for inner constructor patterns: the inner inductive
+    // Restrictions for inner constructor patterns: the inner inductive
     // must be non-parameterised, non-indexed, single-constructor, and
     // non-recursive. (Real call sites — `IntegerRepresentative.make` —
     // satisfy all four; multi-constructor inner patterns would need
@@ -972,7 +972,7 @@ private:
     // Desugars to a `cases ⟨<name>, _choice_pred_…⟩ => <body>` over
     // that hypothesis.
     //
-    // v1: the user's predicate is documentation, not a search key —
+    // The user's predicate is documentation, not a search key —
     // if the most-recent Exists doesn't match what the user intended,
     // the body will fail to elaborate when it tries to use the
     // destructured predicate hypothesis. Predicate-shape filtering
@@ -1032,7 +1032,7 @@ private:
     // hint's arguments by unifying its conclusion with the goal and
     // looking up any leftover binder values in local hypotheses.
     //
-    // Limitations of v1:
+    // Limitations:
     // - Disjunctive arms aren't elaborated yet (Step 4).
     // - `claim P` without `by` isn't elaborated yet (Step 5).
     // - Inter-slot dependencies: each slot's domain may reference
@@ -1330,8 +1330,8 @@ private:
     //   7. Unified equality bridge — rewrite via any in-scope
     //      equality (local hypothesis or library lemma matched at a
     //      goal subexpression) and recurse on the rewritten goal.
-    // v1 skips universe-polymorphic candidates (no universe inference
-    // yet) and does a linear scan (acceptable at current library size;
+    // Universe-polymorphic candidates are skipped (no universe
+    // inference) and the scan is linear (acceptable at current library size;
     // an indexed lookup is a planned follow-on).
     // Symmetry fallback. The goal is `x = y` (or `R(x, y)` for a relation
     // R that advertises a symmetry lemma): if the direct close fails, prove
@@ -1428,7 +1428,7 @@ private:
     //      disjunct's type; build the two lambdas.
     //   5. Emit `Or.eliminate(A, B, Goal, leftLambda, rightLambda,
     //                          theInScopeDisjunction)`.
-    // v1 limits: exactly 2 arms (binary disjunction).
+    // Limits: exactly 2 arms (binary disjunction).
     ExpressionPointer elaborateClaimByCases(
         const SurfaceStructuredClaim& claim,
         const std::vector<LocalBinder>& localBinders,
@@ -1505,7 +1505,7 @@ private:
     //   1. Definitional equality via the kernel's isDefinitionallyEqual.
     //      Catches β/ι/δ reductions (e.g. `succ(b) + x` vs `succ(b+x)`).
     //
-    // Future strategies (v1+):
+    // Future strategies:
     //   2. Single-position diff classified as commutativity /
     //      associativity / identity / local-hypothesis.
     //   3. Multi-position composition.
@@ -3529,7 +3529,7 @@ private:
     // disallowed (the convoy doesn't add information on
     // single-constructor inductives, and the rest of the desugar
     // would have to re-route through the tuple's lone constructor —
-    // not worth the complexity for the v1 cut).
+    // not worth the complexity).
     SurfaceExpressionPointer patternToSurfaceExpression(
         SurfacePatternPointer pattern);
 
@@ -3845,11 +3845,11 @@ private:
     LevelPointer elaborateLevel(const SurfaceLevel& level);
 
     // Resolves a binary arithmetic operator (`+`, `*`, ...) to a kernel
-    // function call. For v1 the resolution table is hardcoded to the
-    // Natural namespace: if both operands have type Natural, use
-    // Natural.add / Natural.multiply. Otherwise an ElaborateError is
-    // raised. A proper using-declaration-driven mechanism is the next
-    // iteration.
+    // function call: a local binder named like the operator (the `·`
+    // group-operation idiom) wins; otherwise the global operator
+    // registry (`operator (+) on (T, T) := f` declarations) dispatches
+    // on the operand types, with `≥`/`>` reusing the `≤`/`<` entries
+    // with the operands flipped.
     ExpressionPointer desugarArithmeticOperator(
         const std::string& operatorSymbol,
         const SurfaceExpression& leftSurface,
@@ -4110,7 +4110,7 @@ private:
     // — same shape as `rewrite(L)` but with the lemma instantiated
     // automatically.
     //
-    // V1 limitations:
+    // Limitations:
     //   * Pattern matching is first-order: linear, no higher-order vars,
     //     no descent under binders. The lemma's LHS may not itself contain
     //     a Lambda/Pi/Let; the search through the goal also does not enter
@@ -4872,9 +4872,8 @@ private:
     // declarations. Keyed by name. When a subsequent declaration's
     // signature or body mentions a key as a free identifier, the
     // elaborator auto-prepends `{p : T}` and one implicit binder per
-    // side-condition. v1: file-local (cleared at module start would be
-    // ideal but for now lives for the entire elaborator instance, which
-    // matches the per-module verifier invocation).
+    // side-condition. Lives for the entire elaborator instance, which
+    // matches the per-module verifier invocation.
     struct ConventionEntry {
         SurfaceExpressionPointer type;
         std::vector<SurfaceConventionProposition> propositions;

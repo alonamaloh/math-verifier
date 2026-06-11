@@ -24,8 +24,8 @@ Notes:
 - No semicolon at the end (matches other top-level declarations).
 - If the user shadows the convention name with their own binder, the
   convention does NOT fire for that declaration.
-- v1 fires on `definition` and `theorem`. Inductive declarations and
-  axioms are not yet covered.
+- Conventions fire on `definition` and `theorem`. Inductive
+  declarations and axioms are not covered.
 - Call sites still rely on the existing implicit-arg machinery —
   arguments uniquely determined by another argument's type are
   inferred; purely propositional arguments may need to be passed

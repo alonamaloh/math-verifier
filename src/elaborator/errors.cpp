@@ -199,7 +199,7 @@ std::string Elaborator::searchSuggestions(
             // Search the WHOLE library when a snapshot is available (the
             // verify-with-cache path), so a lemma that isn't imported yet
             // still surfaces — tagged with the import to add. Without the
-            // snapshot (tests / legacy verify), search the in-scope
+            // snapshot (tests / verify without a cache), search the in-scope
             // environment alone. A hit is "in scope" iff it is already a
             // declaration in environment_; otherwise we cite its module.
             const LibrarySearchIndex* index =

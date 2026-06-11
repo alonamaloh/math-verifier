@@ -71,7 +71,8 @@ void Elaborator::elaborateConventionDeclaration(
         // primality binder only fires once (on `p`'s convention entry).
         // We register the same entry under each name; the prepending
         // logic deduplicates side-condition expressions by surface
-        // syntax (close enough for v1).
+        // syntax (approximate, but faithful for syntactically equal
+        // conditions, which is the case that arises).
         for (const auto& name : declaration.names) {
             if (conventionRegistry_.count(name) > 0) {
                 throw ElaborateError(

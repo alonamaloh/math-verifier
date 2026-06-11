@@ -64,7 +64,7 @@ theorem IntegerEquivalent.symmetric
 The elaborator emits a nested recursor chain whose motives abstract
 the destructured position AND every later position binder, so a
 hypothesis like `aPlusDEqualsBPlusC` arrives in its refined
-Natural-level form. v1 supports inner constructor patterns on
+Natural-level form. Inner constructor patterns are supported on
 single-constructor non-indexed non-recursive (parameterised OK)
 inductives — covers `IntegerRepresentative.make`,
 `RationalRepresentative.make`, `PAdicCauchySequence.make`. Multi-

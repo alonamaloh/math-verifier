@@ -501,7 +501,7 @@ ExpressionPointer Elaborator::buildCaseLambda(
                     &subPattern->node);
                 if (!bareName) {
                     throw ElaborateError(
-                        "nested patterns are not supported in v1");
+                        "nested patterns are not supported");
                 }
                 destructuredNames.push_back(bareName->name);
             }
@@ -997,7 +997,8 @@ ExpressionPointer Elaborator::buildBodyForCase(
             currentBinderCount
                 - static_cast<int>(scrutineeBinderIdx));
 
-        // Resolve the inner inductive and verify v1 restrictions.
+        // Resolve the inner inductive and verify the supported-shape
+        // restrictions.
         ExpressionPointer cursor = weakHeadNormalForm(
             environment_, scrutineeTypeBs);
         std::vector<ExpressionPointer> inductiveArgs;
@@ -1031,14 +1032,14 @@ ExpressionPointer Elaborator::buildBodyForCase(
                 != innerInductive->numParameters) {
             // We extract parameter values from `inductiveArgs` (the
             // applications walked off the scrutinee's type head). Any
-            // extras would be index values; v1 doesn't yet support
-            // indexed inner inductives.
+            // extras would be index values; indexed inner inductives
+            // are not supported.
             throw ElaborateError(
                 "inner constructor pattern at position "
                 + std::to_string(nextCtorPos) + ": inductive '"
                 + innerInductiveName
-                + "' is indexed; v1 supports only non-indexed inner "
-                "inductives");
+                + "' is indexed; inner constructor patterns support "
+                "only non-indexed inductives");
         }
         std::vector<ExpressionPointer> innerParameterValues(
             inductiveArgs.begin(),
@@ -1050,8 +1051,8 @@ ExpressionPointer Elaborator::buildBodyForCase(
                 + innerInductiveName + "' has "
                 + std::to_string(
                     innerInductive->constructorNames.size())
-                + " constructors; v1 supports inner constructor "
-                "patterns only on single-constructor inductives");
+                + " constructors; inner constructor patterns are "
+                "supported only on single-constructor inductives");
         }
         const std::string& expectedCtorName =
             innerInductive->constructorNames[0];
@@ -1122,8 +1123,8 @@ ExpressionPointer Elaborator::buildBodyForCase(
                                 "position "
                                 + std::to_string(nextCtorPos)
                                 + ": constructor '" + expectedCtorName
-                                + "' is recursive; v1 supports inner "
-                                "constructor patterns only on "
+                                + "' is recursive; inner constructor "
+                                "patterns are supported only on "
                                 "non-recursive constructors");
                         }
                     }

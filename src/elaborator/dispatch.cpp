@@ -864,7 +864,7 @@ ExpressionPointer Elaborator::elaborateExpression(
                         // missing); inferring "leading" args there would
                         // duplicate the first argument — e.g.
                         // `induced_map(G, H, f, homo)` passed where a
-                        // function is expected used to become
+                        // function is expected would become
                         // `induced_map G G H f homo …`. Those fall through
                         // to the partial-application path instead.
                         int numLeadingToInfer = 0;
@@ -1179,7 +1179,7 @@ ExpressionPointer Elaborator::elaborateExpression(
                 elaborateExpression(*let->body, extended,
                                      bodyExpectedType);
             // Surface-text unused-name check on every named SurfaceLet
-            // (covers `let X := V;`, legacy `claim X : T by V;`, and
+            // (covers `let X := V;`, `claim X : T by V;`, and
             // `calc … as X;` desugaring). The kernel-level BV(0) check
             // is too lenient here: a downstream auto-prover call that
             // consumes the binding by type-match registers as BV(0)
