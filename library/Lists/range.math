@@ -80,3 +80,33 @@ theorem List.range_down_complete (n : Natural)
         }
       }
   }
+
+-- Conversely, every member of range_down(n) is ≤ n. (Needed to show the
+-- head successor(k) doesn't recur in range_down(k), i.e. distinctness.)
+theorem List.range_down_member_le (n : Natural)
+        : (j : Natural) → List.member(Natural, j, List.range_down(n)) → j ≤ n :=
+  by_induction on n with IH {
+    case zero: {
+        take j : Natural;
+        suppose List.member(Natural, j, List.range_down(0)) as mem;
+        absurd(List.no_member_empty(Natural, j, mem))
+      }
+    case successor(predecessor): {
+        take j : Natural;
+        suppose List.member(Natural, j, List.range_down(successor(predecessor))) as mem;
+        claim invert
+            : j = successor(predecessor)
+              ∨ List.member(Natural, j, List.range_down(predecessor))
+            by List.member_prepend_invert;
+        cases invert {
+          | Or.introduceLeft(jEqual) => {
+              claim j ≤ successor(predecessor) by substituting jEqual;
+              done
+            }
+          | Or.introduceRight(memberTail) =>
+              calc j
+                 ≤ predecessor             by IH(j, memberTail)
+                 ≤ successor(predecessor)  by Natural.le_successor
+        }
+      }
+  }
