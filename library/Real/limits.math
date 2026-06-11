@@ -1,0 +1,227 @@
+-- Real/limits.math
+--
+-- The arithmetic of sequence limits, and the first consequence of
+-- completeness: a monotone sequence bounded above converges (to the
+-- supremum of its range). Limits of sums and negations run on the
+-- triangle inequality with the usual ε/2 bookkeeping; the monotone
+-- convergence theorem is where `Real.supremum_exists` starts paying
+-- analytic dividends.
+
+module Real.limits
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.maximum
+import Rational.basics
+import Rational.addition
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.halve
+import Rational.positive
+import Set.basics
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.order
+import Real.linearity
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.embedding_order
+import Real.convergence
+import Real.supremum
+
+-- ----------------------------------------------------------------------
+-- Constant sequences converge to their value.
+theorem Real.constant_sequence_converges (c : Real)
+        : Real.SequenceConverges((n : Natural) ↦ c, c) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦
+    witness 0 with
+        (m : Natural) (_ : 0 ≤ m) ↦ {
+          claim distanceZero : abs(c - c) = Real.zero
+              by calc abs(c - c)
+                    = abs(Real.zero)
+                          by substituting (ring : c - c = Real.zero)
+                    = Real.zero
+                          by Real.absolute_value_when_nonneg(
+                                 Real.zero, Real.IsNonneg_zero);
+          claim Real.zero < (epsilon : Real)
+              since Rational.to_real.positive_preserves;
+          done by substituting distanceZero
+        }
+
+-- ----------------------------------------------------------------------
+-- Sum of limits: each summand within ε/2 puts the sum within ε.
+theorem Real.SequenceConverges.add (s t : Natural → Real)
+        (sLimit tLimit : Real)
+        (sConverges : Real.SequenceConverges(s, sLimit))
+        (tConverges : Real.SequenceConverges(t, tLimit))
+        : Real.SequenceConverges((n : Natural) ↦ s(n) + t(n), sLimit + tLimit) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    claim halfPositive : Rational.zero < Rational.halve(epsilon)
+        since Rational.halve_positive;
+    obtain ⟨sThreshold, sClose⟩
+        from sConverges(Rational.halve(epsilon), halfPositive);
+    obtain ⟨tThreshold, tClose⟩
+        from tConverges(Rational.halve(epsilon), halfPositive);
+    witness Natural.maximum(sThreshold, tThreshold) with
+        (m : Natural)
+        (aboveMaximum : Natural.maximum(sThreshold, tThreshold) ≤ m) ↦ {
+          claim sAbove : sThreshold ≤ m since Natural.le_through_max_left;
+          claim tAbove : tThreshold ≤ m since Natural.le_through_max_right;
+          claim sBound : abs(s(m) - sLimit) < (Rational.halve(epsilon) : Real)
+              by sClose(m, sAbove);
+          claim tBound : abs(t(m) - tLimit) < (Rational.halve(epsilon) : Real)
+              by tClose(m, tAbove);
+          calc abs((s(m) + t(m)) - (sLimit + tLimit))
+             = abs((s(m) - sLimit) + (t(m) - tLimit))
+                   by substituting
+                       (ring : (s(m) + t(m)) - (sLimit + tLimit)
+                           = (s(m) - sLimit) + (t(m) - tLimit))
+             ≤ abs(s(m) - sLimit) + abs(t(m) - tLimit)
+                   by Real.triangle_inequality
+             < (Rational.halve(epsilon) : Real) + (Rational.halve(epsilon) : Real)
+                   since Real.LessThan.add_strict_strict
+             = ((Rational.halve(epsilon) + Rational.halve(epsilon) : Rational) : Real)
+                   by Rational.to_real.add_preserves(
+                          Rational.halve(epsilon), Rational.halve(epsilon))
+             = (epsilon : Real)
+                   by Rational.halve_doubled(epsilon)
+        }
+  }
+
+-- Negating a sequence negates its limit.
+theorem Real.SequenceConverges.negate (s : Natural → Real) (sLimit : Real)
+        (sConverges : Real.SequenceConverges(s, sLimit))
+        : Real.SequenceConverges((n : Natural) ↦ -s(n), -sLimit) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨threshold, close⟩ from sConverges(epsilon, epsilonPositive);
+    witness threshold with
+        (m : Natural) (aboveThreshold : threshold ≤ m) ↦
+          calc abs(-s(m) - -sLimit)
+             = abs(-(s(m) - sLimit))
+                   by substituting
+                       (ring : -s(m) - -sLimit = -(s(m) - sLimit))
+             = abs(s(m) - sLimit)
+                   by Real.absolute_value_negate(s(m) - sLimit)
+             < (epsilon : Real)
+                   by close(m, aboveThreshold)
+  }
+
+-- ----------------------------------------------------------------------
+-- Monotone convergence. The range of the sequence, as a set.
+definition Real.sequence_range (s : Natural → Real) : Set(Real) :=
+  (x : Real) ↦ ∃ (n : Natural). s(n) = x
+
+-- If no term of the sequence exceeds c, then c bounds the whole range.
+theorem Real.upper_bound_of_no_term_above (s : Natural → Real) (c : Real)
+        (noTermAbove : ¬(∃ (N : Natural). c < s(N)))
+        : Real.IsUpperBound(Real.sequence_range(s), c) :=
+  (y : Real) (yInRange : y ∈ Real.sequence_range(s)) ↦ {
+    obtain ⟨n, termEqualsY⟩ from yInRange;
+    claim ¬(c < s(n))
+        by (above : c < s(n)) ↦ noTermAbove(⟨n, above⟩);
+    claim s(n) ≤ c since Real.LessOrEqual_of_not_LessThan;
+    done by substituting termEqualsY
+  }
+
+-- Subtracting something positive moves strictly down.
+theorem Real.subtract_positive_LessThan (x epsilon : Real)
+        (epsilonPositive : Real.zero < epsilon)
+        : x - epsilon < x := {
+  claim negativePart : -epsilon < Real.zero
+      by calc -epsilon
+            = Real.zero + -epsilon   by ring
+            < epsilon + -epsilon     by Real.add_preserves_LessThan
+            = Real.zero              by ring;
+  calc x - epsilon
+     = -epsilon + x       by ring
+     < Real.zero + x      by Real.add_preserves_LessThan
+     = x                  by ring
+}
+
+-- A monotone sequence bounded above converges — to the supremum of its
+-- range. Within any ε of the supremum there is a term s(N) (else the
+-- supremum could be lowered by ε), and monotonicity keeps the whole
+-- tail trapped between s(N) and the supremum.
+theorem Real.monotone_bounded_converges (s : Natural → Real)
+        (monotone : (i j : Natural) → i ≤ j → s(i) ≤ s(j))
+        (bound : Real)
+        (bounded : (n : Natural) → s(n) ≤ bound)
+        : Real.SequenceConvergent(s) := {
+  -- The range is nonempty and bounded above, so it has a supremum.
+  claim nonempty : Set.IsNonempty(Real, Real.sequence_range(s))
+      by ⟨s(0), ⟨0, reflexivity(Real, s(0))⟩⟩;
+  claim boundedAbove : Real.IsBoundedAbove(Real.sequence_range(s))
+      by ⟨bound,
+          (y : Real) (yInRange : y ∈ Real.sequence_range(s)) ↦ {
+            obtain ⟨n, termEqualsY⟩ from yInRange;
+            claim s(n) ≤ bound by bounded(n);
+            done by substituting termEqualsY
+          }⟩;
+  obtain ⟨limit, isSupremum⟩
+      from Real.supremum_exists(Real.sequence_range(s), nonempty, boundedAbove);
+  let ⟨isUpper, isLeast⟩ := isSupremum;
+  witness limit with
+      (epsilon : Rational)
+      (epsilonPositive : Rational.zero < epsilon) ↦ {
+        claim epsilonRealPositive : Real.zero < (epsilon : Real)
+            since Rational.to_real.positive_preserves;
+        -- Some term rises above limit − ε; otherwise limit − ε would be a
+        -- smaller upper bound than the least one.
+        decide ∃ (N : Natural). limit - (epsilon : Real) < s(N) {
+          | yes termAboveExists => {
+              obtain ⟨N, termAbove⟩ from termAboveExists;
+              witness N with
+                  (m : Natural) (aboveThreshold : N ≤ m) ↦ {
+                    -- limit − ε < s(N) ≤ s(m) ≤ limit < limit + ε.
+                    claim lower : limit - (epsilon : Real) < s(m)
+                        by calc limit - (epsilon : Real)
+                              < s(N)   by termAbove
+                              ≤ s(m)   by monotone(N, m, aboveThreshold);
+                    claim s(m) ≤ limit
+                        by isUpper(s(m), ⟨m, reflexivity(Real, s(m))⟩);
+                    claim s(m) - limit < (epsilon : Real)
+                        by calc s(m) - limit
+                              ≤ limit - limit     by Real.add_preserves_LessOrEqual
+                              = Real.zero         by ring
+                              < (epsilon : Real)  by epsilonRealPositive;
+                    claim -(epsilon : Real) < s(m) - limit
+                        by calc -(epsilon : Real)
+                              = (limit - (epsilon : Real)) - limit   by ring
+                              < s(m) - limit
+                                    by Real.add_preserves_LessThan;
+                    done since Real.absolute_value_LessThan_of_bounds
+                  }
+            }
+          | no noTermAbove => {
+              claim Real.IsUpperBound(Real.sequence_range(s),
+                        limit - (epsilon : Real))
+                  since Real.upper_bound_of_no_term_above;
+              claim limit ≤ limit - (epsilon : Real)
+                  by isLeast(limit - (epsilon : Real),
+                         Real.upper_bound_of_no_term_above(s,
+                             limit - (epsilon : Real), noTermAbove));
+              claim limit - (epsilon : Real) < limit
+                  since Real.subtract_positive_LessThan;
+              claim limit < limit since Real.LessThan.transitive_left;
+              claim notSelfEqual : ¬(limit = limit)
+                  since Real.LessThan.distinct;
+              absurd(notSelfEqual(reflexivity(Real, limit)))
+            }
+        }
+      }
+}

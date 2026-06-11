@@ -457,3 +457,28 @@ theorem Real.not_LessOrEqual_implies
     | Or.introduceRight(yLeqX) => yLeqX
   }
 
+
+-- Contrapositive on the strict side: ¬(y < x) → x ≤ y. By linearity,
+-- either x ≤ y outright, or y ≤ x — and then y = x (else y < x).
+theorem Real.LessOrEqual_of_not_LessThan
+        (x y : Real)
+        (notLess : Not(y < x))
+        : x ≤ y :=
+  cases Real.LessOrEqual.linear(x, y) {
+    | Or.introduceLeft(xLeqY) => xLeqY
+    | Or.introduceRight(yLeqX) =>
+        decide x = y {
+          | yes equal => {
+              claim x ≤ x since Real.LessOrEqual.reflexive;
+              claim x ≤ y by substituting equal;
+              done
+            }
+          | no notEqual => {
+              claim yNotX : ¬(y = x)
+                  by (yEqualsX : y = x) ↦
+                      notEqual(calc x = y by yEqualsX);
+              claim yLessX : y < x by And.introduction(yLeqX, yNotX);
+              absurd(notLess(yLessX))
+            }
+        }
+  }
