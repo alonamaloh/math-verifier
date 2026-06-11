@@ -1,0 +1,110 @@
+-- Real/continuity.math
+--
+-- ε–δ continuity of functions on the reals. Tolerances are Rational
+-- (embedded into Real for the comparisons), mirroring
+-- Real.SequenceConverges: the rationals are dense, so nothing is lost,
+-- and every ε/δ manipulation stays in the ordered field the
+-- auto-prover handles best.
+--
+-- This file: the definition, continuity on a closed interval, and the
+-- algebra of continuous functions (constants, identity, negation; sums
+-- and composition follow in the same file once min(δ1, δ2) enters).
+
+module Real.continuity
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Rational.basics
+import Rational.addition
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.order
+import Real.linearity
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.embedding_order
+
+-- ----------------------------------------------------------------------
+-- f is continuous at x: for every positive rational tolerance ε there
+-- is a positive rational δ such that f moves points δ-close to x to
+-- points ε-close to f(x).
+definition Real.ContinuousAt (f : Real → Real) (x : Real) : Proposition :=
+  (epsilon : Rational) → Rational.zero < epsilon →
+    ∃ (delta : Rational).
+      And(Rational.zero < delta,
+          (y : Real) → abs(y - x) < (delta : Real) →
+            abs(f(y) - f(x)) < (epsilon : Real))
+
+-- f is continuous on the closed interval [a, b]: continuous at every
+-- point of the interval.
+definition Real.ContinuousOn
+        (f : Real → Real) (a b : Real) : Proposition :=
+  (x : Real) → a ≤ x → x ≤ b → Real.ContinuousAt(f, x)
+
+-- ----------------------------------------------------------------------
+-- Constant functions are continuous: any δ works (ε itself is at hand),
+-- since the image never moves at all.
+theorem Real.ContinuousAt.constant (c x : Real)
+        : Real.ContinuousAt((y : Real) ↦ c, x) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦
+    witness epsilon with
+        ⟨epsilonPositive,
+         (y : Real) (_ : abs(y - x) < (epsilon : Real)) ↦ {
+           claim distanceZero : abs(c - c) = Real.zero
+               by calc abs(c - c)
+                     = abs(Real.zero)
+                           by substituting (ring : c - c = Real.zero)
+                     = Real.zero
+                           by Real.absolute_value_when_nonneg(
+                                  Real.zero, Real.IsNonneg_zero);
+           claim Real.zero < (epsilon : Real)
+               since Rational.to_real.positive_preserves;
+           done by substituting distanceZero
+         }⟩
+
+-- The identity is continuous: δ = ε verbatim.
+theorem Real.ContinuousAt.identity (x : Real)
+        : Real.ContinuousAt((y : Real) ↦ y, x) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦
+    witness epsilon with
+        ⟨epsilonPositive,
+         (y : Real) (yClose : abs(y - x) < (epsilon : Real)) ↦ yClose⟩
+
+-- Negation preserves continuity: |−f(y) − (−f(x))| = |f(y) − f(x)|,
+-- so f's own δ serves unchanged.
+theorem Real.ContinuousAt.negate (f : Real → Real) (x : Real)
+        (fContinuous : Real.ContinuousAt(f, x))
+        : Real.ContinuousAt((y : Real) ↦ -f(y), x) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨delta, deltaProperties⟩
+        from fContinuous(epsilon, epsilonPositive);
+    obtain ⟨deltaPositive, fClose⟩ from deltaProperties;
+    witness delta with
+        ⟨deltaPositive,
+         (y : Real) (yClose : abs(y - x) < (delta : Real)) ↦
+           calc abs(-f(y) - -f(x))
+              = abs(-(f(y) - f(x)))
+                    by substituting
+                        (ring : -f(y) - -f(x) = -(f(y) - f(x)))
+              = abs(f(y) - f(x))
+                    by Real.absolute_value_negate(f(y) - f(x))
+              < (epsilon : Real)
+                    by fClose(y, yClose)⟩
+  }
