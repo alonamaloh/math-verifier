@@ -8,6 +8,7 @@
 module Lists.range
 
 import Natural.basics
+import Natural.arithmetic
 import Natural.order
 import Natural.add_order
 import Natural.decide
@@ -17,6 +18,7 @@ import Logic.sum
 import Equality.basics
 import Lists.list
 import Lists.length
+import Lists.append
 
 definition List.range_down : Natural → List(Natural)
   | zero => List.empty(Natural)
@@ -81,6 +83,33 @@ theorem List.range_down_complete (n : Natural)
       }
   }
 
+-- Every member of range_down(n) is positive (the range stops at 1).
+theorem List.range_down_member_positive (n : Natural)
+        : (j : Natural) → List.member(Natural, j, List.range_down(n)) → 1 ≤ j :=
+  by_induction on n with IH {
+    case zero: {
+        take j : Natural;
+        suppose List.member(Natural, j, List.range_down(0)) as mem;
+        absurd(List.no_member_empty(Natural, j, mem))
+      }
+    case successor(predecessor): {
+        take j : Natural;
+        suppose List.member(Natural, j, List.range_down(successor(predecessor))) as mem;
+        claim invert
+            : j = successor(predecessor)
+              ∨ List.member(Natural, j, List.range_down(predecessor))
+            by List.member_prepend_invert;
+        cases invert {
+          | Or.introduceLeft(jEqual) => {
+              claim 1 ≤ successor(predecessor) by Natural.successor_positive;
+              claim 1 ≤ j by substituting jEqual;
+              done
+            }
+          | Or.introduceRight(memberTail) => IH(j, memberTail)
+        }
+      }
+  }
+
 -- Conversely, every member of range_down(n) is ≤ n. (Needed to show the
 -- head successor(k) doesn't recur in range_down(k), i.e. distinctness.)
 theorem List.range_down_member_le (n : Natural)
@@ -109,4 +138,53 @@ theorem List.range_down_member_le (n : Natural)
                  ≤ successor(predecessor)  by Natural.le_successor
         }
       }
+  }
+
+-- ----------------------------------------------------------------------
+-- The slice of the range above a base point:
+-- `range_down_offset(base, count) = [base+count, …, base+1]`, the `count`
+-- integers immediately above `base`, descending. Concatenating it with
+-- `range_down(base)` recovers the full range — the splitting fact behind
+-- "break the product over 1..p−1 into its two halves".
+
+definition List.range_down_offset (base : Natural) : Natural → List(Natural)
+  | zero => List.empty(Natural)
+  | successor(predecessorCount) =>
+      List.prepend(Natural, base + successor(predecessorCount),
+          List.range_down_offset(base, predecessorCount))
+
+-- [base+count .. 1] = [base+count .. base+1] ++ [base .. 1].
+theorem List.range_down_split (base count : Natural)
+        : List.range_down(base + count)
+          = List.append(Natural, List.range_down_offset(base, count),
+                List.range_down(base)) :=
+  by_induction on count with IH {
+    case zero:
+        -- The offset slice is empty and base + 0 = base.
+        calc List.range_down(base + 0)
+           = List.range_down(base)   by (base + 0 = base)
+           = List.append(Natural, List.range_down_offset(base, 0),
+                 List.range_down(base))
+    case successor(predecessorCount):
+        -- Peel the top element base + (1 + count′) off both sides.
+        calc List.range_down(base + successor(predecessorCount))
+           = List.range_down(successor(base + predecessorCount))
+                 by (base + successor(predecessorCount)
+                     = successor(base + predecessorCount))
+           = List.prepend(Natural, successor(base + predecessorCount),
+                 List.range_down(base + predecessorCount))
+           = List.prepend(Natural, successor(base + predecessorCount),
+                 List.append(Natural,
+                     List.range_down_offset(base, predecessorCount),
+                     List.range_down(base)))
+                 by substituting IH
+           = List.prepend(Natural, base + successor(predecessorCount),
+                 List.append(Natural,
+                     List.range_down_offset(base, predecessorCount),
+                     List.range_down(base)))
+                 by (successor(base + predecessorCount)
+                     = base + successor(predecessorCount))
+           = List.append(Natural,
+                 List.range_down_offset(base, successor(predecessorCount)),
+                 List.range_down(base))
   }
