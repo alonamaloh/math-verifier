@@ -1,0 +1,149 @@
+-- Real/density.math
+--
+-- A positive real exceeds some positive rational. This is the bridge
+-- every ε–δ argument needs when the gap it works with is a *real*
+-- quantity (|f(c)| > 0, say) but the tolerance fed to a continuity or
+-- convergence hypothesis must be *rational*.
+--
+-- Proof: descend to a Cauchy representative. By the sign-eventually
+-- dichotomy (Real.linearity), a representative of a nonzero real is
+-- eventually trapped on one side of some positive rational lowerBound;
+-- the negative side contradicts 0 < x, and on the positive side
+-- halve(lowerBound) is the witness. This is a foundation-file descent:
+-- downstream analysis cites only the Real-level statement.
+
+module Real.density
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Rational.basics
+import Rational.addition
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.halve
+import Rational.order_multiplication
+import Rational.positive
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.ring
+import Real.order
+import Real.embedding_order
+import Real.linearity
+
+-- ----------------------------------------------------------------------
+-- 0 < x yields a rational q with 0 < q and (q : ℝ) < x.
+theorem Real.exists_positive_rational_below
+        (x : Real) (xPositive : Real.zero < x)
+        : ∃ (q : Rational). And(Rational.zero < q, (q : Real) < x) := {
+  claim xNotZero : ¬(x = Real.zero)
+      by (xEqualsZero : x = Real.zero) ↦ {
+           claim zeroNotX : ¬(Real.zero = x) since Real.LessThan.distinct;
+           zeroNotX(calc Real.zero = x by xEqualsZero)
+         };
+  cases x refining xPositive, xNotZero {
+    | CauchyRationalSequence.make(seq, seqCauchy) => {
+        -- A nonzero real's representative is not equivalent to the
+        -- zero sequence (the quotient bridge closes this from
+        -- xNotZero), so it is eventually one-sided.
+        claim notEquivalentToZero
+              : ¬CauchyEquivalent(
+                    CauchyRationalSequence.make(seq, seqCauchy),
+                    Rational.to_cauchy_constant(Rational.zero));
+        obtain ⟨lowerBound, boundData⟩
+            from Real.cauchy_sign_eventually(
+                     CauchyRationalSequence.make(seq, seqCauchy),
+                     notEquivalentToZero);
+        obtain ⟨lowerBoundPositive, signData⟩ from boundData;
+        obtain ⟨signIndex, signSplit⟩ from signData;
+        cases signSplit {
+          -- seq(m) ≥ lowerBound past signIndex: then (lowerBound : ℝ)
+          -- ≤ x, and halve(lowerBound) is the rational we want.
+          | Or.introduceLeft(positiveTail) => {
+              claim lowerBoundBelowX
+                    : (lowerBound : Real)
+                      ≤ (Quotient.mk(
+                             CauchyRationalSequence.make(seq, seqCauchy))
+                         : Real)
+                  by (epsilon : Rational)
+                     (epsilonPositive : Rational.zero < epsilon) ↦
+                       witness signIndex with
+                           (m : Natural)
+                           (mPastSignIndex : signIndex ≤ m) ↦ {
+                             claim lowerBound ≤ seq(m)
+                                 by positiveTail(m, mPastSignIndex);
+                             calc -epsilon
+                                < Rational.zero
+                                      by Rational.negate_LessThan_zero_of_positive(
+                                             epsilon, epsilonPositive)
+                                ≤ seq(m) - lowerBound
+                           };
+              claim halvePositive
+                    : Rational.zero < Rational.halve(lowerBound)
+                  since Rational.halve_positive;
+              claim Rational.halve(lowerBound) < lowerBound
+                  since Rational.halve_less_than_self;
+              witness Rational.halve(lowerBound) with
+                  ⟨halvePositive,
+                   calc (Rational.halve(lowerBound) : Real)
+                      < (lowerBound : Real)
+                            by Rational.to_real.LessThan_preserves
+                      ≤ (Quotient.mk(
+                             CauchyRationalSequence.make(seq, seqCauchy))
+                         : Real)
+                            by lowerBoundBelowX⟩
+            }
+          -- seq(m) ≤ -lowerBound past signIndex: then x ≤ (−lowerBound
+          -- : ℝ) < 0, contradicting 0 < x.
+          | Or.introduceRight(negativeTail) => {
+              claim (Quotient.mk(
+                           CauchyRationalSequence.make(seq, seqCauchy))
+                       : Real)
+                      ≤ (-lowerBound : Real)
+                  by (epsilon : Rational)
+                     (epsilonPositive : Rational.zero < epsilon) ↦
+                       witness signIndex with
+                           (m : Natural)
+                           (mPastSignIndex : signIndex ≤ m) ↦ {
+                             claim seq(m) ≤ -lowerBound
+                                 by negativeTail(m, mPastSignIndex);
+                             calc -epsilon
+                                < Rational.zero
+                                      by Rational.negate_LessThan_zero_of_positive(
+                                             epsilon, epsilonPositive)
+                                ≤ -lowerBound - seq(m)
+                           };
+              claim -lowerBound < Rational.zero
+                  since Rational.negate_LessThan_zero_of_positive;
+              claim (-lowerBound : Real) < Real.zero
+                  since Rational.to_real.LessThan_preserves;
+              claim (Quotient.mk(
+                           CauchyRationalSequence.make(seq, seqCauchy))
+                       : Real)
+                      < Real.zero
+                  since Real.LessThan.transitive_left;
+              claim (Quotient.mk(
+                         CauchyRationalSequence.make(seq, seqCauchy))
+                     : Real)
+                    ≤ Real.zero
+                  since Real.LessThan.weaken;
+              claim Real.zero < Real.zero
+                  since Real.LessThan.transitive_right;
+              claim notSelfEqual : ¬(Real.zero = Real.zero)
+                  since Real.LessThan.distinct;
+              absurd(notSelfEqual(reflexivity(Real, Real.zero)))
+            }
+        }
+      }
+  }
+}
