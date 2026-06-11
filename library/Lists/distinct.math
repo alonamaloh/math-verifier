@@ -227,3 +227,108 @@ theorem List.map_distinct (A B : Type(0)) (f : A → B)
       List.Distinct.prepend(B, f(head), List.map(A, B, f, tail),
           List.not_member_map_of_not_member(A, B, f, injective, head, tail, headNotInTail),
           List.map_distinct(A, B, f, injective, tail, tailDistinct))
+
+-- ----------------------------------------------------------------------
+-- Two distinct lists of the same length, one contained in the other, are
+-- permutations of each other — the finite-set "injection between equal
+-- cardinalities is a bijection" fact, in list form. Extract the head of
+-- l1 from l2 and recurse on the tails.
+theorem List.permutation_of_distinct_inclusion (A : Type(0))
+        : (l1 l2 : List(A))
+          → List.Distinct(A, l1)
+          → List.Distinct(A, l2)
+          → ((x : A) → List.member(A, x, l1) → List.member(A, x, l2))
+          → List.length(A, l1) = List.length(A, l2)
+          → List.Permutation(A, l1, l2)
+  | List.empty =>
+      (l2 : List(A))
+      (distinct1 : List.Distinct(A, List.empty(A)))
+      (distinct2 : List.Distinct(A, l2))
+      (inclusion : (x : A) → List.member(A, x, List.empty(A))
+          → List.member(A, x, l2))
+      (lengthEquation : List.length(A, List.empty(A)) = List.length(A, l2)) ↦
+        cases l2 refining lengthEquation, distinct2 {
+          | List.empty => List.Permutation.empty(A)
+          | List.prepend(head, tail) => {
+              -- 0 = 1 + |tail| is absurd.
+              claim impossible : False since Natural.zero_not_successor;
+              absurd(impossible)
+            }
+        }
+  | List.prepend(head, tail) =>
+      (l2 : List(A))
+      (distinct1 : List.Distinct(A, List.prepend(A, head, tail)))
+      (distinct2 : List.Distinct(A, l2))
+      (inclusion : (x : A) → List.member(A, x, List.prepend(A, head, tail))
+          → List.member(A, x, l2))
+      (lengthEquation
+          : List.length(A, List.prepend(A, head, tail)) = List.length(A, l2)) ↦ {
+        -- The head sits somewhere in l2; rotate it to the front.
+        claim headMember1 : List.member(A, head, List.prepend(A, head, tail))
+            by List.member.here(A, head, tail);
+        claim headMember2 : List.member(A, head, l2)
+            by inclusion(head, headMember1);
+        obtain ⟨rest, extracted⟩
+            from List.Permutation.extract(A, head, l2, headMember2);
+        -- Distinctness on both sides, with the head removed.
+        claim headNotInTail : ¬(List.member(A, head, tail))
+            since List.Distinct.head_not_member;
+        claim tailDistinct : List.Distinct(A, tail)
+            since List.Distinct.tail_distinct;
+        claim List.Distinct(A, List.prepend(A, head, rest))
+            by List.Permutation.distinct_invariant(A, l2,
+                   List.prepend(A, head, rest), extracted, distinct2);
+        claim ¬(List.member(A, head, rest))
+            since List.Distinct.head_not_member;
+        claim restDistinct : List.Distinct(A, rest)
+            since List.Distinct.tail_distinct;
+        -- The tail is contained in the remainder: an x ∈ tail is in l2,
+        -- lands in head :: rest, and is not the head (head ∉ tail).
+        claim tailInclusion
+            : (x : A) → List.member(A, x, tail) → List.member(A, x, rest)
+            by (x : A) (xInTail : List.member(A, x, tail)) ↦ {
+                claim xInList1
+                    : List.member(A, x, List.prepend(A, head, tail))
+                    by List.member.there(A, x, head, tail, xInTail);
+                claim List.member(A, x, l2)
+                    by inclusion(x, xInList1);
+                claim List.member(A, x, List.prepend(A, head, rest))
+                    since List.Permutation.member_forward;
+                claim ¬(x = head)
+                    by (xIsHead : x = head) ↦ {
+                        claim headInTail : List.member(A, head, tail)
+                            by substituting xIsHead;
+                        headNotInTail(headInTail)
+                      };
+                done since List.member_of_prepend_not_head
+              };
+        -- Equal lengths after dropping the head from both.
+        claim lengthPermuted
+            : List.length(A, l2) = List.length(A, List.prepend(A, head, rest))
+            since List.Permutation.length_invariant;
+        claim successor(List.length(A, tail)) = successor(List.length(A, rest))
+            by calc successor(List.length(A, tail))
+                  = List.length(A, List.prepend(A, head, tail))
+                  = List.length(A, l2)
+                        by lengthEquation
+                  = List.length(A, List.prepend(A, head, rest))
+                        by lengthPermuted
+                  = successor(List.length(A, rest));
+        claim restLengthEquation : List.length(A, tail) = List.length(A, rest)
+            since Natural.successor_injective;
+        -- Recurse on the tails and reassemble.
+        claim tailPermutation : List.Permutation(A, tail, rest)
+            by List.permutation_of_distinct_inclusion(A, tail, rest,
+                   tailDistinct, restDistinct, tailInclusion, restLengthEquation);
+        claim List.Permutation(A, List.prepend(A, head, tail),
+                  List.prepend(A, head, rest))
+            by List.Permutation.skip(A, head, tail, rest, tailPermutation);
+        claim List.Permutation(A, List.prepend(A, head, rest), l2)
+            since List.Permutation.symmetric;
+        done by List.Permutation.transitive(A,
+                   List.prepend(A, head, tail),
+                   List.prepend(A, head, rest), l2,
+                   List.Permutation.skip(A, head, tail, rest, tailPermutation),
+                   List.Permutation.symmetric(A, l2,
+                       List.prepend(A, head, rest), extracted))
+      }

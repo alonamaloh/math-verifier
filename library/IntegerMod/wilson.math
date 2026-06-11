@@ -604,3 +604,41 @@ theorem Natural.prime_of_divides_factorial_plus_one (p n : Natural)
         };
   And.introduction(pAtLeastTwo, divisorCondition)
 }
+
+-- ----------------------------------------------------------------------
+-- Two more field facts, both inverses of `no_zero_divisors` in spirit:
+-- a product of nonzero classes is nonzero, and a nonzero class cancels
+-- from both sides of an equation.
+
+theorem IntegerMod.multiply_nonzero (p : Natural)
+        (primality : Natural.is_prime(p))
+        (x y : IntegerMod(p))
+        (xNonzero : ¬(x = IntegerMod.zero(p)))
+        (yNonzero : ¬(y = IntegerMod.zero(p)))
+        : ¬(x * y = IntegerMod.zero(p)) :=
+  (productZero : x * y = IntegerMod.zero(p)) ↦ {
+    claim yZero : y = IntegerMod.zero(p) since IntegerMod.no_zero_divisors;
+    yNonzero(yZero)
+  }
+
+-- Cancel a nonzero factor: c·u = c·v implies u = v (multiply by c⁻¹).
+theorem IntegerMod.multiply_cancel_left (p : Natural)
+        (primality : Natural.is_prime(p))
+        (c u v : IntegerMod(p))
+        (cNonzero : ¬(c = IntegerMod.zero(p)))
+        (equation : c * u = c * v)
+        : u = v := {
+  obtain ⟨inverse, inverseEquation⟩ by IntegerMod.nonzero_invertible;
+  claim inverseLeft : inverse * c = IntegerMod.one(p)
+      by calc inverse * c
+            = c * inverse           by IntegerMod.multiply_commutative
+            = IntegerMod.one(p);
+  calc u
+     = IntegerMod.one(p) * u    by IntegerMod.multiply_identity_left
+     = (inverse * c) * u        by substituting inverseLeft
+     = inverse * (c * u)        by IntegerMod.multiply_associative
+     = inverse * (c * v)        by substituting equation
+     = (inverse * c) * v        by IntegerMod.multiply_associative
+     = IntegerMod.one(p) * v    by substituting inverseLeft
+     = v                        by IntegerMod.multiply_identity_left
+}
