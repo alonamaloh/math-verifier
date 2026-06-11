@@ -692,16 +692,65 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
                 break;
             }
         }
-        if (matchedDepth == -1) {
-            throwElaborate(
-                "the `by` hint's conclusion (`"
-                + prettyPrintInLocalScope(
-                      cursorsAtDepth[totalBinders], localBinders)
-                + "`) does not unify with the goal (`"
-                + prettyPrintInLocalScope(goalClosed, localBinders)
-                + "`)");
+        // The conclusion may be an APPLICATION OF A PEELED BINDER —
+        // `P(x)` for a lemma quantified over the predicate P. First-order
+        // matching can then "succeed" with the wrong split (binding P to
+        // a partial application of the goal's head), or fail outright —
+        // either way the premises are the authority: they mention P and x
+        // under rigid heads (`filter(P, list)`), so a premise-driven
+        // recovery with nothing pre-pinned is the fallback strategy.
+        bool conclusionHeadIsFlexible = false;
+        {
+            ExpressionPointer head = cursorsAtDepth[totalBinders];
+            while (auto* app = std::get_if<Application>(&head->node)) {
+                head = app->function;
+            }
+            if (auto* headBinder = std::get_if<BoundVariable>(&head->node)) {
+                conclusionHeadIsFlexible =
+                    headBinder->deBruijnIndex < totalBinders;
+            }
         }
+        if (matchedDepth >= 0) {
+            try {
+                return completeCitationFromBindings(
+                    hintTerm, goalClosed, goalOpened, openedContext,
+                    localBinders, domainsOutermostFirst, cursorsAtDepth,
+                    totalBinders, matchedDepth, bindings,
+                    /*conclusionWasFlexApplication=*/false);
+            } catch (const ElaborateError&) {
+                if (!conclusionHeadIsFlexible) throw;
+                // fall through to the premise-driven strategy
+            }
+        }
+        if (conclusionHeadIsFlexible) {
+            std::vector<ExpressionPointer> deferred(totalBinders);
+            return completeCitationFromBindings(
+                hintTerm, goalClosed, goalOpened, openedContext,
+                localBinders, domainsOutermostFirst, cursorsAtDepth,
+                totalBinders, totalBinders, std::move(deferred),
+                /*conclusionWasFlexApplication=*/true);
+        }
+        throwElaborate(
+            "the `by` hint's conclusion (`"
+            + prettyPrintInLocalScope(
+                  cursorsAtDepth[totalBinders], localBinders)
+            + "`) does not unify with the goal (`"
+            + prettyPrintInLocalScope(goalClosed, localBinders)
+            + "`)");
+    }
 
+ExpressionPointer Elaborator::completeCitationFromBindings(
+        ExpressionPointer hintTerm,
+        const ExpressionPointer& goalClosed,
+        const ExpressionPointer& goalOpened,
+        const Context& openedContext,
+        const std::vector<LocalBinder>& localBinders,
+        const std::vector<ExpressionPointer>& domainsOutermostFirst,
+        const std::vector<ExpressionPointer>& cursorsAtDepth,
+        int totalBinders,
+        int matchedDepth,
+        std::vector<ExpressionPointer> bindings,
+        bool conclusionWasFlexApplication) {
         // Back-inference pass. The conclusion match above pins only the
         // binders that appear in the conclusion; many lemmas keep their key
         // arguments in their HYPOTHESES (e.g. all_prime_under_prepend_equality
@@ -754,8 +803,30 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
                         ExpressionPointer hypType = liftBoundVariables(
                             localBinders[b].type, N - b, 0);
                         std::vector<ExpressionPointer> trial = bindings;
-                        if (matchAgainstPattern(
-                                domain, hypType, matchedDepth, trial)) {
+                        bool matched = matchAgainstPattern(
+                            domain, hypType, matchedDepth, trial);
+                        if (!matched) {
+                            // The hypothesis may be stated through a
+                            // definition that folds the premise's rigid
+                            // head (`coprime_residues(n)` for
+                            // `filter(P, list)`). Unfold the head one
+                            // step at a time — full WHNF would reduce
+                            // PAST the head the pattern wants.
+                            ExpressionPointer unfolded = hypType;
+                            for (int step = 0; step < 4 && !matched;
+                                 ++step) {
+                                ExpressionPointer next =
+                                    unfoldHeadConstantOneStep(unfolded);
+                                if (!next || next.get() == unfolded.get()) {
+                                    break;
+                                }
+                                unfolded = next;
+                                trial = bindings;
+                                matched = matchAgainstPattern(
+                                    domain, unfolded, matchedDepth, trial);
+                            }
+                        }
+                        if (matched) {
                             bindings = std::move(trial);
                             bindings[innerIndex] = makeBoundVariable(N - 1 - b);
                             progress = true;
@@ -881,6 +952,25 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
         for (int p = 0; p < matchedDepth; ++p) {
             int innerIndex = matchedDepth - 1 - p;
             call = makeApplication(call, bindings[innerIndex]);
+        }
+        if (conclusionWasFlexApplication) {
+            // Nothing was pinned from the goal, so nothing yet checks
+            // that the recovered P and x actually instantiate the
+            // conclusion to the claim. β-reduce `P(x)` and compare.
+            ExpressionPointer callType = openOverLocalBinders(
+                inferTypeInLocalContext(localBinders, call),
+                localBinders, localBinders.size());
+            if (!isDefinitionallyEqual(environment_, openedContext,
+                                       callType, goalOpened)) {
+                throwElaborate(
+                    "the `by` hint's conclusion (`"
+                    + prettyPrintInLocalScope(
+                          cursorsAtDepth[totalBinders], localBinders)
+                    + "`), instantiated from the premises, does not "
+                    "give the goal (`"
+                    + prettyPrintInLocalScope(goalClosed, localBinders)
+                    + "`)");
+            }
         }
         return call;
     }

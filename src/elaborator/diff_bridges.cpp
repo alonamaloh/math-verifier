@@ -871,10 +871,34 @@ bool Elaborator::matchAgainstPattern(
                 }
                 bindings = savedBindings;
             }
-            // Structural failed (or subject kinds disagreed). Try
-            // WHNF on the subject: a δ/ι-reducing head (e.g.
-            // `successor(p) * q` → `q + p*q`) might expose the App
-            // shape the pattern needs. Bail if WHNF is a no-op.
+            // Structural failed (or subject kinds disagreed). Unfold the
+            // subject's defined head ONE step at a time and retry: full
+            // WHNF can reduce PAST the head the pattern wants (e.g. a
+            // pattern `filter(P, list)` against `coprime_residues(n)` —
+            // one δβ exposes the filter, but WHNF would continue into
+            // filter's recursor, stuck on the neutral list). Each step
+            // re-runs the full match, so intermediate heads get their
+            // chance.
+            {
+                ExpressionPointer unfolded = subject;
+                for (int step = 0; step < 8; ++step) {
+                    ExpressionPointer next =
+                        unfoldHeadConstantOneStep(unfolded);
+                    if (!next || next.get() == unfolded.get()) break;
+                    unfolded = next;
+                    std::vector<ExpressionPointer> retryBindings =
+                        bindings;
+                    if (matchAgainstPattern(
+                            pattern, unfolded,
+                            binderCount, retryBindings, piDepth)) {
+                        bindings = std::move(retryBindings);
+                        return true;
+                    }
+                }
+            }
+            // Last resort: full WHNF (δ/β/ι) — catches reductions the
+            // pure-δ walk above cannot (e.g. `successor(p) * q` →
+            // `q + p*q`). Bail if it makes no progress.
             ExpressionPointer subjectWhnf = weakHeadNormalForm(
                 environment_, subject);
             if (subjectWhnf.get() != subject.get()) {

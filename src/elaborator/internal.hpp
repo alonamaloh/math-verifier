@@ -3799,6 +3799,24 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int line);
 
+    // The completion phase of a `by <lemma>` citation: given the peel
+    // depth and (possibly partial) bindings from the conclusion match,
+    // run premise back-inference + slot filling, assemble the call, and
+    // (for a flexible-headed conclusion) validate the instantiated
+    // conclusion against the goal.
+    ExpressionPointer completeCitationFromBindings(
+        ExpressionPointer hintTerm,
+        const ExpressionPointer& goalClosed,
+        const ExpressionPointer& goalOpened,
+        const Context& openedContext,
+        const std::vector<LocalBinder>& localBinders,
+        const std::vector<ExpressionPointer>& domainsOutermostFirst,
+        const std::vector<ExpressionPointer>& cursorsAtDepth,
+        int totalBinders,
+        int matchedDepth,
+        std::vector<ExpressionPointer> bindings,
+        bool conclusionWasFlexApplication);
+
     ExpressionPointer recoverClaimHint(
         const ExpressionPointer& hintTerm,
         const SurfaceExpression& byHint,
