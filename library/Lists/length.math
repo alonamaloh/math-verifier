@@ -1,0 +1,34 @@
+-- Lists/length.math
+--
+-- The length of a `List(A)`: a general-purpose counting function. Wilson's
+-- theorem (the product-of-units pairing) needs to induct on the number of
+-- elements, which requires `length` and its invariance under permutation;
+-- but `length` is broadly reusable, so it lives here on its own.
+
+module Lists.length
+
+import Natural.basics
+import Natural.order
+import Equality.basics
+import Lists.list
+
+-- The number of elements in a list.
+definition List.length (A : Type(0)) : List(A) → Natural
+  | List.empty               => 0
+  | List.prepend(head, tail) => successor(List.length(A, tail))
+
+-- `length(prepend(h, t)) = successor(length t)` — definitional, named for
+-- readability at call sites.
+theorem List.length_prepend (A : Type(0)) (head : A) (tail : List(A))
+        : List.length(A, List.prepend(head, tail)) = successor(List.length(A, tail)) :=
+  calc List.length(A, List.prepend(head, tail))
+     = successor(List.length(A, tail))
+
+-- A nonempty list has positive length.
+theorem List.length_positive_of_member (A : Type(0)) (element : A) (list : List(A))
+        (membership : List.member(A, element, list))
+        : 1 ≤ List.length(A, list) :=
+  cases list {
+    | List.empty => absurd(List.no_member_empty(A, element, membership))
+    | List.prepend(head, tail) => Natural.successor_positive(List.length(A, tail))
+  }
