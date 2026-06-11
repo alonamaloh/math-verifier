@@ -1,0 +1,382 @@
+-- IntegerMod/euler_fermat.math
+--
+-- Euler's generalization of Fermat's little theorem (Freek #10): for
+-- gcd(a, n) = 1, a^φ(n) ≡ 1 (mod n). The same bijection proof as
+-- Fermat's little theorem (IntegerMod/fermat_little.math), with the
+-- nonzero classes of F_p replaced by the units of ℤ/n:
+--
+--   * the units are enumerated by U = map([·], coprime_residues(n)) —
+--     complete, distinct, and of length φ(n) by definition of φ;
+--   * multiplication by a unit x permutes U, so
+--     ∏ U = ∏ map(x·_, U) = x^φ(n) · ∏ U;
+--   * ∏ U is itself a unit and cancels, leaving x^φ(n) = 1.
+
+module IntegerMod.euler_fermat
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.power
+import Natural.gcd
+import Natural.totient
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.embedding
+import Integer.ring
+import Integer.divisibility
+import Algebra.ring_lemmas
+import Lists.list
+import Lists.length
+import Lists.map
+import Lists.range
+import Lists.filter
+import Lists.permutation
+import Lists.distinct
+import IntegerMod.basics
+import IntegerMod.operations
+import IntegerMod.ring
+import IntegerMod.instances
+import IntegerMod.field
+import IntegerMod.representative
+import IntegerMod.residues
+import IntegerMod.units
+import IntegerMod.wilson
+import IntegerMod.fermat_little
+
+-- The units of ℤ/n, as the classes of the coprime residues 1..n.
+definition IntegerMod.unit_residues (n : Natural) : List(IntegerMod(n)) :=
+  List.map(Natural, IntegerMod(n), IntegerMod.residue(n),
+      Natural.coprime_residues(n))
+
+-- ----------------------------------------------------------------------
+-- Every member of the list is a unit.
+theorem IntegerMod.unit_residues_member_unit (n : Natural)
+        (z : IntegerMod(n))
+        (zMember : List.member(IntegerMod(n), z, IntegerMod.unit_residues(n)))
+        : IntegerMod.is_unit(z) := {
+  obtain ⟨j, jProperties⟩
+      from List.map_member_invert(Natural, IntegerMod(n), IntegerMod.residue(n),
+               z, Natural.coprime_residues(n), zMember);
+  let ⟨jMember, jClassEquation⟩ := jProperties;
+  claim Natural.coprime(j, n)
+      by List.filter_member_property(Natural,
+             (k : Natural) ↦ Natural.coprime(k, n), j,
+             List.range_down(n), jMember);
+  claim IntegerMod.is_unit(IntegerMod.make(n, (j : Integer)))
+      since IntegerMod.unit_of_coprime;
+  done by substituting jClassEquation
+}
+
+-- ----------------------------------------------------------------------
+-- Completeness: every unit appears on the list (n ≥ 2). The canonical
+-- representative r of a unit class is coprime to n, and r ≠ 0 since
+-- gcd(0, n) = n ≠ 1.
+theorem IntegerMod.unit_residues_complete (n : Natural)
+        (nAtLeastTwo : 2 ≤ n)
+        (c : IntegerMod(n)) (cUnit : IntegerMod.is_unit(c))
+        : List.member(IntegerMod(n), c, IntegerMod.unit_residues(n)) := {
+  claim 1 ≤ 2;
+  claim nPositive : 1 ≤ n by calc (1 : Natural) ≤ 2 ≤ n;
+  obtain ⟨r, rProperties⟩
+      from IntegerMod.exists_natural_representative(n, nPositive, c);
+  let ⟨rBound, cEquation⟩ := rProperties;
+  -- The representative inherits the unit, hence is coprime to n.
+  claim IntegerMod.is_unit(IntegerMod.make(n, (r : Integer)))
+      by substituting cEquation;
+  claim rCoprime : Natural.coprime(r, n)
+      since IntegerMod.coprime_of_unit_representative;
+  -- r ≠ 0: gcd(0, n) = n would force n = 1.
+  claim r ≠ 0
+      by (rZero : r = 0) ↦ {
+          claim Natural.coprime(0, n) by substituting rZero;
+          claim nIsOne : n = 1 since Natural.coprime_zero_is_one;
+          claim 2 ≤ 1 by substituting nIsOne;
+          claim impossible : False since Natural.not_two_less_or_equal_one;
+          impossible
+        };
+  claim 1 ≤ r since Natural.geq_one_when_not_zero;
+  claim r ≤ n since Natural.less_or_equal_predecessor_less_or_equal;
+  -- So r survives the coprime filter of [1..n], and its class is listed.
+  claim memberRange : List.member(Natural, r, List.range_down(n))
+      since List.range_down_complete;
+  claim List.member(Natural, r, Natural.coprime_residues(n))
+      by List.filter_member_complete(Natural,
+             (k : Natural) ↦ Natural.coprime(k, n), r,
+             List.range_down(n), memberRange, rCoprime);
+  claim List.member(IntegerMod(n), IntegerMod.residue(n, r),
+            IntegerMod.unit_residues(n))
+      since List.map_member;
+  done by substituting cEquation
+}
+
+-- ----------------------------------------------------------------------
+-- Distinctness: distinct coprime residues give distinct classes — the
+-- residues sit in [1, n−1] (n itself is not coprime to n for n ≥ 2),
+-- where `make` is injective.
+theorem IntegerMod.unit_residues_distinct (n : Natural)
+        (nAtLeastTwo : 2 ≤ n)
+        : List.Distinct(IntegerMod(n), IntegerMod.unit_residues(n)) := {
+  -- A coprime residue is strictly below the modulus.
+  claim strictBound
+      : (j : Natural) → List.member(Natural, j, Natural.coprime_residues(n))
+          → successor(j) ≤ n
+      by (j : Natural)
+         (jMember : List.member(Natural, j, Natural.coprime_residues(n))) ↦ {
+           claim List.member(Natural, j, List.range_down(n))
+               by List.filter_member_subset(Natural,
+                      (k : Natural) ↦ Natural.coprime(k, n), j,
+                      List.range_down(n), jMember);
+           claim j ≤ n since List.range_down_member_le;
+           claim Natural.coprime(j, n)
+               by List.filter_member_property(Natural,
+                      (k : Natural) ↦ Natural.coprime(k, n), j,
+                      List.range_down(n), jMember);
+           claim ¬(j = n)
+               by (jIsN : j = n) ↦ {
+                   claim Natural.coprime(n, n) by substituting jIsN;
+                   claim nIsOne : n = 1 since Natural.coprime_self_is_one;
+                   claim 2 ≤ 1 by substituting nIsOne;
+                   claim impossible : False
+                       since Natural.not_two_less_or_equal_one;
+                   impossible
+                 };
+           done since Natural.less_or_equal_not_equal_successor
+         };
+  claim (x y : Natural) → List.member(Natural, x, Natural.coprime_residues(n))
+          → List.member(Natural, y, Natural.coprime_residues(n))
+          → IntegerMod.residue(n, x) = IntegerMod.residue(n, y) → x = y
+      by (x y : Natural)
+         (xMember : List.member(Natural, x, Natural.coprime_residues(n)))
+         (yMember : List.member(Natural, y, Natural.coprime_residues(n)))
+         (imagesEqual : IntegerMod.residue(n, x) = IntegerMod.residue(n, y)) ↦ {
+           claim successor(x) ≤ n by strictBound(x, xMember);
+           claim successor(y) ≤ n by strictBound(y, yMember);
+           done by IntegerMod.make_injective_below_modulus
+         };
+  claim rangeDistinct : List.Distinct(Natural, List.range_down(n))
+      since List.range_down_distinct;
+  claim List.Distinct(Natural, Natural.coprime_residues(n))
+      by List.filter_distinct(Natural,
+             (k : Natural) ↦ Natural.coprime(k, n), List.range_down(n),
+             rangeDistinct);
+  done since List.map_distinct_on
+}
+
+-- ----------------------------------------------------------------------
+-- Multiplication by a unit maps the unit list into itself.
+theorem IntegerMod.scaled_unit_residue_member (n : Natural)
+        (nAtLeastTwo : 2 ≤ n)
+        (x : IntegerMod(n)) (xUnit : IntegerMod.is_unit(x))
+        (z : IntegerMod(n))
+        (zMember : List.member(IntegerMod(n), z,
+            List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
+                IntegerMod.unit_residues(n))))
+        : List.member(IntegerMod(n), z, IntegerMod.unit_residues(n)) := {
+  -- z = x·u with u a listed unit, so z is a unit, hence listed.
+  obtain ⟨u, uProperties⟩
+      from List.map_member_invert(IntegerMod(n), IntegerMod(n),
+               IntegerMod.multiply_by(n, x), z, IntegerMod.unit_residues(n),
+               zMember);
+  let ⟨uMember, scaledEqualsZ⟩ := uProperties;
+  claim IntegerMod.is_unit(u) since IntegerMod.unit_residues_member_unit;
+  claim IntegerMod.is_unit(x * u) since IntegerMod.multiply_unit;
+  claim IntegerMod.is_unit(z) by substituting scaledEqualsZ;
+  done since IntegerMod.unit_residues_complete
+}
+
+-- ----------------------------------------------------------------------
+-- Euler's theorem in ℤ/n: a unit raised to φ(n) is 1.
+theorem IntegerMod.euler_fermat (n : Natural)
+        (nAtLeastTwo : 2 ≤ n)
+        (x : IntegerMod(n)) (xUnit : IntegerMod.is_unit(x))
+        : IntegerMod.power(n, x, Natural.totient(n)) = IntegerMod.one(n) := {
+  -- The scaled list map(x·_, U) is a permutation of U: it is contained
+  -- in U, distinct (the unit x cancels), and of equal length.
+  claim (z : IntegerMod(n))
+        → List.member(IntegerMod(n), z,
+              List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
+                  IntegerMod.unit_residues(n)))
+        → List.member(IntegerMod(n), z, IntegerMod.unit_residues(n))
+      by (z : IntegerMod(n))
+         (zMember : List.member(IntegerMod(n), z,
+             List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
+                 IntegerMod.unit_residues(n)))) ↦ {
+           done since IntegerMod.scaled_unit_residue_member
+         };
+  claim (u v : IntegerMod(n))
+        → List.member(IntegerMod(n), u, IntegerMod.unit_residues(n))
+        → List.member(IntegerMod(n), v, IntegerMod.unit_residues(n))
+        → IntegerMod.multiply_by(n, x, u) = IntegerMod.multiply_by(n, x, v)
+        → u = v
+      by (u v : IntegerMod(n))
+         (uMember : List.member(IntegerMod(n), u, IntegerMod.unit_residues(n)))
+         (vMember : List.member(IntegerMod(n), v, IntegerMod.unit_residues(n)))
+         (scaledEqual
+             : IntegerMod.multiply_by(n, x, u) = IntegerMod.multiply_by(n, x, v)) ↦ {
+           done since IntegerMod.multiply_cancel_left_of_unit
+         };
+  claim List.Distinct(IntegerMod(n), IntegerMod.unit_residues(n))
+      since IntegerMod.unit_residues_distinct;
+  claim List.Distinct(IntegerMod(n),
+            List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
+                IntegerMod.unit_residues(n)))
+      since List.map_distinct_on;
+  claim List.length(IntegerMod(n),
+            List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
+                IntegerMod.unit_residues(n)))
+        = List.length(IntegerMod(n), IntegerMod.unit_residues(n))
+      since List.map_length;
+  claim List.Permutation(IntegerMod(n),
+            List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
+                IntegerMod.unit_residues(n)),
+            IntegerMod.unit_residues(n))
+      since List.permutation_of_distinct_inclusion;
+  -- Multiply out both sides of the permutation.
+  claim productEquation
+      : List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+            List.map(IntegerMod(n), IntegerMod(n), IntegerMod.multiply_by(n, x),
+                IntegerMod.unit_residues(n)))
+        = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+              IntegerMod.unit_residues(n))
+      by List.Permutation.product_invariant
+         recalling IntegerMod.multiply_associative(n),
+             IntegerMod.multiply_commutative(n);
+  claim scaledProduct
+      : IntegerMod.power(n, x,
+            List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
+            * List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+                  IntegerMod.unit_residues(n))
+        = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+              IntegerMod.unit_residues(n))
+      by calc IntegerMod.power(n, x,
+                  List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
+                  * List.product(IntegerMod(n), IntegerMod.multiply,
+                        IntegerMod.one(n), IntegerMod.unit_residues(n))
+            = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+                  List.map(IntegerMod(n), IntegerMod(n),
+                      IntegerMod.multiply_by(n, x), IntegerMod.unit_residues(n)))
+                  by IntegerMod.product_map_multiply(n, x,
+                         IntegerMod.unit_residues(n))
+            = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+                  IntegerMod.unit_residues(n))
+                  by productEquation;
+  -- Cancel the product of all units — itself a unit.
+  claim unitMembers
+      : (z : IntegerMod(n))
+        → List.member(IntegerMod(n), z, IntegerMod.unit_residues(n))
+        → IntegerMod.is_unit(z)
+      by (z : IntegerMod(n))
+         (zMember : List.member(IntegerMod(n), z, IntegerMod.unit_residues(n))) ↦ {
+           done since IntegerMod.unit_residues_member_unit
+         };
+  claim IntegerMod.is_unit(
+            List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+                IntegerMod.unit_residues(n)))
+      by IntegerMod.product_unit(n, IntegerMod.unit_residues(n), unitMembers);
+  claim List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+            IntegerMod.unit_residues(n))
+            * IntegerMod.power(n, x,
+                  List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
+        = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+              IntegerMod.unit_residues(n)) * IntegerMod.one(n)
+      by calc List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+                  IntegerMod.unit_residues(n))
+                  * IntegerMod.power(n, x,
+                        List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
+            = IntegerMod.power(n, x,
+                  List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
+                  * List.product(IntegerMod(n), IntegerMod.multiply,
+                        IntegerMod.one(n), IntegerMod.unit_residues(n))
+                  by IntegerMod.multiply_commutative
+            = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+                  IntegerMod.unit_residues(n))
+                  by scaledProduct
+            = List.product(IntegerMod(n), IntegerMod.multiply, IntegerMod.one(n),
+                  IntegerMod.unit_residues(n)) * IntegerMod.one(n)
+                  by IntegerMod.multiply_identity_right;
+  claim IntegerMod.power(n, x,
+            List.length(IntegerMod(n), IntegerMod.unit_residues(n)))
+        = IntegerMod.one(n)
+      since IntegerMod.multiply_cancel_left_of_unit;
+  -- The list has exactly φ(n) elements.
+  claim lengthValue
+      : List.length(IntegerMod(n), IntegerMod.unit_residues(n))
+        = Natural.totient(n)
+      by List.map_length(Natural, IntegerMod(n), IntegerMod.residue(n),
+             Natural.coprime_residues(n));
+  done by substituting lengthValue
+}
+
+-- ----------------------------------------------------------------------
+-- Euler's theorem over the integers (Freek #10): gcd(a, n) = 1 gives
+-- n ∣ a^φ(n) − 1. (For n = 1 everything is divisible by n.)
+theorem Natural.euler_fermat (n a : Natural)
+        (nPositive : 1 ≤ n)
+        (coprime : Natural.coprime(a, n))
+        : Integer.divides((n : Integer),
+              (Natural.power(Natural.totient(n), a) : Integer) - Integer.one) :=
+  cases n refining coprime, nPositive {
+    | zero => {
+        -- 1 ≤ 0 is absurd.
+        claim 1 ≤ 0 by nPositive;
+        claim impossible : False since Natural.not_less_or_equal_successor_zero;
+        absurd(impossible)
+      }
+    | successor(m) =>
+        cases m refining coprime {
+          | zero =>
+              -- n = 1 divides everything.
+              ⟨(Natural.power(Natural.totient(1), a) : Integer) - Integer.one,
+               calc (Natural.power(Natural.totient(1), a) : Integer) - Integer.one
+                  = ((1 : Natural) : Integer)
+                        * ((Natural.power(Natural.totient(1), a) : Integer)
+                            - Integer.one)
+                        by ring⟩
+          | successor(k) => {
+              -- n ≥ 2: the class of a is a unit, and Euler applies.
+              claim 1 ≤ successor(k) since Natural.successor_positive;
+              claim 2 ≤ successor(successor(k))
+                  since Natural.successor_less_or_equal_successor;
+              claim IntegerMod.is_unit(
+                        IntegerMod.make(successor(successor(k)), (a : Integer)))
+                  since IntegerMod.unit_of_coprime;
+              claim classPower
+                  : IntegerMod.power(successor(successor(k)),
+                        IntegerMod.make(successor(successor(k)), (a : Integer)),
+                        Natural.totient(successor(successor(k))))
+                    = IntegerMod.one(successor(successor(k)))
+                  since IntegerMod.euler_fermat;
+              claim IntegerMod.make(successor(successor(k)),
+                        (Natural.power(Natural.totient(successor(successor(k))), a)
+                            : Integer))
+                  = IntegerMod.make(successor(successor(k)), Integer.one)
+                  by calc IntegerMod.make(successor(successor(k)),
+                              (Natural.power(
+                                   Natural.totient(successor(successor(k))), a)
+                                  : Integer))
+                        = IntegerMod.power(successor(successor(k)),
+                              IntegerMod.make(successor(successor(k)),
+                                  (a : Integer)),
+                              Natural.totient(successor(successor(k))))
+                              by IntegerMod.power_of_class(successor(successor(k)),
+                                     a, Natural.totient(successor(successor(k))))
+                        = IntegerMod.one(successor(successor(k)))
+                              by classPower;
+              claim congruent
+                  : Integer.CongruentModulo(successor(successor(k)),
+                        (Natural.power(Natural.totient(successor(successor(k))), a)
+                            : Integer),
+                        Integer.one)
+                  by IntegerMod.congruent_of_make_equal;
+              congruent
+            }
+        }
+  }
