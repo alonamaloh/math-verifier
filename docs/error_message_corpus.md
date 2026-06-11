@@ -180,3 +180,37 @@ each improvement is measured and protected against regression.
   that the generic "citation does not prove this goal" is absent.
 - **Possible follow-up (deferred):** a "did you mean …?" suggestion via
   edit-distance over declaration names — only if it proves worth it.
+
+### 9. Ambiguous premise discharge in `obtain by` / `cases by` — FIXED (fix #5)
+
+- **Trigger:** an argument-free `obtain ⟨…⟩ by L` / `cases by L { … }`
+  where L's premise pattern is matched by SEVERAL in-scope hypotheses
+  that pin different lemma arguments. Repros:
+  `library/ErrorTest/cases_by_ambiguous_premise.math`,
+  `library/ErrorTest/obtain_by_ambiguous_premise.math`.
+- **Was (symptom):** the discharge silently took the most-recent match
+  (recency heuristic), and the wrong instantiation surfaced far away —
+  a branch type-mismatch (`this case gives: b = Integer.zero` against
+  `expected: a = Integer.zero`) or a wrong obtained equation feeding a
+  later step. Scored 0 on cause and location; the conventions doc said
+  "must be unambiguous" but nothing enforced it.
+- **Diagnosis:** `inferCallWithHoles` step 5c (match-and-unify) committed
+  the first hypothesis that unified, and steps 5d/5e (backward chaining)
+  could likewise guess; for these citation forms there is NO downstream
+  goal that validates the choice, so the guess is unchecked.
+- **Now:** the `SurfaceCiteInferred` elaboration (the obtain-by/cases-by
+  desugar) sets `requireUnambiguousDischarge_`; at search depth zero,
+  step 5c then COLLECTS all matching hypotheses instead of committing the
+  first. One match (or several with identical instantiations) commits as
+  before; conflicting matches defer the slot, suppress backward chaining,
+  and the failure reports at the citation site: the premise pattern (with
+  holes shown as `?`), every candidate hypothesis with its type, and the
+  fix ("pass the lemma's arguments explicitly"). Claim/calc citations are
+  untouched — they keep the recency heuristic because a goal validates
+  the outcome downstream (and proofs depend on that backtracking).
+  Three library sites that had been silently lucky (division.math,
+  multiply_bounds.math, prime_split.math) were made explicit.
+- **Still open:** the inbox's "even better" idea — use the expected
+  return type of the `cases` arms to disambiguate before erroring —
+  is unimplemented (it would need the arm types threaded into the
+  citation; the explicit form costs one line and is clearer anyway).

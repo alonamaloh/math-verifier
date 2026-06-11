@@ -48,34 +48,6 @@ rubric (0/1): cause · location · actionable · folded-types · no-jargon
 
 ---
 
-### library/ErrorTest/probe_cases_by_ambiguous.math — 2026-06-09 01:36:38 (exit 1)
-note: cases by <lemma> with two context premises of same x*y=0 shape; wanted a=0 but tactic chose bbZero
-```
-$ ./kernel verify --source library/ErrorTest/probe_cases_by_ambiguous.math --cache-root build
-library/ErrorTest/probe_cases_by_ambiguous.math:16:3: elaborate error: case for 'Or.introduceLeft' of 'Or'
-  cases expression at line 16
-  theorem 'ErrorTest.p'
-  this case's result has the wrong type for the function's declared return type
-    expected:            a = Integer.zero
-    but this case gives: b = Integer.zero
-```
-diagnosis: `cases by Integer.multiply_eq_zero_implies` must pick which context
-  hypothesis discharges the lemma's `x*y = 0` premise. TWO match here
-  (`aaZero : a*a=0` and `bbZero : b*b=0`), and the return type `a = 0` does NOT
-  feed back into the choice — so it silently takes `bbZero`, instantiates
-  `x=y=b`, and the branches now prove `b = 0` against the declared `a = 0`. The
-  surfaced message blames the branch body ("this case gives b = Integer.zero"),
-  which is a SYMPTOM; the real problem is ambiguous premise selection in
-  `cases by`. Wanted, at the `cases by` site: "the premise `x*y = 0` is
-  discharged by more than one hypothesis (`aaZero`, `bbZero`); disambiguate
-  with explicit args — `cases Integer.multiply_eq_zero_implies(a, a, aaZero)`".
-  Even better: prefer the instantiation whose branches match the expected
-  return type before falling back to first-match. FIX: premise search in
-  `cases by` should detect multiple matches (error, or use the goal type to
-  disambiguate) rather than taking the first.
-rubric (0/1): cause · location · actionable · folded-types · no-jargon
-
----
 
 ### library/ErrorTest/probe_substituting_lemma_no_args.math — 2026-06-09 01:36:38 (exit 1)
 note: argument-free substituting of a lemma that still needs its arg

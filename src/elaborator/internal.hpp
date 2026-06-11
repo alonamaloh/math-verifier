@@ -3788,6 +3788,11 @@ private:
     // binders and running the citation machinery on the core goal, then
     // wrapping the result in lambdas. Returns nullptr when the citation
     // doesn't close the core goal either.
+    // Set (and consumed by the next inferCallWithHoles) for obtain-by /
+    // cases-by citations: premise discharge must be unambiguous there,
+    // since no downstream goal validates a guessed hypothesis.
+    bool requireUnambiguousDischarge_ = false;
+
     ExpressionPointer citePiGoalByIntroduction(
         const SurfaceExpression& byHint,
         const ExpressionPointer& goalClosed,

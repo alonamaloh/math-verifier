@@ -236,7 +236,20 @@ ExpressionPointer Elaborator::elaborateExpression(
                     identifier->qualifiedName, identifier->universeArgs,
                     expression.line, expression.column),
                 std::move(holeArgs), expression.line, expression.column);
-            return elaborateExpression(*call, localBinders, expectedType);
+            // No goal validates this citation's outcome (the obtained
+            // existential just flows onward), so a silently-guessed
+            // premise surfaces as a confusing failure far away — demand
+            // an unambiguous discharge instead.
+            requireUnambiguousDischarge_ = true;
+            try {
+                ExpressionPointer cited = elaborateExpression(
+                    *call, localBinders, expectedType);
+                requireUnambiguousDischarge_ = false;
+                return cited;
+            } catch (...) {
+                requireUnambiguousDischarge_ = false;
+                throw;
+            }
         }
 
         if (auto* unfold =

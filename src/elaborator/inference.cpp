@@ -890,6 +890,14 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
         std::map<std::string, ExpressionPointer>* solvedInheritedOut) {
 
         lastDischarges_.clear();
+        // Obtain-by / cases-by citations have no downstream goal to
+        // validate a guessed premise against, so their discharge must be
+        // unambiguous. Applies only to the citation's own call: nested
+        // backward-chaining / auto-prover sub-searches run under the
+        // normal first-match rules.
+        bool requireUnambiguous = requireUnambiguousDischarge_
+            && backwardChainingDepth_ == 0 && autoProveDepth_ == 0;
+        std::string ambiguityReport;
         // Step 1: walk the function's Pi chain. At each position, allocate
         // a fresh Internal FreeVariable. Hole positions add their name to
         // `metavariableNames` (to be resolved by unification); non-hole
@@ -1196,6 +1204,32 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                     // check Prop-ness AFTER unification resolves them, which
                     // preserves "never fill a value hole from context".
                     bool filled = false;
+                    std::vector<int> matchedBinders;
+                    std::map<std::string, ExpressionPointer> firstTrial;
+                    auto commitMatch =
+                        [&](size_t slot, int binderIndex,
+                            const std::map<std::string,
+                                           ExpressionPointer>& solved) {
+                        // Adopt the newly-solved holes (closed to the
+                        // global closed-over-localBinders form) and fill
+                        // this slot with the hypothesis.
+                        for (const auto& entry : solved) {
+                            if (assignment.count(entry.first)) continue;
+                            ExpressionPointer closedValue;
+                            try {
+                                closedValue = closeOverLocalBinders(
+                                    entry.second, localBinders, N);
+                            } catch (...) { closedValue = entry.second; }
+                            assignment[entry.first] = closedValue;
+                        }
+                        int deBruijnIndex = N - 1 - binderIndex;
+                        elaboratedArgs[slot] =
+                            makeBoundVariable(deBruijnIndex);
+                        lastDischarges_.push_back(
+                            {deBruijnIndex, N,
+                             localBinders[binderIndex].name});
+                        progress = true;
+                    };
                     for (int j = N - 1; j >= 0 && !filled; --j) {
                         ExpressionPointer candidateType =
                             openOverLocalBinders(
@@ -1249,25 +1283,95 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
                                     environment_, slotResolved));
                         } catch (...) { resolvedIsProp = false; }
                         if (!resolvedIsProp) continue;
-                        // Commit: adopt the newly-solved holes (closed to
-                        // the global closed-over-localBinders form) and
-                        // fill this slot with the hypothesis.
-                        for (auto& entry : trial) {
-                            if (assignment.count(entry.first)) continue;
-                            ExpressionPointer closedValue;
-                            try {
-                                closedValue = closeOverLocalBinders(
-                                    entry.second, localBinders, N);
-                            } catch (...) { closedValue = entry.second; }
-                            assignment[entry.first] = closedValue;
+                        if (requireUnambiguous) {
+                            // Collect instead of committing; resolved below
+                            // once every hypothesis has been considered.
+                            if (matchedBinders.empty()) {
+                                firstTrial = trial;
+                                matchedBinders.push_back(j);
+                            } else {
+                                bool sameInstantiation = true;
+                                for (auto& entry : trial) {
+                                    if (assignment.count(entry.first)) {
+                                        continue;
+                                    }
+                                    auto previous =
+                                        firstTrial.find(entry.first);
+                                    if (previous == firstTrial.end()
+                                        || compareExpressionStructure(
+                                               entry.second,
+                                               previous->second) != 0) {
+                                        sameInstantiation = false;
+                                        break;
+                                    }
+                                }
+                                if (!sameInstantiation) {
+                                    matchedBinders.push_back(j);
+                                }
+                            }
+                            continue;
                         }
-                        int deBruijnIndex = N - 1 - j;
-                        elaboratedArgs[i] =
-                            makeBoundVariable(deBruijnIndex);
-                        lastDischarges_.push_back(
-                            {deBruijnIndex, N, localBinders[j].name});
+                        commitMatch(i, j, trial);
                         filled = true;
-                        progress = true;
+                    }
+                    if (requireUnambiguous && !filled) {
+                        if (matchedBinders.size() == 1) {
+                            commitMatch(i, matchedBinders[0], firstTrial);
+                            filled = true;
+                            progress = true;
+                        } else if (matchedBinders.size() > 1) {
+                            ExpressionPointer slotShown;
+                            try {
+                                slotShown = openOverLocalBinders(
+                                    substituteFreeVariables(
+                                        piDomains[i], assignment),
+                                    localBinders, N);
+                            } catch (...) { slotShown = nullptr; }
+                            auto blankHoles = [](std::string text) {
+                                // Internal hole FVs print as
+                                // `@_hole_<k>_<lemma>`; show `?` instead.
+                                const std::string marker = "@_hole_";
+                                size_t at;
+                                while ((at = text.find(marker))
+                                       != std::string::npos) {
+                                    size_t end = at + marker.size();
+                                    while (end < text.size()
+                                           && (std::isalnum(
+                                                   (unsigned char)text[end])
+                                               || text[end] == '_'
+                                               || text[end] == '.')) {
+                                        ++end;
+                                    }
+                                    text.replace(at, end - at, "?");
+                                }
+                                return text;
+                            };
+                            ambiguityReport =
+                                "ambiguous `by " + diagnosticName
+                                + "` citation: the premise"
+                                + (slotShown
+                                       ? (" `" + blankHoles(
+                                              prettyPrintInLocalScope(
+                                                  slotShown, localBinders))
+                                          + "`")
+                                       : std::string(""))
+                                + " is matched by several hypotheses that pin "
+                                "different arguments:";
+                            for (int jj : matchedBinders) {
+                                ambiguityReport +=
+                                    "\n    " + localBinders[jj].name + " : "
+                                    + prettyPrintInLocalScope(
+                                          openOverLocalBinders(
+                                              localBinders[jj].type,
+                                              localBinders, jj),
+                                          localBinders);
+                            }
+                            ambiguityReport +=
+                                "\n  pass the lemma's arguments explicitly "
+                                "to name the intended hypothesis: `"
+                                + diagnosticName
+                                + "(…)` (with `from` in an `obtain`).";
+                        }
                     }
                     if (!filled) stillUnresolved.push_back(i);
                 }
@@ -1289,6 +1393,7 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
             return !(v && std::string(v) == "0");
         }();
         if (!unresolved.empty() && backwardChainingEnabled
+            && ambiguityReport.empty()
             && backwardChainingDepth_ < kBackwardChainDepthCap
             && autoProveDepth_ == 0) {
             std::set<std::string> stillUnresolvedNames;
@@ -1349,6 +1454,7 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
         // parent metavar as a side effect. tryResolvePremiseSlot shares this
         // call's metavariableNames/assignment so the leaf solution propagates.
         if (!unresolved.empty() && backwardChainingEnabled
+            && ambiguityReport.empty()
             && backwardChainingDepth_ < kBackwardChainDepthCap
             && autoProveDepth_ == 0) {
             // Arm the kernel-step budget if not already (Step 5e is not inside
@@ -1443,6 +1549,9 @@ std::vector<ExpressionPointer> Elaborator::inferCallWithHoles(
             }
         }
         if (!unresolved.empty()) {
+            if (!ambiguityReport.empty()) {
+                throwElaborate(ambiguityReport);
+            }
             std::string message =
                 "call to '" + diagnosticName
                 + "' at line " + std::to_string(line)
