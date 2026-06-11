@@ -49,3 +49,71 @@ rubric (0/1): cause · location · actionable · folded-types · no-jargon
 ---
 
 
+### Real/continuity.math (mid-development) — 2026-06-11 (hand-recorded, IVT push)
+note: citation unification does not see through a local `let` abbreviation
+```
+library/Real/continuity.math:95:3: elaborate error: claim at line 106
+  ...
+  the `Rational.minimum_positive` citation does not prove this goal
+    goal:        Rational.zero < delta
+    `Rational.minimum_positive` has type: (a : Rational) → (b : Rational) → Rational.zero < a → Rational.zero < b → Rational.zero < (Rational.minimum a b)
+  the hint's arguments could not be inferred from the goal or discharged from context, ...
+```
+diagnosis: `delta` was `let delta : Rational := Rational.minimum(fDelta, gDelta);`
+  — ζ-tracked, kernel-transparent, but the goal-driven citation unifier matches
+  SYNTACTICALLY and never unfolds the let, so `zero < delta` fails against
+  `zero < minimum(a, b)`. The message shows goal + lemma type (good) but the
+  *cause* — "the goal contains a let-bound abbreviation the matcher does not
+  unfold" — is invisible; user must guess. Fix options: ζ-expand let-bindings
+  during citation unification (preferred — `let` is documented as transparent),
+  or say so in the message. Same root cause also breaks `cases`/`obtain`
+  normalization (next entry).
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+---
+
+### Real/intermediate_value.math (mid-development) — 2026-06-11 (hand-recorded, IVT push)
+note: obtain/cases scrutinee normalisation stops at a local `let`-bound Set
+```
+library/Real/intermediate_value.math:1:1: elaborate error: cases scrutinee at line 78: type's head is not an inductive constant after normalisation
+```
+diagnosis: `obtain ⟨_, yRest⟩ from yInCandidates;` where
+  `yInCandidates : y ∈ candidates` and `candidates` was a local
+  `let candidates : Set(Real) := Real.intermediate_value_candidates(f, a, b);`.
+  WHNF unfolds Set.member → candidates(y) and then stops: the let-binder is
+  not δ-unfolded, so the And never surfaces. Replacing the let with the full
+  definition application fixed it. Also: error location is 1:1 + "line 78",
+  not the obtain's column; "inductive constant" is kernel jargon; no hint that
+  the let was the blocker. (Same ζ-opacity family as the citation entry above.)
+rubric (0/1): cause 0 · location 0 · actionable 0 · folded-types 1 · no-jargon 0
+
+---
+
+### Real/intermediate_value.math (mid-development) — 2026-06-11 (hand-recorded, IVT push)
+note: `claim X by decide P { … }` (and `by { decide … }`) rejected as a failed *citation*
+```
+library/Real/intermediate_value.math:69:3: elaborate error: claim at line 92
+  ...
+  the `by` hint citation does not prove this goal
+    goal:        f c ≤ Real.zero
+  the hint's arguments could not be inferred from the goal or discharged from context, ...
+```
+diagnosis: the claim's `by`-payload was a structural proof form
+  (`decide P { | yes … | no … }`), not a citation — but the hint parser/
+  dispatcher fell through to the citation path and reported a unification
+  failure with no inner detail. Wrapping in `{ … }` failed identically.
+  `by cases { case P as h: … case Not(P) as h2: … }` is the supported
+  spelling and worked. Either support `decide` as a claim-hint (it is the
+  documented canonical classical case-split), or have the error say
+  "`decide` is not a claim hint — use `by cases { case P … case Not(P) … }`".
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+---
+
+### (warning, not error) refining-list names count as unused — 2026-06-11 (IVT push)
+note: `claim xNotZero : …;` followed by `cases x refining xPositive, xNotZero { … }`
+  still warns `unused name xNotZero` — usage in a `refining` list is not counted
+  as a use. (Serendipitously the fact was prover-derivable and got deleted, but
+  the false positive stands: a name consumed ONLY by `refining` should count.)
+
+---
