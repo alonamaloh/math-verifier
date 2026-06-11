@@ -49,7 +49,10 @@ calc a   = b   by L         -- '=' step needs the lemma applied (diff-inference)
 - `by L` justifies a step; `since R` is the same but kept as explanation
   (exempt from the redundant-`by` lint). `as NAME` binds the step's fact.
 - `substituting eq` / `rewrite(eq)` rewrite by an equality (prefer
-  `substituting`; raw `rewrite` is a counted CIC leak).
+  `substituting`; raw `rewrite` is a counted CIC leak). `eq` may be a
+  proof, a proposition (`substituting (x = head)` — proved in place), or
+  a quantified lemma cited by name (`substituting Natural.add_zero` —
+  arguments inferred by matching its conclusion against the goal).
 
 ## Claims & closers
 

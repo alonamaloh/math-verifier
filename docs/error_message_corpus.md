@@ -240,3 +240,35 @@ each improvement is measured and protected against regression.
   binders and runs the full citation machinery on the core goal, which
   removed the `(z)(mem) ↦ { done by Lemma }` wrapper idiom from six
   library sites (see `library/Test/pi_goal_citation_test.math`).
+
+### 11. `by substituting <lemma>` did not infer arguments — FIXED (fix #8)
+
+- **Trigger:** `by substituting Natural.add_zero` (a QUANTIFIED equation
+  cited by name) on a calc step / claim whose goal contains an instance
+  of the lemma's conclusion. Repro (now the passing feature test):
+  `library/Test/substituting_lemma_test.math`.
+- **Was (symptom):** "`by substituting`: the supplied expression's type
+  is not an equality `a = b`" — literally correct (the type is a Pi
+  chain ENDING in an equality) but unhelpful: no why, no fix. The trap
+  was the asymmetry: `by <lemma>` and the unnamed `by substitution` both
+  infer arguments; `by substituting <lemma>` alone did not.
+- **Diagnosis:** `elaborateClaimBySubstitution`'s narrowed form fed the
+  citation's type straight to `extractEqualityComponents`, which only
+  accepts a concrete `Equality(A, x, y)`.
+- **Now:** `collectQuantifiedSubstitutionCandidates` (claim.cpp): when
+  the cited type is a Pi chain ending in an equality, its LHS/RHS
+  patterns are matched against the goal's Application subterms
+  (`matchAgainstPattern` — the single-lemma analogue of
+  `collectLibraryEqualitiesAt`, but driven by the cited proof term, so
+  non-indexed lemmas and Pi-typed local hypotheses qualify); each
+  complete match instantiates a substitution candidate for the ordinary
+  bridge. When no instance occurs in the goal, the error names the
+  citation, says it is a quantified equation with N outstanding
+  argument(s), and points at both ways out (apply explicitly / unnamed
+  `by substitution`). ErrorTest:
+  `substituting_lemma_no_occurrence.math`.
+- **Limits:** all lemma binders must be bound by matching ONE side
+  (propositional preconditions are not discharged from hypotheses here,
+  unlike the indexed path), and the instance must occur in the GOAL —
+  a reverse rewrite whose structured side appears only in the result
+  (e.g. introducing `n + 0` out of `n`) still needs explicit arguments.

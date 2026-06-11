@@ -39,28 +39,38 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                     "doesn't typecheck as a proof");
             }
             EqualityComponents components;
+            bool directEquality = true;
             try {
                 components = extractEqualityComponents(
                     eqProofTypeOpened,
                     "by substituting argument", line);
             } catch (const ElaborateError&) {
-                throwElaborate(
-                    "`by substituting`: the supplied expression's "
-                    "type is not an equality `a = b`");
+                directEquality = false;
             }
-            int N = static_cast<int>(localBinders.size());
-            ContextEquality eq;
-            eq.cost = 1;
-            eq.source = "supplied via `by substituting`";
-            eq.carrierType = closeOverLocalBinders(
-                components.carrierType, localBinders, N);
-            eq.lhs = closeOverLocalBinders(
-                components.leftEndpoint, localBinders, N);
-            eq.rhs = closeOverLocalBinders(
-                components.rightEndpoint, localBinders, N);
-            eq.carrierLevel = components.carrierUniverseLevel;
-            eq.proofExpr = eqProof;
-            candidates.push_back(std::move(eq));
+            if (directEquality) {
+                int N = static_cast<int>(localBinders.size());
+                ContextEquality eq;
+                eq.cost = 1;
+                eq.source = "supplied via `by substituting`";
+                eq.carrierType = closeOverLocalBinders(
+                    components.carrierType, localBinders, N);
+                eq.lhs = closeOverLocalBinders(
+                    components.leftEndpoint, localBinders, N);
+                eq.rhs = closeOverLocalBinders(
+                    components.rightEndpoint, localBinders, N);
+                eq.carrierLevel = components.carrierUniverseLevel;
+                eq.proofExpr = eqProof;
+                candidates.push_back(std::move(eq));
+            } else {
+                // A quantified equation (e.g. `by substituting
+                // Natural.add_zero` with `add_zero : (a) → a + 0 = a`):
+                // infer the arguments from the goal, mirroring what
+                // `by <lemma>` and the unnamed `by substitution`
+                // already do. Throws a tailored error when it can't.
+                collectQuantifiedSubstitutionCandidates(
+                    eqProof, eqProofTypeOpened, goalClosed,
+                    localBinders, line, candidates);
+            }
         } else {
             candidates = collectContextEqualities(
                 goalClosed, localBinders, line);
@@ -393,6 +403,139 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
             "equality lets the auto-prover reach a provable form "
             "(consider `by substituting <specific eq>` to narrow, "
             "or supply an explicit `by <proof>`)");
+    }
+
+void Elaborator::collectQuantifiedSubstitutionCandidates(
+        ExpressionPointer citedProof,
+        ExpressionPointer citedTypeOpened,
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line,
+        std::vector<ContextEquality>& out) {
+        int N = static_cast<int>(localBinders.size());
+        std::string citedPrinted = prettyPrintInLocalScope(
+            citedProof, localBinders);
+        // Peel the Pi chain off the citation's type (closed over the
+        // local binders, so the chain's own BoundVariables are the only
+        // ones below `binderCount` — the metavariable slots
+        // matchAgainstPattern expects).
+        ExpressionPointer citedTypeClosed = closeOverLocalBinders(
+            citedTypeOpened, localBinders, N);
+        ExpressionPointer conclusion = citedTypeClosed;
+        int binderCount = 0;
+        while (auto* pi = std::get_if<Pi>(&conclusion->node)) {
+            conclusion = pi->codomain;
+            ++binderCount;
+        }
+        // The conclusion must be `Equality(carrier, lhs, rhs)`.
+        auto* eqApp3 = std::get_if<Application>(&conclusion->node);
+        auto* eqApp2 = eqApp3
+            ? std::get_if<Application>(&eqApp3->function->node) : nullptr;
+        auto* eqApp1 = eqApp2
+            ? std::get_if<Application>(&eqApp2->function->node) : nullptr;
+        auto* eqHead = eqApp1
+            ? std::get_if<Constant>(&eqApp1->function->node) : nullptr;
+        if (binderCount == 0 || !eqHead || eqHead->name != "Equality") {
+            throwElaborate(
+                "`by substituting`: the supplied expression's "
+                "type is not an equality `a = b`"
+                + std::string(binderCount > 0
+                    ? " — '" + citedPrinted + "' is a function whose "
+                      "conclusion is not an equality"
+                    : ""));
+        }
+        ExpressionPointer lhsPattern = eqApp2->argument;
+        ExpressionPointer rhsPattern = eqApp3->argument;
+        // Scan the goal's Application subterms (surface form first,
+        // then the deep-WHNF fallback the bridge itself uses) for an
+        // instance of either endpoint pattern; each complete match
+        // instantiates the citation into a concrete equality candidate.
+        // Bare-BoundVariable patterns are skipped — they match every
+        // subterm and carry no inference signal.
+        std::vector<ContextEquality> inferred;
+        std::function<void(ExpressionPointer)> scan =
+            [&](ExpressionPointer subexpr) {
+            auto* app = std::get_if<Application>(&subexpr->node);
+            if (!app) return;
+            for (const ExpressionPointer& pattern :
+                     {lhsPattern, rhsPattern}) {
+                if (std::holds_alternative<BoundVariable>(pattern->node)) {
+                    continue;
+                }
+                std::vector<ExpressionPointer> bindings(binderCount);
+                if (!matchAgainstPattern(pattern, subexpr,
+                                           binderCount, bindings)) {
+                    continue;
+                }
+                bool allBound = true;
+                for (const auto& binding : bindings) {
+                    if (!binding) { allBound = false; break; }
+                }
+                if (!allBound) continue;
+                // Assemble `cited(binding_for_BV(n-1), …, BV(0))` —
+                // outermost binder first, matching the Pi chain.
+                ExpressionPointer instance = citedProof;
+                for (int i = binderCount - 1; i >= 0; --i) {
+                    instance = makeApplication(instance, bindings[i]);
+                }
+                ExpressionPointer instanceTypeOpened;
+                try {
+                    instanceTypeOpened = inferTypeInLocalContext(
+                        localBinders, instance);
+                } catch (const TypeError&) { continue; }
+                  catch (const ElaborateError&) { continue; }
+                EqualityComponents components;
+                try {
+                    components = extractEqualityComponents(
+                        instanceTypeOpened,
+                        "by substituting argument", line);
+                } catch (const ElaborateError&) { continue; }
+                ContextEquality eq;
+                eq.cost = 1;
+                eq.source = "supplied via `by substituting` ("
+                    + citedPrinted + ", arguments inferred)";
+                eq.carrierType = closeOverLocalBinders(
+                    components.carrierType, localBinders, N);
+                eq.lhs = closeOverLocalBinders(
+                    components.leftEndpoint, localBinders, N);
+                eq.rhs = closeOverLocalBinders(
+                    components.rightEndpoint, localBinders, N);
+                eq.carrierLevel = components.carrierUniverseLevel;
+                eq.proofExpr = std::move(instance);
+                bool duplicate = false;
+                for (const ContextEquality& seen : inferred) {
+                    if (structurallyEqual(seen.lhs, eq.lhs)
+                        && structurallyEqual(seen.rhs, eq.rhs)) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate) inferred.push_back(std::move(eq));
+            }
+            scan(app->function);
+            scan(app->argument);
+        };
+        scan(goalClosed);
+        ExpressionPointer goalDeepWhnf =
+            deepWhnfThroughApplications(goalClosed);
+        if (goalDeepWhnf.get() != goalClosed.get()) {
+            scan(goalDeepWhnf);
+        }
+        if (inferred.empty()) {
+            throwElaborate(
+                "`by substituting`: '" + citedPrinted
+                + "' is a quantified equation — it still expects "
+                + std::to_string(binderCount)
+                + " argument(s), and no instance of its left- or "
+                  "right-hand side occurs in the goal, so they could "
+                  "not be inferred. Apply it explicitly (`by "
+                  "substituting " + citedPrinted + "(…)`), or use the "
+                  "unnamed `by substitution` to search every equality "
+                  "in scope.");
+        }
+        for (ContextEquality& eq : inferred) {
+            out.push_back(std::move(eq));
+        }
     }
 
 ExpressionPointer Elaborator::elaborateClaimByCases(

@@ -1235,6 +1235,25 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int /*line*/);
 
+    // `by substituting <lemma>` where the citation is a QUANTIFIED
+    // equation (a Pi chain ending in `a(x⃗) = b(x⃗)`) rather than a
+    // concrete equality: infer the arguments by matching the
+    // conclusion's LHS/RHS patterns against the goal's Application
+    // subterms (the single-lemma analogue of collectLibraryEqualitiesAt,
+    // but working from the cited proof term, so non-indexed lemmas and
+    // Pi-typed local hypotheses qualify too). Each complete match is
+    // instantiated and appended as a ContextEquality candidate for the
+    // ordinary substitution bridge. Throws a tailored ElaborateError
+    // when the conclusion isn't an equality or no instance occurs in
+    // the goal.
+    void collectQuantifiedSubstitutionCandidates(
+        ExpressionPointer citedProof,
+        ExpressionPointer citedTypeOpened,
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int line,
+        std::vector<ContextEquality>& out);
+
     // Unified context-equality bridge. For every equality in scope
     // (local or library, ground or instantiated), try rewriting the
     // goal by replacing one side with the other, recursing on the

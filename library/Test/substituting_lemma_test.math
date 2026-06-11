@@ -1,0 +1,32 @@
+-- `by substituting <lemma>` with the lemma's arguments INFERRED: the
+-- quantified equation's LHS/RHS patterns are matched against the goal's
+-- subterms, each full match instantiating a substitution candidate —
+-- the same inference `by <lemma>` and the unnamed `by substitution`
+-- already perform (the asymmetry was corpus #11). The match must come
+-- from the goal: a lemma whose instance appears nowhere in the goal
+-- still errors (ErrorTest/substituting_lemma_no_occurrence.math).
+
+module Test.substituting_lemma_test
+
+import Natural.basics
+import Natural.arithmetic
+import Natural.order
+
+-- Calc step, one inferred argument (the original inbox probe).
+theorem Test.calc_step_substituting_lemma (n : Natural) : n + 0 = n :=
+  calc n + 0
+     = n   by substituting Natural.add_zero
+
+-- Two inferred arguments.
+theorem Test.two_arguments_inferred (n m : Natural) : n + m = m + n :=
+  calc n + m
+     = m + n   by substituting Natural.add_commutative
+
+-- Claim form: the instance sits inside a bigger goal, and the rewritten
+-- goal is discharged from a hypothesis.
+theorem Test.claim_substituting_lemma (n : Natural)
+        (h : successor(n) ≤ 5)
+        : successor(n + 0) ≤ 5 := {
+    claim successor(n + 0) ≤ 5 by substituting Natural.add_zero;
+    done
+}
