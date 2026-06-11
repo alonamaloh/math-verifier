@@ -1486,14 +1486,16 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                 && cases->refiningNames.empty()) {
                 return makeSurfaceCases(std::move(rewrittenScrutinee),
                                          std::move(rewrittenClauses),
-                                         node.line, node.column);
+                                         node.line, node.column,
+                                         cases->inductionHypothesisName);
             }
             return makeSurfaceCasesWithRefining(
                 std::move(rewrittenScrutinee),
                 std::move(rewrittenClauses),
                 cases->equalityHypothesisName,
                 cases->refiningNames,
-                node.line, node.column);
+                node.line, node.column,
+                cases->inductionHypothesisName);
         }
         if (auto* claim = std::get_if<SurfaceStructuredClaim>(&node.node)) {
             // Anonymous `claim T by V;` desugars to a SurfaceLet whose
@@ -1572,8 +1574,134 @@ SurfaceExpressionPointer Elaborator::rewriteRecursiveCalls(
                                     std::move(rewrittenSteps),
                                     node.line, node.column);
         }
+        if (auto* decide = std::get_if<SurfaceDecide>(&node.node)) {
+            // A self-call inside a decision arm is the natural way to
+            // write a classically-filtered recursion (e.g. List.filter
+            // keeping `head` when `P(head)` holds) — without this case
+            // it survives unrewritten and trips the kernel's
+            // "undefined constant: <thisDeclName>".
+            return makeSurfaceDecide(
+                rewriteRecursiveCalls(decide->proposition, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                decide->yesBinderName,
+                rewriteRecursiveCalls(decide->yesBody, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                decide->noBinderName,
+                rewriteRecursiveCalls(decide->noBody, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
+        if (auto* tuple = std::get_if<SurfaceAnonymousTuple>(&node.node)) {
+            std::vector<SurfaceExpressionPointer> rewrittenComponents;
+            for (const auto& component : tuple->components) {
+                rewrittenComponents.push_back(rewriteRecursiveCalls(
+                    component, thisDeclName,
+                    recursiveArgToHypothesis, outerBinderCount));
+            }
+            return makeSurfaceAnonymousTuple(
+                std::move(rewrittenComponents), node.line, node.column);
+        }
+        if (auto* note = std::get_if<SurfaceNote>(&node.node)) {
+            auto rewriteOrNull = [&](const SurfaceExpressionPointer& sub) {
+                return sub ? rewriteRecursiveCalls(
+                                 sub, thisDeclName,
+                                 recursiveArgToHypothesis, outerBinderCount)
+                           : nullptr;
+            };
+            return makeSurfaceNote(
+                rewriteOrNull(note->goalType),
+                rewriteOrNull(note->proposition),
+                rewriteOrNull(note->body),
+                node.line, node.column,
+                note->changesGoal,
+                rewriteOrNull(note->proof));
+        }
+        if (auto* choose = std::get_if<SurfaceChoose>(&node.node)) {
+            return makeSurfaceChoose(
+                choose->name,
+                rewriteRecursiveCalls(choose->predicate, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                rewriteRecursiveCalls(choose->body, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
+        if (auto* strongInduction =
+                std::get_if<SurfaceByStrongInduction>(&node.node)) {
+            return makeSurfaceByStrongInduction(
+                rewriteRecursiveCalls(strongInduction->scrutinee,
+                                       thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                strongInduction->subjectName,
+                strongInduction->ihName,
+                rewriteRecursiveCalls(strongInduction->body, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
+        if (auto* inductionUsing =
+                std::get_if<SurfaceByInductionUsing>(&node.node)) {
+            return makeSurfaceByInductionUsing(
+                rewriteRecursiveCalls(inductionUsing->scrutinee,
+                                       thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                rewriteRecursiveCalls(inductionUsing->inductionLemma,
+                                       thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                inductionUsing->subjectName,
+                inductionUsing->ihName,
+                rewriteRecursiveCalls(inductionUsing->body, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
+        if (auto* unfold = std::get_if<SurfaceUnfold>(&node.node)) {
+            return makeSurfaceUnfold(
+                unfold->names,
+                rewriteRecursiveCalls(unfold->body, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
+        if (auto* given = std::get_if<SurfaceGiven>(&node.node)) {
+            return makeSurfaceGiven(
+                rewriteRecursiveCalls(given->proposition, thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
+        if (auto* field = std::get_if<SurfaceField>(&node.node)) {
+            std::vector<SurfaceExpressionPointer> rewrittenHypotheses;
+            for (const auto& hypothesis : field->nonzeroHypotheses) {
+                rewrittenHypotheses.push_back(rewriteRecursiveCalls(
+                    hypothesis, thisDeclName,
+                    recursiveArgToHypothesis, outerBinderCount));
+            }
+            return makeSurfaceField(
+                std::move(rewrittenHypotheses), node.line, node.column);
+        }
+        if (auto* linearCombination =
+                std::get_if<SurfaceLinearCombination>(&node.node)) {
+            return makeSurfaceLinearCombination(
+                rewriteRecursiveCalls(linearCombination->combination,
+                                       thisDeclName,
+                                       recursiveArgToHypothesis,
+                                       outerBinderCount),
+                node.line, node.column);
+        }
         // Atomic forms (identifier, numeric literal, Type, Proposition,
-        // hammer placeholder) carry no sub-expressions and are unchanged.
+        // sorry, ring, goal, hole, cite-inferred) carry no rewritable
+        // sub-expressions and are unchanged. NOTE if you add a surface
+        // node with sub-expressions, it needs a case above — a silent
+        // fall-through here leaves self-calls unrewritten and they die
+        // at the kernel as "undefined constant: <the definition's name>".
         return expression;
     }
 

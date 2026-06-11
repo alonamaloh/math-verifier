@@ -381,14 +381,18 @@ ExpressionPointer Elaborator::abstractStructuralOccurrenceWithWHNF_inner(
             return working;
         }
         if (auto* pi = std::get_if<Pi>(&working->node)) {
-            // Skip WHNF in the domain: domains are types (propositions
-            // or sorts), not the user-value path where
-            // `classical_decidable(P)` lives. Use the cheap structural
-            // walker for the domain so any literal occurrence there
-            // still gets abstracted.
+            // The domain gets the full WHNF walk too: for an implication
+            // goal the hypothesis side is a Pi DOMAIN, and the target
+            // (e.g. `classical_decidable(P)` inside an unreduced
+            // `filter(P, prepend(h, t))`) is only exposed by δ/ι-
+            // unfolding there exactly as in the codomain. The
+            // unfoldExposesHead gate keeps this cheap: domains whose
+            // heads can't reach the target are never reduced.
             int before = occurrenceCount;
-            ExpressionPointer newDomain = abstractStructuralOccurrence(
-                pi->domain, target, currentDepth, occurrenceCount);
+            ExpressionPointer newDomain =
+                abstractStructuralOccurrenceWithWHNF(
+                    pi->domain, target, targetHeadName,
+                    currentDepth, occurrenceCount, whnfFuel);
             ExpressionPointer newCodomain =
                 abstractStructuralOccurrenceWithWHNF(
                     pi->codomain, target, targetHeadName,
@@ -403,10 +407,12 @@ ExpressionPointer Elaborator::abstractStructuralOccurrenceWithWHNF_inner(
                 std::move(newDomain), std::move(newCodomain));
         }
         if (auto* lambda = std::get_if<Lambda>(&working->node)) {
-            // Same domain-skip as for Pi.
+            // Same domain treatment as for Pi.
             int before = occurrenceCount;
-            ExpressionPointer newDomain = abstractStructuralOccurrence(
-                lambda->domain, target, currentDepth, occurrenceCount);
+            ExpressionPointer newDomain =
+                abstractStructuralOccurrenceWithWHNF(
+                    lambda->domain, target, targetHeadName,
+                    currentDepth, occurrenceCount, whnfFuel);
             ExpressionPointer newBody =
                 abstractStructuralOccurrenceWithWHNF(
                     lambda->body, target, targetHeadName,
