@@ -37,6 +37,7 @@ import Rational.positive
 import Rational.absolute_value
 import Rational.triangle
 import Rational.linearity
+import Rational.order_multiplication
 
 -- ----------------------------------------------------------------------
 -- Integer-level: IsNonneg(x) → |x| = x.
@@ -110,13 +111,6 @@ theorem Rational.absolute_value_IsNonneg_at_representative
   | RationalRepresentative.make(n, d) =>
       
       (Integer.absolute_value_IsNonneg(n))
-
--- Restated cleanly: |x| IsNonneg.
-theorem Rational.absolute_value_IsNonneg (x : Rational)
-        : Rational.IsNonneg(abs(x)) :=
-  cases x {
-    | rep => Rational.absolute_value_IsNonneg_at_representative(rep)
-  }
 
 -- |x| < c implies -c < x and x < c. Case split on the sign of x via
 -- IsNonneg_or_negate_IsNonneg. Each branch uses absolute_value_when_*
@@ -293,3 +287,71 @@ theorem Rational.subtract_absolute_value_lower_bound (x delta : Rational)
            = x - abs(x)        by substituting absEquation
       }
   }
+
+-- ----------------------------------------------------------------------
+-- Lower bound for a product of almost-nonnegative bounded factors: with
+-- -δ < s, -δ < t and both |s|, |t| ≤ B, the product sits above -(B·δ).
+-- Case on the sign of t: when t ≥ 0 the worst case is (-δ)·t ≥ -(δ·B);
+-- when t < 0 we have |t| < δ, so |s·t| = |s|·|t| ≤ B·δ.
+theorem Rational.product_lower_bound_of_lower_bounds (s t delta bound : Rational)
+        (deltaPositive : Rational.zero < delta)
+        (sLower : -delta < s) (tLower : -delta < t)
+        (sBound : abs(s) ≤ bound) (tBound : abs(t) ≤ bound)
+        : -(bound * delta) ≤ s * t := {
+  claim Rational.zero ≤ delta since Rational.LessThan.weaken;
+  claim Rational.zero ≤ bound
+      by calc Rational.zero
+            ≤ abs(s)   by Rational.zero_le_absolute_value
+            ≤ bound    by sBound;
+  cases Rational.IsNonneg_or_negate_IsNonneg(t) {
+    | Or.introduceLeft(tNonneg) => {
+        claim -delta ≤ s since Rational.LessThan.weaken;
+        claim scaledLower : -delta * t ≤ s * t
+            since Rational.LessOrEqual.multiply_by_nonneg_right;
+        claim t ≤ bound
+            by calc t
+                  ≤ abs(t)   by Rational.le_absolute_value
+                  ≤ bound    by tBound;
+        claim scaledUpper : delta * t ≤ delta * bound
+            since Rational.LessOrEqual.multiply_by_nonneg_left;
+        calc -(bound * delta)
+           = -(delta * bound)   by ring
+           ≤ -(delta * t)       by Rational.LessOrEqual.negate
+           = -delta * t         by ring
+           ≤ s * t              by scaledLower
+      }
+    | Or.introduceRight(negateTNonneg) => {
+        -- |t| ≤ δ, so the product is within B·δ of zero in absolute value.
+        claim absTEquation : abs(t) = -t
+            since Rational.absolute_value_when_negate_nonneg;
+        claim -t < -(-delta) since Rational.LessThan.negate;
+        claim -t < delta by substituting (ring : -(-delta) = delta);
+        claim -t ≤ delta since Rational.LessThan.weaken;
+        claim absProduct : abs(s * t) = abs(s) * abs(t)
+            since Rational.absolute_value_multiplicative;
+        claim Rational.IsNonneg(abs(t)) since Rational.absolute_value_IsNonneg;
+        claim firstFactor : abs(s) * abs(t) ≤ bound * abs(t)
+            since Rational.LessOrEqual.multiply_by_nonneg_right;
+        claim abs(t) ≤ delta
+            by calc abs(t)
+                  = -t      by absTEquation
+                  ≤ delta   by (-t ≤ delta);
+        claim secondFactor : bound * abs(t) ≤ bound * delta
+            since Rational.LessOrEqual.multiply_by_nonneg_left;
+        claim abs(s * t) ≤ bound * delta
+            by calc abs(s * t)
+                  = abs(s) * abs(t)   by absProduct
+                  ≤ bound * abs(t)    by firstFactor
+                  ≤ bound * delta     by secondFactor;
+        -- s·t ≥ -|s·t| ≥ -(B·δ).
+        claim -(s * t) ≤ abs(-(s * t)) since Rational.le_absolute_value;
+        claim absNegate : abs(-(s * t)) = abs(s * t)
+            since Rational.absolute_value_negate;
+        claim negatedBelow : -(s * t) ≤ abs(s * t) by substituting absNegate;
+        calc -(bound * delta)
+           ≤ -abs(s * t)    by Rational.LessOrEqual.negate
+           ≤ -(-(s * t))    by Rational.LessOrEqual.negate
+           = s * t           by ring
+      }
+  }
+}
