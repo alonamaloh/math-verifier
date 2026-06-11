@@ -2048,17 +2048,16 @@ private:
     // ----------------------------------------------------------------------
     // Commutative-ring decision tactic `ring`.
     //
-    // v1 scope: handles pure-multiplication rearrangement. Both sides
-    // of the goal `e1 = e2` must be products built from `<T>.multiply`
-    // applied to atoms (anything not built from `<T>.multiply`). The
-    // tactic reifies both sides as multisets of atoms, compares them,
-    // and — on match — emits a proof using insertion-sort style swaps
+    // Two layers. The single-operator AC fast path handles pure
+    // rearrangement: when both sides of the goal `e1 = e2` flatten to
+    // the same multiset of factors over one operator, it emits an
+    // insertion-sort chain of commutativity swaps
     // (`<T>.multiply_commutative`) and associativity rewrites
-    // (`<T>.multiply_associative`).
-    //
-    // Out of scope for v1: addition, distributivity, identity (1·x=x),
-    // zero (0·x=0), negation, mixed sums-of-products. For those the
-    // user keeps writing manual calc chains for now.
+    // (`<T>.multiply_associative`). Everything else routes to the
+    // polynomial normaliser (`elaborateRingByNormalisation`), which
+    // proves both sides equal to a shared sum-of-monomials canonical
+    // form — addition, distributivity, identities, zero, negation,
+    // and (on supported carriers) numeric literals.
     //
     // Recognized carriers: any `T` whose head-Constant name has
     // `<T>.multiply`, `<T>.multiply_commutative`, and
@@ -2124,7 +2123,6 @@ private:
         const std::string& opNamespace);
 
     // `ring` — close an `e1 = e2` goal in a commutative ring.
-    // v1: handles pure-multiplication rearrangement.
     // A node of a `linear_combination` combination tree, evaluated to the
     // equation it denotes: `left = right` witnessed by `proof`. A leaf is
     // either a hypothesis (an equality proof `a = b` → ⟨a, b, proof⟩) or a
@@ -2156,7 +2154,7 @@ private:
     // `Ring.equal_of_linear_combination`. `e` is a `+`/`*`/`-` tree whose
     // leaves are equality proofs (hypotheses) or scalar ring coefficients
     // (e.g. `c1 * h1 + c2 * h2`); a bare hypothesis is the single-leaf
-    // case. v1 handles concrete carriers (the op/instance names resolve to
+    // case. Concrete carriers only (the op/instance names resolve to
     // plain constants); a bundled carrier `Ring.carrier(s)` would need the
     // structure argument threaded (future).
     ExpressionPointer elaborateLinearCombination(
@@ -2172,12 +2170,9 @@ private:
 
     // Prove `originalProduct = canonical` where `canonical` is the
     // left-associated product of `sortedFactors`. The original is
-    // assumed to be some product over the same factor multiset; v1
-    // proof: build the canonical kernel term as the target and let
-    // the kernel verify definitional equality of the factor multiset
-    // via a chain of multiply_associative + multiply_commutative.
+    // assumed to be some product over the same factor multiset.
     //
-    // Simpler v1 approach: build proofs INSERTION-SORT style. Maintain
+    // The proofs are built INSERTION-SORT style. Maintain
     // a "current" arrangement; at each step, find the position of the
     // next sorted factor in the current arrangement; commute it left
     // until in position. Each commute is a multiply_commutative
@@ -2829,10 +2824,9 @@ private:
     // congruence, and a "merge" step reconciles the canonical-of-parts
     // form with the canonical-of-whole form.
     //
-    // Coefficient guard: |coeff| <= 1 throughout. Larger collected
-    // coefficients (e.g. a + a → 2·a) are out of scope for v2 and the
-    // top-level decision step bails with a clear error before we reach
-    // the proof emitter.
+    // Coefficients: the canonical form expands every (signature, coef)
+    // entry into |coef| unit monomials, so the proof emitters only ever
+    // see signs in {-1, +1}.
     // =====================================================================
 
     // ------------------------------------------------------------------
@@ -2951,8 +2945,8 @@ private:
         const std::vector<ExpressionPointer>& summands);
 
     // ----------------------------------------------------------------
-    // Sum-AC building blocks: re-using v1's flatten/reassoc/sort
-    // machinery but on the additive operator. Each "atom" of the sum
+    // Sum-AC building blocks: re-using the AC fast path's
+    // flatten/reassoc/sort machinery but on the additive operator. Each "atom" of the sum
     // is an opaque kernel expression (a fully-rendered signed monomial).
     // ----------------------------------------------------------------
 
@@ -3323,9 +3317,10 @@ private:
         ExpressionPointer rightEndpoint,
         const std::string& carrierName) const;
 
-    // v2 of the ring tactic. Called as a fallback when v1 (pure-AC)
-    // can't close the goal. Returns the proof on success; throws
-    // otherwise. `expectedType` is the equality goal.
+    // The polynomial-normalisation layer of the ring tactic. Called as
+    // a fallback when the single-operator AC fast path can't close the
+    // goal. Returns the proof on success; throws otherwise.
+    // `expectedType` is the equality goal.
     ExpressionPointer elaborateRingByNormalisation(
         const std::vector<LocalBinder>& /*localBinders*/,
         ExpressionPointer leftEndpoint,

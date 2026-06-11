@@ -1,7 +1,8 @@
--- Test the `ring` v2 tactic — handles distributivity, negation, and
--- like-term cancellation that v1 can't bridge.
+-- Test the `ring` tactic's polynomial-normalisation layer — handles
+-- distributivity, negation, and like-term cancellation that the
+-- single-operator AC fast path can't bridge.
 
-module Test.ring_v2_test
+module Test.ring_normalisation_test
 
 import axioms
 import Logic.basics
@@ -16,119 +17,119 @@ import Integer.algebra
 import Integer.absolute_value
 
 -- (1) Distributivity left.
-theorem v2_distributivity_left (a b c : Integer)
+theorem normalisation_distributivity_left (a b c : Integer)
         : a * (b + c) = a * b + a * c := ring
 
 -- (2) Distributivity right.
-theorem v2_distributivity_right (a b c : Integer)
+theorem normalisation_distributivity_right (a b c : Integer)
         : (a + b) * c = a * c + b * c := ring
 
 -- (3) Both: full quadratic expansion.
-theorem v2_distributivity_both (a b c d : Integer)
+theorem normalisation_distributivity_both (a b c d : Integer)
         : (a + b) * (c + d) = a*c + a*d + b*c + b*d := ring
 
 -- (4) Distributivity plus a commutative swap on one term.
-theorem v2_distrib_and_swap (a b c : Integer)
+theorem normalisation_distrib_and_swap (a b c : Integer)
         : (a + b) * c = c * a + b * c := ring
 
 -- (5) Like-term cancellation via negation: b cancels.
-theorem v2_cancel (a b c : Integer)
+theorem normalisation_cancel (a b c : Integer)
         : (a + -b) + (b + -c) = a + -c := ring
 
 -- (6) Split-via-anchor: introduce b and -b on the RHS.
-theorem v2_split_via_anchor (a b : Integer)
+theorem normalisation_split_via_anchor (a b : Integer)
         : a = b + (a + -b) := ring
 
 -- (7) Subtract sugar: the carrier's `-` operator is recognised as
 -- `add(_, negate(_))` via δ; ring handles it transparently.
-theorem v2_subtract_chain (a b c : Integer)
+theorem normalisation_subtract_chain (a b c : Integer)
         : (a - b) + (b - c) = a - c := ring
 
 -- (8) Subtract split-via-anchor written with `-` instead of `+ -`.
-theorem v2_subtract_split_via_anchor (a b : Integer)
+theorem normalisation_subtract_split_via_anchor (a b : Integer)
         : a = b + (a - b) := ring
 
 -- (9) Subtract negated.
-theorem v2_negate_subtract (right left : Integer)
+theorem normalisation_negate_subtract (right left : Integer)
         : -(right - left) = left - right := ring
 
 -- (10) Subtract zero. The empty-inner-polynomial negate case was
--- a v2 hole (needed a primitive `negate_zero`); now derived inline
+-- a normaliser gap (needed a primitive `negate_zero`); now derived inline
 -- from add_zero + add_negate_left.
-theorem v2_subtract_zero (a : Integer)
+theorem normalisation_subtract_zero (a : Integer)
         : a - Integer.zero = a := ring
 
 -- (11) Same shape, but the result is itself zero on the LHS.
-theorem v2_zero_minus_zero
+theorem normalisation_zero_minus_zero
         : Integer.zero - Integer.zero = Integer.zero := ring
 
 -- (12) Total cancellation: every monomial cancels, RHS is zero.
 -- Previously hit "proveAddMerge total-cancellation case not implemented".
-theorem v2_total_cancellation_one (a : Integer)
+theorem normalisation_total_cancellation_one (a : Integer)
         : a - a = Integer.zero := ring
 
 -- (13) Total cancellation across two pairs.
-theorem v2_total_cancellation_two (a b : Integer)
+theorem normalisation_total_cancellation_two (a b : Integer)
         : (a + b) - (a + b) = Integer.zero := ring
 
 -- (14) Same, written differently.
-theorem v2_total_cancellation_swap (a b : Integer)
+theorem normalisation_total_cancellation_swap (a b : Integer)
         : (a + b) + (-a + -b) = Integer.zero := ring
 
 -- (15) Like-term collection: a + a collected to coefficient 2 of a.
 -- Both sides have the same shape so the canonical is a + a too.
-theorem v2_like_terms_collect (a : Integer)
+theorem normalisation_like_terms_collect (a : Integer)
         : a + a = a + a := ring
 
 -- (16) Like-term sum with extra atom: (a + b) + a = a + (a + b) (after
 -- sort). LHS collects to [a:2, b:1]; RHS to [a:2, b:1]. Canonical
 -- is (a + a) + b on both sides.
-theorem v2_like_terms_with_extra (a b : Integer)
+theorem normalisation_like_terms_with_extra (a b : Integer)
         : (a + b) + a = a + (a + b) := ring
 
 -- (17) Three copies of the same atom collected.
-theorem v2_like_terms_three (a : Integer)
+theorem normalisation_like_terms_three (a : Integer)
         : (a + a) + a = a + (a + a) := ring
 
 -- (18) Mixed-sign multi-entry group: a + a - a = a. The signature
 -- group for a has signs [+1, +1, -1] (net +1), requiring one
 -- (+a, -a) cancellation and leaving one +a survivor.
-theorem v2_mixed_sign_group (a : Integer)
+theorem normalisation_mixed_sign_group (a : Integer)
         : (a + a) - a = a := ring
 
 -- (19) Same but on the other side.
-theorem v2_mixed_sign_group_reverse (a : Integer)
+theorem normalisation_mixed_sign_group_reverse (a : Integer)
         : a = (a + a) - a := ring
 
 -- (20) Unit factor on the left collapses via one_multiply.
-theorem v2_one_times_atom (a : Integer)
+theorem normalisation_one_times_atom (a : Integer)
         : Integer.one * a = a := ring
 
 -- (21) Unit factor on the right collapses via multiply_one.
-theorem v2_atom_times_one (a : Integer)
+theorem normalisation_atom_times_one (a : Integer)
         : a * Integer.one = a := ring
 
 -- (22) Unit on both sides.
-theorem v2_one_times_one
+theorem normalisation_one_times_one
         : Integer.one * Integer.one = Integer.one := ring
 
 -- (23) Integer numeric literal `(2 : Integer)` is recognised as
 -- coefficient 2 of the empty signature (i.e. two unit copies of
 -- Integer.one). Combined with the unit-strip in proveMultiplyMerge,
 -- `(2 : Integer) * x = x + x` now elaborates.
-theorem v2_literal_two_times_atom (a : Integer)
+theorem normalisation_literal_two_times_atom (a : Integer)
         : a + a = (2 : Integer) * a := ring
 
 -- (24) Literal 3.
-theorem v2_literal_three_times_atom (a : Integer)
+theorem normalisation_literal_three_times_atom (a : Integer)
         : (a + a) + a = (3 : Integer) * a := ring
 
 -- (25) Literal on both sides plus distribution.
-theorem v2_literal_distribute (a b : Integer)
+theorem normalisation_literal_distribute (a b : Integer)
         : (a + a) + (b + b) = (2 : Integer) * a + (2 : Integer) * b := ring
 
 -- (26) Literal addition: 2 + 3 = 5 at Integer level.
-theorem v2_literal_add
+theorem normalisation_literal_add
         : (2 : Integer) + (3 : Integer) = (5 : Integer) := ring
 
 -- (27) Negate of a multi-monomial sum where the coefficients exceed 1.
@@ -138,12 +139,12 @@ theorem v2_literal_add
 -- left-associated running form once the tail had ≥2 summands (≥3 unit
 -- monomials — i.e. coefficients > 1 across multiple monomials), emitting
 -- a malformed proof. Single-monomial negate and ≤2-unit sums never hit it.
-theorem v2_negate_multi_coef (b d : Integer)
+theorem normalisation_negate_multi_coef (b d : Integer)
         : Integer.negate((2 : Integer) * b + (3 : Integer) * d)
           = Integer.negate((2 : Integer) * b) + Integer.negate((3 : Integer) * d) := ring
 
 -- (28) The same, deeper: three monomials each with coefficient > 1.
-theorem v2_negate_three_coef (a b c : Integer)
+theorem normalisation_negate_three_coef (a b c : Integer)
         : Integer.negate((2 : Integer) * a + (3 : Integer) * b + (2 : Integer) * c)
           = Integer.negate(a) + Integer.negate(a) + Integer.negate(b) + Integer.negate(b)
               + Integer.negate(b) + Integer.negate(c) + Integer.negate(c) := ring

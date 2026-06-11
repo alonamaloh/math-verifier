@@ -467,7 +467,7 @@ Elaborator::CombinationEquation Elaborator::evalLinearCombinationTree(
         size_t binderCount = localBinders.size();
         // A bundled carrier's operations carry a leading structure argument
         // (`CommutativeRing.add(c)` not `Integer.add`); prepend it. Empty
-        // for a concrete carrier, so this is the identity in the v1 case.
+        // for a concrete carrier, so this is the identity there.
         auto opHead = [&](const std::string& opName) {
             ExpressionPointer head = makeConstant(opName);
             for (const auto& arg : structurePrefix) {
@@ -628,7 +628,7 @@ ExpressionPointer Elaborator::elaborateLinearCombination(
         // hypotheses (equality proofs) and scalar ring coefficients. Each
         // node denotes an equation; the walker returns the combined
         // `combLeft = combRight` and a proof of it. A bare hypothesis is
-        // the degenerate single-leaf tree (the v1 case).
+        // the degenerate single-leaf tree.
         CombinationEquation comb = evalLinearCombinationTree(
             tactic.combination, localBinders, goal.carrierType,
             goal.carrierUniverseLevel, scheme.opNamespace,
@@ -800,9 +800,10 @@ ExpressionPointer Elaborator::elaborateRing(
         } else if (try_axioms(buildAxioms("add"))) {
             axioms = buildAxioms("add");
         } else {
-            // v1 (pure-AC for one operator) can't close the goal.
-            // Fall through to v2, which normalises both sides to a
-            // sum-of-monomials canonical form (handles distributivity,
+            // The single-operator AC fast path can't close the goal.
+            // Fall through to the polynomial normaliser, which brings
+            // both sides to a sum-of-monomials canonical form (handles
+            // distributivity,
             // 0/1 identity, negation, and like-term cancellation
             // within ±1 coefficient).
             return elaborateRingByNormalisation(
@@ -5325,7 +5326,7 @@ ExpressionPointer Elaborator::elaborateRingByNormalisation(
         context.zeroName      = scheme.opNamespace + ".zero";
         context.oneName       = scheme.opNamespace + ".one";
         populateRingEmbeddingChain(context);
-        // Sanity-check the carrier supports the v2 vocabulary. We only
+        // Sanity-check the carrier supports the normaliser's vocabulary. We only
         // require add + multiply at the moment — zero, one, and negate
         // are optional (a goal that doesn't mention them won't need
         // them).
