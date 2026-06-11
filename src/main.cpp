@@ -5236,7 +5236,11 @@ int verifyWithCache(const std::string& sourcePath,
             loadCacheRecursive(environment, loadPath, alreadyLoaded);
         } catch (const SerializationError& error) {
             std::cerr << "cache load failure for " << loadPath << ": "
-                      << error.what() << "\n";
+                      << error.what() << "\n"
+                      << "  the dependency's cache is missing or stale — "
+                      << "run `make -j 16 library` from the project root "
+                      << "to rebuild dependency caches, then retry this "
+                      << "verify.\n";
             return 1;
         }
     }

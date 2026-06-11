@@ -214,3 +214,29 @@ each improvement is measured and protected against regression.
   return type of the `cases` arms to disambiguate before erroring —
   is unimplemented (it would need the arm types threaded into the
   citation; the explicit form costs one line and is clearer anyway).
+
+### 10. Proof-term `by` hint failures masked by the citation message — FIXED (fix #6)
+
+- **Trigger:** `claim P by (x) ↦ { … }` (or a block / ring / field hint)
+  whose BODY contains a failing inner step, typically deep inside a
+  `cases`/`by_induction` nest. Repro:
+  `library/ErrorTest/lambda_hint_inner_error.math`.
+- **Was (symptom):** "the `by` hint citation does not prove this goal"
+  with the whole Pi-typed claim as the goal and no inner detail. Scored
+  0 on cause and location. Cost: the extract-a-helper-theorem workaround
+  (done repeatedly during the Wilson/Euler sessions purely to see the
+  real error).
+- **Diagnosis:** the claim flow's catch sent every failure to
+  `recoverClaimHint`, which for a proof-term hint can only re-elaborate
+  the identical term — failing identically and replacing the genuinely
+  informative inner error with the generic citation message. (Also fixed
+  here: the doubled article "the the `by` hint".)
+- **Now:** `hintShapeIsProofTerm` (lambda / let-block / ring / field):
+  when such a hint's own elaboration throws, the inner error propagates
+  unmasked, carrying its own claim line, goal, and cited-type details.
+  Citation-shaped hints keep the recovery path and its message.
+- **Related (fix #7, same session):** Pi-typed goals are now citable
+  argument-free — `citePiGoalByIntroduction` introduces the goal's
+  binders and runs the full citation machinery on the core goal, which
+  removed the `(z)(mem) ↦ { done by Lemma }` wrapper idiom from six
+  library sites (see `library/Test/pi_goal_citation_test.math`).
