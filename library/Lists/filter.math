@@ -1,0 +1,296 @@
+-- Lists/filter.math
+--
+-- `List.filter(P, l)`: the sublist of elements satisfying `P`. The
+-- decision is classical (`Logic.classical_decidable`), so `P` can be any
+-- proposition; the price is that `filter` does not compute on concrete
+-- lists — all reasoning goes through the four characterising lemmas
+-- below (membership in both directions, and distinctness).
+--
+-- The per-element decision is factored into `filter_step` taking the
+-- `Decidable` value as an argument (the `bisectionStepWithDec` pattern).
+-- Each lemma's prepend case lives in a `_step` helper that (a) receives
+-- the tail's induction hypothesis as an explicit argument (recursive
+-- references do not resolve inside decision case arms), and (b) opens
+-- `cases Logic.classical_decidable(P(head)) with decisionEquation`; the
+-- arm then moves between the stuck spelling
+-- `filter_step(…, classical_decidable(…))` and the reduced
+-- prepend/skip form by rewriting along `decisionEquation`.
+
+module Lists.filter
+
+import axioms
+import Logic.basics
+import Equality.basics
+import Lists.list
+import Lists.distinct
+
+-- One step: keep `head` exactly when the decision says `P` holds.
+definition List.filter_step (A : Type(0)) (P : Proposition)
+        (head : A) (filteredTail : List(A))
+        (decision : Logic.Decidable(P)) : List(A) :=
+  cases decision {
+    | Logic.Decidable.yes(_) => List.prepend(A, head, filteredTail)
+    | Logic.Decidable.no(_)  => filteredTail
+  }
+
+definition List.filter (A : Type(0)) (P : A → Proposition) : List(A) → List(A)
+  | List.empty => List.empty(A)
+  | List.prepend(head, tail) =>
+      List.filter_step(A, P(head), head, List.filter(A, P, tail),
+          Logic.classical_decidable(P(head)))
+
+-- ----------------------------------------------------------------------
+-- Membership: x ∈ filter(P, l) exactly when x ∈ l and P(x).
+
+-- A member of the filtered list is a member of the original — one
+-- prepend step, with the tail's case supplied as `tailCase`.
+theorem List.filter_member_subset_step (A : Type(0)) (P : A → Proposition)
+        (x head : A) (tail : List(A))
+        (tailCase : List.member(A, x, List.filter(A, P, tail))
+            → List.member(A, x, tail))
+        (mem : List.member(A, x, List.filter(A, P, List.prepend(A, head, tail))))
+        : List.member(A, x, List.prepend(A, head, tail)) :=
+  cases Logic.classical_decidable(P(head)) with decisionEquation {
+    | Logic.Decidable.yes(propertyWitness) => {
+        -- Reduce the filter at the decided value: the head was kept.
+        claim List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.classical_decidable(P(head))))
+            by mem;
+        claim List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.Decidable.yes(propertyWitness)))
+            by substituting decisionEquation;
+        claim List.member(A, x, List.prepend(A, head, List.filter(A, P, tail)));
+        -- So x is the head or a member of the filtered tail.
+        claim split : x = head ∨ List.member(A, x, List.filter(A, P, tail))
+            since List.member_prepend_invert;
+        cases split {
+          | Or.introduceLeft(xIsHead) => {
+              claim List.member(A, head, List.prepend(A, head, tail))
+                  by List.member.here(A, head, tail);
+              claim List.member(A, x, List.prepend(A, head, tail))
+                  by substituting xIsHead;
+              done
+            }
+          | Or.introduceRight(memberFilteredTail) =>
+              List.member.there(A, x, head, tail, tailCase(memberFilteredTail))
+        }
+      }
+    | Logic.Decidable.no(propertyFails) => {
+        -- Reduce the filter at the decided value: the head was dropped.
+        claim List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.classical_decidable(P(head))))
+            by mem;
+        claim List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.Decidable.no(propertyFails)))
+            by substituting decisionEquation;
+        claim memberFilteredTail : List.member(A, x, List.filter(A, P, tail));
+        List.member.there(A, x, head, tail, tailCase(memberFilteredTail))
+      }
+  }
+
+theorem List.filter_member_subset (A : Type(0)) (P : A → Proposition) (x : A)
+        : (list : List(A))
+          → List.member(A, x, List.filter(A, P, list))
+          → List.member(A, x, list)
+  | List.empty =>
+      (mem : List.member(A, x, List.empty(A))) ↦ mem
+  | List.prepend(head, tail) =>
+      (mem : List.member(A, x, List.filter(A, P, List.prepend(A, head, tail)))) ↦
+          List.filter_member_subset_step(A, P, x, head, tail,
+              List.filter_member_subset(A, P, x, tail), mem)
+
+-- A member of the filtered list satisfies the predicate.
+theorem List.filter_member_property_step (A : Type(0)) (P : A → Proposition)
+        (x head : A) (tail : List(A))
+        (tailCase : List.member(A, x, List.filter(A, P, tail)) → P(x))
+        (mem : List.member(A, x, List.filter(A, P, List.prepend(A, head, tail))))
+        : P(x) :=
+  cases Logic.classical_decidable(P(head)) with decisionEquation {
+    | Logic.Decidable.yes(propertyWitness) => {
+        claim List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.classical_decidable(P(head))))
+            by mem;
+        claim List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.Decidable.yes(propertyWitness)))
+            by substituting decisionEquation;
+        claim List.member(A, x, List.prepend(A, head, List.filter(A, P, tail)));
+        claim split : x = head ∨ List.member(A, x, List.filter(A, P, tail))
+            since List.member_prepend_invert;
+        cases split {
+          | Or.introduceLeft(xIsHead) => {
+              -- x is the kept head, and the decision carries P(head).
+              claim P(x) by substituting xIsHead;
+              done
+            }
+          | Or.introduceRight(memberFilteredTail) =>
+              tailCase(memberFilteredTail)
+        }
+      }
+    | Logic.Decidable.no(propertyFails) => {
+        claim List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.classical_decidable(P(head))))
+            by mem;
+        claim List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.Decidable.no(propertyFails)))
+            by substituting decisionEquation;
+        claim memberFilteredTail : List.member(A, x, List.filter(A, P, tail));
+        tailCase(memberFilteredTail)
+      }
+  }
+
+theorem List.filter_member_property (A : Type(0)) (P : A → Proposition) (x : A)
+        : (list : List(A))
+          → List.member(A, x, List.filter(A, P, list))
+          → P(x)
+  | List.empty =>
+      (mem : List.member(A, x, List.empty(A))) ↦
+          absurd(List.no_member_empty(A, x, mem))
+  | List.prepend(head, tail) =>
+      (mem : List.member(A, x, List.filter(A, P, List.prepend(A, head, tail)))) ↦
+          List.filter_member_property_step(A, P, x, head, tail,
+              List.filter_member_property(A, P, x, tail), mem)
+
+-- Conversely, a member of the original that satisfies the predicate
+-- survives the filter.
+theorem List.filter_member_complete_step (A : Type(0)) (P : A → Proposition)
+        (x head : A) (tail : List(A))
+        (tailCase : List.member(A, x, tail) → P(x)
+            → List.member(A, x, List.filter(A, P, tail)))
+        (mem : List.member(A, x, List.prepend(A, head, tail)))
+        (property : P(x))
+        : List.member(A, x, List.filter(A, P, List.prepend(A, head, tail))) :=
+  cases Logic.classical_decidable(P(head)) with decisionEquation {
+    | Logic.Decidable.yes(propertyWitness) => {
+        -- The head is kept; place x in the prepend form, then move the
+        -- result back to the stuck filter spelling.
+        claim placed : List.member(A, x,
+                  List.prepend(A, head, List.filter(A, P, tail)))
+            by cases on List.member_prepend_invert(A, x, head, tail, mem) {
+                 case Or.introduceLeft(xIsHead): {
+                     claim List.member(A, head,
+                               List.prepend(A, head, List.filter(A, P, tail)))
+                         by List.member.here(A, head, List.filter(A, P, tail));
+                     claim List.member(A, x,
+                               List.prepend(A, head, List.filter(A, P, tail)))
+                         by substituting xIsHead;
+                     done
+                   }
+                 case Or.introduceRight(memberTail):
+                     List.member.there(A, x, head, List.filter(A, P, tail),
+                         tailCase(memberTail, property))
+               };
+        claim List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.Decidable.yes(propertyWitness)))
+            by placed;
+        claim atDecision : List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.classical_decidable(P(head))))
+            by substituting decisionEquation;
+        atDecision
+      }
+    | Logic.Decidable.no(propertyFails) => {
+        claim survives : List.member(A, x, List.filter(A, P, tail))
+            by cases on List.member_prepend_invert(A, x, head, tail, mem) {
+                 case Or.introduceLeft(xIsHead): {
+                     -- x is the dropped head, yet P(x) holds — absurd.
+                     claim propertyAtHead : P(head) by substituting xIsHead;
+                     absurd(propertyFails(propertyAtHead))
+                   }
+                 case Or.introduceRight(memberTail):
+                     tailCase(memberTail, property)
+               };
+        claim List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.Decidable.no(propertyFails)))
+            by survives;
+        claim atDecision : List.member(A, x,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.classical_decidable(P(head))))
+            by substituting decisionEquation;
+        atDecision
+      }
+  }
+
+theorem List.filter_member_complete (A : Type(0)) (P : A → Proposition) (x : A)
+        : (list : List(A))
+          → List.member(A, x, list)
+          → P(x)
+          → List.member(A, x, List.filter(A, P, list))
+  | List.empty =>
+      (mem : List.member(A, x, List.empty(A)))
+      (property : P(x)) ↦
+          absurd(List.no_member_empty(A, x, mem))
+  | List.prepend(head, tail) =>
+      (mem : List.member(A, x, List.prepend(A, head, tail)))
+      (property : P(x)) ↦
+          List.filter_member_complete_step(A, P, x, head, tail,
+              List.filter_member_complete(A, P, x, tail), mem, property)
+
+-- ----------------------------------------------------------------------
+-- Filtering a distinct list stays distinct (a sublist of a distinct list).
+theorem List.filter_distinct_step (A : Type(0)) (P : A → Proposition)
+        (head : A) (tail : List(A))
+        (tailCase : List.Distinct(A, tail)
+            → List.Distinct(A, List.filter(A, P, tail)))
+        (distinct : List.Distinct(A, List.prepend(A, head, tail)))
+        : List.Distinct(A, List.filter(A, P, List.prepend(A, head, tail))) :=
+  cases Logic.classical_decidable(P(head)) with decisionEquation {
+    | Logic.Decidable.yes(propertyWitness) => {
+        claim headNotInTail : ¬(List.member(A, head, tail))
+            since List.Distinct.head_not_member;
+        claim tailDistinct : List.Distinct(A, tail)
+            since List.Distinct.tail_distinct;
+        claim headNotInFilteredTail
+            : ¬(List.member(A, head, List.filter(A, P, tail)))
+            by (innerMember : List.member(A, head, List.filter(A, P, tail))) ↦ {
+                claim headInTail : List.member(A, head, tail)
+                    by List.filter_member_subset(A, P, head, tail, innerMember);
+                headNotInTail(headInTail)
+              };
+        claim List.Distinct(A, List.prepend(A, head, List.filter(A, P, tail)))
+            by List.Distinct.prepend(A, head, List.filter(A, P, tail),
+                   headNotInFilteredTail, tailCase(tailDistinct));
+        claim List.Distinct(A,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.Decidable.yes(propertyWitness)));
+        claim atDecision : List.Distinct(A,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.classical_decidable(P(head))))
+            by substituting decisionEquation;
+        atDecision
+      }
+    | Logic.Decidable.no(propertyFails) => {
+        claim tailDistinct : List.Distinct(A, tail)
+            since List.Distinct.tail_distinct;
+        claim List.Distinct(A, List.filter(A, P, tail))
+            by tailCase(tailDistinct);
+        claim List.Distinct(A,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.Decidable.no(propertyFails)));
+        claim atDecision : List.Distinct(A,
+                  List.filter_step(A, P(head), head, List.filter(A, P, tail),
+                      Logic.classical_decidable(P(head))))
+            by substituting decisionEquation;
+        atDecision
+      }
+  }
+
+theorem List.filter_distinct (A : Type(0)) (P : A → Proposition)
+        : (list : List(A))
+          → List.Distinct(A, list)
+          → List.Distinct(A, List.filter(A, P, list))
+  | List.empty =>
+      (distinct : List.Distinct(A, List.empty(A))) ↦ distinct
+  | List.prepend(head, tail) =>
+      (distinct : List.Distinct(A, List.prepend(A, head, tail))) ↦
+          List.filter_distinct_step(A, P, head, tail,
+              List.filter_distinct(A, P, tail), distinct)
