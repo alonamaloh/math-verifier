@@ -166,6 +166,21 @@ ExpressionPointer Elaborator::elaborateExpression(
 
         GoalScope goalScope(goalStack_, expectedType);
 
+        // `--goal-at` recording: first-visit-wins per line keeps the
+        // outermost node starting on a line (the enclosing statement);
+        // a strictly-greater line not past the query refines toward
+        // the queried position. Only PROPOSITION goals are recorded —
+        // data-typed expected types (e.g. a calc-step endpoint's
+        // `Natural`) would report `⊢ Natural`, which answers nothing;
+        // skipping them makes the query fall back to the enclosing
+        // statement's proof obligation. See goalAtSnapshot_'s docstring.
+        if (goalAtLine_ >= 0 && expectedType
+                && expression.line <= goalAtLine_
+                && expression.line > goalAtSnapshot_.line
+                && termIsProposition(localBinders, expectedType)) {
+            goalAtSnapshot_ = {expression.line, expectedType, localBinders};
+        }
+
         // `goal` — refers to the elaborator's current expected type.
         // Resolves to the most-recent push on goalStack_. Note: a
         // bare `goal` here uses the OUTER expected type (the one

@@ -233,6 +233,18 @@ public:
     // `--check-redundant-calc-steps` CLI flag.
     void setReportRedundantCalcSteps(bool flag);
 
+    // `--goal-at LINE` (poor man's infoview): when LINE >= 1, record the
+    // expected type and local context active at the statement at (or
+    // nearest before) LINE during elaboration, for dumping afterwards.
+    // See goalAtSnapshot_ for the recording rule.
+    void setGoalAtLine(int line);
+
+    // Formats the snapshot recorded for `--goal-at` as a hypotheses +
+    // `⊢ goal` block (empty string when nothing was recorded at or
+    // before the queried line). Safe to call after elaboration failed
+    // downstream of the snapshot.
+    std::string formatGoalAtReport() const;
+
     void runModule(const SurfaceModule& module);
 
     // Extract a short identifier from a top-level statement for
@@ -4900,6 +4912,24 @@ private:
     // call carries a non-null expectedType; popped on return via the
     // GoalScope RAII guard.
     std::vector<ExpressionPointer> goalStack_;
+    // `--goal-at` query state: the queried 1-based source line (-1 =
+    // off) and the best snapshot so far (line 0 = none yet).
+    // elaborateExpression records (expected type, local binders) the
+    // FIRST time each source line is reached with a non-null expected
+    // type — that is the outermost node starting on the line, i.e. the
+    // enclosing statement — and a later candidate replaces the snapshot
+    // only when its line is nearer to (but not past) the queried line.
+    // So pointing anywhere inside a multi-line statement reports the
+    // statement's goal. Pretty-printing is deferred to
+    // formatGoalAtReport; the recording hot path only copies
+    // shared_ptrs.
+    int goalAtLine_ = -1;
+    struct GoalAtSnapshot {
+        int line = 0;
+        ExpressionPointer goal;
+        std::vector<LocalBinder> localBinders;
+    };
+    GoalAtSnapshot goalAtSnapshot_;
     // `unfold X in <body>` flips X's opacity from Opaque to
     // Transparent and records the original opacity here. The list is
     // drained at the end of each top-level definition / theorem so

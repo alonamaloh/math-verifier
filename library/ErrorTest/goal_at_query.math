@@ -1,0 +1,19 @@
+-- `--goal-at LINE` regression (see the .flags sidecar): the query must
+-- report the goal and hypotheses at the statement at (or nearest before)
+-- the queried line EVEN THOUGH elaboration fails later in the file —
+-- "what was I proving where I'm stuck" has to survive a downstream error.
+-- The query points at line 17 (the continuation line of the multi-line
+-- second claim); the report must land on the enclosing statement (line
+-- 16) and show its context, including the first claim's named result.
+-- The third claim then fails to elaborate.
+
+module ErrorTest.goal_at_query
+
+import Natural.arithmetic
+
+theorem ErrorTest.probe (a b : Natural) (h : a = b) : a + b = b + b := {
+    claim stepOne : a + b = b + a by Natural.add_commutative;
+    claim b + a
+        = b + b by substituting h;
+    claim a + b = b + b by ErrorTest.no_such_lemma
+}

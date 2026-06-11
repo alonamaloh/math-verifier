@@ -57,6 +57,12 @@ ExpressionPointer elaborateExpression(const SurfaceExpression& expression,
 // is consulted at most once and only on a failure path, so a build that
 // succeeds never calls it. Pass nullptr (the default) to disable; then
 // suggestions come from the in-scope environment alone.
+//
+// `goalAtLine` >= 1 (the `--goal-at` query) records the goal and local
+// context at the statement at (or nearest before) that source line and
+// writes the prettied report into `*goalAtReport` — including when
+// elaboration throws downstream of the queried line, so a file whose
+// proof fails after the query point still reports its goal.
 void elaborateModule(const SurfaceModule& module,
                      Environment& environment,
                      std::vector<std::string>& importedModules,
@@ -65,4 +71,6 @@ void elaborateModule(const SurfaceModule& module,
                      bool reportRedundantByNonEq = false,
                      bool reportUnusedNames = false,
                      std::function<const LibrarySearchIndex*()>
-                         librarySearchProvider = nullptr);
+                         librarySearchProvider = nullptr,
+                     int goalAtLine = -1,
+                     std::string* goalAtReport = nullptr);

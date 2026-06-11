@@ -8,6 +8,10 @@
 #      in the sidecar library/ErrorTest/<name>.expected
 #      (one substring per line; blank lines and `#` comments ignored).
 #
+# An optional <name>.flags sidecar holds extra arguments for the kernel
+# invocation (whitespace-separated, e.g. `--goal-at 12`), for tests that
+# assert on diagnostic output a flag turns on.
+#
 # A file that unexpectedly verifies, lacks a sidecar, or whose message has
 # drifted away from an expected substring is a FAILURE. This makes
 # "the error message says the informative thing" a checked invariant —
@@ -39,7 +43,12 @@ pass=0
 fail=0
 for f in "${files[@]}"; do
   exp="${f%.math}.expected"
-  out=$( ( ulimit -t 60; "$KERNEL" verify --source "$f" --cache-root "$CACHE" ) 2>&1 )
+  flagsFile="${f%.math}.flags"
+  extraFlags=()
+  if [ -f "$flagsFile" ]; then
+    read -r -a extraFlags < "$flagsFile"
+  fi
+  out=$( ( ulimit -t 60; "$KERNEL" verify --source "$f" --cache-root "$CACHE" ${extraFlags[@]+"${extraFlags[@]}"} ) 2>&1 )
   rc=$?
 
   problems=()

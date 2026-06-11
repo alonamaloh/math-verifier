@@ -581,6 +581,34 @@ inside an `at_make` theorem subsumes it without the auxiliary
 definition. A previous draft of the triangle-inequality proof spent
 200 lines on this pattern; the at-make refactor took 40.
 
+## `--goal-at` — ask what the goal is at a line
+
+A poor man's infoview: when you are mid-proof and unsure what remains to
+be proven (or what hypotheses are in scope), put a `sorry` where you are
+stuck and query its line:
+
+```
+./kernel verify --source <file>.math --cache-root build --goal-at <line>
+```
+
+It prints the hypotheses and goal at the proof statement at (or nearest
+before) that line — pointing anywhere inside a multi-line statement
+reports the enclosing statement:
+
+```
+goal at line 147:
+  divisor : Natural
+  dividend : Natural
+  remainderBelowDivisor : successor recursedRemainder ≤ divisor
+  bumpedDecomposition : dividend = (successor recursedQuotient) * divisor + recursedRemainder
+  ⊢ Natural.has_quotient_remainder divisor dividend
+```
+
+The report is printed even when elaboration fails *after* the queried
+line, so a half-written proof still answers "what was I proving here".
+`--output` is optional for a query-only run (no cache is written without
+it).
+
 ## Polishing with the redundancy checks (and the cascade they trigger)
 
 The kernel has three opt-in diagnostics for trimming dead hints (they are

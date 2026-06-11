@@ -185,6 +185,42 @@ std::string Elaborator::prettyPrintInLocalScope(
                                          localBinders.size());
     }
 
+std::string Elaborator::formatGoalAtReport() const {
+        if (goalAtSnapshot_.line == 0) return "";
+        const GoalAtSnapshot& snapshot = goalAtSnapshot_;
+        std::string out =
+            "goal at line " + std::to_string(snapshot.line) + ":\n";
+        for (size_t i = 0; i < snapshot.localBinders.size(); ++i) {
+            const LocalBinder& binder = snapshot.localBinders[i];
+            // Elaborator-generated binders (`_tupleRest_…`,
+            // `_choice_pred_…`) are plumbing, not hypotheses the user
+            // can cite — skip them. A bare `_` stays: that is a
+            // user-written anonymous hypothesis (e.g. a claim's result).
+            if (binder.name.size() > 1 && binder.name[0] == '_') continue;
+            std::string entry = binder.name + " : ";
+            try {
+                entry += prettyPrintInLocalScope(
+                    binder.type, snapshot.localBinders, i);
+                // Show let-bound abbreviations (`let x := V`) with their
+                // value; proof values (claim results) are just stated.
+                if (binder.value && !binder.valueIsProof) {
+                    entry += " := " + prettyPrintInLocalScope(
+                        binder.value, snapshot.localBinders, i);
+                }
+            } catch (...) {
+                entry += "<unprintable>";
+            }
+            out += "  " + entry + "\n";
+        }
+        try {
+            out += "  ⊢ " + prettyPrintInLocalScope(
+                snapshot.goal, snapshot.localBinders) + "\n";
+        } catch (...) {
+            out += "  ⊢ <unprintable>\n";
+        }
+        return out;
+    }
+
 std::string Elaborator::searchSuggestions(
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,

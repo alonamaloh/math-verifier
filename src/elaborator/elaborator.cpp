@@ -16,12 +16,27 @@ void elaborateModule(const SurfaceModule& module,
                      bool reportRedundantByNonEq,
                      bool reportUnusedNames,
                      std::function<const LibrarySearchIndex*()>
-                         librarySearchProvider) {
+                         librarySearchProvider,
+                     int goalAtLine,
+                     std::string* goalAtReport) {
     Elaborator elaborator(environment, importedModules);
     elaborator.setReportRedundantBy(reportRedundantBy);
     elaborator.setReportRedundantCalcSteps(reportRedundantCalcSteps);
     elaborator.setReportRedundantByNonEq(reportRedundantByNonEq);
     elaborator.setReportUnusedNames(reportUnusedNames);
     elaborator.setLibrarySearchProvider(std::move(librarySearchProvider));
-    elaborator.runModule(module);
+    elaborator.setGoalAtLine(goalAtLine);
+    if (!goalAtReport) {
+        elaborator.runModule(module);
+        return;
+    }
+    // The queried goal is wanted even when elaboration fails past the
+    // query point — "what was I proving where I'm stuck" is the use case.
+    try {
+        elaborator.runModule(module);
+    } catch (...) {
+        *goalAtReport = elaborator.formatGoalAtReport();
+        throw;
+    }
+    *goalAtReport = elaborator.formatGoalAtReport();
 }

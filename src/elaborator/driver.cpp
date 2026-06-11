@@ -191,6 +191,8 @@ void Elaborator::setReportRedundantCalcSteps(bool flag) {
         reportRedundantCalcSteps_ = flag;
     }
 
+void Elaborator::setGoalAtLine(int line) { goalAtLine_ = line; }
+
 void Elaborator::runModule(const SurfaceModule& module) {
         moduleName_ = module.moduleName;
         // Seed the rewrite-lemma index from theorems loaded via .mathv

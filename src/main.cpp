@@ -5171,7 +5171,8 @@ int verifyWithCache(const std::string& sourcePath,
                     bool reportRedundantCalcSteps = false,
                     bool reportRedundantByNonEq = false,
                     bool reportUnusedNames = false,
-                    bool writeInterface = true) {
+                    bool writeInterface = true,
+                    int goalAtLine = -1) {
     Environment environment;
     std::set<std::string> alreadyLoaded;
 
@@ -5316,12 +5317,29 @@ int verifyWithCache(const std::string& sourcePath,
     }
 
     std::vector<std::string> importedModules;
+    std::string goalAtReport;
+    // Prints the `--goal-at` query result (or a no-hit note). Runs on the
+    // failure paths too: "what was I proving where I'm stuck" must survive
+    // an error downstream of the queried line.
+    auto printGoalAtReport = [&] {
+        if (goalAtLine < 0) return;
+        if (goalAtReport.empty()) {
+            std::cout << "no goal recorded at or before line "
+                      << goalAtLine << " (the line precedes the first "
+                      << "proof statement, or elaboration failed before "
+                      << "reaching it)\n";
+            return;
+        }
+        std::cout << goalAtReport;
+    };
     try {
         elaborateModule(parsedModule, environment, importedModules,
                          reportRedundantBy, reportRedundantCalcSteps,
                          reportRedundantByNonEq, reportUnusedNames,
-                         librarySearchProvider);
+                         librarySearchProvider, goalAtLine,
+                         goalAtLine >= 0 ? &goalAtReport : nullptr);
     } catch (const ElaborateError& error) {
+        printGoalAtReport();
         std::cerr << sourcePath << ":"
                   << (error.line > 0 ? error.line : 1) << ":"
                   << (error.column > 0 ? error.column : 1)
@@ -5329,6 +5347,7 @@ int verifyWithCache(const std::string& sourcePath,
                   << error.what() << "\n";
         return 1;
     } catch (const TypeError& error) {
+        printGoalAtReport();
         std::cerr << sourcePath << ":1:1: type error: "
                   << error.what() << "\n";
         if (error.expectedType) {
@@ -5341,10 +5360,12 @@ int verifyWithCache(const std::string& sourcePath,
         }
         return 1;
     } catch (const std::exception& error) {
+        printGoalAtReport();
         std::cerr << sourcePath << ":1:1: error: "
                   << error.what() << "\n";
         return 1;
     }
+    printGoalAtReport();
 
     // Build the delta and metadata for the output cache.
     CacheContents cache;
@@ -6247,13 +6268,15 @@ int main(int argc, char* argv[]) {
         // accepted no-op for compatibility.
         bool reportUnusedNames = true;
         bool writeInterface = true;
-        enum class State { None, Source, Output, Deps, CacheRoot } state = State::None;
+        int goalAtLine = -1;
+        enum class State { None, Source, Output, Deps, CacheRoot, GoalAt } state = State::None;
         for (int i = 2; i < argc; ++i) {
             std::string argument = argv[i];
             if (argument == "--source")      { state = State::Source; continue; }
             if (argument == "--output")      { state = State::Output; continue; }
             if (argument == "--deps")        { state = State::Deps;   continue; }
             if (argument == "--cache-root")  { state = State::CacheRoot; continue; }
+            if (argument == "--goal-at")     { state = State::GoalAt; continue; }
             if (argument == "--no-interface") {
                 // Stage-2 of a two-stage build: verify proofs but leave the
                 // interface cache (produced by stage 1) untouched.
@@ -6291,6 +6314,19 @@ int main(int argc, char* argv[]) {
                 case State::Output: outputCachePath = argument; state = State::None; break;
                 case State::Deps:   dependencyCachePaths.push_back(argument); break;
                 case State::CacheRoot: cacheRoot = argument; state = State::None; break;
+                case State::GoalAt: {
+                    char* parseEnd = nullptr;
+                    long parsed = std::strtol(argument.c_str(), &parseEnd, 10);
+                    if (parseEnd == argument.c_str() || *parseEnd != '\0'
+                            || parsed < 1) {
+                        std::cerr << "verify: --goal-at expects a 1-based "
+                                  << "line number, got " << argument << "\n";
+                        return 1;
+                    }
+                    goalAtLine = static_cast<int>(parsed);
+                    state = State::None;
+                    break;
+                }
                 case State::None:
                     std::cerr << "verify: unexpected argument " << argument << "\n";
                     return 1;
@@ -6306,7 +6342,8 @@ int main(int argc, char* argv[]) {
                                reportRedundantCalcSteps,
                                reportRedundantByNonEq,
                                reportUnusedNames,
-                               writeInterface);
+                               writeInterface,
+                               goalAtLine);
     }
     if (argc >= 3 && std::string(argv[1]) == "deps") {
         // kernel deps [--cache-root DIR] SOURCE.math [SOURCE.math ...]
@@ -6392,6 +6429,7 @@ int main(int argc, char* argv[]) {
                   << "                  [--check-redundant-by]\n"
                   << "                  [--check-redundant-by-non-eq]\n"
                   << "                  [--check-redundant-calc-steps]\n"
+                  << "                  [--goal-at LINE]\n"
                   << "                      verify one file, writing a binary\n"
                   << "                      cache. Deps must already be cached.\n"
                   << "                      With --cache-root, the file's imports\n"
@@ -6407,6 +6445,16 @@ int main(int argc, char* argv[]) {
                   << "                      close unaided within the redundancy budget\n"
                   << "                      (see MATH_REDUNDANT_BUDGET). Tidy-up only;\n"
                   << "                      does not affect cache validity.\n"
+                  << "                      --goal-at LINE: print the goal and local\n"
+                  << "                      hypotheses at the proof statement at (or\n"
+                  << "                      nearest before) LINE — a poor man's\n"
+                  << "                      infoview. Put a `sorry` where you are\n"
+                  << "                      stuck and query its line; the report is\n"
+                  << "                      printed even if elaboration fails after\n"
+                  << "                      the queried line. --output is optional\n"
+                  << "                      for a query-only run, e.g.\n"
+                  << "                      `kernel verify --source FILE.math\n"
+                  << "                       --cache-root build --goal-at 123`.\n"
                   << "  kernel deps [--cache-root DIR] FILE.math [FILE.math ...]\n"
                   << "                      emit Makefile dependency lines\n"
                   << "                      (target .mathv -> imported .mathv).\n"
