@@ -37,6 +37,7 @@ import Real.order
 import Real.linearity
 import Real.absolute_value
 import Real.absolute_value_order
+import Real.density
 import Real.embedding_order
 import Real.convergence
 import Real.supremum
@@ -251,3 +252,121 @@ theorem Real.SequenceConverges.pointwise
 definition Real.TendsToInfinity (s : Natural → Real) : Proposition :=
   (bound : Rational) →
     ∃ (N : Natural). (m : Natural) → N ≤ m → (bound : Real) < s(m)
+
+-- ----------------------------------------------------------------------
+-- Limits respect eventual bounds: if some tail of the sequence stays
+-- at or below a roof, the limit cannot rise above it (and dually for
+-- floors). Were the limit strictly above, a rational sliver of the gap
+-- would separate the tail from the limit — contradicting convergence.
+
+theorem Real.SequenceConverges.le_of_eventually_le
+        (s : Natural → Real) (limit bound : Real)
+        (converges : Real.SequenceConverges(s, limit))
+        (N : Natural)
+        (tailBelow : (m : Natural) → N ≤ m → s(m) ≤ bound)
+        : limit ≤ bound := {
+  claim notAbove : ¬(bound < limit)
+      by (above : bound < limit) ↦ {
+           claim gapPositive : Real.zero < limit - bound
+               by calc Real.zero
+                     = bound - bound       by ring
+                     < limit - bound       by Real.add_preserves_LessThan;
+           obtain ⟨epsilon, epsilonData⟩
+               from Real.exists_positive_rational_below(
+                        limit - bound, gapPositive);
+           obtain ⟨epsilonPositive, epsilonBelowGap⟩ from epsilonData;
+           obtain ⟨M, tailClose⟩ from converges(epsilon, epsilonPositive);
+           claim N ≤ Natural.maximum(N, M) since Natural.left_le_max;
+           claim M ≤ Natural.maximum(N, M) since Natural.right_le_max;
+           claim probeBelow : s(Natural.maximum(N, M)) ≤ bound
+               by tailBelow(Natural.maximum(N, M),
+                            (N ≤ Natural.maximum(N, M)));
+           claim close
+                 : abs(s(Natural.maximum(N, M)) - limit) < (epsilon : Real)
+               by tailClose(Natural.maximum(N, M),
+                            (M ≤ Natural.maximum(N, M)));
+           obtain ⟨closeLower, _⟩
+               from Real.absolute_value_LessThan_bounds(
+                        s(Natural.maximum(N, M)) - limit,
+                        (epsilon : Real), close);
+           claim probeAbove : limit - (epsilon : Real)
+                                < s(Natural.maximum(N, M))
+               by calc limit - (epsilon : Real)
+                     = -(epsilon : Real) + limit
+                           by ring
+                     < (s(Natural.maximum(N, M)) - limit) + limit
+                           by Real.add_preserves_LessThan
+                     = s(Natural.maximum(N, M))
+                           by ring;
+           claim -(limit - bound) < -(epsilon : Real)
+               since Real.negate_flip_LessThan;
+           claim boundBelowProbe : bound < s(Natural.maximum(N, M))
+               by calc bound
+                     = limit + -(limit - bound)        by ring
+                     < limit + -(epsilon : Real)
+                           by Real.add_left_preserves_LessThan
+                     = limit - (epsilon : Real)
+                     < s(Natural.maximum(N, M))
+                           by probeAbove;
+           claim bound < bound since Real.LessThan.transitive_right;
+           claim notSelfEqual : ¬(bound = bound)
+               since Real.LessThan.distinct;
+           absurd(notSelfEqual(reflexivity(Real, bound)))
+         };
+  done since Real.LessOrEqual_of_not_LessThan
+}
+
+theorem Real.SequenceConverges.ge_of_eventually_ge
+        (s : Natural → Real) (limit bound : Real)
+        (converges : Real.SequenceConverges(s, limit))
+        (N : Natural)
+        (tailAbove : (m : Natural) → N ≤ m → bound ≤ s(m))
+        : bound ≤ limit := {
+  claim notBelow : ¬(limit < bound)
+      by (below : limit < bound) ↦ {
+           claim gapPositive : Real.zero < bound - limit
+               by calc Real.zero
+                     = limit - limit       by ring
+                     < bound - limit       by Real.add_preserves_LessThan;
+           obtain ⟨epsilon, epsilonData⟩
+               from Real.exists_positive_rational_below(
+                        bound - limit, gapPositive);
+           obtain ⟨epsilonPositive, epsilonBelowGap⟩ from epsilonData;
+           obtain ⟨M, tailClose⟩ from converges(epsilon, epsilonPositive);
+           claim N ≤ Natural.maximum(N, M) since Natural.left_le_max;
+           claim M ≤ Natural.maximum(N, M) since Natural.right_le_max;
+           claim probeAbove : bound ≤ s(Natural.maximum(N, M))
+               by tailAbove(Natural.maximum(N, M),
+                            (N ≤ Natural.maximum(N, M)));
+           claim close
+                 : abs(s(Natural.maximum(N, M)) - limit) < (epsilon : Real)
+               by tailClose(Natural.maximum(N, M),
+                            (M ≤ Natural.maximum(N, M)));
+           obtain ⟨_, closeUpper⟩
+               from Real.absolute_value_LessThan_bounds(
+                        s(Natural.maximum(N, M)) - limit,
+                        (epsilon : Real), close);
+           claim probeBelow : s(Natural.maximum(N, M))
+                                < limit + (epsilon : Real)
+               by calc s(Natural.maximum(N, M))
+                     = (s(Natural.maximum(N, M)) - limit) + limit
+                           by ring
+                     < (epsilon : Real) + limit
+                           by Real.add_preserves_LessThan
+                     = limit + (epsilon : Real)
+                           by ring;
+           claim probeBelowBound : s(Natural.maximum(N, M)) < bound
+               by calc s(Natural.maximum(N, M))
+                     < limit + (epsilon : Real)
+                           by probeBelow
+                     < limit + (bound - limit)
+                           by Real.add_left_preserves_LessThan
+                     = bound
+                           by ring;
+           claim bound < bound since Real.LessThan.transitive_left;
+           claim notSelfEqual : ¬(bound = bound)
+               since Real.LessThan.distinct;
+           absurd(notSelfEqual(reflexivity(Real, bound)))
+         };
+  done since Real.LessOrEqual_of_not_LessThan
+}
