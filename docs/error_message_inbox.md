@@ -211,3 +211,29 @@ read as "step is load-bearing" and the sweep should continue.
 rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
 
 ---
+### Constructor name in a non-first pattern slot silently binds a variable — 2026-06-12 (binomial push)
+note: in a multi-pattern theorem `| successor(i), zero => …` the second
+pattern `zero` is parsed as a FRESH BINDER named `zero` (shadowing the
+constructor), not as the constructor pattern. The arm then proves a
+statement about a variable, and the failure surfaces as the baffling
+"expected: X / but this case gives: X" with byte-identical printouts
+(the goal has the variable `zero : Natural` in context; the arm's calc
+mentions the real constructor via numerals). Cost: ~5 rounds of
+debugging. Wanted: either support constructor patterns in later slots,
+or reject/warn when a pattern variable shadows a constructor of the
+scrutinee's type. (Workaround that landed: pattern on the first argument
+only; recurse on the second via a helper theorem that takes the previous
+row as a Pi-hypothesis.)
+rubric (0/1): cause 0 · location 0 · actionable 0 · folded-types 1 · no-jargon 1
+
+---
+### Redundancy checker false positive: Pi-hypothesis instantiation — 2026-06-12 (binomial push)
+note: --check-redundant-by flagged `by previousRow(successor(m))` on a
+claim as redundant, but the by-less claim FAILS in plain verify ("no
+in-scope hypothesis matches structurally") — the fact in context is a
+Pi (n : Natural) → …, and the prover does not instantiate it at
+successor(m) outside checker mode. Checker and prover disagree; the
+finding cost a verify round-trip.
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+---
