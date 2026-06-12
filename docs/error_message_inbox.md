@@ -186,3 +186,23 @@ read. This is the shape more hint errors should have.
 rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
 
 ---
+### `--check-redundant-calc-steps` splice re-elaboration trips on `a − b` vs `a + (−b)` and hard-errors — 2026-06-12 (|z| triangle push)
+note: on ComplexNumber/triangle_inequality.math the plain verify and both
+`--check-redundant-by` / `--check-redundant-by-non-eq` pass clean, but
+`--check-redundant-calc-steps` aborts with:
+```
+elaborate error: theorem 'ComplexNumber.inner_product_bound'
+  this argument has the wrong type for the function it is given to
+    the function expects: … = re(z)·im(w) + -(im(z)·re(w))
+    but this argument is: … = re(z)·im(w) - im(z)·re(w)
+```
+diagnosis: the checker re-elaborates the calc with a step spliced out; a
+synthesized argument is compared STRUCTURALLY against the expected type,
+and the kernel-defeq pair `a - b` / `a + (-b)` fails that comparison. The
+failure then propagates as a hard error for the whole file instead of
+"step not redundant, continue". Same wanted-behavior as the 2026-06-11
+budget-exhaustion entry: any failure during in-isolation re-proof should
+read as "step is load-bearing" and the sweep should continue.
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+---
