@@ -37,10 +37,11 @@ Always build with `-j 16`; the dependency graph is parallel.
 ## Milestones: Freek's 100 theorems
 
 The library tracks [Freek Wiedijk's "Formalizing 100 Theorems"
-list](https://www.cs.ru.nl/~freek/100/) as a goal thread — 11 entries
-verified so far, from the irrationality of √2 to the intermediate value
-theorem and the geometric series. The index of what's done and where
-each theorem lives is **[docs/freek_100.md](docs/freek_100.md)**.
+list](https://www.cs.ru.nl/~freek/100/) as a goal thread — 17 entries
+verified so far, from the irrationality of √2 through the intermediate
+value theorem, the non-denumerability of the continuum, and the
+inequality of arithmetic and geometric means. The index of what's done
+and where each theorem lives is **[docs/freek_100.md](docs/freek_100.md)**.
 
 ## Lemma search
 
@@ -150,12 +151,18 @@ Imports flow up the dependency layers: a file in `Integer/` can import
 - **Set:** finite-cardinality layer — equinumerosity, sizes, the sum
   and product rules, pigeonhole; Cantor's theorem and enumerability.
 
-Headline theorems (Freek Wiedijk's "100 theorems" tally — eight so
-far): irrationality of √2 (#1), Euler's totient theorem (#10),
-infinitude of primes (#11), **Fermat's two-squares theorem** (#20,
-primes ≡ 1 mod 4, via Wilson + descent in ℤ[i]), **Wilson's theorem
-with its converse** (#51), Cantor's theorem (#63), the Euclidean
-algorithm (#69), and the fundamental theorem of arithmetic (#80).
+Headline theorems (Freek Wiedijk's "100 theorems" tally — seventeen so
+far, indexed in [docs/freek_100.md](docs/freek_100.md)): irrationality
+of √2 (#1), denumerability of ℚ (#3), Euler's totient theorem (#10),
+infinitude of primes (#11), **Fermat's two-squares theorem** (#20, via
+Wilson + descent in ℤ[i]), **non-denumerability of the continuum**
+(#22), **divergence of the harmonic series** (#34), **the
+arithmetic/geometric mean inequality** (#38), the binomial theorem
+(#44), **Wilson's theorem with its converse** (#51), Cantor's theorem
+(#63), the geometric series (#66), the Euclidean algorithm (#69), the
+Cauchy–Schwarz inequality (#78), **the intermediate value theorem**
+(#79), the fundamental theorem of arithmetic (#80), and the sum of the
+reciprocals of the triangular numbers (#42).
 
 ## Elaborator features at a glance
 
