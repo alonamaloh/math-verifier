@@ -313,3 +313,47 @@ theorem Rational.scaled_reciprocal_successor_eventually_below
                  since Rational.halve_less_than_self
       }
 }
+
+-- ----------------------------------------------------------------------
+-- Reciprocals reverse the order on positives: trade 1 = a·(1/a) in,
+-- grow a to b under the nonnegative factor (1/a)·(1/b), and cancel.
+theorem Rational.reciprocal_function_antitone
+        (a b : Rational) (aPositive : Rational.zero < a) (aLeqB : a ≤ b)
+        : Rational.reciprocal_function(b) ≤ Rational.reciprocal_function(a) := {
+  claim Rational.zero < b since Rational.LessThan.transitive_right;
+  claim ¬(a = Rational.zero);
+  claim ¬(b = Rational.zero);
+  claim aCancel : a * Rational.reciprocal_function(a) = Rational.one;
+  claim bCancel : b * Rational.reciprocal_function(b) = Rational.one;
+  claim Rational.zero < Rational.reciprocal_function(a)
+      since Rational.reciprocal_function_positive_of_positive;
+  claim Rational.zero < Rational.reciprocal_function(b)
+      since Rational.reciprocal_function_positive_of_positive;
+  claim Rational.zero ≤ Rational.reciprocal_function(a)
+      since Rational.LessThan.weaken;
+  claim Rational.zero ≤ Rational.reciprocal_function(b)
+      since Rational.LessThan.weaken;
+  claim Rational.IsNonneg(Rational.reciprocal_function(a))
+      since Rational.IsNonneg_of_LessOrEqual_zero;
+  claim Rational.IsNonneg(Rational.reciprocal_function(b))
+      since Rational.IsNonneg_of_LessOrEqual_zero;
+  claim Rational.IsNonneg(
+            Rational.reciprocal_function(a) * Rational.reciprocal_function(b))
+      since Rational.IsNonneg.multiply;
+  claim Rational.zero
+          ≤ Rational.reciprocal_function(a) * Rational.reciprocal_function(b)
+      since Rational.LessOrEqual_zero_of_IsNonneg;
+  calc Rational.reciprocal_function(b)
+     = Rational.one * Rational.reciprocal_function(b)
+     = (a * Rational.reciprocal_function(a)) * Rational.reciprocal_function(b)
+           since aCancel
+     = (Rational.reciprocal_function(a) * Rational.reciprocal_function(b)) * a
+           by ring
+     ≤ (Rational.reciprocal_function(a) * Rational.reciprocal_function(b)) * b
+           since Rational.LessOrEqual.multiply_by_nonneg_left
+     = Rational.reciprocal_function(a) * (b * Rational.reciprocal_function(b))
+           by ring
+     = Rational.reciprocal_function(a) * Rational.one
+           since bCancel
+     = Rational.reciprocal_function(a)
+}

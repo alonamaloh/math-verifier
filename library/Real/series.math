@@ -322,3 +322,144 @@ theorem Real.telescoping_partialSum
            = t(0) - t(1 + predecessor)
                  by ring
   }
+
+-- ----------------------------------------------------------------------
+-- Splitting a partial sum at a cut: the part below n, plus the block
+-- of k terms shifted past n.
+theorem Real.partialSum_split (s : Natural → Real) (n k : Natural)
+        : Real.partialSum(s, k + n)
+          = Real.partialSum(s, n)
+            + Real.partialSum((j : Natural) ↦ s(n + j), k) :=
+  by_induction on k with IH {
+    case zero:
+        calc Real.partialSum(s, 0 + n)
+           = Real.partialSum(s, n)
+           = Real.partialSum(s, n) + Real.zero    by ring
+           = Real.partialSum(s, n)
+             + Real.partialSum((j : Natural) ↦ s(n + j), 0)
+    case successor(predecessor):
+        calc Real.partialSum(s, successor(predecessor) + n)
+           = Real.partialSum(s, predecessor + n) + s(predecessor + n)
+           = (Real.partialSum(s, n)
+              + Real.partialSum((j : Natural) ↦ s(n + j), predecessor))
+             + s(predecessor + n)
+                 since IH
+           = (Real.partialSum(s, n)
+              + Real.partialSum((j : Natural) ↦ s(n + j), predecessor))
+             + s(n + predecessor)
+                 by (predecessor + n = n + predecessor)
+           = Real.partialSum(s, n)
+             + Real.partialSum((j : Natural) ↦ s(n + j), successor(predecessor))
+  }
+
+-- Termwise comparison below the cut compares the partial sums.
+theorem Real.partialSum_le_pointwise (s t : Natural → Real) (n : Natural)
+        (termsBounded : (j : Natural) → successor(j) ≤ n → s(j) ≤ t(j))
+        : Real.partialSum(s, n) ≤ Real.partialSum(t, n) :=
+  by_induction on n with IH refining termsBounded {
+    case zero: {
+        claim Real.zero ≤ Real.zero since Real.LessOrEqual.reflexive;
+        done
+      }
+    case successor(predecessor): {
+        claim prefixBounded
+              : (j : Natural) → successor(j) ≤ predecessor → s(j) ≤ t(j)
+            by (j : Natural) (jBelow : successor(j) ≤ predecessor) ↦
+                 termsBounded(
+                     j, LessOrEqual.step(successor(j), predecessor, jBelow));
+        claim prefixSum
+              : Real.partialSum(s, predecessor) ≤ Real.partialSum(t, predecessor)
+            by IH(prefixBounded);
+        claim successor(predecessor) ≤ successor(predecessor);
+        claim topBounded : s(predecessor) ≤ t(predecessor)
+            by termsBounded(predecessor, (successor(predecessor) ≤ successor(predecessor)));
+        calc Real.partialSum(s, successor(predecessor))
+           = Real.partialSum(s, predecessor) + s(predecessor)
+           ≤ Real.partialSum(t, predecessor) + s(predecessor)
+                 by Real.add_preserves_LessOrEqual
+           ≤ Real.partialSum(t, predecessor) + t(predecessor)
+                 by Real.add_preserves_LessOrEqual_left
+      }
+  }
+
+-- Sums of nonnegative terms are nonnegative.
+theorem Real.partialSum_nonneg (s : Natural → Real) (n : Natural)
+        (termsNonneg : (j : Natural) → Real.zero ≤ s(j))
+        : Real.zero ≤ Real.partialSum(s, n) :=
+  by_induction on n with IH {
+    case zero: {
+        claim Real.zero ≤ Real.zero since Real.LessOrEqual.reflexive;
+        done
+      }
+    case successor(predecessor): {
+        claim Real.zero ≤ s(predecessor) by termsNonneg(predecessor);
+        calc Real.zero
+           = Real.zero + Real.zero    by ring
+           ≤ Real.partialSum(s, predecessor) + Real.zero
+                 by Real.add_preserves_LessOrEqual
+           ≤ Real.partialSum(s, predecessor) + s(predecessor)
+                 by Real.add_preserves_LessOrEqual_left
+      }
+  }
+
+-- … so partial sums of nonnegative terms only grow.
+theorem Real.partialSum_monotone_of_nonneg (s : Natural → Real)
+        (termsNonneg : (j : Natural) → Real.zero ≤ s(j))
+        (N m : Natural) (NLeqM : N ≤ m)
+        : Real.partialSum(s, N) ≤ Real.partialSum(s, m) := {
+  obtain ⟨k, mEq⟩ by Natural.le_to_add;
+  claim blockNonneg
+        : Real.zero ≤ Real.partialSum((j : Natural) ↦ s(N + j), k)
+      by Real.partialSum_nonneg(
+             (j : Natural) ↦ s(N + j), k,
+             (j : Natural) ↦ termsNonneg(N + j));
+  claim Real.partialSum(s, N) ≤ Real.partialSum(s, k + N)
+      by calc Real.partialSum(s, N)
+            = Real.partialSum(s, N) + Real.zero    by ring
+            ≤ Real.partialSum(s, N)
+              + Real.partialSum((j : Natural) ↦ s(N + j), k)
+                  by Real.add_preserves_LessOrEqual_left
+            = Real.partialSum(s, k + N)
+                  by Real.partialSum_split(s, N, k);
+  claim by substitution
+}
+
+-- A constant block sums to (its length)·(the constant), with the
+-- scalar carried by the linearGrowth closed form.
+theorem Real.partialSum_constant_cast (c : Rational) (n : Natural)
+        : Real.partialSum((j : Natural) ↦ (c : Real), n)
+          = ((Rational.linearGrowth(c, n) - Rational.one : Rational) : Real) :=
+  by_induction on n with IH {
+    case zero: {
+        claim zeroUnfold : Rational.linearGrowth(c, 0) = Rational.one;
+        calc Real.partialSum((j : Natural) ↦ (c : Real), 0)
+           = (Rational.zero : Real)
+           = ((Rational.one - Rational.one : Rational) : Real)
+                 by (Rational.zero = Rational.one - Rational.one)
+           = ((Rational.linearGrowth(c, 0) - Rational.one : Rational) : Real)
+                 by zeroUnfold
+      }
+    case successor(predecessor): {
+        claim stepUnfold
+              : Rational.linearGrowth(c, successor(predecessor))
+                = Rational.linearGrowth(c, predecessor) + c;
+        calc Real.partialSum((j : Natural) ↦ (c : Real), successor(predecessor))
+           = Real.partialSum((j : Natural) ↦ (c : Real), predecessor)
+             + (c : Real)
+           = ((Rational.linearGrowth(c, predecessor) - Rational.one
+               : Rational) : Real)
+             + (c : Real)
+                 since IH
+           = ((Rational.linearGrowth(c, predecessor) - Rational.one + c
+               : Rational) : Real)
+                 since Rational.to_real.add_preserves
+           = ((Rational.linearGrowth(c, predecessor) + c - Rational.one
+               : Rational) : Real)
+                 by (Rational.linearGrowth(c, predecessor) - Rational.one + c
+                     = Rational.linearGrowth(c, predecessor) + c
+                       - Rational.one)
+           = ((Rational.linearGrowth(c, successor(predecessor)) - Rational.one
+               : Rational) : Real)
+                 by stepUnfold
+      }
+  }
