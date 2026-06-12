@@ -279,3 +279,38 @@ theorem Natural.monus_successor_shift (n : Natural)
               }
           }
   }
+
+-- Peeling a successor off the minuend, below the diagonal:
+-- (a + 1) − b = (a − b) + 1 when b ≤ a.
+theorem Natural.monus_succ_left
+        : (b a : Natural) → b ≤ a
+          → Natural.monus(successor(a), b) = successor(Natural.monus(a, b))
+  | zero =>
+      (a : Natural) (bound : 0 ≤ a) ↦
+        calc Natural.monus(successor(a), 0)
+           = successor(a)
+                 by Natural.monus_zero(successor(a))
+           = successor(Natural.monus(a, 0))
+                 by Natural.monus_zero(a)
+  | successor(bPredecessor) =>
+      (a : Natural) (bound : successor(bPredecessor) ≤ a) ↦
+        cases a refining bound {
+          | zero =>
+              absurd(Natural.not_less_or_equal_successor_zero(
+                         bPredecessor, bound))
+          | successor(aPredecessor) => {
+              claim bPredecessor ≤ aPredecessor
+                  since Natural.successor_le_cancel;
+              calc Natural.monus(successor(successor(aPredecessor)),
+                       successor(bPredecessor))
+                 = Natural.monus(successor(aPredecessor), bPredecessor)
+                       by Natural.monus_succ_succ(
+                              successor(aPredecessor), bPredecessor)
+                 = successor(Natural.monus(aPredecessor, bPredecessor))
+                       by Natural.monus_succ_left(bPredecessor, aPredecessor,
+                              (bPredecessor ≤ aPredecessor))
+                 = successor(Natural.monus(successor(aPredecessor),
+                       successor(bPredecessor)))
+                       by Natural.monus_succ_succ(aPredecessor, bPredecessor)
+            }
+        }

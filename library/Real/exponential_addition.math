@@ -295,3 +295,140 @@ theorem Real.exponentialTerm_binomial_split (x y : Real) (k : Natural)
                   1 + k,
                   termSplit)
 }
+
+-- ----------------------------------------------------------------------
+-- Exchanging the order of summation over the triangle: summing the
+-- Cauchy-product diagonals through row n equals weighting each a(i) by
+-- the partial sum of b up to n − i. (Σ_{k<n} Σ_{i≤k} aᵢ·b_{k−i}
+-- = Σ_{i<n} aᵢ·B(n−i), where B is the partial-sum of b.)
+theorem Real.cauchy_product_exchange (a b : Natural → Real)
+        : (n : Natural)
+          → Real.partialSum(
+                (k : Natural) ↦
+                    Real.partialSum(
+                        (i : Natural) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
+                n)
+            = Real.partialSum(
+                  (i : Natural) ↦
+                      a(i) * Real.partialSum(b, Natural.monus(n, i)),
+                  n)
+  | zero => done
+  | successor(p) => {
+      claim exchangeTail
+          : Real.partialSum(
+                (k : Natural) ↦
+                    Real.partialSum(
+                        (i : Natural) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
+                p)
+            = Real.partialSum(
+                  (i : Natural) ↦
+                      a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                  p)
+          by Real.cauchy_product_exchange(a, b, p);
+      -- Padding the weighted row-p sum with its vanishing head:
+      -- a(p)·B(p − p) = a(p)·B(0) = 0.
+      claim monusDiagonal : Natural.monus(p, p) = 0 since Natural.monus_self;
+      claim headPadding
+          : Real.partialSum(
+                (i : Natural) ↦
+                    a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                successor(p))
+            = Real.partialSum(
+                  (i : Natural) ↦
+                      a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                  p)
+          by calc Real.partialSum(
+                      (i : Natural) ↦
+                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      successor(p))
+                = Real.partialSum(
+                      (i : Natural) ↦
+                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      p)
+                  + a(p) * Real.partialSum(b, Natural.monus(p, p))
+                = Real.partialSum(
+                      (i : Natural) ↦
+                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      p)
+                  + a(p) * Real.partialSum(b, 0)
+                      since monusDiagonal
+                = Real.partialSum(
+                      (i : Natural) ↦
+                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      p)
+                  + a(p) * Real.zero
+                = Real.partialSum(
+                      (i : Natural) ↦
+                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      p)
+                      by ring;
+      -- Below the cut, peeling the successor off n − i absorbs one
+      -- diagonal term into each weight.
+      claim stepSplit
+          : (i : Natural) → successor(i) ≤ successor(p)
+            → a(i) * Real.partialSum(b, Natural.monus(p, i))
+                  + a(i) * b(Natural.monus(p, i))
+              = a(i) * Real.partialSum(b, Natural.monus(successor(p), i))
+          by (i : Natural) (iBelow : successor(i) ≤ successor(p)) ↦ {
+               claim i ≤ p since Natural.successor_le_cancel;
+               claim monusStep
+                   : Natural.monus(successor(p), i)
+                     = successor(Natural.monus(p, i))
+                   by Natural.monus_succ_left(i, p, (i ≤ p));
+               calc a(i) * Real.partialSum(b, Natural.monus(p, i))
+                        + a(i) * b(Natural.monus(p, i))
+                  = a(i) * (Real.partialSum(b, Natural.monus(p, i))
+                                + b(Natural.monus(p, i)))
+                  = a(i) * Real.partialSum(b, successor(Natural.monus(p, i)))
+                  = a(i) * Real.partialSum(b, Natural.monus(successor(p), i))
+                        since monusStep
+             };
+      calc Real.partialSum(
+               (k : Natural) ↦
+                   Real.partialSum(
+                       (i : Natural) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
+               successor(p))
+         = Real.partialSum(
+               (k : Natural) ↦
+                   Real.partialSum(
+                       (i : Natural) ↦ a(i) * b(Natural.monus(k, i)), 1 + k),
+               p)
+           + Real.partialSum(
+                 (i : Natural) ↦ a(i) * b(Natural.monus(p, i)), 1 + p)
+         = Real.partialSum(
+               (i : Natural) ↦
+                   a(i) * Real.partialSum(b, Natural.monus(p, i)),
+               p)
+           + Real.partialSum(
+                 (i : Natural) ↦ a(i) * b(Natural.monus(p, i)), 1 + p)
+               since exchangeTail
+         = Real.partialSum(
+               (i : Natural) ↦
+                   a(i) * Real.partialSum(b, Natural.monus(p, i)),
+               successor(p))
+           + Real.partialSum(
+                 (i : Natural) ↦ a(i) * b(Natural.monus(p, i)), successor(p))
+               since headPadding
+         = Real.partialSum(
+               (i : Natural) ↦
+                   a(i) * Real.partialSum(b, Natural.monus(p, i))
+                   + a(i) * b(Natural.monus(p, i)),
+               successor(p))
+               by Real.partialSum_add(
+                      (i : Natural) ↦
+                          a(i) * Real.partialSum(b, Natural.monus(p, i)),
+                      (i : Natural) ↦ a(i) * b(Natural.monus(p, i)),
+                      successor(p))
+         = Real.partialSum(
+               (i : Natural) ↦
+                   a(i) * Real.partialSum(b, Natural.monus(successor(p), i)),
+               successor(p))
+               by Real.partialSum_pointwise_below(
+                      (i : Natural) ↦
+                          a(i) * Real.partialSum(b, Natural.monus(p, i))
+                          + a(i) * b(Natural.monus(p, i)),
+                      (i : Natural) ↦
+                          a(i) * Real.partialSum(b, Natural.monus(successor(p), i)),
+                      successor(p),
+                      stepSplit)
+    }
