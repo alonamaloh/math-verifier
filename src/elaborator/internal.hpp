@@ -4800,6 +4800,22 @@ private:
     // Stage-1 statements-only mode (skip proof bodies). See constructor.
     bool statementsOnly_ = false;
     int autoProveDepth_ = 0;
+    // A short label naming the HINT path that invoked the auto-prover
+    // (e.g. "`by substituting` re-proof"), so the expensive-step warning
+    // attributes the cost to that hint instead of calling the step
+    // "by-less". Empty = a genuinely by-less site.
+    std::string autoProveCallerLabel_;
+    struct AutoProveCallerLabelGuard {
+        Elaborator& elaborator;
+        std::string saved;
+        AutoProveCallerLabelGuard(Elaborator& e, const char* label)
+            : elaborator(e), saved(e.autoProveCallerLabel_) {
+            e.autoProveCallerLabel_ = label;
+        }
+        ~AutoProveCallerLabelGuard() {
+            elaborator.autoProveCallerLabel_ = saved;
+        }
+    };
     // Re-entrancy guard for `cases … refining …`. Genuine nesting (a refining
     // cases inside another's arm) is shallow; a runaway here means an infinite
     // refining recursion, which would otherwise overflow the stack and crash

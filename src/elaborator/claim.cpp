@@ -220,7 +220,41 @@ ExpressionPointer Elaborator::elaborateClaimBySubstitution(
                         int budget) -> ExpressionPointer {
                     ExpressionPointer rewrittenGoal = substitute(
                         abstractedBody, 0, toSide);
+                    // Fast path: the rewrite alone settled the goal. A
+                    // directly-supplied equality usually rewrites one side
+                    // of an `a = b` step onto the other, leaving `a = a` —
+                    // close that with reflexivity, no prover call. (The
+                    // prover route costs tens of thousands of kernel steps
+                    // per DIRECTION on real files; this path is what makes
+                    // `by substituting <eq>` as cheap as `since <eq>`.)
+                    {
+                        bool plainEquality = true;
+                        EqualityComponents components;
+                        try {
+                            components = extractEqualityComponents(
+                                rewrittenGoal,
+                                "`by substituting` fast path", line);
+                        } catch (const ElaborateError&) {
+                            plainEquality = false;
+                        } catch (const TypeError&) {
+                            plainEquality = false;
+                        }
+                        if (plainEquality
+                            && structurallyEqual(components.leftEndpoint,
+                                                 components.rightEndpoint)) {
+                            ExpressionPointer reflexive = makeConstant(
+                                "reflexivity",
+                                {components.carrierUniverseLevel});
+                            reflexive = makeApplication(
+                                reflexive, components.carrierType);
+                            reflexive = makeApplication(
+                                reflexive, components.leftEndpoint);
+                            return buildTransport(abstractedBody, reflexive);
+                        }
+                    }
                     try {
+                        AutoProveCallerLabelGuard callerLabel(
+                            *this, "`by substituting` re-proof");
                         ExpressionPointer proofRewritten = autoProveClaim(
                             rewrittenGoal, localBinders, line, budget);
                         return buildTransport(abstractedBody, proofRewritten);

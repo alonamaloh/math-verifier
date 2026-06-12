@@ -1217,12 +1217,24 @@ ExpressionPointer Elaborator::autoProveClaim(
                 uint64_t spent = kernelStepsSoFar() - autoProveStepSnapshot_;
                 long long warnAt = autoProveWarnThresholdValue();
                 if (warnAt > 0 && spent > (uint64_t)warnAt) {
-                    std::cerr << "warning: " << moduleName_ << ":" << line
-                        << ": expensive by-less proof step ("
-                        << spent << " kernel-steps) — the auto-prover closed "
-                        "it by search; add an explicit `by <reason>` so the "
-                        "kernel checks it directly (much faster, and the "
-                        "intent is recorded)\n";
+                    if (autoProveCallerLabel_.empty()) {
+                        std::cerr << "warning: " << moduleName_ << ":"
+                            << line
+                            << ": expensive by-less proof step ("
+                            << spent << " kernel-steps) — the auto-prover "
+                            "closed it by search; add an explicit `by "
+                            "<reason>` so the kernel checks it directly "
+                            "(much faster, and the intent is recorded)\n";
+                    } else {
+                        std::cerr << "warning: " << moduleName_ << ":"
+                            << line
+                            << ": expensive proof search ("
+                            << spent << " kernel-steps) inside "
+                            << autoProveCallerLabel_
+                            << " — the hint made the prover search; prefer "
+                            "`since <fact>` or a more direct hint so the "
+                            "kernel checks the step directly\n";
+                    }
                 }
             }
             return proof;
