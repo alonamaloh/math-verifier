@@ -249,6 +249,32 @@ thread_local uint64_t inferTypeCacheMisses = 0;
 // Guard: every cache consult first checks the requesting environment; a
 // different owner wipes all caches and claims ownership.
 thread_local const void* kernelCacheOwner = nullptr;
+
+// Reduction-recursion depth bound. Fuel bounds the NUMBER of reduction
+// steps, not the nesting of recursive WHNF/isDefEq frames — a runaway
+// unfold whose every frame sees a NEW expression sails past loop
+// detection and overflows the stack (observed as SIGSEGV with kernel
+// caches disabled, where memoisation no longer keeps recursion shallow).
+// The guard turns that into a clean TypeError well before the platform
+// stack limit. At -O3 a WHNF level costs several KB of stack (wrapper +
+// uncached body + helpers get merged into jumbo frames), so 500 nested
+// levels is the safe ceiling; real proofs stay in the low hundreds even
+// with caches off.
+constexpr int kernelMaxReductionDepth = 500;
+thread_local int kernelReductionDepth = 0;
+struct ReductionDepthGuard {
+    ReductionDepthGuard() {
+        if (++kernelReductionDepth > kernelMaxReductionDepth) {
+            --kernelReductionDepth;
+            throw TypeError(
+                "kernel reduction recursion exceeded the depth bound ("
+                + std::to_string(kernelMaxReductionDepth)
+                + "); the term needs deeper nested reduction than the "
+                  "stack safely allows — most often a runaway unfold");
+        }
+    }
+    ~ReductionDepthGuard() { --kernelReductionDepth; }
+};
 thread_local std::size_t kernelCacheOwnerSize = 0;
 
 void ensureKernelCacheOwner(const Environment& environment) {
@@ -450,9 +476,12 @@ struct KernelInstrumentationScope {
         if (kernelCacheEnabled) {
             whnfCache.clear();
             isDefEqTrueCache.clear();
-            whnfInFlight.clear();
-            isDefEqInFlight.clear();
         }
+        // The in-flight sets are call-stack bookkeeping (loop detection
+        // runs regardless of caching); no kernel recursion is active at a
+        // public-entry boundary, so clear them unconditionally.
+        whnfInFlight.clear();
+        isDefEqInFlight.clear();
         // inferTypeCache is always-on; clear at every public-entry
         // boundary along with the gated caches.
         inferTypeCache.clear();
@@ -1188,12 +1217,12 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
     // contract the test suite relies on (e.g. "WHNF throws on fuel
     // exhaustion" — a cached result would silently bypass the throw).
     ++whnfCallCount;
-    if (!kernelCacheEnabled) {
-        return weakHeadNormalFormUncached(
-            environment, std::move(expression), fuel);
+    ReductionDepthGuard depthGuard;
+    if (kernelCacheEnabled) {
+        ensureKernelCacheOwner(environment);
     }
-    ensureKernelCacheOwner(environment);
-    if (auto cached = whnfCache.find(expression);
+    if (auto cached = kernelCacheEnabled
+            ? whnfCache.find(expression) : whnfCache.end();
         cached != whnfCache.end()) {
         ++whnfCacheHits;
         // Diagnostic (MATH_WHNF_CACHE_VERIFY=1): recompute every hit
@@ -1224,6 +1253,11 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
     // chain has come back to itself — no possible further progress, so
     // return the input unchanged. Without this the kernel would unfold
     // δ-recursively until fuel ran out.
+    // Loop detection runs regardless of result caching: without it a
+    // reduction cycle recurses until the STACK overflows (the fuel
+    // counter bounds steps, not frame depth — observed as a SIGSEGV
+    // under MATH_KERNEL_CACHE=0). The in-flight set is pure call-stack
+    // bookkeeping, so it is sound with caching disabled.
     if (whnfInFlight.find(expression) != whnfInFlight.end()) {
         ++whnfLoopsDetected;
         ++loopShortCircuitEpoch;
@@ -1246,7 +1280,7 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
     // (fuel exhaustion, malformed input), the cache stays unpolluted.
     // A result computed while a loop-detection short-circuit fired below
     // us is stack-dependent (see loopShortCircuitEpoch) — don't memoise.
-    if (loopShortCircuitEpoch == epochBefore)
+    if (kernelCacheEnabled && loopShortCircuitEpoch == epochBefore)
         whnfCache.emplace(std::move(key), result);
     return result;
 }
@@ -1680,6 +1714,7 @@ bool isDefinitionallyEqual(const Environment& environment,
     // may have been a fuel-exhaustion conservative answer; reusing it
     // elsewhere with more fuel would be unsound).
     const bool useCache = kernelCacheEnabled;
+    ReductionDepthGuard depthGuard;
     std::pair<ExpressionPointer, ExpressionPointer> cacheKey{left, right};
     if (useCache) {
         ensureKernelCacheOwner(environment);
@@ -1687,9 +1722,13 @@ bool isDefinitionallyEqual(const Environment& environment,
             ++isDefEqCacheHits;
             return true;
         }
-        // Loop detection: re-entering an equality comparison that's
-        // already on the stack means descent didn't make progress. Bail
-        // out with `false`; the outer comparison will then try its other
+    }
+    {
+        // Loop detection runs regardless of result caching (see the WHNF
+        // wrapper: a cycle would otherwise recurse to stack overflow).
+        // Re-entering an equality comparison that's already on the
+        // stack means descent didn't make progress. Bail out with
+        // `false`; the outer comparison will then try its other
         // strategies (η, proof irrelevance) which may still resolve it.
         if (isDefEqInFlight.find(cacheKey) != isDefEqInFlight.end()) {
             ++isDefEqLoopsDetected;
@@ -1705,11 +1744,11 @@ bool isDefinitionallyEqual(const Environment& environment,
         answer = isDefinitionallyEqualImpl(
             environment, context, std::move(left), std::move(right), fuel);
     } catch (...) {
-        if (useCache) isDefEqInFlight.erase(cacheKey);
+        isDefEqInFlight.erase(cacheKey);
         throw;
     }
+    isDefEqInFlight.erase(cacheKey);
     if (useCache) {
-        isDefEqInFlight.erase(cacheKey);
         // A `true` reached through a loop-detection short-circuit below us
         // is stack-dependent (see loopShortCircuitEpoch) — don't memoise.
         if (answer && loopShortCircuitEpoch == epochBefore)

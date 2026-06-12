@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include "elaborator/elaborator.hpp"
 #include "kernel/expression.hpp"
 #include "kernel/hash.hpp"
@@ -5751,7 +5752,17 @@ std::map<std::string, std::string> loadAllCaches(
              cacheRoot, errorCode)) {
         if (entry.is_regular_file()
             && entry.path().extension() == ".mathv") {
-            cacheFiles.push_back(entry.path().string());
+            // Test/ and ErrorTest/ fixtures are excluded from suggestions
+            // anyway — don't even load them. (They are also where
+            // pathological caches live: a 574 MB Test/ring_test.mathv
+            // once cost seconds and ~10 MB of reader stack on every
+            // failing-proof enrichment.)
+            const std::string pathString = entry.path().string();
+            if (pathString.find("/Test/") != std::string::npos
+                || pathString.find("/ErrorTest/") != std::string::npos) {
+                continue;
+            }
+            cacheFiles.push_back(pathString);
         }
     }
     std::sort(cacheFiles.begin(), cacheFiles.end());
@@ -5784,7 +5795,17 @@ LibrarySearchIndex buildLibraryIndex(const std::string& cacheRoot) {
              cacheRoot, errorCode)) {
         if (entry.is_regular_file()
             && entry.path().extension() == ".mathv") {
-            cacheFiles.push_back(entry.path().string());
+            // Test/ and ErrorTest/ fixtures are excluded from suggestions
+            // anyway — don't even load them. (They are also where
+            // pathological caches live: a 574 MB Test/ring_test.mathv
+            // once cost seconds and ~10 MB of reader stack on every
+            // failing-proof enrichment.)
+            const std::string pathString = entry.path().string();
+            if (pathString.find("/Test/") != std::string::npos
+                || pathString.find("/ErrorTest/") != std::string::npos) {
+                continue;
+            }
+            cacheFiles.push_back(pathString);
         }
     }
     std::sort(cacheFiles.begin(), cacheFiles.end());
@@ -6193,7 +6214,18 @@ theorem target (a c b : Nat) : LE(plus(a, b), plus(c, b)) := { done }
 
 } // namespace
 
-int main(int argc, char* argv[]) {
+// The real entry point, run on a worker thread with a LARGE stack (see
+// main below). Several core walkers — the deserializer, structural
+// comparison, substitution, the WHNF/defeq recursion — are recursive in
+// TERM DEPTH, and a pathological term (an exploded proof certificate, a
+// runaway prover search with caches disabled) can legitimately reach
+// tens of thousands of frames. The default 8 MB main-thread stack turns
+// those into SIGSEGV; a roomy worker stack turns them back into the
+// orderly fuel / budget / depth-bound errors. The explicit guards
+// (kernelMaxReductionDepth, the prover depth bound, the deserializer
+// depth bound) remain as logical-runaway detectors well below this
+// physical ceiling.
+static int kernelMain(int argc, char* argv[]) {
     // Honor the optional kernel-instrumentation env vars before any kernel
     // work runs. All three default to "off"; setting them costs nothing on
     // the steady-state hot path beyond a single integer compare.
@@ -6630,4 +6662,31 @@ int main(int argc, char* argv[]) {
 
     std::cout << "\n" << passed << " passed, " << failed << " failed\n";
     return failed == 0 ? 0 : 1;
+}
+
+
+int main(int argc, char* argv[]) {
+    constexpr size_t workerStackBytes = 512ull * 1024 * 1024;
+    struct Args { int argc; char** argv; int result; };
+    Args args{argc, argv, 1};
+    pthread_attr_t attributes;
+    if (pthread_attr_init(&attributes) != 0
+        || pthread_attr_setstacksize(&attributes, workerStackBytes) != 0) {
+        // Could not set up the big-stack worker; run directly (the
+        // explicit depth guards still protect the common cases).
+        return kernelMain(argc, argv);
+    }
+    pthread_t worker;
+    auto trampoline = [](void* raw) -> void* {
+        auto* a = static_cast<Args*>(raw);
+        a->result = kernelMain(a->argc, a->argv);
+        return nullptr;
+    };
+    if (pthread_create(&worker, &attributes, trampoline, &args) != 0) {
+        pthread_attr_destroy(&attributes);
+        return kernelMain(argc, argv);
+    }
+    pthread_join(worker, nullptr);
+    pthread_attr_destroy(&attributes);
+    return args.result;
 }

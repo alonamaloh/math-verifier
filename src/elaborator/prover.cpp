@@ -1055,12 +1055,21 @@ ExpressionPointer Elaborator::trySymmetryFlip(
                 makeApplication(makeConstant("Equality",
                     {comps.carrierUniverseLevel}), carrier), y), x);
             ExpressionPointer flippedProof;
-            ++symmetryFlipDepth_;
-            try {
-                flippedProof = autoProveClaim(flipped, localBinders, line);
-            } catch (const ElaborateError&) { flippedProof = nullptr; }
-              catch (const TypeError&) { flippedProof = nullptr; }
-            --symmetryFlipDepth_;
+            {
+                // RAII: an AutoProverBudgetError sails past the catches
+                // by design and must not leak the depth increment (a
+                // leaked increment disables symmetry flips for the rest
+                // of the module).
+                struct FlipDepthGuard {
+                    int& d;
+                    FlipDepthGuard(int& depth) : d(depth) { ++d; }
+                    ~FlipDepthGuard() { --d; }
+                } flipGuard{symmetryFlipDepth_};
+                try {
+                    flippedProof = autoProveClaim(flipped, localBinders, line);
+                } catch (const ElaborateError&) { flippedProof = nullptr; }
+                  catch (const TypeError&) { flippedProof = nullptr; }
+            }
             if (!flippedProof) return nullptr;
             // Equality.symmetry.{u}(carrier, y, x, flippedProof) : x = y
             ExpressionPointer wrap = makeConstant(
@@ -1100,12 +1109,17 @@ ExpressionPointer Elaborator::trySymmetryFlip(
         ExpressionPointer flipped = makeApplication(
             makeApplication(relation, y), x);
         ExpressionPointer flippedProof;
-        ++symmetryFlipDepth_;
-        try {
-            flippedProof = autoProveClaim(flipped, localBinders, line);
-        } catch (const ElaborateError&) { flippedProof = nullptr; }
-          catch (const TypeError&) { flippedProof = nullptr; }
-        --symmetryFlipDepth_;
+        {
+            struct FlipDepthGuard {
+                int& d;
+                FlipDepthGuard(int& depth) : d(depth) { ++d; }
+                ~FlipDepthGuard() { --d; }
+            } flipGuard{symmetryFlipDepth_};
+            try {
+                flippedProof = autoProveClaim(flipped, localBinders, line);
+            } catch (const ElaborateError&) { flippedProof = nullptr; }
+              catch (const TypeError&) { flippedProof = nullptr; }
+        }
         if (!flippedProof) return nullptr;
         // <R>.symmetric(y, x, flippedProof) : R(x, y) — verified below.
         ExpressionPointer wrap = makeConstant(symName);
@@ -1144,6 +1158,15 @@ ExpressionPointer Elaborator::autoProveClaim(
             int& d;
             ~DepthDecrement() { --d; }
         } decrementer{autoProveDepth_};
+        // Hard recursion bound. The kernel-step budget bounds WORK, not
+        // FRAME DEPTH: a search whose levels are cheap (or whose budget
+        // isn't armed) can otherwise nest prover frames until the stack
+        // overflows (observed as SIGSEGV with kernel caches disabled).
+        // Real searches resolve within a handful of levels; 64 is far
+        // beyond any legitimate chain.
+        if (autoProveDepth_ > 64) {
+            return nullptr;
+        }
 
         // Arm the effort budget on the OUTERMOST claim (depth 0 -> 1) and
         // disarm it (and reset the trip flag) when that call unwinds, so

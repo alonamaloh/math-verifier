@@ -828,9 +828,14 @@ bool Elaborator::matchAgainstPattern(
             // Kind mismatch — try WHNF on the subject. A δ-defined
             // head (e.g. `Integer.LessOrEqual` unfolding to an
             // `Exists`) might expose the shape the pattern wants.
+            // Progress must be checked STRUCTURALLY, not by pointer:
+            // with the kernel caches disabled, WHNF of an already-normal
+            // term rebuilds an equal-but-fresh pointer every call, and a
+            // pointer test recurses here forever (stack-overflow SIGSEGV).
             ExpressionPointer subjectWhnf = weakHeadNormalForm(
                 environment_, subject);
-            if (subjectWhnf.get() != subject.get()) {
+            if (subjectWhnf.get() != subject.get()
+                && !structurallyEqual(subjectWhnf, subject)) {
                 return matchAgainstPattern(
                     pattern, subjectWhnf,
                     binderCount, bindings, piDepth, deferredOut);
@@ -887,7 +892,8 @@ bool Elaborator::matchAgainstPattern(
                 for (int step = 0; step < 8; ++step) {
                     ExpressionPointer next =
                         unfoldHeadConstantOneStep(unfolded);
-                    if (!next || next.get() == unfolded.get()) break;
+                    if (!next || next.get() == unfolded.get()
+                        || structurallyEqual(next, unfolded)) break;
                     unfolded = next;
                     std::vector<ExpressionPointer> retryBindings =
                         bindings;
@@ -903,10 +909,13 @@ bool Elaborator::matchAgainstPattern(
             }
             // Last resort: full WHNF (δ/β/ι) — catches reductions the
             // pure-δ walk above cannot (e.g. `successor(p) * q` →
-            // `q + p*q`). Bail if it makes no progress.
+            // `q + p*q`). Bail if it makes no progress — checked
+            // STRUCTURALLY, not by pointer (see the kind-mismatch site
+            // above: a pointer test loops forever with caches disabled).
             ExpressionPointer subjectWhnf = weakHeadNormalForm(
                 environment_, subject);
-            if (subjectWhnf.get() != subject.get()) {
+            if (subjectWhnf.get() != subject.get()
+                && !structurallyEqual(subjectWhnf, subject)) {
                 return matchAgainstPattern(
                     pattern, subjectWhnf,
                     binderCount, bindings, piDepth, deferredOut);

@@ -176,7 +176,29 @@ void writeExpression(Writer& writer, ExpressionPointer expression) {
     }
 }
 
+// Recursion depth bound for the deserializer. A cache file with a very
+// deep expression chain (a runaway proof certificate — e.g. the 574 MB
+// ring_test.mathv incident, ~83k nested Applications) would otherwise
+// recurse the reader to a stack-overflow SIGSEGV. Failing cleanly names
+// the real problem: such a file should never have been written.
+constexpr int maxReadExpressionDepth = 20000;
+thread_local int readExpressionDepth = 0;
+
 ExpressionPointer readExpression(Reader& reader) {
+    struct DepthGuard {
+        DepthGuard() {
+            if (++readExpressionDepth > maxReadExpressionDepth) {
+                --readExpressionDepth;
+                throw SerializationError(
+                    "readExpression: expression nesting exceeds "
+                    + std::to_string(maxReadExpressionDepth)
+                    + " — the cache file contains a pathologically deep "
+                      "term (likely an exploded proof certificate); "
+                      "rebuild it, or fix whatever wrote it");
+            }
+        }
+        ~DepthGuard() { --readExpressionDepth; }
+    } depthGuard;
     uint8_t tag = reader.readU8();
     switch (tag) {
         case 0: return makeBoundVariable(reader.readI32());
