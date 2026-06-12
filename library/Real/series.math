@@ -1,0 +1,286 @@
+-- Real/series.math
+--
+-- Infinite series as limits of partial sums, and the geometric series
+-- (Freek #66): for |r| < 1 the powers of r sum to the inverse of 1 − r.
+--
+-- The partial sums satisfy the closed form (1 − r)·Sₙ = 1 − rⁿ (a ring
+-- induction), so Sₙ − L = −rⁿ·L whenever (1 − r)·L = 1, and the error
+-- is |r|ⁿ·|L| — geometric decay times a constant. A rational roof over
+-- |L| turns the decay tolerance into the requested ε.
+
+module Real.series
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.absolute_value
+import Rational.triangle
+import Rational.triangle_more
+import Rational.positive
+import Rational.linearity
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Rational.power
+import Algebra.ring_lemmas
+import Set.basics
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.density
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.power
+
+-- ----------------------------------------------------------------------
+-- Partial sums: Σ_{k < n} s(k), by recursion on n.
+definition Real.partialSum (s : Natural → Real) : Natural → Real
+  | zero => Real.zero
+  | successor(n) => Real.partialSum(s, n) + s(n)
+
+-- A series converges to a total when its partial sums do.
+definition Real.SeriesConverges
+        (s : Natural → Real) (total : Real) : Proposition :=
+  Real.SequenceConverges(Real.partialSum(s), total)
+
+-- ----------------------------------------------------------------------
+-- The geometric closed form: (1 − r)·Σ_{k<n} rᵏ = 1 − rⁿ. The sum
+-- telescopes one factor at a time.
+theorem Real.geometric_partialSum (r : Real) (n : Natural)
+        : (Real.one - r)
+              * Real.partialSum((k : Natural) ↦ Real.power(r, k), n)
+          = Real.one - Real.power(r, n) :=
+  by_induction on n with IH {
+    case zero:
+        calc (Real.one - r)
+                 * Real.partialSum((k : Natural) ↦ Real.power(r, k), 0)
+           = (Real.one - r) * Real.zero
+           = Real.one - Real.one              by ring
+           = Real.one - Real.power(r, 0)
+    case successor(predecessor):
+        calc (Real.one - r)
+                 * Real.partialSum(
+                       (k : Natural) ↦ Real.power(r, k), successor(predecessor))
+           = (Real.one - r)
+                 * (Real.partialSum((k : Natural) ↦ Real.power(r, k), predecessor)
+                    + Real.power(r, predecessor))
+           = (Real.one - r)
+                 * Real.partialSum((k : Natural) ↦ Real.power(r, k), predecessor)
+             + (Real.one - r) * Real.power(r, predecessor)
+                 by ring
+           = (Real.one - Real.power(r, predecessor))
+             + (Real.one - r) * Real.power(r, predecessor)
+                 by IH
+           = Real.one - r * Real.power(r, predecessor)
+                 by ring
+           = Real.one - Real.power(r, successor(predecessor))
+  }
+
+-- ----------------------------------------------------------------------
+-- Convergence of the geometric series to a given inverse L of 1 − r.
+theorem Real.geometric_series_converges
+        (r L : Real)
+        (rSmall : abs(r) < Real.one)
+        (inverseProperty : (Real.one - r) * L = Real.one)
+        : Real.SeriesConverges((k : Natural) ↦ Real.power(r, k), L) :=
+  (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
+    claim absRNonneg : Real.zero ≤ abs(r)
+        since Real.absolute_value_nonneg;
+    -- A positive rational roof over |L|.
+    claim absLNonneg : Real.zero ≤ abs(L)
+        since Real.absolute_value_nonneg;
+    obtain ⟨B, LRoof⟩ from Real.exists_rational_above(abs(L));
+    claim castStep : ((B + Rational.one) : Real)
+                     = (B : Real) + (Rational.one : Real)
+        by Rational.to_real.add_preserves(B, Rational.one);
+    claim Rational.zero < Rational.one by Rational.zero_less_one;
+    claim Real.zero < (Rational.one : Real)
+        since Rational.to_real.positive_preserves;
+    calc Real.zero ≤ abs(L) ≤ (B : Real)   as zeroLeqRoof;
+    calc Real.zero
+       ≤ (B : Real)                            by zeroLeqRoof
+       = (B : Real) + Real.zero                by ring
+       < (B : Real) + (Rational.one : Real)
+             by Real.add_left_preserves_LessThan   as roofPositiveReal;
+    claim castRoofPositive
+          : (Rational.zero : Real) < ((B + Rational.one) : Real)
+        by substituting castStep;
+    claim roofPositive : Rational.zero < B + Rational.one
+        since Rational.to_real.LessThan_reflects;
+    claim extendedRoof : abs(L) ≤ ((B + Rational.one) : Real)
+        by { claim abs(L) < (B : Real) + (Rational.one : Real)
+                 by calc abs(L)
+                       ≤ (B : Real)        by LRoof
+                       = (B : Real) + Real.zero    by ring
+                       < (B : Real) + (Rational.one : Real)
+                             by Real.add_left_preserves_LessThan;
+             claim abs(L) ≤ (B : Real) + (Rational.one : Real)
+                 since Real.LessThan.weaken;
+             done by substituting castStep };
+    -- The scaled tolerance ε/(B+1), and the decay tail at it.
+    claim recipPositive
+          : Rational.zero < Rational.reciprocal_function(B + Rational.one)
+        since Rational.reciprocal_function_positive_of_positive;
+    claim scaledPositive
+          : Rational.zero
+            < epsilon * Rational.reciprocal_function(B + Rational.one)
+        since Rational.multiply_positive_positive;
+    obtain ⟨N, tailBelow⟩
+        from Real.power_eventually_below(
+                 abs(r), absRNonneg, rSmall,
+                 epsilon * Rational.reciprocal_function(B + Rational.one),
+                 scaledPositive);
+    -- Scaling back: (ε/(B+1))·(B+1) = ε.
+    claim ¬(B + Rational.one = Rational.zero);
+    claim recipProduct
+          : (B + Rational.one)
+                * Rational.reciprocal_function(B + Rational.one)
+            = Rational.one;
+    claim toleranceProduct
+          : (epsilon * Rational.reciprocal_function(B + Rational.one))
+                * (B + Rational.one)
+            = epsilon
+        by calc (epsilon * Rational.reciprocal_function(B + Rational.one))
+                    * (B + Rational.one)
+              = epsilon
+                    * ((B + Rational.one)
+                       * Rational.reciprocal_function(B + Rational.one))
+                    by ring
+              = epsilon * Rational.one    by recipProduct
+              = epsilon                   by ring;
+    witness N with
+        (m : Natural) (NLeqM : N ≤ m) ↦ {
+          claim powerSmall
+                : Real.power(abs(r), m)
+                  < ((epsilon * Rational.reciprocal_function(B + Rational.one))
+                     : Real)
+              by tailBelow(m, NLeqM);
+          -- Sₘ = (1 − rᵐ)·L, so the error is exactly |r|ᵐ·|L|.
+          claim sumFormula
+                : Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
+                  = (Real.one - Real.power(r, m)) * L
+              by calc Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
+                    = Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
+                          * Real.one
+                          by ring
+                    = Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
+                          * ((Real.one - r) * L)
+                          by inverseProperty
+                    = ((Real.one - r)
+                       * Real.partialSum((k : Natural) ↦ Real.power(r, k), m))
+                          * L
+                          by ring
+                    = (Real.one - Real.power(r, m)) * L
+                          by Real.geometric_partialSum(r, m);
+          claim absDifference
+                : abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m) - L)
+                  = Real.power(abs(r), m) * abs(L)
+              by calc abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m)
+                          - L)
+                    = abs((Real.one - Real.power(r, m)) * L - L)
+                          by sumFormula
+                    = abs(-(Real.power(r, m) * L))
+                          by substituting
+                              (ring : (Real.one - Real.power(r, m)) * L - L
+                                  = -(Real.power(r, m) * L))
+                    = abs(Real.power(r, m) * L)
+                          by Real.absolute_value_negate(Real.power(r, m) * L)
+                    = abs(Real.power(r, m)) * abs(L)
+                          by Real.absolute_value_multiplicative(
+                                 Real.power(r, m), L)
+                    = Real.power(abs(r), m) * abs(L)
+                          by Real.absolute_value_power(r, m);
+          -- |r|ᵐ·|L| ≤ |r|ᵐ·(B+1) < (ε/(B+1))·(B+1) = ε.
+          claim Real.zero ≤ Real.power(abs(r), m)
+              since Real.power_nonneg;
+          claim Real.IsNonneg(Real.power(abs(r), m))
+              since Real.IsNonneg_of_LessOrEqual_zero;
+          claim finalBound
+                : Real.power(abs(r), m) * abs(L) < (epsilon : Real)
+              by calc Real.power(abs(r), m) * abs(L)
+                    = abs(L) * Real.power(abs(r), m)
+                          by ring
+                    ≤ ((B + Rational.one) : Real) * Real.power(abs(r), m)
+                          since Real.LessOrEqual.multiply_by_nonneg_right
+                    = Real.power(abs(r), m) * ((B + Rational.one) : Real)
+                          by ring
+                    < ((epsilon
+                        * Rational.reciprocal_function(B + Rational.one))
+                       : Real)
+                          * ((B + Rational.one) : Real)
+                          since Real.LessThan.multiply_by_positive_right
+                    = (((epsilon
+                         * Rational.reciprocal_function(B + Rational.one))
+                        * (B + Rational.one) : Rational) : Real)
+                          by Rational.to_real.multiply_preserves(
+                                 epsilon
+                                 * Rational.reciprocal_function(B + Rational.one),
+                                 B + Rational.one)
+                    = (epsilon : Real)
+                          by toleranceProduct;
+          calc abs(Real.partialSum((k : Natural) ↦ Real.power(r, k), m) - L)
+             = Real.power(abs(r), m) * abs(L)    by absDifference
+             < (epsilon : Real)                  by finalBound
+        }
+  }
+
+-- ----------------------------------------------------------------------
+-- Freek #66: the geometric series. For |r| < 1 there is an inverse L
+-- of 1 − r — the sum of the series — and Σ rᵏ converges to it.
+theorem Real.geometric_series (r : Real) (rSmall : abs(r) < Real.one)
+        : ∃ (L : Real).
+            And((Real.one - r) * L = Real.one,
+                Real.SeriesConverges((k : Natural) ↦ Real.power(r, k), L)) := {
+  claim r ≤ abs(r) since Real.LessOrEqual_absolute_value;
+  claim rBelowOne : r < Real.one since Real.LessThan.transitive_left;
+  claim gapPositive : Real.zero < Real.one - r
+      by calc Real.zero
+            = r - r             by ring
+            < Real.one - r      by Real.add_preserves_LessThan;
+  claim zeroNotGap : ¬(Real.zero = Real.one - r)
+      since Real.LessThan.distinct;
+  claim gapNotZero : ¬(Real.one - r = Real.zero)
+      by (gapZero : Real.one - r = Real.zero) ↦
+           zeroNotGap(calc Real.zero = Real.one - r by gapZero);
+  obtain ⟨L, inverseProperty⟩
+      from Real.reciprocal_exists_for_nonzero(Real.one - r, gapNotZero);
+  witness L with
+      And.introduction(
+          inverseProperty,
+          Real.geometric_series_converges(r, L, rSmall, inverseProperty))
+}
