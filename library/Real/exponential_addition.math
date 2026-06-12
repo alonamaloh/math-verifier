@@ -940,11 +940,10 @@ theorem Real.cauchy_product_converges
                         since Natural.less_or_equal_predecessor_less_or_equal;
                     obtain ⟨e, nSplit⟩
                         from Natural.subtraction_witness(i, n, (i ≤ n));
-                    claim doubleSplit : n + n = i + (e + n)
-                        by {
-                          claim n + n = (i + e) + n by nSplit;
-                          done
-                        };
+                    claim n + n = i + (e + n)
+                        by calc n + n
+                              = (i + e) + n    by nSplit
+                              = i + (e + n);
                     claim monusStretch : Natural.monus(n + n, i) = e + n
                         by {
                           claim Natural.monus(i + (e + n), i) = e + n
@@ -1326,4 +1325,97 @@ theorem Real.cauchy_product_converges
               aLimit * bLimit,
               finalPointwise,
               assembledAtProduct)
+}
+
+-- ----------------------------------------------------------------------
+-- The functional equation: exp(x + y) = exp(x) · exp(y). The partial
+-- sums of the series at x + y ARE the Cauchy-product triangle sums
+-- (termwise, by the binomial split), and those converge to the product
+-- of the limits by Mertens; limits are unique.
+theorem Real.exponential_add (x y : Real)
+        : Real.exponential(x + y) = Real.exponential(x) * Real.exponential(y) := {
+  obtain ⟨xAbsoluteLimit, xAbsolutelyConverges⟩
+      from Real.exponential_series_absolutely_convergent(x);
+  obtain ⟨yAbsoluteLimit, yAbsolutelyConverges⟩
+      from Real.exponential_series_absolutely_convergent(y);
+  claim xConverges
+      : Real.SequenceConverges(
+            Real.partialSum(Real.exponentialTerm(x)), Real.exponential(x))
+      by Real.exponential_converges(x);
+  claim yConverges
+      : Real.SequenceConverges(
+            Real.partialSum(Real.exponentialTerm(y)), Real.exponential(y))
+      by Real.exponential_converges(y);
+  claim triangleConverges
+      : Real.SequenceConverges(
+            Real.partialSum(
+                (k : Natural) ↦
+                    Real.partialSum(
+                        (i : Natural) ↦
+                            Real.exponentialTerm(x, i)
+                            * Real.exponentialTerm(y, Natural.monus(k, i)),
+                        1 + k)),
+            Real.exponential(x) * Real.exponential(y))
+      by Real.cauchy_product_converges(
+             Real.exponentialTerm(x), Real.exponentialTerm(y),
+             Real.exponential(x), Real.exponential(y),
+             xAbsoluteLimit, yAbsoluteLimit,
+             xConverges, yConverges,
+             xAbsolutelyConverges, yAbsolutelyConverges);
+  claim diagonalsArePowerSeries
+      : (n : Natural)
+        → Real.partialSum(
+              (k : Natural) ↦
+                  Real.partialSum(
+                      (i : Natural) ↦
+                          Real.exponentialTerm(x, i)
+                          * Real.exponentialTerm(y, Natural.monus(k, i)),
+                      1 + k),
+              n)
+          = Real.partialSum(Real.exponentialTerm(x + y), n)
+      by (n : Natural) ↦
+           Real.partialSum_pointwise(
+               (k : Natural) ↦
+                   Real.partialSum(
+                       (i : Natural) ↦
+                           Real.exponentialTerm(x, i)
+                           * Real.exponentialTerm(y, Natural.monus(k, i)),
+                       1 + k),
+               Real.exponentialTerm(x + y),
+               (k : Natural) ↦ {
+                 claim Real.exponentialTerm(x + y, k)
+                       = Real.partialSum(
+                             (i : Natural) ↦
+                                 Real.exponentialTerm(x, i)
+                                 * Real.exponentialTerm(y, Natural.monus(k, i)),
+                             1 + k)
+                     by Real.exponentialTerm_binomial_split(x, y, k);
+                 done
+               },
+               n);
+  claim seriesAtSumConverges
+      : Real.SequenceConverges(
+            Real.partialSum(Real.exponentialTerm(x + y)),
+            Real.exponential(x) * Real.exponential(y))
+      by Real.SequenceConverges.of_pointwise(
+             Real.partialSum(
+                 (k : Natural) ↦
+                     Real.partialSum(
+                         (i : Natural) ↦
+                             Real.exponentialTerm(x, i)
+                             * Real.exponentialTerm(y, Natural.monus(k, i)),
+                         1 + k)),
+             Real.partialSum(Real.exponentialTerm(x + y)),
+             Real.exponential(x) * Real.exponential(y),
+             diagonalsArePowerSeries, triangleConverges);
+  claim seriesAtSumOwnLimit
+      : Real.SequenceConverges(
+            Real.partialSum(Real.exponentialTerm(x + y)),
+            Real.exponential(x + y))
+      by Real.exponential_converges(x + y);
+  done by Real.SequenceConverges.unique(
+              Real.partialSum(Real.exponentialTerm(x + y)),
+              Real.exponential(x + y),
+              Real.exponential(x) * Real.exponential(y),
+              seriesAtSumOwnLimit, seriesAtSumConverges)
 }
