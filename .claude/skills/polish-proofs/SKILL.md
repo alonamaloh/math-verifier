@@ -21,7 +21,21 @@ files YOU wrote or extended — for shared files that were appended to,
 filter findings to the appended line range and leave pre-existing
 findings alone.
 
-## 2. Run the three checks per file
+## 2. Mark the findings inline
+
+```
+python3 .mark_redundant.py <file> [more.math ...]
+```
+
+This runs the redundancy checks and appends each warning VERBATIM as a
+`-- «…»` marker comment on the flagged source line — so the fix
+instruction sits next to the site while you edit, and line numbers
+never drift. Edit each marked site per the triage table (removing the
+marker as you resolve it), then strip any leftovers with
+`python3 .mark_redundant.py --unmark <file>`.
+
+For a quick findings count (or for the checks the marker script does
+not cover), run the checks directly:
 
 ```
 ./kernel verify --source <file> --output /tmp/<name>.v --cache-root build \
@@ -29,7 +43,10 @@ findings alone.
 ```
 
 (Also heed `expensive by-less proof step` and `unused claim/let`
-warnings from the plain build — they count as findings here.)
+warnings from the plain build — they count as findings here. Note the
+marker pass can surface "arguments inferable — `by <lemma>` alone
+suffices" findings: take those — dropping spelled-out lambda arguments
+is a large readability win.)
 
 ## 3. Triage each finding — by readability, not by chasing zero
 
