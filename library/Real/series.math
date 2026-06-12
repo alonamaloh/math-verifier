@@ -574,3 +574,27 @@ theorem Real.partialSum_pointwise_bounded
                  by topEqual
       }
   }
+
+-- ----------------------------------------------------------------------
+-- The triangle inequality for partial sums: |Σ s(k)| ≤ Σ |s(k)|.
+theorem Real.abs_partialSum_le (s : Natural → Real) (n : Natural)
+        : abs(Real.partialSum(s, n))
+          ≤ Real.partialSum((k : Natural) ↦ abs(s(k)), n) :=
+  by_induction on n with IH {
+    case zero: {
+        claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
+        claim absZero : abs(Real.zero) = Real.zero
+            since Real.absolute_value_when_nonneg;
+        claim Real.zero ≤ Real.zero since Real.LessOrEqual.reflexive;
+        done by substituting absZero
+      }
+    case successor(predecessor):
+        calc abs(Real.partialSum(s, successor(predecessor)))
+           = abs(Real.partialSum(s, predecessor) + s(predecessor))
+           ≤ abs(Real.partialSum(s, predecessor)) + abs(s(predecessor))
+                 by Real.triangle_inequality
+           ≤ Real.partialSum((k : Natural) ↦ abs(s(k)), predecessor)
+             + abs(s(predecessor))
+                 by Real.add_preserves_LessOrEqual
+           = Real.partialSum((k : Natural) ↦ abs(s(k)), successor(predecessor))
+  }

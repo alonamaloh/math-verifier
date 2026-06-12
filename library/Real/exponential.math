@@ -1,0 +1,911 @@
+-- Real/exponential.math
+--
+-- The real exponential function, as the sum of the series Σ xᵏ/k!.
+-- The coefficient 1/k! is an honest rational (k! is a positive
+-- natural), so each term is a rational scalar times a power. The
+-- series converges absolutely by the ratio bound: past an index K
+-- with 2·|x| ≤ K + 1, each term is at most half the one before, so
+-- the absolute partial sums sit below a geometric roof and converge
+-- by monotone convergence; Cauchy completeness then carries the
+-- sign-changing series itself. The value exp(x) is extracted by
+-- definite description through Real.limit.
+
+module Real.exponential
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.maximum
+import Natural.compare
+import Natural.subtraction
+import Natural.factorial
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.absolute_value
+import Rational.triangle
+import Rational.triangle_more
+import Rational.positive
+import Rational.halve
+import Rational.linearity
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Algebra.ring_lemmas
+import Set.basics
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.density
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.power
+import Real.series
+import Real.cauchy_complete
+
+-- ----------------------------------------------------------------------
+-- The k-th term of the exponential series: (1/k!) · xᵏ.
+definition Real.exponentialTerm (x : Real) (k : Natural) : Real :=
+  (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+  * Real.power(x, k)
+
+-- ----------------------------------------------------------------------
+-- The factorial's rational cast is positive (so its reciprocal is
+-- honest): factorial(k) = 1 + c for some c, and successor casts are
+-- positive.
+theorem Rational.factorial_cast_positive (k : Natural)
+        : Rational.zero < (Natural.factorial(k) : Rational) := {
+  claim 1 ≤ Natural.factorial(k) by Natural.factorial_positive(k);
+  obtain ⟨c, factorialSplit⟩
+      from Natural.subtraction_witness(1, Natural.factorial(k),
+                                       (1 ≤ Natural.factorial(k)));
+  claim factorialAsSuccessor : Natural.factorial(k) = successor(c)
+      by factorialSplit;
+  claim Rational.zero < (successor(c) : Rational)
+      by Rational.successor_cast_positive(c);
+  done by substituting factorialAsSuccessor
+}
+
+-- ----------------------------------------------------------------------
+-- The defining recurrence, with the factorial unwound one step:
+-- term(x, k+1) = (1/(k+1)) · x · term(x, k).
+theorem Real.exponentialTerm_successor (x : Real) (k : Natural)
+        : Real.exponentialTerm(x, successor(k))
+          = (Rational.reciprocal_function((successor(k) : Rational)) : Real)
+            * (x * Real.exponentialTerm(x, k)) := {
+  claim factorialStep
+        : (Natural.factorial(successor(k)) : Rational)
+          = (successor(k) : Rational) * (Natural.factorial(k) : Rational)
+      by calc (Natural.factorial(successor(k)) : Rational)
+            = ((successor(k) * Natural.factorial(k) : Natural) : Rational)
+            = (successor(k) : Rational) * (Natural.factorial(k) : Rational)
+                  by Rational.from_natural_multiply_preserves(
+                         successor(k), Natural.factorial(k));
+  claim Rational.zero < (successor(k) : Rational)
+      by Rational.successor_cast_positive(k);
+  claim Rational.zero < (Natural.factorial(k) : Rational)
+      by Rational.factorial_cast_positive(k);
+  claim ¬((successor(k) : Rational) = Rational.zero)
+      since Rational.nonzero_of_positive;
+  claim ¬((Natural.factorial(k) : Rational) = Rational.zero)
+      since Rational.nonzero_of_positive;
+  claim reciprocalSplit
+        : Rational.reciprocal_function(
+              (Natural.factorial(successor(k)) : Rational))
+          = Rational.reciprocal_function((successor(k) : Rational))
+            * Rational.reciprocal_function((Natural.factorial(k) : Rational))
+      by calc Rational.reciprocal_function(
+                  (Natural.factorial(successor(k)) : Rational))
+            = Rational.reciprocal_function(
+                  (successor(k) : Rational) * (Natural.factorial(k) : Rational))
+                  since factorialStep
+            = Rational.reciprocal_function((successor(k) : Rational))
+              * Rational.reciprocal_function(
+                    (Natural.factorial(k) : Rational))
+                  since Rational.reciprocal_function_product;
+  calc Real.exponentialTerm(x, successor(k))
+     = (Rational.reciprocal_function(
+            (Natural.factorial(successor(k)) : Rational)) : Real)
+       * Real.power(x, successor(k))
+     = ((Rational.reciprocal_function((successor(k) : Rational))
+         * Rational.reciprocal_function((Natural.factorial(k) : Rational)))
+        : Real)
+       * Real.power(x, successor(k))
+           since reciprocalSplit
+     = ((Rational.reciprocal_function((successor(k) : Rational)) : Real)
+        * (Rational.reciprocal_function(
+               (Natural.factorial(k) : Rational)) : Real))
+       * Real.power(x, successor(k))
+           since Rational.to_real.multiply_preserves
+     = ((Rational.reciprocal_function((successor(k) : Rational)) : Real)
+        * (Rational.reciprocal_function(
+               (Natural.factorial(k) : Rational)) : Real))
+       * (x * Real.power(x, k))
+     = (Rational.reciprocal_function((successor(k) : Rational)) : Real)
+       * (x * ((Rational.reciprocal_function(
+                    (Natural.factorial(k) : Rational)) : Real)
+               * Real.power(x, k)))
+           by ring
+     = (Rational.reciprocal_function((successor(k) : Rational)) : Real)
+       * (x * Real.exponentialTerm(x, k))
+}
+
+-- ----------------------------------------------------------------------
+-- Absolute convergence: the partial sums of |term(x, ·)| are monotone
+-- and bounded, hence convergent. Bounded because past an index K with
+-- 2·|x| ≤ K + 1 the terms at least halve at every step, so the tail
+-- sits under the geometric roof 2·|term(x, K)|.
+theorem Real.exponential_series_absolutely_convergent (x : Real)
+        : Real.SequenceConvergent(
+              Real.partialSum(
+                  (k : Natural) ↦ abs(Real.exponentialTerm(x, k)))) := {
+  -- A roof over |x|, and a natural K with 2·roof ≤ K + 1.
+  obtain ⟨xRoof, xRoofData⟩ from Real.exists_positive_rational_roof(x);
+  obtain ⟨xRoofPositive, xRoofBounds⟩ from xRoofData;
+  obtain ⟨K, doubleRoofBelowAbsolute⟩
+      from Rational.absolute_value_le_succ_natural(xRoof + xRoof);
+  claim doubleRoofPositive : Rational.zero < xRoof + xRoof
+      by calc Rational.zero
+            < xRoof                  by xRoofPositive
+            = Rational.zero + xRoof  by ring
+            < xRoof + xRoof          since Rational.add_preserves_LessThan;
+  claim Rational.zero ≤ xRoof + xRoof since Rational.LessThan.weaken;
+  claim Rational.IsNonneg(xRoof + xRoof)
+      since Rational.IsNonneg_of_LessOrEqual_zero;
+  claim doubleRoofAbsolute : abs(xRoof + xRoof) = xRoof + xRoof
+      since Rational.absolute_value_when_nonneg;
+  claim doubleRoofBelow : xRoof + xRoof ≤ (successor(K) : Rational)
+      by substituting doubleRoofAbsolute;
+  -- Past K, one series step multiplies the term by at most 1/2.
+  claim ratioBound
+        : (k : Natural) → K ≤ k
+          → abs(x) * (Rational.reciprocal_function(
+                          (successor(k) : Rational)) : Real)
+            ≤ (Rational.one_half : Real)
+      by {
+        take k : Natural;
+        take KBelowIndex : K ≤ k;
+        claim successor(K) ≤ successor(k)
+            since Natural.successor_less_or_equal_successor;
+        claim (successor(K) : Rational) ≤ (successor(k) : Rational)
+            since Rational.from_natural_le_preserves;
+        claim succKPositive : Rational.zero < (successor(K) : Rational)
+            by Rational.successor_cast_positive(K);
+        claim Rational.zero < (successor(k) : Rational)
+            by Rational.successor_cast_positive(k);
+        claim reciprocalAntitone
+              : Rational.reciprocal_function((successor(k) : Rational))
+                ≤ Rational.reciprocal_function((successor(K) : Rational))
+            since Rational.reciprocal_function_antitone;
+        claim ¬((successor(K) : Rational) = Rational.zero)
+            since Rational.nonzero_of_positive;
+        claim cancel
+              : (successor(K) : Rational)
+                * Rational.reciprocal_function((successor(K) : Rational))
+                = Rational.one
+            since Rational.reciprocal_function_multiplies;
+        claim Rational.zero
+                < Rational.reciprocal_function((successor(K) : Rational))
+            since Rational.reciprocal_function_positive_of_positive;
+        claim Rational.zero
+                ≤ Rational.reciprocal_function((successor(K) : Rational))
+            since Rational.LessThan.weaken;
+        claim Rational.IsNonneg(
+                  Rational.reciprocal_function((successor(K) : Rational)))
+            since Rational.IsNonneg_of_LessOrEqual_zero;
+        claim doubleProductBelowOne
+              : (xRoof + xRoof)
+                * Rational.reciprocal_function((successor(K) : Rational))
+                ≤ Rational.one
+            by calc (xRoof + xRoof)
+                    * Rational.reciprocal_function((successor(K) : Rational))
+                  ≤ (successor(K) : Rational)
+                    * Rational.reciprocal_function((successor(K) : Rational))
+                        since Rational.LessOrEqual.multiply_by_nonneg_right
+                  = Rational.one
+                        by cancel;
+        claim Rational.IsNonneg(Rational.one_half)
+            by Rational.one_half_IsNonneg;
+        claim halfRational
+              : xRoof
+                * Rational.reciprocal_function((successor(K) : Rational))
+                ≤ Rational.one_half
+            by calc xRoof
+                    * Rational.reciprocal_function((successor(K) : Rational))
+                  = (xRoof * Rational.reciprocal_function(
+                                 (successor(K) : Rational)))
+                    * Rational.one
+                        by ring
+                  = (xRoof * Rational.reciprocal_function(
+                                 (successor(K) : Rational)))
+                    * (Rational.one_half + Rational.one_half)
+                        by (Rational.one
+                            = Rational.one_half + Rational.one_half)
+                  = ((xRoof + xRoof)
+                     * Rational.reciprocal_function(
+                           (successor(K) : Rational)))
+                    * Rational.one_half
+                        by ring
+                  ≤ Rational.one * Rational.one_half
+                        since Rational.LessOrEqual.multiply_by_nonneg_right
+                  = Rational.one_half
+                        by ring;
+        -- Lift the rational bound through the cast.
+        claim (Rational.reciprocal_function((successor(k) : Rational)) : Real)
+                ≤ (Rational.reciprocal_function(
+                       (successor(K) : Rational)) : Real)
+            since Rational.to_real.LessOrEqual_preserves;
+        claim Real.zero ≤ abs(x) since Real.absolute_value_nonneg;
+        claim Rational.zero
+                < Rational.reciprocal_function((successor(k) : Rational))
+            since Rational.reciprocal_function_positive_of_positive;
+        claim Real.zero
+                < (Rational.reciprocal_function(
+                       (successor(k) : Rational)) : Real)
+            since Rational.to_real.positive_preserves;
+        claim Real.zero
+                ≤ (Rational.reciprocal_function(
+                       (successor(k) : Rational)) : Real)
+            since Real.LessThan.weaken;
+        calc abs(x) * (Rational.reciprocal_function(
+                           (successor(k) : Rational)) : Real)
+           ≤ (xRoof : Real)
+             * (Rational.reciprocal_function(
+                    (successor(K) : Rational)) : Real)
+                 since Real.LessOrEqual.multiply_monotone_nonneg
+           = ((xRoof * Rational.reciprocal_function(
+                           (successor(K) : Rational)) : Rational) : Real)
+                 since Rational.to_real.multiply_preserves
+           ≤ (Rational.one_half : Real)
+                 since Rational.to_real.LessOrEqual_preserves
+      };
+  -- Geometric decay of the terms past K, by induction on the offset.
+  claim tailDecay
+        : (j : Natural)
+          → abs(Real.exponentialTerm(x, j + K))
+            ≤ abs(Real.exponentialTerm(x, K))
+              * Real.power((Rational.one_half : Real), j)
+      by by_induction on j with IH {
+           case zero: {
+               claim powerZero
+                     : Real.power((Rational.one_half : Real), 0) = Real.one;
+               claim abs(Real.exponentialTerm(x, K))
+                       ≤ abs(Real.exponentialTerm(x, K))
+                   since Real.LessOrEqual.reflexive;
+               claim productForm
+                     : abs(Real.exponentialTerm(x, K))
+                       = abs(Real.exponentialTerm(x, K))
+                         * Real.power((Rational.one_half : Real), 0)
+                   by calc abs(Real.exponentialTerm(x, K))
+                         = abs(Real.exponentialTerm(x, K)) * Real.one
+                               by ring
+                         = abs(Real.exponentialTerm(x, K))
+                           * Real.power((Rational.one_half : Real), 0)
+                               by powerZero;
+               done by substituting productForm
+             }
+           case successor(predecessor): {
+               claim K ≤ K + predecessor
+                   by Natural.less_or_equal_add_right(K, predecessor);
+               claim indexCommute : K + predecessor = predecessor + K;
+               claim K ≤ predecessor + K by substituting indexCommute;
+               claim stepEquation
+                     : Real.exponentialTerm(x, successor(predecessor + K))
+                       = (Rational.reciprocal_function(
+                              (successor(predecessor + K) : Rational)) : Real)
+                         * (x * Real.exponentialTerm(x, predecessor + K))
+                   by Real.exponentialTerm_successor(x, predecessor + K);
+               claim Rational.zero
+                       < (successor(predecessor + K) : Rational)
+                   by Rational.successor_cast_positive(predecessor + K);
+               claim Rational.zero
+                       < Rational.reciprocal_function(
+                             (successor(predecessor + K) : Rational))
+                   since Rational.reciprocal_function_positive_of_positive;
+               claim Real.zero
+                       < (Rational.reciprocal_function(
+                              (successor(predecessor + K) : Rational)) : Real)
+                   since Rational.to_real.positive_preserves;
+               claim Real.zero
+                       ≤ (Rational.reciprocal_function(
+                              (successor(predecessor + K) : Rational)) : Real)
+                   since Real.LessThan.weaken;
+               claim Real.IsNonneg(
+                         (Rational.reciprocal_function(
+                              (successor(predecessor + K) : Rational)) : Real))
+                   since Real.IsNonneg_of_LessOrEqual_zero;
+               claim absoluteStep
+                     : abs(Real.exponentialTerm(x, successor(predecessor + K)))
+                       = (Rational.reciprocal_function(
+                              (successor(predecessor + K) : Rational)) : Real)
+                         * (abs(x)
+                            * abs(Real.exponentialTerm(x, predecessor + K)))
+                   by calc abs(Real.exponentialTerm(
+                                   x, successor(predecessor + K)))
+                         = abs((Rational.reciprocal_function(
+                                    (successor(predecessor + K) : Rational))
+                                : Real)
+                               * (x * Real.exponentialTerm(
+                                          x, predecessor + K)))
+                               by stepEquation
+                         = abs((Rational.reciprocal_function(
+                                    (successor(predecessor + K) : Rational))
+                                : Real))
+                           * abs(x * Real.exponentialTerm(
+                                         x, predecessor + K))
+                               since Real.absolute_value_multiplicative
+                         = abs((Rational.reciprocal_function(
+                                    (successor(predecessor + K) : Rational))
+                                : Real))
+                           * (abs(x)
+                              * abs(Real.exponentialTerm(
+                                        x, predecessor + K)))
+                               since Real.absolute_value_multiplicative
+                         = (Rational.reciprocal_function(
+                                (successor(predecessor + K) : Rational))
+                            : Real)
+                           * (abs(x)
+                              * abs(Real.exponentialTerm(
+                                        x, predecessor + K)))
+                               since Real.absolute_value_when_nonneg;
+               claim Real.zero ≤ abs(x) since Real.absolute_value_nonneg;
+               claim Real.zero
+                       ≤ abs(Real.exponentialTerm(x, predecessor + K))
+                   since Real.absolute_value_nonneg;
+               claim Real.IsNonneg(abs(x))
+                   since Real.IsNonneg_of_LessOrEqual_zero;
+               claim Real.IsNonneg(
+                         abs(x) * (Rational.reciprocal_function(
+                                       (successor(predecessor + K)
+                                        : Rational)) : Real))
+                   since Real.IsNonneg.multiply;
+               claim Real.zero
+                       ≤ abs(x) * (Rational.reciprocal_function(
+                                       (successor(predecessor + K)
+                                        : Rational)) : Real)
+                   since Real.LessOrEqual_zero_of_IsNonneg;
+               claim ratioAtIndex
+                     : abs(x) * (Rational.reciprocal_function(
+                                     (successor(predecessor + K)
+                                      : Rational)) : Real)
+                       ≤ (Rational.one_half : Real)
+                   by ratioBound(predecessor + K, (K ≤ predecessor + K));
+               calc abs(Real.exponentialTerm(x, successor(predecessor) + K))
+                  = (Rational.reciprocal_function(
+                         (successor(predecessor + K) : Rational)) : Real)
+                    * (abs(x)
+                       * abs(Real.exponentialTerm(x, predecessor + K)))
+                        by absoluteStep
+                  = (abs(x) * (Rational.reciprocal_function(
+                                   (successor(predecessor + K)
+                                    : Rational)) : Real))
+                    * abs(Real.exponentialTerm(x, predecessor + K))
+                        by ring
+                  ≤ (Rational.one_half : Real)
+                    * (abs(Real.exponentialTerm(x, K))
+                       * Real.power((Rational.one_half : Real), predecessor))
+                        since Real.LessOrEqual.multiply_monotone_nonneg
+                  = abs(Real.exponentialTerm(x, K))
+                    * ((Rational.one_half : Real)
+                       * Real.power((Rational.one_half : Real), predecessor))
+                        by ring
+                  = abs(Real.exponentialTerm(x, K))
+                    * Real.power((Rational.one_half : Real),
+                                 successor(predecessor))
+             }
+         };
+  -- The geometric roof: partial sums of (1/2)ᵏ never exceed 2.
+  claim Rational.zero < Rational.one_half by Rational.one_half_positive;
+  claim halfRealPositive : Real.zero < (Rational.one_half : Real)
+      since Rational.to_real.positive_preserves;
+  claim Real.zero ≤ (Rational.one_half : Real) since Real.LessThan.weaken;
+  claim halvesSum
+        : (Rational.one_half : Real) + (Rational.one_half : Real) = Real.one
+      by calc (Rational.one_half : Real) + (Rational.one_half : Real)
+            = ((Rational.one_half + Rational.one_half : Rational) : Real)
+                  by Rational.to_real.add_preserves(
+                         Rational.one_half, Rational.one_half)
+            = (Rational.one : Real)
+                  by Rational.one_half_doubled
+            = Real.one;
+  claim oneMinusHalf
+        : Real.one - (Rational.one_half : Real) = (Rational.one_half : Real)
+      by calc Real.one - (Rational.one_half : Real)
+            = ((Rational.one_half : Real) + (Rational.one_half : Real))
+              - (Rational.one_half : Real)
+                  by halvesSum
+            = (Rational.one_half : Real)
+                  by ring;
+  claim geometricRoof
+        : (c : Natural)
+          → Real.partialSum(
+                (k : Natural) ↦ Real.power((Rational.one_half : Real), k), c)
+            ≤ Real.one + Real.one
+      by {
+        take c : Natural;
+        claim closedForm
+              : (Real.one - (Rational.one_half : Real))
+                * Real.partialSum(
+                      (k : Natural) ↦ Real.power((Rational.one_half : Real), k),
+                      c)
+                = Real.one - Real.power((Rational.one_half : Real), c)
+            by Real.geometric_partialSum((Rational.one_half : Real), c);
+        claim halfScaled
+              : (Rational.one_half : Real)
+                * Real.partialSum(
+                      (k : Natural) ↦ Real.power((Rational.one_half : Real), k),
+                      c)
+                = Real.one - Real.power((Rational.one_half : Real), c)
+            by calc (Rational.one_half : Real)
+                    * Real.partialSum(
+                          (k : Natural) ↦ Real.power(
+                              (Rational.one_half : Real), k), c)
+                  = (Real.one - (Rational.one_half : Real))
+                    * Real.partialSum(
+                          (k : Natural) ↦ Real.power(
+                              (Rational.one_half : Real), k), c)
+                        by oneMinusHalf
+                  = Real.one - Real.power((Rational.one_half : Real), c)
+                        by closedForm;
+        claim Real.zero ≤ Real.power((Rational.one_half : Real), c)
+            since Real.power_nonneg;
+        claim Real.IsNonneg(Real.power((Rational.one_half : Real), c))
+            since Real.IsNonneg_of_LessOrEqual_zero;
+        claim chopped
+              : Real.one - Real.power((Rational.one_half : Real), c)
+                ≤ Real.one
+            by substituting
+                   (ring : Real.power((Rational.one_half : Real), c)
+                       = Real.one
+                         - (Real.one
+                            - Real.power((Rational.one_half : Real), c)));
+        claim doubled
+              : (Rational.one_half : Real) * (Real.one + Real.one) = Real.one
+            by calc (Rational.one_half : Real) * (Real.one + Real.one)
+                  = (Rational.one_half : Real) + (Rational.one_half : Real)
+                        by ring
+                  = Real.one
+                        by halvesSum;
+        claim scaledBound
+              : (Rational.one_half : Real)
+                * Real.partialSum(
+                      (k : Natural) ↦ Real.power((Rational.one_half : Real), k),
+                      c)
+                ≤ (Rational.one_half : Real) * (Real.one + Real.one)
+            by calc (Rational.one_half : Real)
+                    * Real.partialSum(
+                          (k : Natural) ↦ Real.power(
+                              (Rational.one_half : Real), k), c)
+                  = Real.one - Real.power((Rational.one_half : Real), c)
+                        by halfScaled
+                  ≤ Real.one
+                        by chopped
+                  = (Rational.one_half : Real) * (Real.one + Real.one)
+                        by doubled;
+        done by Real.LessOrEqual.multiply_cancel_left_positive(
+                    (Rational.one_half : Real),
+                    Real.partialSum(
+                        (k : Natural) ↦ Real.power(
+                            (Rational.one_half : Real), k), c),
+                    Real.one + Real.one,
+                    halfRealPositive, scaledBound)
+      };
+  -- Termwise nonnegativity, twice over (terms, then their sums).
+  claim termsNonneg
+        : (k : Natural) → Real.zero ≤ abs(Real.exponentialTerm(x, k))
+      by {
+        take k : Natural;
+        claim Real.zero ≤ abs(Real.exponentialTerm(x, k))
+            since Real.absolute_value_nonneg;
+        done
+      };
+  claim sumsMonotone
+        : (i j : Natural) → i ≤ j
+          → Real.partialSum(
+                (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), i)
+            ≤ Real.partialSum(
+                  (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), j)
+      by {
+        take i : Natural; take j : Natural; take iBelowJ : i ≤ j;
+        done by Real.partialSum_monotone_of_nonneg(
+                    (k : Natural) ↦ abs(Real.exponentialTerm(x, k)),
+                    termsNonneg, i, j, iBelowJ)
+      };
+  -- The roof itself is nonnegative padding.
+  claim Real.zero ≤ abs(Real.exponentialTerm(x, K))
+      since Real.absolute_value_nonneg;
+  claim Real.IsNonneg(abs(Real.exponentialTerm(x, K)))
+      since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Rational.zero < Rational.one;
+  claim Real.zero < (Rational.one : Real)
+      since Rational.to_real.positive_preserves;
+  claim onePlusOnePositive : Real.zero < Real.one + Real.one
+      by calc Real.zero
+            < (Rational.one : Real)
+            = Real.one + Real.zero
+            < Real.one + Real.one      by Real.add_left_preserves_LessThan;
+  claim Real.zero ≤ Real.one + Real.one since Real.LessThan.weaken;
+  claim Real.IsNonneg(Real.one + Real.one)
+      since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg(
+            abs(Real.exponentialTerm(x, K)) * (Real.one + Real.one))
+      since Real.IsNonneg.multiply;
+  claim Real.zero
+          ≤ abs(Real.exponentialTerm(x, K)) * (Real.one + Real.one)
+      since Real.LessOrEqual_zero_of_IsNonneg;
+  -- Every partial sum stays below prefix-up-to-K plus the tail roof.
+  claim sumsBounded
+        : (n : Natural)
+          → Real.partialSum(
+                (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), n)
+            ≤ Real.partialSum(
+                  (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), K)
+              + abs(Real.exponentialTerm(x, K)) * (Real.one + Real.one)
+      by {
+        take n : Natural;
+        cases Natural.compare_strict(n, K) {
+          | Natural.StrictComparison.below(nStrictlyBelow) => {
+              claim n ≤ successor(n) by Natural.le_successor(n);
+              claim n ≤ K since LessOrEqual.transitive;
+              claim prefixBound
+                    : Real.partialSum(
+                          (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), n)
+                      ≤ Real.partialSum(
+                            (k : Natural) ↦ abs(Real.exponentialTerm(x, k)),
+                            K)
+                  by Real.partialSum_monotone_of_nonneg(
+                         (k : Natural) ↦ abs(Real.exponentialTerm(x, k)),
+                         termsNonneg, n, K, (n ≤ K));
+              calc Real.partialSum(
+                       (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), n)
+                 ≤ Real.partialSum(
+                       (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), K)
+                       by prefixBound
+                 = Real.partialSum(
+                       (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), K)
+                   + Real.zero
+                 ≤ Real.partialSum(
+                       (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), K)
+                   + abs(Real.exponentialTerm(x, K)) * (Real.one + Real.one)
+                       since Real.add_preserves_LessOrEqual_left
+            }
+          | Natural.StrictComparison.atLeast(KBelowN) => {
+              obtain ⟨c, nSplit⟩
+                  from Natural.subtraction_witness(K, n, KBelowN);
+              claim nAsSum : n = c + K
+                  by calc n
+                        = K + c    by nSplit
+                        = c + K    by ring;
+              claim splitSum
+                    : Real.partialSum(
+                          (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), n)
+                      = Real.partialSum(
+                            (k : Natural) ↦ abs(Real.exponentialTerm(x, k)),
+                            K)
+                        + Real.partialSum(
+                              (j : Natural)
+                                ↦ abs(Real.exponentialTerm(x, K + j)), c)
+                  by calc Real.partialSum(
+                              (k : Natural) ↦ abs(Real.exponentialTerm(x, k)),
+                              n)
+                        = Real.partialSum(
+                              (k : Natural) ↦ abs(Real.exponentialTerm(x, k)),
+                              c + K)
+                              by nAsSum
+                        = Real.partialSum(
+                              (k : Natural) ↦ abs(Real.exponentialTerm(x, k)),
+                              K)
+                          + Real.partialSum(
+                                (j : Natural)
+                                  ↦ abs(Real.exponentialTerm(x, K + j)), c)
+                              by Real.partialSum_split(
+                                     (k : Natural)
+                                       ↦ abs(Real.exponentialTerm(x, k)),
+                                     K, c);
+              claim windowTermBound
+                    : (j : Natural) → successor(j) ≤ c
+                      → abs(Real.exponentialTerm(x, K + j))
+                        ≤ abs(Real.exponentialTerm(x, K))
+                          * Real.power((Rational.one_half : Real), j)
+                  by {
+                    take j : Natural;
+                    take _ : successor(j) ≤ c;
+                    claim decay
+                          : abs(Real.exponentialTerm(x, j + K))
+                            ≤ abs(Real.exponentialTerm(x, K))
+                              * Real.power((Rational.one_half : Real), j)
+                        by tailDecay(j);
+                    claim indexCommute : K + j = j + K;
+                    done by substituting indexCommute
+                  };
+              claim abs(Real.exponentialTerm(x, K))
+                      ≤ abs(Real.exponentialTerm(x, K))
+                  since Real.LessOrEqual.reflexive;
+              claim powersNonneg
+                    : (j : Natural)
+                      → Real.zero
+                        ≤ Real.power((Rational.one_half : Real), j)
+                  by {
+                    take j : Natural;
+                    claim Real.zero ≤ Real.power((Rational.one_half : Real), j)
+                        since Real.power_nonneg;
+                    done
+                  };
+              claim geometricSumNonneg
+                    : Real.zero
+                      ≤ Real.partialSum(
+                            (j : Natural)
+                              ↦ Real.power((Rational.one_half : Real), j), c)
+                  by Real.partialSum_nonneg(
+                         (j : Natural)
+                           ↦ Real.power((Rational.one_half : Real), j),
+                         c, powersNonneg);
+              claim geometricSumBelow
+                    : Real.partialSum(
+                          (j : Natural)
+                            ↦ Real.power((Rational.one_half : Real), j), c)
+                      ≤ Real.one + Real.one
+                  by geometricRoof(c);
+              claim windowBound
+                    : Real.partialSum(
+                          (j : Natural)
+                            ↦ abs(Real.exponentialTerm(x, K + j)), c)
+                      ≤ abs(Real.exponentialTerm(x, K))
+                        * (Real.one + Real.one)
+                  by calc Real.partialSum(
+                              (j : Natural)
+                                ↦ abs(Real.exponentialTerm(x, K + j)), c)
+                        ≤ Real.partialSum(
+                              (j : Natural)
+                                ↦ abs(Real.exponentialTerm(x, K))
+                                  * Real.power((Rational.one_half : Real), j),
+                              c)
+                              by Real.partialSum_le_pointwise(
+                                     (j : Natural)
+                                       ↦ abs(Real.exponentialTerm(x, K + j)),
+                                     (j : Natural)
+                                       ↦ abs(Real.exponentialTerm(x, K))
+                                         * Real.power(
+                                               (Rational.one_half : Real), j),
+                                     c, windowTermBound)
+                        = abs(Real.exponentialTerm(x, K))
+                          * Real.partialSum(
+                                (j : Natural)
+                                  ↦ Real.power((Rational.one_half : Real), j),
+                                c)
+                              by Real.partialSum_scale(
+                                     abs(Real.exponentialTerm(x, K)),
+                                     (j : Natural)
+                                       ↦ Real.power(
+                                             (Rational.one_half : Real), j),
+                                     c)
+                        ≤ abs(Real.exponentialTerm(x, K))
+                          * (Real.one + Real.one)
+                              since Real.LessOrEqual.multiply_monotone_nonneg;
+              calc Real.partialSum(
+                       (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), n)
+                 = Real.partialSum(
+                       (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), K)
+                   + Real.partialSum(
+                         (j : Natural)
+                           ↦ abs(Real.exponentialTerm(x, K + j)), c)
+                       by splitSum
+                 ≤ Real.partialSum(
+                       (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), K)
+                   + abs(Real.exponentialTerm(x, K)) * (Real.one + Real.one)
+                       since Real.add_preserves_LessOrEqual_left
+            }
+        }
+      };
+  done by Real.monotone_bounded_converges(
+              Real.partialSum(
+                  (k : Natural) ↦ abs(Real.exponentialTerm(x, k))),
+              sumsMonotone,
+              Real.partialSum(
+                  (k : Natural) ↦ abs(Real.exponentialTerm(x, k)), K)
+              + abs(Real.exponentialTerm(x, K)) * (Real.one + Real.one),
+              sumsBounded)
+}
+
+-- ----------------------------------------------------------------------
+-- The signed series converges (dominated by its own absolute values),
+-- and exp(x) is THE limit, by definite description.
+theorem Real.exponential_series_convergent (x : Real)
+        : Real.SequenceConvergent(
+              Real.partialSum(Real.exponentialTerm(x))) := {
+  claim domination
+        : (k : Natural)
+          → abs(Real.exponentialTerm(x, k)) ≤ abs(Real.exponentialTerm(x, k))
+      by {
+        take k : Natural;
+        claim abs(Real.exponentialTerm(x, k))
+                ≤ abs(Real.exponentialTerm(x, k))
+            since Real.LessOrEqual.reflexive;
+        done
+      };
+  done by Real.series_dominated_converges(
+              Real.exponentialTerm(x),
+              (k : Natural) ↦ abs(Real.exponentialTerm(x, k)),
+              domination,
+              Real.exponential_series_absolutely_convergent(x))
+}
+
+definition Real.exponential (x : Real) : Real :=
+  Real.limit(Real.partialSum(Real.exponentialTerm(x)),
+             Real.exponential_series_convergent(x))
+
+theorem Real.exponential_converges (x : Real)
+        : Real.SeriesConverges(Real.exponentialTerm(x), Real.exponential(x)) :=
+  Real.limit_converges(Real.partialSum(Real.exponentialTerm(x)),
+                       Real.exponential_series_convergent(x))
+
+-- ----------------------------------------------------------------------
+-- exp(0) = 1: from index 1 on, every partial sum is exactly 1 — the
+-- head term is 1/0! · 0⁰ = 1 and every later term carries a factor
+-- 0^(k+1) = 0.
+theorem Real.exponential_zero : Real.exponential(Real.zero) = Real.one := {
+  claim factorialZeroCast : (Natural.factorial(0) : Rational) = Rational.one;
+  claim Rational.zero < Rational.one;
+  claim ¬(Rational.one = Rational.zero) since Rational.nonzero_of_positive;
+  claim cancelOne
+        : Rational.one * Rational.reciprocal_function(Rational.one)
+          = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  claim reciprocalOne
+        : Rational.reciprocal_function(Rational.one) = Rational.one
+      by calc Rational.reciprocal_function(Rational.one)
+            = Rational.one * Rational.reciprocal_function(Rational.one)
+                  by ring
+            = Rational.one
+                  by cancelOne;
+  claim powerZeroZero : Real.power(Real.zero, 0) = Real.one;
+  claim castOne : (Rational.one : Real) = Real.one;
+  claim termZero : Real.exponentialTerm(Real.zero, 0) = Real.one
+      by calc Real.exponentialTerm(Real.zero, 0)
+            = (Rational.reciprocal_function(
+                   (Natural.factorial(0) : Rational)) : Real)
+              * Real.power(Real.zero, 0)
+            = (Rational.reciprocal_function(Rational.one) : Real)
+              * Real.power(Real.zero, 0)
+                  by factorialZeroCast
+            = (Rational.one : Real) * Real.power(Real.zero, 0)
+                  by reciprocalOne
+            = (Rational.one : Real) * Real.one
+                  by powerZeroZero
+            = Real.one * Real.one
+                  by castOne
+            = Real.one
+                  by ring;
+  claim termSuccessor
+        : (k : Natural)
+          → Real.exponentialTerm(Real.zero, successor(k)) = Real.zero
+      by {
+        take k : Natural;
+        claim powerVanishes
+              : Real.power(Real.zero, successor(k)) = Real.zero
+            by calc Real.power(Real.zero, successor(k))
+                  = Real.zero * Real.power(Real.zero, k)
+                  = Real.zero    by ring;
+        calc Real.exponentialTerm(Real.zero, successor(k))
+           = (Rational.reciprocal_function(
+                  (Natural.factorial(successor(k)) : Rational)) : Real)
+             * Real.power(Real.zero, successor(k))
+           = (Rational.reciprocal_function(
+                  (Natural.factorial(successor(k)) : Rational)) : Real)
+             * Real.zero
+                 by powerVanishes
+           = Real.zero
+                 by ring
+      };
+  claim tailConstant
+        : (p : Natural)
+          → Real.partialSum(Real.exponentialTerm(Real.zero), successor(p))
+            = Real.one
+      by by_induction on p with IH {
+           case zero:
+               calc Real.partialSum(
+                        Real.exponentialTerm(Real.zero), successor(0))
+                  = Real.partialSum(Real.exponentialTerm(Real.zero), 0)
+                    + Real.exponentialTerm(Real.zero, 0)
+                  = Real.zero + Real.one
+                        by termZero
+                  = Real.one
+                        by ring
+           case successor(q):
+               calc Real.partialSum(
+                        Real.exponentialTerm(Real.zero),
+                        successor(successor(q)))
+                  = Real.partialSum(
+                        Real.exponentialTerm(Real.zero), successor(q))
+                    + Real.exponentialTerm(Real.zero, successor(q))
+                  = Real.one + Real.exponentialTerm(Real.zero, successor(q))
+                        since IH
+                  = Real.one + Real.zero
+                        by termSuccessor(q)
+                  = Real.one
+                        by ring
+         };
+  claim sumsConvergeToOne
+        : Real.SequenceConverges(
+              Real.partialSum(Real.exponentialTerm(Real.zero)), Real.one)
+      by {
+        take epsilon : Rational;
+        take epsilonPositive : Rational.zero < epsilon;
+        witness 1 with
+            (m : Natural) (oneBelow : 1 ≤ m) ↦ {
+              obtain ⟨c, mSplit⟩
+                  from Natural.subtraction_witness(1, m, oneBelow);
+              claim mAsSuccessor : m = successor(c) by mSplit;
+              claim sumAtM
+                    : Real.partialSum(Real.exponentialTerm(Real.zero), m)
+                      = Real.one
+                  by calc Real.partialSum(
+                              Real.exponentialTerm(Real.zero), m)
+                        = Real.partialSum(
+                              Real.exponentialTerm(Real.zero), successor(c))
+                              by mAsSuccessor
+                        = Real.one
+                              by tailConstant(c);
+              claim differenceZero
+                    : Real.partialSum(Real.exponentialTerm(Real.zero), m)
+                      - Real.one
+                      = Real.zero
+                  by calc Real.partialSum(
+                              Real.exponentialTerm(Real.zero), m) - Real.one
+                        = Real.one - Real.one    by sumAtM
+                        = Real.zero;
+              claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
+              claim absoluteZero
+                    : abs(Real.partialSum(Real.exponentialTerm(Real.zero), m)
+                          - Real.one)
+                      = Real.zero
+                  by calc abs(Real.partialSum(
+                                  Real.exponentialTerm(Real.zero), m)
+                              - Real.one)
+                        = abs(Real.zero)
+                              by differenceZero
+                        = Real.zero
+                              since Real.absolute_value_when_nonneg;
+              claim Real.zero < (epsilon : Real)
+                  since Rational.to_real.positive_preserves;
+              done by substituting absoluteZero
+            }
+      };
+  done by Real.SequenceConverges.unique(
+              Real.partialSum(Real.exponentialTerm(Real.zero)),
+              Real.exponential(Real.zero), Real.one,
+              Real.exponential_converges(Real.zero),
+              sumsConvergeToOne)
+}

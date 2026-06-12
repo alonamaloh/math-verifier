@@ -557,3 +557,49 @@ theorem Rational.reciprocal_function_multiplies
   cases x refining xNonzero { | RationalRepresentative.make(n, d) =>
     Rational.reciprocal_at_integer_multiplies(n, d, xNonzero) }
 
+
+-- Reciprocals are multiplicative: for nonzero a and b,
+-- a⁻¹ · b⁻¹ = (a·b)⁻¹. Multiply by (a·b)·(a·b)⁻¹ = 1 and regroup so
+-- each factor cancels its own reciprocal.
+theorem Rational.reciprocal_function_product (a b : Rational)
+        (aNonzero : ¬(a = Rational.zero)) (bNonzero : ¬(b = Rational.zero))
+        : Rational.reciprocal_function(a) * Rational.reciprocal_function(b)
+          = Rational.reciprocal_function(a * b) := {
+  claim aCancel : a * Rational.reciprocal_function(a) = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  claim bCancel : b * Rational.reciprocal_function(b) = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  claim productNonzero : ¬(a * b = Rational.zero)
+      by (productZero : a * b = Rational.zero) ↦ {
+           claim bIsZero : b = Rational.zero
+               by calc b
+                    = Rational.one * b                           by ring
+                    = (a * Rational.reciprocal_function(a)) * b  since aCancel
+                    = Rational.reciprocal_function(a) * (a * b)  by ring
+                    = Rational.reciprocal_function(a) * Rational.zero
+                          since productZero
+                    = Rational.zero                              by ring;
+           absurd(bNonzero(bIsZero))
+         };
+  claim productCancel
+        : (a * b) * Rational.reciprocal_function(a * b) = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  calc Rational.reciprocal_function(a) * Rational.reciprocal_function(b)
+     = (Rational.reciprocal_function(a) * Rational.reciprocal_function(b))
+       * Rational.one
+           by ring
+     = (Rational.reciprocal_function(a) * Rational.reciprocal_function(b))
+       * ((a * b) * Rational.reciprocal_function(a * b))
+           since productCancel
+     = ((a * Rational.reciprocal_function(a))
+        * (b * Rational.reciprocal_function(b)))
+       * Rational.reciprocal_function(a * b)
+           by ring
+     = (Rational.one * (b * Rational.reciprocal_function(b)))
+       * Rational.reciprocal_function(a * b)
+           since aCancel
+     = (Rational.one * Rational.one) * Rational.reciprocal_function(a * b)
+           since bCancel
+     = Rational.reciprocal_function(a * b)
+           by ring
+}

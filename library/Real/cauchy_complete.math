@@ -19,6 +19,7 @@ import Equality.basics
 import Natural.basics
 import Natural.order
 import Natural.maximum
+import Natural.compare
 import Rational.basics
 import Rational.addition
 import Rational.negation
@@ -44,6 +45,7 @@ import Real.absolute_value_order
 import Real.embedding_order
 import Real.convergence
 import Real.supremum
+import Real.series
 
 -- ----------------------------------------------------------------------
 -- A Cauchy sequence of reals: past some index, any two terms are
@@ -255,4 +257,167 @@ theorem Real.cauchy_sequence_converges (s : Natural → Real)
               done since Real.absolute_value_LessThan_of_bounds
             }
       }
+}
+
+-- ----------------------------------------------------------------------
+-- Convergent sequences are Cauchy: both tails sit within ε/2 of the
+-- limit, so within ε of each other.
+theorem Real.converges_implies_cauchy (s : Natural → Real)
+        (convergent : Real.SequenceConvergent(s))
+        : Real.SequenceIsCauchy(s) := {
+  obtain ⟨limit, converges⟩ from convergent;
+  take epsilon : Rational;
+  take epsilonPositive : Rational.zero < epsilon;
+  claim halvePositive : Rational.zero < Rational.halve(epsilon)
+      since Rational.halve_positive;
+  obtain ⟨N, tailClose⟩ from converges(Rational.halve(epsilon), halvePositive);
+  witness N with
+      (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦ {
+        claim abs(s(m) - limit) < (Rational.halve(epsilon) : Real)
+            by tailClose(m, mInTail);
+        claim abs(s(n) - limit) < (Rational.halve(epsilon) : Real)
+            by tailClose(n, nInTail);
+        calc abs(s(m) - s(n))
+           = abs((s(m) - limit) + (limit - s(n)))
+                 by ((s(m) - limit) + (limit - s(n)) = s(m) - s(n))
+           ≤ abs(s(m) - limit) + abs(limit - s(n))
+                 by Real.triangle_inequality
+           = abs(s(m) - limit) + abs(s(n) - limit)
+                 since Real.absolute_value_subtract_swap
+           < (Rational.halve(epsilon) : Real)
+             + (Rational.halve(epsilon) : Real)
+                 by Real.LessThan.add_strict_strict
+           = ((Rational.halve(epsilon) + Rational.halve(epsilon)
+               : Rational) : Real)
+                 since Rational.to_real.add_preserves
+           = (epsilon : Real)
+                 by Rational.halve_doubled(epsilon)
+      }
+}
+
+-- ----------------------------------------------------------------------
+-- The comparison test, Cauchy form: if |t(k)| ≤ b(k) termwise and the
+-- partial sums of b are Cauchy, so are the partial sums of t — any
+-- window of t-terms is absolutely below the matching window of b.
+theorem Real.series_dominated_cauchy (t b : Natural → Real)
+        (domination : (k : Natural) → abs(t(k)) ≤ b(k))
+        (boundCauchy : Real.SequenceIsCauchy(Real.partialSum(b)))
+        : Real.SequenceIsCauchy(Real.partialSum(t)) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨N, tailClose⟩ from boundCauchy(epsilon, epsilonPositive);
+    -- The ordered case: the gap from index i up to index j ≥ i.
+    claim oneSided
+          : (i j : Natural) → N ≤ i → N ≤ j → i ≤ j
+            → abs(Real.partialSum(t, j) - Real.partialSum(t, i))
+              < (epsilon : Real)
+        by {
+          take i : Natural; take j : Natural;
+          take iInTail : N ≤ i; take jInTail : N ≤ j;
+          take iLeqJ : i ≤ j;
+          obtain ⟨c, splitEquation⟩
+              from Natural.subtraction_witness(i, j, iLeqJ);
+          claim jAsSum : j = c + i
+              by calc j
+                    = i + c    by splitEquation
+                    = c + i    by ring;
+          claim splitT
+                : Real.partialSum(t, j)
+                  = Real.partialSum(t, i)
+                    + Real.partialSum((k : Natural) ↦ t(i + k), c)
+              by calc Real.partialSum(t, j)
+                    = Real.partialSum(t, c + i)    by jAsSum
+                    = Real.partialSum(t, i)
+                      + Real.partialSum((k : Natural) ↦ t(i + k), c)
+                          by Real.partialSum_split(t, i, c);
+          claim splitB
+                : Real.partialSum(b, j)
+                  = Real.partialSum(b, i)
+                    + Real.partialSum((k : Natural) ↦ b(i + k), c)
+              by calc Real.partialSum(b, j)
+                    = Real.partialSum(b, c + i)    by jAsSum
+                    = Real.partialSum(b, i)
+                      + Real.partialSum((k : Natural) ↦ b(i + k), c)
+                          by Real.partialSum_split(b, i, c);
+          claim tWindowValue
+                : Real.partialSum(t, j) - Real.partialSum(t, i)
+                  = Real.partialSum((k : Natural) ↦ t(i + k), c)
+              by calc Real.partialSum(t, j) - Real.partialSum(t, i)
+                    = (Real.partialSum(t, i)
+                       + Real.partialSum((k : Natural) ↦ t(i + k), c))
+                      - Real.partialSum(t, i)
+                          since splitT
+                    = Real.partialSum((k : Natural) ↦ t(i + k), c)
+                          by ring;
+          claim bWindowValue
+                : Real.partialSum((k : Natural) ↦ b(i + k), c)
+                  = Real.partialSum(b, j) - Real.partialSum(b, i)
+              by calc Real.partialSum((k : Natural) ↦ b(i + k), c)
+                    = (Real.partialSum(b, i)
+                       + Real.partialSum((k : Natural) ↦ b(i + k), c))
+                      - Real.partialSum(b, i)
+                          by ring
+                    = Real.partialSum(b, j) - Real.partialSum(b, i)
+                          since splitB;
+          claim tWindowBound
+                : abs(Real.partialSum((k : Natural) ↦ t(i + k), c))
+                  ≤ Real.partialSum((k : Natural) ↦ b(i + k), c)
+              by calc abs(Real.partialSum((k : Natural) ↦ t(i + k), c))
+                    ≤ Real.partialSum((k : Natural) ↦ abs(t(i + k)), c)
+                          by Real.abs_partialSum_le((k : Natural) ↦ t(i + k), c)
+                    ≤ Real.partialSum((k : Natural) ↦ b(i + k), c)
+                          by Real.partialSum_le_pointwise(
+                                 (k : Natural) ↦ abs(t(i + k)),
+                                 (k : Natural) ↦ b(i + k), c,
+                                 (k : Natural) (_ : successor(k) ≤ c) ↦
+                                   domination(i + k));
+          claim bWindowBelow
+                : Real.partialSum(b, j) - Real.partialSum(b, i)
+                  < (epsilon : Real)
+              by calc Real.partialSum(b, j) - Real.partialSum(b, i)
+                    ≤ abs(Real.partialSum(b, j) - Real.partialSum(b, i))
+                          by Real.LessOrEqual_absolute_value
+                    < (epsilon : Real)
+                          by tailClose(j, i, jInTail, iInTail);
+          calc abs(Real.partialSum(t, j) - Real.partialSum(t, i))
+             = abs(Real.partialSum((k : Natural) ↦ t(i + k), c))
+                   by tWindowValue
+             ≤ Real.partialSum((k : Natural) ↦ b(i + k), c)
+                   by tWindowBound
+             = Real.partialSum(b, j) - Real.partialSum(b, i)
+                   by bWindowValue
+             < (epsilon : Real)
+                   by bWindowBelow
+        };
+    witness N with
+        (m n : Natural) (mInTail : N ≤ m) (nInTail : N ≤ n) ↦
+          cases Natural.compare_strict(m, n) {
+            | Natural.StrictComparison.below(mStrictlyBelowN) => {
+                claim m ≤ n;
+                claim gapBound
+                      : abs(Real.partialSum(t, n) - Real.partialSum(t, m))
+                        < (epsilon : Real)
+                    by oneSided(m, n, mInTail, nInTail, (m ≤ n));
+                claim swapped
+                      : abs(Real.partialSum(t, m) - Real.partialSum(t, n))
+                        = abs(Real.partialSum(t, n) - Real.partialSum(t, m))
+                    since Real.absolute_value_subtract_swap;
+                done by substituting swapped
+              }
+            | Natural.StrictComparison.atLeast(nLeqM) =>
+                oneSided(n, m, nInTail, mInTail, nLeqM)
+          }
+  }
+
+-- The comparison test: a series termwise dominated by a convergent
+-- series converges.
+theorem Real.series_dominated_converges (t b : Natural → Real)
+        (domination : (k : Natural) → abs(t(k)) ≤ b(k))
+        (boundConvergent : Real.SequenceConvergent(Real.partialSum(b)))
+        : Real.SequenceConvergent(Real.partialSum(t)) := {
+  claim Real.SequenceIsCauchy(Real.partialSum(b))
+      since Real.converges_implies_cauchy;
+  claim Real.SequenceIsCauchy(Real.partialSum(t))
+      since Real.series_dominated_cauchy;
+  done by Real.cauchy_sequence_converges
 }
