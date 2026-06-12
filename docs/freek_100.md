@@ -5,11 +5,12 @@ list](https://www.cs.ru.nl/~freek/100/) as a goal thread. This file is
 the index of the entries verified so far: the list number, the headline
 theorem(s) as declared, and the file where each lives.
 
-**14 of 100** as of 2026-06-11.
+**15 of 100** as of 2026-06-11.
 
 | # | Theorem | Declaration | File |
 |---|---------|-------------|------|
 | 1 | The irrationality of √2 | `Natural.sqrt_two_irrational` | `library/Natural/sqrt_two_irrational.math` |
+| 3 | The denumerability of the rational numbers | `Rational.is_enumerable` | `library/Rational/enumerable.math` |
 | 10 | Euler's generalization of Fermat's little theorem | `Natural.euler_fermat`, `IntegerMod.euler_fermat` | `library/IntegerMod/euler_fermat.math` |
 | 11 | The infinitude of primes | `Natural.infinitely_many_primes` | `library/Natural/euclid.math` |
 | 20 | All primes ≡ 1 mod 4 are sums of two squares | `Natural.prime_one_mod_four_sum_of_two_squares` | `library/GaussianInteger/fermat_two_squares.math` |
@@ -28,8 +29,8 @@ theorem(s) as declared, and the file where each lives.
 
 The finite-sum toolkit in `library/Real/series.math` is complete
 (split, comparison, linearity, telescoping, constant blocks). **#38** (arithmetic/geometric mean) waits on a √ construction.
-Also reachable: **#3** (denumerability of ℚ), **#44** (binomial
-theorem, factorials already in place).
+Also reachable: **#25** (Schröder–Bernstein, on the Set/equinumerous
+machinery), **#44** (binomial theorem, factorials already in place).
 
 When a new entry lands, add the row here and tag the theorem's file
 header with the list number.

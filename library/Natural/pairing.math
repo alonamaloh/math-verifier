@@ -1,0 +1,126 @@
+-- Natural/pairing.math
+--
+-- The diagonal enumeration of ℕ × ℕ: walk the anti-diagonals
+-- (0,0), (0,1), (1,0), (0,2), (1,1), (2,0), … — each step moves one
+-- cell down-right along the current diagonal, and from the end of a
+-- diagonal jumps to the top of the next. The pair (k, j) is reached at
+-- index k + T(k + j) (T the triangular numbers), so the enumeration is
+-- surjective: ℕ × ℕ is countable, and with it everything a pair of
+-- naturals can encode.
+
+module Natural.pairing
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.functions
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.triangular
+import Set.basics
+import Set.cantor
+import Set.enumerable
+
+-- One step of the walk: down-right along the diagonal, or to the top
+-- of the next diagonal when the second coordinate is exhausted.
+definition Natural.diagonalStep
+        : Pair(Natural, Natural) → Pair(Natural, Natural)
+  | Product.make(i, j) =>
+      cases j {
+        | zero => Product.make(0, successor(i))
+        | successor(jPredecessor) => Product.make(successor(i), jPredecessor)
+      }
+
+definition Natural.diagonalEnumeration : Natural → Pair(Natural, Natural)
+  | zero => Product.make(0, 0)
+  | successor(n) => Natural.diagonalStep(Natural.diagonalEnumeration(n))
+
+-- Walking k steps from the top of diagonal d reaches (k, d − k).
+theorem Natural.diagonalEnumeration_walks
+        (d : Natural)
+        (diagonalStart
+            : Natural.diagonalEnumeration(Natural.triangular(d))
+              = Product.make(0, d))
+        (k : Natural)
+        : (j : Natural) → k + j = d
+          → Natural.diagonalEnumeration(k + Natural.triangular(d))
+            = Product.make(k, j) :=
+  by_induction on k with IH {
+    case zero:
+        (j : Natural) (sumEquation : 0 + j = d) ↦ {
+          claim jEqualsD : j = d;
+          done by substituting jEqualsD
+        }
+    case successor(kPredecessor):
+        (j : Natural)
+        (sumEquation : successor(kPredecessor) + j = d) ↦ {
+          claim shifted : kPredecessor + successor(j) = d;
+          claim previous
+                : Natural.diagonalEnumeration(
+                      kPredecessor + Natural.triangular(d))
+                  = Product.make(kPredecessor, successor(j))
+              by IH(successor(j), shifted);
+          calc Natural.diagonalEnumeration(
+                   successor(kPredecessor) + Natural.triangular(d))
+             = Natural.diagonalStep(
+                   Natural.diagonalEnumeration(
+                       kPredecessor + Natural.triangular(d)))
+             = Natural.diagonalStep(Product.make(kPredecessor, successor(j)))
+                   since previous
+             = Product.make(successor(kPredecessor), j)
+        }
+  }
+
+-- The top of every diagonal is where the previous one ends: index
+-- T(d) carries (0, d).
+theorem Natural.diagonalEnumeration_starts (d : Natural)
+        : Natural.diagonalEnumeration(Natural.triangular(d))
+          = Product.make(0, d) :=
+  by_induction on d with IH {
+    case zero: done
+    case successor(dPredecessor): {
+        claim walkPrevious
+              : Natural.diagonalEnumeration(
+                    dPredecessor + Natural.triangular(dPredecessor))
+                = Product.make(dPredecessor, 0)
+            by Natural.diagonalEnumeration_walks;
+        claim indexEquation
+              : Natural.triangular(successor(dPredecessor))
+                = successor(dPredecessor + Natural.triangular(dPredecessor));
+        calc Natural.diagonalEnumeration(
+                 Natural.triangular(successor(dPredecessor)))
+           = Natural.diagonalEnumeration(
+                 successor(dPredecessor + Natural.triangular(dPredecessor)))
+                 since indexEquation
+           = Natural.diagonalStep(
+                 Natural.diagonalEnumeration(
+                     dPredecessor + Natural.triangular(dPredecessor)))
+           = Natural.diagonalStep(Product.make(dPredecessor, 0))
+                 since walkPrevious
+           = Product.make(0, successor(dPredecessor))
+      }
+  }
+
+-- Surjectivity: (i, j) is hit at index i + T(i + j).
+theorem Natural.diagonalEnumeration_surjective
+        : Function.IsSurjective(
+              Natural, Pair(Natural, Natural), Natural.diagonalEnumeration) :=
+  (target : Pair(Natural, Natural)) ↦
+    cases target {
+      | Product.make(i, j) => {
+          claim hit
+                : Natural.diagonalEnumeration(i + Natural.triangular(i + j))
+                  = Product.make(i, j)
+              by Natural.diagonalEnumeration_walks;
+          witness i + Natural.triangular(i + j) with hit
+        }
+    }
+
+-- ℕ × ℕ is countable.
+theorem Natural.pairs_enumerable : IsEnumerable(Pair(Natural, Natural)) :=
+  ⟨Natural.diagonalEnumeration, Natural.diagonalEnumeration_surjective⟩

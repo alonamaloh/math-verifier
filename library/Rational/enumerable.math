@@ -1,0 +1,73 @@
+-- Rational/enumerable.math
+--
+-- The denumerability of the rational numbers (Freek #3). A rational is
+-- a class of (numerator, denominator) representatives; the integers
+-- are countable (Integer/enumerable.math), pairs are countable
+-- (the diagonal enumeration), and quotients of countable types are
+-- countable — so ℚ is listed by composing the three.
+
+module Rational.enumerable
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.functions
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.triangular
+import Natural.pairing
+import Set.basics
+import Set.cantor
+import Set.enumerable
+import Integer.basics
+import Integer.enumerable
+import Rational.basics
+
+-- The representatives are countable: pair a listing of ℤ for the
+-- numerator with the raw second coordinate for the denominator.
+theorem RationalRepresentative.is_enumerable
+        : IsEnumerable(RationalRepresentative) := {
+  obtain ⟨integerListing, integerSurjective⟩ from Integer.is_enumerable;
+  obtain ⟨pairListing, pairSurjective⟩ from Natural.pairs_enumerable;
+  witness ((n : Natural) ↦
+      RationalRepresentative.make(
+          integerListing(Product.first(pairListing(n))),
+          Product.second(pairListing(n))))
+  with
+      (target : RationalRepresentative) ↦
+        cases target {
+          | RationalRepresentative.make(numerator, denominatorPredecessor) => {
+              obtain ⟨m, integerHit⟩ from integerSurjective(numerator);
+              obtain ⟨n, pairHit⟩
+                  from pairSurjective(Product.make(m, denominatorPredecessor));
+              witness n with
+                  calc RationalRepresentative.make(
+                           integerListing(Product.first(pairListing(n))),
+                           Product.second(pairListing(n)))
+                     = RationalRepresentative.make(
+                           integerListing(
+                               Product.first(
+                                   Product.make(m, denominatorPredecessor))),
+                           Product.second(
+                               Product.make(m, denominatorPredecessor)))
+                           since pairHit
+                     = RationalRepresentative.make(
+                           integerListing(m), denominatorPredecessor)
+                     = RationalRepresentative.make(
+                           numerator, denominatorPredecessor)
+                           since integerHit
+            }
+        }
+}
+
+-- Freek #3: ℚ is denumerable.
+theorem Rational.is_enumerable : IsEnumerable(Rational) :=
+  IsEnumerable.quotient(
+      RationalRepresentative, RationalEquivalent,
+      RationalRepresentative.is_enumerable)

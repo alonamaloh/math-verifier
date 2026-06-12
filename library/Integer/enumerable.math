@@ -1,0 +1,55 @@
+-- Integer/enumerable.math
+--
+-- ℤ is countable: its representatives are pairs of naturals, the
+-- diagonal enumeration lists those, and quotients of enumerable types
+-- are enumerable.
+
+module Integer.enumerable
+
+import axioms
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.functions
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.triangular
+import Natural.pairing
+import Set.basics
+import Set.cantor
+import Set.enumerable
+import Integer.basics
+
+definition Integer.representative_of_pair
+        : Pair(Natural, Natural) → IntegerRepresentative
+  | Product.make(a, b) => IntegerRepresentative.make(a, b)
+
+theorem Integer.representative_of_pair_surjective
+        : Function.IsSurjective(
+              Pair(Natural, Natural), IntegerRepresentative,
+              Integer.representative_of_pair) :=
+  (target : IntegerRepresentative) ↦
+    cases target {
+      | IntegerRepresentative.make(a, b) =>
+          witness Product.make(a, b) with
+              reflexivity(
+                  IntegerRepresentative, IntegerRepresentative.make(a, b))
+    }
+
+theorem IntegerRepresentative.is_enumerable
+        : IsEnumerable(IntegerRepresentative) :=
+  IsEnumerable.along_surjection(
+      Pair(Natural, Natural), IntegerRepresentative,
+      Integer.representative_of_pair,
+      Natural.pairs_enumerable,
+      Integer.representative_of_pair_surjective)
+
+theorem Integer.is_enumerable : IsEnumerable(Integer) :=
+  IsEnumerable.quotient(
+      IntegerRepresentative, IntegerEquivalent,
+      IntegerRepresentative.is_enumerable)
