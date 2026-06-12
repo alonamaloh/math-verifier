@@ -227,13 +227,18 @@ row as a Pi-hypothesis.)
 rubric (0/1): cause 0 · location 0 · actionable 0 · folded-types 1 · no-jargon 1
 
 ---
-### Redundancy checker false positive: Pi-hypothesis instantiation — 2026-06-12 (binomial push)
-note: --check-redundant-by flagged `by previousRow(successor(m))` on a
-claim as redundant, but the by-less claim FAILS in plain verify ("no
-in-scope hypothesis matches structurally") — the fact in context is a
-Pi (n : Natural) → …, and the prover does not instantiate it at
-successor(m) outside checker mode. Checker and prover disagree; the
-finding cost a verify round-trip.
-rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+### (RESOLVED same day) redundant-`by` warning didn't say WHICH claim — 2026-06-12 (binomial push)
+note: with several multi-line claims in a row, `N: redundant \`by\` on
+\`claim\`` pointed at a line that visually belonged to the PREVIOUS
+claim's `by`, and I removed the wrong hint (which then failed plain
+verify — initially misdiagnosed as a checker false positive on
+Pi-hypothesis instantiation; the checker was right all along, the
+flagged hint was the NEXT claim's recursive call, provable from the
+auto-generated induction hypothesis). FIXED: named claims now carry
+their binding name onto the claim node (parser), and the warning prints
+`redundant \`by\` on \`claim NAME\``; also added MATH_DEBUG_REDUNDANT=1
+to dump the checker's re-proof term + binder context.
+(Test/redundant_by_named_claim_test.math)
+rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
 
 ---

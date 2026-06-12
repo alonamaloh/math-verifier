@@ -508,10 +508,30 @@ ExpressionPointer Elaborator::elaborateStructuredClaim(
                 autoAttempt = nullptr;
             }
             if (autoAttempt) {
+                // Name the claim when it has a label: several multi-line
+                // claims in a row put many `claim …`/`by …` lines near the
+                // reported one, and an unnamed warning is easy to pin on
+                // the wrong claim.
                 std::cerr << "warning: " << moduleName_
                     << ":" << line
-                    << ": redundant `by` on `claim` — auto-prover"
-                       " closes the goal without help\n";
+                    << ": redundant `by` on `claim"
+                    << (claim.label.empty() ? "" : " " + claim.label)
+                    << "` — auto-prover closes the goal without help\n";
+                const char* debugRedundant =
+                    std::getenv("MATH_DEBUG_REDUNDANT");
+                if (debugRedundant && debugRedundant[0] != '\0'
+                    && debugRedundant[0] != '0') {
+                    std::cerr << "[debug-redundant] " << moduleName_ << ":"
+                        << line << " re-proof term: "
+                        << prettyPrint(autoAttempt) << "\n";
+                    for (size_t bi = 0; bi < localBinders.size(); ++bi) {
+                        std::cerr << "[debug-redundant]   binder " << bi
+                            << " (bound "
+                            << (localBinders.size() - 1 - bi) << "): "
+                            << localBinders[bi].name << " : "
+                            << prettyPrint(localBinders[bi].type) << "\n";
+                    }
+                }
             } else if (claim.byHint) {
                 // The whole `by` isn't removable, but maybe its ARGUMENTS are:
                 // `claim T by Lemma(args)` where `by Lemma` alone (args

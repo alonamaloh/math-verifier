@@ -1410,7 +1410,7 @@ private:
                         // fallback). Handles by cases / substitution /
                         // induction / EXPR and the no-`by` auto-prover case.
                         wrapper.value = parseStructuredClaimTail(
-                            statementToken, wrapper.type);
+                            statementToken, wrapper.type, wrapper.name);
                     }
                 } else {
                     expect(TokenKind::Assign, "after let type");
@@ -2942,8 +2942,12 @@ private:
     // from parseStructuredClaim and from the `goal by …` entry point
     // in parseAtom (`goal by Hint` is just `claim by Hint` with a
     // friendlier reading-as-math keyword).
+    // `label` (when non-empty) is the let-binding name of a NAMED claim —
+    // carried onto the claim node so elaborator diagnostics (e.g. the
+    // redundant-`by` warning) can say WHICH claim they are about.
     SurfaceExpressionPointer parseStructuredClaimTail(
-        Token claimToken, SurfaceExpressionPointer proposition) {
+        Token claimToken, SurfaceExpressionPointer proposition,
+        std::string label = "") {
         SurfaceExpressionPointer byHint;
         bool byCases = false;
         bool byInduction = false;
@@ -2975,7 +2979,7 @@ private:
             byHint = parseRecallingWrap(parseExpression());
         }
         return makeSurfaceStructuredClaim(
-            std::move(proposition), /*label=*/"",
+            std::move(proposition), std::move(label),
             std::move(byHint), byCases, std::move(arms),
             claimToken.line, claimToken.column, byInduction,
             bySubstitution, byIsExplanation);
