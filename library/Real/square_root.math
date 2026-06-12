@@ -93,16 +93,15 @@ theorem Real.square_root_exists (c : Real) (cNonneg : Real.zero ≤ c)
       by calc Real.zero * Real.zero - c
             = Real.zero + -c
             ≤ c + -c             by Real.add_preserves_LessOrEqual
-            = Real.zero          by ring;
+            = Real.zero;
   claim Real.IsNonneg(c * c) since Real.square_IsNonneg;
   claim Real.zero ≤ c * c since Real.LessOrEqual_zero_of_IsNonneg;
   claim endNonneg : Real.zero ≤ (c + Real.one) * (c + Real.one) - c
       by calc Real.zero
-            = Real.zero + Real.zero      by ring
+            = Real.zero + Real.zero
             ≤ c * c + Real.zero          by Real.add_preserves_LessOrEqual
             ≤ c * c + (c + Real.one)     since Real.add_preserves_LessOrEqual_left
-            = (c + Real.one) * (c + Real.one) - c
-                  by ring;
+            = (c + Real.one) * (c + Real.one) - c;
   obtain ⟨r, rData⟩
       from Real.intermediate_value(
                (t : Real) ↦ t * t - c, Real.zero, c + Real.one,
@@ -110,14 +109,14 @@ theorem Real.square_root_exists (c : Real) (cNonneg : Real.zero ≤ c)
                startNonpositive, endNonneg);
   obtain ⟨zeroLeqR, rRest⟩ from rData;
   obtain ⟨_, rootEquation⟩ from rRest;
-  claim valueZero : r * r - c = Real.zero by rootEquation;
+  claim valueZero : r * r - c = Real.zero;
   witness r with
       And.introduction(
           zeroLeqR,
           calc r * r
-             = (r * r - c) + c    by ring
+             = (r * r - c) + c
              = Real.zero + c      since valueZero
-             = c                  by ring)
+             = c)
 }
 
 -- ----------------------------------------------------------------------
@@ -129,37 +128,85 @@ theorem Real.square_root_unique
         (rNonneg : Real.zero ≤ r) (sNonneg : Real.zero ≤ s)
         (rSquares : r * r = c) (sSquares : s * s = c)
         : r = s := {
-  claim differenceProduct : (r - s) * (r + s) = Real.zero
+  claim (r - s) * (r + s) = Real.zero
       by calc (r - s) * (r + s)
-            = r * r - s * s    by ring
-            = c - s * s        by rSquares
-            = c - c            by sSquares
-            = Real.zero        by ring;
+            = r * r - s * s
+            = c - s * s
+            = c - c
+            = Real.zero;
   decide r - s = Real.zero {
     | yes differenceZero =>
         Real.eq_of_sub_eq_zero(r, s, differenceZero)
     | no differenceNonzero => {
-        claim sumZero : r + s = Real.zero
-            by Real.right_factor_zero_of_product_zero(
-                   r - s, r + s, differenceProduct, differenceNonzero);
-        claim rBelowZero : r ≤ Real.zero
+        claim r + s = Real.zero
+            since Real.right_factor_zero_of_product_zero;
+        claim r ≤ Real.zero
             by calc r
                   = r + Real.zero
                   ≤ r + s          since Real.add_preserves_LessOrEqual_left
-                  = Real.zero      by sumZero;
-        claim rIsZero : r = Real.zero
+                  = Real.zero;
+        claim r = Real.zero
             since Real.LessOrEqual.antisymmetric;
-        claim sBelowZero : s ≤ Real.zero
+        claim s ≤ Real.zero
             by calc s
                   = Real.zero + s
                   ≤ r + s          since Real.add_preserves_LessOrEqual
-                  = Real.zero      by sumZero;
-        claim sIsZero : s = Real.zero
+                  = Real.zero;
+        claim s = Real.zero
             since Real.LessOrEqual.antisymmetric;
         calc r
-           = Real.zero    by rIsZero
-           = s            by sIsZero
+           = Real.zero
+           = s
       }
+  }
+}
+
+-- Comparing against a nonnegative number reduces to comparing squares:
+-- x² ≤ y² and 0 ≤ y give x ≤ y. (If y ≤ x the squares are forced equal,
+-- and the factorization x² − y² = (x − y)(x + y) = 0 collapses both
+-- numbers to zero unless x = y outright.)
+theorem Real.LessOrEqual_of_square_LessOrEqual (x y : Real)
+        (yNonneg : Real.zero ≤ y) (squaresOrdered : x * x ≤ y * y)
+        : x ≤ y := {
+  done by cases {
+    case x ≤ y as ordered: ordered
+    case Not(x ≤ y) as notOrdered: {
+      claim y ≤ x since Real.not_LessOrEqual_implies;
+      claim y * y ≤ x * x since Real.LessOrEqual.multiply_monotone_nonneg;
+      claim x * x = y * y since Real.LessOrEqual.antisymmetric;
+      claim (x - y) * (x + y) = Real.zero
+          by calc (x - y) * (x + y)
+                = x * x - y * y
+                = y * y - y * y
+                = Real.zero;
+      decide x - y = Real.zero {
+        | yes differenceZero =>
+            calc x
+               = y    since Real.eq_of_sub_eq_zero
+               ≤ y    since Real.LessOrEqual.reflexive
+        | no differenceNonzero => {
+            claim x + y = Real.zero
+                since Real.right_factor_zero_of_product_zero;
+            -- y ≤ x and x + y = 0 squeeze y (and then x) down to zero.
+            claim y ≤ Real.zero
+                by calc y
+                      = Real.zero + y
+                      ≤ y + y          since Real.add_preserves_LessOrEqual
+                      ≤ x + y          since Real.add_preserves_LessOrEqual
+                      = Real.zero;
+            claim y = Real.zero since Real.LessOrEqual.antisymmetric;
+            claim x = Real.zero
+                by calc x
+                      = x + Real.zero
+                      = x + y
+                      = Real.zero;
+            calc x
+               = Real.zero
+               = y
+               ≤ y    since Real.LessOrEqual.reflexive
+          }
+      }
+    }
   }
 }
 
@@ -175,8 +222,7 @@ theorem Real.square_root_property_unique (c : Real)
   (bData : And(Real.zero ≤ b, b * b = c)) ↦ {
     obtain ⟨aNonneg, aSquares⟩ from aData;
     obtain ⟨bNonneg, bSquares⟩ from bData;
-    done by Real.square_root_unique(
-                c, a, b, aNonneg, bNonneg, aSquares, bSquares)
+    done since Real.square_root_unique
   }
 
 -- ----------------------------------------------------------------------
