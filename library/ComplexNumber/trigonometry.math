@@ -1,0 +1,165 @@
+-- ComplexNumber/trigonometry.math
+--
+-- Cosine and sine, defined FROM the complex exponential (not as
+-- standalone power series):
+--
+--   cosine(x) := Re(exp(i·x)),   sine(x) := Im(exp(i·x)).
+--
+-- Euler's formula exp(i·x) = cos(x) + i·sin(x) is then literally the
+-- coordinate reconstruction of exp(i·x). The power-series
+-- characterisations become theorems later (realPart_partialSum + the
+-- i-power 4-cycle); sin² + cos² = 1 and the addition formulas wait on
+-- the ℂ functional equation and conjugation.
+
+module ComplexNumber.trigonometry
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Logic.excluded_middle
+import Logic.description
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.order
+import Natural.add_order
+import Natural.maximum
+import Natural.compare
+import Natural.subtraction
+import Natural.factorial
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.square_root
+import Real.power
+import Real.series
+import Real.cauchy_complete
+import Real.exponential
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import Polynomial.monomial
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+import ComplexNumber.of_coordinates
+import ComplexNumber.coordinate_negate
+import ComplexNumber.embedding
+import ComplexNumber.modulus
+import ComplexNumber.modulus_multiplicative
+import ComplexNumber.triangle_inequality
+import ComplexNumber.modulus_bounds
+import ComplexNumber.completeness
+import ComplexNumber.exponential
+
+-- ----------------------------------------------------------------------
+-- The definitions: the two coordinates of exp(i·x). (cos/sin/exp/Re/Im
+-- are the standard mathematical names, registered as overloads of the
+-- fully-spelled definitions.)
+
+definition Real.cosine (x : Real) : Real :=
+  Re(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+
+definition Real.sine (x : Real) : Real :=
+  Im(exp(ComplexNumber.i * ComplexNumber.from_real(x)))
+
+overload cos := Real.cosine
+overload sin := Real.sine
+
+-- ----------------------------------------------------------------------
+-- Euler's formula: exp(i·x) = cos(x) + i·sin(x). With cosine and sine
+-- DEFINED as the coordinates of exp(i·x), this is the coordinate
+-- reconstruction z = Re(z) + i·Im(z), nothing more.
+theorem ComplexNumber.euler_formula (x : Real)
+        : exp(ComplexNumber.i * ComplexNumber.from_real(x))
+          = ComplexNumber.from_real(cos(x))
+            + ComplexNumber.i * ComplexNumber.from_real(sin(x)) := {
+  done since ComplexNumber.reconstruct
+}
+
+-- ----------------------------------------------------------------------
+-- The values at 0, through exp(0) = 1: i·0 = 0, so cos(0) + i·sin(0)
+-- = exp(0) = 1, whose coordinates are (1, 0).
+
+theorem ComplexNumber.i_times_from_real_zero
+        : ComplexNumber.i * ComplexNumber.from_real(Real.zero)
+          = RingModulo.zero(Real.polynomial_commutative_ring,
+                Complex.definingPolynomial) :=
+  calc ComplexNumber.i * ComplexNumber.from_real(Real.zero)
+     = ComplexNumber.i
+       * RingModulo.zero(Real.polynomial_commutative_ring,
+             Complex.definingPolynomial)
+     = RingModulo.zero(Real.polynomial_commutative_ring,
+           Complex.definingPolynomial)
+
+theorem Real.cosine_zero : cos(Real.zero) = Real.one :=
+  calc cos(Real.zero)
+     = Re(exp(RingModulo.zero(Real.polynomial_commutative_ring,
+                  Complex.definingPolynomial)))
+           by ComplexNumber.i_times_from_real_zero
+     = Re(RingModulo.one(Real.polynomial_commutative_ring,
+              Complex.definingPolynomial))
+           by ComplexNumber.exponential_zero
+     = Re(ComplexNumber.from_real(Real.one))
+     = Real.one
+
+theorem Real.sine_zero : sin(Real.zero) = Real.zero :=
+  calc sin(Real.zero)
+     = Im(exp(RingModulo.zero(Real.polynomial_commutative_ring,
+                  Complex.definingPolynomial)))
+           by ComplexNumber.i_times_from_real_zero
+     = Im(RingModulo.one(Real.polynomial_commutative_ring,
+              Complex.definingPolynomial))
+           by ComplexNumber.exponential_zero
+     = Im(ComplexNumber.from_real(Real.one))
+     = Real.zero
