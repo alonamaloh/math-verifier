@@ -1,0 +1,68 @@
+-- Test/redundant_check_cache_isolation_test.math
+--
+-- Regression test: the speculative re-proofs that --check-redundant-by
+-- runs must not corrupt later kernel judgements. The halfSum claim's
+-- re-proof fails (budget) and triggers the failing-proof lemma search,
+-- which queries the whole-library snapshot environment; before the
+-- environment-owner cache guard (kernel.cpp ensureKernelCacheOwner),
+-- WHNF/defeq/inferType entries computed against that bodyless snapshot
+-- poisoned the module's caches, and the final And.introduction-for-`<`
+-- boundary check (kernel-defeq, LessThan unfolds to the And) came back
+-- FALSE — failing the whole theorem under the checker while plain
+-- verify stayed green. Exercised with --check-redundant-by by the
+-- `checker-tests` make target; must verify cleanly there.
+
+module Test.redundant_check_cache_isolation_test
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.field
+import Real.order_field
+import Real.limits
+import Real.series
+import Real.exponential
+import Real.exponential_addition
+theorem Test.cache_isolation_probe (x : Real)
+        (exponentialNonneg : Real.zero ≤ Real.exponential(x))
+        : Real.zero < Real.exponential(x) := {
+  claim halfSum
+        : (Rational.one_half : Real) + (Rational.one_half : Real)
+          = (Rational.one : Real)
+      by calc (Rational.one_half : Real) + (Rational.one_half : Real)
+            = ((Rational.one_half + Rational.one_half : Rational) : Real)
+            = (Rational.one : Real)   by Rational.one_half_doubled;
+  claim zeroNotExponential : ¬(Real.zero = Real.exponential(x));
+  And.introduction(exponentialNonneg, zeroNotExponential)
+}

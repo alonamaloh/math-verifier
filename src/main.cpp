@@ -6227,7 +6227,13 @@ int main(int argc, char* argv[]) {
         // Enable WHNF memoization for the verify command. The test suite
         // (default argv) doesn't enable it because some integration tests
         // exercise the unmemoised fuel/throw contract directly.
-        kernelCacheEnabled = true;
+        // MATH_KERNEL_CACHE=0 keeps it off — a diagnostic knob for
+        // bisecting suspected cache-poisoning bugs.
+        {
+            const char* cacheFlag = std::getenv("MATH_KERNEL_CACHE");
+            kernelCacheEnabled =
+                !(cacheFlag && cacheFlag[0] == '0' && cacheFlag[1] == '\0');
+        }
         // Two forms:
         //   kernel verify FILE.math FILE.math ...                  (positional form)
         //   kernel verify --source SRC --output OUT.mathv \        (cache form)

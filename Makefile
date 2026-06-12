@@ -110,11 +110,20 @@ TEST_MATHV_FILES := $(patsubst %.math,$(BUILD_DIR)/%.mathv,$(TEST_MATH_FILES))
 LIBRARY_MATHV_IFACE_FILES := $(LIBRARY_MATHV_FILES:.mathv=.mathv.iface)
 TEST_MATHV_IFACE_FILES := $(TEST_MATHV_FILES:.mathv=.mathv.iface)
 
-.PHONY: library library-clean tests error-tests
+.PHONY: library library-clean tests error-tests checker-tests
 
 library: $(LIBRARY_MATHV_FILES) $(LIBRARY_MATHV_IFACE_FILES)
 
-tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES)
+tests: library $(TEST_MATHV_FILES) $(TEST_MATHV_IFACE_FILES) checker-tests
+
+# The redundancy checker's speculative re-proofs must not corrupt later
+# kernel judgements (environment-owner cache guard): this file verifies
+# plain AND must stay green under --check-redundant-by. It once failed
+# there — a failing re-proof's lemma search (whole-library snapshot
+# environment) poisoned the WHNF/defeq caches and a kernel-true boundary
+# equality came back false.
+checker-tests: library $(TEST_MATHV_FILES)
+	@./kernel verify 	    --source library/Test/redundant_check_cache_isolation_test.math 	    --output build/checker-tests.mathv --cache-root build 	    --check-redundant-by --no-check-unused-names > /dev/null 2>&1 	  && echo "checker-tests: PASS" 	  || { echo "checker-tests: FAIL — a clean file broke under --check-redundant-by"; exit 1; }
 
 # Error-message regression suite: each library/ErrorTest/<name>.math is an
 # intentionally-broken proof paired with a <name>.expected sidecar listing

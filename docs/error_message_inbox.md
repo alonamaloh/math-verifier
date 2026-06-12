@@ -157,7 +157,7 @@ note: `claim xNotZero : …;` followed by `cases x refining xPositive, xNotZero 
   the false positive stands: a name consumed ONLY by `refining` should count.)
 
 ---
-### Redundancy checker aborts whole-file on expensive in-isolation re-proof — 2026-06-11 (#42 push)
+### (RESOLVED 2026-06-12 — cache-owner guard + AutoProverBudgetError catches; Real/limits, Real/series, Real/negation, ComplexNumber/completeness all sweep clean) Redundancy checker aborts whole-file on expensive in-isolation re-proof — 2026-06-11 (#42 push)
 2026-06-12 (+1, ℂ-completeness push): same abort on
 ComplexNumber/completeness.math under --check-redundant-by — the in-isolation
 re-proof of a strict `<` calc step explodes into an
@@ -196,7 +196,7 @@ read. This is the shape more hint errors should have.
 rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
 
 ---
-### `--check-redundant-calc-steps` splice re-elaboration trips on `a − b` vs `a + (−b)` and hard-errors — 2026-06-12 (|z| triangle push)
+### (RESOLVED 2026-06-12 — same kernel-cache poisoning root cause; triangle_inequality.math sweeps clean under --check-redundant-calc-steps) `--check-redundant-calc-steps` splice re-elaboration trips on `a − b` vs `a + (−b)` and hard-errors — 2026-06-12 (|z| triangle push)
 note: on ComplexNumber/triangle_inequality.math the plain verify and both
 `--check-redundant-by` / `--check-redundant-by-non-eq` pass clean, but
 `--check-redundant-calc-steps` aborts with:
@@ -247,7 +247,7 @@ to dump the checker's re-proof term + binder context.
 rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
 
 ---
-### --check-redundant-by hard-errors (exit 0!) on And.introduction-for-`<` final terms — 2026-06-12 (exp corollaries)
+### (RESOLVED same day — see the kernel-cache-poisoning entry below; the "exit 0" claim was a pipe-measurement error, real exit was 1) --check-redundant-by hard-errors (exit 0!) on And.introduction-for-`<` final terms — 2026-06-12 (exp corollaries)
 verbatim:
 ```
 library/Real/exponential_algebra.math:99:3: elaborate error: theorem 'Real.exponential_positive'
@@ -289,5 +289,65 @@ choose between an unexplained bare claim and a wrong-feeling failure when
 naming the reason. Wanted: citation matching tries the symmetric form of a
 `Not`-wrapped (or any) equality, mirroring what the auto-prover already does.
 rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
+
+---
+### (RESOLVED same day — root cause was kernel-cache poisoning by the lemma-search snapshot environment) --check-redundant-by aborts + misleading boundary type error — 2026-06-12
+note: the two entries above from today (the And.introduction-for-`<`
+hard error under --check-redundant-by, and the budget-abort at a `<`
+calc step) had ONE root cause, and it was not the checker's error
+handling: the kernel's WHNF / defeq-true / inferType caches are keyed
+by expression only, but their answers depend on the Environment. The
+failing-proof error enrichment (lemma search) queries the SECOND,
+whole-library, bodyless snapshot environment — so every speculative
+re-proof failure (which the checker produces by the dozen) interleaved
+the two environments and cross-poisoned the caches (e.g.
+`Rational.to_real` δ-unfolds in the module environment but is stuck in
+the snapshot; 6357 poisoned hits measured in one checked file). A later
+boundary defeq then read a poisoned entry and reported a kernel-TRUE
+equality (`And(…)` vs `<`, one δ apart) as false. FIX:
+`ensureKernelCacheOwner` in kernel.cpp — every cache consult checks the
+requesting environment (address + declaration count) and self-wipes on
+change; plus a belt-and-suspenders epoch guard that stops caching of
+results influenced by in-flight loop-detection short-circuits.
+Regression: Test/redundant_check_cache_isolation_test.math + the
+`checker-tests` make target (runs it under --check-redundant-by).
+Likely also explains the earlier "STALE CACHE makes citations of new
+lemmas fail" and "--check-redundant-calc-steps hard-errors on
+kernel-defeq a−b vs a+(−b)" entries — RE-TESTED after the fix:
+ComplexNumber/completeness.math (the budget-abort instance) and
+Real/square_root.math under --check-redundant-by
+--check-redundant-calc-steps both sweep clean now. A second,
+independent gap fixed in the same pass: the calc-step speculative
+re-proof sites in calc.cpp caught ElaborateError/TypeError but NOT
+AutoProverBudgetError, so a budget trip during a `<`-step re-proof
+(--check-redundant-by-non-eq) escaped as a hard error at 1:1 and
+aborted the file (the claim-site checks in induction.cpp already
+caught all three). All speculative sites now treat any failure as
+"hint is load-bearing, continue".
+CORRECTION to today's earlier entry: the checker did NOT exit 0 on the
+hard error — it exits 1; the 0 was my measurement error (`$?` read
+after a pipe reports the pipe's last command).
+Debug knobs added while bisecting (kept, all opt-in):
+MATH_KERNEL_CACHE=0 (disable kernel caches in verify),
+MATH_WHNF_CACHE_VERIFY=1 (recompute every WHNF cache hit, flag
+mismatches), MATH_DEFEQ_POISON_CHECK=1 (retry top-level defeq falses
+with cleared caches, flag flips).
+rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
+
+---
+### Stack-overflow segfault instead of fuel error when kernel caches are disabled — 2026-06-12
+note: `MATH_KERNEL_CACHE=0 ./kernel verify … --check-redundant-by` on
+Test/redundant_check_cache_isolation_test.math dies with SIGSEGV
+(exit 139), no output. The cached WHNF wrapper is also where the
+in-flight loop detection lives, so with caches disabled a reduction
+cycle (or very deep speculative-search recursion) recurses until the
+stack overflows — the per-call fuel counter doesn't save it because
+the depth accumulates across mutually-recursive isDefEq/WHNF/inferType
+frames that each start with fresh fuel. Only reachable via the new
+diagnostic knob (verify previously hard-enabled the cache), so low
+priority — but a segfault is never the right failure mode; loop
+detection could move into the uncached path, or a recursion-depth
+counter could turn this into a TypeError.
+rubric (0/1): cause 1 · location 0 · actionable 1 · folded-types 1 · no-jargon 1
 
 ---

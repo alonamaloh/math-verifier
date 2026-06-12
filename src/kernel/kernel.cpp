@@ -181,6 +181,19 @@ thread_local std::unordered_set<
     ExpressionPairStructuralEqual> isDefEqInFlight;
 thread_local uint64_t isDefEqLoopsDetected = 0;
 thread_local uint64_t whnfLoopsDetected = 0;
+// Monotone counter bumped every time EITHER loop-detection short-circuit
+// fires (WHNF returning its input unreduced, isDefEq returning a
+// conservative `false`). A short-circuit's answer depends on what is
+// in flight — i.e. on the CALL STACK — so any result computed while one
+// fired beneath it is context-dependent and MUST NOT be memoised in the
+// context-free caches: a fresh top-level call could reduce further (or
+// decide equality) where the in-flight call could not. Cache writers
+// snapshot this counter before computing and skip the insert when it
+// moved. (Found via a redundancy-check poisoning bug: a speculative
+// auto-prover search cut a reduction cycle, cached the partial WHNF, and
+// a later — completely independent — defeq check at the theorem boundary
+// read the poisoned entry and reported a kernel-true equality as false.)
+thread_local uint64_t loopShortCircuitEpoch = 0;
 
 // inferType cache — keyed by (expressionStructuralHash, contextFingerprint).
 // inferType's result depends on Context (FreeVariable lookups), so the key
@@ -222,6 +235,39 @@ thread_local std::unordered_multimap<
 thread_local uint64_t inferTypeCacheHits = 0;
 thread_local uint64_t inferTypeCacheMisses = 0;
 
+// The Environment all current cache entries were computed against. Every
+// cached kernel result (WHNF, defeq-true, inferType) depends on the
+// environment's declarations — but the caches are keyed by expression
+// alone. The elaborator routinely queries a SECOND environment (the
+// whole-library lemma-search snapshot used to enrich failing-proof errors
+// with unimported-lemma suggestions, loaded WITHOUT definition bodies), and
+// entries computed against one environment are wrong for the other: e.g.
+// `Rational.to_real` δ-unfolds in the module environment but is stuck in
+// the bodyless snapshot. Serving the wrong entry made a kernel-TRUE
+// equality come back false at a theorem boundary (found via the
+// redundancy checker, whose speculative failures trigger lemma searches).
+// Guard: every cache consult first checks the requesting environment; a
+// different owner wipes all caches and claims ownership.
+thread_local const void* kernelCacheOwner = nullptr;
+thread_local std::size_t kernelCacheOwnerSize = 0;
+
+void ensureKernelCacheOwner(const Environment& environment) {
+    // Owner address + declaration count: the count catches the (rare)
+    // address-reuse case where a destroyed environment's storage is
+    // recycled for a new one between public-entry boundaries.
+    if (kernelCacheOwner == &environment
+        && kernelCacheOwnerSize == environment.declarations.size()) {
+        return;
+    }
+    whnfCache.clear();
+    isDefEqTrueCache.clear();
+    whnfInFlight.clear();
+    isDefEqInFlight.clear();
+    inferTypeCache.clear();
+    kernelCacheOwner = &environment;
+    kernelCacheOwnerSize = environment.declarations.size();
+}
+
 // Compute a fingerprint of `context` for inferType caching. XOR-fold per-
 // entry hashes; commutative, but that's fine — Lean's `expr_map` does the
 // same thing for its `m_infer_type` cache and the false-positive rate is
@@ -256,6 +302,7 @@ void invalidateKernelCaches() {
     // inferTypeCache is always-on; clear it whenever the kernel signals
     // a public-entry boundary (declaration commits, environment mutates).
     inferTypeCache.clear();
+    kernelCacheOwner = nullptr;
 }
 // Public read-only accessor for the per-thread reduction-step counter.
 // Defined here (after the anonymous namespace that declares it) so the
@@ -1145,9 +1192,31 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
         return weakHeadNormalFormUncached(
             environment, std::move(expression), fuel);
     }
+    ensureKernelCacheOwner(environment);
     if (auto cached = whnfCache.find(expression);
         cached != whnfCache.end()) {
         ++whnfCacheHits;
+        // Diagnostic (MATH_WHNF_CACHE_VERIFY=1): recompute every hit
+        // uncached and flag entries that no longer reproduce.
+        if (std::getenv("MATH_WHNF_CACHE_VERIFY")) {
+            ExpressionPointer fresh;
+            bool threw = false;
+            try {
+                fresh = weakHeadNormalFormUncached(
+                    environment, expression, fuel);
+            } catch (...) {
+                threw = true;
+            }
+            if (!threw && fresh && !structurallyEqual(fresh, cached->second)) {
+                std::fprintf(stderr,
+                    "[whnf-poison] cached entry differs from fresh\n"
+                    "  input:  %s\n  cached: %s\n  fresh:  %s\n",
+                    renderForDiagnostic(expression).c_str(),
+                    renderForDiagnostic(cached->second).c_str(),
+                    renderForDiagnostic(fresh).c_str());
+                return fresh;
+            }
+        }
         return cached->second;
     }
     // Loop detection: a recursive WHNF call landing on the SAME input
@@ -1157,11 +1226,13 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
     // δ-recursively until fuel ran out.
     if (whnfInFlight.find(expression) != whnfInFlight.end()) {
         ++whnfLoopsDetected;
+        ++loopShortCircuitEpoch;
         return expression;
     }
     ++whnfCacheMisses;
     ExpressionPointer key = expression;
     whnfInFlight.insert(key);
+    uint64_t epochBefore = loopShortCircuitEpoch;
     ExpressionPointer result;
     try {
         result = weakHeadNormalFormUncached(
@@ -1173,7 +1244,10 @@ ExpressionPointer weakHeadNormalForm(const Environment& environment,
     whnfInFlight.erase(key);
     // Only successful reductions reach here; if the uncached body threw
     // (fuel exhaustion, malformed input), the cache stays unpolluted.
-    whnfCache.emplace(std::move(key), result);
+    // A result computed while a loop-detection short-circuit fired below
+    // us is stack-dependent (see loopShortCircuitEpoch) — don't memoise.
+    if (loopShortCircuitEpoch == epochBefore)
+        whnfCache.emplace(std::move(key), result);
     return result;
 }
 
@@ -1608,6 +1682,7 @@ bool isDefinitionallyEqual(const Environment& environment,
     const bool useCache = kernelCacheEnabled;
     std::pair<ExpressionPointer, ExpressionPointer> cacheKey{left, right};
     if (useCache) {
+        ensureKernelCacheOwner(environment);
         if (isDefEqTrueCache.find(cacheKey) != isDefEqTrueCache.end()) {
             ++isDefEqCacheHits;
             return true;
@@ -1618,11 +1693,13 @@ bool isDefinitionallyEqual(const Environment& environment,
         // strategies (η, proof irrelevance) which may still resolve it.
         if (isDefEqInFlight.find(cacheKey) != isDefEqInFlight.end()) {
             ++isDefEqLoopsDetected;
+            ++loopShortCircuitEpoch;
             return false;
         }
         ++isDefEqCacheMisses;
         isDefEqInFlight.insert(cacheKey);
     }
+    uint64_t epochBefore = loopShortCircuitEpoch;
     bool answer;
     try {
         answer = isDefinitionallyEqualImpl(
@@ -1633,7 +1710,34 @@ bool isDefinitionallyEqual(const Environment& environment,
     }
     if (useCache) {
         isDefEqInFlight.erase(cacheKey);
-        if (answer) isDefEqTrueCache.insert(std::move(cacheKey));
+        // A `true` reached through a loop-detection short-circuit below us
+        // is stack-dependent (see loopShortCircuitEpoch) — don't memoise.
+        if (answer && loopShortCircuitEpoch == epochBefore)
+            isDefEqTrueCache.insert(cacheKey);
+    }
+    // Diagnostic (MATH_DEFEQ_POISON_CHECK=1): a top-level `false` is
+    // re-tried with all caches cleared; a flip to `true` proves a cache
+    // entry poisoned the comparison.
+    if (!answer && useCache && isDefEqInFlight.empty()
+        && std::getenv("MATH_DEFEQ_POISON_CHECK")) {
+        whnfCache.clear();
+        isDefEqTrueCache.clear();
+        whnfInFlight.clear();
+        bool fresh = false;
+        try {
+            fresh = isDefinitionallyEqualImpl(
+                environment, context, cacheKey.first, cacheKey.second, fuel);
+        } catch (...) {
+            fresh = false;
+        }
+        if (fresh) {
+            std::fprintf(stderr,
+                "[defeq-poison] cached answer false, fresh answer true\n"
+                "  left:  %s\n  right: %s\n",
+                renderForDiagnostic(cacheKey.first).c_str(),
+                renderForDiagnostic(cacheKey.second).c_str());
+            return true;
+        }
     }
     return answer;
 }
@@ -1682,6 +1786,7 @@ ExpressionPointer inferType(const Environment& environment,
     }();
     InferTypeCacheKey key;
     if (!inferCacheDisabled) {
+        ensureKernelCacheOwner(environment);
         key.expressionHash = expression ? expression->hash : 0;
         key.contextFingerprint = contextFingerprint(context);
         auto range = inferTypeCache.equal_range(key);

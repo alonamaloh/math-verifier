@@ -477,6 +477,12 @@ ExpressionPointer Elaborator::elaborateCalc(
                             autoAttempt = nullptr;
                         } catch (const TypeError&) {
                             autoAttempt = nullptr;
+                        } catch (const AutoProverBudgetError&) {
+                            // Budget tripped re-proving WITHOUT the hint:
+                            // the hint is load-bearing (for speed at least).
+                            // Never escapes — a speculative check must not
+                            // fail the build.
+                            autoAttempt = nullptr;
                         }
                         if (autoAttempt) {
                             std::cerr << "warning: " << moduleName_
@@ -540,6 +546,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                                                 diffAttempt = nullptr;
                                             } catch (const TypeError&) {
                                                 diffAttempt = nullptr;
+                                            } catch (const AutoProverBudgetError&) {
+                                                diffAttempt = nullptr;
                                             }
                                         }
                                         if (diffAttempt) {
@@ -589,6 +597,8 @@ ExpressionPointer Elaborator::elaborateCalc(
                                 } catch (const ElaborateError&) {
                                     bareAttempt = nullptr;
                                 } catch (const TypeError&) {
+                                    bareAttempt = nullptr;
+                                } catch (const AutoProverBudgetError&) {
                                     bareAttempt = nullptr;
                                 }
                                 bool valid = false;
