@@ -1,0 +1,264 @@
+-- ComplexNumber/completeness.math
+--
+-- ℂ is complete. Convergence and the Cauchy property are defined with
+-- the modulus exactly as on ℝ (rational tolerances); the coordinate
+-- bounds |re| ≤ |z| ≤ |re| + |im| squeeze a ℂ-Cauchy sequence into two
+-- real Cauchy coordinate sequences, each converges by the completeness
+-- of ℝ, and the coordinate limits reassemble through `ofCoordinates`
+-- with an ε/2 budget per coordinate.
+
+module ComplexNumber.completeness
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Logic.excluded_middle
+import Logic.description
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Natural.maximum
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.continuity
+import Real.intermediate_value
+import Real.square_root
+import Real.series
+import Real.cauchy_complete
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+import ComplexNumber.of_coordinates
+import ComplexNumber.coordinate_negate
+import ComplexNumber.modulus
+import ComplexNumber.modulus_bounds
+
+-- ----------------------------------------------------------------------
+-- Convergence and the Cauchy property on ℂ, with rational tolerances
+-- (mirrors Real.SequenceConverges / Real.SequenceIsCauchy).
+
+definition ComplexNumber.SequenceConverges
+        (s : Natural → ComplexNumber) (limit : ComplexNumber) : Proposition :=
+  (epsilon : Rational) → Rational.zero < epsilon →
+    ∃ (N : Natural).
+      (m : Natural) → N ≤ m →
+        ComplexNumber.modulus(s(m) - limit) < (epsilon : Real)
+
+definition ComplexNumber.SequenceConvergent
+        (s : Natural → ComplexNumber) : Proposition :=
+  ∃ (limit : ComplexNumber). ComplexNumber.SequenceConverges(s, limit)
+
+definition ComplexNumber.SequenceIsCauchy
+        (s : Natural → ComplexNumber) : Proposition :=
+  (epsilon : Rational) → Rational.zero < epsilon →
+    ∃ (N : Natural).
+      (m n : Natural) → N ≤ m → N ≤ n →
+        ComplexNumber.modulus(s(m) - s(n)) < (epsilon : Real)
+
+-- ----------------------------------------------------------------------
+-- A ℂ-Cauchy sequence is Cauchy in each coordinate: the coordinate of a
+-- difference is the difference of coordinates, and it is bounded by the
+-- modulus.
+
+theorem ComplexNumber.SequenceIsCauchy.realPart
+        (s : Natural → ComplexNumber)
+        (cauchy : ComplexNumber.SequenceIsCauchy(s))
+        : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.realPart(s(n))) :=
+  (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨threshold, close⟩ from cauchy(epsilon, epsilonPositive);
+    witness threshold with
+        (m n : Natural) (aboveM : threshold ≤ m) (aboveN : threshold ≤ n) ↦ {
+          claim differencePart
+              : ComplexNumber.realPart(s(m) - s(n))
+                = ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(s(n))
+              since ComplexNumber.realPart_subtract;
+          calc abs(ComplexNumber.realPart(s(m)) - ComplexNumber.realPart(s(n)))
+             = abs(ComplexNumber.realPart(s(m) - s(n)))
+                   since differencePart
+             ≤ ComplexNumber.modulus(s(m) - s(n))
+                   since ComplexNumber.realPart_bound
+             < (epsilon : Real)
+                   by close(m, n, aboveM, aboveN)
+        }
+  }
+
+theorem ComplexNumber.SequenceIsCauchy.imaginaryPart
+        (s : Natural → ComplexNumber)
+        (cauchy : ComplexNumber.SequenceIsCauchy(s))
+        : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.imaginaryPart(s(n))) :=
+  (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨threshold, close⟩ from cauchy(epsilon, epsilonPositive);
+    witness threshold with
+        (m n : Natural) (aboveM : threshold ≤ m) (aboveN : threshold ≤ n) ↦ {
+          claim differencePart
+              : ComplexNumber.imaginaryPart(s(m) - s(n))
+                = ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(s(n))
+              since ComplexNumber.imaginaryPart_subtract;
+          calc abs(ComplexNumber.imaginaryPart(s(m)) - ComplexNumber.imaginaryPart(s(n)))
+             = abs(ComplexNumber.imaginaryPart(s(m) - s(n)))
+                   since differencePart
+             ≤ ComplexNumber.modulus(s(m) - s(n))
+                   since ComplexNumber.imaginaryPart_bound
+             < (epsilon : Real)
+                   by close(m, n, aboveM, aboveN)
+        }
+  }
+
+-- ----------------------------------------------------------------------
+-- ℂ is complete: a Cauchy sequence converges, to the complex number
+-- whose coordinates are the limits of its coordinate sequences.
+
+theorem ComplexNumber.cauchy_sequence_converges
+        (s : Natural → ComplexNumber)
+        (cauchy : ComplexNumber.SequenceIsCauchy(s))
+        : ComplexNumber.SequenceConvergent(s) := {
+  -- Each coordinate sequence is real-Cauchy, hence converges.
+  claim realCauchy
+      : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.realPart(s(n)))
+      since ComplexNumber.SequenceIsCauchy.realPart;
+  claim imaginaryCauchy
+      : Real.SequenceIsCauchy((n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)))
+      since ComplexNumber.SequenceIsCauchy.imaginaryPart;
+  obtain ⟨realLimit, realConverges⟩
+      from Real.cauchy_sequence_converges(
+               (n : Natural) ↦ ComplexNumber.realPart(s(n)), realCauchy);
+  obtain ⟨imaginaryLimit, imaginaryConverges⟩
+      from Real.cauchy_sequence_converges(
+               (n : Natural) ↦ ComplexNumber.imaginaryPart(s(n)), imaginaryCauchy);
+  -- The candidate limit reassembles the coordinate limits.
+  witness ComplexNumber.ofCoordinates(realLimit, imaginaryLimit) with
+      (epsilon : Rational) (epsilonPositive : Rational.zero < epsilon) ↦ {
+        claim halfPositive : Rational.zero < Rational.halve(epsilon)
+            since Rational.halve_positive;
+        obtain ⟨realThreshold, realClose⟩
+            from realConverges(Rational.halve(epsilon), halfPositive);
+        obtain ⟨imaginaryThreshold, imaginaryClose⟩
+            from imaginaryConverges(Rational.halve(epsilon), halfPositive);
+        witness Natural.maximum(realThreshold, imaginaryThreshold) with
+            (m : Natural)
+            (aboveMaximum : Natural.maximum(realThreshold, imaginaryThreshold) ≤ m) ↦ {
+              claim realAbove : realThreshold ≤ m
+                  since Natural.le_through_max_left;
+              claim imaginaryAbove : imaginaryThreshold ≤ m
+                  since Natural.le_through_max_right;
+              claim abs(ComplexNumber.realPart(s(m)) - realLimit)
+                    < (Rational.halve(epsilon) : Real)
+                  by realClose(m, realAbove);
+              claim abs(ComplexNumber.imaginaryPart(s(m)) - imaginaryLimit)
+                    < (Rational.halve(epsilon) : Real)
+                  by imaginaryClose(m, imaginaryAbove);
+              -- The coordinates of the difference s(m) − limit.
+              claim realDifference
+                  : ComplexNumber.realPart(
+                        s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                    = ComplexNumber.realPart(s(m))
+                      - ComplexNumber.realPart(
+                            ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                  since ComplexNumber.realPart_subtract;
+              claim imaginaryDifference
+                  : ComplexNumber.imaginaryPart(
+                        s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                    = ComplexNumber.imaginaryPart(s(m))
+                      - ComplexNumber.imaginaryPart(
+                            ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                  since ComplexNumber.imaginaryPart_subtract;
+              claim realOfLimit
+                  : ComplexNumber.realPart(
+                        ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                    = realLimit
+                  since ComplexNumber.realPart_ofCoordinates;
+              claim imaginaryOfLimit
+                  : ComplexNumber.imaginaryPart(
+                        ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                    = imaginaryLimit
+                  since ComplexNumber.imaginaryPart_ofCoordinates;
+              -- Squeeze the modulus through the coordinate sum.
+              calc ComplexNumber.modulus(
+                       s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit))
+                 ≤ abs(ComplexNumber.realPart(
+                           s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                       + abs(ComplexNumber.imaginaryPart(
+                                 s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                       since ComplexNumber.modulus_coordinate_bound
+                 = abs(ComplexNumber.realPart(s(m))
+                           - ComplexNumber.realPart(
+                                 ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                       + abs(ComplexNumber.imaginaryPart(
+                                 s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                       since realDifference
+                 = abs(ComplexNumber.realPart(s(m)) - realLimit)
+                       + abs(ComplexNumber.imaginaryPart(
+                                 s(m) - ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                       since realOfLimit
+                 = abs(ComplexNumber.realPart(s(m)) - realLimit)
+                       + abs(ComplexNumber.imaginaryPart(s(m))
+                                 - ComplexNumber.imaginaryPart(
+                                       ComplexNumber.ofCoordinates(realLimit, imaginaryLimit)))
+                       since imaginaryDifference
+                 = abs(ComplexNumber.realPart(s(m)) - realLimit)
+                       + abs(ComplexNumber.imaginaryPart(s(m)) - imaginaryLimit)
+                       since imaginaryOfLimit
+                 < (Rational.halve(epsilon) : Real) + (Rational.halve(epsilon) : Real)
+                       since Real.LessThan.add_strict_strict
+                 = ((Rational.halve(epsilon) + Rational.halve(epsilon) : Rational) : Real)
+                       by Rational.to_real.add_preserves(
+                              Rational.halve(epsilon), Rational.halve(epsilon))
+                 = (epsilon : Real)
+                       by Rational.halve_doubled(epsilon)
+            }
+      }
+}

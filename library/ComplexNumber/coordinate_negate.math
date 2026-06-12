@@ -1,0 +1,162 @@
+-- ComplexNumber/coordinate_negate.math
+--
+-- The coordinate map respects negation and subtraction:
+-- coords(−z) = −coords(z) and so re/im of z − w are the coordinate
+-- differences. Proved at the coefficient level by the same induction
+-- as the scale lemma, then lifted through the two quotients.
+
+module ComplexNumber.coordinate_negate
+
+import Logic.basics
+import Logic.product
+import Logic.quotient
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring
+import Algebra.ring_bundle
+import Real.basics
+import Real.addition
+import Real.multiplication
+import Real.negation
+import Real.ring
+import Real.algebra
+import Real.instances
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.negation
+import Polynomial.multiplication
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+import ComplexNumber.of_coordinates
+
+-- ----------------------------------------------------------------------
+-- Negating a coefficient list negates both coordinates.
+theorem ComplexNumber.coordinatesOfCoefficients_negate
+        : (k : Polynomial.Coefficients(Real))
+          → coords(
+                Polynomial.Coefficients.negate(Real.ring, k))
+            = Product.make(
+                  -Product.first(coords(k)),
+                  -Product.second(coords(k)))
+  | Polynomial.Coefficients.nil => {
+      -- coords(negate([])) = (0, 0) = (−0, −0).
+      claim Real.zero = -Real.zero;
+      done
+    }
+  | Polynomial.Coefficients.cons(c, rest) => {
+      -- negate(c :: rest) = (−c) :: negate(rest); the induction
+      -- hypothesis gives the coordinates of the negated tail.
+      claim tail
+          : coords(
+                Polynomial.Coefficients.negate(Real.ring, rest))
+            = Product.make(
+                  -Product.first(coords(rest)),
+                  -Product.second(coords(rest)));
+      -- real part
+      calc -c - Product.second(coords(
+               Polynomial.Coefficients.negate(Real.ring, rest)))
+         = -c - -Product.second(coords(rest))
+               by tail
+         = -(c - Product.second(coords(rest)));
+      -- imaginary part
+      claim Product.first(coords(
+                Polynomial.Coefficients.negate(Real.ring, rest)))
+            = -Product.first(coords(rest))
+          by tail;
+      done
+    }
+
+-- ----------------------------------------------------------------------
+-- Lifted to ℝ[x]: coords(−p) = −coords(p).
+theorem ComplexNumber.coordinatesOfPolynomial_negate
+        (p : Polynomial(Real, Real.zero))
+        : coords(Polynomial.negate(p))
+          = Product.make(
+                -Product.first(coords(p)),
+                -Product.second(coords(p))) :=
+  cases p { | a =>
+    ComplexNumber.coordinatesOfCoefficients_negate(a)
+  }
+
+-- Lifted to ℂ: coords(−z) = −coords(z).
+theorem ComplexNumber.coordinates_negate (z : ComplexNumber)
+        : coords(RingModulo.negate(z))
+          = Product.make(
+                -ComplexNumber.realPart(z),
+                -ComplexNumber.imaginaryPart(z)) :=
+  cases z { | p =>
+    ComplexNumber.coordinatesOfPolynomial_negate(p)
+  }
+
+-- ----------------------------------------------------------------------
+-- The named-projection forms, for negation and subtraction.
+
+theorem ComplexNumber.realPart_negate (z : ComplexNumber)
+        : ComplexNumber.realPart(RingModulo.negate(z))
+          = -ComplexNumber.realPart(z) :=
+  calc ComplexNumber.realPart(RingModulo.negate(z))
+     = Product.first(coords(RingModulo.negate(z)))
+     = Product.first(Product.make(
+           -ComplexNumber.realPart(z),
+           -ComplexNumber.imaginaryPart(z)))
+     = -ComplexNumber.realPart(z)
+
+theorem ComplexNumber.imaginaryPart_negate (z : ComplexNumber)
+        : ComplexNumber.imaginaryPart(RingModulo.negate(z))
+          = -ComplexNumber.imaginaryPart(z) :=
+  calc ComplexNumber.imaginaryPart(RingModulo.negate(z))
+     = Product.second(coords(RingModulo.negate(z)))
+     = Product.second(Product.make(
+           -ComplexNumber.realPart(z),
+           -ComplexNumber.imaginaryPart(z)))
+     = -ComplexNumber.imaginaryPart(z)
+
+theorem ComplexNumber.realPart_subtract (z w : ComplexNumber)
+        : ComplexNumber.realPart(z - w)
+          = ComplexNumber.realPart(z) - ComplexNumber.realPart(w) := {
+  claim sumPart
+      : ComplexNumber.realPart(z + RingModulo.negate(w))
+        = ComplexNumber.realPart(z)
+          + ComplexNumber.realPart(RingModulo.negate(w))
+      since ComplexNumber.realPart_add;
+  claim negatePart
+      : ComplexNumber.realPart(RingModulo.negate(w))
+        = -ComplexNumber.realPart(w)
+      since ComplexNumber.realPart_negate;
+  calc ComplexNumber.realPart(z - w)
+     = ComplexNumber.realPart(z + RingModulo.negate(w))
+     = ComplexNumber.realPart(z) + ComplexNumber.realPart(RingModulo.negate(w))
+           since sumPart
+     = ComplexNumber.realPart(z) + -ComplexNumber.realPart(w)
+           since negatePart
+     = ComplexNumber.realPart(z) - ComplexNumber.realPart(w)
+}
+
+theorem ComplexNumber.imaginaryPart_subtract (z w : ComplexNumber)
+        : ComplexNumber.imaginaryPart(z - w)
+          = ComplexNumber.imaginaryPart(z) - ComplexNumber.imaginaryPart(w) := {
+  claim sumPart
+      : ComplexNumber.imaginaryPart(z + RingModulo.negate(w))
+        = ComplexNumber.imaginaryPart(z)
+          + ComplexNumber.imaginaryPart(RingModulo.negate(w))
+      since ComplexNumber.imaginaryPart_add;
+  claim negatePart
+      : ComplexNumber.imaginaryPart(RingModulo.negate(w))
+        = -ComplexNumber.imaginaryPart(w)
+      since ComplexNumber.imaginaryPart_negate;
+  calc ComplexNumber.imaginaryPart(z - w)
+     = ComplexNumber.imaginaryPart(z + RingModulo.negate(w))
+     = ComplexNumber.imaginaryPart(z) + ComplexNumber.imaginaryPart(RingModulo.negate(w))
+           since sumPart
+     = ComplexNumber.imaginaryPart(z) + -ComplexNumber.imaginaryPart(w)
+           since negatePart
+     = ComplexNumber.imaginaryPart(z) - ComplexNumber.imaginaryPart(w)
+}

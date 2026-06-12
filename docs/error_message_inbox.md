@@ -158,6 +158,11 @@ note: `claim xNotZero : …;` followed by `cases x refining xPositive, xNotZero 
 
 ---
 ### Redundancy checker aborts whole-file on expensive in-isolation re-proof — 2026-06-11 (#42 push)
+2026-06-12 (+1, ℂ-completeness push): same abort on
+ComplexNumber/completeness.math under --check-redundant-by — the in-isolation
+re-proof of a strict `<` calc step explodes into an
+`And(Not(modulus(…) = ε), modulus(…) ≤ ε)` goal and exhausts the budget;
+whole-file report lost. Plain verify is green.
 note: `--check-redundant-by` on Real/limits.math, Real/series.math,
 Real/negation.math errors out mid-file:
 ```
