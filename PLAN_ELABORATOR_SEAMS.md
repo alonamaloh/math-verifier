@@ -201,6 +201,50 @@ normalization belongs in dispatch too. The carrier-spelling convention
 (`Polynomial(Ring.carrier(Real.ring), …)`, used by all ComplexNumber
 files) remains the documented style either way.
 
+### FINDING (2026-06-12, investigated alongside Fix B — explained, not fixed)
+
+The asymmetry is **an Integer-specific instance registration**, nothing
+in `dispatch.cpp`'s ordering:
+
+1. Target resolution is symmetric. `desugarArithmeticOperator`
+   (desugar_equality.cpp) finds `Polynomial.add` from the registry key
+   `(+, Polynomial, Polynomial)` for BOTH spellings.
+2. The asymmetry is in filling `Polynomial.add`'s implicit `{r : Ring}`:
+   the left operand's type is unified against the declared
+   first-explicit-argument template
+   `Polynomial(Ring.carrier(r), Ring.zero(r))` via `matchAgainstPattern`.
+   At the node `Ring.carrier(BV r)` vs the concrete carrier, the
+   canonical-bundle registry decides: `(Ring, Integer) →
+   Integer.ring_bundle` is registered (`instance Integer.ring_bundle`,
+   Algebra/integer_domain.math), so ℤ resolves; **`Real.ring` is defined
+   (ComplexNumber/basics.math) but never `instance`-registered**, so
+   `(Ring, Real)` misses and unification fails.
+3. The "passes the carrier type itself" symptom is the explicit
+   single-filler fallback at desugar_equality.cpp (`// Fall back to the
+   single-filler heuristic for safety`): it knowingly applies a junk
+   filler (the last argument of the operand's type — `Real.zero`, whose
+   type `Real` is what the kernel then reports against the expected
+   `Ring`) and lets the kernel typecheck catch it. With Fix A that
+   kernel error is now anchored at the declaration instead of 1:1.
+
+**Does Fix B's normalization belong in dispatch? No.** Fix B's deferral
+works because a lemma's *conclusion* contains a binding argument
+(`multiply(Real.ring, …)`) that pins `r`, after which the deferred
+projection nodes verify definitionally. A dispatch *type template*
+`Polynomial(Ring.carrier(r), Ring.zero(r))` mentions `r` only under
+projections — there is nothing to defer against, so deferral would end
+with `r` unbound and fall back to the same registry miss. The registry
+IS the mechanism for recovering a bundle from a concrete carrier.
+
+**The available fix is a library one-liner, deliberately not applied
+here:** `instance Real.ring` makes `p + q` dispatch at
+`Polynomial(Real, Real.zero)` (verified empirically, 2026-06-12, probe
+with the instance + `p + q` statement). Whether ℝ should register its
+bundle — and the ComplexNumber files then shed the
+`Polynomial(Ring.carrier(Real.ring), …)` carrier spelling — is a
+library-design decision for the complex-exponential push to make. Until
+then the carrier-spelling convention remains the documented style.
+
 ---
 
 ## Validation protocol (both fixes)

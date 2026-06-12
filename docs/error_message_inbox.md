@@ -132,24 +132,6 @@ redundant" (a finding of the GOOD kind, or silence) and continue.
 rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
 
 ---
-### Citation against a stale dependency cache reports "arguments could not be inferred" — 2026-06-12 (exp push)
-verbatim (Real/cauchy_complete.math citing brand-new Real.abs_partialSum_le with explicit arguments):
-```
-the `by` hint citation does not prove this goal
-  goal:        Real.absolute_value (Real.partialSum (λ(k : Natural). t (i + k)) c) ≤ …
-the hint's arguments could not be inferred from the goal or discharged from context, …
-```
-diagnosis: the lemma did not exist in the (stale) build/…/series.mathv the
-verify run loaded — the same situation in a scratch probe file reported the
-honest `unknown identifier 'Real.abs_partialSum_le'`. Inside a calc-step
-citation the unknown name instead surfaces as an argument-inference
-failure, which sent me hunting a unification bug (β-redexes under binders)
-for two iterations. Wanted: unknown-lemma detection BEFORE unification, with
-the same "unknown identifier … (check the spelling)" text everywhere; bonus
-points for "(the module cache for X may be stale — rebuild with make)".
-rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
-
----
 ### (good message) `since FACT` on a calc step that needs FACT + a congruence — 2026-06-12 (exp push)
 note: writing `≤ pS(abs∘s, pred) + abs(s(pred))   since IH` (IH plus an
 add-congruence) failed with a model error message:
@@ -162,40 +144,5 @@ both relations printed side by side made the fix (`by
 Real.add_preserves_LessOrEqual`, IH consumed from context) obvious in one
 read. This is the shape more hint errors should have.
 rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
-
----
-### Statements-pass type errors report location 1:1 with no declaration context — 2026-06-12 (ℂ coordinates)
-verbatim (operator dispatch failure inside a THEOREM STATEMENT, during the
-MATH_STATEMENTS_ONLY pass):
-```
-library/ComplexNumber/defining_polynomial_vanishes.math:1:1: type error: Application: argument type does not match Pi domain
-  expected type: Ring
-  actual type:   Real
-```
-diagnosis: the offending application was `p + q` in the statement of
-`coordinatesOfPolynomial_add` (binders spelled `Polynomial(Real,
-Real.zero)`; the `+` instance wanted the `Ring.carrier(Real.ring)`
-spelling and ended up passing `Real` where a `Ring` was expected). The
-message carries NO file location beyond 1:1, no declaration name, and no
-offending expression — I found it by bisecting the file theorem by
-theorem. Statement-pass errors should at least name the declaration and
-the application being elaborated. (Reported by the user as a likely bug:
-any error pointing at 1:1 has lost its location.)
-rubric (0/1): cause 0 · location 0 · actionable 0 · folded-types 1 · no-jargon 1
-
----
-### Citation matching is stricter than prover search (Ring.carrier vs concrete carrier) — 2026-06-12 (ℂ coordinates)
-note: `claim ExtensionallyEqual(Real, Real.zero, multiply(Real.ring, one, k), k)
-since Polynomial.Coefficients.multiply_one_left` FAILS (citation
-match-and-unify will not convert `Real` ↔ `Ring.carrier(Real.ring)`), and
-the same claim with explicit arguments `by multiply_one_left(Real.ring, k)`
-succeeds (defeq application check) — but so does the BARE claim: the
-auto-prover's search finds and applies the same lemma through the defeq.
-So hint-less is strictly more capable than hinted here, which inverts the
-mental model ("hints help"). Wanted: citation matching falls back to
-defeq-modulo-reducible-projections (Ring.carrier(Ring.make(...)) etc.)
-before declaring the unification failed; the redundancy checker's
-"redundant by" finding on the positional form was the only clue.
-rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
 
 ---

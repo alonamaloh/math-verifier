@@ -272,3 +272,100 @@ each improvement is measured and protected against regression.
   unlike the indexed path), and the instance must occur in the GOAL —
   a reverse rewrite whose structured side appears only in the result
   (e.g. introducing `n + 0` out of `n`) still needs explicit arguments.
+
+### 12. Statement-pass errors lost their location (printed at 1:1) — FIXED
+
+- **Trigger:** a kernel TypeError thrown while elaborating a theorem
+  STATEMENT (binder types + declared type) — e.g. `p + q` at
+  `(p q : Polynomial(Real, Real.zero))`, where operator dispatch passes
+  `Real.zero` (type `Real`) where a `Ring` is expected (see corpus #13's
+  dispatch note). Repro: `library/ErrorTest/statement_error_location.math`.
+- **Was (symptom):**
+  ```
+  file.math:1:1: type error: Application: argument type does not match Pi domain
+    expected type: Ring
+    actual type:   Real
+  ```
+  No declaration name, no line, raw kernel wording. Scored 0 on cause,
+  location, actionable, jargon. Found in practice by bisecting the file
+  theorem by theorem (2026-06-12, ℂ coordinates).
+- **Diagnosis:** `elaborateDefinition` wrapped only the proof BODY in the
+  `catch (TypeError) → rethrowKernelError` chain; a TypeError from
+  statement elaboration unwound past every context frame to the driver,
+  whose bare-TypeError printer hardcodes `1:1`.
+- **Now:** the statement is elaborated under its own
+  `theorem 'X' (statement)` frame anchored at the declared type's source
+  span, with the rethrow inside that frame's scope (statements.cpp); the
+  statements-only pass (`MATH_STATEMENTS_ONLY`) has the same wrapping;
+  and `elaborateTopStatement` re-anchors any TypeError that still
+  escapes a declaration handler (`topStatementErrorAnchor`), so a bare
+  kernel TypeError can never reach the driver's 1:1 printer. The error
+  now reads `file.math:27:13: elaborate error: theorem 'X' (statement)`
+  + the friendly "this argument has the wrong type…" rendering.
+- **Related residual fixed in the same push:** `unknown identifier 'X'
+  at line N, column C` carried its position only in the message TEXT;
+  the `ElaborateError` now carries it structurally too, so the header
+  matches (inference.cpp).
+
+### 13. Citation matching blind to `Ring.carrier(r)` ≡ concrete carrier — FIXED
+
+- **Trigger:** citing a lemma stated over `Ring.carrier(r)` /
+  `Ring.zero(r)` (e.g. `Polynomial.Coefficients.multiply_one_left`)
+  argument-free at a goal spelled with the concrete carrier
+  (`ExtensionallyEqual(Real, Real.zero, multiply(Real.ring, …), …)`).
+  Repro (now the passing feature test):
+  `library/Test/citation_carrier_defeq_test.math`.
+- **Was (symptom):** "the `…multiply_one_left` citation does not prove
+  this goal" — while the SAME claim worked with explicit arguments
+  (defeq application checking) and completely BARE (auto-prover search).
+  Hint-less was strictly MORE capable than hinted, inverting the hint
+  model; the redundancy checker's "redundant `by`" was the only
+  discovery mechanism. (2026-06-12, ℂ coordinates.)
+- **Diagnosis:** the first-order matcher walks the conclusion spine
+  left-to-right, so `Ring.carrier(BV r)` is matched against `Real`
+  while `r` is still unbound (the binding argument
+  `multiply(Real.ring, …)` comes later); the canonical-bundle registry
+  had no `(Ring, Real)` entry (`Real.ring` is not
+  `instance`-registered), and no subject-side reduction can fix a stuck
+  projection-of-metavariable.
+- **Now:** `matchAgainstPattern` defers a structure-bundle projection of
+  an unbound metavariable (pattern `S.field(BV slot)` where `S.carrier`
+  exists) and verifies it by definitional equality once the rest of the
+  match binds the slot (`matchAgainstPatternWithDeferredProjections`,
+  diff_bridges.cpp); a bound slot's projection resolves by the same
+  defeq on the failure path, subsuming the old
+  registered-canonical-bundle special case. Wired into the citation flow
+  (`autoFillHintForClaim`); gated to structure projections so the
+  prover's hot failure paths are untouched (ungated cost 2x on
+  Real/supremum; gated, build time within noise).
+- **Boundaries (documented behaviour, not bugs):**
+  - NOT general higher-order unification — function-parameter lemmas
+    keep needing positional citation (Miller-pattern gap).
+  - ζ-opacity is a SEPARATE seam: a lemma conclusion spelling out the
+    list a local `let` abbreviates (`multiply_one_left`'s cons-spine vs
+    a let-bound `one`) still fails to cite — same family as the
+    2026-06-11 let-opacity inbox entries (still open).
+  - Operator dispatch's `Ring` asymmetry (`p + q` at
+    `Polynomial(Integer, …)` but not `Polynomial(Real, …)`) is NOT this
+    seam: dispatch infers `{r : Ring}` from a type template where `r`
+    occurs only under projections, so deferral has nothing to bind it
+    with — the canonical-bundle registry is the mechanism there, and
+    `instance Real.ring` is the (unapplied) library one-liner that fixes
+    ℝ dispatch. Full finding in PLAN_ELABORATOR_SEAMS.md Item C.
+
+### 14. Unknown lemma in a calc-step citation against a stale cache — RESOLVED
+
+- **Trigger (2026-06-12, exp push):** citing a brand-new lemma with
+  explicit arguments inside a calc step while the dependency's `.mathv`
+  was stale (the lemma absent from the loaded cache). The calc-step path
+  reported "the hint's arguments could not be inferred…", sending the
+  author down a unification rabbit hole, while a scratch probe honestly
+  said `unknown identifier`.
+- **Re-checked after fixes #4/#12/#13:** an unknown qualified name cited
+  in a calc step now reports
+  `file.math:11:17: elaborate error: unknown identifier 'X' at line 11, column 17`
+  — unknown-name detection precedes unification on this path too.
+- **Still open (nice-to-have):** the "(the module cache for X may be
+  stale — rebuild with make)" hint when the name exists in source but
+  not in the loaded environment; low value now that the message names
+  the identifier honestly.
