@@ -842,6 +842,46 @@ ExpressionPointer Elaborator::buildCaseLambda(
             if (auto* bareName = std::get_if<SurfacePatternBareName>(
                     &pattern.node)) {
                 positionName = bareName->name;
+                // Footgun guard: a bare name in a non-scrutinee pattern
+                // slot binds a NEW variable — it does NOT match a
+                // constructor. When that name IS a constructor of the
+                // slot's type (`| successor(i), zero => …` with `zero`
+                // shadowing Natural.zero), every downstream failure is
+                // baffling ("expected X / got X" with byte-identical
+                // printouts, the binder vs the constructor). Reject it
+                // by name here.
+                if (!positionName.empty() && positionName[0] != '_') {
+                    std::string slotHead = headConstantName(pi->domain);
+                    const Declaration* slotDeclaration = slotHead.empty()
+                        ? nullptr : environment_.lookup(slotHead);
+                    const Inductive* slotInductive = slotDeclaration
+                        ? std::get_if<Inductive>(slotDeclaration)
+                        : nullptr;
+                    if (slotInductive) {
+                        for (const std::string& ctor :
+                             slotInductive->constructorNames) {
+                            std::string lastComponent =
+                                ctor.substr(ctor.rfind('.') + 1);
+                            if (positionName == ctor
+                                || positionName == lastComponent) {
+                                throw ElaborateError(
+                                    "pattern variable `" + positionName
+                                    + "` at position "
+                                    + std::to_string(i + 1)
+                                    + " shadows constructor `" + ctor
+                                    + "` of `" + slotHead
+                                    + "` — a bare name in a non-first "
+                                      "pattern slot binds a NEW variable, "
+                                      "it does not match the constructor. "
+                                      "Rename the binder, or move the "
+                                      "constructor pattern to the first "
+                                      "(scrutinee) position (e.g. via a "
+                                      "helper that recurses on this "
+                                      "argument).");
+                            }
+                        }
+                    }
+                }
             } else if (std::get_if<SurfacePatternConstructor>(
                            &pattern.node)) {
                 positionName =
