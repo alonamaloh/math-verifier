@@ -49,7 +49,9 @@ laws:
 - **`ComplexNumber/`** — ℂ = ℝ[x]/(x²+1): commutative ring, field, `i²=−1`,
   coordinates (re, im) out of the quotient, the modulus |z| = √(re²+im²)
   with multiplicativity, the triangle inequality, and coordinate bounds,
-  and completeness (every Cauchy sequence converges, coordinate-wise).
+  completeness (every Cauchy sequence converges, coordinate-wise), and the
+  complex exponential exp(z) = Σ zᵏ/k! (limit by definite description,
+  dominated in modulus by the real series at |z|).
 - **`GaussianInteger/`** — ℤ[i] = ℤ[x]/(x²+1).
 - **`FiniteField/`** — F_{p^k} = F_p[x]/(f) for irreducible f.
 - **`PAdic/`** — the p-adic numbers with their absolute value.
