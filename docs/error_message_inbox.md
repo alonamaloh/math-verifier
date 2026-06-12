@@ -171,7 +171,12 @@ error: claim `…`: the auto-prover gave up after exhausting its effort budget �
 diagnosis: the checker re-proves each hinted site WITHOUT its hint; when
 that in-isolation re-proof exceeds the budget on a pre-existing expensive
 site, the failure propagates as a hard error and the whole file's report
-is lost (sites after the expensive one are never tested). Wanted: treat
+is lost (sites after the expensive one are never tested).
+2026-06-12 (+1): on the same Real/limits.math the abort can also surface
+as a citation error ("the `by` hint citation does not prove this goal",
+at monotone_bounded_converges' tuple-hint claim) — plain verify is green,
+so checker-mode state (budget guard or speculative re-elaboration)
+corrupts a later REAL elaboration, not just its own report. Wanted: treat
 budget-exhaustion during checking as "hint is load-bearing, not
 redundant" (a finding of the GOOD kind, or silence) and continue.
 rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
