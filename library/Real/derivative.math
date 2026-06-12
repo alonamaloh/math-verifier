@@ -1,0 +1,203 @@
+-- Real/derivative.math
+--
+-- The derivative, in the division-free linear-approximation form:
+-- f has derivative L at x when, within δ of x, the error of the linear
+-- approximation f(x) + L·(y − x) is at most ε·|y − x| — for every
+-- positive rational ε, with a positive rational δ. No difference
+-- quotient, no punctured neighbourhood (the bound is trivially true at
+-- y = x), and the algebra of derivatives is plain ε-bookkeeping.
+
+module Real.derivative
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.continuity
+
+-- ----------------------------------------------------------------------
+-- f has derivative L at x.
+definition Real.HasDerivativeAt (f : Real → Real) (x L : Real) : Proposition :=
+  (epsilon : Rational) → Rational.zero < epsilon →
+    ∃ (delta : Rational).
+      And(Rational.zero < delta,
+          (y : Real) → abs(y - x) < (delta : Real)
+            → abs(f(y) - f(x) - L * (y - x))
+              ≤ (epsilon : Real) * abs(y - x))
+
+-- ----------------------------------------------------------------------
+-- Constants have derivative zero: the approximation error vanishes.
+theorem Real.HasDerivativeAt.constant (c x : Real)
+        : Real.HasDerivativeAt((y : Real) ↦ c, x, Real.zero) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦
+    witness epsilon with
+        ⟨epsilonPositive,
+         (y : Real) (_ : abs(y - x) < (epsilon : Real)) ↦ {
+           claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
+           claim errorZero
+                 : abs(c - c - Real.zero * (y - x)) = Real.zero
+               by calc abs(c - c - Real.zero * (y - x))
+                     = abs(Real.zero)
+                           by (c - c - Real.zero * (y - x) = Real.zero)
+                     = Real.zero
+                           since Real.absolute_value_when_nonneg;
+           claim Real.zero ≤ abs(y - x) since Real.absolute_value_nonneg;
+           claim Real.zero < (epsilon : Real)
+               since Rational.to_real.positive_preserves;
+           claim Real.zero ≤ (epsilon : Real) since Real.LessThan.weaken;
+           claim Real.IsNonneg((epsilon : Real))
+               since Real.IsNonneg_of_LessOrEqual_zero;
+           claim Real.IsNonneg(abs(y - x))
+               since Real.IsNonneg_of_LessOrEqual_zero;
+           claim Real.IsNonneg((epsilon : Real) * abs(y - x))
+               since Real.IsNonneg.multiply;
+           claim Real.zero ≤ (epsilon : Real) * abs(y - x)
+               since Real.LessOrEqual_zero_of_IsNonneg;
+           done by substituting errorZero
+         }⟩
+
+-- The identity has derivative one.
+theorem Real.HasDerivativeAt.identity (x : Real)
+        : Real.HasDerivativeAt((y : Real) ↦ y, x, Real.one) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦
+    witness epsilon with
+        ⟨epsilonPositive,
+         (y : Real) (_ : abs(y - x) < (epsilon : Real)) ↦ {
+           claim Real.IsNonneg(Real.zero) since Real.IsNonneg_zero;
+           claim errorZero
+                 : abs(y - x - Real.one * (y - x)) = Real.zero
+               by calc abs(y - x - Real.one * (y - x))
+                     = abs(Real.zero)
+                           by (y - x - Real.one * (y - x) = Real.zero)
+                     = Real.zero
+                           since Real.absolute_value_when_nonneg;
+           claim Real.zero ≤ abs(y - x) since Real.absolute_value_nonneg;
+           claim Real.zero < (epsilon : Real)
+               since Rational.to_real.positive_preserves;
+           claim Real.zero ≤ (epsilon : Real) since Real.LessThan.weaken;
+           claim Real.IsNonneg((epsilon : Real))
+               since Real.IsNonneg_of_LessOrEqual_zero;
+           claim Real.IsNonneg(abs(y - x))
+               since Real.IsNonneg_of_LessOrEqual_zero;
+           claim Real.IsNonneg((epsilon : Real) * abs(y - x))
+               since Real.IsNonneg.multiply;
+           claim Real.zero ≤ (epsilon : Real) * abs(y - x)
+               since Real.LessOrEqual_zero_of_IsNonneg;
+           done by substituting errorZero
+         }⟩
+
+-- Derivatives add: each summand gets half the tolerance.
+theorem Real.HasDerivativeAt.add (f g : Real → Real) (x fSlope gSlope : Real)
+        (fDerivative : Real.HasDerivativeAt(f, x, fSlope))
+        (gDerivative : Real.HasDerivativeAt(g, x, gSlope))
+        : Real.HasDerivativeAt(
+              (y : Real) ↦ f(y) + g(y), x, fSlope + gSlope) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    claim halfPositive : Rational.zero < Rational.halve(epsilon)
+        since Rational.halve_positive;
+    obtain ⟨fDelta, fDeltaProperties⟩
+        from fDerivative(Rational.halve(epsilon), halfPositive);
+    obtain ⟨fDeltaPositive, fClose⟩ from fDeltaProperties;
+    obtain ⟨gDelta, gDeltaProperties⟩
+        from gDerivative(Rational.halve(epsilon), halfPositive);
+    obtain ⟨gDeltaPositive, gClose⟩ from gDeltaProperties;
+    claim minimumPositive : Rational.zero < min(fDelta, gDelta)
+        since Rational.minimum_positive;
+    witness min(fDelta, gDelta) with
+        ⟨minimumPositive,
+         (y : Real)
+         (yClose : abs(y - x) < (min(fDelta, gDelta) : Real)) ↦ {
+           claim min(fDelta, gDelta) ≤ fDelta
+               since Rational.minimum_LessOrEqual_left;
+           claim min(fDelta, gDelta) ≤ gDelta
+               since Rational.minimum_LessOrEqual_right;
+           claim yCloseF : abs(y - x) < (fDelta : Real)
+               by calc abs(y - x)
+                     < (min(fDelta, gDelta) : Real)   by yClose
+                     ≤ (fDelta : Real);
+           claim yCloseG : abs(y - x) < (gDelta : Real)
+               by calc abs(y - x)
+                     < (min(fDelta, gDelta) : Real)   by yClose
+                     ≤ (gDelta : Real);
+           claim fBound
+                 : abs(f(y) - f(x) - fSlope * (y - x))
+                   ≤ (Rational.halve(epsilon) : Real) * abs(y - x)
+               by fClose(y, yCloseF);
+           claim gBound
+                 : abs(g(y) - g(x) - gSlope * (y - x))
+                   ≤ (Rational.halve(epsilon) : Real) * abs(y - x)
+               by gClose(y, yCloseG);
+           calc abs(f(y) + g(y) - (f(x) + g(x)) - (fSlope + gSlope) * (y - x))
+              = abs((f(y) - f(x) - fSlope * (y - x))
+                    + (g(y) - g(x) - gSlope * (y - x)))
+                    by (f(y) + g(y) - (f(x) + g(x)) - (fSlope + gSlope) * (y - x)
+                        = (f(y) - f(x) - fSlope * (y - x))
+                          + (g(y) - g(x) - gSlope * (y - x)))
+              ≤ abs(f(y) - f(x) - fSlope * (y - x))
+                + abs(g(y) - g(x) - gSlope * (y - x))
+                    by Real.triangle_inequality
+              ≤ (Rational.halve(epsilon) : Real) * abs(y - x)
+                + abs(g(y) - g(x) - gSlope * (y - x))
+                    by Real.add_preserves_LessOrEqual
+              ≤ (Rational.halve(epsilon) : Real) * abs(y - x)
+                + (Rational.halve(epsilon) : Real) * abs(y - x)
+                    since Real.add_preserves_LessOrEqual_left
+              = ((Rational.halve(epsilon) : Real)
+                 + (Rational.halve(epsilon) : Real)) * abs(y - x)
+                    by ring
+              = ((Rational.halve(epsilon) + Rational.halve(epsilon)
+                  : Rational) : Real) * abs(y - x)
+                    since Rational.to_real.add_preserves
+              = (epsilon : Real) * abs(y - x)
+                    by Rational.halve_doubled(epsilon)
+         }⟩
+  }
