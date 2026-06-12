@@ -657,7 +657,7 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
              trialDepth >= 0 && matchedDepth == -1;
              --trialDepth) {
             std::vector<ExpressionPointer> trialReduced(trialDepth);
-            if (matchAgainstPattern(
+            if (matchAgainstPatternWithDeferredProjections(
                     cursorsAtDepth[trialDepth], goalReduced,
                     trialDepth, trialReduced)) {
                 matchedDepth = trialDepth;
@@ -665,7 +665,7 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
                 break;
             }
             std::vector<ExpressionPointer> trialUnreduced(trialDepth);
-            if (matchAgainstPattern(
+            if (matchAgainstPatternWithDeferredProjections(
                     cursorsAtDepth[trialDepth], goalClosed,
                     trialDepth, trialUnreduced)) {
                 matchedDepth = trialDepth;
@@ -684,7 +684,7 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
             ExpressionPointer cursorReduced = weakHeadNormalForm(
                 environment_, cursorsAtDepth[trialDepth]);
             std::vector<ExpressionPointer> trialCursorReduced(trialDepth);
-            if (matchAgainstPattern(
+            if (matchAgainstPatternWithDeferredProjections(
                     cursorReduced, goalReduced,
                     trialDepth, trialCursorReduced)) {
                 matchedDepth = trialDepth;

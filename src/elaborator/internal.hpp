@@ -1913,6 +1913,17 @@ private:
         LevelPointer carrierLevel,
         int line);
 
+    // A pattern node `Proj(BV slot)` whose metavariable slot was still
+    // unbound when the matcher reached it, provisionally accepted and
+    // recorded for verification once the rest of the match has bound the
+    // slot. `subject` is stored in the lemma-application scope (shifted
+    // past any descended Pi binders).
+    struct DeferredProjectionMatch {
+        ExpressionPointer projectionHead;
+        int slot;
+        ExpressionPointer subject;
+    };
+
     // Phase 3 first-order matcher. Walks `pattern` (a lemma's LHS or
     // RHS, in closed-over-binders form) against `subject` (a term
     // from the calc step's diff position, in closed-over-local-binders
@@ -1934,12 +1945,54 @@ private:
     // literally). A pattern BV index in [piDepth, piDepth +
     // binderCount) refers to lemma metavariable slot
     // `(index - piDepth)`.
+    //
+    // Projection-chain transparency: a pattern node `Proj(BV slot)` (a
+    // Constant applied to a single metavariable — `Ring.carrier(r)`,
+    // `Ring.zero(r)`, …) that fails to match structurally is resolved by
+    // DEFINITIONAL equality once the slot is bound: `Ring.carrier(
+    // Real.ring) ≡ Real` is a plain unfold-then-project chain visible to
+    // application checking and to prover search, and the matcher must not
+    // be blinder than either. When the slot is still UNBOUND at the node
+    // (the lemma's carrier argument precedes the argument that pins the
+    // ring, as in `ExtensionallyEqual(Ring.carrier(r), Ring.zero(r),
+    // multiply(r, …), …)`), the node is DEFERRED into `deferredOut` and
+    // provisionally accepted; the caller verifies each deferred node by
+    // the same definitional check after the rest of the match has bound
+    // the slot — `matchAgainstPatternWithDeferredProjections` packages
+    // that. With `deferredOut == nullptr` (the default), unbound
+    // projections fail as before. Deliberately NOT general higher-order
+    // unification: only single-argument Constant-headed patterns over a
+    // metavariable participate, and only on the failure path of a node.
     bool matchAgainstPattern(
         ExpressionPointer pattern,
         ExpressionPointer subject,
         int binderCount,
         std::vector<ExpressionPointer>& bindings,
-        int piDepth = 0);
+        int piDepth = 0,
+        std::vector<DeferredProjectionMatch>* deferredOut = nullptr);
+
+    // The failure-path fallback for a pattern node `Proj(BV slot)`: defeq
+    // when the slot is bound, deferral when it is not (and `deferredOut`
+    // is supplied). Returns false when the pattern is not of that shape.
+    bool tryProjectionFallback(
+        ExpressionPointer pattern,
+        ExpressionPointer subject,
+        int binderCount,
+        std::vector<ExpressionPointer>& bindings,
+        int piDepth,
+        std::vector<DeferredProjectionMatch>* deferredOut);
+
+    // matchAgainstPattern + verification of the deferred projection
+    // nodes: each `Proj(BV slot)` accepted provisionally during the match
+    // must have its slot bound by the end, and `Proj(binding)` must be
+    // definitionally equal to the subject it was matched against. This is
+    // the entry point citation matching uses (claims, calc steps); the
+    // bare matcher remains for callers that want the strict behaviour.
+    bool matchAgainstPatternWithDeferredProjections(
+        ExpressionPointer pattern,
+        ExpressionPointer subject,
+        int binderCount,
+        std::vector<ExpressionPointer>& bindings);
 
     // Does `expression` contain any BoundVariable in the half-open
     // range `[low, high)` (interpreted in expression's own scope)?

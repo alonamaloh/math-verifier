@@ -714,7 +714,8 @@ bool Elaborator::matchAgainstPattern(
         ExpressionPointer subject,
         int binderCount,
         std::vector<ExpressionPointer>& bindings,
-        int piDepth) {
+        int piDepth,
+        std::vector<DeferredProjectionMatch>* deferredOut) {
         // Canonical-bundle resolution: pattern `<Structure>.carrier(BV(slot))`
         // against a concrete carrier `subject`. Bind `slot` to the canonical
         // bundle registered for `(Structure, head subject)` — letting an
@@ -740,8 +741,30 @@ bool Elaborator::matchAgainstPattern(
                                suffix.size(), suffix) == 0;
                     // (1) `<S>.carrier(BV(slot))` with the slot still
                     //     unsolved: resolve it to the canonical bundle for
-                    //     the concrete subject carrier.
+                    //     the concrete subject carrier. With a deferral
+                    //     accumulator available (citation matching), DEFER
+                    //     instead: the rest of the match may pin the slot
+                    //     to a DIFFERENT bundle over the same carrier
+                    //     (e.g. an unregistered `Real.ring`), which an
+                    //     eager registry bind would poison; the registry
+                    //     is consulted as the last resort during deferred
+                    //     verification instead.
                     if (isCarrier && !bindings[slot]) {
+                        if (deferredOut) {
+                            if (piDepth > 0
+                                && referencesAnyBoundInRange(
+                                       subject, 0, piDepth)) {
+                                return false;
+                            }
+                            deferredOut->push_back(
+                                DeferredProjectionMatch{
+                                    patternApp->function, slot,
+                                    piDepth > 0
+                                        ? liftBoundVariables(
+                                              subject, -piDepth, 0)
+                                        : subject});
+                            return true;
+                        }
                         std::string structure = projection->name.substr(
                             0, projection->name.size() - suffix.size());
                         auto entry =
@@ -754,43 +777,17 @@ bool Elaborator::matchAgainstPattern(
                             return true;
                         }
                     }
-                    // (2) Any OTHER projection of an already-bound slot —
-                    //     `Ring.zero(r)`, `Ring.one(r)`, … once `r` is
-                    //     resolved. Substitute the bundle and accept the
-                    //     slot if the projection is definitionally the
-                    //     subject (e.g. `Ring.zero(Integer.ring_bundle) ≡
-                    //     Integer.zero`). This is what lets the sibling
-                    //     carrier/zero arguments of `Polynomial(…, …)` both
-                    //     match after the carrier fixes the ring. Gated on
-                    //     the slot being bound to a REGISTERED canonical
-                    //     bundle, so it is completely inert (no behaviour
-                    //     change) until/unless a bundle is registered — and
-                    //     only ever relaxes matching for canonical-resolved
-                    //     slots, never general structural matching.
-                    else if (bindings[slot]) {
-                        auto* boundConstant = std::get_if<Constant>(
-                            &bindings[slot]->node);
-                        bool boundIsCanonicalBundle = false;
-                        if (boundConstant) {
-                            for (const auto& registryEntry
-                                 : environment_.canonicalBundleRegistry) {
-                                if (registryEntry.second
-                                    == boundConstant->name) {
-                                    boundIsCanonicalBundle = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (boundIsCanonicalBundle) {
-                            ExpressionPointer substituted = makeApplication(
-                                makeConstant(projection->name),
-                                bindings[slot]);
-                            if (isDefinitionallyEqual(environment_,
-                                    Context{}, substituted, subject)) {
-                                return true;
-                            }
-                        }
-                    }
+                    // Any OTHER projection of a metavariable slot —
+                    //     `Ring.zero(r)`, `Ring.one(r)`, … — is handled on
+                    //     the FAILURE path by tryProjectionFallback:
+                    //     definitional equality once the slot is bound
+                    //     (`Ring.zero(Real.ring) ≡ Real.zero` is a plain
+                    //     unfold-then-project chain), deferral when it is
+                    //     not. Keeping it off the success path leaves the
+                    //     structural fast path untouched. (This subsumes
+                    //     the old registered-canonical-bundle special
+                    //     case, which could not see e.g. `Real.ring` —
+                    //     a Ring bundle that is not instance-registered.)
                 }
             }
         }
@@ -836,9 +833,11 @@ bool Elaborator::matchAgainstPattern(
             if (subjectWhnf.get() != subject.get()) {
                 return matchAgainstPattern(
                     pattern, subjectWhnf,
-                    binderCount, bindings, piDepth);
+                    binderCount, bindings, piDepth, deferredOut);
             }
-            return false;
+            return tryProjectionFallback(
+                pattern, subject, binderCount, bindings, piDepth,
+                deferredOut);
         }
         if (auto* p = std::get_if<BoundVariable>(&pattern->node)) {
             (void)p;
@@ -855,6 +854,9 @@ bool Elaborator::matchAgainstPattern(
             return levelsDefinitionallyEqual(p->level, s->level);
         }
         if (auto* p = std::get_if<Application>(&pattern->node)) {
+            // Deferred entries appended by a failing attempt below must
+            // roll back with the bindings they accompanied.
+            size_t deferredMark = deferredOut ? deferredOut->size() : 0;
             auto* s = std::get_if<Application>(&subject->node);
             if (s) {
                 // Structural attempt — bindings is scratch; save in
@@ -863,13 +865,14 @@ bool Elaborator::matchAgainstPattern(
                     bindings;
                 if (matchAgainstPattern(
                         p->function, s->function,
-                        binderCount, bindings, piDepth)
+                        binderCount, bindings, piDepth, deferredOut)
                     && matchAgainstPattern(
                         p->argument, s->argument,
-                        binderCount, bindings, piDepth)) {
+                        binderCount, bindings, piDepth, deferredOut)) {
                     return true;
                 }
                 bindings = savedBindings;
+                if (deferredOut) deferredOut->resize(deferredMark);
             }
             // Structural failed (or subject kinds disagreed). Unfold the
             // subject's defined head ONE step at a time and retry: full
@@ -890,10 +893,12 @@ bool Elaborator::matchAgainstPattern(
                         bindings;
                     if (matchAgainstPattern(
                             pattern, unfolded,
-                            binderCount, retryBindings, piDepth)) {
+                            binderCount, retryBindings, piDepth,
+                            deferredOut)) {
                         bindings = std::move(retryBindings);
                         return true;
                     }
+                    if (deferredOut) deferredOut->resize(deferredMark);
                 }
             }
             // Last resort: full WHNF (δ/β/ι) — catches reductions the
@@ -904,9 +909,11 @@ bool Elaborator::matchAgainstPattern(
             if (subjectWhnf.get() != subject.get()) {
                 return matchAgainstPattern(
                     pattern, subjectWhnf,
-                    binderCount, bindings, piDepth);
+                    binderCount, bindings, piDepth, deferredOut);
             }
-            return false;
+            return tryProjectionFallback(
+                pattern, subject, binderCount, bindings, piDepth,
+                deferredOut);
         }
         if (auto* p = std::get_if<Constant>(&pattern->node)) {
             auto* s = std::get_if<Constant>(&subject->node);
@@ -931,10 +938,11 @@ bool Elaborator::matchAgainstPattern(
             // piDepth (the binder isn't visible from its own domain)
             // and into codomain at piDepth + 1.
             return matchAgainstPattern(p->domain, s->domain,
-                                          binderCount, bindings, piDepth)
+                                          binderCount, bindings, piDepth,
+                                          deferredOut)
                 && matchAgainstPattern(p->codomain, s->codomain,
                                           binderCount, bindings,
-                                          piDepth + 1);
+                                          piDepth + 1, deferredOut);
         }
         if (auto* p = std::get_if<Lambda>(&pattern->node)) {
             // Same binder bookkeeping as Pi. A lambda shows up on the
@@ -949,13 +957,134 @@ bool Elaborator::matchAgainstPattern(
             auto* s = std::get_if<Lambda>(&subject->node);
             if (!s) return false;
             return matchAgainstPattern(p->domain, s->domain,
-                                          binderCount, bindings, piDepth)
+                                          binderCount, bindings, piDepth,
+                                          deferredOut)
                 && matchAgainstPattern(p->body, s->body,
                                           binderCount, bindings,
-                                          piDepth + 1);
+                                          piDepth + 1, deferredOut);
         }
         // Let is rare in lemma LHSs and needs extra binder bookkeeping;
         // bail conservatively.
         return false;
+    }
+
+bool Elaborator::tryProjectionFallback(
+        ExpressionPointer pattern,
+        ExpressionPointer subject,
+        int binderCount,
+        std::vector<ExpressionPointer>& bindings,
+        int piDepth,
+        std::vector<DeferredProjectionMatch>* deferredOut) {
+        // Only a pattern node `Proj(BV slot)` — a Constant applied to a
+        // single metavariable — participates; anything else fails as the
+        // structural walk decided.
+        auto* patternApp = std::get_if<Application>(&pattern->node);
+        if (!patternApp) return false;
+        auto* projection =
+            std::get_if<Constant>(&patternApp->function->node);
+        if (!projection) return false;
+        // Restrict to STRUCTURE-BUNDLE projections (`Ring.zero`,
+        // `Ring.carrier`, … — a name `S.field` where `S.carrier` is in
+        // scope). This is the whole seam, and it keeps the fallback off
+        // the prover's hot failure paths: a mismatching `successor(n)` /
+        // `negate(x)` node must keep failing instantly, not spend a
+        // definitional-equality check (or a deferred slot) to learn the
+        // same thing. Measured cost of the ungated version: 2x on
+        // Real/supremum.
+        {
+            size_t lastDot = projection->name.rfind('.');
+            if (lastDot == std::string::npos) return false;
+            std::string structure = projection->name.substr(0, lastDot);
+            if (structure.empty()
+                || environment_.lookup(structure + ".carrier") == nullptr) {
+                return false;
+            }
+        }
+        auto* argumentBV =
+            std::get_if<BoundVariable>(&patternApp->argument->node);
+        if (!argumentBV) return false;
+        int idx = argumentBV->deBruijnIndex;
+        if (idx < piDepth || idx >= piDepth + binderCount) return false;
+        int slot = idx - piDepth;
+        // Same scope discipline as a plain metavariable binding: the
+        // subject must survive in the lemma-application context.
+        if (piDepth > 0
+            && referencesAnyBoundInRange(subject, 0, piDepth)) {
+            return false;
+        }
+        ExpressionPointer shiftedSubject = piDepth > 0
+            ? liftBoundVariables(subject, -piDepth, 0)
+            : subject;
+        if (bindings[slot]) {
+            // Slot already pinned: the projection either reduces to the
+            // subject or the node genuinely does not match.
+            ExpressionPointer substituted = makeApplication(
+                patternApp->function, bindings[slot]);
+            try {
+                return isDefinitionallyEqual(
+                    environment_, Context{}, substituted, shiftedSubject);
+            } catch (const TypeError&) {
+                return false;
+            }
+        }
+        if (!deferredOut) return false;
+        deferredOut->push_back(
+            DeferredProjectionMatch{
+                patternApp->function, slot, shiftedSubject});
+        return true;
+    }
+
+bool Elaborator::matchAgainstPatternWithDeferredProjections(
+        ExpressionPointer pattern,
+        ExpressionPointer subject,
+        int binderCount,
+        std::vector<ExpressionPointer>& bindings) {
+        std::vector<DeferredProjectionMatch> deferred;
+        if (!matchAgainstPattern(pattern, subject, binderCount, bindings,
+                                  0, &deferred)) {
+            return false;
+        }
+        // Resolution pass: a `<S>.carrier(BV slot)` node whose slot the
+        // rest of the match did NOT pin falls back to the canonical-bundle
+        // registry (the eager bind the bare matcher would have made).
+        for (const auto& deferredMatch : deferred) {
+            if (bindings[deferredMatch.slot]) continue;
+            auto* projection = std::get_if<Constant>(
+                &deferredMatch.projectionHead->node);
+            if (!projection) continue;
+            const std::string suffix = ".carrier";
+            if (projection->name.size() <= suffix.size()
+                || projection->name.compare(
+                       projection->name.size() - suffix.size(),
+                       suffix.size(), suffix) != 0) {
+                continue;
+            }
+            std::string structure = projection->name.substr(
+                0, projection->name.size() - suffix.size());
+            auto entry = environment_.canonicalBundleRegistry.find(
+                std::make_tuple(structure,
+                    headConstantName(deferredMatch.subject)));
+            if (entry != environment_.canonicalBundleRegistry.end()) {
+                bindings[deferredMatch.slot] =
+                    makeConstant(entry->second);
+            }
+        }
+        // Verification pass: every deferred projection must now reduce to
+        // the subject it was provisionally matched against.
+        for (const auto& deferredMatch : deferred) {
+            if (!bindings[deferredMatch.slot]) return false;
+            ExpressionPointer substituted = makeApplication(
+                deferredMatch.projectionHead,
+                bindings[deferredMatch.slot]);
+            try {
+                if (!isDefinitionallyEqual(environment_, Context{},
+                        substituted, deferredMatch.subject)) {
+                    return false;
+                }
+            } catch (const TypeError&) {
+                return false;
+            }
+        }
+        return true;
     }
 

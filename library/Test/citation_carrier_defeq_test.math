@@ -1,0 +1,85 @@
+-- Citation matching sees through the Ring.carrier projection chain: a
+-- lemma stated over `Ring.carrier(r)` / `Ring.zero(r)` is citable
+-- argument-free at a goal spelled with the CONCRETE carrier — the
+-- matcher defers a projection-of-unsolved-metavariable node, lets a
+-- later argument pin the ring, and verifies the projection by
+-- definitional equality (`Ring.carrier(Integer.ring_bundle) ≡ Integer`).
+-- Previously only explicit arguments (defeq application checking) and
+-- the bare claim (auto-prover search) saw through, so hint-less was
+-- strictly MORE capable than hinted.
+
+module Test.citation_carrier_defeq_test
+
+import Logic.basics
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.integer_domain
+import Integer.basics
+import Integer.addition
+import Integer.multiplication
+import Integer.negation
+import Integer.ring
+import Integer.algebra
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import Polynomial.multiply_laws
+
+-- The goal spells the concrete carrier (Integer, Integer.zero) where the
+-- lemma says (Ring.carrier(r), Ring.zero(r)); the ring is pinned by the
+-- `multiply` argument. Cited via `since` (kept hint) ...
+theorem citation_carrier_since (k : Polynomial.Coefficients(Integer))
+    : Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+          Polynomial.Coefficients.multiply(Integer.ring_bundle,
+              Polynomial.Coefficients.cons(Integer, Integer.one,
+                  Polynomial.Coefficients.nil(Integer)),
+              k),
+          k) := {
+  claim Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+            Polynomial.Coefficients.multiply(Integer.ring_bundle,
+                Polynomial.Coefficients.cons(Integer, Integer.one,
+                    Polynomial.Coefficients.nil(Integer)),
+                k),
+            k)
+      since Polynomial.Coefficients.multiply_one_left;
+}
+
+-- ... and via the argument-free `by` closer.
+theorem citation_carrier_by (k : Polynomial.Coefficients(Integer))
+    : Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+          Polynomial.Coefficients.multiply(Integer.ring_bundle,
+              Polynomial.Coefficients.cons(Integer, Integer.one,
+                  Polynomial.Coefficients.nil(Integer)),
+              k),
+          k) := {
+  done by Polynomial.Coefficients.multiply_one_left
+}
+
+-- A bundle that is NOT instance-registered (the registry knows only
+-- Integer.ring_bundle for the carrier Integer): an eager registry bind
+-- on the carrier slot would pin the WRONG ring here; deferral lets the
+-- `multiply` argument pin this bundle, and the carrier node verifies
+-- definitionally. This is the exact shape of the `Real.ring` seam.
+definition Test.unregistered_ring : Ring :=
+  Ring.make(Integer, Integer.add, Integer.zero, Integer.negate,
+      Integer.multiply, Integer.one, Integer.is_ring)
+
+theorem citation_carrier_unregistered_bundle
+        (k : Polynomial.Coefficients(Integer))
+    : Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+          Polynomial.Coefficients.multiply(Test.unregistered_ring,
+              Polynomial.Coefficients.cons(Integer, Integer.one,
+                  Polynomial.Coefficients.nil(Integer)),
+              k),
+          k) := {
+  claim Polynomial.ExtensionallyEqual(Integer, Integer.zero,
+            Polynomial.Coefficients.multiply(Test.unregistered_ring,
+                Polynomial.Coefficients.cons(Integer, Integer.one,
+                    Polynomial.Coefficients.nil(Integer)),
+                k),
+            k)
+      since Polynomial.Coefficients.multiply_one_left;
+}
