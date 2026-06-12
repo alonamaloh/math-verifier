@@ -20,6 +20,7 @@ module Real.field
 import Logic.basics
 import Logic.exists
 import Logic.quotient
+import Logic.description
 import Equality.basics
 import Natural.basics
 import Natural.peano
@@ -210,3 +211,34 @@ theorem Real.is_field
     ⟨Real.is_commutative_ring,
      Real.zero_not_equal_one,
      Real.reciprocal_exists_for_nonzero⟩
+
+-- ----------------------------------------------------------------------
+-- A multiplicative inverse is unique: two right-inverses of the same x
+-- agree (associate b across x · a = 1).
+theorem Real.inverse_unique (x a b : Real)
+        (aInverse : x * a = Real.one) (bInverse : x * b = Real.one)
+        : a = b :=
+  calc a
+     = a * Real.one    by ring
+     = a * (x * b)     since bInverse
+     = (x * a) * b     by ring
+     = Real.one * b    since aInverse
+     = b               by ring
+
+-- THE reciprocal, by definite description: existence from
+-- reciprocal_exists_for_nonzero, uniqueness from the lemma above. The
+-- reciprocal is now an honest function of (x, proof that x ≠ 0).
+definition Real.reciprocal (x : Real) (xNonzero : ¬(x = Real.zero)) : Real :=
+  Logic.the(
+      Real,
+      (y : Real) ↦ x * y = Real.one,
+      Real.reciprocal_exists_for_nonzero(x, xNonzero),
+      Real.inverse_unique(x))
+
+theorem Real.reciprocal_multiplies (x : Real) (xNonzero : ¬(x = Real.zero))
+        : x * Real.reciprocal(x, xNonzero) = Real.one :=
+  Logic.the_satisfies(
+      Real,
+      (y : Real) ↦ x * y = Real.one,
+      Real.reciprocal_exists_for_nonzero(x, xNonzero),
+      Real.inverse_unique(x))
