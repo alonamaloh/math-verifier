@@ -1,0 +1,39 @@
+-- Natural/triangular.math
+--
+-- Triangular numbers T(n) = 1 + 2 + … + n, by recursion, and the
+-- closed product form 2·T(n+1) = (n+1)(n+2) that the reciprocal
+-- series (Freek #42) runs on.
+
+module Natural.triangular
+
+import axioms
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Equality.basics
+
+definition Natural.triangular : Natural → Natural
+  | zero => 0
+  | successor(n) => Natural.triangular(n) + successor(n)
+
+-- 2·T(k+1) = (k+1)·(k+2).
+theorem Natural.triangular_doubled (k : Natural)
+        : Natural.triangular(1 + k) * 2
+          = successor(k) * successor(successor(k)) :=
+  by_induction on k with IH {
+    case zero: done
+    case successor(predecessor):
+        calc Natural.triangular(1 + successor(predecessor)) * 2
+           = (Natural.triangular(1 + predecessor)
+              + (1 + successor(predecessor))) * 2
+           = Natural.triangular(1 + predecessor) * 2
+             + (1 + successor(predecessor)) * 2
+                 by ring
+           = successor(predecessor) * successor(successor(predecessor))
+             + (1 + successor(predecessor)) * 2
+                 since IH
+           = successor(successor(predecessor))
+             * successor(successor(successor(predecessor)))
+                 by ring
+  }

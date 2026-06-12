@@ -45,6 +45,40 @@ import Rational.linearity
 import Rational.reciprocal
 import Rational.reciprocal_function
 
+-- ----------------------------------------------------------------------
+-- Natural → Rational monotonicity for `succ`.
+
+theorem Rational.from_natural_le_preserves
+        (a b : Natural) (aLeqB : a ≤ b)
+        : (a : Rational) ≤ (b : Rational) := {
+    obtain ⟨c, witnessEquation⟩ from Natural.subtraction_witness(a, b, aLeqB);
+    -- At the representatives, ((a + c) : R) - (a : R) = (c : R): cross-
+    -- multiply, and both numerators reduce to (c : Integer).
+    claim ((a + c) : Rational) - (a : Rational) = (c : Rational)
+      by Quotient.sound(
+             RationalRepresentative.make(
+                 ((a + c) : Integer) * (successor(0) : Integer)
+                 + -(a : Integer) * (successor(0) : Integer),
+                 0 + 0 * successor(0)),
+             RationalRepresentative.make((c : Integer), 0),
+             calc (((a + c) : Integer) * (successor(0) : Integer)
+                   + -(a : Integer) * (successor(0) : Integer))
+                      * (successor(0) : Integer)
+                = ((a + c) : Integer) + -(a : Integer)
+                = ((a : Integer) + (c : Integer)) + -(a : Integer)
+                = (c : Integer) * (successor(0) : Integer)
+                = (c : Integer)
+                      * (successor(0 + 0 * successor(0)) : Integer));
+    -- With b = a + c, (b : R) - (a : R) = (c : R), and the rational image of
+    -- a natural is nonnegative. The goal (a : R) ≤ (b : R) is by definition
+    -- IsNonneg of that difference, so substituting closes it.
+    claim differenceIsImage : (b : Rational) - (a : Rational) = (c : Rational);
+    claim differenceIsNonneg
+        : Rational.IsNonneg((b : Rational) - (a : Rational))
+      by substituting differenceIsImage;
+    differenceIsNonneg
+}
+
 -- (n : Rational) is nonneg for natural n. The cast goes
 -- Natural → Integer → Rational; the numerator at the Rational
 -- representative is Integer.from_natural(n), which is Integer.IsNonneg.
@@ -220,3 +254,67 @@ theorem Rational.succ_K_strictly_less_succ_succ_K_times_epsilon
      = ((1 : Rational) + (successor(K) : Rational)) * epsilon
      = (successor(successor(K)) : Rational) * epsilon
 
+
+-- ----------------------------------------------------------------------
+-- Tail bound for c/(m+1): past some index every scaled reciprocal of a
+-- successor drops below any positive ε. Archimedes pins K with
+-- c ≤ (K+1)·(ε/2); past K the factor (m+1) only grows, and the spare
+-- factor of two makes the bound strict.
+theorem Rational.scaled_reciprocal_successor_eventually_below
+        (c epsilon : Rational)
+        (cNonneg : Rational.IsNonneg(c))
+        (epsilonPositive : Rational.zero < epsilon)
+        : ∃ (N : Natural). (m : Natural) → N ≤ m
+            → c * Rational.reciprocal_function((successor(m) : Rational))
+              < epsilon := {
+  claim halfPositive : Rational.zero < Rational.halve(epsilon)
+      since Rational.halve_positive;
+  claim halfNonneg : Rational.zero ≤ Rational.halve(epsilon)
+      since Rational.LessThan.weaken;
+  obtain ⟨K, archBound⟩
+      from Rational.archimedean_for_positives(
+               c, Rational.halve(epsilon), cNonneg, halfPositive);
+  witness K with
+      (m : Natural) (KLeqM : K ≤ m) ↦ {
+        claim smPositive : Rational.zero < (successor(m) : Rational)
+            since Rational.successor_cast_positive;
+        claim recipPositive
+              : Rational.zero
+                < Rational.reciprocal_function((successor(m) : Rational))
+            since Rational.reciprocal_function_positive_of_positive;
+        claim recipNonneg
+              : Rational.zero
+                ≤ Rational.reciprocal_function((successor(m) : Rational))
+            since Rational.LessThan.weaken;
+        claim successor(K) ≤ successor(m)
+            since Natural.successor_less_or_equal_successor;
+        claim (successor(K) : Rational) ≤ (successor(m) : Rational)
+            since Rational.from_natural_le_preserves;
+        claim scaledLeq
+              : (successor(K) : Rational) * Rational.halve(epsilon)
+                ≤ (successor(m) : Rational) * Rational.halve(epsilon)
+            since Rational.LessOrEqual.multiply_by_nonneg_right;
+        claim ¬((successor(m) : Rational) = Rational.zero);
+        claim cancel
+              : (successor(m) : Rational)
+                    * Rational.reciprocal_function((successor(m) : Rational))
+                = Rational.one;
+        calc c * Rational.reciprocal_function((successor(m) : Rational))
+           ≤ ((successor(K) : Rational) * Rational.halve(epsilon))
+                 * Rational.reciprocal_function((successor(m) : Rational))
+                 since Rational.LessOrEqual.multiply_by_nonneg_right
+           ≤ ((successor(m) : Rational) * Rational.halve(epsilon))
+                 * Rational.reciprocal_function((successor(m) : Rational))
+                 since Rational.LessOrEqual.multiply_by_nonneg_right
+           = Rational.halve(epsilon)
+                 * ((successor(m) : Rational)
+                    * Rational.reciprocal_function((successor(m) : Rational)))
+                 by ring
+           = Rational.halve(epsilon) * Rational.one
+                 by cancel
+           = Rational.halve(epsilon)
+                 by ring
+           < epsilon
+                 since Rational.halve_less_than_self
+      }
+}

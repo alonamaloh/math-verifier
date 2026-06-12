@@ -282,3 +282,43 @@ theorem Real.geometric_series (r : Real) (rSmall : abs(r) < Real.one)
           inverseProperty,
           Real.geometric_series_converges(r, L, rSmall, inverseProperty))
 }
+
+-- ----------------------------------------------------------------------
+-- Partial sums only see the terms' values.
+theorem Real.partialSum_pointwise
+        (s sequencePrime : Natural → Real)
+        (pointwiseEqual : (k : Natural) → s(k) = sequencePrime(k))
+        (n : Natural)
+        : Real.partialSum(s, n) = Real.partialSum(sequencePrime, n) :=
+  by_induction on n with IH {
+    case zero: done
+    case successor(predecessor):
+        calc Real.partialSum(s, successor(predecessor))
+           = Real.partialSum(s, predecessor) + s(predecessor)
+           = Real.partialSum(sequencePrime, predecessor) + s(predecessor)
+                 since IH
+           = Real.partialSum(sequencePrime, predecessor)
+             + sequencePrime(predecessor)
+                 by pointwiseEqual(predecessor)
+  }
+
+-- A telescoping sum collapses to its boundary terms.
+theorem Real.telescoping_partialSum
+        (t : Natural → Real) (n : Natural)
+        : Real.partialSum((k : Natural) ↦ t(k) - t(1 + k), n)
+          = t(0) - t(n) :=
+  by_induction on n with IH {
+    case zero:
+        calc Real.partialSum((k : Natural) ↦ t(k) - t(1 + k), 0)
+           = Real.zero
+           = t(0) - t(0)    by ring
+    case successor(predecessor):
+        calc Real.partialSum(
+                 (k : Natural) ↦ t(k) - t(1 + k), successor(predecessor))
+           = Real.partialSum((k : Natural) ↦ t(k) - t(1 + k), predecessor)
+             + (t(predecessor) - t(1 + predecessor))
+           = (t(0) - t(predecessor)) + (t(predecessor) - t(1 + predecessor))
+                 since IH
+           = t(0) - t(1 + predecessor)
+                 by ring
+  }

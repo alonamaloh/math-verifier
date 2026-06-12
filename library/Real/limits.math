@@ -225,3 +225,22 @@ theorem Real.monotone_bounded_converges (s : Natural → Real)
         }
       }
 }
+
+-- ----------------------------------------------------------------------
+-- Convergence only sees the sequence's values: pointwise-equal
+-- sequences share their limits.
+theorem Real.SequenceConverges.pointwise
+        (s sequencePrime : Natural → Real) (limit : Real)
+        (pointwiseEqual : (n : Natural) → s(n) = sequencePrime(n))
+        (primeConverges : Real.SequenceConverges(sequencePrime, limit))
+        : Real.SequenceConverges(s, limit) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨N, close⟩ from primeConverges(epsilon, epsilonPositive);
+    witness N with
+        (m : Natural) (aboveThreshold : N ≤ m) ↦ {
+          claim abs(sequencePrime(m) - limit) < (epsilon : Real)
+              by close(m, aboveThreshold);
+          done by substituting pointwiseEqual(m)
+        }
+  }
