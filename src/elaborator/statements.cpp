@@ -7,6 +7,62 @@
 #include "elaborator/internal.hpp"
 
 void Elaborator::elaborateTopStatement(const SurfaceTopStatement& statement) {
+        try {
+            elaborateTopStatementDispatch(statement);
+        } catch (const TypeError& kernelError) {
+            // A kernel TypeError that reaches this point escaped every
+            // wrapping catch below; by now stack unwinding has popped the
+            // context frames, so re-throwing it bare would reach the
+            // driver, which prints it at 1:1 with no declaration name.
+            // Re-anchor it at the declaration being elaborated so that
+            // can never happen.
+            auto [description, line, column] =
+                topStatementErrorAnchor(statement);
+            Frame frame(*this, std::move(description), line, column);
+            rethrowKernelError(kernelError);
+        }
+    }
+
+std::tuple<std::string, int, int> Elaborator::topStatementErrorAnchor(
+        const SurfaceTopStatement& statement) const {
+        if (auto* definition =
+                std::get_if<SurfaceDefinitionDeclaration>(&statement)) {
+            return {(definition->isTheorem ? "theorem '" : "definition '")
+                        + definition->name + "'",
+                    definition->type ? definition->type->line : 0,
+                    definition->type ? definition->type->column : 0};
+        }
+        if (auto* axiom = std::get_if<SurfaceAxiomDeclaration>(&statement)) {
+            return {"axiom '" + axiom->name + "'",
+                    axiom->type ? axiom->type->line : 0,
+                    axiom->type ? axiom->type->column : 0};
+        }
+        if (auto* inductive =
+                std::get_if<SurfaceInductiveDeclaration>(&statement)) {
+            return {"inductive '" + inductive->name + "'",
+                    inductive->kind ? inductive->kind->line : 0,
+                    inductive->kind ? inductive->kind->column : 0};
+        }
+        if (auto* convention =
+                std::get_if<SurfaceConventionDeclaration>(&statement)) {
+            std::string names;
+            for (const auto& name : convention->names) {
+                if (!names.empty()) names += " ";
+                names += name;
+            }
+            return {"convention '" + names + "'",
+                    convention->type ? convention->type->line : 0,
+                    convention->type ? convention->type->column : 0};
+        }
+        if (auto* instance =
+                std::get_if<SurfaceInstanceDeclaration>(&statement)) {
+            return {"instance '" + instance->name + "'", 0, 0};
+        }
+        return {"a top-level declaration", 0, 0};
+    }
+
+void Elaborator::elaborateTopStatementDispatch(
+        const SurfaceTopStatement& statement) {
         if (auto* import = std::get_if<SurfaceImportDeclaration>(&statement)) {
             importedModules_.push_back(import->moduleName);
             return;
@@ -670,11 +726,6 @@ void Elaborator::elaborateDefinition(const SurfaceDefinitionDeclaration& origDec
             elaboratePatternMatchDefinition(declaration);
             return;
         }
-        Frame frame(*this,
-            (declaration.isTheorem ? "theorem '" : "definition '")
-            + declaration.name + "'",
-            declaration.body ? declaration.body->line : 0,
-            declaration.body ? declaration.body->column : 0);
         currentUniverseParametersOrdered_ = declaration.universeParameters;
         currentUniverseParameters_ = std::set<std::string>(
             declaration.universeParameters.begin(),
@@ -688,23 +739,47 @@ void Elaborator::elaborateDefinition(const SurfaceDefinitionDeclaration& origDec
         //   body          = fun (a1 : T1) (a2 : T2) ... => bodyExpression
         // We thread a local-binder list as we elaborate the type and body
         // in parallel, then wrap both with the appropriate Pi / Lambda.
+        //
+        // The statement (binder types + return type) is elaborated under
+        // its own frame, anchored at the declared type's source span, and
+        // any kernel TypeError is re-thrown here while that frame is still
+        // on the stack — otherwise the error unwinds past every frame and
+        // prints at 1:1 with no declaration name (the proof body below
+        // always had this wrapping; the statement did not).
         std::vector<LocalBinder> localBinders;
         std::vector<std::pair<std::string, ExpressionPointer>>
             argumentBinders;
-        for (const auto& binder : declaration.arguments) {
-            ExpressionPointer argumentType =
-                elaborateExpression(*binder.type, localBinders);
-            for (const auto& name : binder.names) {
-                argumentBinders.push_back({name, argumentType});
-                localBinders.push_back({name, argumentType});
-                if (&name != &binder.names.back()) {
-                    argumentType = elaborateExpression(*binder.type,
-                                                        localBinders);
+        ExpressionPointer returnType;
+        {
+            Frame statementFrame(*this,
+                (declaration.isTheorem ? "theorem '" : "definition '")
+                + declaration.name + "' (statement)",
+                declaration.type ? declaration.type->line : 0,
+                declaration.type ? declaration.type->column : 0);
+            try {
+                for (const auto& binder : declaration.arguments) {
+                    ExpressionPointer argumentType =
+                        elaborateExpression(*binder.type, localBinders);
+                    for (const auto& name : binder.names) {
+                        argumentBinders.push_back({name, argumentType});
+                        localBinders.push_back({name, argumentType});
+                        if (&name != &binder.names.back()) {
+                            argumentType = elaborateExpression(
+                                *binder.type, localBinders);
+                        }
+                    }
                 }
+                returnType =
+                    elaborateExpression(*declaration.type, localBinders);
+            } catch (const TypeError& kernelError) {
+                rethrowKernelError(kernelError);
             }
         }
-        ExpressionPointer returnType =
-            elaborateExpression(*declaration.type, localBinders);
+        Frame frame(*this,
+            (declaration.isTheorem ? "theorem '" : "definition '")
+            + declaration.name + "'",
+            declaration.body ? declaration.body->line : 0,
+            declaration.body ? declaration.body->column : 0);
         ExpressionPointer bodyExpression;
         try {
             bodyExpression = elaborateExpression(*declaration.body,
@@ -790,20 +865,28 @@ void Elaborator::elaborateTheoremStatementOnly(
         std::vector<LocalBinder> localBinders;
         std::vector<std::pair<std::string, ExpressionPointer>>
             argumentBinders;
-        for (const auto& binder : declaration.arguments) {
-            ExpressionPointer argumentType =
-                elaborateExpression(*binder.type, localBinders);
-            for (const auto& name : binder.names) {
-                argumentBinders.push_back({name, argumentType});
-                localBinders.push_back({name, argumentType});
-                if (&name != &binder.names.back()) {
-                    argumentType = elaborateExpression(*binder.type,
-                                                        localBinders);
+        ExpressionPointer fullType;
+        // Same statement-error wrapping as elaborateDefinition: a kernel
+        // TypeError must be re-thrown while this function's frame is still
+        // on the stack, or it reaches the driver bare and prints at 1:1.
+        try {
+            for (const auto& binder : declaration.arguments) {
+                ExpressionPointer argumentType =
+                    elaborateExpression(*binder.type, localBinders);
+                for (const auto& name : binder.names) {
+                    argumentBinders.push_back({name, argumentType});
+                    localBinders.push_back({name, argumentType});
+                    if (&name != &binder.names.back()) {
+                        argumentType = elaborateExpression(*binder.type,
+                                                            localBinders);
+                    }
                 }
             }
+            fullType =
+                elaborateExpression(*declaration.type, localBinders);
+        } catch (const TypeError& kernelError) {
+            rethrowKernelError(kernelError);
         }
-        ExpressionPointer fullType =
-            elaborateExpression(*declaration.type, localBinders);
         for (auto iterator = argumentBinders.rbegin();
              iterator != argumentBinders.rend(); ++iterator) {
             fullType = makePi(iterator->first, iterator->second, fullType);

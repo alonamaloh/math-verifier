@@ -559,6 +559,20 @@ private:
 
     void elaborateTopStatement(const SurfaceTopStatement& statement);
 
+    // The dispatch body of elaborateTopStatement. The public wrapper
+    // catches any kernel TypeError that escaped the per-declaration
+    // handlers (by which point unwinding has popped the context frames)
+    // and re-anchors it at the declaration via topStatementErrorAnchor,
+    // so a bare TypeError can never reach the driver (which would print
+    // it at 1:1 with no declaration name).
+    void elaborateTopStatementDispatch(
+        const SurfaceTopStatement& statement);
+
+    // (description, line, column) naming the declaration a top-level
+    // statement elaborates — the error anchor of last resort.
+    std::tuple<std::string, int, int> topStatementErrorAnchor(
+        const SurfaceTopStatement& statement) const;
+
     // `convention p [q ...] : T [with H1 [, H2 ...]];` registers each
     // name (`p`, `q`, …) as a key in `conventionRegistry_`. The stored
     // value is the convention's binder shape: the carrier type and the
