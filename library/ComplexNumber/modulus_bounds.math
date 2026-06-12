@@ -1,0 +1,197 @@
+-- ComplexNumber/modulus_bounds.math
+--
+-- The modulus against the coordinates: |re(z)| ≤ |z|, |im(z)| ≤ |z|,
+-- and |z| ≤ |re(z)| + |im(z)|. These squeeze ℂ-convergence between
+-- coordinate-wise convergence in ℝ (the bridge that will make ℂ
+-- complete coordinate-wise). All three compare squares through
+-- Real.LessOrEqual_of_square_LessOrEqual.
+
+module ComplexNumber.modulus_bounds
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Logic.excluded_middle
+import Logic.description
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.continuity
+import Real.intermediate_value
+import Real.square_root
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+import ComplexNumber.of_coordinates
+import ComplexNumber.modulus
+
+-- ----------------------------------------------------------------------
+-- Each coordinate is bounded by the modulus.
+
+theorem ComplexNumber.realPart_bound (z : ComplexNumber)
+        : abs(ComplexNumber.realPart(z)) ≤ ComplexNumber.modulus(z) := {
+  claim zSquares
+      : ComplexNumber.modulus(z) * ComplexNumber.modulus(z)
+        = ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+          + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+      since ComplexNumber.modulus_squares;
+  claim Real.IsNonneg(
+            ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z))
+      since Real.square_IsNonneg;
+  claim Real.zero
+        ≤ ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+      since Real.LessOrEqual_zero_of_IsNonneg;
+  calc abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.realPart(z))
+     = ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+           since Real.absolute_value_square
+     = ComplexNumber.realPart(z) * ComplexNumber.realPart(z) + Real.zero
+     ≤ ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+           + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+           since Real.add_preserves_LessOrEqual_left
+     = ComplexNumber.modulus(z) * ComplexNumber.modulus(z)
+           since zSquares;
+  claim Real.zero ≤ ComplexNumber.modulus(z) since ComplexNumber.modulus_nonneg;
+  done since Real.LessOrEqual_of_square_LessOrEqual
+}
+
+theorem ComplexNumber.imaginaryPart_bound (z : ComplexNumber)
+        : abs(ComplexNumber.imaginaryPart(z)) ≤ ComplexNumber.modulus(z) := {
+  claim zSquares
+      : ComplexNumber.modulus(z) * ComplexNumber.modulus(z)
+        = ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+          + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+      since ComplexNumber.modulus_squares;
+  claim Real.IsNonneg(
+            ComplexNumber.realPart(z) * ComplexNumber.realPart(z))
+      since Real.square_IsNonneg;
+  claim Real.zero
+        ≤ ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+      since Real.LessOrEqual_zero_of_IsNonneg;
+  calc abs(ComplexNumber.imaginaryPart(z)) * abs(ComplexNumber.imaginaryPart(z))
+     = ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+           since Real.absolute_value_square
+     = Real.zero
+           + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+     ≤ ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+           + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+           since Real.add_preserves_LessOrEqual
+     = ComplexNumber.modulus(z) * ComplexNumber.modulus(z)
+           since zSquares;
+  claim Real.zero ≤ ComplexNumber.modulus(z) since ComplexNumber.modulus_nonneg;
+  done since Real.LessOrEqual_of_square_LessOrEqual
+}
+
+-- ----------------------------------------------------------------------
+-- The modulus is bounded by the coordinate sum: |z| ≤ |re(z)| + |im(z)|.
+
+theorem ComplexNumber.modulus_coordinate_bound (z : ComplexNumber)
+        : ComplexNumber.modulus(z)
+          ≤ abs(ComplexNumber.realPart(z)) + abs(ComplexNumber.imaginaryPart(z)) := {
+  claim realSquare
+      : abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.realPart(z))
+        = ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+      since Real.absolute_value_square;
+  claim imaginarySquare
+      : abs(ComplexNumber.imaginaryPart(z)) * abs(ComplexNumber.imaginaryPart(z))
+        = ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+      since Real.absolute_value_square;
+  -- The cross term 2·|re|·|im| is nonnegative.
+  claim Real.zero ≤ abs(ComplexNumber.realPart(z)) since Real.absolute_value_nonneg;
+  claim Real.zero ≤ abs(ComplexNumber.imaginaryPart(z)) since Real.absolute_value_nonneg;
+  claim Real.IsNonneg(abs(ComplexNumber.realPart(z))) since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg(abs(ComplexNumber.imaginaryPart(z))) since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg(
+            abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.imaginaryPart(z)))
+      since Real.IsNonneg.multiply;
+  claim Real.IsNonneg(
+            abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.imaginaryPart(z))
+            + abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.imaginaryPart(z)))
+      since Real.IsNonneg.add;
+  claim Real.zero
+        ≤ abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.imaginaryPart(z))
+          + abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.imaginaryPart(z))
+      since Real.LessOrEqual_zero_of_IsNonneg;
+  -- |z|² = re² + im² picks up the cross term and regroups as a square.
+  calc ComplexNumber.modulus(z) * ComplexNumber.modulus(z)
+     = ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+           + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+           since ComplexNumber.modulus_squares
+     = abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.realPart(z))
+           + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+           since realSquare
+     = abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.realPart(z))
+           + abs(ComplexNumber.imaginaryPart(z)) * abs(ComplexNumber.imaginaryPart(z))
+           since imaginarySquare
+     = abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.realPart(z))
+           + abs(ComplexNumber.imaginaryPart(z)) * abs(ComplexNumber.imaginaryPart(z))
+           + Real.zero
+     ≤ abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.realPart(z))
+           + abs(ComplexNumber.imaginaryPart(z)) * abs(ComplexNumber.imaginaryPart(z))
+           + (abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.imaginaryPart(z))
+                  + abs(ComplexNumber.realPart(z)) * abs(ComplexNumber.imaginaryPart(z)))
+           since Real.add_preserves_LessOrEqual_left
+     = (abs(ComplexNumber.realPart(z)) + abs(ComplexNumber.imaginaryPart(z)))
+           * (abs(ComplexNumber.realPart(z)) + abs(ComplexNumber.imaginaryPart(z)));
+  claim Real.IsNonneg(
+            abs(ComplexNumber.realPart(z)) + abs(ComplexNumber.imaginaryPart(z)))
+      since Real.IsNonneg.add;
+  claim Real.zero
+        ≤ abs(ComplexNumber.realPart(z)) + abs(ComplexNumber.imaginaryPart(z))
+      since Real.LessOrEqual_zero_of_IsNonneg;
+  done since Real.LessOrEqual_of_square_LessOrEqual
+}
