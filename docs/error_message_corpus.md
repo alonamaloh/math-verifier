@@ -349,9 +349,11 @@ each improvement is measured and protected against regression.
     `Polynomial(Integer, …)` but not `Polynomial(Real, …)`) is NOT this
     seam: dispatch infers `{r : Ring}` from a type template where `r`
     occurs only under projections, so deferral has nothing to bind it
-    with — the canonical-bundle registry is the mechanism there, and
-    `instance Real.ring` is the (unapplied) library one-liner that fixes
-    ℝ dispatch. Full finding in PLAN_ELABORATOR_SEAMS.md Item C.
+    with — the canonical-bundle registry is the mechanism there.
+    RESOLVED at the library level: `instance Real.ring`
+    (ComplexNumber/basics.math), pinned by
+    `Test/real_ring_dispatch_test`. Full finding in
+    PLAN_ELABORATOR_SEAMS.md Item C.
 
 ### 14. Unknown lemma in a calc-step citation against a stale cache — RESOLVED
 

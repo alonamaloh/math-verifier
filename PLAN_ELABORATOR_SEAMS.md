@@ -236,14 +236,17 @@ projections — there is nothing to defer against, so deferral would end
 with `r` unbound and fall back to the same registry miss. The registry
 IS the mechanism for recovering a bundle from a concrete carrier.
 
-**The available fix is a library one-liner, deliberately not applied
-here:** `instance Real.ring` makes `p + q` dispatch at
-`Polynomial(Real, Real.zero)` (verified empirically, 2026-06-12, probe
-with the instance + `p + q` statement). Whether ℝ should register its
-bundle — and the ComplexNumber files then shed the
-`Polynomial(Ring.carrier(Real.ring), …)` carrier spelling — is a
-library-design decision for the complex-exponential push to make. Until
-then the carrier-spelling convention remains the documented style.
+**The fix is a library one-liner — APPLIED 2026-06-12 (same session):**
+`instance Real.ring` (ComplexNumber/basics.math, right after the
+definition, mirroring `instance Integer.ring_bundle`) makes `p + q`
+dispatch at `Polynomial(Real, Real.zero)`. Pinned by
+`Test/real_ring_dispatch_test` (statement + body uses of `+`/`*` at the
+concrete spelling). `ErrorTest/statement_error_location` still fails as
+designed — it does not import ComplexNumber.basics, so its environment
+has no `(Ring, Real)` registration. Sweeping the ComplexNumber files'
+`Polynomial(Ring.carrier(Real.ring), …)` carrier spellings back to
+`Polynomial(Real, Real.zero)` is left for the complex-exponential push
+(pure style, now that both spellings elaborate AND cite).
 
 ---
 
