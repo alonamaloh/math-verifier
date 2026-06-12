@@ -57,9 +57,9 @@ import Real.exponential_addition
 theorem Real.exponential_multiply_negate (x : Real)
         : Real.exponential(x) * Real.exponential(-x) = Real.one :=
   calc Real.exponential(x) * Real.exponential(-x)
-     = Real.exponential(x + -x)       by Real.exponential_add(x, -x)
-     = Real.exponential(Real.zero)    by (ring : x + -x = Real.zero)
-     = Real.one                       by Real.exponential_zero
+     = Real.exponential(x + -x)       since Real.exponential_add
+     = Real.exponential(Real.zero)
+     = Real.one                       since Real.exponential_zero
 
 -- ----------------------------------------------------------------------
 -- exp never vanishes: a vanishing factor would collapse the product
@@ -68,11 +68,11 @@ theorem Real.exponential_nonzero (x : Real)
         : ¬(Real.exponential(x) = Real.zero) :=
   (exponentialVanishes : Real.exponential(x) = Real.zero) ↦ {
     calc Real.zero
-       = Real.zero * Real.exponential(-x)              by ring
+       = Real.zero * Real.exponential(-x)
        = Real.exponential(x) * Real.exponential(-x)    since exponentialVanishes
-       = Real.one                                      by Real.exponential_multiply_negate(x)
+       = Real.one                                      since Real.exponential_multiply_negate
        as zeroEqualsOne;
-    claim notEqual : ¬(Real.zero = Real.one) by Real.zero_not_equal_one;
+    claim notEqual : ¬(Real.zero = Real.one) since Real.zero_not_equal_one;
     notEqual(zeroEqualsOne)
   }
 
@@ -115,16 +115,11 @@ theorem Real.exponential_positive (x : Real)
                   since Real.LessOrEqual_zero_of_IsNonneg
             = Real.exponential(x * (Rational.one_half : Real)
                                + x * (Rational.one_half : Real))
-                  by Real.exponential_add(
-                         x * (Rational.one_half : Real),
-                         x * (Rational.one_half : Real))
+                  since Real.exponential_add
             = Real.exponential(x)
                   since splitX;
-  claim notZero : ¬(Real.exponential(x) = Real.zero)
-      since Real.exponential_nonzero;
-  claim zeroNotExponential : ¬(Real.zero = Real.exponential(x))
-      by (zeroEquals : Real.zero = Real.exponential(x)) ↦
-           notZero(calc Real.exponential(x) = Real.zero);
+  -- exp never vanishes (exponential_nonzero), so 0 ≠ exp(x).
+  claim zeroNotExponential : ¬(Real.zero = Real.exponential(x));
   And.introduction(exponentialNonneg, zeroNotExponential)
 }
 
@@ -133,26 +128,26 @@ theorem Real.exponential_positive (x : Real)
 -- second factor exceeds 1 because y − x > 0 (1 + t ≤ exp(t)).
 theorem Real.exponential_preserves_LessThan (x y : Real) (xLessY : x < y)
         : Real.exponential(x) < Real.exponential(y) := {
-  claim gapPositive : Real.zero < y - x
+  claim Real.zero < y - x
       by calc Real.zero
-            = x - x    by ring
+            = x - x
             < y - x    by Real.add_preserves_LessThan;
   claim Real.zero ≤ y - x since Real.LessThan.weaken;
-  claim lowerBound : Real.one + (y - x) ≤ Real.exponential(y - x)
+  claim Real.one + (y - x) ≤ Real.exponential(y - x)
       since Real.exponential_lower_bound;
-  claim factorAboveOne : Real.one < Real.exponential(y - x)
+  claim Real.one < Real.exponential(y - x)
       by calc Real.one
-            = Real.one + Real.zero      by ring
-            < Real.one + (y - x)        by Real.add_left_preserves_LessThan
-            ≤ Real.exponential(y - x)   by lowerBound;
+            = Real.one + Real.zero
+            < Real.one + (y - x)
+            ≤ Real.exponential(y - x);
   claim Real.zero < Real.exponential(x)
       since Real.exponential_positive;
   calc Real.exponential(x)
-     = Real.one * Real.exponential(x)   by ring
+     = Real.one * Real.exponential(x)
      < Real.exponential(y - x) * Real.exponential(x)
            by Real.LessThan.multiply_by_positive_right
      = Real.exponential((y - x) + x)
-           by Real.exponential_add(y - x, x)
+           since Real.exponential_add
      = Real.exponential(y)
            by (ring : (y - x) + x = y)
 }

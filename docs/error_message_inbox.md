@@ -247,3 +247,47 @@ to dump the checker's re-proof term + binder context.
 rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
 
 ---
+### --check-redundant-by hard-errors (exit 0!) on And.introduction-for-`<` final terms — 2026-06-12 (exp corollaries)
+verbatim:
+```
+library/Real/exponential_algebra.math:99:3: elaborate error: theorem 'Real.exponential_positive'
+  the proof of theorem 'Real.exponential_positive' does not have its declared type
+    declared type:        (x : Real) → Real.zero < (Real.exponential x)
+    but this proof has type: (x : Real) → And (Real.zero ≤ (Real.exponential x)) (Not (Real.zero = (Real.exponential x)))
+```
+note: plain verify is GREEN — the theorem ends `And.introduction(…)` for a
+`Real.zero < exp(x)` goal, and `LessThan` unfolds to exactly that `And`
+(same final-term shape as Real.multiply_positive, which the checker
+handles). Under `--check-redundant-by` the in-isolation re-elaboration
+loses the defeq coercion and reports the whole THEOREM as type-incorrect,
+then silently abandons the remaining sites in the file (the last two
+theorems of exponential_algebra.math were never checked — discovered only
+by copying them into a probe file). Worse, the process still EXITS 0, so
+`.mark_redundant.py` reports success. Same wanted-behavior as the
+budget-exhaustion entries: any failure during in-isolation re-proof should
+read as "site is load-bearing, continue", and a checker abort should be
+loud. (+1 budget-abort instance the same session: testing removal of
+`by Real.add_preserves_LessThan` in a `<` calc step dies with the
+"auto-prover gave up after exhausting its effort budget" hard error at
+1:1 instead of "not redundant".)
+rubric (0/1): cause 0 · location 1 · actionable 0 · folded-types 1 · no-jargon 1
+
+---
+### Hint citation won't flip an equality inside Not — 2026-06-12 (exp corollaries)
+verbatim:
+```
+  the `Real.exponential_nonzero` citation does not prove this goal
+    goal:        Not (Real.zero = (Real.exponential x))
+    `Real.exponential_nonzero` has type: (x : Real) → Not ((Real.exponential x) = Real.zero)
+```
+note: the MESSAGE is good (both types shown side by side, cause obvious).
+The gap is prover capability: the bare claim auto-closes (the prover finds
+the lemma by index and flips the inner equality), but an EXPLICIT
+`since/by <lemma>` citation of the very same lemma fails — citation
+unification doesn't try symmetry inside `Not(a = b)`. So the author must
+choose between an unexplained bare claim and a wrong-feeling failure when
+naming the reason. Wanted: citation matching tries the symmetric form of a
+`Not`-wrapped (or any) equality, mirroring what the auto-prover already does.
+rubric (0/1): cause 1 · location 1 · actionable 1 · folded-types 1 · no-jargon 1
+
+---
