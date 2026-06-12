@@ -1,0 +1,186 @@
+-- ComplexNumber/modulus_multiplicative.math
+--
+-- The modulus is multiplicative: |z·w| = |z|·|w|. The coordinates of a
+-- product are the complex product of the coordinates, so |z·w|² expands
+-- by the Brahmagupta–Fibonacci identity
+--   (ac − bd)² + (ad + bc)² = (a² + b²)·(c² + d²)
+-- (a `ring` fact) to |z|²·|w|², and uniqueness of nonnegative square
+-- roots identifies |z·w| with |z|·|w|.
+
+module ComplexNumber.modulus_multiplicative
+
+import Logic.basics
+import Logic.exists
+import Logic.product
+import Logic.quotient
+import Logic.excluded_middle
+import Logic.description
+import Equality.basics
+import Natural.basics
+import Natural.order
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.halve
+import Rational.positive
+import Rational.linearity
+import Rational.minimum
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Set.basics
+import Algebra.ring
+import Algebra.ring_bundle
+import Algebra.ring_lemmas
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.continuity
+import Real.intermediate_value
+import Real.square_root
+import Polynomial.basics
+import Polynomial.addition
+import Polynomial.multiplication
+import RingModulo.basics
+import RingModulo.operations
+import ComplexNumber.basics
+import ComplexNumber.coordinates
+import ComplexNumber.coordinate_homomorphism
+import ComplexNumber.defining_polynomial_vanishes
+import ComplexNumber.coordinate_map
+import ComplexNumber.coordinate_multiplicative
+import ComplexNumber.reconstruction
+import ComplexNumber.of_coordinates
+import ComplexNumber.modulus
+
+-- ----------------------------------------------------------------------
+-- The coordinate product law, in named-projection form: the real and
+-- imaginary parts of z·w.
+
+theorem ComplexNumber.realPart_multiply (z w : ComplexNumber)
+        : ComplexNumber.realPart(z * w)
+          = ComplexNumber.realPart(z) * ComplexNumber.realPart(w)
+            - ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(w) :=
+  calc ComplexNumber.realPart(z * w)
+     = Product.first(coords(z * w))
+     = Product.first(ComplexNumber.coordinateProduct(coords(z), coords(w)))
+     = ComplexNumber.realPart(z) * ComplexNumber.realPart(w)
+           - ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(w)
+
+theorem ComplexNumber.imaginaryPart_multiply (z w : ComplexNumber)
+        : ComplexNumber.imaginaryPart(z * w)
+          = ComplexNumber.realPart(z) * ComplexNumber.imaginaryPart(w)
+            + ComplexNumber.imaginaryPart(z) * ComplexNumber.realPart(w) :=
+  calc ComplexNumber.imaginaryPart(z * w)
+     = Product.second(coords(z * w))
+     = Product.second(ComplexNumber.coordinateProduct(coords(z), coords(w)))
+     = ComplexNumber.realPart(z) * ComplexNumber.imaginaryPart(w)
+           + ComplexNumber.imaginaryPart(z) * ComplexNumber.realPart(w)
+
+-- ----------------------------------------------------------------------
+-- |z·w| = |z|·|w|: both sides are nonnegative and square to
+-- (re(z)² + im(z)²)·(re(w)² + im(w)²), so they are the same square root.
+
+theorem ComplexNumber.modulus_multiplicative (z w : ComplexNumber)
+        : ComplexNumber.modulus(z * w)
+          = ComplexNumber.modulus(z) * ComplexNumber.modulus(w) := {
+  -- The coordinates of z·w, instantiated.
+  claim realProduct
+      : ComplexNumber.realPart(z * w)
+        = ComplexNumber.realPart(z) * ComplexNumber.realPart(w)
+          - ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(w)
+      since ComplexNumber.realPart_multiply;
+  claim imaginaryProduct
+      : ComplexNumber.imaginaryPart(z * w)
+        = ComplexNumber.realPart(z) * ComplexNumber.imaginaryPart(w)
+          + ComplexNumber.imaginaryPart(z) * ComplexNumber.realPart(w)
+      since ComplexNumber.imaginaryPart_multiply;
+  -- |z·w|² expands through the product coordinates; Brahmagupta–Fibonacci
+  -- regroups it as a product of square sums.
+  calc ComplexNumber.modulus(z * w) * ComplexNumber.modulus(z * w)
+     = ComplexNumber.realPart(z * w) * ComplexNumber.realPart(z * w)
+           + ComplexNumber.imaginaryPart(z * w) * ComplexNumber.imaginaryPart(z * w)
+           since ComplexNumber.modulus_squares
+     = (ComplexNumber.realPart(z) * ComplexNumber.realPart(w)
+            - ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(w))
+           * (ComplexNumber.realPart(z) * ComplexNumber.realPart(w)
+                  - ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(w))
+           + ComplexNumber.imaginaryPart(z * w) * ComplexNumber.imaginaryPart(z * w)
+           since realProduct
+     = (ComplexNumber.realPart(z) * ComplexNumber.realPart(w)
+            - ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(w))
+           * (ComplexNumber.realPart(z) * ComplexNumber.realPart(w)
+                  - ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(w))
+           + (ComplexNumber.realPart(z) * ComplexNumber.imaginaryPart(w)
+                  + ComplexNumber.imaginaryPart(z) * ComplexNumber.realPart(w))
+                 * (ComplexNumber.realPart(z) * ComplexNumber.imaginaryPart(w)
+                        + ComplexNumber.imaginaryPart(z) * ComplexNumber.realPart(w))
+           since imaginaryProduct
+     = (ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+            + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z))
+           * (ComplexNumber.realPart(w) * ComplexNumber.realPart(w)
+                  + ComplexNumber.imaginaryPart(w) * ComplexNumber.imaginaryPart(w));
+  -- |z|² and |w|², instantiated.
+  claim zSquares
+      : ComplexNumber.modulus(z) * ComplexNumber.modulus(z)
+        = ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+          + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z)
+      since ComplexNumber.modulus_squares;
+  claim wSquares
+      : ComplexNumber.modulus(w) * ComplexNumber.modulus(w)
+        = ComplexNumber.realPart(w) * ComplexNumber.realPart(w)
+          + ComplexNumber.imaginaryPart(w) * ComplexNumber.imaginaryPart(w)
+      since ComplexNumber.modulus_squares;
+  -- (|z|·|w|)² is the same product of square sums.
+  calc (ComplexNumber.modulus(z) * ComplexNumber.modulus(w))
+           * (ComplexNumber.modulus(z) * ComplexNumber.modulus(w))
+     = (ComplexNumber.modulus(z) * ComplexNumber.modulus(z))
+           * (ComplexNumber.modulus(w) * ComplexNumber.modulus(w))
+     = (ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+            + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z))
+           * (ComplexNumber.modulus(w) * ComplexNumber.modulus(w))
+           since zSquares
+     = (ComplexNumber.realPart(z) * ComplexNumber.realPart(z)
+            + ComplexNumber.imaginaryPart(z) * ComplexNumber.imaginaryPart(z))
+           * (ComplexNumber.realPart(w) * ComplexNumber.realPart(w)
+                  + ComplexNumber.imaginaryPart(w) * ComplexNumber.imaginaryPart(w))
+           since wSquares;
+  -- Both sides are nonnegative …
+  claim Real.zero ≤ ComplexNumber.modulus(z * w) since ComplexNumber.modulus_nonneg;
+  claim Real.zero ≤ ComplexNumber.modulus(z) since ComplexNumber.modulus_nonneg;
+  claim Real.zero ≤ ComplexNumber.modulus(w) since ComplexNumber.modulus_nonneg;
+  claim Real.IsNonneg(ComplexNumber.modulus(z)) since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg(ComplexNumber.modulus(w)) since Real.IsNonneg_of_LessOrEqual_zero;
+  claim Real.IsNonneg(ComplexNumber.modulus(z) * ComplexNumber.modulus(w)) since Real.IsNonneg.multiply;
+  claim Real.zero ≤ ComplexNumber.modulus(z) * ComplexNumber.modulus(w) since Real.LessOrEqual_zero_of_IsNonneg;
+  -- … and square to the same number, so they coincide.
+  done since Real.square_root_unique
+}
