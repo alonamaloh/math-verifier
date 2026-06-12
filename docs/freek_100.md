@@ -28,7 +28,10 @@ theorem(s) as declared, and the file where each lives.
 ## Near-term targets
 
 The finite-sum toolkit in `library/Real/series.math` is complete
-(split, comparison, linearity, telescoping, constant blocks). **#38** (arithmetic/geometric mean) waits on a √ construction.
+(split, comparison, linearity, telescoping, constant blocks). **#38** (arithmetic/geometric mean): the two-variable case and
+square-root existence are done (`library/Real/arithmetic_geometric_mean.math`,
+`library/Real/square_root.math`); the n-variable entry needs finite
+products and Cauchy's forward–backward induction.
 Also reachable: **#25** (Schröder–Bernstein, on the Set/equinumerous
 machinery), **#44** (binomial theorem, factorials already in place).
 
