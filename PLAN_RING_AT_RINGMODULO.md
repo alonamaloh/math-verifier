@@ -23,17 +23,33 @@ The next math (trig: ℂ functional equation = ℂ-Mertens, conjugation)
 needs dozens of ℂ regroupings; at ℝ, half of Mertens was `by ring`
 one-liners. Fix the tactic first.
 
+## Root cause (confirmed by reading ring.cpp:78-86)
+
+The tactic's operation recognizer works by NAMING CONVENTION: for a
+carrier named `T` it looks for the constants `T.add`, `T.subtract`,
+`T.multiply`, `T.negate`, `T.zero`, `T.one`. Real/Integer/Rational/
+Natural satisfy it; ℂ does not — its carrier is `ComplexNumber` (an
+alias of `RingModulo(c, m)`) but its operations are the GENERIC
+`RingModulo.add{c}{m}` etc.; there is no `ComplexNumber.add` constant,
+so every operation application is mis-segmented. Nothing mathematical is
+missing — the manipulation lemmas are generic (Algebra/ring_lemmas) —
+the tactic just cannot SPELL the operations.
+
 ## Work items
 
-1. **Teach `ring` (src/elaborator/ring.cpp, its own TU) the RingModulo
-   operation shapes.** At a carrier `RingModulo(c, m)` the operations are
-   `RingModulo.add{c,m}` / `multiply` / `negate` / `subtract` (defeq
-   add∘negate — either unfold or map directly) / `zero(c,m)` / `one(c,m)`.
-   Template: the Natural-carrier extension of 2026-06-11 (see memory
-   `ring_natural_limitation` for the implementation map: numeral folding,
-   successor(e) = 1+e). The recognizer must match the operations applied
-   to the SAME two leading (bundle, modulus) arguments and treat the rest
-   as the binary/unary operation.
+1. **Resolve operations through the instance registry instead of the
+   naming convention.** We already register canonical commutative-ring
+   instances (`instance Real.ring`, ComplexNumber.is_commutative_ring,
+   RingModulo/instances). An instance VALUE syntactically contains the
+   operation terms; the tactic should look up the registered instance
+   for the goal's carrier type and read the add/multiply/negate/zero/one
+   TERMS out of it, then match goal subterms against those (structural,
+   falling back to defeq). Keep the naming convention as a fallback.
+   Then ANY ring with a registered instance gets the tactic for free
+   (ℂ, ℤ[i], F_{p^k}, Z/(m)) — zero per-ring code, which is the point.
+   Proof-emission side: the abstract-ring path already exists
+   (Test/abstract_ring_ac_test, bundled-ring algebra), so certificates
+   can cite the generic lemmas instantiated with the bundle.
 2. **Register unary minus for RingModulo**: the operator layer resolves
    unary `-` via `<T>.negate`; either register
    `operator (-) on (RingModulo) := RingModulo.negate` (mirroring however
