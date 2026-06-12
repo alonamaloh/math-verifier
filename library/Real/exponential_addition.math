@@ -1,0 +1,297 @@
+-- Real/exponential_addition.math
+--
+-- Toward exp(x + y) = exp(x) · exp(y): the binomial theorem splits the
+-- k-th term of the exponential series at x + y into the k-th diagonal
+-- of the Cauchy product of the series at x and at y,
+--   (x+y)ᵏ/k! = Σ_{i ≤ k} (xⁱ/i!) · (yᵏ⁻ⁱ/(k−i)!),
+-- because C(k, i)/k! = 1/(i!·(k−i)!).
+
+module Real.exponential_addition
+
+import Logic.basics
+import Logic.exists
+import Logic.quotient
+import Logic.excluded_middle
+import Equality.basics
+import Natural.basics
+import Natural.peano
+import Natural.arithmetic
+import Natural.order
+import Natural.add_order
+import Natural.maximum
+import Natural.compare
+import Natural.subtraction
+import Natural.monus
+import Natural.factorial
+import Natural.binomial
+import Integer.basics
+import Integer.embedding
+import Rational.basics
+import Rational.embedding
+import Rational.addition
+import Rational.multiplication
+import Rational.negation
+import Rational.ring
+import Rational.order
+import Rational.order_arithmetic
+import Rational.order_multiplication
+import Rational.absolute_value
+import Rational.triangle
+import Rational.triangle_more
+import Rational.positive
+import Rational.halve
+import Rational.linearity
+import Rational.reciprocal
+import Rational.reciprocal_function
+import Rational.archimedean
+import Algebra.ring_lemmas
+import Set.basics
+import Real.sequence
+import Real.basics
+import Real.embedding
+import Real.addition
+import Real.negation
+import Real.multiplication
+import Real.ring
+import Real.algebra
+import Real.instances
+import Real.order
+import Real.linearity
+import Real.embedding_order
+import Real.order_multiplication
+import Real.apartness
+import Real.reciprocal
+import Real.field
+import Real.order_field
+import Real.absolute_value
+import Real.absolute_value_order
+import Real.density
+import Real.convergence
+import Real.supremum
+import Real.limits
+import Real.power
+import Real.series
+import Real.cauchy_complete
+import Real.binomial_theorem
+import Real.exponential
+
+-- ----------------------------------------------------------------------
+-- The coefficient identity at ℚ: 1/(i+d)! · C(i+d, i) = 1/i! · 1/d!.
+-- The cast of `Natural.binomial_factorial` clears all denominators.
+theorem Rational.binomial_reciprocal_split (i d : Natural)
+        : Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+              * (Natural.binomial(i + d, i) : Rational)
+          = Rational.reciprocal_function((Natural.factorial(i) : Rational))
+            * Rational.reciprocal_function((Natural.factorial(d) : Rational)) := {
+  -- The closed form, cast into ℚ.
+  claim castSplit
+      : (Natural.binomial(i + d, i) : Rational)
+            * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+        = (Natural.factorial(i + d) : Rational)
+      by calc (Natural.binomial(i + d, i) : Rational)
+                  * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+            = (Natural.binomial(i + d, i) : Rational)
+                  * ((Natural.factorial(i) * Natural.factorial(d) : Natural) : Rational)
+                  by Rational.from_natural_multiply_preserves(
+                         Natural.factorial(i), Natural.factorial(d))
+            = ((Natural.binomial(i + d, i)
+                    * (Natural.factorial(i) * Natural.factorial(d)) : Natural) : Rational)
+                  by Rational.from_natural_multiply_preserves(
+                         Natural.binomial(i + d, i),
+                         Natural.factorial(i) * Natural.factorial(d))
+            = ((Natural.factorial(i + d) : Natural) : Rational)
+                  by Natural.binomial_factorial(i, d);
+  -- All three factorial casts are positive, hence nonzero.
+  claim Rational.zero < (Natural.factorial(i) : Rational)
+      since Rational.factorial_cast_positive;
+  claim ¬(Rational.zero = (Natural.factorial(i) : Rational))
+      since Rational.LessThan.distinct;
+  claim ¬((Natural.factorial(i) : Rational) = Rational.zero);
+  claim Rational.zero < (Natural.factorial(d) : Rational)
+      since Rational.factorial_cast_positive;
+  claim ¬(Rational.zero = (Natural.factorial(d) : Rational))
+      since Rational.LessThan.distinct;
+  claim ¬((Natural.factorial(d) : Rational) = Rational.zero);
+  claim Rational.zero < (Natural.factorial(i + d) : Rational)
+      since Rational.factorial_cast_positive;
+  claim ¬(Rational.zero = (Natural.factorial(i + d) : Rational))
+      since Rational.LessThan.distinct;
+  claim ¬((Natural.factorial(i + d) : Rational) = Rational.zero);
+  claim Rational.zero
+        < (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational)
+      since Rational.multiply_positive_positive;
+  claim ¬(Rational.zero
+              = (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+      since Rational.LessThan.distinct;
+  claim ¬((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational)
+              = Rational.zero);
+  -- The cancellations.
+  claim productCancel
+      : ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+            * Rational.reciprocal_function(
+                  (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+        = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  claim wholeCancel
+      : (Natural.factorial(i + d) : Rational)
+            * Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+        = Rational.one
+      since Rational.reciprocal_function_multiplies;
+  claim recipProduct
+      : Rational.reciprocal_function((Natural.factorial(i) : Rational))
+            * Rational.reciprocal_function((Natural.factorial(d) : Rational))
+        = Rational.reciprocal_function(
+              (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+      since Rational.reciprocal_function_product;
+  -- Multiply by 1 = (i!·d!)·(1/(i!·d!)), absorb the closed form, cancel.
+  calc Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+           * (Natural.binomial(i + d, i) : Rational)
+     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+           * ((Natural.binomial(i + d, i) : Rational) * Rational.one)
+     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+           * ((Natural.binomial(i + d, i) : Rational)
+                  * (((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+                         * Rational.reciprocal_function(
+                               (Natural.factorial(i) : Rational)
+                                   * (Natural.factorial(d) : Rational))))
+           since productCancel
+     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+           * (((Natural.binomial(i + d, i) : Rational)
+                   * ((Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational)))
+                  * Rational.reciprocal_function(
+                        (Natural.factorial(i) : Rational)
+                            * (Natural.factorial(d) : Rational)))
+     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+           * ((Natural.factorial(i + d) : Rational)
+                  * Rational.reciprocal_function(
+                        (Natural.factorial(i) : Rational)
+                            * (Natural.factorial(d) : Rational)))
+           since castSplit
+     = ((Natural.factorial(i + d) : Rational)
+            * Rational.reciprocal_function((Natural.factorial(i + d) : Rational)))
+           * Rational.reciprocal_function(
+                 (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+     = Rational.one
+           * Rational.reciprocal_function(
+                 (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+           since wholeCancel
+     = Rational.reciprocal_function(
+           (Natural.factorial(i) : Rational) * (Natural.factorial(d) : Rational))
+     = Rational.reciprocal_function((Natural.factorial(i) : Rational))
+           * Rational.reciprocal_function((Natural.factorial(d) : Rational))
+           since recipProduct
+}
+
+-- ----------------------------------------------------------------------
+-- The k-th exponential term at x + y is the k-th Cauchy-product
+-- diagonal of the two series.
+theorem Real.exponentialTerm_binomial_split (x y : Real) (k : Natural)
+        : Real.exponentialTerm(x + y, k)
+          = Real.partialSum(
+                (i : Natural) ↦
+                    Real.exponentialTerm(x, i)
+                    * Real.exponentialTerm(y, Natural.monus(k, i)),
+                1 + k) := {
+  -- Each summand below the cut: fold the coefficient into the two
+  -- reciprocal factorials.
+  claim termSplit
+      : (i : Natural) → successor(i) ≤ 1 + k
+        → (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+              * (((Natural.binomial(k, i) : Rational) : Real)
+                     * (Real.power(x, i) * Real.power(y, Natural.monus(k, i))))
+          = Real.exponentialTerm(x, i)
+            * Real.exponentialTerm(y, Natural.monus(k, i))
+      by (i : Natural) (iBelow : successor(i) ≤ 1 + k) ↦ {
+           claim i ≤ k since Natural.successor_le_cancel;
+           obtain ⟨d, kSplit⟩ from Natural.subtraction_witness(i, k, (i ≤ k));
+           claim kJoin : i + d = k;
+           claim monusCollapse : Natural.monus(k, i) = d
+               by {
+                 claim Natural.monus(i + d, i) = d since Natural.monus_add_left;
+                 done by substituting kJoin
+               };
+           claim coefficientSplit
+               : Rational.reciprocal_function((Natural.factorial(k) : Rational))
+                     * (Natural.binomial(k, i) : Rational)
+                 = Rational.reciprocal_function((Natural.factorial(i) : Rational))
+                   * Rational.reciprocal_function((Natural.factorial(d) : Rational))
+               by calc Rational.reciprocal_function((Natural.factorial(k) : Rational))
+                           * (Natural.binomial(k, i) : Rational)
+                     = Rational.reciprocal_function((Natural.factorial(i + d) : Rational))
+                           * (Natural.binomial(i + d, i) : Rational)
+                           by kJoin
+                     = Rational.reciprocal_function((Natural.factorial(i) : Rational))
+                           * Rational.reciprocal_function((Natural.factorial(d) : Rational))
+                           by Rational.binomial_reciprocal_split(i, d);
+           calc (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+                    * (((Natural.binomial(k, i) : Rational) : Real)
+                           * (Real.power(x, i) * Real.power(y, Natural.monus(k, i))))
+              = (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+                    * (((Natural.binomial(k, i) : Rational) : Real)
+                           * (Real.power(x, i) * Real.power(y, d)))
+                    since monusCollapse
+              = ((Rational.reciprocal_function((Natural.factorial(k) : Rational))
+                      * (Natural.binomial(k, i) : Rational) : Rational) : Real)
+                    * (Real.power(x, i) * Real.power(y, d))
+                    by Rational.to_real.multiply_preserves(
+                           Rational.reciprocal_function((Natural.factorial(k) : Rational)),
+                           (Natural.binomial(k, i) : Rational))
+              = ((Rational.reciprocal_function((Natural.factorial(i) : Rational))
+                      * Rational.reciprocal_function((Natural.factorial(d) : Rational))
+                          : Rational) : Real)
+                    * (Real.power(x, i) * Real.power(y, d))
+                    since coefficientSplit
+              = ((Rational.reciprocal_function((Natural.factorial(i) : Rational)) : Real)
+                     * (Rational.reciprocal_function((Natural.factorial(d) : Rational)) : Real))
+                    * (Real.power(x, i) * Real.power(y, d))
+                    by Rational.to_real.multiply_preserves(
+                           Rational.reciprocal_function((Natural.factorial(i) : Rational)),
+                           Rational.reciprocal_function((Natural.factorial(d) : Rational)))
+              = ((Rational.reciprocal_function((Natural.factorial(i) : Rational)) : Real)
+                     * Real.power(x, i))
+                    * ((Rational.reciprocal_function((Natural.factorial(d) : Rational)) : Real)
+                           * Real.power(y, d))
+              = Real.exponentialTerm(x, i) * Real.exponentialTerm(y, d)
+              = Real.exponentialTerm(x, i)
+                    * Real.exponentialTerm(y, Natural.monus(k, i))
+                    since monusCollapse
+         };
+  -- Scale the binomial expansion through the sum and rewrite each term.
+  calc Real.exponentialTerm(x + y, k)
+     = (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+           * Real.power(x + y, k)
+     = (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+           * Real.partialSum(
+                 (i : Natural) ↦
+                     ((Natural.binomial(k, i) : Rational) : Real)
+                     * (Real.power(x, i) * Real.power(y, Natural.monus(k, i))),
+                 1 + k)
+           by Real.binomial_theorem(x, y, k)
+     = Real.partialSum(
+           (i : Natural) ↦
+               (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+               * (((Natural.binomial(k, i) : Rational) : Real)
+                      * (Real.power(x, i) * Real.power(y, Natural.monus(k, i)))),
+           1 + k)
+           by Real.partialSum_scale(
+                  (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real),
+                  (i : Natural) ↦
+                      ((Natural.binomial(k, i) : Rational) : Real)
+                      * (Real.power(x, i) * Real.power(y, Natural.monus(k, i))),
+                  1 + k)
+     = Real.partialSum(
+           (i : Natural) ↦
+               Real.exponentialTerm(x, i)
+               * Real.exponentialTerm(y, Natural.monus(k, i)),
+           1 + k)
+           by Real.partialSum_pointwise_below(
+                  (i : Natural) ↦
+                      (Rational.reciprocal_function((Natural.factorial(k) : Rational)) : Real)
+                      * (((Natural.binomial(k, i) : Rational) : Real)
+                             * (Real.power(x, i) * Real.power(y, Natural.monus(k, i)))),
+                  (i : Natural) ↦
+                      Real.exponentialTerm(x, i)
+                      * Real.exponentialTerm(y, Natural.monus(k, i)),
+                  1 + k,
+                  termSplit)
+}
