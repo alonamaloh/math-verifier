@@ -1088,6 +1088,15 @@ private:
         const std::vector<LocalBinder>& localBinders,
         int /*line*/);
 
+    // The single-pass engine behind autoFillHintForClaim (which calls it
+    // twice: as-written, then with let-bound names ζ-unfolded).
+    ExpressionPointer autoFillHintForClaimCore(
+        ExpressionPointer hintTerm,
+        ExpressionPointer hintType,
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
+        int /*line*/);
+
     // Step 3 of the structured-proof feature. Elaborates `given (P)`
     // to a BoundVariable pointing at the unique in-scope hypothesis
     // of type `P`. Errors on zero matches or on ambiguity.

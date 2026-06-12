@@ -601,6 +601,45 @@ ExpressionPointer Elaborator::autoFillHintForClaim(
         ExpressionPointer hintType,
         ExpressionPointer goalClosed,
         const std::vector<LocalBinder>& localBinders,
+        int line) {
+        // First try the citation on the forms as written. On failure,
+        // retry with let-bound names ζ-unfolded in both the goal and the
+        // hint's type: a `let m := successor(n);` abbreviation is an
+        // opaque FreeVariable to the structural matchers, and a lemma
+        // conclusion that needs `m` and `successor(n)` to be the same
+        // term can only unify on the unfolded forms (the long-standing
+        // "let-opacity in citation matching" gap). Fallback-only so
+        // citations that match the FOLDED spelling — e.g. against
+        // context facts stated in terms of the let name — keep working
+        // exactly as before.
+        try {
+            ExpressionPointer direct = autoFillHintForClaimCore(
+                hintTerm, hintType, goalClosed, localBinders, line);
+            if (direct) return direct;
+        } catch (const ElaborateError&) {
+            // fall through to the ζ-unfolded retry
+        } catch (const TypeError&) {
+            // fall through to the ζ-unfolded retry
+        }
+        ExpressionPointer goalUnfolded =
+            zetaUnfoldLetBinders(goalClosed, localBinders);
+        ExpressionPointer hintTypeUnfolded =
+            zetaUnfoldLetBinders(hintType, localBinders);
+        if (structurallyEqual(goalUnfolded, goalClosed)
+            && structurallyEqual(hintTypeUnfolded, hintType)) {
+            // No lets to see through — re-run once for the real error.
+            return autoFillHintForClaimCore(
+                hintTerm, hintType, goalClosed, localBinders, line);
+        }
+        return autoFillHintForClaimCore(
+            hintTerm, hintTypeUnfolded, goalUnfolded, localBinders, line);
+    }
+
+ExpressionPointer Elaborator::autoFillHintForClaimCore(
+        ExpressionPointer hintTerm,
+        ExpressionPointer hintType,
+        ExpressionPointer goalClosed,
+        const std::vector<LocalBinder>& localBinders,
         int /*line*/) {
 
         // Reduce the goal so unification has a stable shape (the
