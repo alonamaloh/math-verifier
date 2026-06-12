@@ -130,6 +130,49 @@ theorem Real.SequenceConverges.negate (s : Natural → Real) (sLimit : Real)
   }
 
 -- ----------------------------------------------------------------------
+-- Convergence only reads the terms: pointwise-equal sequences share
+-- their limits.
+theorem Real.SequenceConverges.of_pointwise (s t : Natural → Real)
+        (limit : Real)
+        (pointwiseEqual : (n : Natural) → s(n) = t(n))
+        (sConverges : Real.SequenceConverges(s, limit))
+        : Real.SequenceConverges(t, limit) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨threshold, close⟩ from sConverges(epsilon, epsilonPositive);
+    witness threshold with
+        (m : Natural) (aboveThreshold : threshold ≤ m) ↦
+          calc abs(t(m) - limit)
+             = abs(s(m) - limit)    by pointwiseEqual(m)
+             < (epsilon : Real)     by close(m, aboveThreshold)
+  }
+
+-- The squeeze at zero: a sequence dominated in absolute value by one
+-- that vanishes also vanishes.
+theorem Real.SequenceConverges.squeeze_zero (v u : Natural → Real)
+        (dominated : (n : Natural) → abs(v(n)) ≤ u(n))
+        (uVanishes : Real.SequenceConverges(u, Real.zero))
+        : Real.SequenceConverges(v, Real.zero) :=
+  (epsilon : Rational)
+  (epsilonPositive : Rational.zero < epsilon) ↦ {
+    obtain ⟨threshold, close⟩ from uVanishes(epsilon, epsilonPositive);
+    witness threshold with
+        (m : Natural) (aboveThreshold : threshold ≤ m) ↦ {
+          claim u(m) ≤ abs(u(m)) since Real.LessOrEqual_absolute_value;
+          calc abs(v(m) - Real.zero)
+             = abs(v(m))
+                   by substituting (ring : v(m) - Real.zero = v(m))
+             ≤ u(m)
+                   by dominated(m)
+             ≤ abs(u(m))
+             = abs(u(m) - Real.zero)
+                   by substituting (ring : u(m) - Real.zero = u(m))
+             < (epsilon : Real)
+                   by close(m, aboveThreshold)
+        }
+  }
+
+-- ----------------------------------------------------------------------
 -- Product of limits. The difference splits as
 --   s(m)·t(m) − S·T = s(m)·(t(m) − T) + T·(s(m) − S);
 -- a rational roof over |s(m)| (one unit above a roof for |S|, once s is

@@ -539,6 +539,65 @@ theorem Real.partialSum_scale (c : Real) (s : Natural → Real) (n : Natural)
                  by ring
   }
 
+-- Negating every term negates the sum.
+theorem Real.partialSum_negate (s : Natural → Real) (n : Natural)
+        : Real.partialSum((k : Natural) ↦ -s(k), n)
+          = -Real.partialSum(s, n) :=
+  by_induction on n with IH {
+    case zero:
+        calc Real.partialSum((k : Natural) ↦ -s(k), 0)
+           = Real.zero
+           = -Real.zero    by ring
+    case successor(predecessor):
+        calc Real.partialSum((k : Natural) ↦ -s(k), successor(predecessor))
+           = Real.partialSum((k : Natural) ↦ -s(k), predecessor)
+             + -s(predecessor)
+           = -Real.partialSum(s, predecessor) + -s(predecessor)
+                 since IH
+           = -(Real.partialSum(s, predecessor) + s(predecessor))
+                 by ring
+  }
+
+-- Sums subtract termwise.
+theorem Real.partialSum_subtract (s t : Natural → Real) (n : Natural)
+        : Real.partialSum((k : Natural) ↦ s(k) - t(k), n)
+          = Real.partialSum(s, n) - Real.partialSum(t, n) :=
+  by_induction on n with IH {
+    case zero:
+        calc Real.partialSum((k : Natural) ↦ s(k) - t(k), 0)
+           = Real.zero
+           = Real.zero - Real.zero    by ring
+    case successor(predecessor):
+        calc Real.partialSum((k : Natural) ↦ s(k) - t(k), successor(predecessor))
+           = Real.partialSum((k : Natural) ↦ s(k) - t(k), predecessor)
+             + (s(predecessor) - t(predecessor))
+           = (Real.partialSum(s, predecessor) - Real.partialSum(t, predecessor))
+             + (s(predecessor) - t(predecessor))
+                 since IH
+           = (Real.partialSum(s, predecessor) + s(predecessor))
+             - (Real.partialSum(t, predecessor) + t(predecessor))
+                 by ring
+  }
+
+-- Scaling on the right (a common factor behind every term).
+theorem Real.partialSum_scale_right (s : Natural → Real) (c : Real) (n : Natural)
+        : Real.partialSum((k : Natural) ↦ s(k) * c, n)
+          = Real.partialSum(s, n) * c :=
+  by_induction on n with IH {
+    case zero:
+        calc Real.partialSum((k : Natural) ↦ s(k) * c, 0)
+           = Real.zero
+           = Real.zero * c    by ring
+    case successor(predecessor):
+        calc Real.partialSum((k : Natural) ↦ s(k) * c, successor(predecessor))
+           = Real.partialSum((k : Natural) ↦ s(k) * c, predecessor)
+             + s(predecessor) * c
+           = Real.partialSum(s, predecessor) * c + s(predecessor) * c
+                 since IH
+           = (Real.partialSum(s, predecessor) + s(predecessor)) * c
+                 by ring
+  }
+
 -- A sum of nonnegative terms vanishes only if every term below the cut
 -- does: each term is squeezed between zero and the whole sum.
 theorem Real.partialSum_zero_term (s : Natural → Real) (n : Natural)
@@ -632,3 +691,41 @@ theorem Real.abs_partialSum_le (s : Natural → Real) (n : Natural)
                  by Real.add_preserves_LessOrEqual
            = Real.partialSum((k : Natural) ↦ abs(s(k)), successor(predecessor))
   }
+
+-- A window of a sum is bounded by the same window of the absolute
+-- series: |B(w+m) − B(m)| ≤ Babs(w+m) − Babs(m).
+theorem Real.partialSum_window_bound (b : Natural → Real) (m w : Natural)
+        : abs(Real.partialSum(b, w + m) - Real.partialSum(b, m))
+          ≤ Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
+            - Real.partialSum((k : Natural) ↦ abs(b(k)), m) := {
+  claim signedSplit
+      : Real.partialSum(b, w + m)
+        = Real.partialSum(b, m)
+          + Real.partialSum((j : Natural) ↦ b(m + j), w)
+      by Real.partialSum_split(b, m, w);
+  claim absSplit
+      : Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
+        = Real.partialSum((k : Natural) ↦ abs(b(k)), m)
+          + Real.partialSum((j : Natural) ↦ abs(b(m + j)), w)
+      by Real.partialSum_split((k : Natural) ↦ abs(b(k)), m, w);
+  calc abs(Real.partialSum(b, w + m) - Real.partialSum(b, m))
+     = abs((Real.partialSum(b, m)
+                + Real.partialSum((j : Natural) ↦ b(m + j), w))
+           - Real.partialSum(b, m))
+           since signedSplit
+     = abs(Real.partialSum((j : Natural) ↦ b(m + j), w))
+           by substituting
+               (ring : Real.partialSum((j : Natural) ↦ b(m + j), w)
+                   = (Real.partialSum(b, m)
+                          + Real.partialSum((j : Natural) ↦ b(m + j), w))
+                     - Real.partialSum(b, m))
+     ≤ Real.partialSum((j : Natural) ↦ abs(b(m + j)), w)
+           by Real.abs_partialSum_le((j : Natural) ↦ b(m + j), w)
+     = (Real.partialSum((k : Natural) ↦ abs(b(k)), m)
+            + Real.partialSum((j : Natural) ↦ abs(b(m + j)), w))
+       - Real.partialSum((k : Natural) ↦ abs(b(k)), m)
+           by ring
+     = Real.partialSum((k : Natural) ↦ abs(b(k)), w + m)
+       - Real.partialSum((k : Natural) ↦ abs(b(k)), m)
+           since absSplit
+}

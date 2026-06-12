@@ -432,3 +432,190 @@ theorem Real.cauchy_product_exchange (a b : Natural → Real)
                       successor(p),
                       stepSplit)
     }
+
+-- ----------------------------------------------------------------------
+-- The square-minus-triangle gap, dominated by the same gap of the
+-- absolute series: |A(n)·B(n) − T(n)| ≤ Aabs(n)·Babs(n) − Tabs(n).
+-- Both gaps are the same a-weighted sum of windows of B, and a window
+-- of B is dominated by the matching window of Babs.
+theorem Real.cauchy_product_difference_bound (a b : Natural → Real) (n : Natural)
+        : abs(Real.partialSum(a, n) * Real.partialSum(b, n)
+                  - Real.partialSum(
+                        (k : Natural) ↦
+                            Real.partialSum(
+                                (i : Natural) ↦ a(i) * b(Natural.monus(k, i)),
+                                1 + k),
+                        n))
+          ≤ Real.partialSum((k : Natural) ↦ abs(a(k)), n)
+                * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+            - Real.partialSum(
+                  (k : Natural) ↦
+                      Real.partialSum(
+                          (i : Natural) ↦ abs(a(i)) * abs(b(Natural.monus(k, i))),
+                          1 + k),
+                  n) := {
+  claim absExchange
+      : Real.partialSum(
+            (k : Natural) ↦
+                Real.partialSum(
+                    (i : Natural) ↦ abs(a(i)) * abs(b(Natural.monus(k, i))),
+                    1 + k),
+            n)
+        = Real.partialSum(
+              (i : Natural) ↦
+                  abs(a(i))
+                  * Real.partialSum((k : Natural) ↦ abs(b(k)), Natural.monus(n, i)),
+              n)
+      by Real.cauchy_product_exchange(
+             (k : Natural) ↦ abs(a(k)), (k : Natural) ↦ abs(b(k)), n);
+  claim signedScale
+      : Real.partialSum(
+            (i : Natural) ↦ a(i) * Real.partialSum(b, n), n)
+        = Real.partialSum(a, n) * Real.partialSum(b, n)
+      by Real.partialSum_scale_right(a, Real.partialSum(b, n), n);
+  claim absScale
+      : Real.partialSum(
+            (i : Natural) ↦
+                abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n),
+            n)
+        = Real.partialSum((k : Natural) ↦ abs(a(k)), n)
+          * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+      by Real.partialSum_scale_right(
+             (k : Natural) ↦ abs(a(k)),
+             Real.partialSum((k : Natural) ↦ abs(b(k)), n), n);
+  -- Each weighted window of B is dominated by the weighted window of Babs.
+  claim termBound
+      : (i : Natural) → successor(i) ≤ n
+        → abs(a(i) * Real.partialSum(b, n)
+                  - a(i) * Real.partialSum(b, Natural.monus(n, i)))
+          ≤ abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+            - abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)),
+                  Natural.monus(n, i))
+      by (i : Natural) (iBelow : successor(i) ≤ n) ↦ {
+           claim i ≤ n since Natural.less_or_equal_predecessor_less_or_equal;
+           obtain ⟨e, nSplit⟩ from Natural.subtraction_witness(i, n, (i ≤ n));
+           claim nJoin : i + e = n;
+           claim monusCollapse : Natural.monus(n, i) = e
+               by {
+                 claim Natural.monus(i + e, i) = e since Natural.monus_add_left;
+                 done by substituting nJoin
+               };
+           claim abs(Real.partialSum(b, n) - Real.partialSum(b, e))
+                 ≤ Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+                   - Real.partialSum((k : Natural) ↦ abs(b(k)), e)
+               by {
+                 claim abs(Real.partialSum(b, i + e) - Real.partialSum(b, e))
+                       ≤ Real.partialSum((k : Natural) ↦ abs(b(k)), i + e)
+                         - Real.partialSum((k : Natural) ↦ abs(b(k)), e)
+                     by Real.partialSum_window_bound(b, e, i);
+                 done by substituting nJoin
+               };
+           claim Real.zero ≤ abs(a(i)) since Real.absolute_value_nonneg;
+           claim Real.IsNonneg(abs(a(i))) since Real.IsNonneg_of_LessOrEqual_zero;
+           calc abs(a(i) * Real.partialSum(b, n)
+                    - a(i) * Real.partialSum(b, Natural.monus(n, i)))
+              = abs(a(i) * Real.partialSum(b, n)
+                    - a(i) * Real.partialSum(b, e))
+                    since monusCollapse
+              = abs(a(i)
+                    * (Real.partialSum(b, n) - Real.partialSum(b, e)))
+                    by substituting
+                        (ring : a(i) * (Real.partialSum(b, n) - Real.partialSum(b, e))
+                            = a(i) * Real.partialSum(b, n)
+                              - a(i) * Real.partialSum(b, e))
+              = abs(a(i)) * abs(Real.partialSum(b, n) - Real.partialSum(b, e))
+                    by Real.absolute_value_multiplicative
+              = abs(Real.partialSum(b, n) - Real.partialSum(b, e)) * abs(a(i))
+              ≤ (Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+                     - Real.partialSum((k : Natural) ↦ abs(b(k)), e))
+                    * abs(a(i))
+                    since Real.LessOrEqual.multiply_by_nonneg_right
+              = abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+                - abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), e)
+              = abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+                - abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)),
+                      Natural.monus(n, i))
+                    since monusCollapse
+         };
+  calc abs(Real.partialSum(a, n) * Real.partialSum(b, n)
+               - Real.partialSum(
+                     (k : Natural) ↦
+                         Real.partialSum(
+                             (i : Natural) ↦ a(i) * b(Natural.monus(k, i)),
+                             1 + k),
+                     n))
+     = abs(Real.partialSum(
+               (i : Natural) ↦ a(i) * Real.partialSum(b, n), n)
+           - Real.partialSum(
+                 (i : Natural) ↦ a(i) * Real.partialSum(b, Natural.monus(n, i)),
+                 n))
+           since signedScale
+     = abs(Real.partialSum(
+               (i : Natural) ↦
+                   a(i) * Real.partialSum(b, n)
+                   - a(i) * Real.partialSum(b, Natural.monus(n, i)),
+               n))
+           by Real.partialSum_subtract(
+                  (i : Natural) ↦ a(i) * Real.partialSum(b, n),
+                  (i : Natural) ↦ a(i) * Real.partialSum(b, Natural.monus(n, i)),
+                  n)
+     ≤ Real.partialSum(
+           (i : Natural) ↦
+               abs(a(i) * Real.partialSum(b, n)
+                   - a(i) * Real.partialSum(b, Natural.monus(n, i))),
+           n)
+           by Real.abs_partialSum_le(
+                  (i : Natural) ↦
+                      a(i) * Real.partialSum(b, n)
+                      - a(i) * Real.partialSum(b, Natural.monus(n, i)),
+                  n)
+     ≤ Real.partialSum(
+           (i : Natural) ↦
+               abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+               - abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)),
+                     Natural.monus(n, i)),
+           n)
+           by Real.partialSum_le_pointwise(
+                  (i : Natural) ↦
+                      abs(a(i) * Real.partialSum(b, n)
+                          - a(i) * Real.partialSum(b, Natural.monus(n, i))),
+                  (i : Natural) ↦
+                      abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+                      - abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)),
+                            Natural.monus(n, i)),
+                  n,
+                  termBound)
+     = Real.partialSum(
+           (i : Natural) ↦
+               abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n),
+           n)
+       - Real.partialSum(
+             (i : Natural) ↦
+                 abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)),
+                     Natural.monus(n, i)),
+             n)
+           by Real.partialSum_subtract(
+                  (i : Natural) ↦
+                      abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)), n),
+                  (i : Natural) ↦
+                      abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)),
+                          Natural.monus(n, i)),
+                  n)
+     = Real.partialSum((k : Natural) ↦ abs(a(k)), n)
+           * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+       - Real.partialSum(
+             (i : Natural) ↦
+                 abs(a(i)) * Real.partialSum((k : Natural) ↦ abs(b(k)),
+                     Natural.monus(n, i)),
+             n)
+           since absScale
+     = Real.partialSum((k : Natural) ↦ abs(a(k)), n)
+           * Real.partialSum((k : Natural) ↦ abs(b(k)), n)
+       - Real.partialSum(
+             (k : Natural) ↦
+                 Real.partialSum(
+                     (i : Natural) ↦ abs(a(i)) * abs(b(Natural.monus(k, i))),
+                     1 + k),
+             n)
+           since absExchange
+}
