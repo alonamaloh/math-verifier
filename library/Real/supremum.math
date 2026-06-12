@@ -54,6 +54,8 @@ import Real.ring
 import Real.algebra
 import Real.order
 import Real.absolute_value
+import Real.absolute_value_order
+import Real.embedding_order
 import Real.linearity
 import Set.basics
 
@@ -266,6 +268,42 @@ theorem Real.exists_rational_above_at_make
 theorem Real.exists_rational_above (x : Real)
         : ∃ (q : Rational). x ≤ (q : Real) :=
   by_representatives x as rep => done by Real.exists_rational_above_at_make
+
+-- A positive rational roof over |x|: the form every ε-argument wants,
+-- with positivity bundled in so the roof can be fed to reciprocals.
+theorem Real.exists_positive_rational_roof (x : Real)
+        : ∃ (q : Rational). And(Rational.zero < q, abs(x) ≤ (q : Real)) := {
+  obtain ⟨bound, boundRoof⟩ from Real.exists_rational_above(abs(x));
+  claim Real.zero ≤ abs(x) since Real.absolute_value_nonneg;
+  claim Rational.zero < Rational.one;
+  claim Real.zero < (Rational.one : Real)
+      since Rational.to_real.positive_preserves;
+  claim roofCast : ((bound + Rational.one) : Real)
+                   = (bound : Real) + (Rational.one : Real)
+      since Rational.to_real.add_preserves;
+  calc Real.zero
+     ≤ abs(x)
+     ≤ (bound : Real)    by boundRoof
+     as boundNonneg;
+  claim roofPositiveReal
+        : (Rational.zero : Real) < ((bound + Rational.one) : Real)
+      by calc (Rational.zero : Real)
+            ≤ (bound : Real)                          by boundNonneg
+            = (bound : Real) + Real.zero
+            < (bound : Real) + (Rational.one : Real)
+                  by Real.add_left_preserves_LessThan
+            = ((bound + Rational.one) : Real)         by roofCast;
+  claim roofPositive : Rational.zero < bound + Rational.one
+      since Rational.to_real.LessThan_reflects;
+  claim roofBounds : abs(x) ≤ ((bound + Rational.one) : Real)
+      by calc abs(x)
+            ≤ (bound : Real)                          by boundRoof
+            = (bound : Real) + Real.zero
+            ≤ (bound : Real) + (Rational.one : Real)
+                  since Real.add_preserves_LessOrEqual_left
+            = ((bound + Rational.one) : Real)         by roofCast;
+  witness bound + Rational.one with ⟨roofPositive, roofBounds⟩
+}
 
 -- ----------------------------------------------------------------------
 -- Building block #3: the bisection state and step function.
